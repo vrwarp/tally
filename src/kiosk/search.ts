@@ -88,6 +88,10 @@ export function searchStudents(
 
     // The input layer caps the buffer at four digits, so longer never happens;
     // answering the first four anyway keeps this total rather than throwing.
+    // Stryker disable next-line ArrayDeclaration: the fallback is only reached
+    // for four digits no household has, and then any array of ids that are not
+    // student ids answers the same empty list. What an empty one says is that
+    // there is nobody, rather than somebody whose id happens not to match.
     const ids = new Set(last4Index[trimmed.slice(0, PHONE_QUERY_LENGTH)] ?? []);
     const results = students.filter((student) => ids.has(student.id)).sort(sortByName);
     return { mode: 'phone', results: results.slice(0, MAX_RESULTS), total: results.length };

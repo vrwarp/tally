@@ -6,13 +6,12 @@
  * is deterministic under test. Nothing in this module reads the clock on its own.
  */
 import {
+  addDays,
   differenceInCalendarDays,
   differenceInCalendarMonths,
   format,
   formatDistanceToNowStrict,
   isSameDay,
-  isToday,
-  isTomorrow,
 } from 'date-fns';
 import { chainKey } from '@/lib/materialize';
 import type { EventSeries, TallyEvent } from '@/types';
@@ -127,6 +126,10 @@ export function nextSeriesOccurrence(
 
   let startAt = atTimeOfDay(day, series.startTime);
   // If today *is* the series day but the gathering already ended, roll a week.
+  // Stryker disable next-line ConditionalExpression: `delta` is only ever zero
+  // or positive, and a positive one puts `day` on a later date than `from` —
+  // so that day's end time is after `from` and the second clause decides it
+  // alone. The first says which case the roll is *for*.
   if (delta === 0 && atTimeOfDay(day, series.endTime) < from) {
     day.setDate(day.getDate() + 7);
     startAt = atTimeOfDay(day, series.startTime);
@@ -149,10 +152,20 @@ export function nextSeriesOccurrence(
 /* Display formatting                                                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * "Today", "Tomorrow", or the day itself — relative to `now` and nothing else.
+ *
+ * Every caller passes the `now` its screen is rendering from, and this used to
+ * take a second opinion from the wall clock for two of the three answers:
+ * `isToday` and `isTomorrow` read the real date rather than the one it was
+ * handed. The two agree almost always, which is what made it worth fixing
+ * rather than leaving — the disagreement is a `useNow()` tick that has not
+ * landed yet at midnight, and the result was this line saying "Today" beside a
+ * header on the same screen that had already decided it was not.
+ */
 export function formatEventDay(date: Date, now: Date = new Date()): string {
   if (isSameDay(date, now)) return 'Today';
-  if (isToday(date)) return 'Today';
-  if (isTomorrow(date)) return 'Tomorrow';
+  if (isSameDay(date, addDays(now, 1))) return 'Tomorrow';
   return format(date, 'EEE, MMM d');
 }
 
@@ -272,10 +285,15 @@ export function fromDateTimeLocalValue(value: string): Date {
 
   const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
 
-  // The constructor rolls overflow forward rather than complaining, so
-  // "2026-02-31" would quietly become 3 March and put an event on the wrong
-  // evening. Reading the fields back is the only way to catch it.
-  if (date.getMonth() !== month - 1 || date.getDate() !== day) {
+  /*
+   * The constructor rolls overflow forward rather than complaining, so
+   * "2026-02-31" would quietly become 3 March and put an event on the wrong
+   * evening. Reading the day back is the only way to catch it, and it is
+   * enough on its own: an overflow always lands on a *smaller* day of the
+   * month than the one asked for, because it is the days the short month did
+   * not have. The month it lands in cannot disagree while the day agrees.
+   */
+  if (date.getDate() !== day) {
     throw new Error(`No such date: "${value}".`);
   }
 

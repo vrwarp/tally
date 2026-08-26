@@ -8,7 +8,7 @@
  * of Check-Ins history turned that from unreachable into the common case.
  */
 import type { ReactNode } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';
@@ -34,8 +34,8 @@ const ARCHIVED = makeEvent({
   startAt: new Date('2024-03-23T02:30:00Z'),
 });
 
-function wrapper(events: TallyEvent[], loading = false) {
-  const value = {
+function contextValue(events: TallyEvent[], loading = false): DataContextValue {
+  return {
     students: [],
     events,
     series: [],
@@ -50,6 +50,10 @@ function wrapper(events: TallyEvent[], loading = false) {
     rosterBackends: [],
     refreshRoster: vi.fn(async () => {}),
   } as unknown as DataContextValue;
+}
+
+function wrapper(events: TallyEvent[], loading = false) {
+  const value = contextValue(events, loading);
 
   return function Wrapper({ children }: { children: ReactNode }) {
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
@@ -119,5 +123,219 @@ describe('useEvent', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.event).toBeNull();
+  });
+});
+
+describe('useEvent, between one night and the next', () => {
+  /** Every render's answer, so the frame after a change is visible to a test. */
+  function record(initial: string | null) {
+    const seen: ReturnType<typeof useEvent>[] = [];
+    const rendered = renderHook(
+      ({ id }: { id: string | null }) => {
+        const resolved = useEvent(id);
+        seen.push(resolved);
+        return resolved;
+      },
+      { wrapper: wrapper([LOADED]), initialProps: { id: initial } },
+    );
+    return { ...rendered, seen };
+  }
+
+  it('never says a night is missing before it has looked', () => {
+    // Arriving at an archived night from a loaded calendar. This drew "no such
+    // gathering" for a frame, which is the exact failure the fallback exists to
+    // stop — a tap that reads as the app losing it.
+    subscribeEvent.mockImplementation(() => () => {});
+
+    const { seen } = record(ARCHIVED.id);
+
+    expect(seen[0]?.loading).toBe(true);
+    expect(seen.every((answer) => answer.loading || answer.event !== null)).toBe(true);
+  });
+
+  it('never shows the last night under this night’s id', async () => {
+    // Tapping from one archived night straight to another. The effect that
+    // cleared the previous answer ran after the render that changed the id, so
+    // one frame drew the first night's title under the second night's URL.
+    const OTHER = makeEvent({ id: 'pco-checkins-698430-2023-05-05', title: 'Older still' });
+    subscribeEvent.mockImplementation((id: string, onChange: (e: TallyEvent) => void) => {
+      onChange(id === ARCHIVED.id ? ARCHIVED : OTHER);
+      return () => {};
+    });
+
+    const { result, rerender, seen } = record(ARCHIVED.id);
+    await waitFor(() => expect(result.current.event).toBe(ARCHIVED));
+
+    const before = seen.length;
+    rerender({ id: OTHER.id });
+
+    for (const answer of seen.slice(before)) {
+      expect(answer.event === null || answer.event === OTHER).toBe(true);
+    }
+    expect(result.current.event).toBe(OTHER);
+  });
+
+  it('is not loading at all when there is no id to resolve', () => {
+    // Even while the calendar is still arriving: there is nothing to wait for.
+    const { result } = renderHook(() => useEvent(null), { wrapper: wrapper([], true) });
+
+    expect(result.current).toEqual({ event: null, loading: false, fromArchive: false });
+  });
+
+  it('is not loading for a night the calendar already holds', () => {
+    // The calendar can still be settling while the night in question is
+    // already in it, and a screen that has its gathering should draw it.
+    const { result } = renderHook(() => useEvent('loaded-night'), {
+      wrapper: wrapper([LOADED], true),
+    });
+
+    expect(result.current.event).toBe(LOADED);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('is loading while the calendar is still arriving', () => {
+    const { result } = renderHook(() => useEvent(ARCHIVED.id), { wrapper: wrapper([], true) });
+
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('closes the listener when the id changes, and opens one for the new id', async () => {
+    const stop = vi.fn();
+    subscribeEvent.mockImplementation((_id: string, onChange: (e: TallyEvent) => void) => {
+      onChange(ARCHIVED);
+      return stop;
+    });
+
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useEvent(id), {
+      wrapper: wrapper([LOADED]),
+      initialProps: { id: ARCHIVED.id },
+    });
+    await waitFor(() => expect(result.current.event).toBe(ARCHIVED));
+
+    rerender({ id: 'another-night' });
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(subscribeEvent).toHaveBeenLastCalledWith(
+      'another-night',
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  it('closes the listener on unmount', () => {
+    const stop = vi.fn();
+    subscribeEvent.mockImplementation(() => stop);
+
+    const { unmount } = renderHook(() => useEvent(ARCHIVED.id), { wrapper: wrapper([LOADED]) });
+    unmount();
+
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a snapshot that arrives after the id moved on', async () => {
+    // A slow listener for a night nobody is looking at any more must not
+    // overwrite the one they are.
+    let deliver: (event: TallyEvent | null) => void = () => {};
+    subscribeEvent.mockImplementation((id: string, onChange: (e: TallyEvent | null) => void) => {
+      if (id === ARCHIVED.id) deliver = onChange;
+      return () => {};
+    });
+
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useEvent(id), {
+      wrapper: wrapper([LOADED]),
+      initialProps: { id: ARCHIVED.id },
+    });
+
+    rerender({ id: 'another-night' });
+    act(() => deliver(ARCHIVED));
+
+    expect(result.current.event).toBeNull();
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('ignores a failure that arrives after the id moved on', async () => {
+    let fail: () => void = () => {};
+    subscribeEvent.mockImplementation(
+      (id: string, _onChange: unknown, onError: () => void) => {
+        if (id === ARCHIVED.id) fail = onError;
+        return () => {};
+      },
+    );
+
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useEvent(id), {
+      wrapper: wrapper([LOADED]),
+      initialProps: { id: ARCHIVED.id },
+    });
+
+    rerender({ id: 'another-night' });
+    act(() => fail());
+
+    // Still waiting on the *new* night, not answered by the old one's failure.
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('does not repaint for a listener it has already closed', () => {
+    /*
+     * The render-time guard already stops a stale answer being *shown* — it
+     * belongs to a different id. What the cancellation flag adds is that the
+     * answer is not written down at all, and the check-in screen rebuilds its
+     * whole roster from this hook, so a write nobody can see still costs the
+     * frame.
+     */
+    let deliver: (event: TallyEvent | null) => void = () => {};
+    let fail: () => void = () => {};
+    subscribeEvent.mockImplementation(
+      (id: string, onChange: (e: TallyEvent | null) => void, onError: () => void) => {
+        if (id === ARCHIVED.id) {
+          deliver = onChange;
+          fail = onError;
+        }
+        return () => {};
+      },
+    );
+
+    let renders = 0;
+    const { rerender } = renderHook(
+      ({ id }: { id: string }) => {
+        renders += 1;
+        return useEvent(id);
+      },
+      { wrapper: wrapper([LOADED]), initialProps: { id: ARCHIVED.id } },
+    );
+
+    rerender({ id: 'another-night' });
+    const settled = renders;
+
+    act(() => deliver(ARCHIVED));
+    act(() => fail());
+
+    expect(renders).toBe(settled);
+  });
+
+  it('closes the read the moment the calendar catches up with the night', () => {
+    // The window can widen underneath a screen — a page of history landing, or
+    // a projection tick. Once the night is in the calendar the second listener
+    // is waste, and the answer has to come from the calendar rather than from
+    // whichever read happened to run first.
+    const stop = vi.fn();
+    subscribeEvent.mockImplementation(() => stop);
+
+    let calendar: TallyEvent[] = [LOADED];
+    function Wrapper({ children }: { children: ReactNode }) {
+      return <DataContext.Provider value={contextValue(calendar)}>{children}</DataContext.Provider>;
+    }
+
+    const { result, rerender } = renderHook(() => useEvent(ARCHIVED.id), { wrapper: Wrapper });
+    expect(subscribeEvent).toHaveBeenCalledTimes(1);
+    expect(result.current.loading).toBe(true);
+
+    calendar = [LOADED, ARCHIVED];
+    rerender();
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(result.current.event).toBe(ARCHIVED);
+    // From the calendar, so a screen may predict from the nights around it.
+    expect(result.current.fromArchive).toBe(false);
+    expect(result.current.loading).toBe(false);
   });
 });

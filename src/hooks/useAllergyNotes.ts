@@ -20,12 +20,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAllergyNotes } from '@/services/functions';
-import {
-  backendOfStudent,
-  personIdFromStudentId,
-  type BackendId,
-  type RosterEntry,
-} from '@/types';
+import { linkageOfStudent, type BackendId, type RosterEntry } from '@/types';
 
 /** Backend person id -> the note, for as long as the tab is open. */
 const held = new Map<string, string>();
@@ -42,16 +37,17 @@ export function invalidateAllergyNotes(): void {
   asked.clear();
 }
 
-/** The person whose upstream record a roster row's note would come from. */
-function personIdOf(entry: RosterEntry): string | null {
-  return entry.student.pcoPersonId ?? personIdFromStudentId(entry.student.id);
-}
-
-/** The same person, named with their backend — the mixed-roster request shape. */
+/**
+ * The person whose upstream record a roster row's note would come from, named
+ * with their backend — the mixed-roster request shape.
+ *
+ * Both halves out of one call. Naming the backend per person and then deriving
+ * the id with `personIdFromStudentId` dropped every Attendees student on the
+ * floor, because that helper answers for Planning Center alone — so the shape
+ * built to carry a mixed roster could only ever carry half of one.
+ */
 function personKeyOf(entry: RosterEntry): { backendId: BackendId; personId: string } | null {
-  const personId = personIdOf(entry);
-  if (!personId) return null;
-  return { backendId: backendOfStudent(entry.student) ?? 'pco', personId };
+  return linkageOfStudent(entry.student);
 }
 
 /**
@@ -66,6 +62,11 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
    * the badges a beat later than the names.
    */
   const [answers, setAnswers] = useState<ReadonlyMap<string, string>>(() =>
+    // Stryker disable next-line ConditionalExpression,EqualityOperator: the
+    // memo below returns `NOTHING` for an empty map anyway, so seeding with a
+    // fresh empty one changes no answer. The branch is what makes the seeding
+    // itself worth doing — a session that already holds notes paints them on
+    // the first frame rather than a beat after the names.
     held.size > 0 ? new Map(held) : NOTHING,
   );
 
@@ -76,6 +77,12 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
    * next. Cancelling per run would mark those ids asked and then discard the
    * answer they came back with.
    */
+  // Stryker disable all: no test can tell this apart from its absence. The
+  // mount effect sets it before any read can resolve, and the only moment it
+  // is false is after unmount — where React ignores the `setState` this
+  // guards anyway. It is here because "ignored" is a promise React has broken
+  // before, and because a read that outlives its component is the ordinary
+  // case on this screen rather than the exceptional one.
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -83,6 +90,7 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
       alive.current = false;
     };
   }, []);
+  /* Stryker restore all */
 
   useEffect(() => {
     const wanted: Array<{ backendId: BackendId; personId: string }> = [];
@@ -136,7 +144,7 @@ export function useAllergyNotes(entries: readonly RosterEntry[]): ReadonlyMap<st
     const byStudent = new Map<string, string>();
     for (const entry of entries) {
       if (!entry.student.hasAllergies) continue;
-      const personId = personIdOf(entry);
+      const personId = personKeyOf(entry)?.personId;
       const note = personId ? answers.get(personId) : undefined;
       if (note) byStudent.set(entry.student.id, note);
     }

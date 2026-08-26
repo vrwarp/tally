@@ -15,6 +15,15 @@ export default tseslint.config(
       'functions/src/generated',
       '.emulator-data',
       'coverage',
+      /*
+       * Stryker copies the whole project — `tsconfig.json` included — into a
+       * sandbox per run. Left visible, typescript-eslint finds several
+       * candidate roots and refuses to parse anything at all, so one mutation
+       * run breaks `npm run lint` for everybody until the directory is
+       * deleted. The reports beside it are generated too.
+       */
+      '.stryker-tmp',
+      'reports',
       // `npm run typecheck` is `tsc -b --noEmit false`, so it leaves a .js
       // beside every .ts it checks. Linting the output as well as the source
       // reports every finding twice — and reports it against rules the

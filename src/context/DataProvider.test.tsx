@@ -243,6 +243,59 @@ describe('DataProvider, when a read comes back different', () => {
     expect(latest?.students[0]?.grade).toBeNull();
   });
 
+  it('publishes a roster whose only change is any one field a row draws', async () => {
+    /*
+     * The signature is a list of the fields a roster row shows, and the failure
+     * it exists to prevent is silent: a field left out of it means an edit that
+     * lands upstream, comes back on the next read, and is dropped as "nothing
+     * changed" — so the screen goes on showing the old value until somebody
+     * reloads. `birthday` was the one that got out.
+     */
+    const changes: Array<[string, Record<string, unknown>]> = [
+      ['a corrected first name', { firstName: 'Jaime' }],
+      ['a corrected surname', { lastName: 'Rivera-Chen' }],
+      ['somebody taken off the roster', { status: 'inactive' }],
+      ['a profile that is now complete', { profileComplete: false }],
+      ['an allergy somebody just recorded', { hasAllergies: true }],
+    ];
+
+    for (const [what, change] of changes) {
+      fetchRoster.mockReset();
+      fetchRoster.mockImplementation(() => Promise.resolve(reply()));
+      const view = mount();
+      await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+      const before = latest?.students;
+
+      await readAgainWith([makeStudent({ id: 'pco_1', pcoPersonId: '1', birthday: null, ...change })]);
+
+      await waitFor(() => expect(latest?.students, what).not.toBe(before));
+      view.unmount();
+    }
+  });
+
+  it('publishes a roster whose only change is who is on it', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+    const before = latest?.students;
+
+    // A different person entirely, with everything else about the row the same.
+    await readAgainWith([makeStudent({ id: 'pco_2', pcoPersonId: '2', birthday: null })]);
+
+    await waitFor(() => expect(latest?.students).not.toBe(before));
+    expect(latest?.students[0]?.id).toBe('pco_2');
+  });
+
+  it('publishes a roster somebody has left', async () => {
+    mount();
+    await waitFor(() => expect(latest?.rosterLoading).toBe(false));
+    const before = latest?.students;
+
+    await readAgainWith([]);
+
+    await waitFor(() => expect(latest?.students).not.toBe(before));
+    expect(latest?.students).toEqual([]);
+  });
+
   it('still drops one that changed nothing at all', async () => {
     mount();
     await waitFor(() => expect(latest?.rosterLoading).toBe(false));

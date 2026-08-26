@@ -118,7 +118,7 @@ export function drawLabel(
   ctx.textBaseline = 'alphabetic';
   for (const draw of layout.draws) {
     ctx.font = labelFont(draw.fontPx, draw.bold);
-    ctx.textAlign = draw.align === 'center' ? 'center' : draw.align;
+    ctx.textAlign = draw.align;
     ctx.fillText(draw.text, draw.x, draw.y);
   }
 

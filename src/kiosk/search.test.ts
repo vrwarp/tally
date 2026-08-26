@@ -46,6 +46,34 @@ describe('searchStudents', () => {
     expect(outcome.results.map((s) => s.id)).toEqual(['s-marcus', 's-maya']);
   });
 
+  it('answers the first four of a longer number rather than nothing at all', () => {
+    /*
+     * The input layer caps the buffer at four digits, so a fifth should not
+     * arrive — but this is the function a parent's whole search goes through,
+     * and "one digit too many finds nobody" is the same screen as "your child
+     * is not here". Answering the first four keeps it total.
+     */
+    const outcome = searchStudents('01345', ROSTER, LAST4);
+
+    expect(outcome.mode).toBe('phone');
+    expect(outcome.results.map((s) => s.id)).toEqual(['s-marcus', 's-maya']);
+  });
+
+  it('caps a household the same way it caps a name search', () => {
+    // A shared number in a big family, or an index entry somebody imported
+    // badly. The list is capped so it fits without scrolling, and `total` is
+    // still what was matched — the same rule as the name search below.
+    const many = Array.from({ length: MAX_RESULTS + 4 }, (_, i) => student(`s-${i}`, `Aaa${i}`, 'Zed'));
+    const outcome = searchStudents(
+      '0134',
+      many,
+      { '0134': many.map((s) => s.id) },
+    );
+
+    expect(outcome.results).toHaveLength(MAX_RESULTS);
+    expect(outcome.total).toBe(MAX_RESULTS + 4);
+  });
+
   it('answers unknown digits with an empty phone result, not a name search', () => {
     expect(searchStudents('7777', ROSTER, LAST4)).toEqual({ mode: 'phone', results: [], total: 0 });
   });

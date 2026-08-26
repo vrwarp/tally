@@ -13,6 +13,7 @@ import {
   bindingEndsAt,
   bindingIsLive,
   clearBinding,
+  eventWindow,
   opensAtLabel,
   readBinding,
   windowHasClosed,
@@ -64,9 +65,52 @@ describe('bindingIsLive', () => {
   });
 });
 
+describe('eventWindow', () => {
+  /*
+   * The clock strings come from the device's own locale — a kiosk in Taipei is
+   * as ordinary as one in Texas — so what is asserted is the join rather than
+   * the times. These run under en-US, where the shape is "6:30 PM".
+   */
+  const at = (hour: number, minute = 0) => Date.UTC(2026, 1, 13, hour, minute);
+
+  it('says the meridiem once when both ends share it', () => {
+    // 62mm of tape and a lobby screen read from four feet away: "6:30 PM –
+    // 8:30 PM" spends a third of the line saying PM twice.
+    expect(
+      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(18, 30), endAtMs: at(20, 30) }),
+    ).toBe('6:30 – 8:30 PM');
+  });
+
+  it('says it twice when the gathering crosses noon', () => {
+    expect(
+      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(11, 30), endAtMs: at(13, 0) }),
+    ).toBe('11:30 AM – 1:00 PM');
+  });
+
+  it('leaves no doubled space where the meridiem was', () => {
+    const window = eventWindow({
+      ...DOORS_CLOSE_EARLY,
+      startAtMs: at(9, 0),
+      endAtMs: at(10, 45),
+    });
+
+    expect(window).toBe('9:00 – 10:45 AM');
+    expect(window).not.toMatch(/\s\s/);
+  });
+
+  it('crosses midnight without pretending the two ends agree', () => {
+    expect(
+      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(23, 0), endAtMs: at(0, 30) }),
+    ).toBe('11:00 PM – 12:30 AM');
+  });
+});
+
 describe('windowHasClosed', () => {
   it('is the advisory line, nothing more', () => {
     expect(windowHasClosed(DOORS_CLOSE_EARLY, 2999)).toBe(false);
+    // The closing instant itself is still open: a family arriving on the
+    // minute the doors close is a family arriving on time.
+    expect(windowHasClosed(DOORS_CLOSE_EARLY, 3000)).toBe(false);
     expect(windowHasClosed(DOORS_CLOSE_EARLY, 3001)).toBe(true);
   });
 });
@@ -144,6 +188,61 @@ describe('persistence', () => {
     expect(readBinding()).toBeNull();
     localStorage.setItem('tally:kiosk:binding', JSON.stringify({ eventId: '' }));
     expect(readBinding()).toBeNull();
+  });
+
+  it('needs every field the screen reads before it will call it a binding', () => {
+    /*
+     * A kiosk that half-reads a binding is worse than one that unbinds: the
+     * screen would open on a gathering with no title and clock times of `NaN`,
+     * and the volunteer has no way to tell that from a real one.
+     */
+    const required = [
+      'eventId',
+      'title',
+      'startAtMs',
+      'endAtMs',
+      'checkInClosesAtMs',
+    ] as const;
+
+    for (const field of required) {
+      const partial: Record<string, unknown> = { ...DOORS_CLOSE_EARLY };
+      delete partial[field];
+      localStorage.setItem('tally:kiosk:binding', JSON.stringify(partial));
+      expect(readBinding(), `missing ${field}`).toBeNull();
+    }
+  });
+
+  it('refuses a field of the wrong type, which is what an older shape looks like', () => {
+    const wrong: Array<[string, unknown]> = [
+      ['eventId', 42],
+      ['title', null],
+      ['startAtMs', '1000'],
+      ['endAtMs', '5000'],
+      ['checkInClosesAtMs', '3000'],
+    ];
+
+    for (const [field, value] of wrong) {
+      localStorage.setItem(
+        'tally:kiosk:binding',
+        JSON.stringify({ ...DOORS_CLOSE_EARLY, [field]: value }),
+      );
+      expect(readBinding(), `${field} = ${String(value)}`).toBeNull();
+    }
+  });
+
+  it('refuses an empty event id, which would bind the kiosk to nothing', () => {
+    localStorage.setItem(
+      'tally:kiosk:binding',
+      JSON.stringify({ ...DOORS_CLOSE_EARLY, eventId: '' }),
+    );
+
+    expect(readBinding()).toBeNull();
+  });
+
+  it('reads a binding whose optional halves are absent', () => {
+    localStorage.setItem('tally:kiosk:binding', JSON.stringify(DOORS_CLOSE_EARLY));
+
+    expect(readBinding()).toEqual(DOORS_CLOSE_EARLY);
   });
 
   it('reads a binding written before pickup existed, rather than logging out', () => {

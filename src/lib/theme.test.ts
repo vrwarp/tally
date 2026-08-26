@@ -17,28 +17,68 @@ import {
   watchSystemTheme,
 } from '@/lib/theme';
 
-/** Stands in for `window.matchMedia`, which jsdom does not implement. */
+/** The media query this module is only ever allowed to ask. */
+const LIGHT_QUERY = '(prefers-color-scheme: light)';
+
+/**
+ * Stands in for `window.matchMedia`, which jsdom does not implement.
+ *
+ * Deliberately strict about both strings it is handed. A browser answers a
+ * query it does not understand with a `MediaQueryList` that simply never
+ * matches, and registers a listener for an event name nothing ever fires — so
+ * both mistakes look exactly like "this device prefers dark and never changes
+ * its mind", which is the one outcome a stub must not paper over.
+ */
 function stubMatchMedia(prefersLight: boolean) {
   const listeners = new Set<(event: MediaQueryListEvent) => void>();
   const query = {
     matches: prefersLight,
-    addEventListener: (_: string, cb: (event: MediaQueryListEvent) => void) => listeners.add(cb),
-    removeEventListener: (_: string, cb: (event: MediaQueryListEvent) => void) =>
-      listeners.delete(cb),
+    addEventListener: (type: string, cb: (event: MediaQueryListEvent) => void) => {
+      if (type === 'change') listeners.add(cb);
+    },
+    removeEventListener: (type: string, cb: (event: MediaQueryListEvent) => void) => {
+      if (type === 'change') listeners.delete(cb);
+    },
   };
 
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn(() => query),
+  const matchMedia = vi.fn((asked: string) =>
+    asked === LIGHT_QUERY ? query : { ...query, matches: false },
   );
+  vi.stubGlobal('matchMedia', matchMedia);
 
   return {
+    matchMedia,
     /** Fires a device-preference change at every listener. */
     flip(toLight: boolean) {
       for (const cb of listeners) cb({ matches: toLight } as MediaQueryListEvent);
     },
     get listenerCount() {
       return listeners.size;
+    },
+  };
+}
+
+/**
+ * Safari below 14, which has `addListener` and nothing else. `handlers` is what
+ * a test asserts against, since these take no event name.
+ */
+function stubLegacyMatchMedia(options: { removable?: boolean } = {}) {
+  const handlers = new Set<(event: MediaQueryListEvent) => void>();
+  const query: Record<string, unknown> = {
+    matches: false,
+    addListener: (cb: (event: MediaQueryListEvent) => void) => handlers.add(cb),
+  };
+  if (options.removable !== false) {
+    query.removeListener = (cb: (event: MediaQueryListEvent) => void) => handlers.delete(cb);
+  }
+
+  vi.stubGlobal('matchMedia', () => query);
+  return {
+    flip(toLight: boolean) {
+      for (const cb of handlers) cb({ matches: toLight } as MediaQueryListEvent);
+    },
+    get handlerCount() {
+      return handlers.size;
     },
   };
 }
@@ -193,5 +233,51 @@ describe('watchSystemTheme', () => {
       throw new Error('not implemented');
     });
     expect(() => watchSystemTheme(() => {})()).not.toThrow();
+  });
+
+  it('asks about light, which is the question every branch here is phrased on', () => {
+    const media = stubMatchMedia(false);
+
+    watchSystemTheme(() => {});
+
+    expect(media.matchMedia).toHaveBeenCalledWith(LIGHT_QUERY);
+  });
+
+  it('follows the device through the listener older Safari offers', () => {
+    const media = stubLegacyMatchMedia();
+    const seen: string[] = [];
+
+    watchSystemTheme((theme) => seen.push(theme));
+    media.flip(true);
+
+    expect(seen).toEqual(['light']);
+  });
+
+  it('unsubscribes through the older pair too', () => {
+    const media = stubLegacyMatchMedia();
+
+    const stop = watchSystemTheme(() => {});
+    expect(media.handlerCount).toBe(1);
+
+    stop();
+
+    expect(media.handlerCount).toBe(0);
+  });
+
+  it('survives a MediaQueryList with neither pair of methods', () => {
+    // Not hypothetical: this is what a stubbed `matchMedia` in somebody else's
+    // test harness looks like, and an unguarded call would take the whole app
+    // down at mount.
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+
+    expect(() => watchSystemTheme(() => {})()).not.toThrow();
+  });
+
+  it('survives a MediaQueryList that can be listened to but not unlistened', () => {
+    const media = stubLegacyMatchMedia({ removable: false });
+    const stop = watchSystemTheme(() => {});
+
+    expect(media.handlerCount).toBe(1);
+    expect(() => stop()).not.toThrow();
   });
 });

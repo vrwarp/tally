@@ -45,6 +45,15 @@ function fakeSend() {
   return { fn, sent };
 }
 
+/** A promise the test releases by hand. */
+function deferred() {
+  let release = () => {};
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release: () => release() };
+}
+
 /** A clock the test moves by hand. */
 function fakeClock(start = 1_000) {
   let value = start;
@@ -81,6 +90,32 @@ describe('the label queue', () => {
 
     expect(raster.fn).toHaveBeenCalledTimes(1);
     expect(send.sent).toHaveLength(1);
+  });
+
+  it('holds a lobby-full of warm labels and drops the oldest past it', async () => {
+    /*
+     * A lobby screen runs for weeks and warms a label for every row a thumb
+     * rests on, so the cache has to have a ceiling — and it has to be a
+     * ceiling rather than a bucket of one, because reusing the warm raster is
+     * the whole reason it exists. Eight is a family and the two behind them.
+     */
+    const raster = fakeRaster();
+    const send = fakeSend();
+    const queue = createLabelQueue({ raster: raster.fn, send: send.fn });
+
+    for (let i = 0; i < 9; i += 1) queue.warm(job(`child-${i}`));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(9);
+
+    // The eight most recent are still warm: printing them builds nothing new.
+    for (let i = 1; i < 9; i += 1) queue.print(job(`child-${i}`));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(9);
+
+    // The ninth-oldest was dropped to make room, so it is built again.
+    queue.print(job('child-0'));
+    await queue.idle();
+    expect(raster.fn).toHaveBeenCalledTimes(10);
   });
 
   it('builds one on demand when nothing warmed it', async () => {
@@ -160,6 +195,45 @@ describe('the label queue', () => {
       await queue.idle();
 
       expect(order).toEqual(['1', '2', '3']);
+    });
+
+    it('picks up a label enqueued in the beat after the queue emptied', async () => {
+      /*
+       * The narrow one, and the reason `pump` re-checks in its `finally`. A tap
+       * that lands after the drain loop has found the queue empty but before
+       * the drain has finished unwinding sees `pumping` still set, so it starts
+       * nothing — and that label then waits for somebody to tap again.
+       *
+       * Reproduced by hanging the first send on a promise the test holds, and
+       * queueing the second tap *behind the drain's own continuation* on that
+       * same promise. That is the one beat.
+       */
+      const sent: RasterResult[] = [];
+      const gate = deferred();
+      let firstSend: Promise<void> | null = null;
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: (result) => {
+          sent.push(result);
+          if (sent.length > 1) return Promise.resolve();
+          firstSend = gate.promise;
+          return firstSend;
+        },
+      });
+
+      queue.print(job('ada'));
+      // Until the drain is parked on `firstSend`, so the tap below lands
+      // behind its continuation rather than in front of it.
+      for (let tick = 0; tick < 10 && firstSend === null; tick += 1) await Promise.resolve();
+      expect(firstSend).not.toBeNull();
+
+      void (firstSend as unknown as Promise<void>).then(() => queue.print(job('noah')));
+      gate.release();
+
+      await queue.idle();
+
+      expect(sent).toHaveLength(2);
+      expect(queue.depth()).toBe(0);
     });
 
     it('picks up a label enqueued while it was already draining', async () => {
@@ -285,6 +359,30 @@ describe('the label queue', () => {
       expect(send.sent).toHaveLength(1);
     });
 
+    it('prints one that is exactly as late as it is allowed to be', async () => {
+      // Two minutes is the line and it is inclusive: a label landing exactly
+      // on it is the last one printed, not the first one binned.
+      const clock = fakeClock();
+      const send = fakeSend();
+      const onDropped = vi.fn();
+      const gate = deferred();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: (result) => (result.job[0] === 1 ? gate.promise.then(() => send.fn(result)) : send.fn(result)),
+        now: clock.now,
+        onDropped,
+      });
+
+      queue.print(job('ada'));
+      queue.print(job('noah'));
+      clock.advance(MAX_LABEL_AGE_MS);
+      gate.release();
+      await queue.idle();
+
+      expect(onDropped).not.toHaveBeenCalled();
+      expect(send.sent).toHaveLength(2);
+    });
+
     it('prints one that is merely a little late', async () => {
       const clock = fakeClock();
       const send = fakeSend();
@@ -332,6 +430,106 @@ describe('the label queue', () => {
 
       release();
       await queue.idle();
+    });
+  });
+
+  describe('the warm cache', () => {
+    it('holds a handful and drops the oldest past it', async () => {
+      const raster = fakeRaster();
+      const queue = createLabelQueue({ raster: raster.fn, send: fakeSend().fn });
+
+      // A parent tapping down a long family list, then back to the top.
+      for (let index = 0; index < 9; index += 1) queue.warm(job(`child-${index}`));
+      expect(raster.seen).toHaveLength(9);
+
+      queue.warm(job('child-8'));
+      expect(raster.seen).toHaveLength(9);
+
+      // The first is gone, so it costs a raster again — which is the trade: a
+      // shelf tablet does not hold nine bitmaps for a queue of one.
+      queue.warm(job('child-0'));
+      expect(raster.seen).toHaveLength(10);
+    });
+
+    it('sends the raster it warmed, not a fresh one', async () => {
+      const raster = fakeRaster();
+      const send = fakeSend();
+      const queue = createLabelQueue({ raster: raster.fn, send: send.fn });
+
+      queue.warm(job('ada'));
+      queue.print(job('ada'));
+      await queue.idle();
+
+      expect(raster.fn).toHaveBeenCalledTimes(1);
+      expect(send.sent).toHaveLength(1);
+      expect(send.sent[0]?.job).toEqual(Uint8Array.from([1]));
+    });
+  });
+
+  describe('the clock it keeps by default', () => {
+    it('stamps the log from the wall clock when nobody injected one', async () => {
+      const before = Date.now();
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      queue.print(job('ada', 'Ada'));
+      await queue.idle();
+
+      const stamped = queue.printedTonight()[0]?.atMs ?? 0;
+      expect(stamped).toBeGreaterThanOrEqual(before);
+      expect(stamped).toBeLessThanOrEqual(Date.now());
+    });
+  });
+
+  describe('a queue nobody is listening to', () => {
+    /*
+     * The kiosk shell wires both callbacks up, and the printer setup screen
+     * does not. Neither of these may become a `TypeError` inside the drain,
+     * which would take the whole queue down with it.
+     */
+    it('drops a stale label without anybody to tell', async () => {
+      const clock = fakeClock();
+      const send = fakeSend();
+      const gate = deferred();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: (result) => (send.sent.length === 0 ? gate.promise.then(() => send.fn(result)) : send.fn(result)),
+        now: clock.now,
+      });
+
+      queue.print(job('ada'));
+      queue.print(job('grace'));
+      clock.advance(MAX_LABEL_AGE_MS + 1);
+      gate.release();
+
+      await expect(queue.idle()).resolves.toBeUndefined();
+      expect(queue.printedTonight().map((entry) => entry.failed)).toContain(true);
+    });
+
+    it('fails a label without anybody to tell', async () => {
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: async () => {
+          throw new Error('printer offline');
+        },
+      });
+
+      queue.print(job('ada', 'Ada'));
+
+      await expect(queue.idle()).resolves.toBeUndefined();
+      expect(queue.printedTonight()[0]?.failed).toBe(true);
+    });
+
+    it('overflows without anybody to tell', async () => {
+      const gate = deferred();
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: () => gate.promise });
+
+      for (let index = 0; index < MAX_QUEUED_LABELS + 3; index += 1) {
+        queue.print(job(`child-${index}`, `Child ${index}`));
+      }
+
+      expect(queue.depth()).toBeLessThanOrEqual(MAX_QUEUED_LABELS);
+      gate.release();
+      await expect(queue.idle()).resolves.toBeUndefined();
     });
   });
 
@@ -435,6 +633,39 @@ describe('the label queue', () => {
       const log = queue.printedTonight();
       expect(log).toHaveLength(MAX_PRINTED_HISTORY);
       expect(log[0]?.name).toBe(`Child ${MAX_PRINTED_HISTORY + 3}`);
+    });
+
+    it('gives every record an id of its own', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      for (const name of ['Ada', 'Grace', 'Katherine']) {
+        queue.print(job(name.toLowerCase(), name));
+        await queue.idle();
+      }
+
+      // The printer screen keys its rows on these, so two the same collapses
+      // one child's sticker into another's.
+      const ids = queue.printedTonight().map((entry) => entry.id);
+      expect(new Set(ids).size).toBe(3);
+      for (const id of ids) expect(id).toMatch(/^p\d+$/);
+    });
+
+    it('logs a label dropped for overflow as an attempt that failed', async () => {
+      const gate = deferred();
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: () => gate.promise });
+
+      for (let index = 0; index < MAX_QUEUED_LABELS + 2; index += 1) {
+        queue.print(job(`child-${index}`, `Child ${index}`));
+      }
+
+      // A child with no sticker, and somebody who can now see so and print it
+      // again — which is exactly what a failed row on the printer screen is.
+      const dropped = queue.printedTonight();
+      expect(dropped.length).toBeGreaterThan(0);
+      for (const entry of dropped) expect(entry.failed).toBe(true);
+
+      gate.release();
+      await queue.idle();
     });
 
     it('forgets the evening when the kiosk leaves the gathering', async () => {

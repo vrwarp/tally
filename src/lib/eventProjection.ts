@@ -107,6 +107,10 @@ export function projectEvents(
     // rule was read from — so this only misses if a caller passed occurrences
     // from a different list than the events they came out of.
     const template = byId.get(occurrence.source.id);
+    // Stryker disable next-line ConditionalExpression: the occurrences come from
+    // `projectOccurrences(stored)` two lines up, so every `source` is an entry
+    // of `stored` and the miss cannot be reached from outside this function.
+    // The guard stays because the invariant is not local to this line.
     if (template) projected.push(asEvent(occurrence, template));
   }
 

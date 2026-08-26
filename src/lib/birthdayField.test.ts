@@ -41,6 +41,14 @@ describe('birthdayFieldFrom', () => {
 });
 
 describe('readBirthdayField', () => {
+  it('sends a day that is not the one on file', () => {
+    // The whole point of the unchanged check is that it says *unchanged*.
+    // Reading every edit as a no-op is a Save that silently does nothing.
+    expect(read('4/20', '03-14')).toEqual({ ok: true, value: '04-20' });
+    expect(read('3/20', '03-14')).toEqual({ ok: true, value: '03-20' });
+    expect(read('4/14', '03-14')).toEqual({ ok: true, value: '04-14' });
+  });
+
   it('sends the day alone, to be kept against the year upstream', () => {
     expect(read('3/16', '03-14')).toEqual({ ok: true, value: '03-16' });
   });
@@ -141,5 +149,132 @@ describe('describeBirthdayField', () => {
     expect(note('2/30', null).tone).toBe('bad');
     expect(note('2/29', null).tone).toBe('bad');
     expect(note('12 / 14 / 2999', null).tone).toBe('bad');
+  });
+
+  it('says the whole sentence, not just the date', () => {
+    // These are the words under the box, and they are the only place the year
+    // being optional is ever explained.
+    expect(note('', null)).toEqual({
+      tone: 'quiet',
+      say: 'Just the numbers — the year is optional.',
+    });
+    expect(note('', '03-14')).toEqual({
+      tone: 'quiet',
+      say: 'Left empty, the birthday Planning Center holds stays as it is.',
+    });
+  });
+
+  it('tells a half-typed year from a half-typed date', () => {
+    expect(note('12', null)).toEqual({ tone: 'quiet', say: 'Keep going.' });
+    expect(note('12 / 14 / 201', null)).toEqual({
+      tone: 'quiet',
+      say: 'Keep going, or leave the year out.',
+    });
+  });
+
+  it('spells out the sentence for a day with no year', () => {
+    expect(note('4/2', null)).toEqual({
+      tone: 'good',
+      say: '2 April, with no year. Planning Center will show no age.',
+    });
+    expect(note('4/2', '03-14')).toEqual({
+      tone: 'good',
+      say: '2 April, keeping the year Planning Center holds.',
+    });
+    expect(note('4/2', '2011-03-14')).toEqual({ tone: 'good', say: '2 April, keeping 2011.' });
+  });
+
+  it('spells out the unchanged sentence, with and without a year', () => {
+    expect(note('3/14', '03-14')).toEqual({
+      tone: 'good',
+      say: '14 March — already what Planning Center holds.',
+    });
+    expect(note('3/14/2011', '2011-03-14')).toEqual({
+      tone: 'good',
+      say: '14 March 2011 — already what Planning Center holds.',
+    });
+  });
+
+  it('names each refusal in its own words', () => {
+    expect(note('2/30', null).say).toBe('That day does not exist in that month.');
+    expect(note('2/29/2011', null).say).toBe('February had no 29th in that year.');
+    expect(note('3/14/2999', null).say).toBe('That year has not happened yet.');
+    expect(note('3/14/1600', null).say).toBe('Years run from 1900 to now.');
+  });
+
+  it('refuses a leap day only where there is genuinely no year to hang it on', () => {
+    // `onFile === null` and not "no year in onFile": a bare `MM-DD` is the
+    // roster's day, whose year upstream this screen has not been told, and
+    // refusing there would turn that into a wrong error on a real 29 February.
+    expect(note('2/29', null).tone).toBe('bad');
+    expect(note('2/29', '03-14').tone).toBe('good');
+    expect(note('2/29', '2011-03-14').tone).toBe('good');
+    expect(note('2/29/2012', null).tone).toBe('good');
+  });
+
+  it('refuses the leap day and no other day on it', () => {
+    // All three of those have to be true at once. 1885 is the year Planning
+    // Center keeps for a birthday nobody knows the year of, and the only day
+    // it does not have is 29 February — every other day of every other month
+    // goes in without a year exactly as it always did.
+    expect(note('2/28', null).tone).toBe('good');
+    expect(note('3/29', null).tone).toBe('good');
+    expect(note('12/29', null).tone).toBe('good');
+    expect(note('2/1', null).tone).toBe('good');
+  });
+
+  it('reads against the caller’s clock, not the wall clock', () => {
+    // Every screen that draws this passes `now`, and a future year is decided
+    // against it. Falling back to the real clock would make the test that
+    // proves it pass for the wrong reason.
+    expect(describeBirthdayField('3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).tone)
+      .toBe('bad');
+    expect(describeBirthdayField('3/14/2026', { onFile: null, now: NOW }).tone).toBe('good');
+  });
+});
+
+describe('the sentences a refusal gets', () => {
+  it('reaches readBirthdayField as well as the note under the box', () => {
+    // The form paints these under the box; the server refuses the same things
+    // in its own voice. Both have to be checkable from here.
+    expect(read('2/30', null)).toEqual({
+      ok: false,
+      error: 'That day does not exist in that month.',
+    });
+    expect(read('2/29/2011', null)).toEqual({
+      ok: false,
+      error: 'February had no 29th in that year.',
+    });
+    expect(read('3/14/2999', null)).toEqual({
+      ok: false,
+      error: 'That year has not happened yet.',
+    });
+    expect(read('3/14/1600', null)).toEqual({ ok: false, error: 'Years run from 1900 to now.' });
+  });
+
+  it('tells half a year from half a date', () => {
+    expect(read('12 / 14 / 20', null)).toEqual({
+      ok: false,
+      error: 'Finish the year, or take it out — a birthday can go in without one.',
+    });
+    expect(read('12', null)).toEqual({
+      ok: false,
+      error: 'That is half a date. Give a month and a day at least.',
+    });
+  });
+
+  it('names what Planning Center cannot hold, and why', () => {
+    expect(read('2/29', null)).toEqual({
+      ok: false,
+      error:
+        'Planning Center cannot hold 29 February without a year, and it has none for them. Give the year too.',
+    });
+  });
+
+  it('reads against the caller’s clock', () => {
+    expect(readBirthdayField('3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).ok).toBe(
+      false,
+    );
+    expect(readBirthdayField('3/14/2026', { onFile: null, now: NOW }).ok).toBe(true);
   });
 });

@@ -50,6 +50,8 @@ describe('isEmbeddedBrowser', () => {
     ['WeChat', 'Mozilla/5.0 (iPhone) MicroMessenger/8.0.40'],
     ['the Google app', 'Mozilla/5.0 (iPhone) GSA/300.0.0'],
     ['a generic Android WebView', 'Mozilla/5.0 (Linux; Android 14; wv) Chrome/120.0.0.0'],
+    // The space after the semicolon is optional in the wild; both shapes ship.
+    ['an Android WebView with no space', 'Mozilla/5.0 (Linux; Android 14;wv) Chrome/120.0.0.0'],
   ];
 
   it.each(WEBVIEWS)('detects %s', (_name, ua) => {
@@ -70,7 +72,105 @@ describe('isEmbeddedBrowser', () => {
   });
 });
 
+describe('where there is no browser to ask', () => {
+  /*
+   * None of these render on a server today. They are the gate on which sign-in
+   * flow to attempt, though, and a `ReferenceError` thrown while deciding is a
+   * login screen that does not appear at all — so each answers rather than
+   * reaching for a global that is not there.
+   */
+  it('reports no webview when there is no navigator', () => {
+    vi.stubGlobal('navigator', undefined);
+    try {
+      expect(isEmbeddedBrowser()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports a browser with no user agent string as an ordinary one', () => {
+    setUserAgent('');
+    expect(isEmbeddedBrowser()).toBe(false);
+
+    // A `navigator` whose `userAgent` is missing entirely, which is what a
+    // hardened runtime and some test harnesses give.
+    Object.defineProperty(navigator, 'userAgent', { value: undefined, configurable: true });
+    expect(isEmbeddedBrowser()).toBe(false);
+  });
+
+  it('reports not standalone when there is no window', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(isStandaloneDisplay()).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('reports third-party when there is no window to compare against', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(isFirstPartyAuthDomain('tally.example')).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('isStandaloneDisplay', () => {
+  it('reports not standalone in a browser with no matchMedia at all', () => {
+    // Older WebViews, and anything running the bundle outside a browser. The
+    // iOS flag below is the other half of the answer.
+    Reflect.deleteProperty(window as object, 'matchMedia');
+
+    expect(isStandaloneDisplay()).toBe(false);
+
+    (window.navigator as { standalone?: boolean }).standalone = true;
+    expect(isStandaloneDisplay()).toBe(true);
+  });
+
+  it('reads the iOS flag as a flag, not as anything truthy', () => {
+    setDisplayMode(null);
+    for (const value of ['true', 1, {}] as unknown[]) {
+      (window.navigator as { standalone?: unknown }).standalone = value;
+      expect(isStandaloneDisplay(), String(value)).toBe(false);
+    }
+  });
+
+  it('asks about each installed display mode, and only those', () => {
+    const asked: string[] = [];
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => {
+        asked.push(query);
+        return { matches: false, media: query } as MediaQueryList;
+      },
+    });
+
+    expect(isStandaloneDisplay()).toBe(false);
+    expect(asked).toEqual([
+      '(display-mode: standalone)',
+      '(display-mode: fullscreen)',
+      '(display-mode: minimal-ui)',
+    ]);
+  });
+
+  it('stops asking once one of them matches', () => {
+    const asked: string[] = [];
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => {
+        asked.push(query);
+        return { matches: true, media: query } as MediaQueryList;
+      },
+    });
+
+    expect(isStandaloneDisplay()).toBe(true);
+    expect(asked).toEqual(['(display-mode: standalone)']);
+  });
+
   it.each(['standalone', 'fullscreen', 'minimal-ui'])('detects display-mode %s', (mode) => {
     setDisplayMode(mode);
     expect(isStandaloneDisplay()).toBe(true);

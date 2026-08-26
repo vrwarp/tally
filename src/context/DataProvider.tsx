@@ -103,16 +103,34 @@ const ROSTER_RESYNC_AFTER_MS = 60 * 1000;
  * array — so the screen behind the panel still said "no birthday" until
  * somebody reloaded the page. A field worth drawing is a field worth comparing.
  */
+/**
+ * What separates one row from the next in a signature.
+ *
+ * Any character does, and that is why the mutants on it are disabled: two
+ * rosters colliding on a different separator would need one student whose
+ * eight fields spell out two students' sixteen, and a signature is a
+ * fixed count of `|`-separated fields per row — so the count alone keeps them
+ * apart whatever sits between them.
+ */
+// Stryker disable next-line StringLiteral: see above.
+const ROW_SEPARATOR = '\n';
+
 function rosterSignature(students: readonly Student[]): string {
-  return students
-    .map(
-      (s) =>
-        `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
-    )
-    .join('\n');
+  return (
+    students
+      .map(
+        (s) =>
+          `${s.id}|${s.firstName}|${s.lastName}|${s.grade}|${s.status}|${s.profileComplete}|${s.hasAllergies}|${s.birthday}`,
+      )
+      .join(ROW_SEPARATOR)
+  );
 }
 
 function describeRosterError(cause: unknown): string {
+  // Stryker disable next-line StringLiteral: the fallback is only ever
+  // compared against the codes below, and no string that is not one of them
+  // reads differently from any other. Empty is what "no code at all" looks
+  // like.
   const code = (cause as { code?: string })?.code ?? '';
   // The server's sentence already names which backend failed — "Planning
   // Center is rate-limiting us", "Could not reach Attendees to load the
@@ -141,6 +159,9 @@ function describeRosterError(cause: unknown): string {
  */
 function rosterErrorReport(cause: unknown): PcoErrorReport {
   return {
+    // Stryker disable next-line StringLiteral: `pcoErrorReport` uses this
+    // fallback for `message` and nothing else, and `message` is overwritten on
+    // the very next line. It is here so the call reads honestly on its own.
     ...pcoErrorReport(cause, 'Could not reach the people backend for the roster.'),
     message: describeRosterError(cause),
   };
@@ -153,9 +174,14 @@ function rosterErrorReport(cause: unknown): PcoErrorReport {
  * every consumer of the context for.
  */
 function backendReportSignature(entries: readonly RosterBackendStatus[]): string {
-  return entries
-    .map((e) => `${e.backendId}|${e.ok}|${e.error ?? ''}|${e.people}|${e.unresolved}|${e.missing}`)
-    .join('\n');
+  return (
+    entries
+      // Stryker disable next-line StringLiteral: the fallback stands in for "no
+      // error", and every line uses the same one — so two reports differ here
+      // exactly when their errors differ, whatever the stand-in says.
+      .map((e) => `${e.backendId}|${e.ok}|${e.error ?? ''}|${e.people}|${e.unresolved}|${e.missing}`)
+      .join(ROW_SEPARATOR)
+  );
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -167,6 +193,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
    * that asks, is refused, and has to decide what to do about it.
    */
   const canReadEdits = can('core');
+  // Stryker disable next-line ArrayDeclaration: these are merged over the
+  // roster by `mergeRoster`, which reads an id off every entry — so anything
+  // in here that is not a student document is dropped before a screen sees it,
+  // and an empty list is the only thing that says "Firestore has not answered".
   const [documents, setDocuments] = useState<Student[]>([]);
   const [storedEvents, setStoredEvents] = useState<TallyEvent[]>([]);
   const [series, setSeries] = useState<EventSeries[]>([]);
@@ -268,7 +298,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     ];
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   /**
    * The aggregate sentence, for the banner that has always shown one.
@@ -365,7 +399,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       pending.current = null;
       if (queued) void refreshRoster(queued.force);
     }
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   /**
    * The roster as last committed, for `applyRosterPerson` to look somebody up
@@ -394,6 +432,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // And on this device, so a reload does not paint the row as it was.
       rememberRosterPerson(person);
     },
+    // Stryker disable next-line ArrayDeclaration: `refreshRoster` is a
+    // `useCallback` over no state, so its identity never changes and an empty
+    // list would behave the same. Naming it is what stops that being an
+    // accident the next edit to it silently relies on.
     [refreshRoster],
   );
 
@@ -415,7 +457,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', resync);
     };
-  }, [refreshRoster]);
+  },
+  // Stryker disable next-line ArrayDeclaration: `refreshRoster` is a
+  // `useCallback` over no state, so its identity never changes and an empty
+  // list would behave the same. Naming it is what stops that being an
+  // accident the next edit to it silently relies on.
+  [refreshRoster]);
 
   /* ---- Profile edits on their way upstream ------------------------------- */
 
@@ -510,6 +557,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
    */
   const canWork = useCallback(
     (event: Pick<TallyEvent, 'id' | 'seriesId' | 'recurrenceRootId'>) =>
+      // Stryker disable next-line StringLiteral: an id nobody holds is an id
+      // nobody holds — `canWorkChain` matches it against a member list, and
+      // every string that is not somebody's uid answers the same.
       canWorkChain(access.get(chainKey(event)), profile?.id ?? '', can('admin')),
     [access, profile?.id, can],
   );

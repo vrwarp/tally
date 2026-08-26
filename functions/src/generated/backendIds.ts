@@ -43,8 +43,16 @@ export type BackendId = keyof typeof BACKEND_PREFIXES;
 
 export const BACKEND_IDS = Object.keys(BACKEND_PREFIXES) as readonly BackendId[];
 
+/**
+ * `Object.hasOwn`, never `in`: `in` walks the prototype chain, so `constructor`
+ * and `toString` both answered yes — and the value being asked about is
+ * `upstreamBackend` off a student document, which is the one field here that
+ * something other than Tally can have written. Answering yes made
+ * `studentIdFor` interpolate `Object` itself into a student id, and the kiosk
+ * then joined a child to no roster row at all.
+ */
 export function isBackendId(value: unknown): value is BackendId {
-  return typeof value === 'string' && value in BACKEND_PREFIXES;
+  return typeof value === 'string' && Object.hasOwn(BACKEND_PREFIXES, value);
 }
 
 /** The student id a backend person is known by, everywhere in Tally. */

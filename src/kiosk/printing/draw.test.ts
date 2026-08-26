@@ -24,12 +24,17 @@ interface DrawnText {
   y: number;
   font: string;
   align: string;
+  fillStyle: string;
+  baseline: string;
 }
 
 let drawn: DrawnText[] = [];
-let filledRects: number[][] = [];
+let filledRects: Array<{ box: number[]; fillStyle: string }> = [];
 /** Every transform the renderer applied, in order — the quarter turn shows up here. */
 let transforms: string[] = [];
+/** How many contexts the stub hands out before it starts answering null. */
+let contextsBeforeNull = Number.POSITIVE_INFINITY;
+let contextsAskedFor: string[] = [];
 
 class StubContext {
   font = '';
@@ -43,7 +48,9 @@ class StubContext {
   ) {}
 
   fillRect(x: number, y: number, w: number, h: number): void {
-    filledRects.push([x, y, w, h]);
+    // The colour matters as much as the box: a label filled black and then
+    // written on in black comes off the printer as a solid rectangle.
+    filledRects.push({ box: [x, y, w, h], fillStyle: this.fillStyle });
   }
 
   /*
@@ -67,7 +74,15 @@ class StubContext {
   }
 
   fillText(text: string, x: number, y: number): void {
-    drawn.push({ text, x, y, font: this.font, align: this.textAlign });
+    drawn.push({
+      text,
+      x,
+      y,
+      font: this.font,
+      align: this.textAlign,
+      fillStyle: this.fillStyle,
+      baseline: this.textBaseline,
+    });
   }
 
   getImageData(): { data: Uint8ClampedArray } {
@@ -80,7 +95,11 @@ class StubOffscreenCanvas {
   constructor(width: number, height: number) {
     this.ctx = new StubContext(width, height);
   }
-  getContext(): StubContext {
+  /** Like the real thing: a kind it does not recognise is `null`, not a throw. */
+  getContext(kind: string): StubContext | null {
+    contextsAskedFor.push(kind);
+    if (kind !== '2d') return null;
+    if (contextsAskedFor.length > contextsBeforeNull) return null;
     return this.ctx;
   }
 }
@@ -91,6 +110,8 @@ beforeEach(() => {
   drawn = [];
   filledRects = [];
   transforms = [];
+  contextsAskedFor = [];
+  contextsBeforeNull = Number.POSITIVE_INFINITY;
   (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = StubOffscreenCanvas;
 });
 
@@ -242,7 +263,60 @@ describe('drawLabel', () => {
       drawLabel(DEFAULT_LABEL_TEMPLATE, values, { width: 696, height: 271 });
       // One fill covering the whole label: prepareImage composites onto white
       // and thresholds, so starting white saves the pass and the letterboxing.
-      expect(filledRects).toEqual([[0, 0, 696, 271]]);
+      expect(filledRects).toEqual([{ box: [0, 0, 696, 271], fillStyle: '#ffffff' }]);
+    });
+
+    it('writes in black, on the baseline the layout measured against', () => {
+      drawLabel(DEFAULT_LABEL_TEMPLATE, values, { width: 696, height: 271 });
+
+      // White on white is a blank sticker, and the wrong baseline moves every
+      // line by most of its own height — neither shows up in a size check.
+      expect(drawn.length).toBeGreaterThan(0);
+      for (const entry of drawn) {
+        expect(entry.fillStyle).toBe('#000000');
+        expect(entry.baseline).toBe('alphabetic');
+      }
+    });
+
+    it('draws each line on the alignment the template asked for', () => {
+      const mixed: LabelTemplate = {
+        lines: [
+          { text: '{{firstName}}', size: 'md', bold: false, align: 'left', requiresValue: false },
+          { text: '{{lastInitial}}', size: 'md', bold: false, align: 'center', requiresValue: false },
+          { text: '{{grade}}', size: 'md', bold: false, align: 'right', requiresValue: false },
+        ],
+        copies: 1,
+      };
+
+      drawLabel(mixed, values, { width: 696, height: 271 });
+
+      expect(drawn.map((entry) => entry.align)).toEqual(['left', 'center', 'right']);
+    });
+
+    it('asks for a 2d context and nothing else', () => {
+      drawLabel(DEFAULT_LABEL_TEMPLATE, values, { width: 696, height: 271 });
+
+      expect(contextsAskedFor).toEqual(['2d', '2d']);
+    });
+  });
+
+  describe('a canvas that will not give up a context', () => {
+    it('says so rather than measuring against nothing', () => {
+      // The scratch canvas is only there to measure with; without it every
+      // line would be laid out at width zero and stack on top of itself.
+      contextsBeforeNull = 0;
+
+      expect(() => drawLabel(DEFAULT_LABEL_TEMPLATE, values, { width: 696, height: 271 })).toThrow(
+        'No 2d context on an OffscreenCanvas.',
+      );
+    });
+
+    it('says so rather than drawing onto nothing', () => {
+      contextsBeforeNull = 1;
+
+      expect(() => drawLabel(DEFAULT_LABEL_TEMPLATE, values, { width: 696, height: 271 })).toThrow(
+        'No 2d context on an OffscreenCanvas.',
+      );
     });
 
     it('draws the resolved text, not the template tokens', () => {

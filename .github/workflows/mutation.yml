@@ -1,0 +1,97 @@
+name: Mutation testing
+
+# Separate from `ci.yml` on purpose. The two halves of mutation testing have
+# very different shapes: the pull-request half is a couple of minutes and
+# belongs on every push, and the whole-codebase half is a couple of hours and
+# belongs to nobody's afternoon. Putting them here keeps `ci.yml` a description
+# of one run rather than of two schedules.
+on:
+  pull_request:
+  schedule:
+    # Monday, early. Late enough after the weekend that a failure is read on a
+    # working day, early enough that it is read at the start of one.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  changed:
+    name: Changed modules
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # A ceiling rather than an expectation. What this normally is is one or two
+    # modules and a minute or two, and the cost is not in the number of modules
+    # but in the number of *tests* each one drags in: a branch touching
+    # `src/types/index.ts` pulls a hundred and thirty test files into every one
+    # of its runs, and the dry run alone is minutes.
+    #
+    # Set high enough that a branch touching the whole scope still finishes,
+    # because the alternative is a gate that quietly covers less than it says
+    # — and a partial answer here reads exactly like a complete one. The
+    # concurrency group above cancels superseded runs, so a long ceiling costs
+    # nothing on a branch that keeps moving.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The gate is "what did this branch change", which needs the merge
+          # base — so the whole history rather than the default single commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # Only the modules this branch touched, each against the tests that can
+      # reach it. A pull request changing two files answers in a minute or two;
+      # the whole-codebase run below is what covers everything else.
+      - name: Mutate what this branch changed
+        run: node scripts/mutation-sweep.mjs --since "origin/${{ github.base_ref }}"
+
+      - name: Require 90% on the modules that changed
+        run: node scripts/mutation-summary.mjs --min 90
+
+      - name: Upload the reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-changed
+          path: reports/mutation/
+          retention-days: 7
+
+  full:
+    name: Whole logic core
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Hours, not minutes. Every mutant is a test run, and there are thousands.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # The published number: the whole scope against the whole suite. Breaks
+      # below the threshold in `stryker.config.json`.
+      - name: Mutation test everything
+        run: npm run test:mutation
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report-full
+          path: reports/mutation/
+          retention-days: 30

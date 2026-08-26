@@ -431,22 +431,184 @@ describe('layoutLabel', () => {
       expect(fittedFirst).toBeLessThan(loose.draws[0]!.fontPx);
     });
 
-    it('drops trailing lines last, and keeps the name', () => {
-      const result = layoutLabel(overfull, {}, DIE_CUT, measure);
-      if (result.droppedLines > 0) {
-        expect(result.draws[0]!.text).toBe('Bartholomew');
-        expect(result.draws.map((draw) => draw.text)).not.toContain('Extra');
-      }
-      // Whatever it took, the result fits.
-      expect(result.height).toBe(271);
+    it('fills the label it was given, whatever it took to get there', () => {
+      expect(layoutLabel(overfull, {}, DIE_CUT, measure).height).toBe(271);
+    });
+
+    it('keeps the one line even when the one line does not fit either', () => {
+      /*
+       * An allergy note somebody typed at length. Shrunk to the floor and
+       * wrapped, it is still taller than a 29mm sticker — and the drop has
+       * nothing left to drop. Running on would leave a blank label, which
+       * tells a leader nothing about a child it exists to warn them about.
+       */
+      const long = Array.from({ length: 110 }, () => 'aaaa').join(' ');
+      const result = layoutLabel(template([line(long, 'sm')]), {}, DIE_CUT, measure);
+
+      expect(result.droppedLines).toBe(0);
+      expect(result.draws.length).toBeGreaterThan(1);
+      expect(result.draws[0]!.text.startsWith('aaaa')).toBe(true);
     });
 
     it('always keeps at least one line', () => {
+      // A blank sticker tells a parent nothing. Whatever will not fit, the name
+      // at the top of the template is the last thing to go, and it does not.
       const absurd = template(
         Array.from({ length: 6 }, () => line('Bartholomew Fitzwilliam', 'xl', true)),
       );
       const result = layoutLabel(absurd, {}, DIE_CUT, measure);
       expect(result.draws.length).toBeGreaterThanOrEqual(1);
+      expect(result.draws[0]!.text).toBe('Bartholomew Fitzwilliam');
+    });
+  });
+
+  /*
+   * The arithmetic, written out.
+   *
+   * Everything above asks whether the layout is *sensible*; these ask whether it
+   * is the layout this module says it is. A sticker is 29mm tall and the numbers
+   * below are dots, so a line-gap that is added once too often or a line height
+   * applied by division rather than multiplication is the difference between a
+   * name on a label and a name half off one — and neither shows up in an
+   * assertion that two baselines merely increase.
+   *
+   * The constants are repeated rather than imported because they are the claim:
+   * 46 dots for `md`, a 1.18 line height, a 0.16 gap between lines and nothing
+   * above the first, and 8 dots of padding.
+   */
+  describe('the arithmetic', () => {
+    it('stacks three lines at the exact baselines, and reports the exact length', () => {
+      const result = layoutLabel(
+        template([line('one', 'md'), line('two', 'md'), line('three', 'md')]),
+        {},
+        ENDLESS,
+        measure,
+      );
+
+      // Top padding, then each line's own height, with a gap before the second
+      // and third and none before the first. The baseline sits a font-size
+      // below the top of each line box.
+      expect(result.draws.map((draw) => draw.y)).toEqual([54, 116, 177]);
+      // Three line heights, two gaps, and the padding at both ends, rounded up
+      // to a whole dot because tape is cut in dots.
+      expect(result.height).toBe(Math.ceil(3 * 46 * 1.18 + 2 * 46 * 0.16 + 8 + 8));
+      expect(result.height).toBe(194);
+    });
+
+    it('spends the ends it was given, and not each other’s', () => {
+      /*
+       * A die-cut label with lopsided margins. The room the block is centred in
+       * is the height less *both* ends; adding one back instead of taking it
+       * away moves the name four dots down a 29mm sticker, which is the sort of
+       * thing that only shows up on the fiftieth one.
+       */
+      const result = layoutLabel(
+        template([line('Ada', 'sm')]),
+        {},
+        { ...DIE_CUT, paddingTop: 100, paddingBottom: 4 },
+        measure,
+      );
+
+      const room = 271 - 100 - 4;
+      expect(result.draws[0]!.y).toBe(Math.round(100 + (room - 34 * 1.18) / 2 + 34));
+      expect(result.draws[0]!.y).toBe(197);
+    });
+
+    it('does not call a label that fits exactly a label it had to shrink', () => {
+      // Exactly as tall as the block, to the dot. `scaledToFit` is what the
+      // printer screen shows a leader to explain why their template came out
+      // smaller than they drew it, and a label that fitted never did.
+      const height = 46 * 1.18 + 46 * 0.16 + 46 * 1.18;
+      const result = layoutLabel(
+        template([line('one', 'md'), line('two', 'md')]),
+        {},
+        { width: 696, height, padding: 0 },
+        measure,
+      );
+
+      expect(result.scaledToFit).toBe(false);
+      expect(result.droppedLines).toBe(0);
+      expect(result.draws).toHaveLength(2);
+    });
+
+    it('squeezes as little as it can rather than as much as it may', () => {
+      /*
+       * The floor on the squeeze is a floor, not a target. Three xl lines want
+       * 370 dots and have 255, which is a scale of about 0.69 — taking 0.5
+       * instead would print a legible label two sizes smaller than it needed to
+       * be, every time, on the assumption that anything overfull is very.
+       */
+      const result = layoutLabel(
+        template([line('Ada', 'xl'), line('Bo', 'xl'), line('Cyd', 'xl')]),
+        {},
+        DIE_CUT,
+        measure,
+      );
+
+      const wanted = 3 * 96 * 1.18 + 2 * 96 * 0.16;
+      expect(result.draws[0]!.fontPx).toBe(Math.round(96 * (255 / wanted)));
+      expect(result.draws[0]!.fontPx).toBe(66);
+      expect(result.scaledToFit).toBe(true);
+      expect(result.droppedLines).toBe(0);
+    });
+
+    it('drops trailing lines when one squeeze is not enough, and keeps the first', () => {
+      const overfull = template([
+        line('Bartholomew', 'xl', true),
+        line('12th grade', 'lg'),
+        line('Sunday Nursery', 'lg'),
+        line('9:04 AM', 'lg'),
+        line('Room 3', 'lg'),
+        line('Extra', 'lg'),
+      ]);
+      const result = layoutLabel(overfull, {}, DIE_CUT, measure);
+
+      // Not "if anything was dropped": something was, and it was the end.
+      expect(result.droppedLines).toBeGreaterThan(0);
+      expect(result.draws[0]!.text).toBe('Bartholomew');
+      expect(result.draws.map((draw) => draw.text)).not.toContain('Extra');
+      // And the drop stopped as soon as the rest fitted, rather than running on
+      // to one line or to none.
+      expect(result.draws.length).toBeGreaterThan(1);
+    });
+  });
+
+  describe('breaking a name across lines', () => {
+    /* No padding, so the width is the label's own 696 dots and the arithmetic
+     * is legible: the fake measurer charges half the font size per character,
+     * so at the 24-dot floor a line holds exactly 58 of them. */
+    const FULL: LabelBox = { width: 696, height: null, padding: 0 };
+    const A = 'a'.repeat(28);
+    const B = 'b'.repeat(29);
+    const C = 'c'.repeat(10);
+
+    it('keeps a line that fills the width to the last dot', () => {
+      // 40 characters at 34 dots is 680, which is the width exactly. Wrapping
+      // here would break a name that fits, and shrinking it would make a label
+      // smaller than the one the leader designed for no reason at all.
+      const exact = 'x'.repeat(40);
+      const result = layoutLabel(template([line(exact, 'sm')]), {}, DIE_CUT, measure);
+
+      expect(result.draws).toHaveLength(1);
+      expect(result.draws[0]!.text).toBe(exact);
+      expect(result.draws[0]!.fontPx).toBe(34);
+    });
+
+    it('fits the last word that still fits, not the last that fits with room to spare', () => {
+      // `${A} ${B}` is 58 characters — the width to the dot at the floor size.
+      const result = layoutLabel(template([line(`${A} ${B} ${C}`, 'sm')]), {}, FULL, measure);
+
+      expect(result.draws.map((draw) => draw.text)).toEqual([`${A} ${B}`, C]);
+      expect(result.draws[0]!.fontPx).toBe(24);
+    });
+
+    it('starts a line with a word too long for one rather than dropping it', () => {
+      // Nothing fits, so every word begins a line of its own — including the
+      // first, which would otherwise be measured against an empty line and lose.
+      const long = 'w'.repeat(60);
+      const result = layoutLabel(template([line(`${long} ${long}`, 'sm')]), {}, FULL, measure);
+
+      expect(result.draws.map((draw) => draw.text)).toEqual([long, long]);
     });
   });
 

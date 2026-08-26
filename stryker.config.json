@@ -1,0 +1,55 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts"
+  },
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/lib/**/*.ts",
+    "src/services/**/*.ts",
+    "src/hooks/**/*.ts",
+    "src/context/**/*.{ts,tsx}",
+    "src/types/**/*.ts",
+    "src/kiosk/*.ts",
+    "src/kiosk/printing/**/*.ts",
+    "src/kiosk/registration/steps.ts",
+    "!src/**/*.test.{ts,tsx}",
+    "!src/**/*.fuzz.test.{ts,tsx}",
+    "!src/lib/firebase.ts",
+    "!src/kiosk/services.ts",
+    "!src/kiosk/main.tsx",
+    "!src/kiosk/printing/raster.worker.ts"
+  ],
+  "reporters": [
+    "html",
+    "clear-text",
+    "progress",
+    "json"
+  ],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "clearTextReporter": {
+    "allowColor": false,
+    "maxTestsToLog": 0,
+    "logTests": false
+  },
+  "concurrency": 3,
+  "timeoutMS": 30000,
+  "timeoutFactor": 2.5,
+  "disableTypeChecks": true,
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true,
+  "thresholds": {
+    "high": 95,
+    "low": 90,
+    "break": 90
+  },
+  "dryRunTimeoutMinutes": 20,
+  "ignoreStatic": true
+}

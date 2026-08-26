@@ -189,6 +189,20 @@ describe('describeRecurrence', () => {
     );
   });
 
+  it('calls every day "Daily" only when it really is every day', () => {
+    // A fortnightly rule that happens to name all seven days is not daily, and
+    // saying so would hide half the schedule from whoever chose it.
+    expect(describeRecurrence(rule({ interval: 2, weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe(
+      'Every 2 weeks on Sun, Mon, Tue, Wed, Thu, Fri and Sat',
+    );
+  });
+
+  it('phrases a yearly rule that skips years', () => {
+    expect(describeRecurrence(rule({ frequency: 'yearly', interval: 2 }), TUESDAY)).toBe(
+      'Every 2 years on July 21',
+    );
+  });
+
   it('phrases intervals and multi-day weeks', () => {
     expect(describeRecurrence(rule({ interval: 2, weekdays: [1, 3] }), TUESDAY)).toBe(
       'Every 2 weeks on Monday and Wednesday',
@@ -232,6 +246,19 @@ describe('recurrencePresets', () => {
     ]);
   });
 
+  it('names each option by the id the dropdown reopens on', () => {
+    // The label is what a leader reads; the id is what the form stores and what
+    // `matchRecurrencePreset` has to hand back. Two options sharing one would
+    // reopen the dropdown on the wrong entry.
+    expect(recurrencePresets(TUESDAY).map((preset) => preset.id)).toEqual([
+      'daily',
+      'weekly',
+      'monthlyDay',
+      'monthlyWeekday',
+      'yearly',
+    ]);
+  });
+
   it('re-phrases when the date moves', () => {
     expect(recurrencePresets(FRIDAY).map((preset) => preset.label)).toContain(
       'Monthly on the fourth Friday',
@@ -244,6 +271,18 @@ describe('matchRecurrencePreset', () => {
   it('reopens the dropdown on the entry a rule was saved from', () => {
     expect(matchRecurrencePreset(rule(), FRIDAY)).toBe('weekly');
     expect(matchRecurrencePreset(rule({ weekdays: [...EVERY_WEEKDAY] }), FRIDAY)).toBe('daily');
+  });
+
+  it('reopens on each of the five, not only on weekly', () => {
+    // A day-of-month anchor that is not also a whole-number week keeps the two
+    // monthly entries apart: the 21st of July 2026 is a Tuesday in the third
+    // week, so both are reachable and each has to be found by its own rule.
+    expect(matchRecurrencePreset(rule({ weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe('daily');
+    expect(matchRecurrencePreset(rule({ frequency: 'monthly' }), TUESDAY)).toBe('monthlyDay');
+    expect(
+      matchRecurrencePreset(rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' }), TUESDAY),
+    ).toBe('monthlyWeekday');
+    expect(matchRecurrencePreset(rule({ frequency: 'yearly' }), TUESDAY)).toBe('yearly');
   });
 
   it('falls to custom for anything the shortlist cannot say', () => {
@@ -450,6 +489,17 @@ describe('retimeRecurrence', () => {
     expect(retimeRecurrence(picked, FRIDAY, new Date(2026, 6, 25))).toBe(picked);
   });
 
+  it('leaves a multi-day rule alone even when it starts on the old day', () => {
+    /*
+     * Both halves of the guard matter. "One day, and that day is the one the
+     * event was on" is what makes a rule the event's own weekday rather than a
+     * choice — and a rule of two days that happens to begin on the old one is
+     * still a choice, which moving the event must not collapse to a single day.
+     */
+    const picked = rule({ weekdays: [5, 2] });
+    expect(retimeRecurrence(picked, FRIDAY, new Date(2026, 6, 25))).toBe(picked);
+  });
+
   it('leaves rules with no weekday of their own alone', () => {
     const monthly = rule({ frequency: 'monthly' });
     expect(retimeRecurrence(monthly, FRIDAY, new Date(2026, 6, 25))).toBe(monthly);
@@ -469,6 +519,18 @@ describe('validateRecurrence', () => {
 
   it('rejects a weekly rule with every day unticked', () => {
     expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toMatch(/at least one day/);
+  });
+
+  it('accepts a gathering in the last instant of the day the repeat ends on', () => {
+    /*
+     * "On or after", and the day is whole: a repeat told to end on the 20th
+     * covers the 20th, right up to the last millisecond of it. Reading the
+     * boundary the other way refuses a form a leader has filled in correctly,
+     * with a sentence saying they have not.
+     */
+    const lastInstant = new Date(2026, 9, 20, 23, 59, 59, 999);
+
+    expect(validateRecurrence(rule({ until: '2026-10-20' }), lastInstant)).toBeNull();
   });
 
   it('rejects an end date before the gathering it repeats', () => {
@@ -518,5 +580,29 @@ describe('defaultRuleForFrequency', () => {
     expect(next.interval).toBe(3);
     expect(next.count).toBe(8);
     expect(next.weekdays).toEqual([]);
+  });
+
+  it('carries an end date across too, and the monthly shape with it', () => {
+    /*
+     * Flicking through the units to look at them must not quietly drop what
+     * has been typed. The end date is the one nobody would notice going: a
+     * repeat that was told to stop in October and comes back unbounded looks
+     * exactly like one that was never given a date.
+     */
+    const previous = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek', until: '2026-10-20' });
+    const next = defaultRuleForFrequency('yearly', FRIDAY, previous);
+
+    expect(next.until).toBe('2026-10-20');
+    expect(next.monthlyMode).toBe('dayOfWeek');
+  });
+
+  it('validates only the rule that can be wrong', () => {
+    // "Pick at least one day of the week" is a sentence about weekly rules. A
+    // monthly one has no weekdays by construction, and telling somebody to
+    // pick a day on a form with no day picker on it is a dead end.
+    expect(validateRecurrence(rule({ frequency: 'monthly', weekdays: [] }), FRIDAY)).toBeNull();
+    expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toBe(
+      'Pick at least one day of the week.',
+    );
   });
 });

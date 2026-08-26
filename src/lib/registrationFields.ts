@@ -75,15 +75,25 @@ export function checkName(raw: unknown, field: string): FieldCheck<string> {
  * most.
  */
 export function checkGrade(raw: unknown): FieldCheck<number | null> {
+  const wrong = 'grade must be a whole number from -1 (Pre-K) to 12, or null.';
   if (raw === null || raw === undefined) return { ok: true, value: null };
-  if (
-    typeof raw !== 'number' ||
-    !Number.isInteger(raw) ||
-    raw < MIN_GRADE ||
-    raw > MAX_GRADE
-  ) {
-    return bad('grade must be a whole number from -1 (Pre-K) to 12, or null.');
-  }
+
+  /*
+   * Its own guard, and not folded into the test below, because that is the
+   * only arrangement in which the comment on it can be believed.
+   *
+   * The clause changes no answer at run time: `Number.isInteger` already
+   * refuses everything that is not a number. It is here for the narrowing —
+   * without it `raw` is still `unknown` at the comparisons and at `value: raw`.
+   * Saying so to Stryker needs a `disable next-line`, and that directive
+   * matches by line, against a node that *starts* on it. A comment sitting
+   * inside a parenthesised condition is attached to the whole expression and
+   * silently disables nothing, which is worse than no comment at all.
+   */
+  // Stryker disable next-line ConditionalExpression: see above — no input reaches
+  // this guard that the integer check below would not refuse anyway.
+  if (typeof raw !== 'number') return bad(wrong);
+  if (!Number.isInteger(raw) || raw < MIN_GRADE || raw > MAX_GRADE) return bad(wrong);
   return { ok: true, value: raw };
 }
 
@@ -101,7 +111,12 @@ export function checkPhone(raw: unknown): FieldCheck<string> {
   let digits = raw.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
   if (digits.length !== 10) return bad('Enter a 10-digit phone number.');
-  if (/^(\d)\1{9}$/.test(digits)) return bad('That does not look like a phone number.');
+  // Every digit the same. Spelled out rather than as `/^(\d)\1{9}$/`, which
+  // restates the ten the line above has just enforced — and would go on
+  // meaning "ten" if that number ever changed.
+  if ([...digits].every((digit) => digit === digits[0])) {
+    return bad('That does not look like a phone number.');
+  }
   return { ok: true, value: digits };
 }
 

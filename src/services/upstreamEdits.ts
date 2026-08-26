@@ -83,10 +83,17 @@ const WATCHED: UpstreamEditState[] = [
 const STATES = new Set<string>([...WATCHED, 'cancelled']);
 
 function state(value: unknown): UpstreamEditState {
+  // Stryker disable next-line ConditionalExpression: `STATES` holds strings, so
+  // `has` refuses a number or an object on its own. The `typeof` is here to
+  // narrow for the cast rather than to decide anything.
   return typeof value === 'string' && STATES.has(value) ? (value as UpstreamEditState) : 'queued';
 }
 
 function patch(value: unknown): UpstreamEditPatch {
+  // Stryker disable next-line ConditionalExpression: reading a field off a
+  // number or a string is `undefined`, not a throw, so the loop below refuses
+  // every primitive on its own and only null and undefined needed catching.
+  // The object test says what a patch is rather than leaving it to be inferred.
   if (!value || typeof value !== 'object') return {};
   const source = value as Record<string, unknown>;
   const out: Record<string, unknown> = {};

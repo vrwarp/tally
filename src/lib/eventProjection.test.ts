@@ -128,9 +128,85 @@ describe('projectEvents', () => {
     const retreat = friday({ id: 'retreat', mode: 'oneoff', seriesId: null, recurrence: null });
     expect(projectEvents([retreat], FRIDAY)).toEqual([retreat]);
   });
+
+  it('leaves a calendar with nothing to project in the order it arrived', () => {
+    // The early return is a pass-through, not a re-sort: `subscribeEvents`
+    // already delivers newest-first, and a screen reading the query unchanged
+    // must go on seeing exactly what it delivered.
+    const older = friday({ id: 'retreat-a', mode: 'oneoff', seriesId: null, recurrence: null });
+    const newer = friday({
+      id: 'retreat-b',
+      mode: 'oneoff',
+      seriesId: null,
+      recurrence: null,
+      startAt: new Date(2026, 6, 31, 19, 0),
+    });
+
+    expect(projectEvents([older, newer], FRIDAY).map((event) => event.id)).toEqual([
+      'retreat-a',
+      'retreat-b',
+    ]);
+  });
+
+  it('does not hand the caller back its own array to mutate', () => {
+    const stored = [friday({ id: 'retreat', mode: 'oneoff', seriesId: null, recurrence: null })];
+    expect(projectEvents(stored, FRIDAY)).not.toBe(stored);
+  });
+
+  it('calls a projected gathering recurring, because that is what it is', () => {
+    // Nothing projected can have come from a one-off, and screens branch on
+    // this: the RSVP tab and the repeat editor are both keyed off `mode`.
+    const calendar = projectEvents([friday()], FRIDAY);
+    const projected = calendar.find((event) => event.id === 'friday-fellowship-2026-07-31');
+
+    expect(projected?.mode).toBe('recurring');
+  });
 });
 
 describe('calendarSignature', () => {
+  it('is one line per gathering, naming everything a screen draws', () => {
+    // Spelled out rather than compared, because what this has to guarantee is
+    // that two different calendars cannot produce one string — and a separator
+    // is the whole of what stops one gathering's id running into the next
+    // one's fields.
+    const one = friday({ id: 'a', mode: 'oneoff', seriesId: null, recurrence: null });
+    const two = friday({
+      id: 'b',
+      mode: 'oneoff',
+      seriesId: null,
+      recurrence: null,
+      startAt: new Date(2026, 6, 31, 19, 0),
+    });
+
+    expect(calendarSignature([one, two])).toBe(
+      [
+        `a|${one.startAt.getTime()}|${one.endAt.getTime()}|scheduled|1|${one.updatedAt.getTime()}`,
+        `b|${two.startAt.getTime()}|${two.endAt.getTime()}|scheduled|1|${two.updatedAt.getTime()}`,
+      ].join('\n'),
+    );
+  });
+
+  it('tells two calendars apart even when their fields run together', () => {
+    // A Firestore document id may contain a pipe. Without the line break, an
+    // id that happens to spell out the next gathering's row would make two
+    // different calendars compare equal — and the provider would then hand a
+    // stale array to every screen in the app.
+    const one = friday({ id: 'a', mode: 'oneoff', seriesId: null, recurrence: null });
+    const two = friday({
+      id: 'b',
+      mode: 'oneoff',
+      seriesId: null,
+      recurrence: null,
+      startAt: new Date(2026, 6, 31, 19, 0),
+    });
+    const collision = friday({
+      ...two,
+      id: `a|${one.startAt.getTime()}|${one.endAt.getTime()}|scheduled|1|${one.updatedAt.getTime()}b`,
+    });
+
+    expect(calendarSignature([one, two])).not.toBe(calendarSignature([collision]));
+  });
+
   it('is stable across a recomputation that changed nothing', () => {
     // The property the data provider leans on: the projection is rebuilt on
     // every clock tick, and an identical calendar must not re-render the app.

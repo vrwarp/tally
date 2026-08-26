@@ -49,6 +49,21 @@ describe('sanitizeIconPath', () => {
     expect(sanitizeIconPath(`M0 0${' 1'.repeat(4000)}`)).toBeNull();
   });
 
+  it('draws a path of exactly the length it stops at', () => {
+    // Four thousand is the stop, and it is inclusive: a glyph landing exactly
+    // on it is the last one drawn, not the first one dropped.
+    const exact = `M0 0${'1'.repeat(3996)}`;
+    expect(exact).toHaveLength(4000);
+    expect(sanitizeIconPath(exact)).toBe(exact);
+
+    expect(sanitizeIconPath(`${exact}1`)).toBeNull();
+  });
+
+  it('refuses an empty path rather than drawing nothing', () => {
+    expect(sanitizeIconPath('')).toBeNull();
+    expect(sanitizeIconPath('   ')).toBeNull();
+  });
+
   it('trims, because a stored value is not a literal', () => {
     expect(sanitizeIconPath('  M0 0h10v10z  ')).toBe('M0 0h10v10z');
   });

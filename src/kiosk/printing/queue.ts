@@ -109,10 +109,6 @@ export const MAX_PRINTED_HISTORY = 8;
 /** How many warm-but-unprinted rasters to hold before evicting the oldest. */
 const MAX_WARM_LABELS = 8;
 
-interface WarmEntry {
-  result: Promise<RasterResult>;
-  warmedAtMs: number;
-}
 
 interface QueuedLabel {
   job: LabelJob;
@@ -161,7 +157,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
   const { raster, send } = options;
   const now = options.now ?? (() => Date.now());
 
-  const warm = new Map<string, WarmEntry>();
+  const warm = new Map<string, Promise<RasterResult>>();
   const pending: QueuedLabel[] = [];
   let pumping: Promise<void> | null = null;
   const printed: PrintedLabel[] = [];
@@ -177,6 +173,9 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       atMs: now(),
       failed,
     });
+    // Stryker disable next-line EqualityOperator: truncating a list that is
+    // already exactly this long is a no-op, so `>=` behaves the same. The
+    // comparison is here to say when the list grows past the bound.
     if (printed.length > MAX_PRINTED_HISTORY) printed.length = MAX_PRINTED_HISTORY;
   }
 
@@ -189,7 +188,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
    */
   function rasterFor(job: LabelJob): Promise<RasterResult> {
     const existing = warm.get(job.studentId);
-    if (existing) return existing.result;
+    if (existing) return existing;
 
     const result = raster(job);
     result.catch(() => {});
@@ -198,17 +197,21 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       // Oldest first. Map iteration is insertion-ordered, which is exactly the
       // order wanted and is why this is not a sort.
       const oldest = warm.keys().next();
+      // Stryker disable next-line ConditionalExpression: the map is at its
+      // limit to have got here, so the iterator always has a key. The check is
+      // here because the type says it might not.
       if (!oldest.done) warm.delete(oldest.value);
     }
-    warm.set(job.studentId, { result, warmedAtMs: now() });
+    warm.set(job.studentId, result);
     return result;
   }
 
   async function drain(): Promise<void> {
-    while (pending.length > 0) {
-      const next = pending.shift();
-      if (!next) break;
-
+    // Draining *is* shifting until there is nothing left, so the emptiness test
+    // and the shift are one thing. Written as two — `while (length > 0)` and
+    // then `if (!next) break` — each covered for the other, and neither could
+    // have been wrong.
+    for (let next = pending.shift(); next; next = pending.shift()) {
       if (now() - next.queuedAtMs > MAX_LABEL_AGE_MS) {
         // Logged as an attempt that failed, because that is what it is from the
         // far side of the glass: a child with no sticker, and somebody who can
@@ -254,12 +257,12 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       // not a consequence of the row being tapped again.
       warm.delete(job.studentId);
 
-      if (pending.length >= MAX_QUEUED_LABELS) {
-        const dropped = pending.shift();
-        if (dropped) {
-          record(dropped.job, true);
-          options.onDropped?.('overflow', dropped.job);
-        }
+      const dropped = pending.length >= MAX_QUEUED_LABELS ? pending.shift() : undefined;
+      if (dropped) {
+        // An attempt that failed, because that is what it is from the far side
+        // of the glass: a child with no sticker.
+        record(dropped.job, true);
+        options.onDropped?.('overflow', dropped.job);
       }
       pending.push({ job, result, queuedAtMs: now() });
       pump();

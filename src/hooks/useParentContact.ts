@@ -47,6 +47,10 @@ export interface ParentContactResult {
 
 export function useParentContact(): ParentContactResult {
   const [reachable, setReachable] = useState<ReadonlyMap<string, boolean>>(() => held ?? NOTHING);
+  // Stryker disable next-line ArrowFunction,ConditionalExpression: the
+  // `loaded` the caller sees is `loaded || held !== null`, so a session that
+  // already holds an answer reads as settled whatever this seeds. It is here
+  // so the state says the same thing the getter does.
   const [loaded, setLoaded] = useState(() => held !== null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,12 +71,21 @@ export function useParentContact(): ParentContactResult {
         held = next;
         if (stale) return;
         setReachable(next);
+        // Stryker disable next-line BooleanLiteral,CallExpression: `held` was
+        // set two lines up, and the caller's `loaded` is
+        // `loaded || held !== null` — so neither the value nor the call itself
+        // can be seen from outside.
         setLoaded(true);
+        // Stryker disable next-line CallExpression: the only route to a second
+        // attempt is `refresh`, which clears the error before this can, so
+        // there is never one left here to clear.
         setError(null);
       })
       .catch((cause: unknown) => {
         if (stale) return;
         // Not held: an outage must not be remembered as "nobody has a parent".
+        // Stryker disable next-line StringLiteral: read only by `includes`,
+        // which no sentinel matches, so what it is does not matter.
         const code = (cause as { code?: string })?.code ?? '';
         setError(
           code.includes('permission-denied')
@@ -92,7 +105,11 @@ export function useParentContact(): ParentContactResult {
   const refresh = useCallback(() => {
     setError(null);
     setAttempt((count) => count + 1);
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   return { reachable, loading, loaded: loaded || held !== null, error, refresh };
 }

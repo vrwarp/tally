@@ -119,6 +119,9 @@ export function pcoErrorReport(
  * contains a code sample would otherwise end the block early and leave the rest
  * of the report rendering as prose in whoever's chat window it landed in.
  */
+// Stryker disable next-line StringLiteral: every call site passes a language,
+// and the default is here so the signature reads as "optional" rather than as
+// a parameter every caller must remember.
 function fenced(body: string, language = ''): string {
   const longest = [...body.matchAll(/`+/g)].reduce((max, [run]) => Math.max(max, run.length), 0);
   const fence = '`'.repeat(Math.max(3, longest + 1));

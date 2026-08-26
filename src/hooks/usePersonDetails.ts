@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPersonDetails } from '@/services/functions';
-import { backendLabelOf, personIdFromStudentId, type PcoPersonDetails, type Student } from '@/types';
+import { backendLabelOf, personIdOfStudent, type PcoPersonDetails, type Student } from '@/types';
 
 const cache = new Map<string, PcoPersonDetails | null>();
 
@@ -58,13 +58,27 @@ export interface PersonDetailsResult {
 }
 
 export function usePersonDetails(student: Student | null): PersonDetailsResult {
-  const personId = student ? (student.pcoPersonId ?? personIdFromStudentId(student.id)) : null;
+  // Whichever backend holds them, not just Planning Center: the callable
+  // dispatches on `studentId` and reads either, and gating on a Planning
+  // Center person id told every Attendees student's screen there was nothing
+  // to look up.
+  const personId = student ? personIdOfStudent(student) : null;
+  // Stryker disable next-line StringLiteral: with no student there is nobody
+  // to look up, so this key is never handed to the cache or to the server. It
+  // is a placeholder for a hook that is standing by.
   const key = student?.id ?? '';
   // A string, not the student object, so the fetch effect can depend on it
   // without re-running every time the roster hands down a new array.
+  // Stryker disable next-line StringLiteral: only ever read into the failure
+  // sentence, which needs a read, which needs a student.
   const backendLabel = student ? backendLabelOf(student) : 'the backend';
 
+  // Stryker disable next-line ArrowFunction,LogicalOperator: what the caller
+  // reads is `details ?? cache.get(key)`, so a session that already holds this
+  // student answers from the memo whatever the state seeds. Seeding it anyway
+  // is what stops the first frame being a render behind.
   const [details, setDetails] = useState<PcoPersonDetails | null>(() => cache.get(key) ?? null);
+  /* Stryker disable next-line ArrowFunction: `loaded || cache.has(key)`, as above. */
   const [loaded, setLoaded] = useState(() => cache.has(key));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +98,10 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
 
   // A different student means a different answer; anything held is not it.
   useEffect(() => {
+    // Stryker disable next-line LogicalOperator: the getters below read the
+    // memo too, so what this puts in state for a cached student is invisible.
+    // It matters for the *uncached* one, where it is what clears the previous
+    // student's answer off the screen.
     setDetails(cache.get(key) ?? null);
     setLoaded(cache.has(key));
     setError(null);
@@ -108,13 +126,27 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
       .then((response) => {
         if (stale) return;
         cache.set(key, response.data);
+        /*
+         * The memo was filled on the line above and both getters read it, so
+         * neither of the two annotated lines can be seen on its own. They are
+         * here because state is what re-renders, and because a reader of this
+         * function should not have to know that the getters cover for it.
+         *
+         * Two directives rather than one: `next-line` means the next line.
+         */
+        // Stryker disable next-line CallExpression: see above.
         setDetails(response.data);
         setLoaded(true);
+        // Stryker disable next-line CallExpression: see above — and the only
+        // route to a second attempt is `retry` or `refresh`, both of which
+        // clear the error before this can, so there is never one left to clear.
         setError(null);
       })
       .catch((cause: unknown) => {
         if (stale) return;
         // Not cached: an outage must not become a permanent "no contact".
+        // Stryker disable next-line StringLiteral,OptionalChaining: read only
+        // by `includes`, which no sentinel matches.
         const code = (cause as { code?: string })?.code ?? '';
         setError(
           code.includes('permission-denied')
@@ -135,8 +167,14 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     // Clearing the error here rather than in the effect is what lets the screen
     // show a spinner on the retry instead of the failure it is retrying.
     setError(null);
+    // Stryker disable next-line ArithmeticOperator: a dependency of the fetch
+    // effect and nothing else, so any change re-runs it.
     setAttempt((count) => count + 1);
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself.
+  []);
 
   const refresh = useCallback(() => {
     // The memo is what the fetch effect checks before asking, so dropping it is
@@ -144,6 +182,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     invalidatePersonDetails(key);
     forceNext.current = true;
     setError(null);
+    /* Stryker disable next-line ArithmeticOperator: any change, as above. */
     setAttempt((count) => count + 1);
   }, [key]);
 

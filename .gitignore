@@ -143,3 +143,7 @@ docs/uxr/kiosk-walkthrough.html
 
 # The e2e log, when a run is driven by hand rather than by CI.
 e2e-run.log
+
+# Mutation testing
+.stryker-tmp/
+reports/mutation/

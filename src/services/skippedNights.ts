@@ -178,6 +178,9 @@ export async function recordExamination(args: {
   const { chainKey, examinedFrom, skipped, held, known } = args;
 
   const reach =
+    // Stryker disable next-line EqualityOperator: two watermarks at the same
+    // instant are the same watermark, so `<=` picks a different object and
+    // writes the same coverage.
     known?.examinedFrom && known.examinedFrom < examinedFrom ? known.examinedFrom : examinedFrom;
 
   await setDoc(

@@ -88,4 +88,40 @@ describe('tokenValuesFor', () => {
     // rasterise time, and absent reads as empty until it does.
     expect(tokenValuesFor(student({ hasAllergies: true }), BINDING).allergy).toBeUndefined();
   });
+
+  describe('the two the clock answers', () => {
+    /*
+     * Asserted by what they must *not* carry rather than by their exact text,
+     * because the locale is the device's and a kiosk in Taipei is as ordinary
+     * as one in Texas. What is not negotiable is the width: this is 62mm of
+     * tape, most of it already spent on a child's name.
+     */
+    it('dates the label without the year', () => {
+      const date = tokenValuesFor(student(), BINDING).date ?? '';
+      const year = String(new Date().getFullYear());
+
+      expect(date).not.toBe('');
+      expect(date).not.toContain(year);
+      expect(date.length).toBeLessThanOrEqual(12);
+    });
+
+    it('times it to the minute, not the second', () => {
+      const time = tokenValuesFor(student(), BINDING).time ?? '';
+
+      // A sticker that says 7:04:31 PM is reporting on the printer, not on the
+      // check-in.
+      expect(time).not.toMatch(/\d:\d\d:\d\d/);
+      expect(time).toMatch(/\d/);
+    });
+
+    it('says today, and this hour', () => {
+      const { date = '', time = '' } = tokenValuesFor(student(), BINDING);
+      const now = new Date();
+
+      // A sticker is handed over within a second of being asked for, so these
+      // are the wall clock and not anything cached from when the kiosk booted.
+      expect(date).toContain(String(now.getDate()));
+      expect(time).toContain(String(now.getMinutes()).padStart(2, '0'));
+    });
+  });
 });

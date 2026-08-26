@@ -1517,22 +1517,49 @@ export const BACKEND_LABELS: Record<BackendId, string> = {
   a32: 'Attendees',
 };
 
+/** A student, in whatever shape the linkage has reached this screen in. */
+export type LinkableStudent = Pick<Student, 'id' | 'pcoPersonId'> & {
+  upstreamBackend?: BackendId | null;
+  upstreamPersonId?: string | null;
+};
+
 /**
- * Which backend holds a student, or null for a visitor no push has landed on.
+ * Which backend holds a student and who they are in it, or null for a visitor
+ * no push has landed on.
+ *
  * The id prefix is the claim when there is one; the server-written linkage
  * fields answer for a visitor document, with the legacy `pcoPersonId` still
- * meaning Planning Center.
+ * meaning Planning Center. Both halves come from here together on purpose —
+ * deriving the backend from the prefix and the person id from `pcoPersonId`
+ * gave a pair that disagreed for every Attendees student, because
+ * `personIdFromStudentId` answers for Planning Center and nothing else.
  */
-export function backendOfStudent(
-  student: Pick<Student, 'id' | 'pcoPersonId'> & {
-    upstreamBackend?: BackendId | null;
-    upstreamPersonId?: string | null;
-  },
-): BackendId | null {
+export function linkageOfStudent(
+  student: LinkableStudent,
+): { backendId: BackendId; personId: string } | null {
   const parsed = parseStudentId(student.id);
-  if (parsed) return parsed.backendId;
-  if (student.upstreamBackend && student.upstreamPersonId) return student.upstreamBackend;
-  return student.pcoPersonId ? 'pco' : null;
+  if (parsed) return parsed;
+  if (student.upstreamBackend && student.upstreamPersonId) {
+    return { backendId: student.upstreamBackend, personId: student.upstreamPersonId };
+  }
+  return student.pcoPersonId ? { backendId: 'pco', personId: student.pcoPersonId } : null;
+}
+
+/** Which backend holds a student, or null for a visitor no push has landed on. */
+export function backendOfStudent(student: LinkableStudent): BackendId | null {
+  return linkageOfStudent(student)?.backendId ?? null;
+}
+
+/**
+ * Who this student is upstream, whichever backend holds them.
+ *
+ * Not `personIdFromStudentId`: that one is the Planning Center compatibility
+ * helper and answers null for an `a32_` id by design. Reaching for it here is
+ * what left every Attendees student's parent contact and allergy note behind a
+ * screen that said there was nothing to look up.
+ */
+export function personIdOfStudent(student: LinkableStudent): string | null {
+  return linkageOfStudent(student)?.personId ?? null;
 }
 
 /**
@@ -1543,7 +1570,7 @@ export function backendOfStudent(
  * badge, the push button — and where the server still sends them unless a
  * leader has picked otherwise.
  */
-export function backendLabelOf(student: Parameters<typeof backendOfStudent>[0]): string {
+export function backendLabelOf(student: LinkableStudent): string {
   return BACKEND_LABELS[backendOfStudent(student) ?? 'pco'];
 }
 

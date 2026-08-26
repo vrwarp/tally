@@ -22,6 +22,9 @@
  */
 export function isEmbeddedBrowser(): boolean {
   if (typeof navigator === 'undefined') return false;
+  // Stryker disable next-line StringLiteral: the fallback is handed straight to
+  // the pattern below, and no string that is not one of those browsers' agents
+  // matches it. Empty is what "the browser told us nothing" looks like.
   const ua = navigator.userAgent || '';
   return /\bFBAN|\bFBAV|FB_IAB|Messenger|Instagram|Line\/|MicroMessenger|; ?wv\)|\bGSA\//.test(ua);
 }
@@ -42,10 +45,20 @@ export function isStandaloneDisplay(): boolean {
 
   const matchMedia = window.matchMedia;
   const displayStandalone =
+    // Stryker disable next-line ConditionalExpression: `some` calls through
+    // `matchMedia` inside a `try`, so a missing one throws and is caught and
+    // answered `false` there. This is the cheap path to the same answer, and
+    // the honest statement of what is being asked.
     typeof matchMedia === 'function' &&
     ['standalone', 'fullscreen', 'minimal-ui'].some((mode) => {
       try {
         return matchMedia(`(display-mode: ${mode})`).matches;
+        /*
+         * The `return false` below is an equivalent mutant that cannot be
+         * annotated away — see `docs/mutation-testing.md`. Emptying the catch
+         * answers `undefined`, which `some` reads the same way, and there is
+         * no node starting on a `} catch {` line for a directive to attach to.
+         */
       } catch {
         return false;
       }

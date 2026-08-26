@@ -50,6 +50,13 @@ const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
 function redirectPending(): boolean {
   try {
     return window.sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1';
+    /*
+     * The `return false` below is an equivalent mutant and cannot be annotated
+     * away: emptying the catch answers `undefined`, which every caller of this
+     * reads the same way. `disable next-line` matches the line the node it is
+     * attached to starts on, and nothing a comment can attach to starts on the
+     * `} catch {` line — so this is one of the survivors the score carries.
+     */
   } catch {
     // Safari in private mode throws on sessionStorage. Assume no redirect is in
     // flight: the cost of being wrong is one Google sign-in that has to be
@@ -89,6 +96,9 @@ const POPUP_NEVER_OPENED = new Set([
 ]);
 
 function describeAuthError(error: unknown): string {
+  // Stryker disable next-line StringLiteral: the fallback is only ever read by
+  // a `switch` and a `Set.has`, neither of which any string could match — so
+  // what it is does not matter, only that it is a string.
   const code = (error as { code?: string })?.code ?? '';
   const message = (error as { message?: string })?.message ?? '';
   const embedded = isEmbeddedBrowser();
@@ -107,6 +117,9 @@ function describeAuthError(error: unknown): string {
       return embedded
         ? IN_APP_BROWSER_DEAD_END
         : 'This browser cannot do Google sign-in. Open Tally in Safari or Chrome.';
+    // Stryker disable next-line ConditionalExpression: `break` and falling out
+    // of the switch are the same thing here — the sentence is worked out below
+    // either way. The case is what says the list above is not exhaustive.
     default:
       break;
   }
@@ -137,6 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+  // Stryker disable next-line BooleanLiteral: only `status` and `stage` read
+  // this, and both ignore it while there is no user — so the initial value is
+  // never on screen. It is `false` because that is what is true: nobody has
+  // asked yet.
   const [profileResolved, setProfileResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Bumped to re-establish the profile listener. See `refreshProfile`. */
@@ -159,9 +176,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       uid.current = nextUser?.uid ?? null;
       setUser(nextUser);
       setProfile(null);
+      // Stryker disable next-line ConditionalExpression: signing out is a
+      // resolved answer — there is definitively no profile — but nothing reads
+      // this while `user` is null, so no test can tell it from `false`. It says
+      // what is true rather than what is observable.
       setProfileResolved(nextUser === null);
     });
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself. What
+  // an empty one *says* is that this closes over nothing.
+  []);
 
   /* Mirror the authorisation document for the signed-in user. */
   useEffect(() => {
@@ -229,6 +255,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshProfile = useCallback(async () => {
     const current = auth.currentUser;
+    // Stryker disable next-line ConditionalExpression: without it, reading
+    // `.uid` off nothing throws into the catch below and the `finally` bumps an
+    // epoch the profile effect ignores while there is no user — so the two
+    // versions are the same from outside. Saying "nobody is signed in, there is
+    // nothing to read" beats arriving at that by way of a swallowed TypeError.
     if (!current) return;
 
     try {
@@ -238,9 +269,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* Denied, or unreachable. The listener remains the source of truth. */
     } finally {
+      // Stryker disable next-line ArithmeticOperator: this is a dependency of
+      // the profile effect and nothing else, so any change re-subscribes and
+      // the direction is arbitrary.
       setProfileEpoch((epoch) => epoch + 1);
     }
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself. What
+  // an empty one *says* is that this closes over nothing.
+  []);
 
   /*
    * Finish a `signInWithRedirect` round-trip — but only when this tab actually
@@ -272,7 +311,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // later mount in this tab repeat the handshake.
         setRedirectPending(false);
       });
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself. What
+  // an empty one *says* is that this closes over nothing.
+  []);
 
   /**
    * Google sign-in, routed by what the current browser can actually do.
@@ -336,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        * the same dead end, reached more slowly and explained worse. So the
        * first-party check gates the retry rather than decorating it.
        */
+      /* Stryker disable next-line StringLiteral: read only by `has` — see above. */
       const code = (cause as { code?: string })?.code ?? '';
       if (POPUP_NEVER_OPENED.has(code) && isFirstPartyAuthDomain(authDomain)) {
         try {
@@ -349,12 +394,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(describeAuthError(cause));
       throw cause;
     }
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself. What
+  // an empty one *says* is that this closes over nothing.
+  []);
 
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
     setRedirectPending(false);
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: any constant array is the same
+  // array to React — the list is compared element by element against the last
+  // render's, and a literal that never changes never differs from itself. What
+  // an empty one *says* is that this closes over nothing.
+  []);
 
   const status: AuthStatus = !authResolved
     ? 'loading'

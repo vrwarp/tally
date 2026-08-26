@@ -65,8 +65,12 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
   const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(events.length > 0);
   const [error, setError] = useState<string | null>(null);
+  // Stryker disable next-line StringLiteral: this is only ever compared with a
+  // request key, and no key is empty — a request is at least one event id — so
+  // what the sentinel says does not matter, only that it is not a key.
   const inFlight = useRef<string>('');
   /** The request that already spent its one retry. See the catch below. */
+  /* Stryker disable next-line StringLiteral: a sentinel, as above. */
   const failedKey = useRef<string>('');
 
   // Identity of the request, so re-renders with an equivalent list do not refetch.
@@ -108,8 +112,13 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
         // to `cache` for these: an absent register and an empty one must not
         // become the same thing.
         for (const eventId of result.denied) refused.add(eventId);
+        // Stryker disable next-line StringLiteral: anything that is not a
+        // request key lets the next failure have its retry, which is the point.
         failedKey.current = '';
         setError(null);
+        // Stryker disable next-line ArithmeticOperator: this is a dependency
+        // of the effect and the memo below and nothing else, so any change
+        // re-runs them and the direction is arbitrary.
         setVersion((current) => current + 1);
       })
       .catch((cause: Error) => {
@@ -135,11 +144,13 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
          */
         if (failedKey.current !== key) {
           failedKey.current = key;
+          /* Stryker disable next-line ArithmeticOperator: any change, as above. */
           setVersion((current) => current + 1);
         }
       })
       .finally(() => {
         if (cancelled) return;
+        /* Stryker disable next-line StringLiteral: a sentinel, as above. */
         inFlight.current = '';
         setLoading(false);
       });
@@ -160,6 +171,9 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
    * wrapper object either way. Republishing an equivalent list makes every
    * consumer recompute: the check-in screen rebuilds its entire roster from it.
    */
+  // Stryker disable next-line ArrayDeclaration: whatever this starts as, the
+  // first comparison below finds it different from a real answer and replaces
+  // it. Empty is what is true before anything has been read.
   const last = useRef<EventAttendanceSnapshot[]>([]);
 
   const snapshots = useMemo(() => {
@@ -199,6 +213,9 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
    * nobody has restricted anything.
    */
   const denied = useMemo(() => {
+    // Stryker disable next-line ConditionalExpression: the line below answers
+    // `NO_DENIALS` for an empty set too. This is the fast path to it, on every
+    // screen in a deployment where nobody has restricted anything.
     if (refused.size === 0) return NO_DENIALS;
     const mine = new Set(events.map((event) => event.id).filter((id) => refused.has(id)));
     return mine.size === 0 ? NO_DENIALS : mine;

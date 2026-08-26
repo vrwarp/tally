@@ -39,6 +39,8 @@ const MAX_PROPERTIES = 32;
  * that includes the bar above it — so the untinted answer is the document's own
  * value rather than a constant retyped here that could drift from it.
  */
+// Stryker disable next-line all: read once when the module loads, which is
+// before any mutant can be switched on — see docs/mutation-testing.md.
 const SHIPPED_THEME_COLOR =
   document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null;
 
@@ -51,6 +53,11 @@ const SHIPPED_THEME_COLOR =
  * handed a name or a value that nothing has looked at.
  */
 export function sanitizeKioskPalette(value: unknown): KioskPalette | null {
+  // Stryker disable next-line ConditionalExpression: anything truthy that is
+  // not an object has no entries a property name could match — a string yields
+  // index keys, a number and a function yield none — so all of them reach the
+  // same `null` by the long road. This is the short one, and the statement of
+  // what a palette is.
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
   const safe: KioskPalette = {};
@@ -93,7 +100,12 @@ export function applyKioskTheme(
    * Collected before removing, because `style` is a live list and deleting from
    * under an index walk skips every other entry.
    */
+  // Stryker disable next-line ArrayDeclaration: whatever starts in here is
+  // handed to `removeProperty`, which does nothing for a name the element does
+  // not have. Empty is the only one that says nothing is stale yet.
   const stale: string[] = [];
+  // Stryker disable next-line EqualityOperator: `item` past the end answers the
+  // empty string, which is not a property name and fails the test below.
   for (let i = 0; i < root.style.length; i += 1) {
     const property = root.style.item(i);
     if (PROPERTY.test(property)) stale.push(property);

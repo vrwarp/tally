@@ -123,6 +123,21 @@ describe('studentDatePatch', () => {
     expect(patch).not.toHaveProperty('firstAttendedAt');
   });
 
+  it('writes nothing at all for a second tap at the same gathering', () => {
+    /*
+     * A double tap, or a correction that checks the same child in again. Their
+     * last-seen is already this gathering, so there is nothing new to say — and
+     * a patch anyway would touch `updatedAt` and `updatedBy` on a profile
+     * nothing changed about, which is what the roster's "edited by" reads.
+     */
+    const already = student({
+      firstAttendedAt: new Date('2026-01-02T19:00:00Z'),
+      lastAttendedAt: event.startAt,
+    });
+
+    expect(studentDatePatch(clock, already, event, 'uid-1')).toBeNull();
+  });
+
   it('omits the grade when nobody actually holds one', () => {
     const patch = studentDatePatch(clock, student({ grade: null }), event, 'uid-1');
     expect(patch).not.toHaveProperty('grade');

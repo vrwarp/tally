@@ -295,9 +295,20 @@ export function defaultRuleForFrequency(
     {
       frequency,
       interval: previous?.interval ?? 1,
-      // Coming back to weekly keeps the days already chosen, so flicking
-      // through the units to look at them does not wipe the selection.
+      /*
+       * Coming back to weekly keeps the days already chosen, so flicking
+       * through the units to look at them does not wipe the selection.
+       *
+       * The mutants on both of these lines are equivalent because of the
+       * `normalizeRecurrence` around the whole object: it clears weekdays for
+       * every frequency but weekly, drops any that are not a whole 0-6, and
+       * reads anything that is not `dayOfWeek` as `dayOfMonth`. So no value
+       * here reaches a caller unrepaired — these say what is meant rather than
+       * what survives.
+       */
+      // Stryker disable next-line ConditionalExpression,ArrayDeclaration: see above.
       weekdays: frequency === 'weekly' ? (previous?.weekdays ?? []) : [],
+      // Stryker disable next-line StringLiteral: see above.
       monthlyMode: previous?.monthlyMode ?? 'dayOfMonth',
       until: previous?.until ?? null,
       count: previous?.count ?? null,

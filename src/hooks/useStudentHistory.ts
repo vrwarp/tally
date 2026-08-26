@@ -50,6 +50,24 @@ function timeOf(entry: StudentHistoryEntry): number {
   return (entry.event?.startAt ?? entry.record.checkedInAt).getTime();
 }
 
+/**
+ * A history nobody has asked for yet.
+ *
+ * One statement of it, read from both places that need it — the value the hook
+ * opens with, and the value it returns to when the student changes. It was two
+ * statements, five `useState` defaults and five setters in an effect, and two
+ * statements of one thing is one of them going stale.
+ */
+function noHistoryYet() {
+  return {
+    entries: [] as StudentHistoryEntry[],
+    started: false,
+    loading: false,
+    hasMore: true,
+    error: null as Error | null,
+  };
+}
+
 export function useStudentHistory(
   studentId: string | readonly string[] | null,
 ): StudentHistoryState {
@@ -62,11 +80,7 @@ export function useStudentHistory(
   // inline; the *key* is what the effects below should turn on.
   const key = ids.join('|');
 
-  const [entries, setEntries] = useState<StudentHistoryEntry[]>([]);
-  const [started, setStarted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, setState] = useState(noHistoryYet);
 
   /** Per id: the next cursor, or `done` once that stream is exhausted. */
   const cursors = useRef<Map<string, StudentHistoryCursor | null | 'done'>>(new Map());
@@ -79,47 +93,54 @@ export function useStudentHistory(
     // another's list.
     cursors.current = new Map();
     readingFor.current = key;
-    setEntries([]);
-    setStarted(false);
-    setLoading(false);
-    setHasMore(true);
-    setError(null);
+    setState(noHistoryYet());
   }, [key]);
 
   const loadMore = useCallback(() => {
     if (ids.length === 0) return;
 
-    setStarted(true);
-    setLoading(true);
-    setError(null);
+    setState((current) => ({ ...current, started: true, loading: true, error: null }));
 
     const forKey = key;
-    const live = ids.filter((id) => cursors.current.get(id) !== 'done');
+    // The cursor comes out of the map here rather than inside the request, so
+    // that the one place deciding a stream is finished is also the one place
+    // reading where it got to.
+    const live = ids
+      .map((id) => ({ id, cursor: cursors.current.get(id) ?? null }))
+      .filter(
+        (stream): stream is { id: string; cursor: StudentHistoryCursor | null } =>
+          stream.cursor !== 'done',
+      );
 
     void Promise.all(
-      live.map(async (id) => {
-        const cursor = cursors.current.get(id);
-        const page = await fetchStudentHistory(id, cursor === 'done' ? null : (cursor ?? null));
-        return { id, page };
-      }),
+      live.map(async ({ id, cursor }) => ({ id, page: await fetchStudentHistory(id, cursor) })),
     )
       .then((pages) => {
         if (readingFor.current !== forKey) return;
         const fresh: StudentHistoryEntry[] = [];
         for (const { id, page } of pages) {
+          // Both halves are required. A page that says it is the last one is
+          // the last one whatever cursor came with it, and a cursor-less page
+          // has nowhere to go next however much it claims is left.
           cursors.current.set(id, page.hasMore && page.cursor ? page.cursor : 'done');
           fresh.push(...page.entries);
         }
-        setEntries((current) => [...current, ...fresh].sort((a, b) => timeOf(b) - timeOf(a)));
-        setHasMore(ids.some((id) => cursors.current.get(id) !== 'done'));
-        setLoading(false);
+        setState((current) => ({
+          ...current,
+          entries: [...current.entries, ...fresh].sort((a, b) => timeOf(b) - timeOf(a)),
+          hasMore: ids.some((id) => cursors.current.get(id) !== 'done'),
+          loading: false,
+        }));
       })
       .catch((cause: unknown) => {
         if (readingFor.current !== forKey) return;
-        setError(cause instanceof Error ? cause : new Error(String(cause)));
-        setLoading(false);
+        setState((current) => ({
+          ...current,
+          error: cause instanceof Error ? cause : new Error(String(cause)),
+          loading: false,
+        }));
       });
   }, [ids, key]);
 
-  return { entries, started, loading, hasMore, error, loadMore };
+  return { ...state, loadMore };
 }

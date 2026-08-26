@@ -82,6 +82,7 @@ gotchas around the `functions/` package: **[docs/development.md](docs/developmen
 | `npm run seed` / `verify:seed` | Fill the emulators with a demo ministry; re-derive the product's claims from it. |
 | `npm test` | Unit tests (Vitest, jsdom). |
 | `npm run test:all` | Unit, security rules and Cloud Functions suites. |
+| `npm run test:mutation` | Mutation testing: does the suite notice when the code is wrong? |
 | `npm run e2e` | Playwright, four browsers. |
 | `npm run lint` / `typecheck` | ESLint / types only. |
 | `npm run deploy` | Build and `firebase deploy`, with the preflight checks. |
@@ -164,6 +165,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/deployment-setup.md](docs/deployment-setup.md) | Deploying, and everything that has to exist first |
 | [docs/error-handling.md](docs/error-handling.md) | The guards, why each exists, and the gaps that are still open |
 | [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
+| [docs/mutation-testing.md](docs/mutation-testing.md) | Whether the tests would notice a wrong answer — the score, the loop, and what it found |
 | [docs/kiosk-performance.md](docs/kiosk-performance.md) | The kiosk benchmark: what it measures, what it found, and the budgets it holds |
 | [e2e/README.md](e2e/README.md) | Running and writing end-to-end tests |
 | [docker/README.md](docker/README.md) | The containerised end-to-end runner |

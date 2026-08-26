@@ -226,6 +226,14 @@ function clock(ms: number): string {
 export function eventWindow(binding: KioskBinding): string {
   const start = clock(binding.startAtMs);
   const end = clock(binding.endAtMs);
+  /*
+   * Anchored, and the space optional, for formats `Intl` produces in locales
+   * this build does not ship strings for — a meridiem that is not at the end is
+   * not this one's, and some locales set it tight against the minutes. Neither
+   * is reachable from the formatter above, which is why the mutants on them are
+   * disabled rather than tested.
+   */
+  // Stryker disable next-line Regex: see above.
   const meridiem = /\s?([AP]M)$/i.exec(start);
   const shared = meridiem && end.toUpperCase().endsWith(meridiem[1]!.toUpperCase());
   return `${shared ? start.slice(0, meridiem.index) : start} – ${end}`;

@@ -48,6 +48,10 @@ function subscribe(onStoreChange: () => void): () => void {
   window.addEventListener('beforeinstallprompt', onStoreChange);
   window.addEventListener('appinstalled', onStoreChange);
   return () => {
+    // Stryker disable next-line CallExpression: a departed subscriber that is
+    // still called reads the same snapshot and `useSyncExternalStore` bails, so
+    // nothing can see the entry survive. It is here so a set does not grow by
+    // one per mount for as long as a kiosk is open.
     listeners.delete(onStoreChange);
     window.removeEventListener('beforeinstallprompt', onStoreChange);
     window.removeEventListener('appinstalled', onStoreChange);
@@ -75,6 +79,11 @@ export function useCanInstall(): boolean {
  */
 export async function promptInstall(): Promise<void> {
   const event = window.__tallyKioskInstall;
+  // Stryker disable next-line ConditionalExpression: without it, reading
+  // `prompt` off nothing throws into the catch below, and the wake-up it does
+  // first reaches subscribers whose answer has not changed — which
+  // `useSyncExternalStore` drops. Saying "there is nothing to show" beats
+  // arriving at the same place by way of a swallowed TypeError.
   if (!event) return;
   window.__tallyKioskInstall = null;
   for (const listener of listeners) listener();

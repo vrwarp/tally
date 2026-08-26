@@ -87,6 +87,29 @@ describe('familyOf', () => {
     expect(familyOf(MARCUS, roster, digits)).toEqual([]);
   });
 
+  it('offers the largest group that is still a family', () => {
+    // Seven others, for eight in all — the same number of labels the print
+    // queue holds. The refusal starts one past that, not on it.
+    const roster = [MARCUS];
+    const crowd = ['s-marcus'];
+    for (let index = 0; index < MAX_FAMILY_OFFER; index += 1) {
+      const extra = student(`s-extra-${index}`, `Extra${index}`, 'Case');
+      roster.push(extra);
+      crowd.push(extra.id);
+    }
+
+    const offered = familyOf(MARCUS, roster, buildFamilyDigits({ '0134': crowd }));
+    expect(offered).toHaveLength(MAX_FAMILY_OFFER);
+  });
+
+  it('skips a student the index has never heard of rather than reading past them', () => {
+    // Jordan is on the roster and not in the index; the walk has to step over
+    // them without asking what digits they answer to.
+    const last4 = { '0134': ['s-marcus', 's-amara'] };
+
+    expect(familyIn(last4, MARCUS)).toEqual(['s-amara']);
+  });
+
   it('never includes the student who was tapped', () => {
     const last4 = { '0134': ['s-marcus'] };
     expect(familyIn(last4, MARCUS)).toEqual([]);
@@ -95,6 +118,22 @@ describe('familyOf', () => {
   it('sorts the offer by name, like every other list of students', () => {
     const last4 = { '0134': ['s-noah', 's-marcus', 's-amara'] };
     expect(familyIn(last4, NOAH)).toEqual(['s-amara', 's-marcus']);
+  });
+
+  it('sorts the offer rather than handing back roster order', () => {
+    // The roster arrives in the order the server built it; a family panel that
+    // followed it would put the same siblings in a different order each night.
+    const roster = [
+      student('s-zoe', 'Zoe', 'Osei'),
+      MARCUS,
+      student('s-abe', 'Abe', 'Osei'),
+    ];
+    const digits = buildFamilyDigits({ '0134': ['s-zoe', 's-marcus', 's-abe'] });
+
+    expect(familyOf(MARCUS, roster, digits).map((member) => member.id)).toEqual([
+      's-abe',
+      's-zoe',
+    ]);
   });
 });
 

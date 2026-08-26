@@ -194,6 +194,9 @@ function rasterWorker(): Worker {
   started.onmessage = (event: MessageEvent<RasterReply>) => {
     const resolve = waiting.get(event.data.id);
     if (!resolve) return;
+    // Stryker disable next-line CallExpression: the worker answers each request
+    // once, so nothing can observe the entry still being there. It is here so a
+    // lobby screen's map does not grow by one per label for the evening.
     waiting.delete(event.data.id);
     resolve(event.data);
   };
@@ -203,6 +206,8 @@ function rasterWorker(): Worker {
 
 function rasterInWorker(config: PrinterConfig, job: LabelJob): Promise<RasterResult> {
   return new Promise<RasterResult>((resolve, reject) => {
+    // Stryker disable next-line UpdateOperator: all this has to be is a number
+    // no other in-flight request is using, and counting either way gives one.
     const id = nextRequestId++;
     waiting.set(id, (reply) => {
       if (reply.ok) resolve({ job: reply.job, pageCount: reply.pageCount });

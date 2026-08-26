@@ -45,6 +45,10 @@ export const KIOSK_KEYS = {
 export function readJson<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(key);
+    // Stryker disable next-line ConditionalExpression: nothing observable turns
+    // on this. A missing key is `null`, which `JSON.parse` coerces to the string
+    // "null" and answers `null` for; an empty one throws into the catch, which
+    // answers `null` too. It is here to say what the empty cases mean.
     if (!raw) return null;
     return JSON.parse(raw) as T;
   } catch {
@@ -162,7 +166,14 @@ export interface KioskParticipationScope {
   recent: ReadonlySet<string>;
 }
 
-/** Empty means "nothing to scope by" to every reader. */
+/**
+ * Empty means "nothing to scope by" to every reader.
+ *
+ * Stryker cannot answer for this one and says so: the object is built when the
+ * module loads, which is before any mutant is switched on, so a test can read
+ * the emptied version only by reloading the module — see `docs/mutation-testing.md`.
+ */
+// Stryker disable next-line ObjectLiteral: built at module load, so no test run can see it emptied.
 export const NO_PARTICIPATION: KioskParticipationScope = {
   participated: new Set<string>(),
   recent: new Set<string>(),
@@ -204,6 +215,10 @@ export interface CachedPulse {
 }
 
 function pulseNumber(value: unknown): number {
+  // Stryker disable next-line ConditionalExpression: `Number.isFinite` — the
+  // static one, not the global — is already false for everything that is not a
+  // number, so the `typeof` refuses nothing it would let through. It is here
+  // for the narrowing that makes `value` a number at the return.
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 

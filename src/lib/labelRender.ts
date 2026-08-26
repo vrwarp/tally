@@ -282,10 +282,14 @@ export function resolveLines(
  * A single word too long to fit is returned as-is: hyphenating a child's name
  * is worse than a name that touches the edges, and the caller has already
  * shrunk as far as it is willing to go.
+ *
+ * Two things about the text are the caller's to guarantee, and both hold. It
+ * does not fit — `fitLine` has already returned for the text that does — and it
+ * has no leading, trailing or repeated spaces, because `fillLabelTokens`
+ * collapses and trims before `resolveLines` ever builds a line. So every word
+ * here is a real word, and there is at least one.
  */
 function wrap(text: string, fontPx: number, bold: boolean, width: number, measure: MeasureText): string[] {
-  if (measure(text, fontPx, bold) <= width) return [text];
-
   const words = text.split(' ');
   const lines: string[] = [];
   let current = '';
@@ -299,7 +303,9 @@ function wrap(text: string, fontPx: number, bold: boolean, width: number, measur
       current = word;
     }
   }
-  if (current !== '') lines.push(current);
+  // Unconditional: the first word is non-empty and `current` only ever becomes
+  // a word or a run of them, so there is always a last line to add.
+  lines.push(current);
 
   return lines;
 }
@@ -324,6 +330,15 @@ function fitLine(
     fontPx -= 2;
   }
 
+  /*
+   * A shortcut rather than a decision, which is why the mutants on it are
+   * disabled: `wrap` puts a text that fits back together unchanged — every
+   * prefix of it fits too, so the whole thing accumulates into one line — and
+   * would answer `[line.text]` here whatever this guard did. What it saves is a
+   * pass over the words of every line that did not need wrapping, on a layout
+   * that is attempted up to half a dozen times.
+   */
+  // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: see above.
   if (measure(line.text, fontPx, line.bold) <= width) {
     return { fontPx, texts: [line.text] };
   }
@@ -371,16 +386,10 @@ export function layoutLabel(
   const maxHeight =
     box.height === null ? null : Math.max(1, box.height - paddingTop - paddingBottom);
 
+  // A template whose every line resolved to nothing needs no special case: the
+  // ordinary path lays out no rows, measures nothing, and returns the same
+  // empty label — the box's own dimensions, or the padding alone on a free axis.
   const resolved = resolveLines(template, values);
-  if (resolved.length === 0) {
-    return {
-      draws: [],
-      width: box.width ?? paddingLeft + paddingRight,
-      height: box.height ?? paddingTop + paddingBottom,
-      droppedLines: 0,
-      scaledToFit: false,
-    };
-  }
 
   /** Lay out at a given scale, reporting the height it wanted. */
   const attempt = (scale: number, lines: ResolvedLine[]) => {
@@ -450,6 +459,12 @@ export function layoutLabel(
   const alignWidth = box.width === null ? contentWidth : innerWidth;
   const height = box.height ?? Math.ceil(contentHeight + paddingTop + paddingBottom);
   const top =
+    // Stryker disable next-line ConditionalExpression: the two branches agree on
+    // a free height. `maxHeight` is null exactly when `box.height` is, so the
+    // offset is `(0 - contentHeight) / 2`, which is never positive — the
+    // `Math.max` makes it `paddingTop` either way. The branch says which case is
+    // which. (Under the ternary, not the `const`, because `next-line` matches
+    // the line the node it is attached to starts on.)
     box.height === null
       ? paddingTop
       : paddingTop + Math.max(0, ((maxHeight ?? 0) - contentHeight) / 2);

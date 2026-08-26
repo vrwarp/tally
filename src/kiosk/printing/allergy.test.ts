@@ -130,6 +130,17 @@ describe('what gets asked for', () => {
 });
 
 describe('a flagged child never gets a blank', () => {
+  it('falls back when the read answers with nothing at all', async () => {
+    // The callable answers `null` for a person it could not read, which is not
+    // the same as a person with no note — and `null.trim()` is a rejection
+    // that the sticker would then be waiting on.
+    setAllergySource(async () => null as unknown as string);
+
+    startAllergyLookup(student(), PRINTS_ALLERGY);
+
+    await expect(allergyFor('pco_4200003')).resolves.toBe(ALLERGY_UNREAD);
+  });
+
   it('falls back to the bare word when the read fails', async () => {
     setAllergySource(async () => {
       throw new Error('offline in the hallway');
@@ -189,6 +200,50 @@ describe('a flagged child never gets a blank', () => {
   });
 });
 
+describe('the wait itself', () => {
+  it('leaves no timer armed once the note is in hand', async () => {
+    vi.useFakeTimers();
+    try {
+      setAllergySource(async () => 'Peanuts');
+      startAllergyLookup(student(), PRINTS_ALLERGY);
+
+      await expect(allergyFor('pco_4200003')).resolves.toBe('Peanuts');
+
+      // Hundreds of labels an evening, each holding the page awake for four
+      // seconds after it had its answer.
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves no timer armed when the wait is what answered', async () => {
+    vi.useFakeTimers();
+    try {
+      setAllergySource(() => new Promise<string>(() => {}));
+      startAllergyLookup(student(), PRINTS_ALLERGY);
+
+      const reading = allergyFor('pco_4200003');
+      await vi.advanceTimersByTimeAsync(ALLERGY_WAIT_MS);
+
+      await expect(reading).resolves.toBe(ALLERGY_UNREAD);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('arms no timer for a job that never asked', async () => {
+    vi.useFakeTimers();
+    try {
+      await expect(allergyFor('pco_nobody')).resolves.toBeUndefined();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('what is kept, and for how long', () => {
   it('holds nothing for a child the parent backed out of', async () => {
     setAllergySource(async () => 'Peanuts');
@@ -208,6 +263,20 @@ describe('what is kept, and for how long', () => {
 
     await expect(allergyFor('pco_1')).resolves.toBeUndefined();
     await expect(allergyFor('pco_2')).resolves.toBeUndefined();
+  });
+
+  it('holds the whole handful, and starts dropping only past it', async () => {
+    setAllergySource(async (id) => `note for ${id}`);
+
+    // Eight is a queue at the door, not an accumulation: every one of them is
+    // still there. The eviction starts on the ninth.
+    for (let index = 0; index < 8; index += 1) {
+      startAllergyLookup(student({ id: `pco_${index}` }), PRINTS_ALLERGY);
+    }
+
+    for (let index = 0; index < 8; index += 1) {
+      await expect(allergyFor(`pco_${index}`)).resolves.toBe(`note for pco_${index}`);
+    }
   });
 
   it('holds only a handful at a time, oldest out first', async () => {
