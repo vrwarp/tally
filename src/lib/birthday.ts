@@ -200,6 +200,8 @@ export function birthdayState(birthday: string | null | undefined, now: Date): B
   const days = daysToBirthday(birthday, now);
   if (days === null) return 'missing';
   if (days === 0) return 'today';
+  // Stryker disable next-line EqualityOperator: zero returned on the line above,
+  // so `> 0` and `>= 0` select the same days from here on.
   if (days > 0) return days <= BIRTHDAY_WINDOW_DAYS ? 'soon' : 'quiet';
   return days >= -BIRTHDAY_WINDOW_DAYS ? 'recent' : 'quiet';
 }

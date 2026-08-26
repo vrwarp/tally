@@ -128,6 +128,14 @@ was: three of the first equivalent mutants found here turned out to be
 duplicated state, a restated constant, and a line that did nothing, and all
 three were deleted rather than annotated.
 
+One class of these is left un-annotated on purpose, because annotating it would
+cost more than it is worth. Stryker's `ArrayDeclaration` mutator rewrites `[]`
+as `["Stryker was here"]`, and for a React hook's *dependency* array that is
+always equivalent: the replacement is a constant, so the deps never change and
+the effect runs exactly as often as it did. There are thirteen of those in the
+scope. `useState([])` is a different matter — the initial value really does
+change — and those are killable and killed.
+
 ## What it found
 
 The first pass over the logic core, in the order the sweep reached them:

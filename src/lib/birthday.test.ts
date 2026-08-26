@@ -55,6 +55,17 @@ describe('birthdayState', () => {
     expect(daysToBirthday('01-02', dec29)).toBe(4);
   });
 
+  it('settles a birthday exactly half a year away the same way every time', () => {
+    // Two candidates can be equidistant: 2 July is 183 days either side of
+    // 1 January 2024, because a leap day sits between last year's occurrence
+    // and this year's. The first candidate wins, which is the one behind — and
+    // it is 'quiet' either way, so what this pins is only that the sign
+    // `daysToBirthday` hands its callers does not depend on a tiebreak nobody
+    // wrote down.
+    expect(daysToBirthday('07-02', new Date(2024, 0, 1))).toBe(-183);
+    expect(birthdayState('07-02', new Date(2024, 0, 1))).toBe('quiet');
+  });
+
   it('does not care what time of day it is asked', () => {
     expect(birthdayState('03-14', new Date(2026, 2, 14, 0, 1))).toBe('today');
     expect(birthdayState('03-14', new Date(2026, 2, 14, 23, 59))).toBe('today');
@@ -101,6 +112,39 @@ describe('taking a birthday apart', () => {
     // being trusted. `parseBirthday` is the one that knows what a year means.
     expect(birthdayParts('2011-03-14')).toBeNull();
     expect(birthdayParts('13-40')).toBeNull();
+  });
+
+  it('refuses each half of an impossible date on its own', () => {
+    // The pattern only says "two digits": `00` and `99` both match it, so
+    // every one of these bounds is reachable from a real stored value.
+    expect(birthdayParts('00-14')).toBeNull();
+    expect(birthdayParts('13-14')).toBeNull();
+    expect(birthdayParts('03-00')).toBeNull();
+    expect(birthdayParts('03-32')).toBeNull();
+  });
+
+  it('keeps the days at either end of the range', () => {
+    expect(birthdayParts('01-01')).toEqual({ month: 1, day: 1 });
+    expect(birthdayParts('12-31')).toEqual({ month: 12, day: 31 });
+  });
+
+  it('refuses each half of an impossible dated birthday too', () => {
+    expect(parseBirthday('2011-00-14')).toBeNull();
+    expect(parseBirthday('2011-13-14')).toBeNull();
+    expect(parseBirthday('2011-03-00')).toBeNull();
+    expect(parseBirthday('2011-03-32')).toBeNull();
+  });
+
+  it('keeps the ends of the range with a year on them', () => {
+    expect(parseBirthday('2011-01-01')).toEqual({ month: 1, day: 1, year: 2011 });
+    expect(parseBirthday('2011-12-31')).toEqual({ month: 12, day: 31, year: 2011 });
+  });
+
+  it('refuses a string that is not a date at all', () => {
+    expect(parseBirthday('')).toBeNull();
+    expect(parseBirthday('March 14')).toBeNull();
+    expect(parseBirthday('3-14')).toBeNull();
+    expect(parseBirthday('11-03-14')).toBeNull();
   });
 
   /**
@@ -155,6 +199,25 @@ describe('isRealBirthday', () => {
     expect(isRealBirthday(13, 14)).toBe(false);
     expect(isRealBirthday(3, 0)).toBe(false);
     expect(isRealBirthday(3, 14.5)).toBe(false);
+    expect(isRealBirthday(3.5, 14)).toBe(false);
+  });
+
+  it('keeps the first day of the first month, and the last of the last', () => {
+    // The bounds are inclusive at both ends, and 1 January is a birthday.
+    expect(isRealBirthday(1, 1)).toBe(true);
+    expect(isRealBirthday(12, 31)).toBe(true);
+  });
+
+  it('checks the month’s own length against the year, not February’s', () => {
+    // The year narrows February and nothing else: a 31-day month stays 31 days
+    // long in every year there has ever been.
+    expect(isRealBirthday(1, 31, 2011)).toBe(true);
+    expect(isRealBirthday(4, 31, 2011)).toBe(false);
+    expect(isRealBirthday(2, 28, 2011)).toBe(true);
+  });
+
+  it('refuses a year that is not a whole number', () => {
+    expect(isRealBirthday(3, 14, 2011.5)).toBe(false);
   });
 
   it('refuses a year of birth before anybody alive was born', () => {
