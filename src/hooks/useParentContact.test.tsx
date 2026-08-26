@@ -291,6 +291,37 @@ describe('useParentContact', () => {
       expect(result.current.loading).toBe(false);
     });
 
+    it('does not report a failure the reader has already asked past', async () => {
+      /*
+       * The abandoned sweep failing. Its bad news belongs to a question nobody
+       * is asking any more, and putting it on screen would cover a sweep that
+       * is still running — on the list somebody pressed refresh on because the
+       * last answer looked wrong.
+       */
+      const gates: ((value: unknown) => void)[] = [];
+      const rejects: ((cause: Error) => void)[] = [];
+      getParentContactStatus.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            gates.push(resolve);
+            rejects.push(reject);
+          }),
+      );
+
+      const { result } = renderHook(() => useParentContact());
+      await waitFor(() => expect(gates).toHaveLength(1));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(gates).toHaveLength(2));
+
+      await act(async () => {
+        rejects[0]!(new Error('offline'));
+        await Promise.resolve();
+      });
+
+      expect(result.current.error).toBeNull();
+    });
+
     it('counts as settled once any sweep has answered', async () => {
       const gates = twoSweeps();
       const { result } = renderHook(() => useParentContact());

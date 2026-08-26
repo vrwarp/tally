@@ -445,6 +445,32 @@ describe('retry, pressed more than once', () => {
   });
 });
 
+describe('refresh, after the panel moved to another student', () => {
+  it('refreshes the student on screen rather than the one it opened on', async () => {
+    /*
+     * `refresh` drops the memo for a student and then asks again, and which
+     * student that is has to follow the panel. A closure holding the id it was
+     * first built with would invalidate somebody else's entry and leave this
+     * one cached — so the press would do nothing, on the button somebody
+     * reaches for precisely because what is on screen looks wrong.
+     */
+    const { result, rerender } = renderHook(
+      ({ student }: { student: Parameters<typeof usePersonDetails>[0] }) =>
+        usePersonDetails(student),
+      { initialProps: { student: linked() } },
+    );
+    await waitFor(() => expect(result.current.details).not.toBeNull());
+
+    rerender({ student: linked({ id: 'pco_222', pcoPersonId: '222' }) });
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(2));
+
+    act(() => result.current.refresh());
+
+    await waitFor(() => expect(getPersonDetails).toHaveBeenCalledTimes(3));
+    expect(getPersonDetails.mock.calls.at(-1)?.[0]).toMatchObject({ studentId: 'pco_222' });
+  });
+});
+
 describe('a late answer', () => {
   it('does not land after the student has changed', async () => {
     let answerFirst: (value: { data: PcoPersonDetails | null }) => void = () => {};
