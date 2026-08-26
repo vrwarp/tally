@@ -278,6 +278,84 @@ describe('the per-backend report', () => {
     expect(latest?.rosterBackends[0]?.ok).toBe(false);
   });
 
+  it('publishes a new one when any one line of it moves', async () => {
+    /*
+     * The settings screen reads all six of these off each backend, and the
+     * churn guard in front of them is a string comparison — so a field left
+     * out of that string is a line that stops updating and never says so.
+     */
+    const base = {
+      backendId: 'pco' as const,
+      ok: true,
+      error: null as string | null,
+      people: 12,
+      unresolved: 0,
+      missing: 0,
+    };
+    const moves: Array<[string, Record<string, unknown>]> = [
+      ['a backend that started failing', { ok: false }],
+      ['a reason for the failure', { error: 'Rate-limited' }],
+      ['somebody joining the roster', { people: 13 }],
+      ['a row nobody could resolve', { unresolved: 2 }],
+      ['a record that has gone missing upstream', { missing: 1 }],
+      ['a different backend answering', { backendId: 'a32' as const }],
+    ];
+
+    for (const [what, move] of moves) {
+      fetchRoster.mockReset();
+      fetchRoster.mockImplementation(async () => ({
+        students: [],
+        fetchedAt: new Date('2026-02-13T19:30:00Z'),
+        offline: false,
+        perBackend: [base],
+      }));
+
+      const view = mount();
+      await waitFor(() => expect(latest?.rosterBackends).toHaveLength(1));
+      const first = latest?.rosterBackends;
+
+      fetchRoster.mockImplementationOnce(async () => ({
+        students: [],
+        fetchedAt: new Date('2026-02-13T19:30:00Z'),
+        offline: false,
+        perBackend: [{ ...base, ...move }],
+      }));
+      await act(async () => {
+        await latest?.refreshRoster(true);
+      });
+
+      expect(latest?.rosterBackends, what).not.toBe(first);
+      view.unmount();
+    }
+  });
+
+  it('holds the same array when only the instant of the read moved', async () => {
+    // `fetchedAt` is deliberately out of the signature: every read restamps it,
+    // and restamping is not a change worth re-rendering every consumer for.
+    fetchRoster.mockImplementationOnce(async () => ({
+      students: [],
+      fetchedAt: new Date('2026-02-13T19:30:00Z'),
+      offline: false,
+      perBackend: report(true, 12),
+    }));
+
+    mount();
+    await waitFor(() => expect(latest?.rosterBackends).toHaveLength(1));
+    const first = latest?.rosterBackends;
+
+    fetchRoster.mockImplementationOnce(async () => ({
+      students: [],
+      fetchedAt: new Date('2026-02-13T20:30:00Z'),
+      offline: false,
+      perBackend: [{ ...report(true, 12)[0]!, fetchedAt: new Date('2026-02-13T20:30:00Z') }],
+    }));
+    await act(async () => {
+      await latest?.refreshRoster(true);
+    });
+
+    expect(latest?.rosterBackends).toBe(first);
+  });
+
   it('treats a read that reported no backends as an empty list', async () => {
     fetchRoster.mockResolvedValue({ students: [], fetchedAt: new Date(), offline: false });
 
