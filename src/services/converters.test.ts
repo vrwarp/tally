@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import {
+  fromRosterPerson,
   toAttendance,
   toDate,
   toDateOrNull,
@@ -19,7 +20,7 @@ import {
   toStudent,
   toUserProfile,
 } from '@/services/converters';
-import { DEFAULT_SETTINGS } from '@/types';
+import { DEFAULT_SETTINGS, type PcoRosterPerson } from '@/types';
 
 /**
  * The minimum of `DocumentSnapshot` the converters actually touch. Cast rather
@@ -139,6 +140,170 @@ describe('toStudent', () => {
     expect(student.firstAttendedAt).toBeNull();
     expect(student.lastAttendedAt).toBeNull();
   });
+
+  it('reads only a real boolean as a yes', () => {
+    /*
+     * Every one of these decides something a leader sees: the visitor badge,
+     * whether a push is still owed, whether the row is waiting on somebody to
+     * look at it. A string, a 1, or an older spelling of the field must read as
+     * "no" rather than as "yes" — an unset flag is the ordinary case, and a
+     * screen full of badges nobody can clear is worse than no badge.
+     */
+    const wrong = toStudent(
+      fakeSnapshot({
+        data: {
+          isVisitor: 'yes',
+          upstreamPushPending: 1,
+          upstreamRecordMissing: 'true',
+          pendingReview: {},
+        },
+      }),
+    );
+
+    expect(wrong).toMatchObject({
+      isVisitor: false,
+      upstreamPushPending: false,
+      upstreamRecordMissing: false,
+      pendingReview: false,
+    });
+
+    const right = toStudent(fakeSnapshot({ data: { isVisitor: true, pendingReview: true } }));
+    expect(right).toMatchObject({ isVisitor: true, pendingReview: true });
+  });
+
+  it('is active unless the document says the one word that means otherwise', () => {
+    // "inactive" is the only value that takes somebody off the roster, so
+    // anything else — including a typo, and including nothing — leaves them on
+    // it. Getting this the other way round empties a ministry's roster.
+    expect(toStudent(fakeSnapshot({ data: { status: 'inactive' } })).status).toBe('inactive');
+    expect(toStudent(fakeSnapshot({ data: { status: 'active' } })).status).toBe('active');
+    expect(toStudent(fakeSnapshot({ data: { status: 'archived' } })).status).toBe('active');
+    expect(toStudent(fakeSnapshot({ data: {} })).status).toBe('active');
+  });
+
+  it('folds both spellings of "merged from" into one list, without repeats', () => {
+    /*
+     * `mergedFromStudentId` predates a keeper being able to absorb more than
+     * one duplicate. Both spellings can be on the same document — the older
+     * merge wrote one, a later one wrote the other — and the list is what every
+     * screen reads to know which ids now point here.
+     */
+    const keeper = toStudent(
+      fakeSnapshot({
+        data: {
+          mergedFromStudentIds: ['pco_1', 'pco_2', 7, null],
+          mergedFromStudentId: 'pco_1',
+        },
+      }),
+    );
+
+    expect(keeper.mergedFromStudentIds).toEqual(['pco_1', 'pco_2']);
+  });
+
+  it('reads the older single field on its own', () => {
+    const keeper = toStudent(fakeSnapshot({ data: { mergedFromStudentId: 'pco_9' } }));
+    expect(keeper.mergedFromStudentIds).toEqual(['pco_9']);
+
+    // And a document that absorbed nobody has an empty list, not a list with
+    // something in it: the badge counts this.
+    expect(toStudent(fakeSnapshot({ data: {} })).mergedFromStudentIds).toEqual([]);
+    expect(
+      toStudent(fakeSnapshot({ data: { mergedFromStudentIds: 'pco_1' } })).mergedFromStudentIds,
+    ).toEqual([]);
+  });
+
+  it('prefers the stored search key over one rebuilt from the name', () => {
+    // The stored key is what the server wrote and what a roster search matches
+    // on; rebuilding it here would quietly disagree with the index on any name
+    // the two normalise differently.
+    const stored = toStudent(
+      fakeSnapshot({ data: { firstName: 'Jamie', lastName: 'Rivera', searchName: 'jamie r' } }),
+    );
+    expect(stored.searchName).toBe('jamie r');
+
+    // And builds one when the document has none, so an older write is findable.
+    const rebuilt = toStudent(fakeSnapshot({ data: { firstName: 'Jamie', lastName: 'Rivera' } }));
+    expect(rebuilt.searchName).toBe('jamie rivera');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* fromRosterPerson                                                            */
+/* -------------------------------------------------------------------------- */
+
+describe('fromRosterPerson', () => {
+  const NOW = new Date(2026, 1, 13, 19, 0);
+
+  function person(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
+    return {
+      id: 'pco_500',
+      pcoPersonId: '500',
+      firstName: 'Bree',
+      lastName: 'Sandoval',
+      grade: 7,
+      status: 'active',
+      searchName: 'bree sandoval',
+      profileComplete: true,
+      hasAllergies: false,
+      birthday: null,
+      ...overrides,
+    };
+  }
+
+  it('is upstream’s row, not Tally’s: no visitor badge and nothing to push', () => {
+    // The mirror image of `toStudent`. This row came *from* the backend, so
+    // there is nothing owed to it and nobody added them at a door.
+    expect(fromRosterPerson(person(), NOW)).toMatchObject({
+      fromPlanningCenter: true,
+      isVisitor: false,
+      upstreamPushPending: false,
+    });
+  });
+
+  it('carries the linkage on the row, so a grafted student still names a backend', () => {
+    /*
+     * `mergeRoster` moves this row under a visitor document's id, where the
+     * `pco_`/`a32_` prefix stops answering — so the backend has to travel as a
+     * field. A stored roster written before the field existed is Planning
+     * Center's, because nothing else existed then.
+     */
+    expect(fromRosterPerson(person({ backendId: 'a32', id: 'a32_9f0c' }), NOW)).toMatchObject({
+      upstreamBackend: 'a32',
+      createdBy: 'attendees32',
+    });
+
+    expect(fromRosterPerson(person({ id: 'a32_9f0c' }), NOW)).toMatchObject({
+      upstreamBackend: 'a32',
+      // Not the backend of the id: the sentinel says which *sync* wrote the
+      // row, and only an explicit `backendId` says that.
+      createdBy: 'planning-center',
+    });
+
+    expect(fromRosterPerson(person({ id: 'legacy-id' }), NOW)).toMatchObject({
+      upstreamBackend: 'pco',
+      createdBy: 'planning-center',
+    });
+  });
+
+  it('dates the row to the epoch, so nobody predates the gatherings they missed', () => {
+    /*
+     * `createdAt` has one job: deciding whether a student could plausibly have
+     * attended a past gathering. Stamping somebody the church already had on
+     * file with the moment we happened to read them would put every event
+     * before every student, and the MIA list would be empty for ever.
+     */
+    expect(fromRosterPerson(person(), NOW).createdAt).toEqual(new Date(0));
+    expect(fromRosterPerson(person(), NOW).updatedAt).toEqual(NOW);
+  });
+
+  it('reads a missing birthday as none rather than as undefined', () => {
+    // A roster parked in local storage by a build that predates the field
+    // comes back without it, and `undefined` reaches the badge as "not
+    // missing" — which is the one answer nobody can act on.
+    const { birthday: _dropped, ...older } = person();
+
+    expect(fromRosterPerson(older as PcoRosterPerson, NOW).birthday).toBeNull();
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -239,6 +404,16 @@ describe('toAttendance', () => {
     expect(record.id).toBe('student-7');
     expect(record.studentId).toBe('student-7');
     expect(record.eventId).toBe('event-99');
+  });
+
+  it('keeps every method the app can actually produce', () => {
+    // Each of these is a different door: the roster search, the quick-add
+    // modal, a leader typing up a register, an import, and the lobby kiosk.
+    // Folding any of them into "tap" loses the only record of how a child
+    // arrived, which is what the insights screen counts.
+    for (const method of ['search', 'quick-add', 'manual', 'import', 'kiosk'] as const) {
+      expect(toAttendance(fakeSnapshot({ data: { method } }), 'e').method).toBe(method);
+    }
   });
 
   it('coerces an unrecognised check-in method to "tap"', () => {
@@ -367,6 +542,106 @@ describe('toEvent', () => {
       toEvent(fakeSnapshot({ data: { mode: 'oneoff', recurrence: { frequency: 'weekly' } } }))
         .recurrence,
     ).toBeNull();
+  });
+
+  it('keeps a monthly rule’s mode, and reads anything else as day-of-month', () => {
+    // "The third Tuesday" and "the 15th" are different gatherings. Only the one
+    // word means the former, so a missing or garbled value has to fall to the
+    // date — which is the rule the editor writes by default.
+    const byWeekday = toEvent(
+      fakeSnapshot({
+        data: { recurrence: { frequency: 'monthly', monthlyMode: 'dayOfWeek' } },
+      }),
+    );
+    expect(byWeekday.recurrence?.monthlyMode).toBe('dayOfWeek');
+
+    for (const monthlyMode of [undefined, 'dayofweek', 'weekday', 3]) {
+      const event = toEvent(
+        fakeSnapshot({ data: { recurrence: { frequency: 'monthly', monthlyMode } } }),
+      );
+      expect(event.recurrence?.monthlyMode).toBe('dayOfMonth');
+    }
+  });
+
+  it('keeps an end date that is a date', () => {
+    // The other half of the malformed-`until` test below it: a real one has to
+    // survive, or a series a leader ended would repeat for ever.
+    const event = toEvent(
+      fakeSnapshot({ data: { recurrence: { frequency: 'weekly', until: '2026-06-26' } } }),
+    );
+    expect(event.recurrence?.until).toBe('2026-06-26');
+
+    // And a value that is not even a string is not an end date.
+    expect(
+      toEvent(fakeSnapshot({ data: { recurrence: { frequency: 'weekly', until: 20260626 } } }))
+        .recurrence?.until,
+    ).toBeNull();
+  });
+
+  it('reads an interval and a count only when they are numbers', () => {
+    const event = toEvent(
+      fakeSnapshot({
+        data: { recurrence: { frequency: 'weekly', interval: 'two', count: 'ten' } },
+      }),
+    );
+
+    // One week, no end: the rule the editor produces when nobody says
+    // otherwise, rather than a rule with `NaN` in it that projects nothing.
+    expect(event.recurrence).toMatchObject({ interval: 1, count: null });
+
+    // And a number that is not finite is not a number of anything. Firestore
+    // can hold a NaN or an Infinity, and either would make the projection
+    // silently produce no occurrences at all.
+    const notFinite = toEvent(
+      fakeSnapshot({
+        data: { recurrence: { frequency: 'weekly', interval: Number.NaN, count: Infinity } },
+      }),
+    );
+    expect(notFinite.recurrence).toMatchObject({ interval: 1, count: null });
+
+    const real = toEvent(
+      fakeSnapshot({ data: { recurrence: { frequency: 'weekly', interval: 2, count: 10 } } }),
+    );
+    expect(real.recurrence).toMatchObject({ interval: 2, count: 10 });
+  });
+
+  it('lets only a trip borrow a prediction', () => {
+    /*
+     * A recurring gathering predicts from its own chain. A stray
+     * `predictFromChain` on one would silently point the lobby screen at
+     * another gathering's regulars — the wrong children ticked, at a door.
+     */
+    expect(
+      toEvent(fakeSnapshot({ data: { mode: 'oneoff', predictFromChain: 'friday' } }))
+        .predictFromChain,
+    ).toBe('friday');
+    expect(
+      toEvent(fakeSnapshot({ data: { mode: 'recurring', predictFromChain: 'friday' } }))
+        .predictFromChain,
+    ).toBeNull();
+  });
+
+  it('never turns check-out on because of the shape of a gathering', () => {
+    // A nursery is something somebody switches on. An RSVP list is not: a trip
+    // with a fixed list is why one-offs have a roster story at all.
+    expect(toEvent(fakeSnapshot({ data: { mode: 'oneoff' } }))).toMatchObject({
+      requiresRsvp: true,
+      requiresCheckOut: false,
+    });
+    expect(toEvent(fakeSnapshot({ data: { mode: 'recurring' } }))).toMatchObject({
+      requiresRsvp: false,
+      requiresCheckOut: false,
+    });
+    expect(
+      toEvent(fakeSnapshot({ data: { mode: 'recurring', requiresCheckOut: true } }))
+        .requiresCheckOut,
+    ).toBe(true);
+  });
+
+  it('is a document, so it is materialised by definition', () => {
+    // The other half of the calendar is projected in memory and says `false`.
+    // A screen decides whether it can edit a row from this.
+    expect(toEvent(fakeSnapshot({ data: {} })).materialized).toBe(true);
   });
 
   it('only honours an explicit "cancelled" status', () => {

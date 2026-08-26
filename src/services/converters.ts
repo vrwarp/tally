@@ -221,6 +221,9 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
   // reads back as what it always meant rather than as no rule at all.
   const legacyDaily = raw.frequency === 'daily';
   if (!legacyDaily && !isRecurrenceFrequency(raw.frequency)) return null;
+  // Stryker disable next-line StringLiteral: `normalizeRecurrence` below reads
+  // anything it does not recognise as weekly too, so no string here changes the
+  // rule that comes back. Saying it plainly is what documents the migration.
   const frequency = legacyDaily ? 'weekly' : (raw.frequency as RecurrenceFrequency);
 
   return normalizeRecurrence(
@@ -231,7 +234,11 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
         ? [...EVERY_WEEKDAY]
         : Array.isArray(raw.weekdays)
           ? (raw.weekdays as number[])
-          : [],
+          : // Stryker disable next-line ArrayDeclaration: `normalizeRecurrence`
+            // keeps only whole numbers 0-6 and falls back to the event's own
+            // weekday when none survive, so every array that is not a list of
+            // weekdays — this one included — reaches the same rule.
+            [],
       monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
       // A malformed `until` reads as "no end date" rather than as "ended", so a
       // corrupt field never makes a live weekly gathering look finished.
@@ -396,6 +403,10 @@ export function toEventSeries(snapshot: DocumentSnapshot<DocumentData>): EventSe
 }
 
 export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSettings {
+  // Stryker disable next-line ConditionalExpression: a shortcut, not a decision
+  // — the path below reads a missing document as `{}` and every field then
+  // falls to the same default this returns. It saves the clamps, and says that
+  // a ministry that has never opened the settings screen is not misconfigured.
   if (!snapshot.exists()) return DEFAULT_SETTINGS;
   const data = (snapshot.data() ?? {}) as Partial<AppSettingsDoc>;
 
