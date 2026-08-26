@@ -96,6 +96,52 @@ describe('checkIn', () => {
     expect(studentWrite()).toMatchObject({ firstName: 'Alena', lastName: 'Ruiz', grade: 9 });
   });
 
+  it('marks a first-ever night only for somebody who has never been', async () => {
+    /*
+     * The badge a leader looks for on a Wednesday: whose first time is this.
+     * It is computed here, from the student's own `firstAttendedAt`, because
+     * the record is the permanent thing and the roster row it was copied from
+     * may be gone by the time anybody reads it back.
+     */
+    await tap(makeStudent({ id: 'pco_9', firstAttendedAt: null }));
+    expect(attendanceWrite().data?.isFirstEver).toBe(true);
+
+    set.mockClear();
+    await tap(makeStudent({ id: 'pco_9', firstAttendedAt: new Date('2025-09-05T19:00:00') }));
+    expect(attendanceWrite().data?.isFirstEver).toBe(false);
+  });
+
+  it('merges into the student document rather than replacing it', async () => {
+    /*
+     * `set(..., { merge: true })` and not `update`: for a Planning Center
+     * student the document usually does not exist yet, and an `update` that
+     * fails takes the *attendance* write down with it — the tap would flash
+     * green and then quietly not have happened. Without the merge flag the same
+     * write would overwrite the whole profile with these six fields.
+     */
+    await tap(makeStudent({ id: 'pco_9', firstAttendedAt: null }));
+
+    const call = set.mock.calls.find(([ref]) =>
+      (ref as { path: string }).path.startsWith('students/'),
+    );
+    expect(call?.[2]).toEqual({ merge: true });
+  });
+
+  it('leaves the student document alone when it has nothing to say about them', async () => {
+    // Already been, and already seen later than this gathering. Writing an
+    // empty patch would touch `updatedAt` on a profile nothing changed about.
+    await tap(
+      makeStudent({
+        id: 'pco_9',
+        firstAttendedAt: new Date('2025-09-05T19:00:00'),
+        lastAttendedAt: new Date('2026-03-06T19:00:00'),
+      }),
+    );
+
+    expect(studentWrite()).toBeNull();
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
   it('writes no grade for somebody Planning Center holds none for', async () => {
     // The clamp's landing spot, not a grade. Stamping it here would put an
     // invented 6th grade on the permanent record of every adult a leader has
@@ -172,6 +218,32 @@ describe('swapCheckIn', () => {
     expect(attendanceWrite().data?.isFirstEver).toBe(false);
   });
 
+  it('still marks it a first-ever night when the receiving student has never been', async () => {
+    await swapCheckIn({
+      event: EVENT,
+      from: makeAttendance({ ...RECORD, isFirstEver: false }),
+      to: makeStudent({ ...RIGHT, firstAttendedAt: null }),
+      uid: 'counselor-2',
+    });
+
+    expect(attendanceWrite().data?.isFirstEver).toBe(true);
+  });
+
+  it('merges the receiving student’s dates rather than replacing their profile', async () => {
+    await swapCheckIn({
+      event: EVENT,
+      from: RECORD,
+      to: makeStudent({ ...RIGHT, firstAttendedAt: null }),
+      uid: 'counselor-2',
+    });
+
+    const call = set.mock.calls.find(([ref]) =>
+      (ref as { path: string }).path.startsWith('students/'),
+    );
+    expect(call?.[1]).toMatchObject({ firstAttendedAt: EVENT.startAt });
+    expect(call?.[2]).toEqual({ merge: true });
+  });
+
   it('back-fills the receiving student’s dates, and only forward', async () => {
     await swapCheckIn({
       event: EVENT,
@@ -234,6 +306,30 @@ describe('quickAddAndCheckIn', () => {
 
     const [, payload] = set.mock.calls[0]!;
     expect(payload).toMatchObject({ grade: 9 });
+  });
+
+  it('flags the new profile for the core team to finish', async () => {
+    // The yellow "Missing Info" badge. A quick-add is a name and maybe a grade,
+    // typed by somebody with a queue behind them; somebody else finishes it.
+    await quickAddAndCheckIn({ draft, event: EVENT, uid: 'counselor-1' });
+
+    expect(set.mock.calls[0]![1]).toMatchObject({ isVisitor: true });
+  });
+
+  it('records how they arrived, and that it is their first night', async () => {
+    /*
+     * Both are known for certain here and nowhere else: the student did not
+     * exist a moment ago, so this is their first night by construction, and
+     * they came in through the quick-add modal rather than off the roster.
+     */
+    await quickAddAndCheckIn({ draft, event: EVENT, uid: 'counselor-1' });
+
+    // The student ref is minted by `newStudentRef`, which is not this file's
+    // stub — so the attendance write is the one with a path of its own.
+    const attendance = set.mock.calls.find(([ref]) =>
+      (ref as { path?: string }).path?.includes('/attendance/'),
+    );
+    expect(attendance?.[1]).toMatchObject({ method: 'quick-add', isFirstEver: true });
   });
 
   /**
@@ -362,6 +458,32 @@ describe('fetchAttendanceByEvent', () => {
     // once is.
     expect(peak).toBeLessThan(100);
     expect(peak).toBeLessThanOrEqual(12);
+  });
+
+  it('tells who has gone home apart from who is present', async () => {
+    /*
+     * Two sets off one read, and they have to stay apart: `present` is everyone
+     * on the register, `checkedOut` only those a parent has collected. A screen
+     * that conflated them would show an empty room at the end of the night, and
+     * the check-out button is what a leader uses to know who is still in it.
+     */
+    getDocs.mockResolvedValue({
+      docs: [
+        { id: 'gone-home', get: (key: string) => (key === 'checkedOutAt' ? 'a-timestamp' : null) },
+        { id: 'still-here', get: () => null },
+        // A pending `serverTimestamp()` reads back null locally — the same
+        // state as never having been collected, which is the honest answer
+        // until the write lands.
+        { id: 'pending', get: (key: string) => (key === 'checkedOutAt' ? undefined : null) },
+      ],
+    });
+
+    const result = await fetchAttendanceByEvent(['event-1']);
+
+    expect(result.byEvent.get('event-1')?.present).toEqual(
+      new Set(['gone-home', 'still-here', 'pending']),
+    );
+    expect(result.byEvent.get('event-1')?.checkedOut).toEqual(new Set(['gone-home']));
   });
 
   it('asks for nothing when given nothing', async () => {

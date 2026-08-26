@@ -24,7 +24,7 @@
  *   node scripts/mutation-sweep.mjs --skip-reported    # only modules with no report yet
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = process.cwd();
@@ -143,12 +143,36 @@ function reportFor(file) {
 
 const skipReported = flags.has('--skip-reported');
 
+/**
+ * Whether a module's report still describes the code that is there now.
+ *
+ * "Already reported" has to mean "reported for *this* module and *these*
+ * tests", or a resumed sweep quietly hands back yesterday's numbers for
+ * everything worked on since — which is what a mutation score is least able to
+ * survive, because a stale one looks exactly like a fresh one and is the number
+ * somebody then works from. Anything the run could have read is compared:
+ * the module, and every test file that can reach it.
+ */
+function reportIsCurrent(file, scope) {
+  const report = reportFor(file);
+  if (!existsSync(report)) return false;
+  const written = statSync(report).mtimeMs;
+  const newer = (path) => {
+    try {
+      return statSync(path).mtimeMs > written;
+    } catch {
+      // Deleted since the run. Whatever it said, it no longer holds.
+      return true;
+    }
+  };
+  return !newer(file) && !scope.some(newer);
+}
+
 const modules = walk(join(ROOT, 'src'))
   .filter((file) => includes.some((pattern) => pattern.test(file)))
   .filter((file) => !excludes.some((pattern) => pattern.test(file)))
   .filter((file) => filter.length === 0 || filter.some((prefix) => file.startsWith(prefix)))
-  .filter((file) => changed === null || changed.has(file))
-  .filter((file) => !skipReported || !existsSync(reportFor(file)));
+  .filter((file) => changed === null || changed.has(file));
 
 if (changed !== null && modules.length === 0) {
   console.log('No module in the mutation scope changed on this branch.');
@@ -157,23 +181,32 @@ if (changed !== null && modules.length === 0) {
 
 /** How many test files each module drags in — the cost of asking about it. */
 const plan = [];
+let skipped = 0;
 for (const file of modules) {
+  let tests = [];
   let scope = 0;
   try {
-    scope = execFileSync('node', ['scripts/mutation-scope.mjs', file], {
+    tests = execFileSync('node', ['scripts/mutation-scope.mjs', file], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     })
       .trim()
-      .split(',').length;
+      .split(',');
+    scope = tests.length;
   } catch {
     // No test imports it at all. Still worth running: every mutant will be
     // reported as uncovered, which is the finding.
     scope = Number.MAX_SAFE_INTEGER;
   }
+  if (skipReported && reportIsCurrent(file, tests)) {
+    skipped += 1;
+    continue;
+  }
   plan.push({ file, scope });
 }
 plan.sort((a, b) => a.scope - b.scope || a.file.localeCompare(b.file));
+
+if (skipped > 0) console.log(`Skipping ${skipped} module(s) whose report is still current.`);
 
 if (flags.has('--list')) {
   for (const { file, scope } of plan) {

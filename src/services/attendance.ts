@@ -331,8 +331,15 @@ export async function fetchAttendanceByEvent(
   // increment is synchronous with the read of `next`, so two workers can never
   // claim the same event.
   const worker = async (): Promise<void> => {
+    // Stryker disable next-line EqualityOperator: one past the end reads as
+    // `undefined` and is skipped by the guard below, so a `<=` bound costs an
+    // iteration that does nothing and changes no answer.
     for (let index = next++; index < eventIds.length; index = next++) {
       const eventId = eventIds[index];
+      // Stryker disable next-line ConditionalExpression: and the guard cannot
+      // fire while the bound above is right — it is here because the index is
+      // computed rather than iterated, and `noUncheckedIndexedAccess` is
+      // correct that nothing in the types says it is in range.
       if (eventId === undefined) continue;
 
       /*
