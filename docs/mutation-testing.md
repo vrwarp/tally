@@ -292,6 +292,53 @@ The first pass over the logic core, in the order the sweep reached them:
 - **`fetchRoster` re-sorted an answer it had merged nothing into**, putting this
   side's ordering rule in front of the server's — which is the one that knows
   about secondary sorts and about people with no surname.
+- **Two modules with one basename overwrote each other's report.** Five pairs in
+  this repo share a basename — two `roster.ts`, two `theme.ts`, two
+  `planningCenter.ts`, two `eventAccess.ts`, two `index.ts` — and the sweep
+  named reports after it. The second run of a pair replaced the first, so the
+  aggregate scored eighty-three modules from seventy-eight reports and
+  `--skip-reported` skipped a module that had never run. Both looked exactly
+  like success. Reports are named by the whole path now, and `--skip-reported`
+  means "reported for *this* code": it compares the report against the module
+  and every test that can reach it, because a stale score reads exactly like a
+  fresh one and is the number somebody then works from.
+- **Half the attendance service had no test at all.** The live subscription every
+  device on a gathering watches, the two single-document writes, and the three
+  reads a student's profile is built from — including `fetchStudentHistory`,
+  which is the screen a leader reads before deciding whether to ring a family.
+  Two claims there are about a partial answer being indistinguishable from a
+  complete one: `withheld` must survive, or a history silently comes back short;
+  and `hasMore` must be the server's word, because a page of twenty can arrive
+  as six once restricted nights are filtered out.
+- **`formatEventDay` took a second opinion from the wall clock.** It reads
+  "Today" from the `now` it is handed and then asked `isToday`/`isTomorrow`,
+  which read the real date. Every caller passes the `useNow()` tick its screen
+  renders from, and one of them sits beside a header deciding "is this today"
+  from that same tick — so at a midnight the tick had not caught up with, two
+  halves of one line disagreed.
+- **`updateStudent` would have put back a grade somebody had just changed**, if
+  the guard on its name-and-grade fallback had ever been wrong: nothing held it
+  to only running when the patch named no grade. Its sibling needs both halves
+  of a name or neither, because one half builds a search key reading
+  "undefined rivera" — the field every roster search matches on.
+- **The gathering list was named by whichever instance the query returned last.**
+  A gathering renamed in March would have gone back to its March name on
+  whichever page load read the old instance last. The same shape turned up in
+  `materialize`, where a `COUNT`-bounded repeat counts from the night the chain
+  began and three documents compete to be it — ending the repeat a week early or
+  running it a week late, silently, because both look like a plausible calendar.
+- **Nothing measured the label.** `labelRender`'s tests asked whether the layout
+  was sensible rather than whether it was the layout the module describes, and
+  baselines that merely increase cannot tell a line gap added once too often
+  from one added correctly. Three guards there could not have been wrong and are
+  gone: `wrap` returned early for text that fits and is only ever called for
+  text that does not, it skipped a final empty line `fillLabelTokens` cannot
+  produce, and the empty-template early return restated what the ordinary path
+  already computes.
+- **The datetime-local parser had no test for any of its own rules** — not the
+  anchor that stops `"on 2026-02-13T19:00"` parsing, not one of six range
+  clauses, and not the overflow check that catches 31 February before it becomes
+  3 March. That check is one comparison now rather than two.
 
 ## In CI
 
