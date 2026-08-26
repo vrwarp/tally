@@ -27,6 +27,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const timer = timers.current.get(id);
     if (timer) {
       clearTimeout(timer);
+      // Stryker disable next-line CallExpression: nothing reads this map except
+      // the two lines around it and the unmount sweep, and a stale entry there
+      // only re-clears a timer that is already gone. It is here so a lobby
+      // screen's map does not grow by one per check-in for the evening.
       timers.current.delete(id);
     }
   }, []);
@@ -52,6 +56,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const pending = timers.current;
     return () => {
       pending.forEach((timer) => clearTimeout(timer));
+      // Stryker disable next-line CallExpression: the provider is going away
+      // and the map with it, so nothing can observe this. It is here because a
+      // map of dead handles is not a thing to hand to a garbage collector and
+      // hope about.
       pending.clear();
     };
   }, []);
@@ -106,6 +114,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 className="pointer-events-auto shrink-0 rounded-lg bg-black/25 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide"
                 onClick={() => {
+                  // Stryker disable next-line OptionalChaining: this button is
+                  // only rendered inside `toast.action ? … : null`, so the
+                  // guard can never fire. TypeScript loses that narrowing
+                  // across the closure and asks for it anyway.
                   toast.action?.onPress();
                   dismiss(toast.id);
                 }}

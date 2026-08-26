@@ -232,6 +232,34 @@ describe('dismissing', () => {
 
     expect(cleared).toHaveBeenCalledTimes(2);
   });
+
+  it('takes the timer down with the toast', () => {
+    // Otherwise a lobby screen that shows a toast per check-in keeps a live
+    // timeout per check-in for the rest of the evening.
+    mount();
+    act(() => void latest?.show('Checked in'));
+    expect(vi.getTimerCount()).toBe(1);
+
+    act(() => latest?.dismiss('toast-1'));
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('forgets a timer it has already cleared, rather than clearing it twice', () => {
+    const cleared = vi.spyOn(globalThis, 'clearTimeout');
+    const { unmount } = mount();
+    act(() => {
+      latest?.show('One');
+      latest?.show('Two');
+    });
+
+    act(() => latest?.dismiss('toast-1'));
+    unmount();
+
+    // One for the dismiss, one for the toast still up. A third would mean the
+    // map is still holding the dismissed one.
+    expect(cleared).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('the panel over the roster', () => {
@@ -274,6 +302,15 @@ describe('the panel over the roster', () => {
     expect(panels[0]).toContain('bg-present-600');
     expect(panels[1]).toContain('bg-danger-600');
     expect(panels[2]).toContain('bg-ink-800');
+
+    // And *only* its own: three background classes on one panel is a toast
+    // whose colour depends on which rule the stylesheet happens to win with.
+    expect(panels[0]).not.toContain('bg-danger-600');
+    expect(panels[0]).not.toContain('bg-ink-800');
+    expect(panels[1]).not.toContain('bg-present-600');
+    expect(panels[1]).not.toContain('bg-ink-800');
+    expect(panels[2]).not.toContain('bg-present-600');
+    expect(panels[2]).not.toContain('bg-danger-600');
   });
 
   it('draws no action button when there is no action', () => {
