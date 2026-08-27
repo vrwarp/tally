@@ -164,7 +164,11 @@ describe('the roster parked on this device', () => {
   });
 
   it('keeps one exactly at the window, because the bound is inclusive', () => {
-    park([person()], Date.now() - STALE_AFTER_MS);
+    // The read consults the clock again, so "exactly" needs it held still
+    // between parking and reading.
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    park([person()], now - STALE_AFTER_MS);
     expect(cachedRoster()?.students).toHaveLength(1);
   });
 
