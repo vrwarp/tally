@@ -31,7 +31,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import { dirname, extname, join, resolve } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
 import { build } from 'vite';
