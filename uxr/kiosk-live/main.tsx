@@ -320,6 +320,7 @@ export function Kiosk() {
       checkedOutIds={new Set()}
       tracksCheckOut={binding.requiresCheckOut ?? false}
       printerNeedsAttention={params.get('printer') === '1'}
+      backdrop={photoUrl !== null}
       refresh="idle"
       widening={false}
       onWiden={() => {}}

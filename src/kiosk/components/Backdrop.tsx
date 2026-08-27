@@ -43,12 +43,15 @@
  *
  * The veil the image sits under is `.kiosk-backdrop-veil` in index.css —
  * built from `--color-ink-950`, never a literal black, so its direction and
- * tint follow the gathering's ground and hue turn by construction. The
- * legibility story is geometry, not hope: the header band and everything from
- * the console rule down sit on the full page colour, and the photograph's one
- * clear window is the region where nothing guaranteed ever renders on idle.
- * The editor's preview shares the same class, which is what keeps the two
- * from disagreeing.
+ * tint follow the gathering's ground and hue turn by construction. The image
+ * runs full bleed under a light wash (the appeal consultation's verdict on
+ * the first, banded construction: every guarantee kept, a photograph owning
+ * a fifth of the frame, the point lost), and the legibility numbers ride the
+ * content instead: the idle instruction's own plate, the register chip's
+ * underlay, the keys' translucent fill, and one header token step — all page
+ * token, all compositing back to the bare page on a kiosk with no
+ * photograph. The editor's preview shares the same classes, which is what
+ * keeps the office and the shelf from disagreeing.
  */
 import { memo, useEffect, useRef, useState } from 'react';
 import { tallyRender } from '../renderTally';

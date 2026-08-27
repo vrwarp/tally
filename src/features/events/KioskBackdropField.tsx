@@ -80,16 +80,14 @@ const CROPS = [
 function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSProperties {
   const rem = (value: number) => `${(value * scale).toFixed(3)}rem`;
   return {
-    '--backdrop-header': rem(6),
-    '--backdrop-band-edge': rem(2.5),
-    // The landscape shelf runs the stylesheet's short-track anchors — see the
-    // media step in index.css — and its crop here has to crop the same veil.
-    '--backdrop-band-end': rem(tall ? 21 : 15),
-    '--backdrop-window-top': rem(tall ? 26 : 18),
-    '--backdrop-chrome': rem(tall ? 31 : 27),
-    '--backdrop-fade': rem(6),
-    '--backdrop-band': ground === 'light' ? '95%' : '88%',
-    '--backdrop-floor': ground === 'light' ? '70%' : '42%',
+    '--backdrop-head-hold': rem(5.5),
+    // The landscape shelf releases its header grade sooner — the same media
+    // step the stylesheet applies, cropped here at this box's scale.
+    '--backdrop-head-release': rem(tall ? 9 : 7),
+    '--backdrop-foot-rise': rem(10),
+    '--backdrop-head': ground === 'light' ? '92%' : '85%',
+    '--backdrop-wash': ground === 'light' ? '30%' : '18%',
+    '--backdrop-foot': ground === 'light' ? '0%' : '14%',
   } as CSSProperties;
 }
 
@@ -245,25 +243,45 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                         className="kiosk-backdrop-veil absolute inset-0"
                         style={veilStyle(scale, tall, worn.ground)}
                       />
-                      {/* The idle screen's words, at the veil's own scale. */}
+                      {/* The idle screen's words on their plate, at the
+                          veil's own scale — the same construction the shelf
+                          paints, so the preview cannot oversell the wash. */}
                       <div
-                        className="absolute inset-x-0 text-center"
+                        className="absolute inset-x-0 flex justify-center text-center"
                         style={{ top: `${(8.5 * scale).toFixed(2)}rem` }}
                       >
-                        <div
-                          className="text-[10px] leading-tight font-semibold"
-                          style={{ color: colours['--color-ink-100'] }}
-                        >
-                          Type a name
-                        </div>
-                        <div
-                          className="text-[6px] leading-tight"
-                          style={{ color: colours['--color-ink-400'] }}
-                        >
-                          or the last 4 digits of your phone
+                        <div className="relative px-2.5 py-1">
+                          <div
+                            aria-hidden="true"
+                            className="absolute"
+                            style={{
+                              inset: '-90% -45%',
+                              background: `radial-gradient(ellipse closest-side, color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '55%' : '45%'}, transparent), transparent)`,
+                            }}
+                          />
+                          <div
+                            aria-hidden="true"
+                            className="absolute inset-0 rounded"
+                            style={{
+                              background: `color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '90%' : '78%'}, transparent)`,
+                            }}
+                          />
+                          <div
+                            className="relative text-[10px] leading-tight font-semibold"
+                            style={{ color: colours['--color-ink-100'] }}
+                          >
+                            Type a name
+                          </div>
+                          <div
+                            className="relative text-[6px] leading-tight"
+                            style={{ color: colours['--color-ink-400'] }}
+                          >
+                            or the last 4 digits of your phone
+                          </div>
                         </div>
                       </div>
-                      {/* The keys, as shapes: what says "machine, for touching". */}
+                      {/* The keys, as shapes: what says "machine, for
+                          touching" — tinted the 80% the real keyboard is. */}
                       <div
                         className="absolute inset-x-1 bottom-1 grid grid-cols-3 gap-0.5"
                         aria-hidden="true"
@@ -272,7 +290,9 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                           <div
                             key={key}
                             className="h-1.5 rounded-[2px]"
-                            style={{ background: colours['--color-ink-800'] }}
+                            style={{
+                              background: `color-mix(in srgb, ${colours['--color-ink-800']} 80%, transparent)`,
+                            }}
                           />
                         ))}
                       </div>

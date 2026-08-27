@@ -2206,6 +2206,10 @@ export function KioskApp() {
         // Only "trouble" — a kiosk with no printer is not a kiosk with a broken
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
+        // Mounted, not merely configured: the header's token step exists for
+        // the photograph actually behind the glass, and until the pixels have
+        // resolved there is nothing behind it but the page.
+        backdrop={backdropUrl !== null}
         refresh={refresh}
         widening={widening}
         onWiden={() => void onWiden()}

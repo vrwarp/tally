@@ -404,25 +404,47 @@
  * follow the ground by construction, and the veil, the results ramp and the
  * status-bar colour stay one material because all three read the same token.
  *
- * Legibility is geometry, not wash. Reading down the gradient: the header
- * band sits on the full page colour; the region the idle instruction occupies
- * sits on a stop strong enough for its `ink-400` lines against a worst-case
- * white image (88% of ink-950 leaves such text ~5.4:1; the light ground needs
- * 95%, set below, because dark-on-light spends its margin faster); the
- * photograph's one clear window is the stretch of the results track where
- * nothing guaranteed ever renders on idle; and the veil reaches the full page
- * colour again above the console rule, so the register chip, the buffer band
- * and the keyboard stand on exactly the page they ship on. The bottom anchors
- * are lengths rather than percentages because the chrome they clear is a
- * fixed height per shape — on screens too short for the window the stops
- * simply collapse and the photograph narrows to a glow, which is the honest
- * answer on a phone-shaped kiosk.
+ * The photograph runs full bleed, and the guarantees ride the content. The
+ * first construction here answered legibility with horizontal bands — an
+ * opaque header, an 88% stop under the instruction, one windowed sliver of
+ * image, solid from the console rule down — and the appeal consultation
+ * priced what that bought: a photograph owning a fifth of the frame at half
+ * strength, every guarantee kept and the point of the feature lost. Nothing
+ * guaranteed ever renders between the idle instruction and the console rule
+ * (rows, the count, the no-match panel all require a non-empty buffer, which
+ * puts this whole layer at opacity 0), so the bands were armour for states
+ * that cannot coexist with the image. What carries the numbers now:
  *
- * The event editor's preview paints this same class over its mock, scaled
+ *   - the wash below: a light grade over the whole frame — the image runs at
+ *     ~82% strength on the dark ground (70% on light), with a header grade
+ *     at the top and, on the dark ground only, a low grade at the foot that
+ *     grounds the keyboard without ever returning to the page;
+ *   - `.kiosk-idle-plate` / `.kiosk-idle-halo`: a page-token card hugging
+ *     the idle instruction's own words, which is where the ink-400 lines'
+ *     4.5:1 actually lives (78% over the 18% wash ≈ 82% combined → 4.7:1
+ *     against a worst-case white image; the light ground's 90% over its 30%
+ *     wash ≈ 93% → 4.5:1 for its dimmer ink);
+ *   - `.kiosk-chip-ground`: the page-token underlay that keeps the register
+ *     chip's brand-300 at 4.7:1 wherever the photograph is bright;
+ *   - the keys' own translucent fill (`bg-ink-800/80` in the keyboard),
+ *     whose caps hold ~8:1 over worst-case white through the foot grade —
+ *     the room glints in the gutters, and the pressed key goes opaque, which
+ *     is the feedback;
+ *   - one token step in the header: the hours line reads ink-400 instead of
+ *     ink-500 while a photograph is mounted (see SearchHeader), which is
+ *     what lets the header grade release at 85% instead of holding the top
+ *     of the glass at 96% for a single dim string.
+ *
+ * Every plate is the page token, so a kiosk with no photograph composites
+ * all of them back to exactly the page — the no-photo idle screen is
+ * pixel-identical to the kiosk that shipped, with no state coupling anywhere
+ * but that one header class.
+ *
+ * The event editor's preview paints these same classes over its mock, scaled
  * through the custom properties — one veil, so the preview and the shelf
- * cannot disagree. The solid `background` above the gradient is the fallback
- * for engines without color-mix: they keep the full page colour, the
- * photograph stays hidden, and an old tablet is exactly the kiosk that
+ * cannot disagree. The solid `background` above each gradient is the
+ * fallback for engines without color-mix: they keep the full page colour,
+ * the photograph stays hidden, and an old tablet is exactly the kiosk that
  * shipped rather than an unveiled one.
  */
 .kiosk-backdrop {
@@ -444,85 +466,147 @@
 }
 
 /*
- * Two layers rather than one run of stops, because the two halves of the
- * guarantee are anchored to different ends of the screen. The top layer reads
- * downward — the opaque header band, the strong stop under the instruction,
- * easing to the window's floor, which then simply holds. The bottom layer
- * reads upward — the full page colour through the chrome's whole height,
- * dissolving over `--backdrop-fade` above it — and painting it as its own
- * bottom-anchored layer is what keeps every shape honest at once: a single
- * top-down gradient with length stops collapses them on a short screen, and
- * where it collapsed (a phone, the landscape kiosk) the photograph ended in a
- * hard seam at exactly the height a parent's eye crosses on the way to the
- * keys. Composited, the floor rides over the dissolve and the window closes
- * softly wherever the two meet — which on a cramped shape is almost
- * immediately, and that is the honest answer there.
+ * Two composited layers, anchored to opposite ends. The top layer holds the
+ * header grade through the title and hours (a length, because the header is
+ * roughly the same pixel height on every shape) and releases to the wash,
+ * which then simply runs — 82% image to the bezel. The bottom layer is the
+ * dark ground's low grade under the keyboard: ~14% at the foot fading to
+ * nothing, so the keys sit on ~30% combined without the veil ever returning
+ * to the page. No stop below the header ever reaches 100% — full bleed means
+ * no letterbox edge anywhere for a seam to live on.
  */
 .kiosk-backdrop-veil {
-  --backdrop-header: 6rem;
-  --backdrop-band-edge: 2.5rem;
-  --backdrop-band-end: 21rem;
-  --backdrop-window-top: 26rem;
-  --backdrop-chrome: 27rem;
-  --backdrop-fade: 6rem;
-  --backdrop-band: 88%;
-  /*
-   * The floor is aesthetic, not a legibility number: nothing guaranteed ever
-   * renders inside the clear window on idle, so its only jobs are "never
-   * raw" and "defers to the palette". 42% was set by looking — at 55% a warm
-   * room read as a dark one, which is the opposite of what a church uploads
-   * a photograph for.
-   */
-  --backdrop-floor: 42%;
+  --backdrop-head: 85%;
+  --backdrop-head-hold: 5.5rem;
+  --backdrop-head-release: 9rem;
+  --backdrop-wash: 18%;
+  --backdrop-foot: 14%;
+  --backdrop-foot-rise: 10rem;
   background: var(--color-ink-950);
   background:
     linear-gradient(
       to bottom,
-      var(--color-ink-950) 0,
-      var(--color-ink-950) var(--backdrop-header),
-      color-mix(in srgb, var(--color-ink-950) var(--backdrop-band), transparent)
-        calc(var(--backdrop-header) + var(--backdrop-band-edge)),
-      color-mix(in srgb, var(--color-ink-950) var(--backdrop-band), transparent)
-        var(--backdrop-band-end),
-      color-mix(in srgb, var(--color-ink-950) var(--backdrop-floor), transparent)
-        var(--backdrop-window-top)
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-head), transparent) 0,
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-head), transparent)
+        var(--backdrop-head-hold),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-wash), transparent)
+        var(--backdrop-head-release),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-wash), transparent) 100%
     ),
     linear-gradient(
       to top,
-      var(--color-ink-950) 0,
-      var(--color-ink-950) var(--backdrop-chrome),
-      color-mix(in srgb, var(--color-ink-950) 0%, transparent)
-        calc(var(--backdrop-chrome) + var(--backdrop-fade))
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-foot), transparent) 0,
+      color-mix(in srgb, var(--color-ink-950) 0%, transparent) var(--backdrop-foot-rise)
     );
 }
 
-/* Dark ink on a light page spends its contrast margin faster — see above. */
+/*
+ * The light ground is the sun-print: a flat vellum wash at 70% image, no
+ * foot grade (on light, flat is calmer), and the guarantees carried by
+ * near-opaque porcelain plates rather than a stronger fog — dark ink spends
+ * its margin faster, and the plates hug the content so they cost the image
+ * almost nothing.
+ */
 [data-theme='light'] .kiosk-backdrop-veil {
-  --backdrop-band: 95%;
-  --backdrop-floor: 70%;
+  --backdrop-head: 92%;
+  --backdrop-wash: 30%;
+  --backdrop-foot: 0%;
 }
 
-/* The chrome steps up on a screen stood on end, so its clearance does too. */
-@media (min-height: 1000px) {
+/* The landscape shelf is 800px tall with the same-height header, so the
+   grade releases sooner and the top corners reach the wash. */
+@media (min-width: 1024px) and (max-height: 999px) {
   .kiosk-backdrop-veil {
-    --backdrop-chrome: 31rem;
+    --backdrop-head-release: 7rem;
   }
 }
 
 /*
- * The landscape kiosk is the shortest track — ~800px minus the header minus
- * the chrome leaves under 300 — and at the default anchors the instruction
- * band ran past where the chrome's dissolve begins, so the window collapsed
- * and the whole photograph lived at the band's 12%. The idle instruction sits
- * higher on this shape too (the same fact that gives the results region its
- * own shallower fade above), so the band can end sooner and leave the shape
- * an honest, if modest, window.
+ * The plate under the idle instruction — where the ink-400 lines' 4.5:1
+ * actually lives — and the halo that melts it into the wash so it reads as
+ * glow rather than masking. Both are the page token: on a kiosk with no
+ * photograph they composite to exactly the page and vanish. The plate's
+ * radius sits one step above the rounded-xl control family on purpose — it
+ * is a surface, not a button.
  */
-@media (min-width: 1024px) and (max-height: 999px) {
-  .kiosk-backdrop-veil {
-    --backdrop-band-end: 15rem;
-    --backdrop-window-top: 18rem;
-  }
+.kiosk-idle-plate {
+  background: color-mix(in srgb, var(--color-ink-950) var(--backdrop-plate, 78%), transparent);
+}
+.kiosk-idle-halo {
+  background: radial-gradient(
+    ellipse closest-side,
+    color-mix(in srgb, var(--color-ink-950) var(--backdrop-halo, 45%), transparent),
+    transparent
+  );
+}
+[data-theme='light'] .kiosk-idle-plate {
+  --backdrop-plate: 90%;
+}
+[data-theme='light'] .kiosk-idle-halo {
+  --backdrop-halo: 55%;
+}
+
+/*
+ * The keyboard, turned to glass — but only while a photograph is mounted.
+ *
+ * `kiosk-has-backdrop` is set by the search screen exactly when the
+ * backdrop layer holds pixels, and it is the whole of the state coupling:
+ * these two rules are unlayered on purpose, which is what lets them outrank
+ * the keys' own `bg-ink-800` utility — and why the pressed state has to be
+ * restated here, or the same precedence would hold a pressed key
+ * translucent. Everywhere the class is absent — the wizard, the reprint
+ * search, a kiosk with no photograph — the keyboard is byte-identical to
+ * the one that shipped.
+ */
+.kiosk-has-backdrop [data-key] {
+  background: color-mix(in srgb, var(--color-ink-800) 80%, transparent);
+}
+.kiosk-has-backdrop [data-key]:active {
+  background: var(--color-ink-600);
+}
+
+/*
+ * The console rule, with its ends faded — the same conditional. A 1px line
+ * run to the bezel declares the console one object against an opaque page;
+ * run across a full-bleed photograph it read as the last wire of the old
+ * banded construction. Same height either way: geometry never changes.
+ */
+.kiosk-rule-faded {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--color-ink-800) 70%, transparent) 15%,
+    color-mix(in srgb, var(--color-ink-800) 70%, transparent) 85%,
+    transparent
+  );
+}
+
+/*
+ * The register chip's ground: the shipped brand tint over a page-token
+ * underlay, so brand-300 keeps 4.5:1 wherever the photograph is bright —
+ * and, over a bare page, composites back to the chip that shipped. The
+ * pressed state lives here too, because a plain class would otherwise
+ * outrank the utility that used to carry it.
+ */
+.kiosk-chip-ground {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--color-brand-600) 15%, transparent),
+      color-mix(in srgb, var(--color-brand-600) 15%, transparent)
+    ),
+    color-mix(in srgb, var(--color-ink-950) var(--backdrop-chip, 65%), transparent);
+}
+.kiosk-chip-ground:active {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--color-brand-600) 30%, transparent),
+      color-mix(in srgb, var(--color-brand-600) 30%, transparent)
+    ),
+    color-mix(in srgb, var(--color-ink-950) var(--backdrop-chip, 65%), transparent);
+}
+[data-theme='light'] .kiosk-chip-ground {
+  --backdrop-chip: 92%;
 }
 
 @layer base {
