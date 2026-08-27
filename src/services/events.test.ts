@@ -560,6 +560,17 @@ describe('what a gathering is written as', () => {
     expect(payload().kioskTheme).not.toMatchObject({ ground: 'nonsense' });
   });
 
+  it('keeps a well-formed backdrop pointer and drops any other shape', async () => {
+    await createEvent(draft({ kioskBackdropId: 'b0123456789abcdef' }), 'uid-miriam');
+    expect(payload().kioskBackdropId).toBe('b0123456789abcdef');
+
+    await createEvent(draft({ kioskBackdropId: 'not/an/id' }), 'uid-miriam');
+    expect(payload().kioskBackdropId).toBeNull();
+
+    await createEvent(draft(), 'uid-miriam');
+    expect(payload().kioskBackdropId).toBeNull();
+  });
+
   it('is scheduled unless somebody says otherwise', async () => {
     await createEvent(draft(), 'uid-miriam');
     expect(payload().status).toBe('scheduled');

@@ -135,12 +135,24 @@ const SearchHeader = memo(function SearchHeader({
   title,
   line,
   printerNeedsAttention,
+  backdrop,
 }: {
   iconPath: string | null | undefined;
   title: string;
   /** The line under the title, already decided: the hours, opens-at, or closed. */
   line: string;
   printerNeedsAttention: boolean;
+  /**
+   * Whether the gathering's photograph is mounted behind this screen.
+   *
+   * It moves exactly one token: the hours line steps ink-500 → ink-400. That
+   * step is what lets the veil's header grade release at 85% instead of
+   * holding the whole top of the glass near-opaque for a single dim string —
+   * ink-500 needs a 96% veil just to keep its shipped contrast against a
+   * worst-case white image, and everything else up here is cheap. The
+   * photo-less kiosk keeps its shipped ink-500 exactly.
+   */
+  backdrop: boolean;
 }) {
   tallyRender('SearchHeader');
   return (
@@ -209,7 +221,9 @@ const SearchHeader = memo(function SearchHeader({
       <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
         <EventName path={iconPath} title={title} />
       </div>
-      <div className="text-base text-ink-500 kiosk:text-lg">{line}</div>
+      <div className={`text-base kiosk:text-lg ${backdrop ? 'text-ink-400' : 'text-ink-500'}`}>
+        {line}
+      </div>
     </div>
   );
 });
@@ -299,7 +313,12 @@ const SearchConsole = memo(function SearchConsole({
              in legibility, and on a portrait tablet this was simultaneously
              the only accented object on the glass and the smallest type on
              it, read at arm's length. */
-          className="flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-brand-600/15 px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30 tall:h-14 tall:px-5 kiosk:text-base"
+          /* `kiosk-chip-ground` is the shipped brand tint over a page-token
+             underlay (index.css): identical to the old bg-brand-600/15 over a
+             bare page, and what keeps this text readable when the gathering's
+             photograph is bright behind it. Its :active lives in the class,
+             because a plain class here would outrank the utility. */
+          className="kiosk-chip-ground flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 tall:h-14 tall:px-5 kiosk:text-base"
         >
           {/*
             * The question goes first and, on a narrow screen standing beside
@@ -414,6 +433,7 @@ export function SearchScreen({
   checkedOutIds,
   tracksCheckOut,
   printerNeedsAttention,
+  backdrop,
   refresh,
   widening,
   onWiden,
@@ -430,6 +450,8 @@ export function SearchScreen({
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
   printerNeedsAttention: boolean;
+  /** The gathering's photograph is mounted behind this screen. See SearchHeader. */
+  backdrop: boolean;
   /**
    * How the silent church-wide sweep behind an empty result is doing. No
    * button drives it any more; what remains on screen is its headline ("Still
@@ -673,7 +695,18 @@ export function SearchScreen({
   }, [buffer]);
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto]">
+    /*
+     * `kiosk-has-backdrop` rides the root exactly while the photograph is
+     * mounted: it is what turns the keys to glass and fades the console
+     * rule's ends (index.css). A class on the root rather than props into
+     * the keyboard, so the memoized subtrees stay memoized and the wizard's
+     * keyboard — which never has a photograph — stays untouched.
+     */
+    <div
+      className={`grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto] ${
+        backdrop ? 'kiosk-has-backdrop' : ''
+      }`}
+    >
       {/* Everything above the results, memoized so a keystroke leaves it
           alone — the header's own reasoning lives on SearchHeader. */}
       <SearchHeader
@@ -681,6 +714,7 @@ export function SearchScreen({
         title={binding.title}
         line={headerLine}
         printerNeedsAttention={printerNeedsAttention}
+        backdrop={backdrop}
       />
 
       {/*
@@ -792,6 +826,24 @@ export function SearchScreen({
             */}
           {outcome.mode === 'idle' && (
             <div className="flex flex-col items-center pt-6 text-center">
+              {/*
+                * The words, on their own plate.
+                *
+                * While the gathering's photograph runs full bleed behind this
+                * screen, the instruction's contrast lives here — a page-token
+                * card hugging the words, with a halo that melts it into the
+                * wash so it reads as glow rather than masking (numbers and
+                * reasoning on `.kiosk-idle-plate` in index.css). Paint only:
+                * negative insets, so the three lines keep their exact shipped
+                * positions — and pure page token, so a kiosk with no
+                * photograph composites all of it back to the bare page.
+                * `isolate` keeps the negative z-indices inside this block
+                * rather than racing the backdrop layer for the same layer
+                * order.
+                */}
+              <div className="relative isolate flex flex-col items-center">
+                <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
+                <div aria-hidden="true" className="kiosk-idle-plate absolute -inset-x-10 -inset-y-7 -z-10 rounded-2xl" />
               {/* Two voices, not three. The instruction and its alternative are
                   one unit, set tight; what happens next is separated by air
                   rather than by a third size, which at a 2px step read as one
@@ -828,6 +880,7 @@ export function SearchScreen({
                 * offer.
                 */}
               <div className="pt-4 text-lg text-ink-400 kiosk:text-xl">Then tap your child&rsquo;s name.</div>
+              </div>
             </div>
           )}
           {outcome.mode === 'phone-partial' && (
@@ -1026,7 +1079,11 @@ export function SearchScreen({
         * flattened the keys, which are `ink-800` and need the page's distance
         * to stay shapes in a dim room.
         */}
-      <div className="border-t border-ink-800/70" />
+      {backdrop ? (
+        <div className="kiosk-rule-faded" />
+      ) : (
+        <div className="border-t border-ink-800/70" />
+      )}
 
       {/*
         * The standing offer: the one door off this screen that is never closed.

@@ -46,6 +46,7 @@
     // where there is no `jsx` and no `@/`, and a file this project does not
     // name is seen only by the wrong environment.
     "uxr/kiosk-live/main.tsx",
+    "uxr/kiosk-editor-live/main.tsx",
     "uxr/kiosk-setup-live/main.tsx",
     "uxr/kiosk-setup-live/scene.tsx",
     "uxr/kiosk-setup-live/stubs.tsx",

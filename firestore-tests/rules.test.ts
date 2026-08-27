@@ -10,9 +10,11 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import {
+  Bytes,
   Timestamp,
   arrayRemove,
   collection,
+  type Firestore,
   collectionGroup,
   deleteDoc,
   doc,
@@ -594,6 +596,40 @@ describe('events', () => {
         kioskTheme: { ground: 'dark', accent: 'chartreuse', confirm: 'forest', backdrop: 'indigo' },
       }),
     );
+  });
+
+  it('accepts a kiosk backdrop pointer, and its absence', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-photo')), {
+        ...eventDoc(),
+        kioskBackdropId: 'b0123456789abcdef',
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('event-no-photo')), { ...eventDoc(), kioskBackdropId: null }),
+    );
+  });
+
+  it('rejects a backdrop pointer that is not the shape this repo mints', async () => {
+    /*
+     * Tighter than a hue name because of where the value travels: the kiosk
+     * turns it into a `kioskBackdrops/{id}` document path and a cache key.
+     * See `lib/kioskBackdrop.ts`.
+     */
+    const db = asUser(env, UID.core);
+    for (const kioskBackdropId of [
+      42,
+      '',
+      'b0123', // too short to be a digest prefix
+      'B0123456789ABCDEF', // minted lowercase; a second spelling is a second path
+      'b0123456789abcdeg', // not hex
+      'kioskBackdrops/b0123456789abcdef', // a path, not an id
+    ]) {
+      await assertFails(
+        setDoc(doc(db, paths.event('event-bad-photo')), { ...eventDoc(), kioskBackdropId }),
+      );
+    }
   });
 
   describe('the chain references', () => {
@@ -2177,6 +2213,79 @@ describe('kiosk', () => {
           roster: { rev: 999 },
         }),
       );
+    });
+  });
+
+  describe('kioskBackdrops', () => {
+    /** A well-formed photograph, small enough to write in a test. */
+    const backdropDoc = (updatedBy: string) => ({
+      image: Bytes.fromUint8Array(new Uint8Array([137, 1, 2, 3])),
+      contentType: 'image/webp',
+      width: 1920,
+      height: 1200,
+      updatedAt: serverTimestamp(),
+      updatedBy,
+    });
+    const at = (db: Firestore, id = 'b0123456789abcdef') => doc(db, 'kioskBackdrops', id);
+
+    it('is readable by active members, kiosk sessions included', async () => {
+      await assertSucceeds(getDoc(at(asUser(env, UID.counselor))));
+      await assertSucceeds(getDoc(at(asKiosk(env, UID.counselor))));
+      await assertFails(getDoc(at(asUser(env, UID.stranger))));
+      await assertFails(getDoc(at(asAnonymous(env))));
+    });
+
+    it('is never listed — ids arrive on the binding, not by browsing', async () => {
+      await assertFails(getDocs(collection(asUser(env, UID.admin), 'kioskBackdrops')));
+    });
+
+    it('is created by core with a well-formed image, and by nobody below', async () => {
+      await assertSucceeds(setDoc(at(asUser(env, UID.core)), backdropDoc(UID.core)));
+      await assertFails(
+        setDoc(at(asUser(env, UID.counselor), 'b89abcdef0123456'), backdropDoc(UID.counselor)),
+      );
+      await assertFails(
+        setDoc(at(asKiosk(env, UID.counselor), 'b89abcdef0123456'), backdropDoc(UID.counselor)),
+      );
+    });
+
+    it('rejects an id that is not the content-addressed shape', async () => {
+      const db = asUser(env, UID.core);
+      for (const id of ['photo', 'B0123456789ABCDEF', 'b0123', 'b0123456789abcdeg']) {
+        await assertFails(setDoc(at(db, id), backdropDoc(UID.core)));
+      }
+    });
+
+    it('rejects a malformed image, oversize included', async () => {
+      const db = asUser(env, UID.core);
+      const good = backdropDoc(UID.core);
+      for (const bad of [
+        { ...good, image: 'not bytes' },
+        { ...good, image: Bytes.fromUint8Array(new Uint8Array(0)) },
+        // One byte past KIOSK_BACKDROP_MAX_BYTES — the rules' copy of the cap.
+        { ...good, image: Bytes.fromUint8Array(new Uint8Array(600_001)) },
+        { ...good, contentType: 'image/png' },
+        { ...good, width: 0 },
+        { ...good, height: 2048 },
+        { ...good, updatedAt: 'today' },
+        // Attribution is the writer's own uid, not a claim about somebody else.
+        { ...good, updatedBy: UID.admin },
+      ]) {
+        await assertFails(setDoc(at(db, 'b456789abcdef012'), bad));
+      }
+    });
+
+    it('is create-only: under a content-addressed id, an update is a lie', async () => {
+      await assertSucceeds(setDoc(at(asUser(env, UID.core), 'bfedcba9876543210'), backdropDoc(UID.core)));
+      await assertFails(
+        setDoc(at(asUser(env, UID.admin), 'bfedcba9876543210'), backdropDoc(UID.admin)),
+      );
+      await assertFails(
+        updateDoc(at(asUser(env, UID.admin), 'bfedcba9876543210'), { width: 800 }),
+      );
+      // And never deleted from a client: nothing records which gatherings
+      // still wear an image, so a delete could undress somebody else's kiosk.
+      await assertFails(deleteDoc(at(asUser(env, UID.admin), 'bfedcba9876543210')));
     });
   });
 

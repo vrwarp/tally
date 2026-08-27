@@ -30,9 +30,15 @@ test.describe('dashboard', () => {
 
     // Not "the section rendered" but "the section has somebody in it". An empty
     // MIA list is the failure mode that looks like success, so assert on the
-    // count the heading carries and on rows that link to a real student.
-    const mia = await page.getByRole('heading', { name: /missing in action/i }).first().innerText();
-    expect(Number(/(\d+)/.exec(mia)?.[1] ?? 0)).toBeGreaterThan(0);
+    // count the heading carries and on rows that link to a real student. The
+    // count hydrates after the heading paints, so polled — same patience the
+    // incomplete-profiles heading below already gets.
+    const mia = page.getByRole('heading', { name: /missing in action/i }).first();
+    await expect
+      .poll(async () => Number(/(\d+)/.exec(await mia.innerText())?.[1] ?? 0), {
+        timeout: 20_000,
+      })
+      .toBeGreaterThan(0);
     await expect(page.locator('a[href^="/students/"]').first()).toBeVisible();
 
     /*

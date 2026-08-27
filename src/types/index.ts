@@ -758,6 +758,18 @@ export interface TallyEventDoc {
    */
   kioskTheme: KioskTheme | null;
 
+  /**
+   * The photograph a lobby kiosk stands behind while bound here, as the id of
+   * a `kioskBackdrops/{id}` document — or null for none, which is the
+   * ordinary answer and costs nothing anywhere. The id, never the image: the
+   * events collection is read wholesale by the kiosk chooser and subscribed by
+   * the calendar, and a photo riding on those reads would bill every screen
+   * for one gathering's decoration. Content-addressed, so the id is also the
+   * revision. Carried onto projected occurrences alongside `kioskTheme`, for
+   * the same reason. See `lib/kioskBackdrop.ts`.
+   */
+  kioskBackdropId: string | null;
+
   status: EventStatus;
 
   createdAt: Timestamp;

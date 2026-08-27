@@ -108,6 +108,21 @@ export interface KioskEventEntry {
   /** `--color-ink-950` → `#0e0406`, and only the slots that actually moved. */
   palette?: KioskPalette;
   /**
+   * The photograph the kiosk stands behind while bound here — the id of a
+   * `kioskBackdrops/{id}` document, or absent for a gathering without one,
+   * which is most of them.
+   *
+   * The id and never the image, unlike `palette` and `iconPath`, and the
+   * difference is scale, not principle. Those are handed over finished because
+   * computing them needs code the kiosk must not carry; this one is finished
+   * pixels either way, but a chooser can list a month of evenings and a photo
+   * per row would be megabytes answering a question about titles and times.
+   * The kiosk reads the one document it actually binds to, once, and caches it
+   * — see `src/kiosk/backdrop.ts`. Content-addressed, so the id is also the
+   * revision.
+   */
+  backdropId?: string;
+  /**
    * The gathering's icon, already looked up: SVG path data on Material's
    * `0 -960 960 960` viewBox, or absent for a gathering nobody gave one.
    *
@@ -180,6 +195,11 @@ function kioskIcon(name: string | null): { iconPath?: string } {
   return icon ? { iconPath: icon.path } : {};
 }
 
+/** The backdrop id, or nothing at all — spread like the two above. */
+function kioskBackdrop(id: string | null): { backdropId?: string } {
+  return id ? { backdropId: id } : {};
+}
+
 function entryFromSource(
   source: OccurrenceSource,
   data: Record<string, unknown> | null,
@@ -201,6 +221,7 @@ function entryFromSource(
     allergiesSupported,
     ...kioskIcon(source.icon),
     ...kioskLook(source.kioskTheme),
+    ...kioskBackdrop(source.kioskBackdropId),
   };
 }
 
@@ -281,6 +302,7 @@ export async function listKioskEvents(
       labelTemplate: occurrence.source.labelTemplate,
       allergiesSupported,
       ...kioskLook(occurrence.source.kioskTheme),
+      ...kioskBackdrop(occurrence.source.kioskBackdropId),
     });
   }
 

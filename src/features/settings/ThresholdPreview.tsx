@@ -97,6 +97,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           requiresCheckOut: false,
           labelTemplate: null,
           kioskTheme: null,
+          kioskBackdropId: null,
           status: 'scheduled',
           createdAt: now,
           updatedAt: now,

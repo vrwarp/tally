@@ -91,6 +91,8 @@ export interface OccurrenceSource {
   labelTemplate: LabelTemplate | null;
   /** And this, which is what a kiosk bound to the occurrence will wear. */
   kioskTheme: KioskTheme | null;
+  /** And the photograph it stands behind — a `kioskBackdrops/{id}` id. */
+  kioskBackdropId: string | null;
 }
 
 /**

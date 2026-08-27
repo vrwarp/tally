@@ -28,6 +28,7 @@
  * `scripts/sync-functions-shared.mjs`. This file is only the parts that differ
  * on a server: reading the collection, decoding admin `Timestamp`s, and writing.
  */
+import { sanitizeKioskBackdropId } from './generated/kioskBackdrop.js';
 import { sanitizeKioskTheme } from './generated/kioskTheme.js';
 import { sanitizeLabelTemplate } from './generated/labelTemplate.js';
 import {
@@ -148,6 +149,7 @@ export function toSource(id: string, data: Record<string, unknown>): OccurrenceS
     requiresCheckOut: data.requiresCheckOut === true,
     labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
     kioskTheme: sanitizeKioskTheme(data.kioskTheme),
+    kioskBackdropId: sanitizeKioskBackdropId(data.kioskBackdropId),
   };
 }
 
@@ -193,6 +195,8 @@ function payloadFor(
     // And the look, so materialising the Sunday a kiosk is being bound to is
     // not what sends the lobby screen back to navy.
     kioskTheme: source.kioskTheme,
+    // The photograph rides with the look it belongs to.
+    kioskBackdropId: source.kioskBackdropId,
     status: 'scheduled',
     createdAt: now,
     updatedAt: now,

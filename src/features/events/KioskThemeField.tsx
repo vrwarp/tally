@@ -22,13 +22,12 @@ import {
   CONFIRM_HUES,
   DEFAULT_KIOSK_THEME,
   KIOSK_HUES,
-  KIOSK_SOURCE_RAMPS,
-  kioskPalette,
   type KioskGround,
   type KioskHue,
   type KioskTheme,
 } from '@/lib/kioskTheme';
 import { cn } from '@/lib/utils';
+import { painted } from './kioskPreview';
 
 export interface KioskThemeFieldProps {
   value: KioskTheme | null;
@@ -59,15 +58,6 @@ const SLOTS: readonly { slot: Slot; label: string; hint: string; offered: readon
       offered: KIOSK_HUES,
     },
   ];
-
-/** What the kiosk would actually paint: the stylesheet, with the palette over it. */
-function painted(theme: KioskTheme): Record<string, string> {
-  const base: Record<string, string> = {};
-  for (const [family, ramp] of Object.entries(KIOSK_SOURCE_RAMPS[theme.ground])) {
-    for (const [step, hex] of Object.entries(ramp)) base[`--color-${family}-${step}`] = hex;
-  }
-  return { ...base, ...(kioskPalette(theme) ?? {}) };
-}
 
 /**
  * One hue as it would land in a given slot, for the swatch.

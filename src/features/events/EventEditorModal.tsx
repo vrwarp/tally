@@ -39,6 +39,10 @@ import { useToast } from '@/context/toastContext';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';
 import { IconPickerField } from '@/features/events/IconPickerField';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
+import {
+  KioskBackdropField,
+  type KioskBackdropChoice,
+} from '@/features/events/KioskBackdropField';
 import { KioskThemeField } from '@/features/events/KioskThemeField';
 import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import { gatheringOptions } from '@/lib/gatherings';
@@ -48,6 +52,7 @@ import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/r
 import { cn } from '@/lib/utils';
 import { addMinutes, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/time';
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
+import { putKioskBackdrop } from '@/services/kioskBackdrops';
 import type { EventMode, RecurrenceRule, TallyEvent } from '@/types';
 
 /** House defaults for the check-in window, in minutes around the event. */
@@ -88,6 +93,12 @@ interface EditorForm {
   labelTemplate: LabelTemplate | null;
   /** What a kiosk bound here looks like, or null for Tally's own colours. */
   kioskTheme: KioskTheme | null;
+  /**
+   * The kiosk's photograph: none, the one the event already points at, or one
+   * chosen this session and uploaded only if the save goes through — closing
+   * the editor abandons it with the rest of the form.
+   */
+  kioskBackdrop: KioskBackdropChoice;
   /**
    * A window left at the standard hour follows the event when its times move;
    * one somebody hand-tuned is pinned and never rewritten underneath them.
@@ -159,6 +170,9 @@ function buildForm(
     requiresCheckOut: event?.requiresCheckOut ?? defaults?.requiresCheckOut ?? false,
     labelTemplate: event?.labelTemplate ?? defaults?.labelTemplate ?? null,
     kioskTheme: event?.kioskTheme ?? defaults?.kioskTheme ?? null,
+    kioskBackdrop: ((id) => (id ? { kind: 'kept' as const, id } : { kind: 'none' as const }))(
+      event?.kioskBackdropId ?? defaults?.kioskBackdropId ?? null,
+    ),
     opensPinned:
       Math.round((startAt.getTime() - opensAt.getTime()) / 60_000) !== OPENS_BEFORE_MIN,
     closesPinned:
@@ -466,6 +480,10 @@ export function EventEditorModal({
       // one-offs too, and a week of holiday club is exactly the thing somebody
       // wants their lobby screen to look like.
       kioskTheme: form.kioskTheme,
+      // The photograph the event already points at, or nothing. A photo chosen
+      // this session is uploaded inside `save` below and lands here then — the
+      // bytes must not go to Firestore for a form that never gets saved.
+      kioskBackdropId: form.kioskBackdrop.kind === 'kept' ? form.kioskBackdrop.id : null,
       // `buildEventPayload` writes `status` on every save, so an edit has to
       // carry the current one forward or it would quietly un-cancel the event.
       status: event?.status ?? 'scheduled',
@@ -473,6 +491,16 @@ export function EventEditorModal({
 
     setSaving(true);
     try {
+      /*
+       * The photograph first, so the event never points at pixels that are
+       * not there: an upload that fails fails the whole save, loudly, rather
+       * than saving an event whose kiosk would show nothing. Content-addressed
+       * — a re-save of the same photo is a read, not a second copy.
+       */
+      if (form.kioskBackdrop.kind === 'new') {
+        draft.kioskBackdropId = await putKioskBackdrop(form.kioskBackdrop.prepared, user.uid);
+      }
+
       let eventId = event?.id ?? '';
 
       if (event) {
@@ -794,6 +822,15 @@ export function EventEditorModal({
           <KioskThemeField
             value={form.kioskTheme}
             onChange={(kioskTheme) => patch({ kioskTheme })}
+          />
+
+          {/* Beside the colours because they are one decision about one
+              screen — and so the photo's preview can wear the theme being
+              picked above it, live. */}
+          <KioskBackdropField
+            value={form.kioskBackdrop}
+            theme={form.kioskTheme}
+            onChange={(kioskBackdrop) => patch({ kioskBackdrop })}
           />
 
           <TextField

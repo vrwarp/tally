@@ -61,6 +61,13 @@ const KEY_CLASS =
      somebody standing, so a key that is comfortable in a hand is small on
      a shelf. */
   'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
+  /* Solid here, tinted by context: while the gathering's photograph is up,
+     the search screen's `kiosk-has-backdrop` class turns these fills to 80%
+     glass (see index.css) — the room glints in the gutters, the caps hold
+     ~8:1 over a worst-case white image, and a pressed key goes opaque, which
+     is the feedback. Every screen without that class, the wizard's and the
+     reprint search's keyboards included, keeps this keyboard byte-identical
+     to the one that shipped. */
   'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 kiosk:text-2xl';
 
 export const Keyboard = memo(function Keyboard({

@@ -181,6 +181,7 @@ export function eventDoc(overrides: Partial<TallyEventDoc> = {}): TallyEventDoc 
     requiresCheckOut: false,
     labelTemplate: null,
     kioskTheme: null,
+    kioskBackdropId: null,
     status: 'scheduled',
     createdAt: T0,
     updatedAt: T0,

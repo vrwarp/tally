@@ -83,9 +83,11 @@ export function StaffScreen({
   window: eventWindow,
   printer,
   trouble,
+  backdrop,
   onReprint,
   onPrinter,
   onChangeEvent,
+  onHideBackdrop,
   onStay,
 }: {
   title: string;
@@ -101,6 +103,13 @@ export function StaffScreen({
    */
   printer: 'ready' | 'trouble' | 'none';
   /**
+   * Whether this binding is wearing a photograph — the row below is drawn
+   * only while there is one to take off. False again after the hold's own
+   * door has been used: the row removes itself with the photo, which is the
+   * confirmation.
+   */
+  backdrop: boolean;
+  /**
    * What is actually wrong, when something is — `PrinterState`'s own sentence,
    * the one the printer screen has always shown.
    *
@@ -113,6 +122,8 @@ export function StaffScreen({
   onReprint: () => void;
   onPrinter: () => void;
   onChangeEvent: () => void;
+  /** Takes the photograph off this device for the rest of the binding. */
+  onHideBackdrop: () => void;
   onStay: () => void;
 }) {
   const tap = useTap();
@@ -250,6 +261,29 @@ export function StaffScreen({
         >
           Change event
         </button>
+
+        {/*
+          * The photograph's off switch, for the Sunday it is wrong on the
+          * shelf: device-local, no network, no editor rights — see
+          * `hideBackdrop` in KioskApp. A row like the others (the rule at the
+          * top of this file), drawn only while there is a photograph to take
+          * off, and last because it is the rarest errand here. "The photo" and
+          * not "the background", because it is described over the phone to
+          * whoever is standing at the kiosk, and the photo is what they see.
+          */}
+        {backdrop && (
+          <button
+            type="button"
+            tabIndex={-1}
+            {...tap(() => {
+              haptic();
+              onHideBackdrop();
+            })}
+            className={DOOR}
+          >
+            Hide the photo
+          </button>
+        )}
       </div>
 
       {/* The loud one is the way back to the door, as it is on the screen this

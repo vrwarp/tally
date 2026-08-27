@@ -9,6 +9,7 @@
  */
 import { Timestamp, type DocumentData, type DocumentSnapshot } from 'firebase/firestore';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeKioskBackdropId } from '@/lib/kioskBackdrop';
 import { sanitizeKioskTheme } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate } from '@/lib/labelTemplate';
 import {
@@ -304,6 +305,7 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     // as — the sanitizer's docblock explains why that is the safe direction.
     labelTemplate: sanitizeLabelTemplate(data.labelTemplate),
     kioskTheme: sanitizeKioskTheme(data.kioskTheme),
+    kioskBackdropId: sanitizeKioskBackdropId(data.kioskBackdropId),
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     createdAt: toDate(data.createdAt, fallback),
     updatedAt: toDate(data.updatedAt, fallback),
