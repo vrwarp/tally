@@ -24,15 +24,20 @@
  *   ?icon=campfire            the gathering's icon, by Material name
  *   ?screen=chooser           the staff chooser, with a week of gatherings on it
  *   ?screen=staff             the staff menu, reached by holding Clear
+ *   ?screen=success           the tick, as it paints after a confirm
  *   ?screen=unbind            "Change event?", the one question the kiosk asks
  *   ?icons=all|some|none      how many chooser rows wear an icon      (default all)
  *   ?twins=1                  two occurrences of one gathering, one day
+ *   ?photo=1                  the gathering's photograph behind the idle screen
+ *   ?backdrop=1               the staff menu's "Hide the photo" row
+ *   ?ground=light             the light ground, as a light-themed gathering wears it
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/index.css';
 import { findEventIcon } from '@/lib/eventIcons';
 import { eventWindow, type KioskBinding } from '@/kiosk/binding';
+import { Backdrop } from '@/kiosk/components/Backdrop';
 import type { KioskKey } from '@/kiosk/components/Keyboard';
 import { RegistrationFlow } from '@/kiosk/registration/RegistrationFlow';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
@@ -40,9 +45,25 @@ import { ChangeEventScreen } from '@/kiosk/screens/ChangeEventScreen';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
+import { SuccessScreen } from '@/kiosk/screens/SuccessScreen';
 import type { KioskEventEntry, KioskServices } from '@/kiosk/KioskApp';
 
 const params = new URLSearchParams(location.search);
+
+/*
+ * The ground, worn the way `applyKioskTheme` wears it: `data-theme` on the
+ * root. The harness stands in for the binding here exactly as it stands in
+ * for the server on the icon below.
+ */
+if (params.get('ground') === 'light') document.documentElement.dataset.theme = 'light';
+
+/*
+ * The photograph, standing in for a `kioskBackdrops/{id}` fetch: the real
+ * layer, handed a URL the way KioskApp hands it an object URL. The scene is
+ * drawn rather than shot so the fixture follows the feature's own guidance —
+ * a place, not a poster; no words, no faces.
+ */
+const photoUrl = params.get('photo') === '1' ? '/uxr/kiosk-live/backdrop-demo.svg' : null;
 
 /*
  * A gathering in progress: started 22 minutes ago, another 68 to run, check-in
@@ -239,6 +260,16 @@ export function Kiosk() {
     );
   }
 
+  if (params.get('screen') === 'success') {
+    return (
+      <SuccessScreen
+        students={STUDENTS.slice(0, 2)}
+        intent={params.get('pickup') === '1' ? 'check-out' : 'check-in'}
+        onDone={() => {}}
+      />
+    );
+  }
+
   if (params.get('screen') === 'unbind') {
     return (
       <ChangeEventScreen
@@ -275,6 +306,11 @@ export function Kiosk() {
   }
 
   return (
+    <>
+    {/* Behind the search screen exactly as KioskApp mounts it: the one
+        instance, shown while the glass is calm and at zero the moment it is
+        not — which is what `?photo=1&buffer=…` photographs. */}
+    {photoUrl && <Backdrop url={photoUrl} shown={buffer === ''} />}
     <SearchScreen
       binding={binding}
       buffer={buffer}
@@ -291,6 +327,7 @@ export function Kiosk() {
       onRegister={() => {}}
       onStaffGate={() => {}}
     />
+    </>
   );
 }
 

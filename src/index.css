@@ -466,7 +466,14 @@
   --backdrop-chrome: 27rem;
   --backdrop-fade: 6rem;
   --backdrop-band: 88%;
-  --backdrop-floor: 55%;
+  /*
+   * The floor is aesthetic, not a legibility number: nothing guaranteed ever
+   * renders inside the clear window on idle, so its only jobs are "never
+   * raw" and "defers to the palette". 42% was set by looking — at 55% a warm
+   * room read as a dark one, which is the opposite of what a church uploads
+   * a photograph for.
+   */
+  --backdrop-floor: 42%;
   background: var(--color-ink-950);
   background:
     linear-gradient(
@@ -499,6 +506,22 @@
 @media (min-height: 1000px) {
   .kiosk-backdrop-veil {
     --backdrop-chrome: 31rem;
+  }
+}
+
+/*
+ * The landscape kiosk is the shortest track — ~800px minus the header minus
+ * the chrome leaves under 300 — and at the default anchors the instruction
+ * band ran past where the chrome's dissolve begins, so the window collapsed
+ * and the whole photograph lived at the band's 12%. The idle instruction sits
+ * higher on this shape too (the same fact that gives the results region its
+ * own shallower fade above), so the band can end sooner and leave the shape
+ * an honest, if modest, window.
+ */
+@media (min-width: 1024px) and (max-height: 999px) {
+  .kiosk-backdrop-veil {
+    --backdrop-band-end: 15rem;
+    --backdrop-window-top: 18rem;
   }
 }
 

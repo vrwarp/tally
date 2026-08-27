@@ -68,6 +68,13 @@ const SCENES: {
    */
   scrollToEnd?: boolean;
   /**
+   * Extra milliseconds to sit before the shot, for the states that arrive on
+   * their own clock: the photograph fades in 350ms late over 1200ms, so a
+   * frame shot at the default settle catches a backdrop at a twentieth of its
+   * strength and both critics judge a veil nobody ships.
+   */
+  settle?: number;
+  /**
    * Presses to run before the shot, as `data-key` values or button labels.
    *
    * The wizard holds its step in a reducer, so the only way to photograph step
@@ -184,6 +191,33 @@ const SCENES: {
    */
   { id: 'staff-icon', query: 'screen=staff&icon=groups', views: ['phone', 'kiosktall'] },
   { id: 'staff', query: 'screen=staff', views: ['phone'] },
+  /*
+   * The photograph, in the four states its rules are about: worn on the idle
+   * screen, gone the moment something is typed, the light ground's vellum
+   * treatment, and the staff menu carrying its off switch. The typed frame is
+   * driven by `?buffer=` rather than by presses so the layer mounts already
+   * hidden — no transition to race — and the idle frames wait out the
+   * deliberate slow fade-in.
+   */
+  {
+    id: 'photo-idle',
+    query: 'photo=1&icon=groups',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    settle: 1900,
+  },
+  {
+    id: 'photo-typed',
+    query: 'photo=1&buffer=Alva&present=2&icon=groups',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+  },
+  {
+    id: 'photo-light',
+    query: 'photo=1&ground=light&icon=groups',
+    views: ['kiosktall', 'kioskwide'],
+    settle: 1900,
+  },
+  { id: 'photo-staff', query: 'screen=staff&backdrop=1&icon=groups', views: ['phone', 'kiosktall'] },
+  { id: 'photo-success', query: 'screen=success&icon=groups', views: ['kiosktall'] },
   { id: 'unbind-icon', query: 'screen=unbind&icon=groups', views: ['phone', 'kiosktall'] },
   {
     id: 'unbind-longtitle-icon',
@@ -247,7 +281,7 @@ for (const scene of SCENES) {
     });
     const page = await context.newPage();
     await page.goto(`${base}?${scene.query}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(scene.settle ?? 250);
 
     for (const press of scene.drive ?? []) {
       const key = page.locator(`[data-key="${press}"]`).first();

@@ -82,12 +82,14 @@ function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSP
   return {
     '--backdrop-header': rem(6),
     '--backdrop-band-edge': rem(2.5),
-    '--backdrop-band-end': rem(21),
-    '--backdrop-window-top': rem(26),
+    // The landscape shelf runs the stylesheet's short-track anchors — see the
+    // media step in index.css — and its crop here has to crop the same veil.
+    '--backdrop-band-end': rem(tall ? 21 : 15),
+    '--backdrop-window-top': rem(tall ? 26 : 18),
     '--backdrop-chrome': rem(tall ? 31 : 27),
     '--backdrop-fade': rem(6),
     '--backdrop-band': ground === 'light' ? '95%' : '88%',
-    '--backdrop-floor': ground === 'light' ? '70%' : '55%',
+    '--backdrop-floor': ground === 'light' ? '70%' : '42%',
   } as CSSProperties;
 }
 
