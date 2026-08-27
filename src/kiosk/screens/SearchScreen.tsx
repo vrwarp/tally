@@ -221,7 +221,7 @@ const SearchHeader = memo(function SearchHeader({
       <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
         <EventName path={iconPath} title={title} />
       </div>
-      <div className={`text-base kiosk:text-lg ${backdrop ? 'text-ink-400' : 'text-ink-500'}`}>
+      <div className={`text-base kiosk:text-lg ${backdrop ? 'text-ink-300' : 'text-ink-500'}`}>
         {line}
       </div>
     </div>
@@ -827,19 +827,23 @@ export function SearchScreen({
           {outcome.mode === 'idle' && (
             <div className="flex flex-col items-center pt-6 text-center">
               {/*
-                * The words, on their own plate.
+                * The words, on the veil's own ground.
                 *
-                * While the gathering's photograph runs full bleed behind this
-                * screen, the instruction's contrast lives here — a page-token
-                * card hugging the words, with a halo that melts it into the
-                * wash so it reads as glow rather than masking (numbers and
-                * reasoning on `.kiosk-idle-plate` in index.css). Paint only:
-                * negative insets, so the three lines keep their exact shipped
-                * positions — and pure page token, so a kiosk with no
-                * photograph composites all of it back to the bare page.
-                * `isolate` keeps the negative z-indices inside this block
-                * rather than racing the backdrop layer for the same layer
-                * order.
+                * On portrait shapes the photograph's canopy — the veil's head
+                * grade, extended to hold the console and these lines as one
+                * mass — is the instruction's whole contrast, so the plate and
+                * halo below paint nothing there; they are the landscape
+                * shelf's card, where the photograph frames it on every side
+                * (numbers and reasoning on `.kiosk-backdrop-veil` and
+                * `.kiosk-idle-plate` in index.css). The ground lives in the
+                * backdrop layer rather than here on purpose: it fades with
+                * the image, so no keystroke can catch the title over an
+                * unveiled photograph. Paint only: negative insets, so the
+                * three lines keep their exact shipped positions — and pure
+                * page token, so a kiosk with no photograph composites all of
+                * it back to the bare page. `isolate` keeps the negative
+                * z-indices inside this block rather than racing the backdrop
+                * layer for the same layer order.
                 */}
               <div className="relative isolate flex flex-col items-center">
                 <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
@@ -849,7 +853,7 @@ export function SearchScreen({
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
               <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Type a name</div>
-              <div className="pt-1 text-lg text-ink-400 kiosk:text-xl">or the last 4 digits of your phone</div>
+              <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>or the last 4 digits of your phone</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -879,7 +883,7 @@ export function SearchScreen({
                 * sends somebody hunting for a button and finding the register
                 * offer.
                 */}
-              <div className="pt-4 text-lg text-ink-400 kiosk:text-xl">Then tap your child&rsquo;s name.</div>
+              <div className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>Then tap your child&rsquo;s name.</div>
               </div>
             </div>
           )}
@@ -1079,8 +1083,12 @@ export function SearchScreen({
         * flattened the keys, which are `ink-800` and need the page's distance
         * to stay shapes in a dim room.
         */}
+      {/* While the photograph is up (which is exactly the idle state), the
+          rule separated nothing from nothing and read as a stray line drawn
+          on the picture — the newcomer consultation's finding. It returns
+          with the states that have content above it. */}
       {backdrop ? (
-        <div className="kiosk-rule-faded" />
+        outcome.mode === 'idle' ? null : <div className="kiosk-rule-faded" />
       ) : (
         <div className="border-t border-ink-800/70" />
       )}

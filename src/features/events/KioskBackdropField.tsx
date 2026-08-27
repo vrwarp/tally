@@ -79,16 +79,26 @@ const CROPS = [
  */
 function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSProperties {
   const rem = (value: number) => `${(value * scale).toFixed(3)}rem`;
-  return {
-    '--backdrop-head-hold': rem(5.5),
-    // The landscape shelf releases its header grade sooner — the same media
-    // step the stylesheet applies, cropped here at this box's scale.
-    '--backdrop-head-release': rem(tall ? 9 : 7),
-    '--backdrop-foot-rise': rem(10),
-    '--backdrop-head': ground === 'light' ? '92%' : '85%',
-    '--backdrop-wash': ground === 'light' ? '30%' : '18%',
-    '--backdrop-foot': ground === 'light' ? '0%' : '14%',
-  } as CSSProperties;
+  // The same fork the stylesheet makes: portrait carries the canopy — one
+  // grade holding console and instruction together — while the shelf keeps
+  // the short header grade with the card below it.
+  return tall
+    ? ({
+        '--backdrop-head-hold': rem(18.75),
+        '--backdrop-head-release': rem(23.75),
+        '--backdrop-foot-rise': rem(10),
+        '--backdrop-head': ground === 'light' ? '85%' : '68%',
+        '--backdrop-wash': ground === 'light' ? '15%' : '18%',
+        '--backdrop-foot': ground === 'light' ? '0%' : '14%',
+      } as CSSProperties)
+    : ({
+        '--backdrop-head-hold': rem(5.5),
+        '--backdrop-head-release': rem(7),
+        '--backdrop-foot-rise': rem(10),
+        '--backdrop-head': ground === 'light' ? '92%' : '85%',
+        '--backdrop-wash': ground === 'light' ? '30%' : '18%',
+        '--backdrop-foot': ground === 'light' ? '0%' : '14%',
+      } as CSSProperties);
 }
 
 /** "12 Oct", for the conscience line. */
@@ -243,29 +253,35 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                         className="kiosk-backdrop-veil absolute inset-0"
                         style={veilStyle(scale, tall, worn.ground)}
                       />
-                      {/* The idle screen's words on their plate, at the
-                          veil's own scale — the same construction the shelf
-                          paints, so the preview cannot oversell the wash. */}
+                      {/* The idle screen's words at the veil's own scale —
+                          the same construction the shelf paints, so the
+                          preview cannot oversell the wash. On the portrait
+                          crop the canopy is their whole ground; the shelf
+                          crop keeps the card and its halo. */}
                       <div
                         className="absolute inset-x-0 flex justify-center text-center"
                         style={{ top: `${(8.5 * scale).toFixed(2)}rem` }}
                       >
                         <div className="relative px-2.5 py-1">
-                          <div
-                            aria-hidden="true"
-                            className="absolute"
-                            style={{
-                              inset: '-90% -45%',
-                              background: `radial-gradient(ellipse closest-side, color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '55%' : '45%'}, transparent), transparent)`,
-                            }}
-                          />
-                          <div
-                            aria-hidden="true"
-                            className="absolute inset-0 rounded"
-                            style={{
-                              background: `color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '90%' : '78%'}, transparent)`,
-                            }}
-                          />
+                          {!tall && (
+                            <>
+                              <div
+                                aria-hidden="true"
+                                className="absolute"
+                                style={{
+                                  inset: '-90% -45%',
+                                  background: `radial-gradient(ellipse closest-side, color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '55%' : '45%'}, transparent), transparent)`,
+                                }}
+                              />
+                              <div
+                                aria-hidden="true"
+                                className="absolute inset-0 rounded"
+                                style={{
+                                  background: `color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '90%' : '78%'}, transparent)`,
+                                }}
+                              />
+                            </>
+                          )}
                           <div
                             className="relative text-[10px] leading-tight font-semibold"
                             style={{ color: colours['--color-ink-100'] }}
@@ -274,7 +290,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                           </div>
                           <div
                             className="relative text-[6px] leading-tight"
-                            style={{ color: colours['--color-ink-400'] }}
+                            style={{ color: colours['--color-ink-300'] }}
                           >
                             or the last 4 digits of your phone
                           </div>
@@ -344,6 +360,12 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
               A child&rsquo;s face on this screen needs their parent&rsquo;s yes — it stands in a
               public lobby all morning. Rooms, decorations and seasons work better than people.
               Use a photo the church owns or took.
+            </p>
+            <p className="text-xs leading-snug text-ink-500">
+              The kiosk&rsquo;s own words hold the top of the glass — deepest on a screen
+              stood on end, and never a promise of cover: the wide shelf shows more of the
+              photo than the tall one. The previews show exactly how much of each crop
+              stays clear.
             </p>
           </div>
 
