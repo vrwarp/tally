@@ -135,25 +135,22 @@ const SearchHeader = memo(function SearchHeader({
   title,
   line,
   printerNeedsAttention,
-  backdrop,
 }: {
   iconPath: string | null | undefined;
   title: string;
   /** The line under the title, already decided: the hours, opens-at, or closed. */
   line: string;
   printerNeedsAttention: boolean;
-  /**
-   * Whether the gathering's photograph is mounted behind this screen.
-   *
-   * It moves exactly one token: the hours line steps ink-500 → ink-400. That
-   * step is what lets the veil's header grade release at 85% instead of
-   * holding the whole top of the glass near-opaque for a single dim string —
-   * ink-500 needs a 96% veil just to keep its shipped contrast against a
-   * worst-case white image, and everything else up here is cheap. The
-   * photo-less kiosk keeps its shipped ink-500 exactly.
-   */
-  backdrop: boolean;
 }) {
+  /*
+   * The hours line's photograph step (ink-500 → ink-300 while the picture is
+   * up) arrives as CSS through the root's `kiosk-photo-idle` class rather
+   * than as a prop, so this memo's identity survives every keystroke — and
+   * so the step follows the picture being *visible*, not merely mounted: at
+   * ink-300 on a photo-less typed screen the time range outshone the grade
+   * labels beside the names. The photo-less kiosk keeps its shipped ink-500
+   * exactly.
+   */
   tallyRender('SearchHeader');
   return (
     /* The staff gate used to be an invisible square over this corner; it is a
@@ -221,7 +218,7 @@ const SearchHeader = memo(function SearchHeader({
       <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
         <EventName path={iconPath} title={title} />
       </div>
-      <div className={`text-base kiosk:text-lg ${backdrop ? 'text-ink-400' : 'text-ink-500'}`}>
+      <div className="kiosk-hours-line text-base text-ink-500 kiosk:text-lg">
         {line}
       </div>
     </div>
@@ -705,7 +702,7 @@ export function SearchScreen({
     <div
       className={`grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto] ${
         backdrop ? 'kiosk-has-backdrop' : ''
-      }`}
+      } ${backdrop && buffer === '' ? 'kiosk-photo-idle' : ''}`}
     >
       {/* Everything above the results, memoized so a keystroke leaves it
           alone — the header's own reasoning lives on SearchHeader. */}
@@ -714,7 +711,6 @@ export function SearchScreen({
         title={binding.title}
         line={headerLine}
         printerNeedsAttention={printerNeedsAttention}
-        backdrop={backdrop}
       />
 
       {/*
@@ -827,19 +823,23 @@ export function SearchScreen({
           {outcome.mode === 'idle' && (
             <div className="flex flex-col items-center pt-6 text-center">
               {/*
-                * The words, on their own plate.
+                * The words, on the veil's own ground.
                 *
-                * While the gathering's photograph runs full bleed behind this
-                * screen, the instruction's contrast lives here — a page-token
-                * card hugging the words, with a halo that melts it into the
-                * wash so it reads as glow rather than masking (numbers and
-                * reasoning on `.kiosk-idle-plate` in index.css). Paint only:
-                * negative insets, so the three lines keep their exact shipped
-                * positions — and pure page token, so a kiosk with no
-                * photograph composites all of it back to the bare page.
-                * `isolate` keeps the negative z-indices inside this block
-                * rather than racing the backdrop layer for the same layer
-                * order.
+                * On portrait shapes the photograph's canopy — the veil's head
+                * grade, extended to hold the console and these lines as one
+                * mass — is the instruction's whole contrast, so the plate and
+                * halo below paint nothing there; they are the landscape
+                * shelf's card, where the photograph frames it on every side
+                * (numbers and reasoning on `.kiosk-backdrop-veil` and
+                * `.kiosk-idle-plate` in index.css). The ground lives in the
+                * backdrop layer rather than here on purpose: it fades with
+                * the image, so no keystroke can catch the title over an
+                * unveiled photograph. Paint only: negative insets, so the
+                * three lines keep their exact shipped positions — and pure
+                * page token, so a kiosk with no photograph composites all of
+                * it back to the bare page. `isolate` keeps the negative
+                * z-indices inside this block rather than racing the backdrop
+                * layer for the same layer order.
                 */}
               <div className="relative isolate flex flex-col items-center">
                 <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
@@ -849,7 +849,7 @@ export function SearchScreen({
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
               <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Type a name</div>
-              <div className="pt-1 text-lg text-ink-400 kiosk:text-xl">or the last 4 digits of your phone</div>
+              <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>or the last 4 digits of your phone</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -879,7 +879,7 @@ export function SearchScreen({
                 * sends somebody hunting for a button and finding the register
                 * offer.
                 */}
-              <div className="pt-4 text-lg text-ink-400 kiosk:text-xl">Then tap your child&rsquo;s name.</div>
+              <div className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>Then tap your child&rsquo;s name.</div>
               </div>
             </div>
           )}
@@ -1079,6 +1079,13 @@ export function SearchScreen({
         * flattened the keys, which are `ink-800` and need the page's distance
         * to stay shapes in a dim room.
         */}
+      {/* While the photograph is up the rule separated nothing from nothing
+          and read as a stray line drawn on the picture — the newcomer
+          consultation's finding. It dissolves by paint on the photograph's
+          own clocks (index.css) rather than by mount: unmounting here put
+          the line back over a full-strength image for a frame on the first
+          keystroke, and left the chip on a bare page for the 1.5s the image
+          takes to return after Clear. */}
       {backdrop ? (
         <div className="kiosk-rule-faded" />
       ) : (
