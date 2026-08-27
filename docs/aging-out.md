@@ -8,6 +8,12 @@
 > loop ran until a round produced no finding above minor, the same bar `docs/refinements.md`
 > uses. Solution numbers (S1–S7) and journey numbers (J/M) are stable references for whatever
 > gets built.
+>
+> **The product owner selected S1+S2 to explore further; S3–S7 are parked** (their sections
+> stand as reference). A fourth critique pass then stress-tested S1+S2 against the question
+> *"what if staff doesn't get around to the act for months?"* — its findings are folded into
+> S1/S2 below and written up in [the lateness section](#s1s2-under-lateness), which is the
+> direct answer to that question.
 
 ## The problem, in the code's own terms
 
@@ -118,18 +124,27 @@ effective date — the release **applies only to events at or after `from`**.
   S2's seed) and **no longer with us** (graduated / moved away; deactivation only ever a
   *separate second press* that states its door cost). Optional note. Nothing load-bearing
   reads the reason.
-- **Effects**: the row leaves MIA now; the chain's Recent drops them for events at/after
-  `from`; the kiosk's *ticked* guess drops them at the next participation delivery.
-  Findability is untouched: **`participated` is never subtracted from, by anything, ever.**
+- **Effects — two named predicates, never conflated** (the lateness pass forced this
+  split): `resolvesRow(student, chain)` — a standing (non-inert) release excludes the
+  student from that chain's **MIA list** from the moment it exists, *regardless of `from`*,
+  because the release is the resolution of the question the row asks whenever the misses
+  happened (without this, the forward-defaulted date means a months-late release fails to
+  clear the very rows it was performed on — the primary case). And `appliesAt(event)` —
+  for **prediction and Recent**, the release applies only to events at or after `from`,
+  never rewriting who was recent before it. The kiosk's *ticked* guess drops at the next
+  participation delivery. Findability is untouched: **`participated` is never subtracted
+  from, by anything, ever.**
 - **The void is a derivation, not a write**: a release is **inert while the chain holds
   attendance for that student at or after `from`**. Readers already hold the evidence; no
   void ever executes on a lobby tablet; back-filling an old register cannot undo a September
   act; a proactive August act survives the August Sundays it was meant to permit. *Pinned
   test: act Aug 12 with `from` Sep 7; check the student in Aug 17; the release stands Sep 7
-  and Aug 17's roster never applied it.* Build notes: render inert releases *as inert* in the
-  ledger strip; and if the habitual-mis-tap-voids-the-release residual ever matters, the knob
-  is voiding on staff-written attendance only (`method` already distinguishes `kiosk`) — a
-  knob, not present work.
+  and Aug 17's roster never applied it.* An inert release restores the student to MIA
+  computation naturally, and `wasRegular` already handles the drop-in-visit case. Build
+  notes: render inert releases *as inert* in the ledger strip; and if the
+  habitual-mis-tap-voids-the-release residual ever matters, the knob is voiding on
+  staff-written attendance only (`method` already distinguishes `kiosk`) — a knob, not
+  present work.
 - **The old tablet learns to point — on the confirm screen** (the result row is a fixed
   four-state slot that would evict a caption with "✓ Checked in" at the moment of the
   mis-tap): one line in the confirm screen's sentence region, **outside the measured family
@@ -141,14 +156,40 @@ effective date — the release **applies only to events at or after `from`**.
   the feature).
 - **Locked, not hidden — the ledger, on both sides**: on release the MIA row greys **in
   place** with one-tap session Undo; after reload, a collapsed counted strip under the MIA
-  list on the **source** ("9 no longer expected · latest Sep 7") **and the destination**
-  ("9 moved up here · Sep 7 · Ruth") — provenance for the counselors meeting nine badged
-  names, never on the check-in header. Strips open to rows with reason, author, date,
-  per-row and bulk undo. The same record renders on the student page's per-gathering
-  standing. The ledger may count itself — the never-a-count rule belongs to the seed.
-- **Reads join the prediction's pre-paint one-shot**, per chain; refused/failed read = no
-  release. The list never changes under a reader. Releases follow `mergedFromStudentIds` at
-  read time.
+  list on the **source** and the **destination** — provenance for the counselors meeting
+  nine badged names, never on the check-in header. Strips open to rows with reason, author,
+  and **both dates** — *resolved on* Jan 12, *effective from* Jan 19 — because a late act
+  makes one date field tell two different truths. The strip **renders even when the MIA tab
+  is empty**: months on, the cohort fragments (someone deactivates two from the student
+  page; the window retires others), and "tab is clean" must never be the only record. The
+  **destination strip also reports arrivals against seeds at expiry** — *"9 moved up here ·
+  6 arrived · 3 never came"*, opening to the three names. That is the never-landed check on
+  the **on-time** path, where the at-act evidence below is necessarily blank: the seed's own
+  expiry is the app discovering, unprompted, that a declared claim about the future did not
+  come true, about four instances after the act, while it is still recoverable — never a
+  call-list row, never a streak (S2's invisible-to-streaks constraint stands). Per-row and
+  bulk undo throughout; the same record renders on the student page's per-gathering
+  standing. The ledger may count itself — the never-a-count rule belongs to the seed — but
+  it is **twice systematically incomplete** (the nursery drip, aged-out rows), so no report
+  is ever built on it.
+- **The act shows, per selected student, whether they landed** — one derived line from data
+  already loaded: *"seen at Friday Fellowship 11 times, last Friday"* / *"not seen anywhere
+  since Aug 31."* Evidence, never a verdict; blank at week 0 by nature (the destination has
+  no history yet — the ledger's expiry report covers that path). And because a months-late
+  bulk release is performed as cleanup, by whoever was asked for numbers, under someone
+  else's deadline, the negative is also **stated once, unskippably, in the confirm
+  sentence**, in the review screen's own grammar: *"Release 9 from Sunday Kids. 3 of them
+  have not been seen at any gathering since Aug 31 — Micah, Ava, Devon. Releasing them
+  clears the only row asking about them."* — with **"Keep those 3 on the list"** beside the
+  confirm, one tap. Never unselected-by-default: that would be a verdict, and it fights the
+  gesture.
+- **Reads join the prediction's pre-paint one-shot**, per chain, **issued in parallel with
+  the history read, never after it** — the church that never performs the act must pay
+  nothing on the one screen with a three-second budget. Refused/failed read = no release.
+  The list never changes under a reader. Releases follow `mergedFromStudentIds` at read
+  time. (Pre-existing and out of scope, one sentence for honesty: `standingIn` matches on
+  `student.id` alone and does not union merged ids the way the profile does, so a merged
+  student can already leave the MIA list by a route that has nothing to do with S1.)
 
 ### S2 — The seed
 
@@ -160,6 +201,9 @@ two dates defaulting to one.
   **not** `onChain`-gated (a chain-read gate would half-fail exactly the cross-chain acts
   this exists for); patches the participation overlay and bumps the pulse server-side
   (`kioskIndex/*` is functions-write-only). The confirmation says when the lobby will know.
+  **Release and seed share one act id** — it is what the batch undo already needs, and it
+  lets source attendance at/after `from` expire the sibling seed (the student who moves
+  back has left the destination; its badge must not outlive them there).
 - **Effective date asked first, defaulting forward** — to the destination chain's next
   scheduled occurrence on or after the named date, the release's `from` following it. A
   leader who never touches the date **cannot release an attending cohort**; releasing early
@@ -170,8 +214,13 @@ two dates defaulting to one.
   findable") justifies the seed; the release's subtraction is safe for its own reason — it
   removes an auto-tick, never a search result. `recent ⊆ participated` holds.
 - **Check-in screen**: seeded students are simply *inside* the Recent filter, A–Z in the one
-  list, with a row badge in the `computeWarnings` grammar. **Never a section.** Checking one
-  in moves no row.
+  list, with a row badge in the visual grammar of `computeWarnings` — computed in
+  `buildRoster` beside `isRecent`, on the `RosterEntry` (`computeWarnings` takes a `Student`
+  alone and cannot see the seed). **The badge renders only while the seed is the reason the
+  student is in the list** (seeded and *not* Recent on their own attendance) — so a seed
+  performed months late on a student who long since landed is inert on arrival, visibly and
+  invisibly, and M5's decisive second visit keeps its badge while week 3's cleared 2-of-3
+  drops it. **Never a section.** Checking one in moves no row.
 - **Kiosk**: findability only. A seeded child is offered unticked at full weight and **never
   arrives pre-ticked** — a tick is a write into a room that tracks check-out. *Mirror tests:
   seed a child at a check-out gathering, tap the sibling — unticked; release a child, tap the
@@ -181,11 +230,63 @@ two dates defaulting to one.
   of the destination chain have passed, **whichever is later** — N = `predictiveOfLastN + 1`,
   floor 4, expressed as that derivation (one ordinary miss pushes own-qualification to the
   fourth instance; overshoot costs a stale badge). Held instances only, so breaks and
-  fortnightly chains cost nothing; seeds expire when the destination chain is ended. Release
-  and seed on the same chain/student pair: either clears the other.
+  fortnightly chains cost nothing; seeds expire when the destination chain is ended, and
+  when source attendance at/after `from` voids the sibling release (the shared act id
+  above). **The nightly participation rebuild drops expired seeds** when it folds the
+  overlay — it already sweeps the year of attendance that holds every fact the rule needs —
+  so the overlay cannot accrete dead cohorts, and the destination strip can tell a live
+  seed from a spent one. Release and seed on the same chain/student pair: either clears the
+  other.
+- **Seeds follow `mergedFromStudentIds` at read time**, exactly as releases and history do —
+  the population most likely to be merged is J3's family, registered at the lobby because
+  the kiosk could not find them: precisely the child the seed exists for, who must not drop
+  out of scope mid-bridge because a reviewer merged them. Added to the mirror tests.
 - **Invisible to streaks**, pinned by regression test: nothing that computes MIA or
-  `standingIn` reads a seed — a seeded student who never comes is a conversation, not a
-  call-list row. **Never a count** anywhere. Fail open everywhere.
+  `standingIn` reads a seed — a seeded student who never comes is a conversation (surfaced
+  by the destination strip's expiry report, S1), not a call-list row. **Never a count**
+  anywhere. Fail open everywhere.
+
+### S1+S2 under lateness
+
+The product owner's question — *what if staff doesn't get around to this for months?* — and
+its answer, from a fourth critique pass. With S3 (the reminder card) parked, this is not an
+edge case: **the act performed weeks or months late, from the MIA list, as cleanup, is the
+primary path**, and promotion-Sunday-prepared-in-August is the exception. The staff seat
+adds who actually does it: not the director who knows, but whoever was asked for numbers —
+core rank, least context — triggered by someone else's deadline, never by the tab being
+dirty. The realistic distribution is week 3 / next August / never.
+
+**Traced by month.** Weeks 0–3 un-acted: exactly today's app; nothing in S1+S2 has fired,
+nothing is worse. Act at week 3: rows clear, ledger records, the seed bridges the stragglers
+and no-ops for the already-landed. Act at month 4: the MIA rows are still standing (the
+window is a year) so the entrance still exists; the release clears them (the
+two-predicate split above is what makes that true despite the forward-defaulted date); the
+old chain's Recent and ticks decayed on their own months ago; the confirm-screen line still
+buys its wrong-tablet reduction for the rest of the participated year; the badge rule keeps
+the seed inert on long-landed kids; the ledger records January honestly, with both dates.
+Act never: everything decays on its own — Recent in two instances, MIA rows when the
+365-day window slides past, findability at a year — and **the un-acted limit of S1+S2 is
+exactly today's app plus one parallel read that costs nothing**. The interface never breaks
+for not being used; there is simply nothing left to act on once decay has done its year.
+
+**The value curve, stated honestly.** The *release half ages well*: the rows it resolves
+are still there and still wrong in January, so a late act recovers most of its value. The
+*seed half ages poorly by design*: it bridges weeks 1–3, and by month 4 behavior has taken
+over — no interface can recover the bridge after the moment has passed. Lateness's
+unrecoverable costs are the wrong calls already made and the door friction already
+suffered.
+
+**The one dangerous case, and its two checkpoints.** The kid who "moved up" and never
+landed is on no list anywhere for about a year once released (the seed is invisible to
+streaks by hard constraint; `computeUnseen` skips anyone the loaded year saw at anything) —
+and today's false MIA row would have produced the phone call that accidentally discovered
+them. Worse, the naive fix (evidence at the moment of the act) is blank on the *on-time*
+path, where the destination has no history yet — it would reward lateness on exactly the
+axis this section is about. So the check lives at both ends, neither a verdict: **at the
+act**, per-row standing plus the confirm sentence naming the never-seen with a one-tap
+*"Keep those 3 on the list"* (the late-cleanup catch); **at seed expiry**, the destination
+strip's *"9 moved up here · 6 arrived · 3 never came"* (the on-time catch, about four
+instances after the act, while it is still recoverable).
 
 ### S3 — The card that remembers the ritual
 
