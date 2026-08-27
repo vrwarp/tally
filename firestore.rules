@@ -507,6 +507,17 @@ service cloud.firestore {
               && v != '..');
       }
 
+      /**
+       * The kiosk photograph's pointer. Tighter than a hue name because of
+       * where it travels: the kiosk turns it into a `kioskBackdrops/{id}`
+       * document path and a cache key, so only the exact shape this repo
+       * mints — `b` + hex — is a value at all. See `lib/kioskBackdrop.ts`,
+       * whose sanitizer holds the same line client-side.
+       */
+      function validKioskBackdropId(v) {
+        return v == null || (v is string && v.matches('^b[0-9a-f]{16,64}$'));
+      }
+
       function validEvent() {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
@@ -520,6 +531,7 @@ service cloud.firestore {
           && (recurrence == null || validRecurrence(recurrence))
           && (labelTemplate == null || validLabelTemplate(labelTemplate))
           && (kioskTheme == null || validKioskTheme(kioskTheme))
+          && validKioskBackdropId(d.get('kioskBackdropId', null))
           && validChainRef(d.get('seriesId', null))
           && validChainRef(d.get('recurrenceRootId', null))
           && validChainRef(d.get('predictFromChain', null));
@@ -1054,6 +1066,49 @@ service cloud.firestore {
     match /kioskIndex/{docId} {
       allow get: if isActive();
       allow list, write: if false;
+    }
+
+    /**
+     * The photographs lobby kiosks stand behind — finished pixels, one image
+     * per document, named by content (`b` + a prefix of the SHA-256 of the
+     * encoded bytes; see `src/lib/kioskBackdrop.ts`).
+     *
+     * Create-only, and that is the content-addressing enforced rather than a
+     * hunch about clients: under an id that names its bytes, an update is by
+     * definition a document whose name has become a lie, and two gatherings
+     * can be wearing that name. The editor never needs one — replacing a
+     * photo writes a new document and points the event at it — and it checks
+     * for an existing document first, so re-uploading the same file is a read,
+     * not a write. No deletes for the same sharing reason: nothing records
+     * that this gathering was an image's only wearer, and an orphaned
+     * document is a few hundred kilobytes where a dangling id is a kiosk
+     * with no backdrop.
+     *
+     * The size ceiling is `KIOSK_BACKDROP_MAX_BYTES`, which cannot be
+     * imported here — keep the two together. The bounds on the dimensions
+     * are the editor's own resize cap, `KIOSK_BACKDROP_EDGE_PX`.
+     */
+    match /kioskBackdrops/{backdropId} {
+      function validKioskBackdrop() {
+        let d = request.resource.data;
+        return d.image is bytes
+          && d.image.size() > 0
+          && d.image.size() <= 600000
+          && d.contentType in ['image/webp', 'image/jpeg']
+          && d.width is int && d.width > 0 && d.width <= 1920
+          && d.height is int && d.height > 0 && d.height <= 1920
+          && d.updatedAt is timestamp
+          && d.updatedBy == request.auth.uid;
+      }
+
+      // The kiosk session is the approving staff member's own uid, so the
+      // membership test the rest of the kiosk's reads pass covers this one.
+      allow get: if isActive();
+      // Core and up, exactly like the events that point at these.
+      allow create: if isCore()
+        && backdropId.matches('^b[0-9a-f]{16,64}$')
+        && validKioskBackdrop();
+      allow list, update, delete: if false;
     }
 
     /**

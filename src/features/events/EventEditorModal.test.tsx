@@ -32,6 +32,13 @@ vi.mock('@/services/events', () => ({
   ensureMaterialized: async (event: TallyEvent) => event.id,
 }));
 
+// The backdrop service reaches for the live Firestore on import; the field it
+// serves is rendered by this modal but exercised in its own suite.
+vi.mock('@/services/kioskBackdrops', () => ({
+  putKioskBackdrop: vi.fn(async () => 'b0123456789abcdef'),
+  fetchKioskBackdrop: vi.fn(async () => null),
+}));
+
 const FRIDAY = 'friday-fellowship';
 
 const fridaySeries: EventSeries = {

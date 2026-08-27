@@ -289,6 +289,7 @@ One dated gathering.
 | `requiresCheckOut` | boolean | Turns the roster ternary: children are checked in and then collected. Off by default and unconditionally — unlike `requiresRsvp`, nothing about a gathering's shape implies it. Inherited by projected occurrences, because a nursery is exactly the kind of gathering that repeats. |
 | `labelTemplate` | object \| null | What the kiosk prints when a child is checked in here — `{ lines: [{ text, size, bold, align }], copies }`, where `text` may contain `{{firstName}}`-style tokens. Null means this gathering prints nothing, which is the default: a printer plugged in for the nursery must not start producing stickers at youth group. Content and layout only — no label size, no printer model, because which roll is loaded is a fact about the kiosk in the lobby and lives in *its* localStorage. Inherited by projected occurrences alongside `requiresCheckOut`, and carried onto the kiosk's chooser row because the kiosk never reads an event document. Shape pinned by the rules for the same reason `recurrence` is: a screen on a shelf expands it and nobody is standing there. See [`src/lib/labelTemplate.ts`](../src/lib/labelTemplate.ts). |
 | `kioskTheme` | object \| null | What a lobby kiosk looks like while it is bound to this gathering — `{ ground, accent, confirm, backdrop }`, where the ground is `dark` or `light` and the other three are hue *names* from the wheel in [`src/lib/kioskTheme.ts`](../src/lib/kioskTheme.ts). Null is the ordinary answer and means the kiosk that shipped. The three slots are named for the job each does — what you touch, what just happened, the wash on the page — because the kiosk's palette is already semantic and has no second or third *tier* to rank. `warn` is deliberately not among them: it is what an allergy line is painted in, on screen and on the label, and no gathering may recolour it. Stored by name, like `icon`, so a colour can be corrected without rewriting anybody's events; an unknown name reads as that slot's default. Inherited by projected occurrences alongside `labelTemplate`. Never read by the kiosk in this form — `functions/src/kiosk/events.ts` turns the names into finished hex while building the chooser row, because OKLCH and a gamut search are not work for a screen on a shelf. |
+| `kioskBackdropId` | string \| null | The photograph a lobby kiosk stands behind its idle screen while bound here, as the id of a [`kioskBackdrops/{backdropId}`](#kioskbackdropsbackdropid) document. The pointer and never the pixels, because this collection is read wholesale by the kiosk chooser and subscribed by the calendar — a photo riding those reads would bill every screen for one gathering's decoration. Content-addressed (`b` + a prefix of the image's SHA-256), so the id is also the revision and replacing the photo means a new id. Null is the ordinary answer. Inherited by projected occurrences alongside `kioskTheme`, and carried onto the chooser row as `backdropId`. See [`src/lib/kioskBackdrop.ts`](../src/lib/kioskBackdrop.ts). |
 | `status` | `'scheduled' \| 'cancelled'` | Cancelled events are never offered as live and never inform prediction. A *finished* event with no attendance is treated as cancelled too — see [decision 3](#3-a-gathering-with-no-attendance-is-a-cancelled-one). |
 | `pcoCheckInsEventId`, `pcoCheckInsPeriodId` | string, on imported events only | Which Planning Center Check-Ins event and event period this gathering was imported from. Provenance for a re-import and for whoever is reading the console; nothing in the app renders them. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or `'planning-center'` for a gathering imported from Check-Ins history. |
@@ -755,6 +756,35 @@ It holds no names, no digits, no student ids — nothing but counters, timestamp
 the security argument: the attack on a client-writable pulse is spoofing "your caches changed" at
 every kiosk and driving the fleet into refetch loops, so `set` fails even for an admin. The rules
 test pins it.
+
+### `kioskBackdrops/{backdropId}`
+
+The photographs lobby kiosks stand behind their idle screens — one image per document, finished
+pixels, written by the event editor after it has downscaled and re-encoded whatever a leader handed
+it (which also strips the file's metadata: a phone photo carries the GPS position of wherever it was
+taken, and this one is bound for a public lobby by way of a database the whole team can read).
+
+| field | type | notes |
+| --- | --- | --- |
+| `image` | bytes | The encoded image, ≤ 600 KB — the cap the rules enforce and `KIOSK_BACKDROP_MAX_BYTES` names; the editor aims at ~350 KB and 1920 px on the long edge. Bytes in Firestore rather than a storage bucket on purpose: it is the one image the kiosk reads, once per revision per device, and a whole second product (rules, emulator, SDK chunk) for a third of a megabyte would be the tail wagging the dog. |
+| `contentType` | `'image/webp' \| 'image/jpeg'` | What the editor's canvas produced. |
+| `width`, `height` | number | Of the encoded image, for the record — the kiosk cover-crops whatever it gets. |
+| `updatedAt` | Timestamp | First upload — the "Photo · uploaded 12 Oct" line in the editor, which is what gives seasonal turnover a conscience. Never actually updated; see below. |
+| `updatedBy` | string | The uploader's uid; the rules require it to be the caller's own. |
+
+The id is content-addressed — `b` + a prefix of the SHA-256 of `image` — which is what makes the
+rest of the design fall out. The id *is* the revision, so a kiosk that has cached one never asks
+whether it changed; two gatherings uploading the same file share a document; and the collection is
+**create-only** — under an id that names its bytes, an update is by definition a document whose name
+has become a lie, possibly on another gathering's kiosk. Nothing deletes from a client either, for
+the sharing half of the same reason: nothing records which gatherings still point at an image, so an
+orphaned document is a few hundred kilobytes of storage where a wrong delete is somebody's kiosk
+undressed. Replacing a photo writes a new document and repoints the event.
+
+**Who reads:** any active member, kiosk sessions included — the kiosk fetches the one document its
+binding names, after the reads that make it searchable have landed, and caches the pixels on-device
+(Cache API, not localStorage — nothing about a photograph may ride the synchronous boot path). **Who
+writes:** core and up, like the events that point here. Never listed by anybody.
 
 ### `kioskRegistrations/{registrationId}`
 

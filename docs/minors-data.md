@@ -42,6 +42,16 @@ is their own typing, not a record; the note travels on the review record and rea
 after approval only the way any other upstream note does. See
 [the data model](data-model.md#kioskregistrationsregistrationid).
 
+"Never a photograph" is a rule about records: no child's record carries a picture, and nothing the
+kiosk shows about a child ever will. A gathering *may* stand a photograph behind the kiosk's idle
+screen — its own room, a seasonal image — and that is decoration chosen by a core-team member, not
+data about anyone. The line to hold is that the two never meet: the editor's guidance says it at
+the moment of upload — a child's face on a screen the public stands in front of all morning needs
+that child's parent to have said yes, and rooms beat people — and the photograph is gone from the
+glass the moment a family starts typing, so it is never the background to anybody's name. A wrong
+image on a Sunday does not wait for an editor either: the staff screen behind the kiosk's own gate
+takes it off that device immediately, offline included.
+
 It is also narrow in *who* it will find. The search is scoped to the children who have been to that
 gathering in the last year — the same year the check-in screen uses to decide who belongs to a room
 — rather than to every active student in the ministry, because a parent at Friday Fellowship is not

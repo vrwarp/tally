@@ -383,6 +383,125 @@
   }
 }
 
+/*
+ * The photograph behind the idle search screen, and the veil that makes it
+ * lawful. See src/kiosk/components/Backdrop.tsx for when the layer shows at
+ * all; this block owns what it looks like while it does.
+ *
+ * The two transitions are asymmetric on purpose. Out is fast and immediate —
+ * a parent has started working, and the photograph's job is to be gone. Back
+ * in is slower and starts late, so a screen returning to idle leads with the
+ * instruction and the photograph arrives third; a first letter landing
+ * mid-return reverses the same transition continuously rather than cutting.
+ * Opacity only, on a layer that carries `will-change` from mount, so neither
+ * direction ever pays promotion, paint or texture upload inside a keystroke's
+ * frame — the same argument that put the no-match word pulse on composited
+ * opacity (see the animation note below).
+ *
+ * The veil is built from `--color-ink-950` and never from a literal black:
+ * the token is the page, so on a light ground the veil lightens, and on a
+ * hue-turned gathering it carries the theme's own cast — direction and tint
+ * follow the ground by construction, and the veil, the results ramp and the
+ * status-bar colour stay one material because all three read the same token.
+ *
+ * Legibility is geometry, not wash. Reading down the gradient: the header
+ * band sits on the full page colour; the region the idle instruction occupies
+ * sits on a stop strong enough for its `ink-400` lines against a worst-case
+ * white image (88% of ink-950 leaves such text ~5.4:1; the light ground needs
+ * 95%, set below, because dark-on-light spends its margin faster); the
+ * photograph's one clear window is the stretch of the results track where
+ * nothing guaranteed ever renders on idle; and the veil reaches the full page
+ * colour again above the console rule, so the register chip, the buffer band
+ * and the keyboard stand on exactly the page they ship on. The bottom anchors
+ * are lengths rather than percentages because the chrome they clear is a
+ * fixed height per shape — on screens too short for the window the stops
+ * simply collapse and the photograph narrows to a glow, which is the honest
+ * answer on a phone-shaped kiosk.
+ *
+ * The event editor's preview paints this same class over its mock, scaled
+ * through the custom properties — one veil, so the preview and the shelf
+ * cannot disagree. The solid `background` above the gradient is the fallback
+ * for engines without color-mix: they keep the full page colour, the
+ * photograph stays hidden, and an old tablet is exactly the kiosk that
+ * shipped rather than an unveiled one.
+ */
+.kiosk-backdrop {
+  opacity: 1;
+  will-change: opacity;
+  transition: opacity 1200ms ease-in 350ms;
+}
+
+.kiosk-backdrop-hidden {
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-backdrop,
+  .kiosk-backdrop-hidden {
+    transition: none;
+  }
+}
+
+/*
+ * Two layers rather than one run of stops, because the two halves of the
+ * guarantee are anchored to different ends of the screen. The top layer reads
+ * downward — the opaque header band, the strong stop under the instruction,
+ * easing to the window's floor, which then simply holds. The bottom layer
+ * reads upward — the full page colour through the chrome's whole height,
+ * dissolving over `--backdrop-fade` above it — and painting it as its own
+ * bottom-anchored layer is what keeps every shape honest at once: a single
+ * top-down gradient with length stops collapses them on a short screen, and
+ * where it collapsed (a phone, the landscape kiosk) the photograph ended in a
+ * hard seam at exactly the height a parent's eye crosses on the way to the
+ * keys. Composited, the floor rides over the dissolve and the window closes
+ * softly wherever the two meet — which on a cramped shape is almost
+ * immediately, and that is the honest answer there.
+ */
+.kiosk-backdrop-veil {
+  --backdrop-header: 6rem;
+  --backdrop-band-edge: 2.5rem;
+  --backdrop-band-end: 21rem;
+  --backdrop-window-top: 26rem;
+  --backdrop-chrome: 27rem;
+  --backdrop-fade: 6rem;
+  --backdrop-band: 88%;
+  --backdrop-floor: 55%;
+  background: var(--color-ink-950);
+  background:
+    linear-gradient(
+      to bottom,
+      var(--color-ink-950) 0,
+      var(--color-ink-950) var(--backdrop-header),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-band), transparent)
+        calc(var(--backdrop-header) + var(--backdrop-band-edge)),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-band), transparent)
+        var(--backdrop-band-end),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-floor), transparent)
+        var(--backdrop-window-top)
+    ),
+    linear-gradient(
+      to top,
+      var(--color-ink-950) 0,
+      var(--color-ink-950) var(--backdrop-chrome),
+      color-mix(in srgb, var(--color-ink-950) 0%, transparent)
+        calc(var(--backdrop-chrome) + var(--backdrop-fade))
+    );
+}
+
+/* Dark ink on a light page spends its contrast margin faster — see above. */
+[data-theme='light'] .kiosk-backdrop-veil {
+  --backdrop-band: 95%;
+  --backdrop-floor: 70%;
+}
+
+/* The chrome steps up on a screen stood on end, so its clearance does too. */
+@media (min-height: 1000px) {
+  .kiosk-backdrop-veil {
+    --backdrop-chrome: 31rem;
+  }
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;

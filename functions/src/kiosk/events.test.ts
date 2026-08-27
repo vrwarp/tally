@@ -189,6 +189,53 @@ describe('listKioskEvents', () => {
   });
 
   /*
+   * The backdrop travels as its pointer and nothing else: the pixels live in
+   * `kioskBackdrops/{id}` and the kiosk reads them once at bind — a chooser
+   * that carried them would be megabytes answering a question about titles.
+   */
+  it('carries the backdrop id onto the row, and no key at all without one', async () => {
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'nursery',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { kioskBackdropId: 'b0123456789abcdef' },
+    );
+    seedEvent(db, 'youth', {
+      start: '2026-08-09T18:00:00Z',
+      end: '2026-08-09T20:00:00Z',
+      closes: '2026-08-09T21:00:00Z',
+    });
+
+    const entries = await listKioskEvents(db, NOW, logger);
+    const nursery = entries.find((entry) => entry.id === 'nursery');
+    const youth = entries.find((entry) => entry.id === 'youth');
+    expect(nursery?.backdropId).toBe('b0123456789abcdef');
+    expect(youth && 'backdropId' in youth).toBe(false);
+  });
+
+  /* An id only vandalism could have written is dropped on the way out. */
+  it('drops a malformed backdrop id rather than handing it to a shelf', async () => {
+    const db = new FakeFirestore();
+    seedEvent(
+      db,
+      'nursery',
+      {
+        start: '2026-08-09T10:00:00Z',
+        end: '2026-08-09T12:00:00Z',
+        closes: '2026-08-09T13:00:00Z',
+      },
+      { kioskBackdropId: 'kioskBackdrops/../users' },
+    );
+    const entry = (await listKioskEvents(db, NOW, logger))[0];
+    expect(entry && 'backdropId' in entry).toBe(false);
+  });
+
+  /*
    * The icon is looked up here for the same reason the palette is resolved
    * here: the catalogue is sixty kilobytes, the kiosk needs one glyph out of
    * it, and its first-paint budget is the tightest number in the repo.

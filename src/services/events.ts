@@ -21,6 +21,7 @@ import {
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { findEventIcon } from '@/lib/eventIcons';
+import { sanitizeKioskBackdropId } from '@/lib/kioskBackdrop';
 import { sanitizeKioskTheme, type KioskTheme } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { chainKey } from '@/lib/materialize';
@@ -66,6 +67,8 @@ export interface EventDraft {
   labelTemplate?: LabelTemplate | null;
   /** Ground and hues for a lobby kiosk bound to this gathering. */
   kioskTheme?: KioskTheme | null;
+  /** The kiosk's photograph, as a `kioskBackdrops/{id}` id. */
+  kioskBackdropId?: string | null;
   status?: EventStatus;
 }
 
@@ -246,6 +249,10 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     // hold against a stale editor bundle as well as against a hand-written
     // document.
     kioskTheme: sanitizeKioskTheme(draft.kioskTheme),
+    // Sanitised on the way out like the theme above it, and cheaper to: an id
+    // that fails the shape check becomes null, which is "no photo" — the same
+    // safe direction a malformed label template falls.
+    kioskBackdropId: sanitizeKioskBackdropId(draft.kioskBackdropId),
     status: draft.status ?? 'scheduled',
     updatedAt: serverTimestamp(),
   };

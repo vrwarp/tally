@@ -42,6 +42,8 @@ import {
   type KioskBinding,
 } from './binding';
 import { applyKioskTheme } from './theme';
+import { loadBackdrop } from './backdrop';
+import { Backdrop } from './components/Backdrop';
 import { tallyRender } from './renderTally';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
@@ -408,10 +410,18 @@ export function KioskApp() {
   } | null>(null);
   const [registration, setRegistration] = useState<KioskRegistration | null>(null);
 
+  /**
+   * Whether anybody is mid-anything on this glass — nothing typed, nothing
+   * overlaid, nobody in the wizard. One expression with two readers: the
+   * expiry clock below asks it through `idleRef`, and the backdrop shows the
+   * gathering's photograph exactly while it is true — which is the whole of
+   * when a photograph is lawful (see components/Backdrop.tsx).
+   */
+  const calm = buffer === '' && overlay === null && registering === null;
   const idleRef = useRef(true);
   // A family halfway through the wizard is not an idle kiosk: the binding must
   // not expire under them and the 4am reload must not take the screen away.
-  idleRef.current = buffer === '' && overlay === null && registering === null;
+  idleRef.current = calm;
 
   /**
    * When the glass was last touched — the other half of that question.
@@ -444,6 +454,102 @@ export function KioskApp() {
    * (hydrate has just loaded everything anyway).
    */
   const pulseRef = useRef<CachedPulse | null>(readCachedPulse());
+
+  /**
+   * Settles when the reads that make this kiosk searchable have — see
+   * `hydrate`. Null until then, which awaits as "now": a kiosk that never
+   * hydrates (unbound, or a test renderer) has no queue for a photograph to
+   * get behind.
+   */
+  const searchReadyRef = useRef<Promise<unknown> | null>(null);
+
+  /**
+   * The photograph's pixels, as an object URL — or null, which is most
+   * kiosks. Resolved by the effect below: this device's cached copy without a
+   * byte of network, or one fetch per new id once the kiosk is searchable.
+   */
+  const [backdropUrl, setBackdropUrl] = useState<string | null>(null);
+  const backdropId = binding?.kioskBackdropId ?? null;
+
+  /**
+   * The id the URL on screen answers for, and the URL itself — refs, because
+   * they exist to keep the resolve effect *idempotent across its own deps*.
+   * The effect re-runs when the services chunk lands a moment into every
+   * boot, and without this guard a warm kiosk resolved its cached photograph
+   * twice: revoke, null, re-read, re-decode — a restarted fade for nothing.
+   */
+  const backdropResolvedRef = useRef<string | null>(null);
+  const backdropUrlRef = useRef<string | null>(null);
+  const retireBackdropUrl = useCallback(() => {
+    // Revoked, not merely dropped: the blob behind a forgotten object URL is
+    // pinned for the life of the page, and this page's life is weeks.
+    if (backdropUrlRef.current) URL.revokeObjectURL(backdropUrlRef.current);
+    backdropUrlRef.current = null;
+    backdropResolvedRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!backdropId) {
+      retireBackdropUrl();
+      setBackdropUrl(null);
+      return;
+    }
+    // Already on the glass — the re-run is the services chunk arriving, and
+    // there is nothing it could add to a photograph already resolved.
+    if (backdropResolvedRef.current === backdropId) return;
+    let cancelled = false;
+    /*
+     * No fetcher until the services chunk has landed: the effect runs again
+     * when it does, and until then `loadBackdrop` answers from this device's
+     * cache alone — which is the whole warm-boot path, ~4am reload included,
+     * and needs neither Firebase nor the network. The fetcher itself waits
+     * out `searchReadyRef` first: cache-first means the wait is only ever
+     * paid on the first evening a photograph is new to this device.
+     */
+    const fetcher = services
+      ? async () => {
+          await searchReadyRef.current;
+          if (cancelled) return null;
+          const image = await services.fetchBackdrop(backdropId);
+          if (!image) return null;
+          return new Blob([image.bytes as BlobPart], { type: image.contentType });
+        }
+      : null;
+    void loadBackdrop(backdropId, fetcher).then((blob) => {
+      if (cancelled || !blob) return;
+      retireBackdropUrl();
+      backdropResolvedRef.current = backdropId;
+      backdropUrlRef.current = URL.createObjectURL(blob);
+      setBackdropUrl(backdropUrlRef.current);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [backdropId, services, retireBackdropUrl]);
+
+  // The unmount is the one exit the effect above deliberately does not
+  // handle, so the last URL still gets its revocation.
+  useEffect(() => retireBackdropUrl, [retireBackdropUrl]);
+
+  /**
+   * The staff gate's answer to a photograph that is wrong *today*: take it
+   * off this device, now, with no network and no editor. Written through to
+   * the stored binding so the ~4am reload keeps it off, and healed the way
+   * every optional binding field heals — the next rebind re-reads the row and
+   * wears whatever the gathering says by then. The event itself is untouched;
+   * fixing the photograph for every kiosk is still Tuesday's job in the
+   * editor.
+   */
+  const hideBackdrop = useCallback(() => {
+    if (binding) {
+      const shorn = { ...binding, kioskBackdropId: null };
+      writeBinding(shorn);
+      setBinding(shorn);
+    }
+    // Back to the door: the volunteer's confirmation is the idle screen
+    // standing there plain.
+    setOverlay(null);
+  }, [binding]);
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
@@ -597,8 +703,18 @@ export function KioskApp() {
 
   const hydrate = useCallback(
     (loaded: KioskServices, bound: KioskBinding) => {
-      void loaded.loadRoster(landStudents).then(landStudents);
-      void loaded.loadPhoneIndex(landLast4).then(landLast4);
+      const rosterLanded = loaded.loadRoster(landStudents).then(landStudents);
+      const phonesLanded = loaded.loadPhoneIndex(landLast4).then(landLast4);
+      /*
+       * The moment this kiosk is searchable, for the one consumer that has
+       * agreed to wait for it: the backdrop's network fetch. A photograph on
+       * lobby wifi contends with the reads a queue is actually waiting on, so
+       * it goes last — behind the roster and the phone index, the two that
+       * make a family findable. `allSettled` because a failed roster read
+       * must not also strand the photograph: the point is ordering, not
+       * success.
+       */
+      searchReadyRef.current = Promise.allSettled([rosterLanded, phonesLanded]);
       // Per binding rather than per boot: a kiosk moved from Friday to Sunday
       // is a kiosk asking about a different set of children.
       void loaded.loadParticipation(bound.predictsFrom, landScope).then(landScope).catch(() => {});
@@ -1701,13 +1817,30 @@ export function KioskApp() {
   }
 
   if (phase === 'ready' && binding) {
+    /*
+     * The photograph, first in every frame of the bound kiosk so React keeps
+     * the one instance across every screen swap — an overlay replaces the
+     * whole subtree beside it, and a layer that remounted per family would
+     * pay a decode per family on exactly the hardware that cannot. Visible
+     * only while `calm` (see components/Backdrop.tsx); on every other screen
+     * it is the same element at opacity zero, which is what keeps the confirm,
+     * the tick and the staff glass exactly as flat as they ship.
+     */
+    const backdrop = <Backdrop url={backdropUrl} shown={calm} />;
     if (registering && services) {
       // The chunk is a few tens of kilobytes off a warm cache; the word is for
       // the cold first tap of an evening, and it holds the frame's shape.
       if (!registration) {
-        return <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>;
+        return (
+          <>
+            {backdrop}
+            <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
+          </>
+        );
       }
       return (
+        <>
+        {backdrop}
         <registration.RegistrationFlow
           binding={binding}
           registrationId={registering.registrationId}
@@ -1765,6 +1898,7 @@ export function KioskApp() {
             setBuffer('');
           }}
         />
+        </>
       );
     }
     /*
@@ -1837,6 +1971,8 @@ export function KioskApp() {
                   : 'trouble'
             }
             trouble={printerState?.kind === 'trouble' ? printerState.message : null}
+            backdrop={!!binding.kioskBackdropId}
+            onHideBackdrop={hideBackdrop}
             onReprint={() => {
               setBuffer('');
               setSentId(null);
@@ -1915,49 +2051,60 @@ export function KioskApp() {
         );
 
       return (
-        <StaffSession onReturn={leaveStaff}>
-          {overlay.kind === 'printer' && !printing ? (
-            <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
-          ) : (
-            staffScreen
-          )}
-        </StaffSession>
+        <>
+          {backdrop}
+          <StaffSession onReturn={leaveStaff}>
+            {overlay.kind === 'printer' && !printing ? (
+              <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
+            ) : (
+              staffScreen
+            )}
+          </StaffSession>
+        </>
       );
     }
 
     if (overlay?.kind === 'success') {
       return (
-        <SuccessScreen
-          students={overlay.students}
-          intent={overlay.intent}
-          onDone={() => {
-            // Home, cleared. A parent with three kids retypes their four digits
-            // rather than the whole queue behind them reading the last one's
-            // name — and a kiosk left alone mid-search shows nothing about
-            // whoever walked away from it.
-            setOverlay(null);
-            setBuffer('');
-          }}
-        />
+        <>
+          {backdrop}
+          <SuccessScreen
+            students={overlay.students}
+            intent={overlay.intent}
+            onDone={() => {
+              // Home, cleared. A parent with three kids retypes their four digits
+              // rather than the whole queue behind them reading the last one's
+              // name — and a kiosk left alone mid-search shows nothing about
+              // whoever walked away from it.
+              setOverlay(null);
+              setBuffer('');
+            }}
+          />
+        </>
       );
     }
     if (overlay?.kind === 'not-open') {
       return (
-        <NotOpenScreen
-          opensAt={overlay.opensAt}
-          onDone={() => {
-            // Home, cleared — the same landing the tick makes, for the same
-            // reason: the next family starts from blank glass.
-            setOverlay(null);
-            setBuffer('');
-          }}
-        />
+        <>
+          {backdrop}
+          <NotOpenScreen
+            opensAt={overlay.opensAt}
+            onDone={() => {
+              // Home, cleared — the same landing the tick makes, for the same
+              // reason: the next family starts from blank glass.
+              setOverlay(null);
+              setBuffer('');
+            }}
+          />
+        </>
       );
     }
     if (overlay?.kind === 'sibling') {
       const { from } = overlay;
       const already = new Set([from.student.id, ...from.family.map((member) => member.id)]);
       return (
+        <>
+        {backdrop}
         <SiblingScreen
           student={from.student}
           buffer={buffer}
@@ -1982,10 +2129,13 @@ export function KioskApp() {
             setOverlay(from);
           }}
         />
+        </>
       );
     }
     if (overlay?.kind === 'confirm') {
       return (
+        <>
+        {backdrop}
         <ConfirmScreen
           student={overlay.student}
           intent={overlay.intent}
@@ -2037,9 +2187,12 @@ export function KioskApp() {
             setOverlay(null);
           }}
         />
+        </>
       );
     }
     return (
+      <>
+      {backdrop}
       <SearchScreen
         binding={binding}
         buffer={buffer}
@@ -2112,6 +2265,7 @@ export function KioskApp() {
          */
         onStaffGate={onStaffGate}
       />
+      </>
     );
   }
 

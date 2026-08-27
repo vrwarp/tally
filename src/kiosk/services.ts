@@ -22,6 +22,7 @@ import {
   type Auth,
 } from 'firebase/auth';
 import {
+  Bytes,
   collection,
   connectFirestoreEmulator,
   doc,
@@ -39,6 +40,12 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
+import {
+  KIOSK_BACKDROPS_COLLECTION,
+  KIOSK_BACKDROP_MAX_BYTES,
+  sanitizeKioskBackdropId,
+  sanitizeKioskBackdropType,
+} from '@/lib/kioskBackdrop';
 import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
@@ -165,6 +172,11 @@ export interface KioskEventEntry {
    */
   ground?: KioskGround;
   palette?: KioskPalette;
+  /**
+   * The kiosk's photograph, as a `kioskBackdrops/{id}` id — absent for the
+   * ordinary unphotographed gathering. See `fetchBackdrop`.
+   */
+  backdropId?: string;
   /**
    * The gathering's icon as SVG path data, resolved server-side from the
    * Material name the event stores — absent when it has none, or when it names
@@ -298,6 +310,11 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     // Undefined rather than null when there is nothing, so an unthemed,
     // un-iconed gathering's binding carries no key at all.
     iconPath: sanitizeIconPath(entry.iconPath) ?? undefined,
+    // Same argument once more: the id becomes a Firestore document path and a
+    // cache key on this device, so only the shape this repo mints gets kept.
+    // Undefined rather than null for the ordinary unphotographed gathering,
+    // so its binding carries no key at all.
+    kioskBackdropId: sanitizeKioskBackdropId(entry.backdropId) ?? undefined,
     boundAtMs: Date.now(),
   };
 }
@@ -584,6 +601,48 @@ export async function fetchPulse(): Promise<KioskPulse | null> {
 /** Remembers which revisions this kiosk has acted on, across reboots. */
 export function rememberPulse(pulse: CachedPulse): void {
   writeCachedPulse(pulse);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The backdrop                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** One backdrop's finished pixels, as fetched. See `src/kiosk/backdrop.ts`. */
+export interface KioskBackdropImage {
+  bytes: Uint8Array;
+  contentType: string;
+}
+
+/**
+ * The photograph behind the idle screen, read once per id per device.
+ *
+ * One document, by the content-addressed id the binding carries — so this is
+ * never polled and never re-read for the same picture: the caller caches the
+ * answer under the id (see `src/kiosk/backdrop.ts`) and only a *new* id costs
+ * a read. Null for anything less than a well-formed image inside the size the
+ * editor is allowed to write, and null on any failure at all: a backdrop is
+ * decoration, and the kiosk without one is exactly the kiosk that shipped.
+ * Fail open, always — the same posture as the pulse above.
+ */
+export async function fetchBackdrop(id: string): Promise<KioskBackdropImage | null> {
+  const safe = sanitizeKioskBackdropId(id);
+  if (!safe) return null;
+  try {
+    const snapshot = await getDoc(doc(db, KIOSK_BACKDROPS_COLLECTION, safe));
+    const data = snapshot.data();
+    if (!data) return null;
+    const image = data.image;
+    const contentType = sanitizeKioskBackdropType(data.contentType);
+    if (!(image instanceof Bytes) || !contentType) return null;
+    const bytes = image.toUint8Array();
+    // The rules hold writers to this, and the kiosk holds readers to it too:
+    // what goes into this device's cache is never bigger than what the editor
+    // is allowed to produce, whatever a hand-written document claims.
+    if (bytes.byteLength === 0 || bytes.byteLength > KIOSK_BACKDROP_MAX_BYTES) return null;
+    return { bytes, contentType };
+  } catch {
+    return null;
+  }
 }
 
 /*

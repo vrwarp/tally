@@ -119,6 +119,23 @@ export interface KioskBinding {
   kioskGround?: KioskGround | null;
   kioskPalette?: KioskPalette | null;
   /**
+   * The photograph this gathering stands behind the idle screen — the id of a
+   * `kioskBackdrops/{id}` document, fetched once and cached on this device by
+   * `src/kiosk/backdrop.ts`.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before backdrops existed has no such key, and a paired lobby screen must
+   * not be logged out by a deploy. Absent or null reads as "no photograph",
+   * which is exactly the kiosk that shipped, and the next rebind picks up
+   * whatever the gathering actually says.
+   *
+   * Null is also what the staff gate's "hide the photo" writes over a present
+   * id — a per-device stand-down for the Sunday the picture is wrong and the
+   * event editor is out of reach. It heals the same way every other field
+   * here does: the next rebind re-reads the row.
+   */
+  kioskBackdropId?: string | null;
+  /**
    * The gathering's icon, as SVG path data on Material's `0 -960 960 960`
    * viewBox — or absent for a gathering nobody gave one, which is most of them.
    *

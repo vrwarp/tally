@@ -229,9 +229,11 @@ export function Kiosk() {
         iconPath={binding.iconPath}
         window={eventWindow(binding)}
         printer="ready"
+        backdrop={params.get('backdrop') === '1'}
         onReprint={() => {}}
         onPrinter={() => {}}
         onChangeEvent={() => {}}
+        onHideBackdrop={() => {}}
         onStay={() => {}}
       />
     );

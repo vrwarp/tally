@@ -70,6 +70,8 @@ function asEvent(
     // yet is the Sunday a lobby screen gets bound to, and it should not go back
     // to navy for the one week ahead of the chain.
     kioskTheme: source.kioskTheme,
+    // And the photograph, which travels with the look it belongs to.
+    kioskBackdropId: source.kioskBackdropId,
     // A projected gathering is on by definition. Calling one off is an act, and
     // an act materialises it.
     status: 'scheduled',
