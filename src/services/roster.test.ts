@@ -331,13 +331,17 @@ describe('fetchRoster with more than one backend', () => {
 
   it('keeps a carried slice that is exactly at the window', async () => {
     // Inclusive on purpose: a slice a week old to the millisecond is the last
-    // one this rule is willing to show, not the first it refuses.
+    // one this rule is willing to show, not the first it refuses. The rule
+    // reads the clock again after the fetch, so "exactly" needs the clock
+    // held still between here and there.
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
     window.localStorage.setItem(
       CACHE_KEY,
       JSON.stringify({
         people: [person(), WEI],
-        storedAt: Date.now(),
-        freshAt: { pco: Date.now(), a32: Date.now() - STALE_AFTER_MS },
+        storedAt: now,
+        freshAt: { pco: now, a32: now - STALE_AFTER_MS },
       }),
     );
 
