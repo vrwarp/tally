@@ -66,6 +66,20 @@ if (params.get('ground') === 'light') document.documentElement.dataset.theme = '
 const photoUrl = params.get('photo') === '1' ? '/uxr/kiosk-live/backdrop-demo.svg' : null;
 
 /*
+ * `?nofade=1` takes the results ramp out of the paint entirely —
+ * display:none, so it stops painting and compositing while the React tree
+ * stays byte-identical. The A/B knob for `bench-fade.ts`, which asks what
+ * the ramp actually costs a Pi-class device; a knob here rather than a code
+ * branch in SearchScreen, because the screen must not carry benchmark
+ * plumbing.
+ */
+if (params.get('nofade') === '1') {
+  const style = document.createElement('style');
+  style.textContent = '.kiosk-list-fade-overlay { display: none !important; }';
+  document.head.appendChild(style);
+}
+
+/*
  * A gathering in progress: started 22 minutes ago, another 68 to run, check-in
  * closing half an hour after it ends.
  *
