@@ -17,17 +17,21 @@ function blobOf(text: string): Blob {
 
 /**
  * jsdom ships no `Response`, so the store gets the smallest one that can hold
- * a blob — which is also all `cache.put` is ever handed.
+ * a blob — which is also all `cache.put` is ever handed. The init is kept so a
+ * test can check what the entry was filed with.
  */
 class FakeResponse {
-  constructor(private readonly body: Blob) {}
+  constructor(
+    private readonly body: Blob,
+    readonly init?: { headers?: Record<string, string> },
+  ) {}
   async blob(): Promise<Blob> {
     return this.body;
   }
 }
 
 /** A Cache API double: one bucket, insertion-ordered, string keys. */
-function stubCaches(): { store: Map<string, FakeResponse> } {
+function stubCaches(): { store: Map<string, FakeResponse>; open: ReturnType<typeof vi.fn> } {
   const store = new Map<string, FakeResponse>();
   const cache = {
     match: async (key: string) => store.get(key) ?? undefined,
@@ -39,9 +43,10 @@ function stubCaches(): { store: Map<string, FakeResponse> } {
       return store.delete(typeof key === 'string' ? key : key.url);
     },
   };
-  vi.stubGlobal('caches', { open: async () => cache });
+  const open = vi.fn(async () => cache);
+  vi.stubGlobal('caches', { open });
   vi.stubGlobal('Response', FakeResponse);
-  return { store };
+  return { store, open };
 }
 
 afterEach(() => {
@@ -103,6 +108,55 @@ describe('with a Cache API', () => {
     stubCaches();
     await writeCachedBackdrop(ID, new Blob([new Uint8Array(700_000)], { type: 'image/webp' }));
     expect(await readCachedBackdrop(ID)).toBeNull();
+  });
+
+  it('keeps an entry exactly at the ceiling — the bound is inclusive', async () => {
+    stubCaches();
+    await writeCachedBackdrop(ID, new Blob([new Uint8Array(600_000)], { type: 'image/webp' }));
+    expect((await readCachedBackdrop(ID))?.size).toBe(600_000);
+  });
+
+  it('refuses an empty entry, whoever wrote it', async () => {
+    const { store } = stubCaches();
+    store.set(`/kiosk-backdrop/${ID}`, new FakeResponse(new Blob([], { type: 'image/webp' })));
+    expect(await readCachedBackdrop(ID)).toBeNull();
+  });
+
+  it('refuses a nonsense id without even opening the store', async () => {
+    const { store, open } = stubCaches();
+    expect(await readCachedBackdrop('nope')).toBeNull();
+    await writeCachedBackdrop('nope', blobOf('pixels'));
+    expect(open).not.toHaveBeenCalled();
+    expect(store.size).toBe(0);
+  });
+
+  it('files the entry under the content type it will be read back as', async () => {
+    const { store } = stubCaches();
+    await writeCachedBackdrop(ID, blobOf('pixels'));
+    expect(store.get(`/kiosk-backdrop/${ID}`)?.init).toEqual({
+      headers: { 'Content-Type': 'image/webp' },
+    });
+  });
+
+  it('a storage that refuses to open reads as null, not as an error', async () => {
+    vi.stubGlobal('caches', {
+      open: async () => {
+        throw new Error('quota');
+      },
+    });
+    vi.stubGlobal('Response', FakeResponse);
+    expect(await readCachedBackdrop(ID)).toBeNull();
+    await expect(writeCachedBackdrop(ID, blobOf('pixels'))).resolves.toBeUndefined();
+  });
+
+  it('a fetcher that answers null writes nothing to the store', async () => {
+    const { store, open } = stubCaches();
+    expect(await loadBackdrop(ID, async () => null)).toBeNull();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.size).toBe(0);
+    // One open for the cache read, none for a write that must not happen.
+    expect(open).toHaveBeenCalledTimes(1);
   });
 
   it('a fetcher that has not been granted yet is a cache-only read, not a failure', async () => {
