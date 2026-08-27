@@ -56,6 +56,11 @@ vi.mock('@/services/rsvps', () => ({
 
 vi.mock('@/services/users', () => ({ subscribeUsers: () => () => {} }));
 
+vi.mock('@/services/kioskBackdrops', () => ({
+  putKioskBackdrop: vi.fn(async () => 'b0123456789abcdef'),
+  fetchKioskBackdrop: vi.fn(async () => null),
+}));
+
 vi.mock('@/services/eventAccess', () => ({
   restrictChain: async () => {},
   reopenChain: async () => {},
