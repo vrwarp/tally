@@ -148,16 +148,22 @@ async function measure(page: Page, variant: 'fade' | 'nofade', port: number): Pr
     await page.waitForTimeout(80);
   }
 
-  const scroll = await page.evaluate(async () => {
-    const region = document.querySelector<HTMLElement>('.overflow-y-auto')!;
+  /*
+   * A string body, deliberately: tsx transpiles this file with esbuild's
+   * keepNames, which decorates named inner functions with `__name(...)` —
+   * a helper that does not exist inside the page, so a serialized callback
+   * carrying one throws `__name is not defined`. A string passes through
+   * untouched.
+   */
+  const scroll = (await page.evaluate(`(async () => {
+    const region = document.querySelector('.overflow-y-auto');
     const extent = region.scrollHeight - region.clientHeight;
-    const frames: number[] = [];
+    const frames = [];
     let last = performance.now();
     let tick = 0;
-    await new Promise<void>((done) => {
+    await new Promise((done) => {
       const step = () => {
         tick += 1;
-        // A triangle wave over the extent, ~2px-per-frame-throttled speed.
         const phase = (tick % 120) / 120;
         region.scrollTop = extent * (phase < 0.5 ? phase * 2 : 2 - phase * 2);
         const now = performance.now();
@@ -169,7 +175,7 @@ async function measure(page: Page, variant: 'fade' | 'nofade', port: number): Pr
       requestAnimationFrame(step);
     });
     return frames;
-  });
+  })()`)) as number[];
 
   return { keys, scroll, paintMs: 0, rasterMs: 0, compositeMs: 0 };
 }
