@@ -135,25 +135,22 @@ const SearchHeader = memo(function SearchHeader({
   title,
   line,
   printerNeedsAttention,
-  backdrop,
 }: {
   iconPath: string | null | undefined;
   title: string;
   /** The line under the title, already decided: the hours, opens-at, or closed. */
   line: string;
   printerNeedsAttention: boolean;
-  /**
-   * Whether the gathering's photograph is mounted behind this screen.
-   *
-   * It moves exactly one token: the hours line steps ink-500 → ink-400. That
-   * step is what lets the veil's header grade release at 85% instead of
-   * holding the whole top of the glass near-opaque for a single dim string —
-   * ink-500 needs a 96% veil just to keep its shipped contrast against a
-   * worst-case white image, and everything else up here is cheap. The
-   * photo-less kiosk keeps its shipped ink-500 exactly.
-   */
-  backdrop: boolean;
 }) {
+  /*
+   * The hours line's photograph step (ink-500 → ink-300 while the picture is
+   * up) arrives as CSS through the root's `kiosk-photo-idle` class rather
+   * than as a prop, so this memo's identity survives every keystroke — and
+   * so the step follows the picture being *visible*, not merely mounted: at
+   * ink-300 on a photo-less typed screen the time range outshone the grade
+   * labels beside the names. The photo-less kiosk keeps its shipped ink-500
+   * exactly.
+   */
   tallyRender('SearchHeader');
   return (
     /* The staff gate used to be an invisible square over this corner; it is a
@@ -221,7 +218,7 @@ const SearchHeader = memo(function SearchHeader({
       <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
         <EventName path={iconPath} title={title} />
       </div>
-      <div className={`text-base kiosk:text-lg ${backdrop ? 'text-ink-300' : 'text-ink-500'}`}>
+      <div className="kiosk-hours-line text-base text-ink-500 kiosk:text-lg">
         {line}
       </div>
     </div>
@@ -705,7 +702,7 @@ export function SearchScreen({
     <div
       className={`grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto] ${
         backdrop ? 'kiosk-has-backdrop' : ''
-      }`}
+      } ${backdrop && buffer === '' ? 'kiosk-photo-idle' : ''}`}
     >
       {/* Everything above the results, memoized so a keystroke leaves it
           alone — the header's own reasoning lives on SearchHeader. */}
@@ -714,7 +711,6 @@ export function SearchScreen({
         title={binding.title}
         line={headerLine}
         printerNeedsAttention={printerNeedsAttention}
-        backdrop={backdrop}
       />
 
       {/*
@@ -1083,12 +1079,15 @@ export function SearchScreen({
         * flattened the keys, which are `ink-800` and need the page's distance
         * to stay shapes in a dim room.
         */}
-      {/* While the photograph is up (which is exactly the idle state), the
-          rule separated nothing from nothing and read as a stray line drawn
-          on the picture — the newcomer consultation's finding. It returns
-          with the states that have content above it. */}
+      {/* While the photograph is up the rule separated nothing from nothing
+          and read as a stray line drawn on the picture — the newcomer
+          consultation's finding. It dissolves by paint on the photograph's
+          own clocks (index.css) rather than by mount: unmounting here put
+          the line back over a full-strength image for a frame on the first
+          keystroke, and left the chip on a bare page for the 1.5s the image
+          takes to return after Clear. */}
       {backdrop ? (
-        outcome.mode === 'idle' ? null : <div className="kiosk-rule-faded" />
+        <div className="kiosk-rule-faded" />
       ) : (
         <div className="border-t border-ink-800/70" />
       )}

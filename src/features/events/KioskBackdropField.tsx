@@ -79,25 +79,37 @@ const CROPS = [
  */
 function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSProperties {
   const rem = (value: number) => `${(value * scale).toFixed(3)}rem`;
+  const light = ground === 'light';
   // The same fork the stylesheet makes: portrait carries the canopy — one
-  // grade holding console and instruction together — while the shelf keeps
-  // the short header grade with the card below it.
+  // grade holding console and instruction together, released on a curve —
+  // while the shelf keeps the short header grade with the card below it.
+  // The portrait crop paints the *phone's* canopy proportion, the deepest
+  // any portrait kiosk paints, so a crop approved here errs toward more of
+  // the photograph covered on Sunday, never less.
   return tall
     ? ({
-        '--backdrop-head-hold': rem(18.75),
-        '--backdrop-head-release': rem(23.75),
+        '--backdrop-head-hold': rem(24.6),
+        '--backdrop-rel1': rem(light ? 6.8 : 5.7),
+        '--backdrop-rel2': rem(light ? 12.9 : 10.6),
+        '--backdrop-rel3': rem(light ? 17.4 : 14.4),
         '--backdrop-foot-rise': rem(10),
-        '--backdrop-head': ground === 'light' ? '85%' : '68%',
-        '--backdrop-wash': ground === 'light' ? '15%' : '18%',
-        '--backdrop-foot': ground === 'light' ? '0%' : '14%',
+        '--backdrop-head': light ? '85%' : '68%',
+        '--backdrop-mid1': light ? '62%' : '42%',
+        '--backdrop-mid2': light ? '38%' : '26%',
+        '--backdrop-wash': light ? '15%' : '18%',
+        '--backdrop-foot': light ? '18%' : '14%',
       } as CSSProperties)
     : ({
         '--backdrop-head-hold': rem(5.5),
-        '--backdrop-head-release': rem(7),
+        '--backdrop-rel1': rem(0.5),
+        '--backdrop-rel2': rem(1),
+        '--backdrop-rel3': rem(1.5),
         '--backdrop-foot-rise': rem(10),
-        '--backdrop-head': ground === 'light' ? '92%' : '85%',
-        '--backdrop-wash': ground === 'light' ? '30%' : '18%',
-        '--backdrop-foot': ground === 'light' ? '0%' : '14%',
+        '--backdrop-head': light ? '92%' : '85%',
+        '--backdrop-mid1': light ? '66%' : '56%',
+        '--backdrop-mid2': light ? '47%' : '37%',
+        '--backdrop-wash': light ? '30%' : '18%',
+        '--backdrop-foot': light ? '0%' : '14%',
       } as CSSProperties);
 }
 

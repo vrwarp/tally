@@ -490,10 +490,25 @@
  * ink-300 4.70:1. (66% dark and 83% light look the same and miss — 4.56
  * and 4.46 — which is why these are 68 and 85.)
  */
+/*
+ * The release is a curve, not a leg: two mid stops after the hold, so the
+ * canopy lets go the way light does instead of drawing a horizon — the
+ * verify round measured the single-leg ramp at 2 sRGB levels per pixel on
+ * the phone, barely gentler than the edge this construction removed. The
+ * mid percentages sit above the straight line between hold and wash, and
+ * the light ground's run longer still: its drop is 70 points against
+ * dark's 50, and a pure hue swing at constant lightness is where banding
+ * lives. Lengths are offsets from the hold, so the per-shape blocks below
+ * move one number each.
+ */
 .kiosk-backdrop-veil {
   --backdrop-head: 68%;
-  --backdrop-head-hold: 17.5rem;
-  --backdrop-head-release: 21rem;
+  --backdrop-head-hold: 16.25rem;
+  --backdrop-mid1: 42%;
+  --backdrop-mid2: 26%;
+  --backdrop-rel1: 3.75rem;
+  --backdrop-rel2: 7rem;
+  --backdrop-rel3: 9.5rem;
   --backdrop-wash: 18%;
   --backdrop-foot: 14%;
   --backdrop-foot-rise: 10rem;
@@ -504,8 +519,12 @@
       color-mix(in srgb, var(--color-ink-950) var(--backdrop-head), transparent) 0,
       color-mix(in srgb, var(--color-ink-950) var(--backdrop-head), transparent)
         var(--backdrop-head-hold),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-mid1), transparent)
+        calc(var(--backdrop-head-hold) + var(--backdrop-rel1)),
+      color-mix(in srgb, var(--color-ink-950) var(--backdrop-mid2), transparent)
+        calc(var(--backdrop-head-hold) + var(--backdrop-rel2)),
       color-mix(in srgb, var(--color-ink-950) var(--backdrop-wash), transparent)
-        var(--backdrop-head-release),
+        calc(var(--backdrop-head-hold) + var(--backdrop-rel3)),
       color-mix(in srgb, var(--color-ink-950) var(--backdrop-wash), transparent) 100%
     ),
     linear-gradient(
@@ -520,39 +539,82 @@
  * floor its ink-300 needs over a black photograph — and the wash below it
  * drops to 15%: on light the wash was pure atmosphere tax (the guarantees
  * live in the canopy and the chip's near-opaque ground), so the free field
- * runs at 85% image instead of 70%. No foot grade; on light, flat is calmer.
+ * runs at 85% image instead of 70%. The foot returns at 18% now that the
+ * wash is 15 — in the page token it brightens toward the page, and it is
+ * what keeps the light keyboard standing on the same ~30% combined footing
+ * as the dark one instead of floating as tiles on the image.
  */
 [data-theme='light'] .kiosk-backdrop-veil {
   --backdrop-head: 85%;
+  --backdrop-mid1: 62%;
+  --backdrop-mid2: 38%;
+  --backdrop-rel1: 4.5rem;
+  --backdrop-rel2: 8.5rem;
+  --backdrop-rel3: 11.5rem;
   --backdrop-wash: 15%;
-  --backdrop-foot: 0%;
+  --backdrop-foot: 18%;
 }
 
-/* The tall portrait tablet sets its type a size up, so the console and the
-   instruction reach deeper before the canopy may let go. */
-@media (min-width: 768px) {
+/*
+ * The deeper hold hangs on the same two conditions as the `kiosk` type
+ * variant (the top of this file), never on a width of its own: the hold was
+ * measured against each type size, and a shape that takes kiosk type in a
+ * phone-sized hold would put the last guaranteed line inside the release —
+ * the 744×1133 tablet is exactly that shape, and its worst case measures
+ * 272px, inside this 280px hold. The landscape block below outranks both by
+ * source order for the shelf.
+ */
+@media (min-height: 1000px) {
   .kiosk-backdrop-veil {
-    --backdrop-head-hold: 18.75rem;
-    --backdrop-head-release: 23.75rem;
+    --backdrop-head-hold: 17.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .kiosk-backdrop-veil {
+    --backdrop-head-hold: 17.5rem;
   }
 }
 
 /*
  * The landscape shelf keeps the shipped card construction: a short header
  * grade, the plate and halo under the instruction, and the flanks at full
- * strength — which is that shape's whole point. The light overrides sit
- * inside the query so they outrank the global light canopy values above.
+ * strength — which is that shape's whole point. Its mid stops sit on the
+ * straight line the shipped single-leg release drew, so the shelf paints
+ * what it always painted. The light overrides sit inside the query so they
+ * outrank the global light canopy values above. Booked, not forked: the
+ * shelf's own junction (the plate's top ~24px still inside the release)
+ * and the light shelf's chip-versus-plate sameness are owned follow-ups —
+ * the fix is the head releasing above the plate's top edge, which touches
+ * neither the plate nor the flanks.
  */
 @media (min-width: 1024px) and (max-height: 999px) {
   .kiosk-backdrop-veil {
     --backdrop-head: 85%;
     --backdrop-head-hold: 5.5rem;
-    --backdrop-head-release: 7rem;
+    --backdrop-mid1: 56%;
+    --backdrop-mid2: 37%;
+    --backdrop-rel1: 0.5rem;
+    --backdrop-rel2: 1rem;
+    --backdrop-rel3: 1.5rem;
     --backdrop-wash: 18%;
+    --backdrop-foot: 14%;
   }
   [data-theme='light'] .kiosk-backdrop-veil {
     --backdrop-head: 92%;
+    --backdrop-mid1: 66%;
+    --backdrop-mid2: 47%;
+    --backdrop-rel1: 0.5rem;
+    --backdrop-rel2: 1rem;
+    --backdrop-rel3: 1.5rem;
     --backdrop-wash: 30%;
+    --backdrop-foot: 0%;
+  }
+  /* The shelf's chip keeps its shipped 65%: at the portrait 78% it became
+     the same material at the same strength as the non-pressable plate
+     beside it, and the shelf is where "an edge over the photograph means
+     press me" has to stay true. */
+  .kiosk-chip-ground {
+    --backdrop-chip: 65%;
   }
 }
 
@@ -614,6 +676,15 @@
  */
 .kiosk-rule-faded {
   height: 1px;
+  /* Present in the DOM at every state, carried by paint: on the idle screen
+     the photograph itself separates the chip from the keys and the rule read
+     as a scratch on the print, so it dissolves as the photograph arrives —
+     on the photograph's own two clocks, because a mount/unmount here put a
+     stray line over a full-strength image for a frame on the first
+     keystroke, and left the chip floating on a bare page for the 1.5s the
+     image takes to return after Clear. */
+  opacity: 1;
+  transition: opacity 220ms ease-out;
   background: linear-gradient(
     to right,
     transparent,
@@ -621,6 +692,28 @@
     color-mix(in srgb, var(--color-ink-800) 70%, transparent) 85%,
     transparent
   );
+}
+/*
+ * `kiosk-photo-idle` rides the search screen's root exactly while the
+ * photograph is up — mounted AND the buffer empty — where `kiosk-has-backdrop`
+ * only says mounted. Two copy rules hang on it: the rule above dissolves
+ * under the picture, and the header's hours line takes its token step only
+ * while there is actually a picture to earn it — at ink-300 on a photo-less
+ * typed screen it outshone the grade labels beside the names, which are the
+ * small text a parent is actually choosing by. The class-only mechanism is
+ * what lets the memoized header keep its identity across keystrokes.
+ */
+.kiosk-photo-idle .kiosk-rule-faded {
+  opacity: 0;
+  transition: opacity 1200ms ease-in 350ms;
+}
+.kiosk-photo-idle .kiosk-hours-line {
+  color: var(--color-ink-300);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-rule-faded {
+    transition: none;
+  }
 }
 
 /*
