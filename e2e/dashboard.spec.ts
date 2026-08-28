@@ -92,7 +92,7 @@ test.describe('dashboard', () => {
       )
     ).map((label) => label.replace(/^Parent contact for /, ''));
 
-    let reachable = 0;
+    const reachable: string[] = [];
     for (const name of names) {
       const block = page.getByRole('group', { name: `Parent contact for ${name}` }).first();
 
@@ -102,10 +102,16 @@ test.describe('dashboard', () => {
        * it is not printed — or a plain statement of why neither exists. What
        * must never happen is a row that resolves to nothing, or spins forever,
        * which is the unactionable row this test exists to catch.
+       *
+       * The first of those used to be the Call and Text links themselves, on
+       * the row. They live in a dialog now — the row carries one button, so a
+       * call list stays a list at 390px — and `Modal` keeps its children
+       * mounted inside a closed `<dialog>`, which is exactly the shape of a
+       * false pass: the links are *in the DOM* on every row and visible on
+       * none. So the row's claim is the button, and the claim that the button
+       * leads somewhere is made once, below, by opening it.
        */
-      const reachOut = block.getByRole('link', {
-        name: new RegExp(`about ${escapeForRegExp(name)} at `, 'i'),
-      });
+      const reachOut = block.getByRole('button', { name: `Contact parent for ${name}` });
       const addOne = block.getByRole('button', {
         name: new RegExp(`^Add parent contact for ${escapeForRegExp(name)}`),
       });
@@ -114,13 +120,35 @@ test.describe('dashboard', () => {
       );
 
       await expect(reachOut.or(addOne).or(nobodyToCall).first()).toBeVisible({ timeout: 20_000 });
-      if ((await reachOut.count()) > 0) reachable += 1;
+      if ((await reachOut.count()) > 0) reachable.push(name);
     }
 
     // And at least one row really produced a number or an address, so this is
     // exercising the Planning Center read rather than tallying excuses. The
     // seed's `drifted` band — the five absent 4+ weeks — all have a parent.
-    expect(reachable, 'not one follow-up row yielded any contact details').toBeGreaterThan(0);
+    expect(reachable.length, 'not one follow-up row yielded any contact details').toBeGreaterThan(
+      0,
+    );
+
+    /*
+     * And the button is a way to reach somebody rather than a button that says
+     * so. One row is enough: they are one component, and what is being checked
+     * here is that the read Planning Center answered ends in a `tel:` or an
+     * `sms:` a leader can press — the thing this whole card exists to produce.
+     */
+    const first = reachable[0]!;
+    await page
+      .getByRole('group', { name: `Parent contact for ${first}` })
+      .first()
+      .getByRole('button', { name: `Contact parent for ${first}` })
+      .click();
+
+    await expect(
+      page
+        .getByRole('dialog')
+        .getByRole('link', { name: new RegExp(`about ${escapeForRegExp(first)} at `, 'i') })
+        .first(),
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test('a student nobody can reach still has somewhere to press', async ({ page, signedInAs }) => {

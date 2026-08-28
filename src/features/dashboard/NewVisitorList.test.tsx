@@ -140,7 +140,7 @@ describe('NewVisitorList', () => {
     expect(within(row).getByText('Incomplete')).toBeInTheDocument();
   });
 
-  it('leaves a reachable student their call and text buttons', async () => {
+  it('leaves a reachable student their way of contacting the parent', async () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
@@ -155,7 +155,7 @@ describe('NewVisitorList', () => {
 
     show([fromRoster()], new Map([['pco_4200014', true]]));
 
-    expect(await screen.findByRole('link', { name: /Call Wen Lee/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Contact parent/ })).toBeInTheDocument();
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
   });
 
@@ -204,7 +204,7 @@ describe('NewVisitorList', () => {
       new Map([['pco_4200099', true]]),
     );
 
-    expect(await screen.findByRole('link', { name: /Call Wen Lee/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Contact parent/ })).toBeInTheDocument();
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
   });
 

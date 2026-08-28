@@ -7,8 +7,8 @@
  * team group chat. So a row offers the two things a phone can do — dial and
  * text — and the list offers a clipboard copy for the chat.
  */
-import type { ReactNode } from 'react';
-import { Button, Spinner } from '@/components/ui';
+import { useState, type ReactNode } from 'react';
+import { Button, Modal, Spinner } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
@@ -36,11 +36,169 @@ function ActionLink({
     <a
       href={href}
       aria-label={label}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-ink-800 px-3 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-3 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
     >
       <span aria-hidden="true">{icon}</span>
       {children}
     </a>
+  );
+}
+
+/**
+ * "Contact parent", and the dialog behind it.
+ *
+ * The button is the row's; everything about *how* to reach the family is the
+ * dialog's. That split is what lets a call list stay a list: the row carries a
+ * name, a streak and one control, and the details — whose number this is, the
+ * digits themselves, whether there is an email as well — arrive only for the
+ * row somebody actually chose.
+ *
+ * `tel:` and `sms:` are protocols a desktop services unreliably, which is why
+ * the number is printed inside the dialog in full and selectable rather than
+ * hidden behind the links: on a laptop, reading the digits *is* how a leader
+ * places the call.
+ *
+ * They are printed *there* and not on the row, which reverses a previous pass
+ * that hung them under the button as a caption for wide screens. The geometry
+ * refused it. A 38px button that has to sit on the row's optical line — where
+ * the avatar, the streak badge and Resolve all sit — leaves 36px below that
+ * line, and a 16px caption plus the row's own padding does not fit in it: the
+ * button rode 10px high on every row of the list, and the block reserved 56px
+ * of height and 208px of width to hold a 152px control. The row cannot have
+ * all three of a centred button, a caption beneath it and its current height.
+ *
+ * The caption is the one to give up, because the dialog does its job better:
+ * the number is `text-xl` and centred there, with the whole of `Copy number`
+ * under it, against 12px of grey on the row. What is lost is comparing two
+ * families' numbers without opening anything, which is not a thing a call list
+ * is for — a leader rings one family, then the next.
+ */
+function ContactParentButton({
+  student,
+  details,
+}: {
+  student: Student;
+  details: { parentName?: string | null; parentPhone?: string | null; parentEmail?: string | null };
+}) {
+  const [open, setOpen] = useState(false);
+  const { show } = useToast();
+
+  const name = studentFullName(student);
+  const phone = details.parentPhone?.trim() ?? '';
+  const email = details.parentEmail?.trim() ?? '';
+  const parent = details.parentName?.trim() || `${name}'s parent`;
+
+  /** The same guard `CopyContactsButton` uses: absent on http and in some
+      in-app browsers, and saying so beats silently doing nothing. */
+  const copyNumber = async () => {
+    if (!navigator.clipboard) {
+      show('Copying is blocked on this device.', { tone: 'error' });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(formatPhone(phone));
+      show(`Copied ${parent}'s number`);
+    } catch {
+      show('Could not copy the number.', { tone: 'error' });
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="secondary"
+        /*
+         * `md`, not `sm`. This is one of the two things a leader taps on this
+         * screen, ten rows deep, and `sm` is `min-h-9` — 36px, below the 44 the
+         * brief calls marginal, on a phone held in one hand. `md` is
+         * `min-h-11 pointer-fine:min-h-9`, so it is 44 under a thumb and stays
+         * exactly the 36 it already renders under a mouse.
+         */
+        size="md"
+        /*
+         * No leading glyph. 📞 measured 1.46:1 on the `ink-800` fill — the
+         * darkest thing on the button, reading as a smudge — and it is pure
+         * grey among blue-slate neutrals, so it belongs to no token and would
+         * become the loudest object in the row when the ramp flips for the
+         * light theme. It also over-promised: it says "dial", and this opens a
+         * chooser. The label is two clear words.
+         */
+        onClick={() => setOpen(true)}
+        /* The row says whose parent it is; the button's own label must too, or
+           a screen reader on a call list hears a run of identical controls. */
+        aria-label={`Contact parent for ${name}`}
+      >
+        Contact parent
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={parent}
+        description={`About ${name}`}
+        size="sm"
+        /*
+          The way out is the quietest thing here, not the loudest.
+
+          `Modal`'s footer gives its last child double width, so a lone
+          `secondary` Close became the widest, lowest, most thumb-reachable
+          object in the sheet — on a dialog whose whole job is producing a phone
+          call, with Call and Text as two half-width pills above it. Ghost, and
+          the header's × offers the same escape.
+        */
+        footer={
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {phone ? (
+            <div className="flex flex-col gap-3">
+              {/* Selectable, and the largest thing in the dialog: on a laptop
+                  this is the answer, not a fallback for one — which is also why
+                  it can be taken in one press rather than triple-clicked into a
+                  softphone. */}
+              <p className="text-center text-xl font-semibold tabular-nums text-ink-50">
+                {formatPhone(phone)}
+              </p>
+              <Button variant="ghost" size="sm" onClick={copyNumber}>
+                Copy number
+              </Button>
+              <div className="flex gap-2 [&>*]:flex-1">
+                <ActionLink
+                  href={`tel:${dialable(phone)}`}
+                  label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
+                  icon="📞"
+                >
+                  Call parent
+                </ActionLink>
+                <ActionLink
+                  href={`sms:${dialable(phone)}`}
+                  label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
+                  icon="💬"
+                >
+                  Text parent
+                </ActionLink>
+              </div>
+            </div>
+          ) : null}
+
+          {email ? (
+            <div className="flex flex-col gap-3">
+              <p className="break-all text-center text-sm text-ink-200">{email}</p>
+              <ActionLink
+                href={`mailto:${email}`}
+                label={`Email ${parent} about ${name} at ${email}`}
+                icon="✉"
+              >
+                Email parent
+              </ActionLink>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -91,7 +249,6 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   const label = backendLabelOf(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
-  const parent = details?.parentName?.trim() || `${name}'s parent`;
 
   let body: ReactNode;
 
@@ -114,9 +271,17 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // Also the frame before the fetch starts, which is why this asks `loaded`
     // rather than `loading` — otherwise every row blinks through an empty state
     // on its way to the spinner.
+    /*
+     * Short, because this transient line is what the row's action column has to
+     * be wide enough for. "Looking up parent contact…" measured ~198px, so the
+     * column reserved 13rem to hold a 152px button — 56px of unpaintable width
+     * in every row, taken from the student's name, to caption a state that
+     * lasts a few hundred milliseconds. Three words fit inside the button's own
+     * width, and the name column gets the rest back.
+     */
     body = (
       <p className="flex items-center gap-2 text-xs text-ink-500">
-        <Spinner /> Looking up parent contact…
+        <Spinner /> Looking up parent…
       </p>
     );
   } else if (!details) {
@@ -161,59 +326,29 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
         }}
       />
     );
-  } else if (phone) {
-    body = (
-      <div className="flex flex-wrap items-center gap-2">
-        <ActionLink
-          href={`tel:${dialable(phone)}`}
-          label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
-          icon="📞"
-        >
-          Call parent
-        </ActionLink>
-        <ActionLink
-          href={`sms:${dialable(phone)}`}
-          label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
-          icon="💬"
-        >
-          Text parent
-        </ActionLink>
-        {/*
-          Printed where there is room for it.
-
-          Below `lg` the row is 358px wide and the number is what forced a
-          fourth line onto it. On a laptop it is the opposite: `tel:` and
-          `sms:` are protocols a desktop services unreliably, so a leader
-          working this list on a Tuesday morning needs the digits themselves —
-          otherwise the only route to ten numbers is opening ten records.
-
-          The digits and nothing else. Naming the parent here as well reads
-          beautifully and costs about 120px, which on the one row that folds
-          onto a single line comes out of the student's own name — measured at
-          1280px, it took that name to nothing at all. Whose number this is, is
-          said on the buttons instead, where it costs the same width at every
-          size.
-        */}
-        <span className="hidden text-xs tabular-nums text-ink-500 lg:inline">
-          {formatPhone(phone)}
-        </span>
-      </div>
-    );
   } else {
-    body = (
-      <div className="flex flex-wrap items-center gap-2">
-        <ActionLink
-          href={`mailto:${email}`}
-          label={`Email ${parent} about ${name} at ${email}`}
-          icon="✉"
-        >
-          Email parent
-        </ActionLink>
-        {/* Same rule as the phone number above: printed where there is room
-            for it, and the mailto carries it either way. */}
-        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">{email}</span>
-      </div>
-    );
+    /*
+     * One button, and the ways to reach the parent behind it.
+     *
+     * This used to be the affordances themselves — Call and Text side by side,
+     * with the number printed beside them on a wide screen. Three things went
+     * wrong with that, and all three are about the list rather than the row.
+     * At 390px the two pills do not fit on one line, so every row wore them
+     * stacked and stood about 200px tall: a call list showed three names, and
+     * the whole job of this screen is scanning a dozen. On a laptop the pair
+     * plus the digits claimed 378px of the row, which is why the student's own
+     * name had to be capped to survive at 1280. And a third control had
+     * nowhere to go — see the Resolve button in `MiaList`, which is what
+     * forced the question.
+     *
+     * Collapsed, the row is one line at every width and the dialog says more
+     * than the strip could: whose number it is, in full, with Call and Text as
+     * targets the size of a thumb rather than pills squeezed into a column.
+     * The cost is one tap before a call — paid once per call actually made,
+     * where the old layout charged every row on the screen for the two people
+     * a leader eventually rang.
+     */
+    body = <ContactParentButton student={student} details={details} />;
   }
 
   /*

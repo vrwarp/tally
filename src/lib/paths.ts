@@ -70,10 +70,34 @@ export const COLLECTIONS = {
    * document to hang it on. An absent document means the gathering is open.
    */
   eventAccess: 'eventAccess',
+  /**
+   * One document per (chain, student) pair: this gathering no longer expects
+   * this student, and why. The aging-out record — see docs/aging-out.md.
+   *
+   * Keyed `{chainKey}__{studentId}` so a repeat of the act addresses the same
+   * document instead of stacking a second claim — the idempotency argument
+   * attendance makes. Top-level and flat because its primary reader, the
+   * dashboard's pooled "not seen anywhere" derivation, needs every student's
+   * releases across every chain in one small query.
+   */
+  transitions: 'transitions',
   /** Subcollection names. */
   attendance: 'attendance',
   rsvps: 'rsvps',
 } as const;
+
+/**
+ * The document id a transition lives at.
+ *
+ * Deterministic from the pair, which is the whole mechanism: two leaders
+ * releasing the same student from the same gathering address one document, and
+ * the second write replaces rather than duplicates. `__` cannot appear in a
+ * series slug or a Firestore auto-id, and the fields are authoritative anyway —
+ * nothing ever parses this id back apart.
+ */
+export function transitionId(chainKey: string, studentId: string): string {
+  return `${chainKey}__${studentId}`;
+}
 
 export const SETTINGS_DOC_ID = 'settings';
 
@@ -116,6 +140,10 @@ export const paths = {
 
   eventAccessCollection: () => COLLECTIONS.eventAccess,
   eventAccess: (chainKey: string) => `${COLLECTIONS.eventAccess}/${chainKey}`,
+
+  transitionsCollection: () => COLLECTIONS.transitions,
+  transition: (chainKey: string, studentId: string) =>
+    `${COLLECTIONS.transitions}/${transitionId(chainKey, studentId)}`,
 
   attendanceCollection: (eventId: string) =>
     `${COLLECTIONS.events}/${eventId}/${COLLECTIONS.attendance}`,

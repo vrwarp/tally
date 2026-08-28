@@ -1677,6 +1677,74 @@ describe('skippedNights', () => {
   });
 });
 
+describe('transitions', () => {
+  const chain = ID.series;
+  const path = paths.transition(chain, ID.student);
+  const release = (over: Record<string, unknown> = {}) => ({
+    chainKey: chain,
+    studentId: ID.student,
+    reason: 'moved-on',
+    note: null,
+    releasedBy: UID.core,
+    releasedByName: 'Dana Ruiz',
+    releasedAt: serverTimestamp(),
+    ...over,
+  });
+
+  it('lets core release a student from a gathering, and change the answer', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, path), release()));
+    // Re-performing the act replaces the one document — a changed mind about
+    // the reason, with a note, is the same address.
+    await assertSucceeds(setDoc(doc(db, path), release({ reason: 'departed', note: 'graduated' })));
+  });
+
+  it('refuses a counselor — who a gathering expects is the call list’s own rank', async () => {
+    const db = asUser(env, UID.counselor);
+    await assertFails(setDoc(doc(db, path), release({ releasedBy: UID.counselor })));
+  });
+
+  it('refuses a document filed under the wrong pair', async () => {
+    // The composite id is the address and the fields are the claim; a document
+    // disagreeing with its own path would answer for a pair it is not about.
+    const db = asUser(env, UID.core);
+    await assertFails(
+      setDoc(doc(db, paths.transition(chain, 'someone-else')), release()),
+    );
+    await assertFails(setDoc(doc(db, path), release({ chainKey: 'another-chain' })));
+  });
+
+  it('refuses a forged author', async () => {
+    // The ledger says who decided; that has to be the session that wrote it.
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, path), release({ releasedBy: UID.admin })));
+  });
+
+  it('refuses any reason outside the two that differ in effect', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, path), release({ reason: 'other' })));
+    await assertFails(setDoc(doc(db, path), release({ reason: null })));
+  });
+
+  it('refuses extra keys — a seed cannot be smuggled onto the record', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, path), release({ seeded: true })));
+  });
+
+  it('lets core undo, and nobody below', async () => {
+    await assertSucceeds(setDoc(doc(asUser(env, UID.core), path), release()));
+    await assertFails(deleteDoc(doc(asUser(env, UID.counselor), path)));
+    await assertSucceeds(deleteDoc(doc(asUser(env, UID.core), path)));
+  });
+
+  it('lets any active member read it, and nobody outside', async () => {
+    await assertSucceeds(setDoc(doc(asUser(env, UID.core), path), release()));
+    await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), path)));
+    await assertFails(getDoc(doc(asUser(env, UID.inactive), path)));
+    await assertFails(getDoc(doc(asAnonymous(env), path)));
+  });
+});
+
 /**
  * Who may work one gathering.
  *

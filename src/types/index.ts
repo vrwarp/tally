@@ -940,6 +940,69 @@ export interface EventAccess extends Omit<EventAccessDoc, 'updatedAt' | 'members
 }
 
 /* -------------------------------------------------------------------------- */
+/* Transitions                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Why one gathering stopped expecting one student.
+ *
+ * Two values, because only two differ in effect — and the difference is real
+ * and load-bearing, once (see docs/aging-out.md). `moved-on` means *the
+ * ministry still expects to see them somewhere*: the student's pre-release
+ * sightings stop shielding them from the dashboard's "Not seen at any
+ * gathering" list, so a child who "moved up" and landed nowhere surfaces a few
+ * weeks after the act instead of never. `departed` means *this record is the
+ * resolution* — graduated, moved away, drifted — and suppresses that row while
+ * it stands. Nothing else anywhere reads the reason; `note` is free text for
+ * flavor.
+ */
+export type TransitionReason = 'moved-on' | 'departed';
+
+/** What each reason is called on screen. Storage keeps the short values. */
+export const TRANSITION_REASON_LABEL: Record<TransitionReason, string> = {
+  'moved-on': 'Moved on within the ministry',
+  departed: 'No longer with us',
+};
+
+/**
+ * One gathering no longer expects one student.
+ *
+ * Stored at `transitions/{chainKey}__{studentId}` — the composite id is what
+ * makes the write idempotent and the invariant structural: at most one standing
+ * release per (gathering, student) pair, and a re-release simply replaces the
+ * old one. The fields are authoritative; the id is addressing.
+ *
+ * A release is never deleted by the system when contradicted — it goes *inert*:
+ * readers treat it as absent while the chain holds attendance for the student
+ * at or after `releasedAt`. That is a derivation over history every reader
+ * already has, so nothing ever has to execute a "void" write, least of all a
+ * lobby tablet. Undo (a person changing their mind) is the one delete.
+ */
+export interface TransitionDoc {
+  /** The chain that no longer expects them. Bound to the document id by rules. */
+  chainKey: string;
+  /** Who. Bound to the document id by rules, like attendance is. */
+  studentId: string;
+  reason: TransitionReason;
+  /** Free text — "graduated", "moved to Austin". Never parsed. */
+  note: string | null;
+  releasedBy: string;
+  /**
+   * Denormalised at write time, the way `upstreamEdits.createdByName` is:
+   * the ledger has to say who decided, and `users/` is not readable to
+   * everyone who reads this.
+   */
+  releasedByName: string;
+  releasedAt: Timestamp;
+}
+
+export interface Transition extends Omit<TransitionDoc, 'releasedAt'> {
+  /** `{chainKey}__{studentId}`. */
+  id: string;
+  releasedAt: Date;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Settings                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -1646,6 +1709,21 @@ export interface MiaStudent {
    * single-gathering view; only the merged list can count above it.
    */
   alsoMissingCount: number;
+  /**
+   * Set on a gathering row whose student the loaded window has seen *nowhere*
+   * — not at any other gathering, not at a one-off — since their last visit
+   * here (the date this carries). The minority of rows where "missing from
+   * Sunday Kids" may really mean "missing from everything", pre-marked so the
+   * reader sees it while scanning rather than after pressing something.
+   */
+  notSeenAnywhereSince?: Date;
+  /**
+   * Set on an unseen row that exists because a moved-on release said the
+   * ministry still expects this student somewhere and nowhere has seen them
+   * since: the chain they were released from, its title (null when that chain
+   * is outside the loaded window), and when. Absent on every other row.
+   */
+  release?: { chainKey: string; fromTitle: string | null; at: Date };
 }
 
 export interface NewVisitor {

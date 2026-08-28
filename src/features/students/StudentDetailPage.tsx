@@ -44,10 +44,13 @@ import { useProfileHistory } from '@/features/students/useProfileHistory';
 import { useToast } from '@/context/toastContext';
 import {
   groupByGathering,
+  isInertRelease,
   orderSnapshotsNewestFirst,
   standingIn,
+  transitionsFor,
   type GatheringStanding,
 } from '@/features/dashboard/insights';
+import { ReleaseDialog, type ReleaseTarget } from '@/features/dashboard/ReleaseDialog';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { EditBirthday } from '@/features/students/EditBirthday';
 import { StudentEditorModal } from '@/features/students/StudentEditorModal';
@@ -72,18 +75,23 @@ import {
   removeRosterMember,
 } from '@/services/functions';
 import { setStudentStatus } from '@/services/students';
+import { releaseStudent, undoRelease } from '@/services/transitions';
+import { useTransitions } from '@/hooks/useTransitions';
 import {
   cancelUpstreamEdit,
   dismissUpstreamEdit,
   retryUpstreamEdit,
 } from '@/services/upstreamEdits';
 import {
+  TRANSITION_REASON_LABEL,
   backendLabelOf,
   backendOfStudent,
   needsAHuman,
   studentFullName,
   type Student,
   type TallyEvent,
+  type Transition,
+  type TransitionReason,
 } from '@/types';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
@@ -117,7 +125,7 @@ export function StudentDetailPage() {
   const navigate = useNavigate();
   const { students, events, series, settings, loading, rosterError, refreshRoster, upstreamEdits } =
     useData();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { show } = useToast();
   const now = useNow(60_000);
 
@@ -298,6 +306,104 @@ export function StudentDetailPage() {
     }
     return groups;
   }, [snapshots, series, student, settings]);
+
+  /*
+   * The aging-out record for this student (docs/aging-out.md), and the page's
+   * half of the act. This is the n=1 entrance — the nursery drip, the mid-year
+   * move — where no MIA row exists yet to act from: Ruth decides at the
+   * birthday, from the gathering's own standing block below.
+   */
+  const { transitions } = useTransitions();
+  const [pendingRelease, setPendingRelease] = useState<ReleaseTarget | null>(null);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+  const [releaseUndoBusyKey, setReleaseUndoBusyKey] = useState<string | null>(null);
+
+  /**
+   * The release standing against each gathering here, inertness included.
+   *
+   * Most recent wins where a merge contributed a second document, and an inert
+   * one is kept — the standing block renders it *as* stood down rather than
+   * pretending nobody ever decided anything.
+   */
+  const releasesByChain = useMemo(() => {
+    const map = new Map<string, { transition: Transition; inert: boolean }>();
+    if (!student) return map;
+
+    const byChain = new Map<string, typeof snapshots>();
+    for (const snapshot of snapshots) {
+      if (snapshot.event.mode !== 'recurring') continue;
+      const key = chainKey(snapshot.event);
+      const held = byChain.get(key);
+      if (held) held.push(snapshot);
+      else byChain.set(key, [snapshot]);
+    }
+
+    for (const transition of transitionsFor(student, transitions)) {
+      const existing = map.get(transition.chainKey);
+      if (existing && existing.transition.releasedAt >= transition.releasedAt) continue;
+      map.set(transition.chainKey, {
+        transition,
+        inert: isInertRelease(transition, byChain.get(transition.chainKey), student.id),
+      });
+    }
+    return map;
+  }, [student, transitions, snapshots]);
+
+  const openRelease = (group: HistoryGroup) => {
+    if (!student) return;
+    // "Seen nowhere since": their last presence in this group, with no presence
+    // anywhere — any group, one-offs included — after it. The strongest
+    // sentence in the dialog is for exactly this case.
+    const lastHere = group.entries.find((entry) => entry.present)?.event.startAt ?? null;
+    const seenSince =
+      lastHere !== null &&
+      snapshots.some(
+        (snapshot) =>
+          snapshot.event.startAt.getTime() > lastHere.getTime() &&
+          snapshot.presentStudentIds.has(student.id),
+      );
+    setPendingRelease({
+      student,
+      chainKey: group.key,
+      gatheringTitle: group.title,
+      notSeenAnywhereSince: lastHere !== null && !seenSince ? lastHere : null,
+    });
+  };
+
+  const confirmRelease = async (
+    target: ReleaseTarget,
+    reason: TransitionReason,
+    note: string,
+  ) => {
+    if (!user) return;
+    setReleaseBusy(true);
+    try {
+      await releaseStudent({
+        chainKey: target.chainKey,
+        studentId: target.student.id,
+        reason,
+        note,
+        uid: user.uid,
+        authorName: profile?.displayName ?? user.email ?? 'Somebody',
+      });
+      setPendingRelease(null);
+    } catch {
+      show('Could not save the release. Nothing changed.', { tone: 'error' });
+    } finally {
+      setReleaseBusy(false);
+    }
+  };
+
+  const handleReleaseUndo = async (transition: Transition) => {
+    setReleaseUndoBusyKey(transition.id);
+    try {
+      await undoRelease(transition.chainKey, transition.studentId);
+    } catch {
+      show('Could not undo the release.', { tone: 'error' });
+    } finally {
+      setReleaseUndoBusyKey(null);
+    }
+  };
 
   /**
    * The streak the tile reports: the gathering they have drifted furthest from,
@@ -973,6 +1079,18 @@ export function StudentDetailPage() {
                   </p>
                 </header>
 
+                {/* The transition record's home on this page: what was decided
+                    about this gathering expecting them, and the act itself —
+                    the entrance that needs no MIA row to exist first. */}
+                {group.key !== ONE_OFF_GROUP ? (
+                  <ReleaseStanding
+                    release={releasesByChain.get(group.key) ?? null}
+                    onRelease={() => openRelease(group)}
+                    onUndo={handleReleaseUndo}
+                    undoBusyId={releaseUndoBusyKey}
+                  />
+                ) : null}
+
                 {/* Oldest to newest, left to right, which is how a run of misses
                     reads as a run rather than as a list to count backwards. */}
                 <ul className="flex flex-wrap gap-1.5 px-4 py-3">
@@ -1009,7 +1127,82 @@ export function StudentDetailPage() {
         // contact this page is showing, not just the roster row behind it.
         onSaved={refreshDetails}
       />
+
+      <ReleaseDialog
+        target={pendingRelease}
+        threshold={settings.miaConsecutiveMisses}
+        busy={releaseBusy}
+        onClose={() => setPendingRelease(null)}
+        onConfirm={confirmRelease}
+      />
     </PageFrame>
+  );
+}
+
+/**
+ * One gathering's release state on the student page, and the act's entrance.
+ *
+ * Three shapes, one line each. Nothing decided: the quiet button, which is the
+ * n=1 door the nursery drip comes through. A standing release: the record —
+ * reason, note, who, when — with Undo, exactly what the ledger strip on the
+ * dashboard says about the same document. A release the student's own
+ * attendance has stood down: shown *as* stood down, because a page that
+ * quietly dropped it would leave the next reader wondering whether anybody
+ * ever decided anything — and the act button returns, since releasing again
+ * is one fresh document, not an undo-then-redo.
+ */
+function ReleaseStanding({
+  release,
+  onRelease,
+  onUndo,
+  undoBusyId,
+}: {
+  release: { transition: Transition; inert: boolean } | null;
+  onRelease: () => void;
+  onUndo: (transition: Transition) => void;
+  undoBusyId: string | null;
+}) {
+  if (!release) {
+    return (
+      <div className="flex justify-end px-4 pt-2">
+        <Button variant="ghost" size="sm" onClick={onRelease}>
+          No longer expected…
+        </Button>
+      </div>
+    );
+  }
+
+  const { transition, inert } = release;
+
+  return (
+    <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl bg-ink-950 px-3 py-1 ring-1 ring-ink-800">
+      <p className={cn('min-w-0 flex-1 truncate text-xs', inert ? 'text-ink-500' : 'text-ink-300')}>
+        {inert ? (
+          <>
+            Was marked no longer expected —{' '}
+            <span className="text-present-400">back since, so it no longer applies</span>
+          </>
+        ) : (
+          <>No longer expected here — {TRANSITION_REASON_LABEL[transition.reason]}</>
+        )}
+        {transition.note ? ` · “${transition.note}”` : ''} · {transition.releasedByName},{' '}
+        {formatShortDate(transition.releasedAt)}
+      </p>
+      {inert ? (
+        <Button variant="ghost" size="sm" onClick={onRelease}>
+          No longer expected…
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onUndo(transition)}
+          loading={undoBusyId === transition.id}
+        >
+          Undo
+        </Button>
+      )}
+    </div>
   );
 }
 
