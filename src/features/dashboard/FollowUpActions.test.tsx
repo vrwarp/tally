@@ -176,6 +176,24 @@ describe('FollowUpActions', () => {
     ).toBeInTheDocument();
   });
 
+  it('gives the button the whole of the student name, not just a role', async () => {
+    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+
+    mount(inPlanningCenter());
+
+    /*
+     * Both names are built from `studentFullName`, and the dashboard e2e leans
+     * on exactly that: it reads the group's label off the DOM, strips "Parent
+     * contact for ", and looks for the button by the remainder. Asserted as a
+     * whole string rather than a pattern because a partial match is what let
+     * that pair drift apart in the first place — and because on a call list a
+     * screen reader otherwise hears ten identical controls.
+     */
+    expect(
+      await screen.findByRole('button', { name: 'Contact parent for Iris Chen' }),
+    ).toBeInTheDocument();
+  });
+
   it('says whose number it is on the buttons themselves', async () => {
     getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
 
