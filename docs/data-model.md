@@ -42,6 +42,7 @@ students/{studentId}                     the roster itself — a document is a m
 events/{eventId}                         a single dated gathering
 events/{eventId}/attendance/{studentId}  who showed up
 events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
+transitions/{chainKey}__{studentId}      this gathering no longer expects this student
 config/settings                          tunable thresholds
 config/planningCenter                    the non-secret Planning Center settings
 config/attendees32                       the non-secret Attendees settings
@@ -520,6 +521,50 @@ A fence whose gaps are undocumented is worse than none, so:
 - **Not a data-protection boundary.** The problem being solved is clutter on a nursery volunteer's
   screen, not secrecy. Anything that genuinely must not be seen by part of the team does not belong
   in Tally.
+
+### `transitions/{chainKey}__{studentId}`
+
+The aging-out record: one gathering no longer expects one student, and why. The design, its
+five critique rounds and everything deliberately not built are
+[docs/aging-out.md](aging-out.md); this entry is the collection as shipped.
+
+Keyed by the pair, the way attendance is keyed by student: the id makes the act idempotent
+(two leaders releasing the same student address one document; a changed mind replaces rather
+than stacks) and the invariant structural — at most one release per (gathering, student). The
+rules bind the fields to the path, so a document cannot answer for a pair it is not about.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `chainKey` | string | The chain that no longer expects them. Bound to the id. |
+| `studentId` | string | Who. Bound to the id. Read through `mergedFromStudentIds` like history, so a release recorded before a merge still governs the winner. |
+| `reason` | `'moved-on' \| 'departed'` | The one deliberately load-bearing bit. **Moved on within the ministry** means *we still expect to see them somewhere*: their pre-release sightings stop shielding them from the dashboard's "Not seen at any gathering" list, so a child who moved up and landed nowhere surfaces a few weeks after the act — anchored to the act, not the calendar. **No longer with us** means *this record is the resolution* (graduated, moved away, drifted) and suppresses that row while it stands. Nothing else ever reads the reason. |
+| `note` | string \| null | Free text — "graduated", "moved to Austin". Never parsed. |
+| `releasedBy`, `releasedByName` | string | Who decided. The name is denormalised at write time, as `upstreamEdits.createdByName` is, because the ledger has to say who and `users/` is not readable to everyone who reads this. |
+| `releasedAt` | Timestamp | The act's own instant — there is deliberately no effective-date picker; with nothing to seed there is no reason to act early, and the bare timestamp cannot express the confusing backdated states a picker could. |
+
+**A contradicted release is derived inert, never deleted.** While the chain holds attendance
+for the student at or after `releasedAt`, every reader treats the record as absent — the
+student's own presence outranks any declaration, no "void" write exists anywhere (least of
+all on a lobby tablet), and back-filling an old register cannot undo a later act. The one
+delete is a person pressing Undo.
+
+**What reads it — three dashboard derivations, and nothing else.** A standing release
+excludes the student from that chain's MIA list unconditionally (the act is usually performed
+*late*, from the row itself, so it must resolve misses that predate it); the reason steers
+the pooled unseen list as above, with the surfacing gate and the row's count both anchored at
+`releasedAt`; and the ledger strip under the MIA list renders every release — reason, note,
+author, date, inert ones *as* inert — with undo, even when the list above is empty. The
+check-in screen and the kiosk read nothing here, by design: Recent decays on its own two
+instances before the MIA row that prompts a release can even exist. Every reader fails open —
+an unreadable release means "still expected", and the chain row it would have resolved is
+the fallback for the pooled row it would have created.
+
+**Who writes:** core and up, directly under the rules — by rank alone, deliberately not
+`onChain`-gated: who a gathering *expects* is the call list's own question, `eventAccess`
+governs who may *work* a gathering, and the pooled list must read releases across chains its
+reader does not work. **Who reads:** any active member — the record holds no more than
+`students.lastAttendedAt` already says to the same audience. Deletes are core and up, and
+mean undo.
 
 ### `kioskPairings/{code}`
 

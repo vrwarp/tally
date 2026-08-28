@@ -12,6 +12,7 @@ import type {
   Rsvp,
   Student,
   TallyEvent,
+  Transition,
   UserProfile,
 } from '@/types';
 import { DEFAULT_SETTINGS, buildSearchName } from '@/types';
@@ -60,6 +61,9 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     ...(overrides.upstreamRecordMissing === undefined
       ? {}
       : { upstreamRecordMissing: overrides.upstreamRecordMissing }),
+    ...(overrides.mergedFromStudentIds === undefined
+      ? {}
+      : { mergedFromStudentIds: overrides.mergedFromStudentIds }),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),
@@ -151,6 +155,23 @@ export function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
 
 export function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return { ...DEFAULT_SETTINGS, ...overrides };
+}
+
+/** One aging-out release: `chainKey` no longer expects `studentId`. */
+export function makeTransition(overrides: Partial<Transition> = {}): Transition {
+  const chainKey = overrides.chainKey ?? 'friday-fellowship';
+  const studentId = overrides.studentId ?? nextId('student');
+
+  return {
+    id: pick(overrides, 'id', `${chainKey}__${studentId}`),
+    chainKey,
+    studentId,
+    reason: pick(overrides, 'reason', 'moved-on'),
+    note: pick(overrides, 'note', null),
+    releasedBy: pick(overrides, 'releasedBy', 'uid-core'),
+    releasedByName: pick(overrides, 'releasedByName', 'Dana Ruiz'),
+    releasedAt: pick(overrides, 'releasedAt', NOW),
+  };
 }
 
 /**

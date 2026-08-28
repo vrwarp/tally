@@ -32,6 +32,7 @@ import type {
   NewVisitor,
   Student,
   TallyEvent,
+  Transition,
 } from '@/types';
 
 /** Newest-first ordering, which every function below assumes. */
@@ -171,6 +172,71 @@ export function groupByGathering(
   return [...gatherings.values()].sort((a, b) => b.lastHeldAt.getTime() - a.lastHeldAt.getTime());
 }
 
+/* -------------------------------------------------------------------------- */
+/* Transitions — the aging-out record                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The releases that speak about one student, merged history included.
+ *
+ * A release recorded against a student id that was later merged away still
+ * governs the winner — the record follows `mergedFromStudentIds` at read time,
+ * exactly as attendance history does on the student's page. Presence tests in
+ * this file stay on `student.id` alone, as they are everywhere else here; the
+ * asymmetry is the file's own long-standing one, not this feature's.
+ */
+export function transitionsFor(
+  student: Student,
+  transitions: readonly Transition[],
+): Transition[] {
+  if (transitions.length === 0) return [];
+  const ids = new Set([student.id, ...(student.mergedFromStudentIds ?? [])]);
+  return transitions.filter((transition) => ids.has(transition.studentId));
+}
+
+/**
+ * Whether the student's own attendance has stood this release down.
+ *
+ * A release is inert — treated as absent by every reader — while the chain
+ * holds attendance for the student at or after `releasedAt`. Derived, never
+ * written: the one tap that unmakes the act is the student walking in, and no
+ * device anywhere has to execute a "void". `chainSnapshots` is whatever of the
+ * chain the caller has loaded; a release older than the loaded window can only
+ * matter to rows the same window can still produce, so the answer is right
+ * wherever the question can arise.
+ */
+export function isInertRelease(
+  release: Transition,
+  chainSnapshots: readonly EventAttendanceSnapshot[] | undefined,
+  studentId: string,
+): boolean {
+  if (!chainSnapshots) return false;
+  return chainSnapshots.some(
+    (snapshot) =>
+      snapshot.event.startAt.getTime() >= release.releasedAt.getTime() &&
+      snapshot.presentStudentIds.has(studentId),
+  );
+}
+
+/**
+ * The standing (non-inert) release of `student` from this gathering, if any.
+ *
+ * At most one document exists per (chain, student) pair by construction; a
+ * merge can contribute a second under an old id, and the most recent act
+ * governs — the same precedence the pooled list uses across chains.
+ */
+export function standingReleaseIn(
+  gathering: Gathering,
+  student: Student,
+  transitions: readonly Transition[],
+): Transition | null {
+  const candidates = transitionsFor(student, transitions)
+    .filter((transition) => transition.chainKey === gathering.key)
+    .filter((transition) => !isInertRelease(transition, gathering.snapshots, student.id))
+    .sort((a, b) => b.releasedAt.getTime() - a.releasedAt.getTime());
+  return candidates[0] ?? null;
+}
+
 export interface GatheringStanding {
   /** Nights of this gathering missed in a row, newest first. */
   consecutiveMisses: number;
@@ -297,6 +363,7 @@ export function computeMiaFor(
   gathering: Gathering,
   students: readonly Student[],
   settings: AppSettings,
+  transitions: readonly Transition[] = [],
 ): MiaStudent[] {
   if (gathering.snapshots.length === 0) return [];
 
@@ -304,6 +371,17 @@ export function computeMiaFor(
 
   for (const student of students) {
     if (student.status !== 'active') continue;
+
+    /*
+     * A standing release resolves the row, unconditionally — whatever the
+     * dates of the misses. The release is the answer to the question the row
+     * asks, and the act is usually performed *late*, from the row itself, so
+     * scoping this to misses after `releasedAt` would make the primary
+     * gesture fail in the primary case. The student's own attendance at or
+     * after the release stands it down (`isInertRelease`), which is what
+     * restores them to this computation when they come back.
+     */
+    if (standingReleaseIn(gathering, student, transitions)) continue;
 
     const { consecutiveMisses, lastAttended, eligible, wasRegular } = standingIn(
       gathering,
@@ -351,21 +429,118 @@ export function computeMiaFor(
  * Students seen only at a one-off are left out: `computeOneOffOnly` tells their
  * story better, and two lists asking for the same phone call is how a call list
  * stops being worked.
+ *
+ * ## How a release steers this list
+ *
+ * The transition record's one load-bearing bit is spent here (docs/aging-out.md).
+ * A student's own recent sightings are what shield them from this list — and a
+ * **moved-on** release re-anchors that shield at the act: sightings anywhere
+ * *before* the release stop shielding, sightings at or after it shield as
+ * normal. Both shields, the recurring one and the one-off one — a July retreat
+ * must not hide a child released in September, and retreat-goers are exactly
+ * the students whose disappearance most warrants a call. So the child who
+ * "moved up" and landed somewhere has post-release sightings and never appears;
+ * the child who landed nowhere surfaces once some gathering has held the usual
+ * threshold of instances *since the release* — anchored at the act, not the
+ * calendar, so a January release detects a lost family exactly as well as a
+ * September one. Their row carries the provenance.
+ *
+ * A **departed** release is the opposite: the record is the resolution, and the
+ * row is suppressed while the release stands. Without this, every family that
+ * left would surface here as soon as their old sightings aged out of the
+ * window, already resolved and back on the call list.
+ *
+ * The student's own attendance outranks all of it: a release with attendance at
+ * or after it is inert (`isInertRelease`), and the most recent standing release
+ * governs when several exist across chains.
  */
 export function computeUnseen(
   students: readonly Student[],
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
+  transitions: readonly Transition[] = [],
 ): MiaStudent[] {
   const history = recurringSnapshots(snapshots);
   if (history.length === 0) return [];
   const oneOffs = oneOffSnapshots(snapshots);
   const gatherings = groupByGathering(snapshots);
+  const byChain = new Map(gatherings.map((gathering) => [gathering.key, gathering.snapshots]));
 
   const results: MiaStudent[] = [];
 
   for (const student of students) {
     if (student.status !== 'active') continue;
+
+    const standing = transitionsFor(student, transitions)
+      .filter((release) => !isInertRelease(release, byChain.get(release.chainKey), student.id))
+      .sort((a, b) => b.releasedAt.getTime() - a.releasedAt.getTime());
+    const governing = standing[0] ?? null;
+
+    // Resolved. Somebody said this family is no longer with us, and a resolved
+    // family must not reappear on a call list next September because their old
+    // sightings aged out. Their own attendance would stand the release down.
+    if (governing?.reason === 'departed') continue;
+
+    if (governing) {
+      const anchor = governing.releasedAt.getTime();
+
+      const seenSinceRelease = [...history, ...oneOffs].some(
+        (snapshot) =>
+          snapshot.event.startAt.getTime() >= anchor &&
+          snapshot.presentStudentIds.has(student.id),
+      );
+      if (seenSinceRelease) continue;
+
+      // A student whose only window sighting is a (pre-release) one-off keeps
+      // the rule the ordinary path has: `computeOneOffOnly` tells their story,
+      // and two lists asking for the same phone call is how a call list stops
+      // being worked.
+      if (
+        !history.some((snapshot) => snapshot.presentStudentIds.has(student.id)) &&
+        oneOffs.some((snapshot) => snapshot.presentStudentIds.has(student.id))
+      ) {
+        continue;
+      }
+
+      const lastAttendedAt = student.lastAttendedAt;
+      if (!lastAttendedAt || !Number.isFinite(lastAttendedAt.getTime())) continue;
+
+      /*
+       * The gate, anchored at the release rather than at `createdAt` — for a
+       * multi-year student the `createdAt` anchor passes instantly, which
+       * would surface them the day they were released. Somebody has to have
+       * had the usual number of chances to be seen *since the act* before the
+       * list says they landed nowhere.
+       */
+      const heldSince = (nights: readonly EventAttendanceSnapshot[]) =>
+        nights.filter((snapshot) => snapshot.event.startAt.getTime() >= anchor).length;
+      if (!gatherings.some((g) => heldSince(g.snapshots) >= settings.miaConsecutiveMisses)) {
+        continue;
+      }
+
+      /*
+       * The count is anchored too, or a fresh release would sort to the top of
+       * the whole call list on a lifetime night-count and displace the
+       * genuinely longest-absent — and the list's order is the order a leader
+       * works the phone.
+       */
+      results.push({
+        student,
+        consecutiveMisses: heldSince(history),
+        lastAttendedAt,
+        lastAttendedEventTitle: null,
+        gatheringKey: null,
+        gatheringTitle: null,
+        alsoMissingCount: 0,
+        release: {
+          chainKey: governing.chainKey,
+          fromTitle: gatherings.find((g) => g.key === governing.chainKey)?.title ?? null,
+          at: governing.releasedAt,
+        },
+      });
+      continue;
+    }
+
     if (history.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
     if (oneOffs.some((snapshot) => snapshot.presentStudentIds.has(student.id))) continue;
 
@@ -434,13 +609,38 @@ export function computeMiaByGathering(
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
   series: readonly EventSeries[] = [],
+  transitions: readonly Transition[] = [],
 ): MiaStudent[] {
-  return [
+  const rows = [
     ...groupByGathering(snapshots, series).flatMap((gathering) =>
-      computeMiaFor(gathering, students, settings),
+      computeMiaFor(gathering, students, settings, transitions),
     ),
-    ...computeUnseen(students, snapshots, settings),
+    ...computeUnseen(students, snapshots, settings, transitions),
   ];
+
+  /*
+   * Pre-mark the exception. Most rows here mean "drifted from this gathering,
+   * probably at another one"; a minority mean "and nowhere has seen them
+   * since", which is the row a reader must not resolve on momentum. Marked on
+   * the row itself, before any press, because a warning that appears only
+   * inside a dialog is read after the decision it was meant to inform.
+   *
+   * Strictly after the last visit: the visit itself is a sighting at this
+   * gathering, and a same-instant snapshot is the night in question.
+   */
+  const anywhere = [...recurringSnapshots(snapshots), ...oneOffSnapshots(snapshots)];
+  for (const row of rows) {
+    if (row.gatheringKey === null || row.lastAttendedAt === null) continue;
+    const after = row.lastAttendedAt.getTime();
+    const seenSince = anywhere.some(
+      (snapshot) =>
+        snapshot.event.startAt.getTime() > after &&
+        snapshot.presentStudentIds.has(row.student.id),
+    );
+    if (!seenSince) row.notSeenAnywhereSince = row.lastAttendedAt;
+  }
+
+  return rows;
 }
 
 /**
@@ -475,8 +675,9 @@ export function computeMia(
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
   series: readonly EventSeries[] = [],
+  transitions: readonly Transition[] = [],
 ): MiaStudent[] {
-  return mergeMia(computeMiaByGathering(students, snapshots, settings, series));
+  return mergeMia(computeMiaByGathering(students, snapshots, settings, series, transitions));
 }
 
 /**

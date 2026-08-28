@@ -33,6 +33,7 @@ import {
   makeSettings,
   makeSnapshot,
   makeStudent,
+  makeTransition,
   makeWeeklyEvents,
 } from '../../../tests/factories';
 
@@ -1912,5 +1913,246 @@ describe('check-out never touches attendance', () => {
 
     expect(computeSummary({ snapshots, mia: [], newVisitors: [], incomplete: [] }).checkOutRate)
       .toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The transition record (docs/aging-out.md)                                   */
+/* -------------------------------------------------------------------------- */
+
+describe('a release and the chain MIA row', () => {
+  const settings = makeSettings({ miaConsecutiveMisses: 3 });
+
+  it('resolves the row, however old the misses — the late act is the primary case', () => {
+    const student = makeStudent({ id: 'zoe', createdAt: LONG_AGO });
+    const events = fridays(4);
+    // Present four weeks ago, absent for the three since: a standing MIA row.
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
+    ];
+    expect(computeMia([student], snapshots, settings)).toHaveLength(1);
+
+    // Released *now* — months after every one of the misses. The release is
+    // the answer to the question the row asks, whenever the misses happened;
+    // scoped to misses after the act, the primary gesture would fail in the
+    // primary case.
+    const release = makeTransition({ chainKey: FRIDAY, studentId: student.id, releasedAt: NOW });
+    expect(computeMia([student], snapshots, settings, [], [release])).toEqual([]);
+  });
+
+  it('is stood down by the student’s own attendance at or after it', () => {
+    const student = makeStudent({ id: 'owen', createdAt: LONG_AGO });
+    const events = fridays(5);
+    // Released after the oldest night — then he walked back in, then drifted.
+    const release = makeTransition({
+      chainKey: FRIDAY,
+      studentId: student.id,
+      releasedAt: new Date(events[0]!.startAt.getTime() + 60_000),
+    });
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(events[2]!),
+      held(events[3]!),
+      held(events[4]!),
+    ];
+
+    // The attendance at events[1] outranks the record: the release is inert,
+    // no write anywhere made it so, and the row stands again.
+    const rows = computeMia([student], snapshots, settings, [], [release]);
+    expect(studentIds(rows)).toEqual([student.id]);
+  });
+
+  it('follows a merge: a release under the old id governs the winner’s row', () => {
+    const student = makeStudent({
+      id: 'winner',
+      createdAt: LONG_AGO,
+      mergedFromStudentIds: ['loser'],
+    });
+    const events = fridays(4);
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
+    ];
+    const release = makeTransition({ chainKey: FRIDAY, studentId: 'loser', releasedAt: NOW });
+
+    expect(computeMia([student], snapshots, settings, [], [release])).toEqual([]);
+  });
+});
+
+describe('a release and the unseen list', () => {
+  const settings = makeSettings({ miaConsecutiveMisses: 3 });
+
+  // The promoted-and-lost shape: three old Sunday sightings inside the window,
+  // nothing anywhere since, released three and a half weeks ago. Three Sundays
+  // and three Fridays have been held since the act.
+  const sundays = makeWeeklyEvents({ count: 6, seriesId: SUNDAY, title: 'Sunday School' });
+  const fridayNights = fridays(4);
+  const releasedAt = new Date(NOW.getTime() - 3.5 * 7 * 86_400_000);
+  const zoe = () =>
+    makeStudent({ id: 'zoe', createdAt: LONG_AGO, lastAttendedAt: sundays[2]!.startAt });
+  const baseline = (extra: readonly EventAttendanceSnapshot[] = []) => [
+    held(sundays[0]!, ['zoe']),
+    held(sundays[1]!, ['zoe']),
+    held(sundays[2]!, ['zoe']),
+    held(sundays[3]!),
+    held(sundays[4]!),
+    held(sundays[5]!),
+    ...fridayNights.map((event) => held(event)),
+    ...extra,
+  ];
+  const movedOn = (over: Record<string, unknown> = {}) =>
+    makeTransition({ chainKey: SUNDAY, studentId: 'zoe', releasedAt, ...over });
+
+  it('surfaces the moved-on student nowhere has seen since, count anchored at the act', () => {
+    // Shielded today: their own old sightings are inside the window.
+    expect(computeUnseen([zoe()], baseline(), settings)).toEqual([]);
+
+    const rows = computeUnseen([zoe()], baseline(), settings, [movedOn()]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      // Held nights since the release, everywhere — not a lifetime count that
+      // would sort a fresh release to the top of the whole call list.
+      consecutiveMisses: 6,
+      gatheringKey: null,
+      release: { chainKey: SUNDAY, fromTitle: 'Sunday School', at: releasedAt },
+    });
+  });
+
+  it('is not shielded by a pre-release one-off — the retreat must not hide them', () => {
+    const retreat = makeOneOff({
+      id: 'retreat',
+      startAt: new Date(NOW.getTime() - 5 * 7 * 86_400_000),
+    });
+    const rows = computeUnseen(
+      [zoe()],
+      baseline([makeSnapshot(retreat, ['zoe'])]),
+      settings,
+      [movedOn()],
+    );
+    expect(studentIds(rows)).toEqual(['zoe']);
+  });
+
+  it('is shielded by any sighting after the release — they landed', () => {
+    const landedAtFriday = computeUnseen(
+      [zoe()],
+      [
+        ...baseline().slice(0, -1),
+        held(fridayNights[3]!, ['zoe']), // the newest Friday, after the act
+      ],
+      settings,
+      [movedOn()],
+    );
+    expect(landedAtFriday).toEqual([]);
+
+    const retreatAfter = makeOneOff({
+      id: 'retreat-after',
+      startAt: new Date(NOW.getTime() - 7 * 86_400_000),
+    });
+    const landedAtOneOff = computeUnseen(
+      [zoe()],
+      baseline([makeSnapshot(retreatAfter, ['zoe'])]),
+      settings,
+      [movedOn()],
+    );
+    expect(landedAtOneOff).toEqual([]);
+  });
+
+  it('waits for the usual number of chances since the act — the gate is anchored there', () => {
+    // Released a moment ago: nothing has been held since, so a multi-year
+    // student must not surface the day they were released.
+    const justNow = movedOn({ releasedAt: new Date(NOW.getTime() - 60_000) });
+    expect(computeUnseen([zoe()], baseline(), settings, [justNow])).toEqual([]);
+  });
+
+  it('suppresses the row entirely while a departed release stands', () => {
+    expect(
+      computeUnseen([zoe()], baseline(), settings, [movedOn({ reason: 'departed' })]),
+    ).toEqual([]);
+
+    // The sharper half: a family whose sightings have aged out of the window
+    // would surface on the ordinary path — resolved or not. The record is the
+    // resolution, and it holds them off the list.
+    const ghost = makeStudent({
+      id: 'ghost',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
+    const everything = [...fridays(3).map((event) => held(event))];
+    expect(computeUnseen([ghost], everything, settings)).toHaveLength(1);
+    const departed = makeTransition({
+      chainKey: 'some-old-chain',
+      studentId: 'ghost',
+      reason: 'departed',
+      releasedAt: CAME_ONCE_LONG_AGO,
+    });
+    expect(computeUnseen([ghost], everything, settings, [departed])).toEqual([]);
+  });
+
+  it('lets the most recent standing release govern when the reasons disagree', () => {
+    const ghost = makeStudent({
+      id: 'ghost',
+      createdAt: LONG_AGO,
+      lastAttendedAt: CAME_ONCE_LONG_AGO,
+    });
+    const everything = [...fridays(3).map((event) => held(event))];
+    const older = new Date(2025, 5, 1, 12, 0);
+    const newer = new Date(2025, 8, 1, 12, 0);
+
+    // Departed, then moved on: the ministry changed its mind — still watching.
+    const watching = [
+      makeTransition({ chainKey: 'a', studentId: 'ghost', reason: 'departed', releasedAt: older }),
+      makeTransition({ chainKey: 'b', studentId: 'ghost', reason: 'moved-on', releasedAt: newer }),
+    ];
+    expect(studentIds(computeUnseen([ghost], everything, settings, watching))).toEqual(['ghost']);
+
+    // Moved on, then departed: the later record is the resolution.
+    const resolved = [
+      makeTransition({ chainKey: 'a', studentId: 'ghost', reason: 'moved-on', releasedAt: older }),
+      makeTransition({ chainKey: 'b', studentId: 'ghost', reason: 'departed', releasedAt: newer }),
+    ];
+    expect(computeUnseen([ghost], everything, settings, resolved)).toEqual([]);
+  });
+});
+
+describe('the pre-marked exception on gathering rows', () => {
+  const settings = makeSettings({ miaConsecutiveMisses: 3 });
+
+  it('marks the row whose student the window has seen nowhere since', () => {
+    const student = makeStudent({ id: 'ben', createdAt: LONG_AGO });
+    const events = fridays(4);
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
+    ];
+
+    const rows = computeMiaByGathering([student], snapshots, settings);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.notSeenAnywhereSince).toEqual(events[0]!.startAt);
+  });
+
+  it('leaves the row unmarked when another gathering has seen them since', () => {
+    const student = makeStudent({ id: 'zoe', createdAt: LONG_AGO });
+    const events = fridays(4);
+    const sunday = makeWeeklyEvents({ count: 1, seriesId: SUNDAY, title: 'Sunday School' });
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!),
+      held(events[2]!),
+      held(events[3]!),
+      held(sunday[0]!, [student.id]),
+    ];
+
+    const rows = computeMiaByGathering([student], snapshots, settings);
+    const fridayRow = rows.find((row) => row.gatheringKey === FRIDAY);
+    expect(fridayRow).toBeDefined();
+    expect(fridayRow!.notSeenAnywhereSince).toBeUndefined();
   });
 });

@@ -24,10 +24,26 @@ vi.mock('@/context/dataContext', () => ({ useData }));
 vi.mock('@/hooks/useEventSnapshots', () => ({ useEventSnapshots }));
 vi.mock('@/hooks/useParentContact', () => ({ useParentContact }));
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show: vi.fn() }) }));
+vi.mock('@/context/authContext', () => ({
+  useAuth: () => ({
+    user: { uid: 'uid-core', email: 'core@example.org' },
+    profile: { displayName: 'Dana Ruiz' },
+  }),
+}));
 vi.mock('@/services/functions', () => ({
   getPersonDetails: vi.fn().mockResolvedValue({ data: null }),
   setParentContact: vi.fn(),
   addParent: vi.fn(),
+}));
+// The record streams from Firestore in the real page; these tests are about
+// the screen's empty and loading shapes, so the stream answers "none".
+vi.mock('@/services/transitions', () => ({
+  subscribeTransitions: (onChange: (transitions: never[]) => void) => {
+    onChange([]);
+    return () => {};
+  },
+  releaseStudent: vi.fn(),
+  undoRelease: vi.fn(),
 }));
 
 /** A ministry with nothing on record: no calendar, no history, a settled roster. */

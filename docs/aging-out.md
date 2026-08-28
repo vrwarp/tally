@@ -1,6 +1,14 @@
 # Aging out of a gathering — a design exploration
 
-> **Status: design, not product.** Nothing in this document is built. It is the converged
+> **Status: the transition record below is built; everything else here is the design record
+> behind it.** The collection as shipped is
+> [`transitions/{chainKey}__{studentId}`](data-model.md#transitionschainkey__studentid); the
+> derivations live in `src/features/dashboard/insights.ts`, the act and its ledger in
+> `src/features/dashboard/` (`ReleaseDialog`, `TransitionLedger`, the MIA list) and on the
+> student page's per-gathering standing, and the pinned tests are in `insights.test.ts` and
+> `firestore-tests/rules.test.ts`. S3–S7 remain unbuilt, parked below.
+>
+> This document is the converged
 > output of a critique loop (a church-staff consultant and a UXR journey critic, both reading
 > this repository) on one problem: a student ages out of one program and into another —
 > promotion Sunday moves the 5th graders to the youth ministry, a birthday moves a toddler up

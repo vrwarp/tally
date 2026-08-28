@@ -893,6 +893,62 @@ service cloud.firestore {
     }
 
     /* ---------------------------------------------------------------- */
+    /* transitions                                                       */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * The aging-out record: one gathering no longer expects one student, and
+     * why. Written from the dashboard's MIA rows and a student's page, read by
+     * the dashboard derivations, and — deliberately — touching neither the
+     * check-in screen nor the kiosk. See docs/aging-out.md.
+     *
+     * Keyed `{chainKey}__{studentId}`, and the binding is enforced the way
+     * attendance enforces its student id: the fields are the claim, the id is
+     * the address, and a document disagreeing with its own path would answer
+     * for a pair it is not about. Idempotent by construction — a repeat of the
+     * act replaces rather than duplicates.
+     *
+     * Core and up, by rank alone — deliberately not gated on `onChain`. Who a
+     * gathering *expects* is the call list's own question, owned by the same
+     * rank that owns the call list and the event editor; `eventAccess` governs
+     * who may *work* a gathering, which is a different thing, and its own text
+     * says the problem it solves is clutter rather than secrecy. Gating here
+     * would also break the record's one cross-chain reader: the pooled "not
+     * seen at any gathering" list reads every student's releases across every
+     * chain, including chains this reader does not work.
+     *
+     * Reads are any-active for the same reason: the record holds a student id,
+     * a reason and a name — no more than `students.lastAttendedAt` already
+     * says to the same audience.
+     *
+     * Delete is a person pressing Undo, and nothing else: the system never
+     * deletes a contradicted release, it derives it inert (attendance at or
+     * after `releasedAt` stands it down), so no client ever has to be trusted
+     * with a "void" write.
+     */
+    match /transitions/{transitionId} {
+      function validTransition() {
+        let d = request.resource.data;
+        return transitionId == d.chainKey + '__' + d.studentId
+          && d.keys().hasAll(['chainKey', 'studentId', 'reason', 'note',
+                              'releasedBy', 'releasedByName', 'releasedAt'])
+          && d.keys().hasOnly(['chainKey', 'studentId', 'reason', 'note',
+                               'releasedBy', 'releasedByName', 'releasedAt'])
+          && d.chainKey is string && d.chainKey.size() > 0
+          && d.studentId is string && d.studentId.size() > 0
+          && d.reason in ['moved-on', 'departed']
+          && (d.note == null || (d.note is string && d.note.size() <= 500))
+          && d.releasedBy == request.auth.uid
+          && d.releasedByName is string && d.releasedByName.size() <= 120
+          && d.releasedAt is timestamp;
+      }
+
+      allow get, list: if isActive();
+      allow create, update: if isCore() && validTransition();
+      allow delete: if isCore();
+    }
+
+    /* ---------------------------------------------------------------- */
     /* config                                                            */
     /* ---------------------------------------------------------------- */
 

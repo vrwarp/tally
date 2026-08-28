@@ -14,7 +14,7 @@
  */
 import { Link } from 'react-router-dom';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
-import { Card, CardHeader, EmptyState } from '@/components/ui';
+import { Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import {
@@ -24,8 +24,9 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeSentence, initials } from '@/lib/utils';
-import { studentFullName, type MiaStudent } from '@/types';
+import { gradeSentence, initials, sortByName } from '@/lib/utils';
+import { sessionReleaseKey, type SessionRelease } from '@/features/dashboard/sessionRelease';
+import { TRANSITION_REASON_LABEL, studentFullName, type MiaStudent } from '@/types';
 
 export interface MiaListProps {
   items: readonly MiaStudent[];
@@ -48,6 +49,18 @@ export interface MiaListProps {
   onContactAdded?: () => void;
   /** What the CSV needs that the rows do not carry. See `followUpCsv.ts`. */
   exportContext?: FollowUpCsvContext;
+  /**
+   * Offered on rows a release can resolve — every row that names a gathering,
+   * and an unseen row that a moved-on release produced (its resolution is the
+   * same act with the other reason). Absent, the list is read-only, exactly as
+   * it was before the transition record existed.
+   */
+  onResolve?: (item: MiaStudent) => void;
+  /** Rows released this session, rendered greyed in place. */
+  sessionReleases?: ReadonlyMap<string, SessionRelease>;
+  onUndoSessionRelease?: (release: SessionRelease) => void;
+  /** The session-release key an undo is in flight for. */
+  undoBusyKey?: string | null;
 }
 
 export function MiaList({
@@ -57,8 +70,34 @@ export function MiaList({
   gatheringTitle = null,
   onContactAdded,
   exportContext = NO_EXPORT_CONTEXT,
+  onResolve,
+  sessionReleases,
+  onUndoSessionRelease,
+  undoBusyKey = null,
 }: MiaListProps) {
   const students = items.map((item) => item.student);
+
+  /*
+   * The list plus this session's released rows, in one order. A released row
+   * holds the place its streak earned — greying in place is the whole point —
+   * so the merge re-applies the list's own comparator rather than appending.
+   * A row the derivation still produces (the release failed to land, or undo
+   * won) renders as a live row, not twice.
+   */
+  const live = new Set(items.map((item) => sessionReleaseKey(item.gatheringKey, item.student.id)));
+  const releasedRows = [...(sessionReleases?.entries() ?? [])].filter(([key]) => !live.has(key));
+  const entries: Array<
+    { kind: 'live'; item: MiaStudent } | { kind: 'released'; key: string; release: SessionRelease }
+  > = [
+    ...items.map((item) => ({ kind: 'live' as const, item })),
+    ...releasedRows.map(([key, release]) => ({ kind: 'released' as const, key, release })),
+  ].sort((a, b) => {
+    const rowA = a.kind === 'live' ? a.item : a.release.item;
+    const rowB = b.kind === 'live' ? b.item : b.release.item;
+    return (
+      rowB.consecutiveMisses - rowA.consecutiveMisses || sortByName(rowA.student, rowB.student)
+    );
+  });
 
   return (
     <Card>
@@ -118,7 +157,7 @@ export function MiaList({
         // Three lines: under "All" every row also names the gathering somebody
         // has gone missing from, which is this list's tallest and commonest row.
         <CallListLoadingRows rows={4} lines={gatheringTitle === null ? 3 : 2} />
-      ) : items.length === 0 ? (
+      ) : entries.length === 0 ? (
         <EmptyState
           title={`Nobody has missed ${threshold} in a row — nice.`}
           description={
@@ -129,20 +168,77 @@ export function MiaList({
         />
       ) : (
         <ul className="divide-y divide-ink-800">
-          {items.map((item) => (
-            // Keyed by both: the merged list holds one row per student, but a
-            // single-gathering list is a slice of rows that also exist for
-            // other gatherings, and a student id alone is not unique across them.
-            <MiaRow
-              key={`${item.gatheringKey}:${item.student.id}`}
-              item={item}
-              showGathering={gatheringTitle === null}
-              onContactAdded={onContactAdded}
-            />
-          ))}
+          {entries.map((entry) =>
+            entry.kind === 'live' ? (
+              // Keyed by both: the merged list holds one row per student, but a
+              // single-gathering list is a slice of rows that also exist for
+              // other gatherings, and a student id alone is not unique across them.
+              <MiaRow
+                key={sessionReleaseKey(entry.item.gatheringKey, entry.item.student.id)}
+                item={entry.item}
+                showGathering={gatheringTitle === null}
+                onContactAdded={onContactAdded}
+                onResolve={onResolve}
+              />
+            ) : (
+              <ReleasedRow
+                key={entry.key}
+                release={entry.release}
+                showGathering={gatheringTitle === null}
+                onUndo={onUndoSessionRelease}
+                busy={undoBusyKey === entry.key}
+              />
+            ),
+          )}
         </ul>
       )}
     </Card>
+  );
+}
+
+/**
+ * A row released seconds ago: greyed in place, one tap from coming back.
+ *
+ * Everything interactive about the live row is gone — the release is the
+ * resolution, and Call/Text on a resolved row would invite exactly the phone
+ * call the press was ending. What stays is the identity, what was decided, and
+ * Undo. On reload this row is the ledger strip's, not the list's.
+ */
+function ReleasedRow({
+  release,
+  showGathering,
+  onUndo,
+  busy,
+}: {
+  release: SessionRelease;
+  showGathering: boolean;
+  onUndo?: (release: SessionRelease) => void;
+  busy: boolean;
+}) {
+  const { item, reason } = release;
+  const name = studentFullName(item.student);
+
+  return (
+    <li className="flex items-center gap-3 px-3 py-2 opacity-60">
+      <span
+        aria-hidden="true"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
+      >
+        {initials(item.student.firstName, item.student.lastName)}
+      </span>
+      <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center">
+        <span className="truncate text-base font-semibold text-ink-50">{name}</span>
+        <span className="truncate text-xs text-ink-500">
+          No longer expected{showGathering && item.gatheringTitle ? ` at ${item.gatheringTitle}` : ' here'}{' '}
+          — {TRANSITION_REASON_LABEL[reason]}
+        </span>
+      </div>
+      {onUndo ? (
+        <Button variant="ghost" size="sm" onClick={() => onUndo(release)} loading={busy}>
+          Undo
+        </Button>
+      ) : null}
+    </li>
   );
 }
 
@@ -150,14 +246,21 @@ function MiaRow({
   item,
   showGathering,
   onContactAdded,
+  onResolve,
 }: {
   item: MiaStudent;
   showGathering: boolean;
   onContactAdded?: () => void;
+  onResolve?: (item: MiaStudent) => void;
 }) {
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
   const grade = gradeSentence(student);
+  // Every row that names a gathering can be released from it; an unseen row
+  // can only be re-answered when a release produced it (same act, other
+  // reason). A plain unseen row's remedy stays what it always was — a phone
+  // call, or deactivation from the student's page.
+  const resolvable = onResolve && (item.gatheringKey !== null || item.release !== undefined);
 
   /*
    * The gathering is named once per row, not twice.
@@ -229,15 +332,27 @@ function MiaRow({
                 rather than "No grade", for the same reason. */}
             {grade ? <span className="hidden lg:inline">{grade} · </span> : null}
             {lastSeen}
+            {item.gatheringKey !== null && item.notSeenAnywhereSince ? (
+              // The pre-marked exception: most rows here mean "drifted from
+              // this gathering, probably at another one" — this one means "and
+              // nowhere has seen them since", said before any control is
+              // pressed rather than inside a dialog after the decision.
+              <span className="text-warn-400"> · and nowhere since</span>
+            ) : null}
           </span>
-          {showGathering ? (
+          {showGathering || item.release ? (
             <span className="truncate text-xs text-ink-500">
               {item.gatheringTitle
                 ? `Missing from ${item.gatheringTitle}`
-                : // No gathering can claim them: the window holds no sighting of
-                  // them at any of them, which is the strongest version of this
-                  // list's case rather than a weaker one.
-                  'Not seen at any gathering'}
+                : item.release
+                  ? // The provenance a released row carries: who decided this
+                    // student had moved on, has been contradicted by nobody —
+                    // and no gathering has seen them since.
+                    `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} ${formatShortDate(item.release.at)} — not seen since`
+                  : // No gathering can claim them: the window holds no sighting of
+                    // them at any of them, which is the strongest version of this
+                    // list's case rather than a weaker one.
+                    'Not seen at any gathering'}
               {item.alsoMissingCount > 0
                 ? ` · and ${item.alsoMissingCount} other ${
                     item.alsoMissingCount === 1 ? 'gathering' : 'gatherings'
@@ -246,6 +361,18 @@ function MiaRow({
             </span>
           ) : null}
         </Link>
+
+        {resolvable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => onResolve(item)}
+            aria-label={`No longer expected — ${name}`}
+          >
+            Resolve…
+          </Button>
+        ) : null}
 
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
           <span className="sr-only">

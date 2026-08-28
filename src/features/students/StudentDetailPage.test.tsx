@@ -71,6 +71,16 @@ vi.mock('@/services/functions', () => ({
   addParent: vi.fn(),
 }));
 vi.mock('@/services/students', () => ({ setStudentStatus: vi.fn(), updateStudent: vi.fn() }));
+// The aging-out record streams from Firestore in the real page; nothing in
+// this suite is about it, so the stream answers "none".
+vi.mock('@/services/transitions', () => ({
+  subscribeTransitions: (onChange: (transitions: never[]) => void) => {
+    onChange([]);
+    return () => {};
+  },
+  releaseStudent: vi.fn(),
+  undoRelease: vi.fn(),
+}));
 
 /*
  * The two halves of the page that talk to Firestore. Neither has anything to

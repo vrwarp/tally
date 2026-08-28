@@ -25,7 +25,7 @@
  * `useEventSnapshots`) — a Friday from six weeks ago will not change while a
  * leader reads this.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   EmptyState,
@@ -35,15 +35,21 @@ import {
   TabBar,
 } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
+import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { useToast } from '@/context/toastContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { useParentContact } from '@/hooks/useParentContact';
+import { useTransitions } from '@/hooks/useTransitions';
 import { AttendanceTrend } from '@/features/dashboard/AttendanceTrend';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
 import { MiaList } from '@/features/dashboard/MiaList';
+import { sessionReleaseKey, type SessionRelease } from '@/features/dashboard/sessionRelease';
 import { NewVisitorList } from '@/features/dashboard/NewVisitorList';
 import { OneOffOnlyList, OneOffRecapList } from '@/features/dashboard/OneOffInsights';
+import { ReleaseDialog, type ReleaseTarget } from '@/features/dashboard/ReleaseDialog';
+import { TransitionLedger, type LedgerRow } from '@/features/dashboard/TransitionLedger';
 import {
   computeIncompleteProfiles,
   computeMiaByGathering,
@@ -53,6 +59,7 @@ import {
   computeSummary,
   gatheringsOnCalendar,
   groupByGathering,
+  isInertRelease,
   mergeMia,
   seenAt,
 } from '@/features/dashboard/insights';
@@ -60,7 +67,8 @@ import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
 import { formatShortDate } from '@/lib/time';
 import { cn, sameItems } from '@/lib/utils';
-import type { TallyEvent } from '@/types';
+import { releaseStudent, undoRelease } from '@/services/transitions';
+import { studentFullName, type MiaStudent, type TallyEvent, type Transition, type TransitionReason } from '@/types';
 
 /**
  * How many past nights of *each* gathering the dashboard reasons over.
@@ -99,6 +107,33 @@ export function DashboardPage() {
   } = useData();
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
+  const { user, profile } = useAuth();
+  const { show } = useToast();
+
+  /*
+   * The aging-out record (docs/aging-out.md), read live so the ledger strip
+   * and the undo reflect an act made on another device. Loaded here and on
+   * the student page only — never provider-wide, because the check-in
+   * screen's promise is that this feature costs a door nothing.
+   */
+  const { transitions } = useTransitions();
+
+  /** The release being composed, if any: the dialog's whole state. */
+  const [pendingRelease, setPendingRelease] = useState<{
+    item: MiaStudent;
+    target: ReleaseTarget;
+  } | null>(null);
+  const [releaseBusy, setReleaseBusy] = useState(false);
+  /**
+   * Rows released this session, so they grey in place instead of vanishing
+   * under the reader who pressed the button. Cleared only by undo — a reload
+   * hands the record to the ledger strip.
+   */
+  const [sessionReleases, setSessionReleases] = useState<ReadonlyMap<string, SessionRelease>>(
+    new Map(),
+  );
+  const [undoBusyKey, setUndoBusyKey] = useState<string | null>(null);
+  const [ledgerUndoBusyId, setLedgerUndoBusyId] = useState<string | null>(null);
 
   /*
    * The window, taken per gathering.
@@ -246,8 +281,8 @@ export function DashboardPage() {
    * Friday arrival to Sunday.
    */
   const miaRows = useMemo(
-    () => computeMiaByGathering(students, snapshots, settings, series),
-    [students, snapshots, settings, series],
+    () => computeMiaByGathering(students, snapshots, settings, series, transitions),
+    [students, snapshots, settings, series, transitions],
   );
   const mia = useMemo(
     () =>
@@ -255,6 +290,130 @@ export function DashboardPage() {
         ? miaRows.filter((row) => row.gatheringKey === activeGathering.key)
         : mergeMia(miaRows),
     [miaRows, activeGathering],
+  );
+
+  /*
+   * The act, from the row that announces the need for it.
+   *
+   * A gathering row releases from that gathering; an unseen row that a
+   * moved-on release produced re-answers the same release (usually with the
+   * other reason). One student at a time, deliberately — see `ReleaseDialog`
+   * for why there is no multi-select.
+   */
+  const handleResolve = useCallback((item: MiaStudent) => {
+    const chain = item.gatheringKey ?? item.release?.chainKey;
+    if (!chain) return;
+    setPendingRelease({
+      item,
+      target: {
+        student: item.student,
+        chainKey: chain,
+        gatheringTitle: item.gatheringTitle ?? item.release?.fromTitle ?? 'this gathering',
+        // An unseen row is by definition unseen since its last visit; a
+        // gathering row carries the pre-computed mark or nothing.
+        notSeenAnywhereSince:
+          item.notSeenAnywhereSince ?? (item.gatheringKey === null ? item.lastAttendedAt : null),
+      },
+    });
+  }, []);
+
+  const confirmRelease = useCallback(
+    async (target: ReleaseTarget, reason: TransitionReason, note: string) => {
+      if (!pendingRelease || !user) return;
+      setReleaseBusy(true);
+      try {
+        await releaseStudent({
+          chainKey: target.chainKey,
+          studentId: target.student.id,
+          reason,
+          note,
+          uid: user.uid,
+          authorName: profile?.displayName ?? user.email ?? 'Somebody',
+        });
+        const key = sessionReleaseKey(pendingRelease.item.gatheringKey, target.student.id);
+        setSessionReleases((current) =>
+          new Map(current).set(key, { item: pendingRelease.item, reason }),
+        );
+        setPendingRelease(null);
+      } catch {
+        show('Could not save the release. Nothing changed.', { tone: 'error' });
+      } finally {
+        setReleaseBusy(false);
+      }
+    },
+    [pendingRelease, user, profile, show],
+  );
+
+  const handleUndoSessionRelease = useCallback(
+    async (release: SessionRelease) => {
+      const chain = release.item.gatheringKey ?? release.item.release?.chainKey;
+      if (!chain) return;
+      const key = sessionReleaseKey(release.item.gatheringKey, release.item.student.id);
+      setUndoBusyKey(key);
+      try {
+        await undoRelease(chain, release.item.student.id);
+        setSessionReleases((current) => {
+          const next = new Map(current);
+          next.delete(key);
+          return next;
+        });
+      } catch {
+        show('Could not undo the release.', { tone: 'error' });
+      } finally {
+        setUndoBusyKey(null);
+      }
+    },
+    [show],
+  );
+
+  /*
+   * The ledger, scoped like every list on this screen: one gathering's
+   * releases under its tab, all of them under "All". Names come from the
+   * roster (the record holds ids), titles from the same map the tabs use, and
+   * a release the student's own attendance has stood down is rendered as
+   * stood down rather than dropped.
+   */
+  const ledgerRows = useMemo<LedgerRow[]>(() => {
+    const scoped = activeGathering
+      ? transitions.filter((transition) => transition.chainKey === activeGathering.key)
+      : transitions;
+    if (scoped.length === 0) return [];
+
+    const titles = new Map<string, string>();
+    for (const entry of [...planned, ...gatherings]) titles.set(entry.key, entry.title);
+    const byChain = new Map(gatherings.map((gathering) => [gathering.key, gathering.snapshots]));
+
+    return scoped.map((transition) => {
+      const student = students.find(
+        (candidate) =>
+          candidate.id === transition.studentId ||
+          (candidate.mergedFromStudentIds ?? []).includes(transition.studentId),
+      );
+      return {
+        transition,
+        studentName: student ? studentFullName(student) : 'Someone no longer on the roster',
+        gatheringTitle: titles.get(transition.chainKey) ?? null,
+        inert: isInertRelease(
+          transition,
+          byChain.get(transition.chainKey),
+          student?.id ?? transition.studentId,
+        ),
+      };
+    });
+  }, [transitions, activeGathering, planned, gatherings, students]);
+
+  const handleLedgerUndo = useCallback(
+    async (transition: Transition) => {
+      setLedgerUndoBusyId(transition.id);
+      try {
+        await undoRelease(transition.chainKey, transition.studentId);
+      } catch {
+        show('Could not undo the release.', { tone: 'error' });
+      } finally {
+        setLedgerUndoBusyId(null);
+      }
+    },
+    [show],
   );
 
   /*
@@ -626,6 +785,23 @@ export function DashboardPage() {
               gatheringTitle={activeGathering?.title ?? null}
               onContactAdded={parentContact.refresh}
               exportContext={exportContext}
+              onResolve={handleResolve}
+              sessionReleases={sessionReleases}
+              onUndoSessionRelease={handleUndoSessionRelease}
+              undoBusyKey={undoBusyKey}
+            />
+          )}
+          {/*
+            The ledger renders whenever there is anything to say — including
+            when the list above is empty, because months on, "the tab is
+            clean" must never be the only record of what was released from it.
+          */}
+          {recentEvents.length === 0 ? null : (
+            <TransitionLedger
+              rows={ledgerRows}
+              showGathering={activeGathering === null}
+              onUndo={handleLedgerUndo}
+              undoBusyId={ledgerUndoBusyId}
             />
           )}
           {/*
@@ -711,6 +887,14 @@ export function DashboardPage() {
           ) : null}
         </div>
       </div>
+
+      <ReleaseDialog
+        target={pendingRelease?.target ?? null}
+        threshold={settings.miaConsecutiveMisses}
+        busy={releaseBusy}
+        onClose={() => setPendingRelease(null)}
+        onConfirm={confirmRelease}
+      />
     </PageFrame>
   );
 }
