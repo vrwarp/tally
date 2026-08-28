@@ -203,7 +203,7 @@ export function useParentContact() {
     reachable: new Map(
       STUDENTS.map((student) => [
         student.id,
-        { phone: '5550100', email: null, name: 'A parent' },
+        { phone: '5550100100', email: null, name: 'A parent' },
       ]),
     ),
     loading: false,
@@ -228,7 +228,7 @@ export function usePersonDetails(student: { firstName?: string } | null) {
   return {
     details: {
       parentName: `${student?.firstName ?? 'A'}'s parent`,
-      parentPhone: '5550100',
+      parentPhone: '5550100100',
       parentEmail: null,
     },
     loading: false,

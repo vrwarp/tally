@@ -33,13 +33,15 @@ export function useTransitions(): { transitions: Transition[]; error: string | n
       },
     );
     return unsubscribe;
-    /*
-     * Subscribes once and lives as long as the screen. Any *constant* array
-     * does that, so a mutant that fills this one behaves identically: there is
-     * no render at which the two differ, and no test can tell them apart.
-     */
-    // Stryker disable next-line ArrayDeclaration: equivalent, see above.
-  }, []);
+  },
+  // Stryker disable next-line ArrayDeclaration: subscribes once and lives as
+  // long as the screen. Any *constant* array does that, so a filled one behaves
+  // identically — there is no render at which the two differ, and no test can
+  // tell them apart. The directive belongs immediately before the `[]` and not
+  // at the end of the body above: Stryker reads these from the comments Babel
+  // attaches to a node, and a comment closing a block belongs to the block
+  // rather than to the argument after it, where it is silently ignored.
+  []);
 
   return { transitions, error };
 }
