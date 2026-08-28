@@ -8,6 +8,12 @@
 > student page's per-gathering standing, and the pinned tests are in `insights.test.ts` and
 > `firestore-tests/rules.test.ts`. S3–S7 remain unbuilt, parked below.
 >
+> **Photographed**: [the walkthrough](walkthrough/transitions/README.md) is eleven frames of
+> the shipping screen — one ministry four weeks past a promotion Sunday, the act, the ledger,
+> and the safety net firing six weeks later — shot at a laptop and a phone from the app's own
+> `DashboardPage` over a fixture the real derivations reason about
+> (`uxr/transitions-live/`, `npm run walkthrough:transitions`).
+>
 > This document is the converged
 > output of a critique loop (a church-staff consultant and a UXR journey critic, both reading
 > this repository) on one problem: a student ages out of one program and into another —

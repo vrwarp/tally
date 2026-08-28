@@ -332,47 +332,60 @@ function MiaRow({
                 rather than "No grade", for the same reason. */}
             {grade ? <span className="hidden lg:inline">{grade} · </span> : null}
             {lastSeen}
-            {item.gatheringKey !== null && item.notSeenAnywhereSince ? (
-              // The pre-marked exception: most rows here mean "drifted from
-              // this gathering, probably at another one" — this one means "and
-              // nowhere has seen them since", said before any control is
-              // pressed rather than inside a dialog after the decision.
-              <span className="text-warn-400"> · and nowhere since</span>
-            ) : null}
           </span>
-          {showGathering || item.release ? (
+          {/*
+            The third line: which gathering this row is about, and the one fact
+            that outranks it.
+
+            The gathering clause is for the merged view only — under a single
+            gathering's tab the card header has already said which one, and
+            repeating it here spends the line that the warning below needs.
+          */}
+          {showGathering || item.notSeenAnywhereSince ? (
             <span className="truncate text-xs text-ink-500">
-              {item.gatheringTitle
-                ? `Missing from ${item.gatheringTitle}`
-                : item.release
-                  ? // The provenance a released row carries: who decided this
-                    // student had moved on, has been contradicted by nobody —
-                    // and no gathering has seen them since.
-                    `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} ${formatShortDate(item.release.at)} — not seen since`
-                  : // No gathering can claim them: the window holds no sighting of
-                    // them at any of them, which is the strongest version of this
-                    // list's case rather than a weaker one.
-                    'Not seen at any gathering'}
-              {item.alsoMissingCount > 0
+              {showGathering
+                ? item.gatheringTitle
+                  ? `Missing from ${item.gatheringTitle}`
+                  : item.release
+                    ? // The provenance a released row carries: who decided this
+                      // student had moved on, has been contradicted by nobody —
+                      // and no gathering has seen them since.
+                      `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} ${formatShortDate(item.release.at)} — not seen since`
+                    : // No gathering can claim them: the window holds no sighting
+                      // of them at any of them, which is the strongest version of
+                      // this list's case rather than a weaker one.
+                      'Not seen at any gathering'
+                : null}
+              {showGathering && item.alsoMissingCount > 0
                 ? ` · and ${item.alsoMissingCount} other ${
                     item.alsoMissingCount === 1 ? 'gathering' : 'gatherings'
                   }`
                 : ''}
+              {/*
+                The pre-marked exception, and it takes this line rather than the
+                meta line above.
+
+                Most rows here mean "drifted from this gathering, probably at
+                another one"; this one means "and nowhere has seen them since",
+                which is the single fact deciding whether a release is
+                bookkeeping or the closing of the last question anybody was
+                asking about a child. Appended to the meta line it was the last
+                clause of the row's most crowded sentence — grade, then the
+                last-seen date, then this — and at the `xl` fold, where the
+                contact block takes 18rem of the row, it truncated away entirely
+                on the screen a leader actually works this list on.
+              */}
+              {item.notSeenAnywhereSince ? (
+                <span className="text-warn-400">
+                  {showGathering
+                    ? ' · and nowhere since'
+                    : `Not seen anywhere since ${formatShortDate(item.notSeenAnywhereSince)}`}
+                </span>
+              ) : null}
             </span>
           ) : null}
         </Link>
 
-        {resolvable ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0"
-            onClick={() => onResolve(item)}
-            aria-label={`No longer expected — ${name}`}
-          >
-            Resolve…
-          </Button>
-        ) : null}
 
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
           <span className="sr-only">
@@ -431,11 +444,40 @@ function MiaRow({
         way, and the one-line answer makes 48px and its own width the truth
         again.
       */}
-      <FollowUpActions
-        student={student}
-        onContactAdded={onContactAdded}
-        className="mt-1 pb-1 pl-14 xl:mt-0 xl:min-h-17 xl:w-72 xl:shrink-0 xl:pb-0 xl:pl-0 2xl:min-h-12 2xl:w-auto"
-      />
+      {/*
+        Resolve sits with Call and Text, not up in the identity line.
+
+        It is an action on this row and it belongs where this row's other
+        actions are — but the deciding reason is width. Inline beside the name
+        it took about 90px out of the identity line at every breakpoint, and at
+        390px that is the difference between "Aiden Brooks" and "Aiden Br…":
+        the phone spends 44 on the avatar, 48 on the streak badge and 12 of
+        gutter before the name gets a pixel, so a third control there crushes
+        the one thing the row exists to say. Down here the strip already has
+        the width, and the three controls read as what they are — the things a
+        leader does about this student.
+      */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 pl-14 xl:mt-0 xl:flex-nowrap xl:shrink-0 xl:pl-0">
+        {/* Sized by its own contents, never stretched: given `flex-1` here it
+            narrowed to about 200px on a phone and its two pills wrapped one
+            under the other, doubling the height of every row on the list. */}
+        <FollowUpActions
+          student={student}
+          onContactAdded={onContactAdded}
+          className="pb-1 xl:min-h-17 xl:w-72 xl:pb-0 2xl:min-h-12 2xl:w-auto"
+        />
+        {resolvable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => onResolve(item)}
+            aria-label={`No longer expected — ${name}`}
+          >
+            Resolve…
+          </Button>
+        ) : null}
+      </div>
     </li>
   );
 }

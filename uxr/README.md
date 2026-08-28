@@ -88,6 +88,25 @@ component being photographed, and it is its own file so that a refinement's
 before-frames and after-frames come out of the same harness, browser and
 viewports.
 
+`transitions-live/` mounts the real `DashboardPage` for the aging-out
+walkthrough, and it is the case where the *fixture* is the point. The subject —
+a gathering four weeks past a promotion Sunday, with nine children who cleared
+its Recent bar in August and have missed every night since, one of them seen
+nowhere at all, and a real drifter underneath them — does not exist in the seed
+and cannot be produced by tapping; reaching it means two months of two
+gatherings' attendance. So the fixture supplies the registers and nothing else,
+and `computeMiaByGathering` decides the rows exactly as it does against
+Firestore. Its releases really write, into a store held in `sessionStorage` so
+the walkthrough can reload and photograph the tab a leader opens *tomorrow* —
+the greyed session rows gone, the ledger standing in their place.
+
+It also earned its keep as a critique rather than a record: shot at 1440 and
+390, it showed that the "and nowhere since" mark had been appended to the row's
+most crowded line and truncated away entirely at the width a leader actually
+works this list on, and that the new Resolve control, inline beside the name,
+was cutting "Aiden Brooks" to "Aiden Br…" on a phone. Both were fixed in `src/`
+before the frames were kept.
+
 The kiosk shooter also asserts what a screenshot cannot show: whether any frame
 scrolls sideways. A fixed-height row whose contents are wider than the glass
 takes the whole grid with it rather than clipping, and the frame looks identical

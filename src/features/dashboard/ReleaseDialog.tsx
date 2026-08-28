@@ -58,20 +58,17 @@ const REASON_HINT: Record<TransitionReason, string> = {
  * and a caption that only warned about the surfacing one would train the
  * reader that the sentence never matters.
  */
-function consequence(
-  target: ReleaseTarget,
-  reason: TransitionReason,
-  threshold: number,
-): string {
+function consequence(target: ReleaseTarget, reason: TransitionReason, threshold: number): string {
   const name = target.student.firstName || studentFullName(target.student);
   const unseen = target.notSeenAnywhereSince
     ? `${name} has not been seen at any gathering since ${formatShortDate(target.notSeenAnywhereSince)}. `
     : '';
 
   if (reason === 'departed') {
-    return `${unseen}Marking ${name} “no longer with us” means Tally stops asking about ${
-      target.notSeenAnywhereSince ? 'them' : `${name}`
-    }: they leave this list and will not appear on any other. Checking them in here again undoes it.`;
+    return (
+      `${unseen}Marking ${name} “no longer with us” means Tally stops asking about them: they ` +
+      `leave this list and will not appear on any other. Checking them in here again undoes it.`
+    );
   }
 
   return (
@@ -114,55 +111,58 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
         </>
       }
     >
-      <fieldset className="flex flex-col gap-2">
-        <legend className="sr-only">Why {name} is no longer expected</legend>
-        {(['moved-on', 'departed'] as const).map((value) => (
-          <label
-            key={value}
-            className={
-              'flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ' +
-              (reason === value
-                ? 'bg-ink-800 ring-brand-500'
-                : 'ring-ink-700 hover:bg-ink-800/50')
-            }
-          >
-            <input
-              type="radio"
-              name="release-reason"
-              value={value}
-              checked={reason === value}
-              onChange={() => setReason(value)}
-              className="mt-1 size-4 accent-brand-500"
-            />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-semibold text-ink-50">
-                {TRANSITION_REASON_LABEL[value]}
+      {/* The dialog body is a plain block — every form in the app supplies its
+          own rhythm, and without one the picker, the note and the sentence
+          below it ran together as a single wall. */}
+      <div className="flex flex-col gap-4">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="sr-only">Why {name} is no longer expected</legend>
+          {(['moved-on', 'departed'] as const).map((value) => (
+            <label
+              key={value}
+              className={
+                'flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ' +
+                (reason === value ? 'bg-ink-800 ring-brand-500' : 'ring-ink-700 hover:bg-ink-800/50')
+              }
+            >
+              <input
+                type="radio"
+                name="release-reason"
+                value={value}
+                checked={reason === value}
+                onChange={() => setReason(value)}
+                className="mt-1 size-4 accent-brand-500"
+              />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-semibold text-ink-50">
+                  {TRANSITION_REASON_LABEL[value]}
+                </span>
+                <span className="text-xs text-ink-400">{REASON_HINT[value]}</span>
               </span>
-              <span className="text-xs text-ink-400">{REASON_HINT[value]}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+            </label>
+          ))}
+        </fieldset>
 
-      <TextField
-        label="Note (optional)"
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        maxLength={500}
-        placeholder="“graduated”, “moved to Austin”"
-        hint="Kept on the record under this list, for whoever reads it later."
-      />
+        <TextField
+          label="Note (optional)"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          maxLength={500}
+          placeholder="“graduated”, “moved to Austin”"
+          hint="Kept on the record under this list, for whoever reads it later."
+        />
 
-      <p
-        className={
-          'rounded-xl px-3 py-2.5 text-sm ring-1 ' +
-          (reason === 'departed' && target.notSeenAnywhereSince
-            ? 'bg-warn-500/10 text-warn-300 ring-warn-500/25'
-            : 'bg-ink-800/60 text-ink-300 ring-ink-700')
-        }
-      >
-        {consequence(target, reason, threshold)}
-      </p>
+        <p
+          className={
+            'rounded-xl px-3 py-2.5 text-sm ring-1 ' +
+            (reason === 'departed' && target.notSeenAnywhereSince
+              ? 'bg-warn-500/10 text-warn-300 ring-warn-500/25'
+              : 'bg-ink-800/60 text-ink-300 ring-ink-700')
+          }
+        >
+          {consequence(target, reason, threshold)}
+        </p>
+      </div>
     </Modal>
   );
 }

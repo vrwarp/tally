@@ -72,6 +72,7 @@
   }
   .step p { max-width: 40rem; margin: 0.6rem auto 1.5rem; color: var(--muted); }
   .step code { font-family: var(--mono); font-size: 0.85em; }
+  .step strong { color: var(--ink); font-weight: 600; }
 
   figure { margin: 0; display: flex; justify-content: center; }
   .shot {
@@ -98,10 +99,7 @@
   <header class="masthead">
     <p class="eyebrow">Review — corrections</p>
     <h1>Fixing what a family typed, before it becomes permanent</h1>
-    <p class="standfirst">
-      One registration, wrong in every way a real one is wrong, walked through the five
-      journeys the change was designed around.
-    </p>
+    <p class="standfirst">One registration, wrong in every way a real one is wrong, walked through the five journeys the change was designed around.</p>
     <p class="provenance">Every frame is the application’s own Review screen — the same component <code>src/App.tsx</code> routes to, rendered by Vite with the app’s own stylesheet. What is faked is Firestore and the three callables behind it (<code>uxr/review-live/</code>), and the fakes follow the server’s rules, because those consequences are the subject: a rename really does re-scan the roster here, and the collision it reveals is the collision the real one reveals.</p>
 
     <div class="toggle" role="group" aria-label="Choose a screen size">
@@ -232,12 +230,7 @@
 </div></section>
 
   <footer>
-    <p>
-      The journeys and the rules this screen follows are in
-      <code>docs/review-corrections.md</code>. Regenerate this page with
-      <code>npx tsx uxr/review-live/shoot.ts</code> then
-      <code>npx tsx scripts/build-corrections-walkthrough.ts</code>.
-    </p>
+    <p>The journeys and the rules this screen follows are in <code>docs/review-corrections.md</code>. Regenerate this page with <code>npx tsx uxr/review-live/shoot.ts</code> then <code>npx tsx scripts/build-corrections-walkthrough.ts</code>.</p>
   </footer>
 </div>
 

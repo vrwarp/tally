@@ -8,8 +8,8 @@ Every frame is the application’s own Review screen — the same component `src
 Regenerate with:
 
 ```bash
-npx tsx uxr/review-live/shoot.ts                    # capture
-npx tsx scripts/build-corrections-walkthrough.ts    # build the page
+npx tsx uxr/review-live/shoot.ts   # capture
+npx tsx scripts/build-corrections-walkthrough.ts   # build the page
 ```
 
 ## The card that had no proportionate answer
