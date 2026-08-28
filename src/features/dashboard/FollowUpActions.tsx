@@ -54,9 +54,24 @@ function ActionLink({
  * row somebody actually chose.
  *
  * `tel:` and `sms:` are protocols a desktop services unreliably, which is why
- * the number is printed here in full and selectable rather than hidden behind
- * the links: on a laptop, reading the digits *is* how a leader places the
- * call, and that used to be a `lg:`-only span squeezed beside the pills.
+ * the number is printed inside the dialog in full and selectable rather than
+ * hidden behind the links: on a laptop, reading the digits *is* how a leader
+ * places the call.
+ *
+ * They are printed *there* and not on the row, which reverses a previous pass
+ * that hung them under the button as a caption for wide screens. The geometry
+ * refused it. A 38px button that has to sit on the row's optical line — where
+ * the avatar, the streak badge and Resolve all sit — leaves 36px below that
+ * line, and a 16px caption plus the row's own padding does not fit in it: the
+ * button rode 10px high on every row of the list, and the block reserved 56px
+ * of height and 208px of width to hold a 152px control. The row cannot have
+ * all three of a centred button, a caption beneath it and its current height.
+ *
+ * The caption is the one to give up, because the dialog does its job better:
+ * the number is `text-xl` and centred there, with the whole of `Copy number`
+ * under it, against 12px of grey on the row. What is lost is comparing two
+ * families' numbers without opening anything, which is not a thing a call list
+ * is for — a leader rings one family, then the next.
  */
 function ContactParentButton({
   student,
@@ -90,48 +105,31 @@ function ContactParentButton({
 
   return (
     <>
-      <div className="flex min-w-0 flex-col items-start gap-1">
-        <Button
-          variant="secondary"
-          /*
-           * `md`, not `sm`. This is one of the two things a leader taps on this
-           * screen, ten rows deep, and `sm` is `min-h-9` — 36px, below the 44
-           * the brief calls marginal, on a phone held in one hand. `md` is
-           * `min-h-11 pointer-fine:min-h-9`, so it is 44 under a thumb and
-           * stays exactly the 36 it already renders under a mouse.
-           */
-          size="md"
-          /*
-           * No leading glyph. 📞 measured 1.46:1 on the `ink-800` fill — the
-           * darkest thing on the button, reading as a smudge — and it is pure
-           * grey among blue-slate neutrals, so it belongs to no token and would
-           * become the loudest object in the row when the ramp flips for the
-           * light theme. It also over-promised: it says "dial", and this opens
-           * a chooser. The label is two clear words.
-           */
-          onClick={() => setOpen(true)}
-          /* The row says whose parent it is; the button's own label must too, or
-             a screen reader on a call list hears a run of identical controls. */
-          aria-label={`Contact parent for ${name}`}
-        >
-          Contact parent
-        </Button>
-        {/*
-          The digits, where there is a pointer and no dialler.
-
-          `tel:` and `sms:` are protocols a desktop services unreliably, so on a
-          laptop reading the number *is* how the call gets placed — which made
-          collapsing it behind a dialog a straight loss there: ten rows became
-          ten dialogs, and no two numbers could be read at once. Under the
-          button rather than beside it, because the line is the one dimension
-          the folded block can spend without taking it from the student's name.
-        */}
-        {phone ? (
-          <span className="hidden text-xs tabular-nums text-ink-500 xl:inline">
-            {formatPhone(phone)}
-          </span>
-        ) : null}
-      </div>
+      <Button
+        variant="secondary"
+        /*
+         * `md`, not `sm`. This is one of the two things a leader taps on this
+         * screen, ten rows deep, and `sm` is `min-h-9` — 36px, below the 44 the
+         * brief calls marginal, on a phone held in one hand. `md` is
+         * `min-h-11 pointer-fine:min-h-9`, so it is 44 under a thumb and stays
+         * exactly the 36 it already renders under a mouse.
+         */
+        size="md"
+        /*
+         * No leading glyph. 📞 measured 1.46:1 on the `ink-800` fill — the
+         * darkest thing on the button, reading as a smudge — and it is pure
+         * grey among blue-slate neutrals, so it belongs to no token and would
+         * become the loudest object in the row when the ramp flips for the
+         * light theme. It also over-promised: it says "dial", and this opens a
+         * chooser. The label is two clear words.
+         */
+        onClick={() => setOpen(true)}
+        /* The row says whose parent it is; the button's own label must too, or
+           a screen reader on a call list hears a run of identical controls. */
+        aria-label={`Contact parent for ${name}`}
+      >
+        Contact parent
+      </Button>
 
       <Modal
         open={open}
@@ -273,9 +271,17 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // Also the frame before the fetch starts, which is why this asks `loaded`
     // rather than `loading` — otherwise every row blinks through an empty state
     // on its way to the spinner.
+    /*
+     * Short, because this transient line is what the row's action column has to
+     * be wide enough for. "Looking up parent contact…" measured ~198px, so the
+     * column reserved 13rem to hold a 152px button — 56px of unpaintable width
+     * in every row, taken from the student's name, to caption a state that
+     * lasts a few hundred milliseconds. Three words fit inside the button's own
+     * width, and the name column gets the rest back.
+     */
     body = (
       <p className="flex items-center gap-2 text-xs text-ink-500">
-        <Spinner /> Looking up parent contact…
+        <Spinner /> Looking up parent…
       </p>
     );
   } else if (!details) {

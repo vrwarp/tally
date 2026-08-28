@@ -87,10 +87,25 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                     <span className="font-normal text-ink-400"> · {gatheringTitle}</span>
                   ) : null}
                 </p>
-                <p className="truncate text-xs text-ink-500">
+                {/*
+                  The date leads, and the line wraps rather than clipping.
+
+                  Opened after a promotion Sunday this strip is nine rows of one
+                  batch: same reason, same person, same day. Written
+                  reason-first and truncated, every row rendered the identical
+                  string — "Moved on within the ministry · Ruth Ad…" — with the
+                  date not on the row at all and the decider cut mid-surname, on
+                  a phone, 40px from a one-tap Undo. A line that is the same on
+                  every row is texture, not information, and it hides the one
+                  row that differs by burying what varies at the tail of what
+                  does not. What differs comes first now: the exception is the
+                  row whose date is not the header's "latest", and it is
+                  findable at a glance.
+                */}
+                <p className="text-xs text-ink-500">
+                  {formatShortDate(transition.releasedAt)} ·{' '}
                   {TRANSITION_REASON_LABEL[transition.reason]}
-                  {transition.note ? ` — “${transition.note}”` : ''} ·{' '}
-                  {transition.releasedByName}, {formatShortDate(transition.releasedAt)}
+                  {transition.note ? ` — “${transition.note}”` : ''} · {transition.releasedByName}
                   {inert ? (
                     // Their own attendance outranks the record, and the strip
                     // says so rather than quietly dropping the row.

@@ -52,6 +52,55 @@ describe('splitFirstName', () => {
     expect(splitFirstName('Benson “”')).toEqual({ firstName: 'Benson', nickname: null });
   });
 
+  /*
+   * The four things the pattern's own anchors and gaps are load-bearing for.
+   *
+   * `splitFirstName` runs over whatever Planning Center hands back, including
+   * fields a person pasted into. Each case below is a string the parser must
+   * *decline*, or a piece of whitespace it must absorb, and each of them turns
+   * on one character of the expression — the leading `^`, the trailing `$`,
+   * either `\s*`, or the `.trim()` in front of it. Drop any one and the
+   * function still passes every case above it, which is why they are here:
+   * a nickname invented out of the middle of a name is a name change the
+   * editor then writes back to Planning Center.
+   */
+  it('will not pick a nickname out of the middle of a multi-line paste', () => {
+    // Without the leading anchor the parser is free to start at the second
+    // line and hand back "Tsai", quietly dropping "Benson".
+    expect(splitFirstName('Benson\nTsai “蔡秉洲”')).toEqual({
+      firstName: 'Benson\nTsai “蔡秉洲”',
+      nickname: null,
+    });
+  });
+
+  it('needs the quoted half at the very end, or the name is not a composite', () => {
+    // A full name that happens to carry a nickname in the middle is one name,
+    // not a first name and a nickname: splitting it would drop the surname.
+    expect(splitFirstName('Ben “Benji” Tsai')).toEqual({
+      firstName: 'Ben “Benji” Tsai',
+      nickname: null,
+    });
+    expect(splitFirstName('Ben “Benji”Jr')).toEqual({
+      firstName: 'Ben “Benji”Jr',
+      nickname: null,
+    });
+  });
+
+  it('does not need a space before the quote', () => {
+    // The gap between the two halves is optional, and what sits in front of
+    // the quote is the legal name however tightly it was typed — not, as it
+    // would be if that gap could swallow it, nothing at all.
+    expect(splitFirstName('Ben“Benji”')).toEqual({ firstName: 'Ben', nickname: 'Benji' });
+  });
+
+  it('absorbs the whitespace around both halves', () => {
+    expect(splitFirstName('\nBenson “蔡秉洲”')).toEqual({
+      firstName: 'Benson',
+      nickname: '蔡秉洲',
+    });
+    expect(splitFirstName('Ben “ Benji ”')).toEqual({ firstName: 'Ben', nickname: 'Benji' });
+  });
+
   it('round-trips, so opening the editor and saving changes nothing', () => {
     for (const composite of ['Benson “蔡秉洲”', 'Benson', '蔡秉洲', 'Mary Jane “MJ”']) {
       const halves = splitFirstName(composite);

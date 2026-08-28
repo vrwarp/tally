@@ -100,21 +100,28 @@ describe('MiaList', () => {
      * that in both directions — as a floor so a row does not widen when its own
      * lookup lands, and as a ceiling so the width does not come out of the
      * student's name. It was 18rem when the block was two pills and a wrapped
-     * number; one button and a line of digits is 13, and the 80px difference is
-     * the meta line a leader reads.
+     * number, and 13 when it was a button with the digits captioned under it.
+     * It is the button, so it is 10, and each of those 128px went back to the
+     * meta line a leader reads.
      */
     const { container } = mount([mia('Bree', 'Sandoval', 'pco:1')]);
 
     const row = container.querySelector('li');
     expect(row).toHaveClass('xl:flex');
     expect(screen.getByRole('group', { name: /Parent contact for Bree Sandoval/ })).toHaveClass(
-      'xl:w-52',
-      // The settled height of what the block now holds: the button, and the
-      // line of digits under it that a laptop needs because `tel:` does not
-      // work there. Reserved rather than measured, so a row does not grow as
-      // its own lookup lands under a leader already reading the list.
-      'xl:min-h-14',
-      '2xl:w-auto',
+      'xl:w-40',
     );
+    /*
+     * And nothing taller than the pill it holds. A `min-h` above `min-h-12`
+     * here is a reservation for something stacked under the button, and a
+     * stack is what lifted the button 10px off the line the avatar, the badge
+     * and Resolve all sit on — on every row of the list.
+     */
+    expect(screen.getByRole('group', { name: /Parent contact for Bree Sandoval/ })).not.toHaveClass(
+      'xl:min-h-14',
+    );
+    // The row's own floor is what keeps a released row exactly as tall as the
+    // live one it replaces; see `ReleasedRow`.
+    expect(row).toHaveClass('xl:min-h-18');
   });
 });

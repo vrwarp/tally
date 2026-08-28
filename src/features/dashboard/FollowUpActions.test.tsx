@@ -205,14 +205,23 @@ describe('FollowUpActions', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps the digits off the row and prints them in the dialog', async () => {
+  it('keeps the digits off the row entirely and prints them in the dialog', async () => {
     /*
      * The row is one control wide at every width — that is what lets a call
      * list show a dozen names on a phone instead of three. The digits
      * themselves still have to exist somewhere a leader can read them, because
      * `tel:` is a protocol a desktop services unreliably, so the dialog prints
-     * the number in full. Pinned in both directions: the pull to put the
-     * number back on the row is strong, and it is what made every row tall.
+     * the number in full.
+     *
+     * Pinned because the pull to put the number back on the row is strong, and
+     * has been given in to once: as a caption under the button for wide
+     * screens. It cost the row more than it looked like. A caption below a
+     * button that has to centre on the row's optical line does not fit in the
+     * 36px under that line, so the button rode 10px high on every row of the
+     * list, and the column reserved 56px of height and 208px of width around a
+     * 152px control — width taken from the student's name beside it. The
+     * dialog prints the number at `text-xl` with a copy button under it, which
+     * is a better answer to "read me these digits" than 12px of grey.
      */
     getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
 
@@ -221,23 +230,13 @@ describe('FollowUpActions', () => {
     await screen.findByRole('button', { name: /Contact parent/ });
 
     /*
-     * The digits exist twice, and where each copy lives is the claim.
-     *
-     * On the row they are `hidden xl:inline` — printed only where there is a
-     * pointer and no dialler, because on a laptop reading them *is* how the
-     * call gets placed, and hidden on a phone where they cost the width that
-     * made every name truncate. In the dialog they are unconditional.
-     *
      * `Modal` keeps its children mounted and lets the `<dialog>` hide them, so
-     * both are in the DOM either way and the test has to say which is which.
+     * the dialog's copy is in the DOM before it is opened. Exactly one copy,
+     * and it is that one.
      */
     const copies = screen.getAllByText('(925) 336-6692');
-    const onRow = copies.filter((node) => node.closest('dialog') === null);
-    const inDialog = copies.filter((node) => node.closest('dialog') !== null);
-
-    expect(onRow).toHaveLength(1);
-    expect(onRow[0]).toHaveClass('hidden', 'xl:inline');
-    expect(inDialog).toHaveLength(1);
+    expect(copies.filter((node) => node.closest('dialog') === null)).toHaveLength(0);
+    expect(copies.filter((node) => node.closest('dialog') !== null)).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: /Contact parent/ }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('(925) 336-6692');
