@@ -7,8 +7,8 @@
  * team group chat. So a row offers the two things a phone can do — dial and
  * text — and the list offers a clipboard copy for the chat.
  */
-import type { ReactNode } from 'react';
-import { Button, Spinner } from '@/components/ui';
+import { useState, type ReactNode } from 'react';
+import { Button, Modal, Spinner } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
@@ -41,6 +41,105 @@ function ActionLink({
       <span aria-hidden="true">{icon}</span>
       {children}
     </a>
+  );
+}
+
+/**
+ * "Contact parent", and the dialog behind it.
+ *
+ * The button is the row's; everything about *how* to reach the family is the
+ * dialog's. That split is what lets a call list stay a list: the row carries a
+ * name, a streak and one control, and the details — whose number this is, the
+ * digits themselves, whether there is an email as well — arrive only for the
+ * row somebody actually chose.
+ *
+ * `tel:` and `sms:` are protocols a desktop services unreliably, which is why
+ * the number is printed here in full and selectable rather than hidden behind
+ * the links: on a laptop, reading the digits *is* how a leader places the
+ * call, and that used to be a `lg:`-only span squeezed beside the pills.
+ */
+function ContactParentButton({
+  student,
+  details,
+}: {
+  student: Student;
+  details: { parentName?: string | null; parentPhone?: string | null; parentEmail?: string | null };
+}) {
+  const [open, setOpen] = useState(false);
+
+  const name = studentFullName(student);
+  const phone = details.parentPhone?.trim() ?? '';
+  const email = details.parentEmail?.trim() ?? '';
+  const parent = details.parentName?.trim() || `${name}'s parent`;
+
+  return (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        leading={<span aria-hidden="true">📞</span>}
+        onClick={() => setOpen(true)}
+        /* The row says whose parent it is; the button's own label must too, or
+           a screen reader on a call list hears a run of identical controls. */
+        aria-label={`Contact parent for ${name}`}
+      >
+        Contact parent
+      </Button>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={parent}
+        description={`About ${name}`}
+        size="sm"
+        footer={
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {phone ? (
+            <div className="flex flex-col gap-3">
+              {/* Selectable, and the largest thing in the dialog: on a laptop
+                  this is the answer, not a fallback for one. */}
+              <p className="text-center text-xl font-semibold tabular-nums text-ink-50">
+                {formatPhone(phone)}
+              </p>
+              <div className="flex gap-2 [&>*]:flex-1">
+                <ActionLink
+                  href={`tel:${dialable(phone)}`}
+                  label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
+                  icon="📞"
+                >
+                  Call parent
+                </ActionLink>
+                <ActionLink
+                  href={`sms:${dialable(phone)}`}
+                  label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
+                  icon="💬"
+                >
+                  Text parent
+                </ActionLink>
+              </div>
+            </div>
+          ) : null}
+
+          {email ? (
+            <div className="flex flex-col gap-3">
+              <p className="break-all text-center text-sm text-ink-200">{email}</p>
+              <ActionLink
+                href={`mailto:${email}`}
+                label={`Email ${parent} about ${name} at ${email}`}
+                icon="✉"
+              >
+                Email parent
+              </ActionLink>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -91,7 +190,6 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   const label = backendLabelOf(student);
   const phone = details?.parentPhone?.trim() ?? '';
   const email = details?.parentEmail?.trim() ?? '';
-  const parent = details?.parentName?.trim() || `${name}'s parent`;
 
   let body: ReactNode;
 
@@ -161,59 +259,29 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
         }}
       />
     );
-  } else if (phone) {
-    body = (
-      <div className="flex flex-wrap items-center gap-2">
-        <ActionLink
-          href={`tel:${dialable(phone)}`}
-          label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
-          icon="📞"
-        >
-          Call parent
-        </ActionLink>
-        <ActionLink
-          href={`sms:${dialable(phone)}`}
-          label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
-          icon="💬"
-        >
-          Text parent
-        </ActionLink>
-        {/*
-          Printed where there is room for it.
-
-          Below `lg` the row is 358px wide and the number is what forced a
-          fourth line onto it. On a laptop it is the opposite: `tel:` and
-          `sms:` are protocols a desktop services unreliably, so a leader
-          working this list on a Tuesday morning needs the digits themselves —
-          otherwise the only route to ten numbers is opening ten records.
-
-          The digits and nothing else. Naming the parent here as well reads
-          beautifully and costs about 120px, which on the one row that folds
-          onto a single line comes out of the student's own name — measured at
-          1280px, it took that name to nothing at all. Whose number this is, is
-          said on the buttons instead, where it costs the same width at every
-          size.
-        */}
-        <span className="hidden text-xs tabular-nums text-ink-500 lg:inline">
-          {formatPhone(phone)}
-        </span>
-      </div>
-    );
   } else {
-    body = (
-      <div className="flex flex-wrap items-center gap-2">
-        <ActionLink
-          href={`mailto:${email}`}
-          label={`Email ${parent} about ${name} at ${email}`}
-          icon="✉"
-        >
-          Email parent
-        </ActionLink>
-        {/* Same rule as the phone number above: printed where there is room
-            for it, and the mailto carries it either way. */}
-        <span className="hidden min-w-0 truncate text-xs text-ink-500 lg:inline">{email}</span>
-      </div>
-    );
+    /*
+     * One button, and the ways to reach the parent behind it.
+     *
+     * This used to be the affordances themselves — Call and Text side by side,
+     * with the number printed beside them on a wide screen. Three things went
+     * wrong with that, and all three are about the list rather than the row.
+     * At 390px the two pills do not fit on one line, so every row wore them
+     * stacked and stood about 200px tall: a call list showed three names, and
+     * the whole job of this screen is scanning a dozen. On a laptop the pair
+     * plus the digits claimed 378px of the row, which is why the student's own
+     * name had to be capped to survive at 1280. And a third control had
+     * nowhere to go — see the Resolve button in `MiaList`, which is what
+     * forced the question.
+     *
+     * Collapsed, the row is one line at every width and the dialog says more
+     * than the strip could: whose number it is, in full, with Call and Text as
+     * targets the size of a thumb rather than pills squeezed into a column.
+     * The cost is one tap before a call — paid once per call actually made,
+     * where the old layout charged every row on the screen for the two people
+     * a leader eventually rang.
+     */
+    body = <ContactParentButton student={student} details={details} />;
   }
 
   /*

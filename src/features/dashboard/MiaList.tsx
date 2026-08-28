@@ -466,11 +466,24 @@ function MiaRow({
           onContactAdded={onContactAdded}
           className="pb-1 xl:min-h-17 xl:w-72 xl:pb-0 2xl:min-h-12 2xl:w-auto"
         />
+        {/*
+          A button, and deliberately a quieter one than its neighbour.
+
+          As a bare ghost it read as a link floating at the end of the row —
+          on a laptop, where the strip folds into a column, it was text with
+          no edges beside a filled pill, which is not a state this design
+          system has. So it takes the same shell as Contact parent and sheds
+          the fill: a ring and muted text against the page rather than a
+          raised face. The two are then legible as what they are — the thing
+          a leader does about this student on the phone, and the thing they
+          do about the row — without the second competing for the first's
+          weight on a list that exists to produce calls.
+        */}
         {resolvable ? (
           <Button
             variant="ghost"
             size="sm"
-            className="shrink-0"
+            className="shrink-0 text-ink-400 ring-1 ring-ink-800 hover:text-ink-100"
             onClick={() => onResolve(item)}
             aria-label={`No longer expected — ${name}`}
           >

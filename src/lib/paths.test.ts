@@ -22,6 +22,7 @@ import {
   SERIES_IDS,
   SETTINGS_DOC_ID,
   paths,
+  transitionId,
 } from '@/lib/paths';
 
 describe('the collection names', () => {
@@ -84,6 +85,27 @@ describe('top-level collections and their documents', () => {
     expect(paths.skippedNights('friday-fellowship')).toBe('skippedNights/friday-fellowship');
     expect(paths.eventAccessCollection()).toBe('eventAccess');
     expect(paths.eventAccess('friday-fellowship')).toBe('eventAccess/friday-fellowship');
+  });
+
+  it('addresses a transition by the pair it is about', () => {
+    /*
+     * The composite id is the whole idempotency mechanism: two leaders
+     * releasing the same student from the same gathering address one document,
+     * so the second act replaces the first rather than stacking a second claim.
+     * Pinned in both halves — the id itself, and the path built from it —
+     * because a separator that changed would silently start creating a second
+     * record per pair.
+     */
+    expect(transitionId('sunday-kids', 'pco_5101')).toBe('sunday-kids__pco_5101');
+    expect(paths.transitionsCollection()).toBe('transitions');
+    expect(paths.transition('sunday-kids', 'pco_5101')).toBe(
+      'transitions/sunday-kids__pco_5101',
+    );
+  });
+
+  it('keeps the pairs apart in both directions', () => {
+    expect(transitionId('sunday-kids', 'a')).not.toBe(transitionId('sunday-kids', 'b'));
+    expect(transitionId('friday', 'a')).not.toBe(transitionId('sunday-kids', 'a'));
   });
 
   it('addresses upstream edits at the top level', () => {

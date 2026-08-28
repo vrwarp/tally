@@ -83,6 +83,10 @@ describe('FollowUpActions', () => {
 
     mount(inPlanningCenter());
 
+    // The row fetches on sight — the button is the evidence, and it is offered
+    // only once there is somebody behind it.
+    await userEvent.click(await screen.findByRole('button', { name: /Contact parent/ }));
+
     expect(
       await screen.findByRole('link', { name: /Text Wen Chen about Iris Chen at/ }),
     ).toBeInTheDocument();
@@ -176,28 +180,55 @@ describe('FollowUpActions', () => {
     getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
+    await userEvent.click(await screen.findByRole('button', { name: /Contact parent/ }));
 
-    // A row reading "Iris Chen … Call" invites the one reading that is wrong:
-    // Tally holds no contact details for a 14-year-old and never will.
+    // A control reading "Iris Chen … Call" invites the one reading that is
+    // wrong: Tally holds no contact details for a 14-year-old and never will.
     expect(await screen.findByRole('link', { name: /Call Wen Chen/ })).toHaveTextContent(
       'Call parent',
     );
     expect(screen.getByRole('link', { name: /Text Wen Chen/ })).toHaveTextContent('Text parent');
   });
 
-  it('prints the number and nothing beside it', async () => {
+  it('names the student on the row button, not just inside the dialog', async () => {
     /*
-     * Whose number it is belongs on the buttons, not next to the digits. The
-     * parent's name reads well there and costs about 120px on the one row that
-     * folds onto a single line — where it came out of the student's own name,
-     * measured at nothing at all on a 1280px laptop. Pinned because the pull to
-     * add it back is strong and the damage is invisible in a unit test.
+     * A call list is a run of these, and behind the dialog they are otherwise
+     * identical controls. A screen reader hearing "Contact parent" nine times
+     * has no way to tell which row it is on.
      */
     getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 
-    expect(await screen.findByText('(925) 336-6692')).toBeInTheDocument();
-    expect(screen.queryByText(/Wen Chen ·/)).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Contact parent for Iris Chen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the digits off the row and prints them in the dialog', async () => {
+    /*
+     * The row is one control wide at every width — that is what lets a call
+     * list show a dozen names on a phone instead of three. The digits
+     * themselves still have to exist somewhere a leader can read them, because
+     * `tel:` is a protocol a desktop services unreliably, so the dialog prints
+     * the number in full. Pinned in both directions: the pull to put the
+     * number back on the row is strong, and it is what made every row tall.
+     */
+    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+
+    mount(inPlanningCenter());
+
+    await screen.findByRole('button', { name: /Contact parent/ });
+
+    /*
+     * `Modal` keeps its children mounted and lets the `<dialog>` hide them, so
+     * the claim to pin is *where* the digits are rather than whether they
+     * exist: inside the dialog, never in the row's own strip. In the row they
+     * cost the width that made every name truncate.
+     */
+    expect(screen.getByText('(925) 336-6692').closest('dialog')).not.toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /Contact parent/ }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('(925) 336-6692');
   });
 });

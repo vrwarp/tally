@@ -33,6 +33,11 @@ export function useTransitions(): { transitions: Transition[]; error: string | n
       },
     );
     return unsubscribe;
+    // Stryker disable next-line ArrayDeclaration: the dependency array is empty
+    // because this subscribes once and lives as long as the screen. Any
+    // *constant* array does that, so a mutant that fills it behaves
+    // identically — there is no render at which the two differ, and no test can
+    // tell them apart.
   }, []);
 
   return { transitions, error };
