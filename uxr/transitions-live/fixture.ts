@@ -107,6 +107,9 @@ function instance(seriesId: string, title: string, startAt: Date, hours: number)
     createdAt: new Date('2026-08-01T12:00:00'),
     updatedAt: new Date('2026-08-01T12:00:00'),
     createdBy: 'seed',
+    // Every night in this fixture is one that was held and has a register, so
+    // a document stands behind all of them.
+    materialized: true,
   };
 }
 
@@ -216,13 +219,13 @@ export const STUDENTS: Student[] = [
   ),
 ];
 
-const regularIds = REGULARS.map(([id]) => id);
+const regularIds: string[] = REGULARS.map(([id]) => id);
 const landedAtFriday = promoted.filter((entry) => entry.id !== MICAH).map((entry) => entry.id);
 
 /** Who was in the room, night by night — the only input the rules actually read. */
 export const SNAPSHOTS: EventAttendanceSnapshot[] = [
   ...sundays.map((event) => {
-    const present = [...regularIds];
+    const present: string[] = [...regularIds];
     // The cohort, and Devon, until the Sunday they moved up.
     if (event.startAt < PROMOTION_SUNDAY) {
       present.push(...promoted.map((entry) => entry.id), DEVON);
@@ -237,7 +240,7 @@ export const SNAPSHOTS: EventAttendanceSnapshot[] = [
     };
   }),
   ...fridays.map((event) => {
-    const present = ['pco_5301', 'pco_5302'];
+    const present: string[] = ['pco_5301', 'pco_5302'];
     // Eight of the nine, from the Friday after promotion Sunday.
     if (event.startAt > PROMOTION_SUNDAY) present.push(...landedAtFriday);
     return {

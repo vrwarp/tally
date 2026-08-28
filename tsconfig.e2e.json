@@ -43,6 +43,9 @@
     "uxr/review-live/Toast.tsx",
     "uxr/review-live/stubs.tsx",
     "uxr/review-live/fixture.ts",
+    "uxr/transitions-live/main.tsx",
+    "uxr/transitions-live/stubs.tsx",
+    "uxr/transitions-live/fixture.ts",
     "uxr/identity-live/main.tsx",
     "uxr/identity-live/stubs.tsx",
     "uxr/identity-live/fixtures.ts"
