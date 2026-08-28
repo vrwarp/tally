@@ -219,22 +219,65 @@ function ReleasedRow({
   const name = studentFullName(item.student);
 
   return (
-    <li className="flex items-center gap-3 px-3 py-2 opacity-60">
+    /*
+      The same height its live version had, and the fade on the contents rather
+      than on the row.
+
+      A live row's 85px comes from the contact column's reservation, which a
+      released row has none of — so releasing used to shrink the row by 24px and
+      drag every row below it up, including the next "Resolve…", under a cursor
+      already moving toward it. The one gesture this card exists to slow down
+      was the one that moved the next target. `xl:min-h-17` reproduces the live
+      row's folded height; below `xl` the two are the same already.
+
+      And `opacity-60` on the `<li>` faded the row's own bottom border, so one
+      divider in the list was a different colour from the other nine. The fade
+      belongs to what the row says, not to the line that separates it from the
+      next one.
+    */
+    <li className="flex items-center gap-3 px-3 py-2 xl:min-h-18">
       <span
         aria-hidden="true"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-ink-800 text-sm font-bold text-ink-300 opacity-60"
       >
         {initials(item.student.firstName, item.student.lastName)}
       </span>
       <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center">
-        <span className="truncate text-base font-semibold text-ink-50">{name}</span>
-        <span className="truncate text-xs text-ink-500">
+        <span className="truncate text-base font-semibold text-ink-50 opacity-60">{name}</span>
+        {/*
+          Stepped up a rung before the row is dimmed.
+
+          `ink-500` multiplied by 60% lands at 2.15:1 against the card — the
+          row's newest and most consequential sentence, and the least readable
+          thing on the screen. `ink-300` faded reads where `ink-500` faded does
+          not, which matters because everything else about this row says
+          "settled" by subtraction, and subtraction is also what "failed to
+          load" looks like.
+        */}
+        <span className="truncate text-xs text-ink-300 opacity-60">
           No longer expected{showGathering && item.gatheringTitle ? ` at ${item.gatheringTitle}` : ' here'}{' '}
           — {TRANSITION_REASON_LABEL[reason]}
         </span>
       </div>
+      {/* One positive mark, in the column the streak badge left, so the column
+          stays a column rather than becoming a hole. */}
+      <span
+        aria-hidden="true"
+        className="shrink-0 rounded-xl bg-ink-800/60 px-2.5 py-1 text-center text-[10px] uppercase tracking-wide text-ink-400 ring-1 ring-ink-800"
+      >
+        resolved
+      </span>
       {onUndo ? (
-        <Button variant="ghost" size="sm" onClick={() => onUndo(release)} loading={busy}>
+        <Button
+          variant="ghost"
+          size="md"
+          // The same material as "Resolve…" — see the note there. A reversal
+          // that reads brighter and less button-shaped than the act it reverses
+          // is the hierarchy upside down.
+          className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100"
+          onClick={() => onUndo(release)}
+          loading={busy}
+        >
           Undo
         </Button>
       ) : null}
@@ -342,7 +385,19 @@ function MiaRow({
             repeating it here spends the line that the warning below needs.
           */}
           {showGathering || item.notSeenAnywhereSince ? (
-            <span className="truncate text-xs text-ink-500">
+            /*
+              Wraps where every other line truncates.
+
+              On the merged tab this line carries both the gathering and the
+              clause that decides whether the row is bookkeeping or a child
+              nobody has seen — and truncation ate exactly the second half:
+              "Missing from Sunday Kids · and …" spent 27px of amber saying the
+              word "and", and a released student's "— not seen since" was cut
+              off, leaving a sentence that reads as completed filing. Two lines
+              cost 16px on the rows that carry it; the collapse above just
+              bought 85.
+            */
+            <span className="text-xs text-ink-500">
               {showGathering
                 ? item.gatheringTitle
                   ? `Missing from ${item.gatheringTitle}`
@@ -408,63 +463,46 @@ function MiaRow({
       </div>
 
       {/*
-        The cap is what lets the row fold at 1280 at all.
+        The row's actions, and the width they are allowed to cost.
 
-        Call, Text and the phone number are 378px side by side, and 378 beside
-        the 168 the rest of the row costs leaves 38px of a 584px column for the
-        student's name. Held to 18rem the block keeps its two buttons on one
-        line and wraps the number underneath — it is the least load-bearing
-        thing on the row, and `tel:` still carries it — which buys the name
-        back. Off again at `2xl`, where the column is 808 and nothing has to
-        give way.
+        Folded at `xl` this is no longer a strip under the row — it is the
+        row's second column, so every dimension it reserves is taken from the
+        student's name beside it. The reservation used to be 18rem wide and
+        68px tall, measured against two pills and a wrapped phone number. One
+        button replaced all three, and the leftover was 118px of empty,
+        unpaintable width in every row: at 1440 the name column was 180px, so
+        "Last seen Aug 30, 43 days ago" lost its relative age and the amber
+        mark was cut mid-date — on the very rows that mark exists to flag.
 
-        Both of the cap's dimensions have to be paid for before the answer
-        arrives, because folded, this block is no longer a strip under the row
-        — it is the row's second column, and everything about its size is now
-        something the rest of the row can feel.
+        So the block is sized against what it actually holds now. Its widest
+        state is not the button (170px) but the sentence it waits behind,
+        "Looking up parent contact…" at ~198px, and 13rem covers that with
+        room for the two `pointer-fine` steps below. Still a floor as well as
+        a ceiling, for the original reason: sized only as a cap, every row
+        widened by ~30px as its own lookup landed, dragging the streak badge
+        and the end of the name leftward one row at a time.
 
-        *Height.* `FollowUpActions` reserves one pill line for itself
-        (`min-h-12`, 48px) so a row does not grow when Planning Center finally
-        answers — but that reservation is for an answer on one line, and inside
-        this cap the answer is two: 44px of pills, the 8px flex gap, and the
-        16px line the number wraps onto, 68px in all. Measured, not guessed: at
-        1280 the settled block is 68px and the empty one 48, and 12 of the 20
-        came out of the row (the identity column beside it is 56 tall), which
-        is exactly the 73→85px jump this fold introduced.
-
-        *Width.* 18rem as a floor as well as a ceiling. "Looking up parent
-        contact…" is 198px wide and the pills are the full 288, so a cap alone
-        let every row's block widen by 91px as its own lookup landed — dragging
-        the streak badge and the end of the student's name leftward with it,
-        one row at a time. Sized rather than capped, the two columns are the
-        same two columns before and after, and the badges line up down the
-        list instead of settling into place.
-
-        Both come off at `2xl`, where the column is 808, nothing has to give
-        way, and the one-line answer makes 48px and its own width the truth
-        again.
+        `pl-14` is the other half. It indents the strip to align under the
+        name, which is right — but only where there is room, and at 360px it
+        is 56 of the 278px the two controls need. Below `sm` the strip starts
+        at the row's edge instead, which is what keeps "Resolve…" on the same
+        line as "Contact parent" on an iPhone SE, a 13 mini and most Android
+        handsets rather than wrapping and giving back 40px of the 85 this
+        change just bought.
       */}
-      {/*
-        Resolve sits with Call and Text, not up in the identity line.
-
-        It is an action on this row and it belongs where this row's other
-        actions are — but the deciding reason is width. Inline beside the name
-        it took about 90px out of the identity line at every breakpoint, and at
-        390px that is the difference between "Aiden Brooks" and "Aiden Br…":
-        the phone spends 44 on the avatar, 48 on the streak badge and 12 of
-        gutter before the name gets a pixel, so a third control there crushes
-        the one thing the row exists to say. Down here the strip already has
-        the width, and the three controls read as what they are — the things a
-        leader does about this student.
-      */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 pl-14 xl:mt-0 xl:flex-nowrap xl:shrink-0 xl:pl-0">
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:pl-14 xl:mt-0 xl:flex-nowrap xl:shrink-0 xl:pl-0">
         {/* Sized by its own contents, never stretched: given `flex-1` here it
             narrowed to about 200px on a phone and its two pills wrapped one
             under the other, doubling the height of every row on the list. */}
         <FollowUpActions
           student={student}
           onContactAdded={onContactAdded}
-          className="pb-1 xl:min-h-17 xl:w-72 xl:pb-0 2xl:min-h-12 2xl:w-auto"
+          // No `pb-1`. That padding sat inside the `min-h-12` box the button
+          // centres in, so it nudged the button up 2px against the Resolve
+          // beside it — two adjacent pills whose tops and bottoms both miss by
+          // 2px, on every row. The line's own `gap-y-1` does that job where it
+          // is actually needed, which is between wrapped lines.
+          className="xl:min-h-14 xl:w-52 2xl:w-auto"
         />
         {/*
           A button, and deliberately a quieter one than its neighbour.
@@ -482,8 +520,15 @@ function MiaRow({
         {resolvable ? (
           <Button
             variant="ghost"
-            size="sm"
-            className="shrink-0 text-ink-400 ring-1 ring-ink-800 hover:text-ink-100"
+            // `md` for the reason its neighbour takes it: 44px under a thumb,
+            // 36 under a mouse. Two 36px targets 6px apart, one of which files
+            // a child as no longer expected, is not a phone control.
+            size="md"
+            // `ring-ink-800` measured 1.22:1 against the card — the label and
+            // the ellipsis were carrying the whole affordance, and the ring was
+            // buying neither an edge nor a boundary between two adjacent
+            // targets. `ink-700` is the ring the secondary button already uses.
+            className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100"
             onClick={() => onResolve(item)}
             aria-label={`No longer expected — ${name}`}
           >

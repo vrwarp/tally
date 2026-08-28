@@ -98,9 +98,15 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                   ) : null}
                 </p>
               </div>
+              {/* The same material as "Resolve…" on the rows above and "Undo"
+                  on a released row: one setting of "quiet but pressable" on a
+                  screen that had four. An un-ringed ghost here read brighter
+                  than the ringed act it reverses while being less
+                  button-shaped than it. */}
               <Button
                 variant="ghost"
-                size="sm"
+                size="md"
+                className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100"
                 onClick={() => onUndo(transition)}
                 loading={undoBusyId === transition.id}
               >

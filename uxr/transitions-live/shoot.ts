@@ -176,7 +176,10 @@ const STEPS: Step[] = [
       await page.getByRole('dialog').getByText('Moved on within the ministry').click();
       await page.waitForTimeout(150);
       await confirmRelease(page);
-      await frameList(page);
+      // The row this step is about is eight rows down, so framing the card
+      // photographs the rows above it — on a phone, the greyed row and its
+      // Undo were off the bottom of a frame captioned about them.
+      await frameRow(page, 'Zoe Alvarez');
     },
   },
   {

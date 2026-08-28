@@ -36,7 +36,7 @@ function ActionLink({
     <a
       href={href}
       aria-label={label}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-ink-800 px-3 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-ink-800 px-3 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
     >
       <span aria-hidden="true">{icon}</span>
       {children}
@@ -66,25 +66,72 @@ function ContactParentButton({
   details: { parentName?: string | null; parentPhone?: string | null; parentEmail?: string | null };
 }) {
   const [open, setOpen] = useState(false);
+  const { show } = useToast();
 
   const name = studentFullName(student);
   const phone = details.parentPhone?.trim() ?? '';
   const email = details.parentEmail?.trim() ?? '';
   const parent = details.parentName?.trim() || `${name}'s parent`;
 
+  /** The same guard `CopyContactsButton` uses: absent on http and in some
+      in-app browsers, and saying so beats silently doing nothing. */
+  const copyNumber = async () => {
+    if (!navigator.clipboard) {
+      show('Copying is blocked on this device.', { tone: 'error' });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(formatPhone(phone));
+      show(`Copied ${parent}'s number`);
+    } catch {
+      show('Could not copy the number.', { tone: 'error' });
+    }
+  };
+
   return (
     <>
-      <Button
-        variant="secondary"
-        size="sm"
-        leading={<span aria-hidden="true">📞</span>}
-        onClick={() => setOpen(true)}
-        /* The row says whose parent it is; the button's own label must too, or
-           a screen reader on a call list hears a run of identical controls. */
-        aria-label={`Contact parent for ${name}`}
-      >
-        Contact parent
-      </Button>
+      <div className="flex min-w-0 flex-col items-start gap-1">
+        <Button
+          variant="secondary"
+          /*
+           * `md`, not `sm`. This is one of the two things a leader taps on this
+           * screen, ten rows deep, and `sm` is `min-h-9` — 36px, below the 44
+           * the brief calls marginal, on a phone held in one hand. `md` is
+           * `min-h-11 pointer-fine:min-h-9`, so it is 44 under a thumb and
+           * stays exactly the 36 it already renders under a mouse.
+           */
+          size="md"
+          /*
+           * No leading glyph. 📞 measured 1.46:1 on the `ink-800` fill — the
+           * darkest thing on the button, reading as a smudge — and it is pure
+           * grey among blue-slate neutrals, so it belongs to no token and would
+           * become the loudest object in the row when the ramp flips for the
+           * light theme. It also over-promised: it says "dial", and this opens
+           * a chooser. The label is two clear words.
+           */
+          onClick={() => setOpen(true)}
+          /* The row says whose parent it is; the button's own label must too, or
+             a screen reader on a call list hears a run of identical controls. */
+          aria-label={`Contact parent for ${name}`}
+        >
+          Contact parent
+        </Button>
+        {/*
+          The digits, where there is a pointer and no dialler.
+
+          `tel:` and `sms:` are protocols a desktop services unreliably, so on a
+          laptop reading the number *is* how the call gets placed — which made
+          collapsing it behind a dialog a straight loss there: ten rows became
+          ten dialogs, and no two numbers could be read at once. Under the
+          button rather than beside it, because the line is the one dimension
+          the folded block can spend without taking it from the student's name.
+        */}
+        {phone ? (
+          <span className="hidden text-xs tabular-nums text-ink-500 xl:inline">
+            {formatPhone(phone)}
+          </span>
+        ) : null}
+      </div>
 
       <Modal
         open={open}
@@ -92,8 +139,17 @@ function ContactParentButton({
         title={parent}
         description={`About ${name}`}
         size="sm"
+        /*
+          The way out is the quietest thing here, not the loudest.
+
+          `Modal`'s footer gives its last child double width, so a lone
+          `secondary` Close became the widest, lowest, most thumb-reachable
+          object in the sheet — on a dialog whose whole job is producing a phone
+          call, with Call and Text as two half-width pills above it. Ghost, and
+          the header's × offers the same escape.
+        */
         footer={
-          <Button variant="secondary" onClick={() => setOpen(false)}>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
             Close
           </Button>
         }
@@ -102,10 +158,15 @@ function ContactParentButton({
           {phone ? (
             <div className="flex flex-col gap-3">
               {/* Selectable, and the largest thing in the dialog: on a laptop
-                  this is the answer, not a fallback for one. */}
+                  this is the answer, not a fallback for one — which is also why
+                  it can be taken in one press rather than triple-clicked into a
+                  softphone. */}
               <p className="text-center text-xl font-semibold tabular-nums text-ink-50">
                 {formatPhone(phone)}
               </p>
+              <Button variant="ghost" size="sm" onClick={copyNumber}>
+                Copy number
+              </Button>
               <div className="flex gap-2 [&>*]:flex-1">
                 <ActionLink
                   href={`tel:${dialable(phone)}`}

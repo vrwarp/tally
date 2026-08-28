@@ -221,12 +221,23 @@ describe('FollowUpActions', () => {
     await screen.findByRole('button', { name: /Contact parent/ });
 
     /*
+     * The digits exist twice, and where each copy lives is the claim.
+     *
+     * On the row they are `hidden xl:inline` — printed only where there is a
+     * pointer and no dialler, because on a laptop reading them *is* how the
+     * call gets placed, and hidden on a phone where they cost the width that
+     * made every name truncate. In the dialog they are unconditional.
+     *
      * `Modal` keeps its children mounted and lets the `<dialog>` hide them, so
-     * the claim to pin is *where* the digits are rather than whether they
-     * exist: inside the dialog, never in the row's own strip. In the row they
-     * cost the width that made every name truncate.
+     * both are in the DOM either way and the test has to say which is which.
      */
-    expect(screen.getByText('(925) 336-6692').closest('dialog')).not.toBeNull();
+    const copies = screen.getAllByText('(925) 336-6692');
+    const onRow = copies.filter((node) => node.closest('dialog') === null);
+    const inDialog = copies.filter((node) => node.closest('dialog') !== null);
+
+    expect(onRow).toHaveLength(1);
+    expect(onRow[0]).toHaveClass('hidden', 'xl:inline');
+    expect(inDialog).toHaveLength(1);
 
     await userEvent.click(screen.getByRole('button', { name: /Contact parent/ }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('(925) 336-6692');
