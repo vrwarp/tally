@@ -80,36 +80,48 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                 'flex items-center gap-3 px-3 py-2 ' + (inert ? 'opacity-60' : '')
               }
             >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-ink-100">
+              {/*
+                One line where there is a pointer, two where there is a thumb.
+
+                This was the phone's row at 1440 as well: a name, then a wrapped
+                sentence, then 325px of nothing before Undo — 45% of the row,
+                ten rows running, pushing the attendance trend off the fold on
+                the very screen somebody opens the ledger to read. Folded up, the
+                name takes a fixed column at `lg` so the dates line up under each
+                other and the one release that is not part of the batch can be
+                found by running down an edge rather than by reading ten
+                sentences. 15rem, because the column has to hold the longest
+                real pair — a name and the gathering beside it on the pooled
+                tab — and at 13 it clipped "Malik Johnson · Sunday Ki…".
+              */}
+              <div className="min-w-0 flex-1 sm:flex sm:items-baseline sm:gap-3">
+                <p className="truncate text-sm font-semibold text-ink-100 sm:shrink-0 lg:w-60">
                   {studentName}
                   {showGathering && gatheringTitle ? (
                     <span className="font-normal text-ink-400"> · {gatheringTitle}</span>
                   ) : null}
                 </p>
-                {/*
-                  The date leads, and the line wraps rather than clipping.
-
-                  Opened after a promotion Sunday this strip is nine rows of one
-                  batch: same reason, same person, same day. Written
-                  reason-first and truncated, every row rendered the identical
-                  string — "Moved on within the ministry · Ruth Ad…" — with the
-                  date not on the row at all and the decider cut mid-surname, on
-                  a phone, 40px from a one-tap Undo. A line that is the same on
-                  every row is texture, not information, and it hides the one
-                  row that differs by burying what varies at the tail of what
-                  does not. What differs comes first now: the exception is the
-                  row whose date is not the header's "latest", and it is
-                  findable at a glance.
-                */}
-                <p className="text-xs text-ink-500">
-                  {formatShortDate(transition.releasedAt)} ·{' '}
-                  {TRANSITION_REASON_LABEL[transition.reason]}
-                  {transition.note ? ` — “${transition.note}”` : ''} · {transition.releasedByName}
+                <p className="min-w-0 text-xs text-ink-500 sm:flex-1">
+                  {/* What differs, first and in its own ink. Nine of these rows
+                      are one batch — same reason, same person, same day — so
+                      reason-first the line was texture rather than information,
+                      and the row that mattered was buried at the tail of the
+                      sentence every other row also had. */}
+                  <span className="tabular-nums text-ink-400">
+                    {formatShortDate(transition.releasedAt)}
+                  </span>{' '}
+                  · {TRANSITION_REASON_LABEL[transition.reason]}
+                  {transition.note ? ` — “${transition.note}”` : ''}
+                  {/* Bound to its separator: wrapping left the middot hanging
+                      alone at the right margin on every row of the phone. */}
+                  <span className="whitespace-nowrap"> · {transition.releasedByName}</span>
                   {inert ? (
                     // Their own attendance outranks the record, and the strip
                     // says so rather than quietly dropping the row.
-                    <span className="text-present-400"> · back since — no longer in effect</span>
+                    <span className="whitespace-nowrap text-present-400">
+                      {' '}
+                      · back since — no longer in effect
+                    </span>
                   ) : null}
                 </p>
               </div>

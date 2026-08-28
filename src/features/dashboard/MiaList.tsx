@@ -264,7 +264,19 @@ function ReleasedRow({
           {initials(item.student.firstName, item.student.lastName)}
         </span>
         <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center">
-          <span className="truncate text-base font-semibold text-ink-50 opacity-60">{name}</span>
+          {/*
+            Stepped down the ramp rather than washed out.
+
+            At `ink-50` under a 60% fade the name measured L=158.7 against an
+            Undo label at L=161.3 — the row's loudest text was its control
+            rather than the child it is about, and the two were close enough to
+            leave the row with no first thing to read. A live row's name
+            outranks its Resolve by a mile; this one has to as well. `ink-300`
+            unfaded clears the button outright and still sits well below the
+            `ink-50` a live row uses, so the row reads settled without reading
+            failed.
+          */}
+          <span className="truncate text-base font-semibold text-ink-300">{name}</span>
           {/*
             The list's own meta ink, at full strength, and no ellipsis.
 
@@ -319,7 +331,7 @@ function ReleasedRow({
             // The same material as "Resolve…" — see the note there. A reversal
             // that reads brighter and less button-shaped than the act it
             // reverses is the hierarchy upside down.
-            className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100 xl:min-w-28"
+            className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100 min-w-28"
             onClick={() => onUndo(release)}
             loading={busy}
           >
@@ -463,7 +475,21 @@ function MiaRow({
                     ? // The provenance a released row carries: who decided this
                       // student had moved on, has been contradicted by nobody —
                       // and no gathering has seen them since.
-                      `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} ${formatShortDate(item.release.at)} — not seen since`
+                      //
+                      // Bound, because un-truncating this line governed the
+                      // overflow and left nothing governing the break: it fell
+                      // inside the date ("Sunday Kids Sep / 8", a bare numeral
+                      // starting a line 20px from a red streak count) and it
+                      // orphaned "since" onto a fourth line, making this the one
+                      // row in the list 18px taller than the rest. The date and
+                      // the clause qualifying it are one fact, so they move to
+                      // the next line together or not at all.
+                      [
+                        `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} `,
+                        <span key="since" className="whitespace-nowrap">
+                          {formatShortDate(item.release.at)} — not seen since
+                        </span>,
+                      ]
                     : // No gathering can claim them: the window holds no sighting
                       // of them at any of them, which is the strongest version of
                       // this list's case rather than a weaker one.
@@ -489,10 +515,22 @@ function MiaRow({
                 on the screen a leader actually works this list on.
               */}
               {item.notSeenAnywhereSince ? (
-                <span className="text-warn-400">
-                  {showGathering
-                    ? ' · and nowhere since'
-                    : `Not seen anywhere since ${formatShortDate(item.notSeenAnywhereSince)}`}
+                /*
+                  The accent breaks as a unit or not at all.
+
+                  Wrapping reproduced by another route the exact failure the
+                  truncation caused: line one ended on an amber "· and" and the
+                  words carrying the meaning fell to line two, so the flag read
+                  as two stray marks rather than one. `whitespace-nowrap` moves
+                  the whole clause down together — it is 130px, which fits the
+                  narrowest column this line ever has.
+                */
+                <span className="whitespace-nowrap text-warn-400">
+                  {showGathering ? (
+                    ' · and nowhere since'
+                  ) : (
+                    <>Not seen anywhere since {formatShortDate(item.notSeenAnywhereSince)}</>
+                  )}
                 </span>
               ) : null}
             </span>
@@ -601,14 +639,19 @@ function MiaRow({
             // the ellipsis were carrying the whole affordance, and the ring was
             // buying neither an edge nor a boundary between two adjacent
             // targets. `ink-700` is the ring the secondary button already uses.
-            // `xl:min-w-28` is not cosmetic. Above the fold the identity group
-            // is `flex-1`, so where the streak badge lands is decided by how
-            // wide this strip is — and a released row, whose strip holds one
-            // shorter word, stretched its own group 240px further and put its
-            // mark in no column at all. Resolve and Undo are one width, and the
+            // `min-w-28` is not cosmetic. Above the fold the identity group is
+            // `flex-1`, so where the streak badge lands is decided by how wide
+            // this strip is — and a released row, whose strip holds one shorter
+            // word, stretched its own group 240px further and put its mark in
+            // no column at all. Resolve and Undo are one width, and the
             // released strip reserves the contact slot, so the two rows' badge
             // columns land on the same pixel.
-            className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100 xl:min-w-28"
+            //
+            // At every size, not just above the fold: below it the two sat at
+            // 109.5 and 74.5, so the column that holds "the thing you do about
+            // this row" jogged 35px at the released row — and the narrower of
+            // the two was the one that reverses a decision about a child.
+            className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100 min-w-28"
             onClick={() => onResolve(item)}
             aria-label={`No longer expected — ${name}`}
           >
