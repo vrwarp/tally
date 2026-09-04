@@ -211,7 +211,12 @@ export function RegistrationFlow({
   const childNumber = state.children.length + 1;
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto_auto]">
+    /* The column is the glass, never its widest item. A name typed to
+        NAME_MAX_LENGTH sits truncated in the readout, and truncation clips a
+        box whose minimum is still the whole name — which, as the minimum of
+        an auto track, widened the header, the body and the keys past a phone.
+        See the same rule on the search screen's root for the mechanism. */
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto_auto]">
       <Header
         title={titleFor(state, childNumber)}
         subtitle={subtitleFor(state, binding)}

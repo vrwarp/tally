@@ -699,8 +699,31 @@ export function SearchScreen({
      * the keyboard, so the memoized subtrees stay memoized and the wizard's
      * keyboard — which never has a photograph — stays untouched.
      */
+    /*
+     * `grid-cols-[minmax(0,1fr)]` is the width of the glass, stated.
+     *
+     * An implicit grid column is `auto`, and an auto track is never narrower
+     * than the widest thing in it: each item's minimum is its min-content
+     * size unless the item is itself a scroll container. Two items here can
+     * ask for more than the screen. A name row's `truncate` clips the name
+     * but does not shrink its minimum — nowrap text is as wide as itself —
+     * and the results region is a plain block around the scroller, so a
+     * child named to the register's forty-character limits (a family typed
+     * a sentence where a first name goes) put the region's minimum at the
+     * column cap plus its gutters: 720px. The readout is the same shape
+     * with the typed buffer in it. On any glass under 720px the track grew
+     * to that, and *every* row in this grid is laid out on that one track:
+     * the header centred off-screen, the count lost its last letter, and
+     * the keyboard's right-hand keys went past the bezel — while the row
+     * that caused it looked perfectly truncated. `minmax(0, 1fr)` takes
+     * the content-based minimum away, so the column is the container and a
+     * name that is too long overflows the box that owns it, which is the
+     * one with `truncate` on it. Not `min-w-0` on the two items, because the
+     * next item added would have to remember it; the rule belongs to the
+     * track.
+     */
     <div
-      className={`grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto] ${
+      className={`grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto_auto_auto_auto] ${
         backdrop ? 'kiosk-has-backdrop' : ''
       } ${backdrop && buffer === '' ? 'kiosk-photo-idle' : ''}`}
     >

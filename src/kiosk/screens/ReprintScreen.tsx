@@ -118,7 +118,11 @@ export function ReprintScreen({
   const wraps = outcome.results.length >= 4;
 
   return (
-    <div className="grid h-full grid-rows-[auto_1fr_auto_auto_auto_auto]">
+    /* The column is the glass, never its widest item: the rows and the
+        readout both truncate text whose min-content width is the whole text,
+        and a plain block around a scroller passes that minimum up to the
+        track. See the same rule on the search screen's root. */
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto_auto_auto_auto]">
       {/*
         * Whose screen this is, said in the place the gathering's name usually
         * is, and under it the promise that survives everything this screen does.

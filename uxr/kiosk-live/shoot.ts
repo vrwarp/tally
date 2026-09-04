@@ -143,6 +143,20 @@ const SCENES: {
     views: ['phone', 'kioskwide'],
     scrollToEnd: true,
   },
+  {
+    /*
+     * One name as long as the register allows, in the list. The row truncates
+     * it, and the screenshot looks right whether or not the screen is broken —
+     * the frame is the viewport either way. What this scene is for is the
+     * sideways check on the way past: a row whose minimum width is the whole
+     * name once widened the grid column every other part of the screen sits
+     * in, so the count lost its last letter and the keyboard its last key. At
+     * every shape, because the width it fails at is the width of the glass.
+     */
+    id: 'search-longname',
+    query: 'buffer=Alva&present=2&longname=1',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+  },
   { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'register-first', query: 'screen=register', views: ['phone', 'kiosktall', 'kioskwide'] },
   {

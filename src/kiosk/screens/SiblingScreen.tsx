@@ -98,7 +98,11 @@ export function SiblingScreen({
   }, [buffer]);
 
   return (
-    <div className="grid h-full grid-rows-[auto_auto_1fr_auto_auto]">
+    /* The column is the glass, never its widest item — the readout's
+        truncated buffer has a min-content width of the whole buffer, which on a
+        narrow screen is wider than the screen. See the same rule on the search
+        screen's root for the mechanism. */
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_1fr_auto_auto]">
       <div className="relative px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
         <button
           type="button"
