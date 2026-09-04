@@ -1081,11 +1081,14 @@ export function SearchScreen({
         */}
       {/* While the photograph is up the rule separated nothing from nothing
           and read as a stray line drawn on the picture — the newcomer
-          consultation's finding. It dissolves by paint on the photograph's
-          own clocks (index.css) rather than by mount: unmounting here put
-          the line back over a full-strength image for a frame on the first
-          keystroke, and left the chip on a bare page for the 1.5s the image
-          takes to return after Clear. */}
+          consultation's finding. It dissolves by paint (index.css) rather
+          than by mount, and in sequence with the photograph rather than in
+          step with it: gone inside the picture's delay after Clear, back
+          only once the picture has left on the first keystroke. Unmounting
+          put the line over a full-strength image for a frame; fading it on
+          the picture's own clock drew it across the arriving picture for a
+          second, because a line that is invisible against the page is not
+          invisible against a photograph at half strength. */}
       {backdrop ? (
         <div className="kiosk-rule-faded" />
       ) : (
