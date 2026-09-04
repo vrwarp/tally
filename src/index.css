@@ -676,15 +676,26 @@
  */
 .kiosk-rule-faded {
   height: 1px;
-  /* Present in the DOM at every state, carried by paint: on the idle screen
-     the photograph itself separates the chip from the keys and the rule read
-     as a scratch on the print, so it dissolves as the photograph arrives —
-     on the photograph's own two clocks, because a mount/unmount here put a
-     stray line over a full-strength image for a frame on the first
-     keystroke, and left the chip floating on a bare page for the 1.5s the
-     image takes to return after Clear. */
+  /* Present in the DOM at every state, carried by paint — and sequenced
+     around the photograph rather than crossfaded with it. It used to
+     dissolve on the picture's own clock (1200ms ease-in, 350ms late, the
+     exact inverse of the layer's fade-in), on the reasoning that opacities
+     summing to one would keep the console whole. They do; visibility does
+     not follow. This line is one token step off the page, so it is nothing
+     against the page and a scratch against a picture, and at every Clear a
+     hairline crossed the arriving image for a second, peaking near 60%
+     photo opacity: +6 luminance levels on the light ground, −16 on the
+     dark, screencast off the kiosk-live harness. So the two never share a
+     frame. After Clear the rule is gone inside the picture's 350ms delay
+     (the `kiosk-photo-idle` rule below); on the first keystroke it returns
+     only after the picture's 220ms exit, which is the delay here. What
+     that costs: the chip stands on a bare page without its rule for the
+     ~1.2s the picture takes to ease in — the same lead-with-the-instruction
+     beat the fade already makes — and 220ms without it under rows that
+     have already landed. Unmounting instead was tried first, and put the
+     line over a full-strength image for a frame on the first keystroke. */
   opacity: 1;
-  transition: opacity 220ms ease-out;
+  transition: opacity 220ms ease-out 220ms;
   background: linear-gradient(
     to right,
     transparent,
@@ -697,7 +708,7 @@
  * `kiosk-photo-idle` rides the search screen's root exactly while the
  * photograph is up — mounted AND the buffer empty — where `kiosk-has-backdrop`
  * only says mounted. Two copy rules hang on it: the rule above dissolves
- * under the picture, and the header's hours line takes its token step only
+ * ahead of the picture, and the header's hours line takes its token step only
  * while there is actually a picture to earn it — at ink-300 on a photo-less
  * typed screen it outshone the grade labels beside the names, which are the
  * small text a parent is actually choosing by. The class-only mechanism is
@@ -705,7 +716,9 @@
  */
 .kiosk-photo-idle .kiosk-rule-faded {
   opacity: 0;
-  transition: opacity 1200ms ease-in 350ms;
+  /* Shorter than the photograph's 350ms delay (`.kiosk-backdrop` above), so
+     the line is gone before the first pixel of picture is up. */
+  transition: opacity 300ms ease-out;
 }
 .kiosk-photo-idle .kiosk-hours-line {
   color: var(--color-ink-300);
