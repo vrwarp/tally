@@ -12,6 +12,7 @@
  */
 import { expect, test } from './support/fixtures';
 import { gotoReady } from './support/auth';
+import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 import { rosterAction } from './support/rosterActions';
 
 const ROUTES = [
@@ -114,5 +115,77 @@ test.describe('layout', () => {
 
     expect(amount, `/students overflows by ${amount}px with one long name on the roster.`)
       .toBeLessThanOrEqual(1);
+  });
+
+  /*
+   * The lobby kiosk, with a child like that on its glass.
+   *
+   * The search screen is a one-column grid, and a grid column is never
+   * narrower than the widest thing in it — a minimum that `truncate` does not
+   * lower, because clipping a name leaves its min-content width the whole
+   * name. A family registered a child with a sentence where a first name goes,
+   * and a tablet under 720px wide went sideways: the header centred off the
+   * glass, the count lost its last letter and the keyboard its last column of
+   * keys, while the row that caused it looked perfectly truncated. The column
+   * is pinned to the glass now (see SearchScreen's root); this is the frame
+   * that keeps it there, at the narrowest shape a kiosk takes — the phone the
+   * shooter in uxr/kiosk-live uses, where the same name once overflowed by
+   * 330px.
+   *
+   * The child goes in through the New-visitor form, as above, and never
+   * attends anything, so the scoped search says "no match" and the row is
+   * reached through **Search everyone** — which is also the door a long name
+   * arrives by on a real evening, on a gathering the family is new to.
+   */
+  test('the kiosk survives a student with a very long name', async ({
+    browser,
+    page,
+    firestore,
+  }) => {
+    const surname =
+      'Vandersteen-Okonkwo Fitzwilliam Abernathy Featherstonehaugh Wintermute Vasquez';
+
+    await gotoReady(page, '/students');
+    await (await rosterAction(page, /new visitor/i)).click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/first name/i).fill('Wilhelmina');
+    await dialog.getByLabel(/last name/i).fill(surname);
+    await dialog.getByLabel(/^grade/i).selectOption('9');
+    await dialog.getByRole('button', { name: /add student/i }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 30_000 });
+
+    const { context, page: kiosk } = await openKiosk(browser, {
+      viewport: { width: 390, height: 844 },
+    });
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /friday fellowship/i);
+
+      await typeOnKiosk(kiosk, 'wilhelmina');
+      await expect(kiosk.getByText(/no match/i)).toBeVisible({ timeout: 15_000 });
+      await kiosk.getByRole('button', { name: /Search everyone/i }).click();
+      await expect(kiosk.getByRole('button', { name: /wilhelmina/i }).first()).toBeVisible({
+        timeout: 15_000,
+      });
+
+      const amount = await kiosk.evaluate(() => {
+        const root = document.documentElement;
+        return root.scrollWidth - root.clientWidth;
+      });
+      expect(amount, `the kiosk overflows by ${amount}px with one long name in its results.`)
+        .toBeLessThanOrEqual(1);
+    } finally {
+      // The kiosk closes and the child goes whatever the verdict, so a red run
+      // leaves nothing behind for the specs after it.
+      await context.close();
+      const created = await firestore.until(
+        'students',
+        (docs) => docs.some((doc) => doc.data.lastName === surname),
+        'the long-named student',
+      );
+      const id = created.find((doc) => doc.data.lastName === surname)?.id;
+      if (id) await firestore.remove(`students/${id}`);
+    }
   });
 });
