@@ -19,6 +19,7 @@
  *   ?buffer=Alva              what has been typed                    (default "")
  *   ?nomatch=1                the search finished and found nobody
  *   ?present=1,2              ids already checked in tonight
+ *   ?longname=1               one child named to the register's forty-character limits
  *   ?pickup=1                 a gathering that also hands children back
  *   ?title=…                  the gathering's name
  *   ?icon=campfire            the gathering's icon, by Material name
@@ -218,6 +219,30 @@ const STUDENTS: KioskStudent[] = [
   { id: '11', firstName: 'Alonzo', lastName: 'Allred', grade: 9 },
 ] as KioskStudent[];
 
+/*
+ * The name that took a lobby screen sideways.
+ *
+ * `?longname=1`. The register step accepts forty characters in each half of a
+ * name (NAME_MAX_LENGTH), and a family used them: a whole sentence typed where
+ * a first name goes. The row truncates it, as it should — but `truncate` clips
+ * a box whose *minimum* width was still the whole sentence, and on the search
+ * screen that minimum widened the one grid column past the glass and took the
+ * header, the count and the keyboard's last keys with it. A row can be as long
+ * as the register allows; what the frame has to prove is that nothing else on
+ * the screen knows.
+ *
+ * Gated behind the flag rather than on the roster, so every list the existing
+ * scenes photograph is the list they have always photographed.
+ */
+const LONG_NAME: KioskStudent = {
+  id: '12',
+  firstName: 'Alvara-Bartholomea Vandersteen-Okonkwo',
+  lastName: 'Featherstonehaugh Fitzwilliam Alvarez',
+  grade: 8,
+} as KioskStudent;
+
+const roster = params.get('longname') === '1' ? [...STUDENTS, LONG_NAME] : STUDENTS;
+
 function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
   const digits = /^\d+$/.test(buffer);
   const mode = !buffer
@@ -234,7 +259,7 @@ function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
   const needle = buffer.toLowerCase();
   const matched =
     buffer && !nobody
-      ? STUDENTS.filter((student) =>
+      ? roster.filter((student) =>
           `${student.firstName} ${student.lastName}`
             .toLowerCase()
             .split(/[\s-]+/)
