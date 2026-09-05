@@ -105,6 +105,33 @@ export type Layout = {
   barInset?: boolean;
   /** `centered-deep`: bottom row 8px shorter and 8px lower, so the board's height holds. */
   deepBottom?: boolean;
+  /**
+   * Round 3's version of the same gutter, spread thin: every row's keys 2px
+   * shorter and the ten freed pixels all under the Z row, so the gutter above
+   * the bottom row is 16px, no row is a different height from any other, and
+   * the board's height holds. The wide design critic read an 8px step on one
+   * row as a squashed row; 2px on five is below sight.
+   */
+  deepEven?: boolean;
+  /**
+   * The moat expressed on Clear's side rather than the bar's: Clear gives back
+   * 8px on its bar side (or its ’ side on the flanked row), so the bar keeps
+   * its axis and its column edges and the exception lands on the worded key.
+   */
+  clearInset?: boolean;
+  /**
+   * The bar's word on the row's own baseline, with no optical lift: the tall
+   * design critic measured every other legend at +11px from its key's centre
+   * and the lifted word at +9, and a row stops reading as one setting there.
+   */
+  labelOnBaseline?: boolean;
+  /**
+   * The apostrophe left where an apostrophe sits in a word — high — rather
+   * than pulled down onto the hyphen's line. Round 2 levelled the two marks
+   * and three reviewers read the levelled ’ as a comma; the one cue that
+   * tells the two marks apart is height, so the marks are allowed to disagree.
+   */
+  apostropheHigh?: boolean;
   /** The board as registration renders it — `shift` passed, so a screen that writes to the roster. */
   rows: Slot[][];
   /** The board as search renders it — `shift` omitted. Defaults to `rows`. */
@@ -220,6 +247,42 @@ const LAYOUTS: Layout[] = [
       '`centered-grid` with the word “space” on the bar in Clear’s exact voice — the board’s one worded-key treatment, same size, weight and ramp step, on the letters’ optical line.',
     rows: board(CENTRED_BOTTOM('space')),
   },
+
+  /* -------------------------------------------------------------------- */
+  /* Round 3 — the modifiers composed, each in the form both camps asked for  */
+  /* -------------------------------------------------------------------- */
+
+  {
+    id: 'centered-safe',
+    ...R2,
+    clearInset: true,
+    deepEven: true,
+    apostropheHigh: true,
+    summary:
+      '`centered-grid` with its two seams of unequal consequence paid for: Clear gives back 8px on its bar side (the bar keeps its axis and its columns), and every key is 2px shorter so the gutter above the bottom row is 16px — no row a different height, board height unchanged.',
+    rows: board(CENTRED_BOTTOM()),
+  },
+  {
+    id: 'centered-safe-labelled',
+    ...R2,
+    clearInset: true,
+    deepEven: true,
+    apostropheHigh: true,
+    labelOnBaseline: true,
+    summary:
+      '`centered-safe` with the bar named, in Clear’s voice and Clear’s case: “Space”. The two worded keys become one class the letters are not.',
+    rows: board(CENTRED_BOTTOM('Space')),
+  },
+  {
+    id: 'flanked-twin-safe',
+    ...R2,
+    clearInset: true,
+    deepEven: true,
+    apostropheHigh: true,
+    summary:
+      '`flanked-twin` with the design critics’ trade: the corner ⌫ takes the Z-row ⌫’s 3 cells so the two deletes are one plate repeated on one axis, and the hyphen takes the spare cell (1.5 letters — the one punctuation key wider than a letter). Clear gives back 8px so the ’ beside it has a 14px moat; the even trim puts 16px under the Z row. The bar stays on the axis: 6 cells either side of it.',
+    rows: board([CLEAR(2), P("'"), SPACE(4), P('-', 1.5), BACKSPACE(1.5)]),
+  },
 ];
 
 const params = new URLSearchParams(location.search);
@@ -296,6 +359,20 @@ const MARK_HYPHEN: React.CSSProperties = { transform: 'translateY(-0.04em)' };
  * ⌫) while keeping its baseline within 2px of Clear's, which is as close as
  * a lowercase word and a title-case one get in one row.
  */
+/*
+ * The prototype's override block, as the frozen-HTML loop has one: the even
+ * trim's two heights, which Tailwind cannot see because they are only used
+ * here. The implementation is `h-[3.375rem] tall:h-[3.875rem]` on every key.
+ */
+const PROTO_CSS =
+  '.kb-even{height:calc(3.5rem - 2px)}@media (min-height:1000px){.kb-even{height:calc(4rem - 2px)}}';
+if (typeof document !== 'undefined' && !document.getElementById('kb-proto-css')) {
+  const style = document.createElement('style');
+  style.id = 'kb-proto-css';
+  style.textContent = PROTO_CSS;
+  document.head.appendChild(style);
+}
+
 const WORD_CLASS = 'text-base font-medium text-ink-300';
 const WORD_LIFT: React.CSSProperties = { display: 'block', transform: 'translateY(-0.1em)' };
 
@@ -363,12 +440,16 @@ export const Keyboard = memo(function Keyboard({
     const style: React.CSSProperties = { gridColumn: `span ${cells} / span ${cells}` };
     // The moat: the bar gives back 8px on the side Clear is on, and nowhere else.
     if (bottom && chosen.barInset && slot.kind === 'space') style.marginLeft = '0.5rem';
+    // The moat, on Clear's side instead: Clear gives back the 8px.
+    if (bottom && chosen.clearInset && slot.kind === 'clear') style.marginRight = '0.5rem';
     return style;
   };
+  /* Round 3's even trim: 2px off every key, at both type steps (see PROTO_CSS). */
+  const evenClass = chosen.deepEven ? ' kb-even' : '';
 
   const renderSlot = (slot: Slot, index: number, bottom: boolean) => {
     const style = slotStyle(slot, bottom);
-    const keyClass = bottom && chosen.deepBottom ? KEY_CLASS_SHORT : KEY_CLASS;
+    const keyClass = (bottom && chosen.deepBottom ? KEY_CLASS_SHORT : KEY_CLASS) + evenClass;
     switch (slot.kind) {
       case 'gap':
         return <div key={index} data-gap style={style} />;
@@ -441,7 +522,7 @@ export const Keyboard = memo(function Keyboard({
           >
             {slot.label ? (
               chosen.legends ? (
-                <span style={WORD_LIFT}>{slot.label}</span>
+                <span style={chosen.labelOnBaseline ? undefined : WORD_LIFT}>{slot.label}</span>
               ) : (
                 <span className="text-sm font-medium tracking-wide text-ink-400 kiosk:text-base">{slot.label}</span>
               )
@@ -454,7 +535,13 @@ export const Keyboard = memo(function Keyboard({
         if (slot.key === "'") {
           return (
             <button key={index} type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={keyClass} style={style}>
-              {chosen.legends ? <span className={MARK_CLASS} style={MARK_APOSTROPHE}>&rsquo;</span> : <>&rsquo;</>}
+              {chosen.legends ? (
+                <span className={MARK_CLASS} style={chosen.apostropheHigh ? undefined : MARK_APOSTROPHE}>
+                  &rsquo;
+                </span>
+              ) : (
+                <>&rsquo;</>
+              )}
             </button>
           );
         }
@@ -487,7 +574,13 @@ export const Keyboard = memo(function Keyboard({
         return mode === 'grid' ? (
           <div
             key={i}
-            className={bottom && chosen.deepBottom ? 'grid gap-1.5 mt-2' : 'grid gap-1.5'}
+            className={
+              bottom && chosen.deepBottom
+                ? 'grid gap-1.5 mt-2'
+                : bottom && chosen.deepEven
+                  ? 'grid gap-1.5 mt-[10px]'
+                  : 'grid gap-1.5'
+            }
             style={{ gridTemplateColumns: 'repeat(20, minmax(0, 1fr))' }}
           >
             {row.map((slot, j) => renderSlot(slot, j, bottom))}

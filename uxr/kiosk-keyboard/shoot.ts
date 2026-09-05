@@ -112,10 +112,10 @@ const SCENES: {
 const DEFAULT_LAYOUTS = [
   'current',
   'centered-grid',
-  'centered-moat',
-  'centered-deep',
-  'flanked-twin',
   'labelled-voice',
+  'centered-safe',
+  'centered-safe-labelled',
+  'flanked-twin-safe',
 ];
 
 const args = process.argv.slice(2);
