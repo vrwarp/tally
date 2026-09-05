@@ -94,6 +94,14 @@ const SCENES: {
     drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next', '7th grade', 'P', 'E', 'A', 'N', 'U', 'T', 'S', 'space', 'T', 'R', 'E', 'E', 'space', 'N', 'U', 'T', 'S'],
   },
   { id: 'photo-idle', query: 'photo=1&icon=groups', views: ['kiosktall'], settle: 1900 },
+  /*
+   * The same photograph on the light ground — the one frame the staff
+   * consultation asked for before it would pick a labelled bar. A leader can
+   * set a gathering light from two buttons in the event editor, the ink ramp
+   * flips wholesale for it, and every contrast number in rounds 1 and 2 was
+   * taken on the dark ground over one picture.
+   */
+  { id: 'photo-light', query: 'photo=1&ground=light&icon=groups', views: ['kiosktall'], settle: 1900 },
 ];
 
 /*
