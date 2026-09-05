@@ -17,11 +17,32 @@
  * pressed state, the haptic tick, the hold on Clear, the shift-aware labels,
  * the `data-key` names every test and every e2e addresses a key by.
  *
- * Widths are inline `flex` values rather than `flex-[n]` utilities, because a
- * class built from a number in a table is invisible to Tailwind's scanner; the
- * implementation of whichever layout wins goes back to utilities. The
- * container carries `data-kb-layout`, `data-kb-spec` and `data-kb-summary` so
- * the shooter can crop to the board, measure it and caption a contact sheet
+ * ## Round 2
+ *
+ * Round 1 measured the same nominal width four different ways on one board: a
+ * "1.5-unit" key is 143.7, 146.4 or 150px on the wide kiosk depending on how
+ * many gutters its row swallows, so no bottom row could land on the columns
+ * above it by construction. Round 2 answers that with a **fixed track** rather
+ * than a nudge to one row — `mode: 'grid'` lays every row of the board on
+ * twenty half-columns with the board's own 6px gap, so a letter is two cells,
+ * the home row's stagger one, the Z row's ⇧/⌫ flanks three, and the bottom row
+ * is written in the same currency as the rows it closes. Sizes stay in
+ * letter-units in the table below and are doubled into cells at render time,
+ * which keeps one row table serving both measuring systems.
+ *
+ * Round 2's boards also carry the punctuation fix: `’` and `-` were 31 lit
+ * pixels apiece against a letter's 180, on two different optical lines. They
+ * are now set a size step up, inside a span, with a transform that puts both
+ * marks on the letters' line. The glyph characters are untouched, because the
+ * delegated handler types the button's `textContent` when it is one character
+ * long — nothing else may go inside those two buttons.
+ *
+ * Widths are inline `flex` / `gridColumn` values rather than `flex-[n]` or
+ * `col-span-n` utilities, because a class built from a number in a table is
+ * invisible to Tailwind's scanner; the implementation of whichever layout wins
+ * goes back to utilities (`col-span-12`, `grid-cols-[repeat(20,minmax(0,1fr))]`).
+ * The container carries `data-kb-layout`, `data-kb-spec` and `data-kb-summary`
+ * so the shooter can crop to the board, measure it and caption a contact sheet
  * without a second copy of this table.
  *
  * Working file: this is what the loop edits between rounds. What it settles
@@ -45,35 +66,58 @@ export type ShiftState = 'off' | 'on' | 'lock';
 /* The layouts                                                               */
 /* ------------------------------------------------------------------------ */
 
+/**
+ * How a row measures itself.
+ *
+ * `flex` is the shipping board: each slot's size is a `flex-grow` share of
+ * whatever is left after that row's own gutters, so the unit is a different
+ * number of pixels in every row.
+ *
+ * `grid` is round 2's fixed track: twenty half-columns across the board with
+ * the same 6px gap, every slot spanning whole cells. One unit in the table is
+ * two cells, so a letter is 2, the home row's stagger 1, the Z row's flanks 3,
+ * Clear 4 and a twelve-cell bar 12 — and every vertical edge in the bottom
+ * row is a vertical edge in the four rows above it.
+ */
+type Mode = 'flex' | 'grid';
+
 type Slot =
   /** A letter, a digit, or one of the two punctuation marks names carry. */
-  | { kind: 'char'; key: string; flex: number }
+  | { kind: 'char'; key: string; units: number }
   /** The bar. `label` sets a word on it; the shipping bar is blank. */
-  | { kind: 'space'; flex: number; label?: string }
-  | { kind: 'clear'; flex: number }
-  | { kind: 'backspace'; flex: number }
+  | { kind: 'space'; units: number; label?: string }
+  | { kind: 'clear'; units: number }
+  | { kind: 'backspace'; units: number }
   /** The shift key where a screen passes `shift`; the same width of nothing where it does not. */
-  | { kind: 'shift'; flex: number }
+  | { kind: 'shift'; units: number }
   /** Empty width — the stagger of the home row, the flank of the bottom one. */
-  | { kind: 'gap'; flex: number };
+  | { kind: 'gap'; units: number };
 
 export type Layout = {
   id: string;
   /** One sentence a critic reads on the contact sheet. */
   summary: string;
+  /** Defaults to the shipping board's flex. */
+  mode?: Mode;
+  /** `’` and `-` set at a letter's optical weight, on one shared optical line. */
+  legends?: boolean;
+  /** `centered-moat`: the bar inset 8px on its Clear side, widening that one seam. */
+  barInset?: boolean;
+  /** `centered-deep`: bottom row 8px shorter and 8px lower, so the board's height holds. */
+  deepBottom?: boolean;
   /** The board as registration renders it — `shift` passed, so a screen that writes to the roster. */
   rows: Slot[][];
   /** The board as search renders it — `shift` omitted. Defaults to `rows`. */
   searchRows?: Slot[][];
 };
 
-const chars = (keys: string, flex = 1): Slot[] => [...keys].map((key) => ({ kind: 'char', key, flex }));
-const P = (key: "'" | '-', flex = 1): Slot => ({ kind: 'char', key, flex });
-const SPACE = (flex: number, label?: string): Slot => ({ kind: 'space', flex, label });
-const CLEAR = (flex: number): Slot => ({ kind: 'clear', flex });
-const BACKSPACE = (flex: number): Slot => ({ kind: 'backspace', flex });
-const SHIFT = (flex: number): Slot => ({ kind: 'shift', flex });
-const GAP = (flex: number): Slot => ({ kind: 'gap', flex });
+const chars = (keys: string, units = 1): Slot[] => [...keys].map((key) => ({ kind: 'char', key, units }));
+const P = (key: "'" | '-', units = 1): Slot => ({ kind: 'char', key, units });
+const SPACE = (units: number, label?: string): Slot => ({ kind: 'space', units, label });
+const CLEAR = (units: number): Slot => ({ kind: 'clear', units });
+const BACKSPACE = (units: number): Slot => ({ kind: 'backspace', units });
+const SHIFT = (units: number): Slot => ({ kind: 'shift', units });
+const GAP = (units: number): Slot => ({ kind: 'gap', units });
 
 const DIGITS = chars('1234567890');
 const TOP = chars('QWERTYUIOP');
@@ -84,6 +128,12 @@ const LOW = (right: Slot): Slot[] => [SHIFT(1.5), ...chars('ZXCVBNM'), right];
 const UPPER = [DIGITS, TOP, HOME, LOW(BACKSPACE(1.5))];
 
 const board = (bottom: Slot[], upper: Slot[][] = UPPER): Slot[][] => [...upper, bottom];
+
+/** Every round-2 board: the fixed track, and the punctuation set as legends. */
+const R2 = { mode: 'grid', legends: true } as const;
+
+/** `centered-*`'s shared bottom row — Clear 4 · space 12 · ’ 2 · - 2 of twenty. */
+const CENTRED_BOTTOM = (label?: string): Slot[] => [CLEAR(2), SPACE(6, label), P("'"), P('-')];
 
 const LAYOUTS: Layout[] = [
   {
@@ -128,29 +178,79 @@ const LAYOUTS: Layout[] = [
     summary: '`centered` with the word “space” set small and quiet on the bar, the way iOS names it — a blank plate says nothing about what it does.',
     rows: board([CLEAR(2), SPACE(6, 'space'), P("'"), P('-')]),
   },
+
+  /* -------------------------------------------------------------------- */
+  /* Round 2 — one fixed track, and the punctuation set at a letter's weight */
+  /* -------------------------------------------------------------------- */
+
+  {
+    id: 'centered-grid',
+    ...R2,
+    summary:
+      'Clear 4 · space 12 · ’ 2 · - 2 of twenty half-columns. `centered` with its arithmetic corrected: every edge in the row is an edge in the rows above, both flanks weigh exactly the same, and the bar’s centre is the board’s midline to 0px.',
+    rows: board(CENTRED_BOTTOM()),
+  },
+  {
+    id: 'centered-moat',
+    ...R2,
+    barInset: true,
+    summary:
+      '`centered-grid` with the bar inset 8px on its Clear side, so the one seam where a miss empties the whole buffer gets ~14px of air instead of the row’s 6px. The bar’s centre pays 4px for it.',
+    rows: board(CENTRED_BOTTOM()),
+  },
+  {
+    id: 'centered-deep',
+    ...R2,
+    deepBottom: true,
+    summary:
+      '`centered-grid` with the bottom row’s keys 8px shorter and its top margin 8px deeper: ~14px under ⇧ and ⌫, so a low miss during a correction lands on nothing. Board height, key count and the four rows above are unchanged.',
+    rows: board(CENTRED_BOTTOM()),
+  },
+  {
+    id: 'flanked-twin',
+    ...R2,
+    summary:
+      'Clear 4 · ’ 2 · space 8 · - 2 · ⌫ 4, and ⌫ *also* stays at the Z row’s right end. The phone-pad rhyme with punctuation flanking the bar, a live bottom-right corner and a free miss under ⌫ — bought with a second delete key and a bar of four letters.',
+    rows: board([CLEAR(2), P("'"), SPACE(4), P('-'), BACKSPACE(2)]),
+  },
+  {
+    id: 'labelled-voice',
+    ...R2,
+    summary:
+      '`centered-grid` with the word “space” on the bar in Clear’s exact voice — the board’s one worded-key treatment, same size, weight and ramp step, on the letters’ optical line.',
+    rows: board(CENTRED_BOTTOM('space')),
+  },
 ];
 
 const params = new URLSearchParams(location.search);
 const chosen = LAYOUTS.find((layout) => layout.id === params.get('kb')) ?? LAYOUTS[0]!;
+const mode: Mode = chosen.mode ?? 'flex';
 
-/** `Clear 1.5 · ’ 1 · - 1 · space 3.5` — the row as a caption. */
+/**
+ * `Clear 1.5 · ’ 1 · - 1 · space 3.5` — the row as a caption.
+ *
+ * In the currency the row is actually measured in, so a grid row reads in
+ * cells of twenty and a flex row in units of ten and neither has to be
+ * converted by the person holding the contact sheet.
+ */
 function describe(row: Slot[]): string {
   return row
     .map((slot) => {
-      const flex = slot.flex === 1 ? '' : ` ${slot.flex}`;
+      const n = mode === 'grid' ? slot.units * 2 : slot.units;
+      const size = mode === 'grid' || n !== 1 ? ` ${n}` : '';
       switch (slot.kind) {
         case 'char':
-          return `${slot.key === "'" ? '’' : slot.key}${flex}`;
+          return `${slot.key === "'" ? '’' : slot.key}${size}`;
         case 'space':
-          return `space${flex}${slot.label ? ` “${slot.label}”` : ''}`;
+          return `space${size}${slot.label ? ` “${slot.label}”` : ''}`;
         case 'clear':
-          return `Clear${flex}`;
+          return `Clear${size}`;
         case 'backspace':
-          return `⌫${flex}`;
+          return `⌫${size}`;
         case 'shift':
-          return `⇧${flex}`;
+          return `⇧${size}`;
         case 'gap':
-          return `(empty${flex})`;
+          return `(empty${size})`;
       }
     })
     .join(' · ');
@@ -160,11 +260,44 @@ function describe(row: Slot[]): string {
 /* The component — Keyboard.tsx with the rows read from the table           */
 /* ------------------------------------------------------------------------ */
 
-const KEY_CLASS =
-  'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 kiosk:text-2xl';
+/** Everything a key is except its height, which `centered-deep` shortens. */
+const KEY_BASE =
+  'flex min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 kiosk:text-2xl';
+const KEY_CLASS = `${KEY_BASE} h-14 tall:h-16`;
+/** 8px off the bottom row, paid straight into the gutter above it. */
+const KEY_CLASS_SHORT = `${KEY_BASE} h-12 tall:h-14`;
 
-const flexStyle = (flex: number): React.CSSProperties => ({ flex: `${flex} 1 0%` });
+/**
+ * The two punctuation legends.
+ *
+ * A size step up on the mark alone — the key, the plate and the glyph are
+ * untouched — and a transform that lands both marks on the line the letters'
+ * caps sit on. The apostrophe hangs near cap height and needs pushing down a
+ * quarter of its own size; the hyphen sits a hair below the line and comes up
+ * by a twentieth. Written in `em` so one pair of numbers holds at both type
+ * steps.
+ */
+const MARK_CLASS = 'block text-3xl leading-none kiosk:text-4xl';
+const MARK_APOSTROPHE: React.CSSProperties = { transform: 'translateY(0.25em)' };
+const MARK_HYPHEN: React.CSSProperties = { transform: 'translateY(-0.04em)' };
+
+/**
+ * `labelled-voice`'s word.
+ *
+ * Clear's classes go on the *button*, exactly as Clear carries them, so the
+ * two worded keys resolve to one voice rather than to two that happen to be
+ * spelled the same — `text-base` is inert on both, overridden by the letters'
+ * `text-xl`/`kiosk:text-2xl`, and a word set from a span would not have been.
+ * The span exists only to carry the transform: "space" has a descender and no
+ * ascender, so left alone its ink box centres 3.4px below the line the
+ * capitals sit on. A tenth of an em up puts the word's x-height band on that
+ * line exactly (measured: −1.5px from the key's centre, the same as Z, M and
+ * ⌫) while keeping its baseline within 2px of Clear's, which is as close as
+ * a lowercase word and a title-case one get in one row.
+ */
+const WORD_CLASS = 'text-base font-medium text-ink-300';
+const WORD_LIFT: React.CSSProperties = { display: 'block', transform: 'translateY(-0.1em)' };
 
 export const Keyboard = memo(function Keyboard({
   onKey,
@@ -217,9 +350,25 @@ export const Keyboard = memo(function Keyboard({
   }, []);
 
   const rows = shift === undefined && chosen.searchRows ? chosen.searchRows : chosen.rows;
+  const last = rows.length - 1;
 
-  const renderSlot = (slot: Slot, index: number) => {
-    const style = flexStyle(slot.flex);
+  /**
+   * A slot's width, in the row's own measuring system: a share of the leftover
+   * in flex, whole cells of the fixed track in grid. `span n / span n` is what
+   * `col-span-n` emits, so the implementation is a class swap.
+   */
+  const slotStyle = (slot: Slot, bottom: boolean): React.CSSProperties => {
+    if (mode !== 'grid') return { flex: `${slot.units} 1 0%` };
+    const cells = slot.units * 2;
+    const style: React.CSSProperties = { gridColumn: `span ${cells} / span ${cells}` };
+    // The moat: the bar gives back 8px on the side Clear is on, and nowhere else.
+    if (bottom && chosen.barInset && slot.kind === 'space') style.marginLeft = '0.5rem';
+    return style;
+  };
+
+  const renderSlot = (slot: Slot, index: number, bottom: boolean) => {
+    const style = slotStyle(slot, bottom);
+    const keyClass = bottom && chosen.deepBottom ? KEY_CLASS_SHORT : KEY_CLASS;
     switch (slot.kind) {
       case 'gap':
         return <div key={index} data-gap style={style} />;
@@ -234,7 +383,7 @@ export const Keyboard = memo(function Keyboard({
             data-key="shift"
             aria-label={shift === 'lock' ? 'Caps lock on' : shift === 'on' ? 'Shift on' : 'Shift'}
             aria-pressed={shift !== 'off'}
-            className={`${KEY_CLASS} text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
+            className={`${keyClass} text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
             style={style}
           >
             {shift === 'lock' ? '⇪' : '⇧'}
@@ -248,7 +397,7 @@ export const Keyboard = memo(function Keyboard({
             tabIndex={-1}
             data-key="backspace"
             aria-label="Delete"
-            className={`${KEY_CLASS} text-2xl`}
+            className={`${keyClass} text-2xl`}
             style={style}
           >
             ⌫
@@ -265,7 +414,7 @@ export const Keyboard = memo(function Keyboard({
             onPointerUp={onClearHeld ? cancelHold : undefined}
             onPointerLeave={onClearHeld ? cancelHold : undefined}
             onPointerCancel={onClearHeld ? cancelHold : undefined}
-            className={`${KEY_CLASS} text-base font-medium text-ink-300 ${onClearHeld ? 'kiosk-hold-key' : ''}`}
+            className={`${keyClass} ${WORD_CLASS} ${onClearHeld ? 'kiosk-hold-key' : ''}`}
             style={
               onClearHeld
                 ? ({
@@ -287,11 +436,15 @@ export const Keyboard = memo(function Keyboard({
             tabIndex={-1}
             data-key="space"
             aria-label="Space"
-            className={KEY_CLASS}
+            className={slot.label && chosen.legends ? `${keyClass} ${WORD_CLASS}` : keyClass}
             style={style}
           >
             {slot.label ? (
-              <span className="text-sm font-medium tracking-wide text-ink-400 kiosk:text-base">{slot.label}</span>
+              chosen.legends ? (
+                <span style={WORD_LIFT}>{slot.label}</span>
+              ) : (
+                <span className="text-sm font-medium tracking-wide text-ink-400 kiosk:text-base">{slot.label}</span>
+              )
             ) : (
               <>&nbsp;</>
             )}
@@ -300,20 +453,20 @@ export const Keyboard = memo(function Keyboard({
       case 'char':
         if (slot.key === "'") {
           return (
-            <button key={index} type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={KEY_CLASS} style={style}>
-              &rsquo;
+            <button key={index} type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={keyClass} style={style}>
+              {chosen.legends ? <span className={MARK_CLASS} style={MARK_APOSTROPHE}>&rsquo;</span> : <>&rsquo;</>}
             </button>
           );
         }
         if (slot.key === '-') {
           return (
-            <button key={index} type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={KEY_CLASS} style={style}>
-              -
+            <button key={index} type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={keyClass} style={style}>
+              {chosen.legends ? <span className={MARK_CLASS} style={MARK_HYPHEN}>-</span> : <>-</>}
             </button>
           );
         }
         return (
-          <button key={index} type="button" tabIndex={-1} data-key={slot.key} className={KEY_CLASS} style={style}>
+          <button key={index} type="button" tabIndex={-1} data-key={slot.key} className={keyClass} style={style}>
             {capitals ? slot.key : slot.key.toLowerCase()}
           </button>
         );
@@ -329,11 +482,22 @@ export const Keyboard = memo(function Keyboard({
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >
-      {rows.map((row, i) => (
-        <div key={i} className="flex gap-1.5">
-          {row.map(renderSlot)}
-        </div>
-      ))}
+      {rows.map((row, i) => {
+        const bottom = i === last;
+        return mode === 'grid' ? (
+          <div
+            key={i}
+            className={bottom && chosen.deepBottom ? 'grid gap-1.5 mt-2' : 'grid gap-1.5'}
+            style={{ gridTemplateColumns: 'repeat(20, minmax(0, 1fr))' }}
+          >
+            {row.map((slot, j) => renderSlot(slot, j, bottom))}
+          </div>
+        ) : (
+          <div key={i} className="flex gap-1.5">
+            {row.map((slot, j) => renderSlot(slot, j, bottom))}
+          </div>
+        );
+      })}
     </div>
   );
 });

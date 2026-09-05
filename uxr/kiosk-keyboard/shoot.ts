@@ -88,7 +88,10 @@ const SCENES: {
     id: 'register-allergies',
     query: 'screen=register',
     views: ['phone', 'kiosktall'],
-    drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next', '7th grade', 'Next', 'P', 'E', 'A', 'N', 'U', 'T', 'S', 'space', 'T', 'R', 'E', 'E', 'space', 'N', 'U', 'T', 'S'],
+    // A grade chip advances the wizard by itself (`chooseGrade` calls
+    // `advance`), so there is no Next between it and the allergies step; the
+    // one that used to be here walked straight past the board being shot.
+    drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next', '7th grade', 'P', 'E', 'A', 'N', 'U', 'T', 'S', 'space', 'T', 'R', 'E', 'E', 'space', 'N', 'U', 'T', 'S'],
   },
   { id: 'photo-idle', query: 'photo=1&icon=groups', views: ['kiosktall'], settle: 1900 },
 ];
