@@ -77,17 +77,34 @@ const SCENES: {
     views: ['phone', 'kiosktall', 'kioskwide'],
     drive: ['R', 'O', 'B', 'I', 'N'],
   },
+  {
+    /*
+     * The wizard's free-text step — "Peanuts tree nuts" — five spaces in a
+     * row, the highest-volume space typing on the kiosk and the one field
+     * where a stray ’ or - is kept rather than refused. The journey
+     * consultation found it missing from round 1; every other scene presses
+     * the bar at most once.
+     */
+    id: 'register-allergies',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall'],
+    drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next', '7th grade', 'Next', 'P', 'E', 'A', 'N', 'U', 'T', 'S', 'space', 'T', 'R', 'E', 'E', 'space', 'N', 'U', 'T', 'S'],
+  },
   { id: 'photo-idle', query: 'photo=1&icon=groups', views: ['kiosktall'], settle: 1900 },
 ];
 
+/*
+ * The round-2 set. Round 1's seven live on in `Keyboard.variants.tsx` and can
+ * still be shot with `--kb`; these are the survivors and the shapes the round
+ * asked for.
+ */
 const DEFAULT_LAYOUTS = [
   'current',
-  'centered',
-  'centered-flank',
-  'flanked',
-  'flanked-gap',
-  'plain-search',
-  'labelled',
+  'centered-grid',
+  'centered-moat',
+  'centered-deep',
+  'flanked-twin',
+  'labelled-voice',
 ];
 
 const args = process.argv.slice(2);
@@ -140,7 +157,13 @@ type KeyBox = { key: string; x: number; y: number; width: number; height: number
 type Metrics = {
   layout: string;
   spec: string;
-  board: { x: number; width: number };
+  board: { x: number; width: number; height: number };
+  /** Slots with no `data-key` — glass a finger can land on that does nothing — per row. */
+  deadCells: number[];
+  /** How many ⌫ keys the board carries; the shipped board has one. */
+  backspaces: number;
+  /** The vertical gap between each row and the next, in CSS px. */
+  rowGutters: number[];
   rows: KeyBox[][];
   bottom: {
     /** The bar's centre minus the board's midline, in CSS px; negative is left. */
@@ -223,6 +246,12 @@ for (const kb of layouts) {
               };
             }),
           );
+          const deadCells = [...root.children].map((row) => row.querySelectorAll('[data-gap]').length);
+          const backspaces = root.querySelectorAll('[data-key="backspace"]').length;
+          const rowGutters = rows.slice(1).map((row, i) => {
+            const above = rows[i]!;
+            return Math.round((row[0]!.y - (above[0]!.y + above[0]!.height)) * 10) / 10;
+          });
           const letter = rows[1]![0]!.width;
           const bottom = rows[rows.length - 1]!;
           const space = bottom.find((k) => k.key === 'space')!;
@@ -233,7 +262,10 @@ for (const kb of layouts) {
           return {
             layout,
             spec,
-            board: { x: Math.round(rootBox.x), width: Math.round(rootBox.width) },
+            board: { x: Math.round(rootBox.x), width: Math.round(rootBox.width), height: Math.round(rootBox.height) },
+            deadCells,
+            backspaces,
+            rowGutters,
             rows,
             bottom: {
               spaceOffsetPx: Math.round((spaceCentre - mid) * 10) / 10,
@@ -290,7 +322,7 @@ for (const scene of SCENES) {
           <figcaption>
             <b>${kb}</b>
             <span>${m.spec}</span>
-            <em>bar centre ${off > 0 ? '+' : ''}${off}% of board width from the midline · bar ${Math.round(m.bottom.spaceWidthPx)}px · letter ${Math.round(m.bottom.letterWidthPx)}px</em>
+            <em>bar centre ${off > 0 ? '+' : ''}${off}% of board width from the midline · bar ${Math.round(m.bottom.spaceWidthPx)}px · letter ${Math.round(m.bottom.letterWidthPx)}px · dead cells ${m.deadCells.reduce((a, b) => a + b, 0)} · ⌫ ×${m.backspaces} · gutter above bottom row ${m.rowGutters[m.rowGutters.length - 1]}px</em>
           </figcaption>
           <img src="data:image/png;base64,${data}" style="width:${Math.round((width * cell))}px" />
         </figure>`);
