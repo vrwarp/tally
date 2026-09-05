@@ -30,6 +30,7 @@ see `.gitignore`. What the finished campaigns settled is
 | `measure.ts` | Re-runs the walkthrough's measurements against frozen scenes: how far each page scrolls, and whether it scrolls sideways. |
 | `locked-scene.ts` | Derives the "you are not on this gathering" state, which the seed never produces. |
 | `*-live/` | Screens mounted from `src/` against a fixture rather than walked to. See below. |
+| `kiosk-keyboard/` | The kiosk mounted around a *table of candidate keyboard rows*, chosen by `?kb=`, with every import of `components/Keyboard` aliased to the table — so a campaign about one row photographs real screens around each candidate, measures every key, and lays the candidates side by side per state and glass. |
 
 ## The agents
 

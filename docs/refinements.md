@@ -1,6 +1,6 @@
 # Design refinements — what was argued, and what it settled
 
-Eight screens in Tally were not designed once and shipped. They went through a
+Nine screens in Tally were not designed once and shipped. They went through a
 critique loop — two agents judging rendered frames, one answering them, repeat
 until a round produces no finding above `minor` — and the loop changed the
 product, not just the pixels. The harness that runs it is [`uxr/`](../uxr/README.md).
@@ -271,6 +271,85 @@ Shipped: `src/kiosk/components/EventName.tsx`, on the lobby header, the chooser
 row, the hold button, the staff menu and the change-event question — five
 surfaces, one rule: *wherever the kiosk names a gathering, the name wears its
 mark.*
+
+---
+
+## The kiosk keyboard's bottom row — 3 rounds
+
+A parent's friend, using the lobby tablet, said the keyboard was weird: the
+space bar was off to the right instead of in the middle. It was. The bottom row
+was `Clear · ’ · - · space`, four keys sharing seven flex units under rows of
+ten, so the bar began at the midline and ran to the bezel, its centre a quarter
+of the board's width right of the board's. Measured, the row's exact midpoint —
+where a hand goes for a space on every other keyboard — was the hyphen key, on
+every screen shape. Search folded the stray mark; registration kept it and
+capitalised the next letter, so "Mary Jane" could leave the wizard as
+"Mary-Jane" on a sticker and in the church's database.
+
+The campaign ran on a harness that mounts the real `SearchScreen` and
+`RegistrationFlow` around a table of candidate rows (`uxr/kiosk-keyboard/`),
+measures every key's box, and lays the candidates side by side per state and
+glass. Ten reviewers a round: three visual critics and three design critics
+(phone, portrait tablet, landscape tablet), and the parent, newcomer,
+church-staff and journey consultants. The product owner chose from the
+survivors.
+
+**Round 1: seven rows, four dropped on their own terms.** Moving ⌫ off the
+letter row to fill the bottom-right corner left dead glass where every phone
+puts delete — a tap with no buzz reads as a frozen tablet, and every consultant
+refused it. An empty corner read as a key that failed to render, and over a
+gathering's photograph as the brightest rectangle on the board. Dropping the
+punctuation from the search screen alone left the complaint standing on the one
+screen the complaint was about, and gave the same corner two meanings a minute
+apart. And Clear at the width of the ⇧/⌫ flanks could not hold its own word on a
+phone: the ink ran past the rounded corners. Two units is Clear's floor.
+
+What survived was arithmetic. The board had no single unit — each row divided
+the same width minus its own gap count, so a "1.5-unit" key was three widths on
+one glass and no bottom row could land on the columns above by construction.
+Every row now sits on one track of twenty half-column cells: a letter is two,
+the stagger one, the flanks three, Clear four, the bar twelve. The digit and
+letter rows did not move; the bottom row's edges fall on theirs to the pixel
+and the bar's centre is the board's midline on every glass.
+
+**Round 2: the geometry finished, and the panel split.** The visual critics
+asked for two protections composed onto the finished row — a deeper gutter
+under the letter rows, because ⌫ now sat over the hyphen and, on the wizard, ⇧
+over Clear, and more air at the seam between the bar and Clear. The design
+critics asked for both undone: a bottom row 8px shorter than the others read as
+a squashed row and detached over the photograph, and a bar inset on one side
+left the axis it had just been put on. A row with a second delete under the
+first — the journey consultation's candidate — made the correction miss free
+and then read as a render fault, two identical marks on plates of unequal
+width. A word on the bar, which round 1 had set small and grey and measured at
+2.99:1 over a white photo region, came back in Clear's exact voice and measured
+as legibly as Clear on both grounds.
+
+Round 2 also found the bug the ’ key had shipped with: the key showed a
+typographer's ’ and typed it, and the wizard's name filter accepts only the
+straight mark, so the press buzzed, nothing appeared, and O'Brien had been
+registering as Obrien since the key existed. The key types the straight
+apostrophe now, on every screen.
+
+**Round 3: the protections rebuilt in the form both camps accepted.** The
+gutter comes from trimming every key 2px rather than one row 8px, so no row is
+a different height and the ten freed pixels all sit under the Z row (16px, was
+6). The seam comes off Clear rather than the bar (14px, was 6), so the bar keeps
+its axis and both its columns. The apostrophe went back up to where it sits in a
+word, because levelled with the hyphen it read as a comma. The board's height
+is unchanged on every viewport.
+
+Shipped: `centered-safe` — `Clear · space · ’ · -` on the twenty-cell track,
+Clear giving 8px to its bar side, every key 2px shorter, the punctuation legends
+one size larger. With it, the search buffer refuses a mark on digits the way it
+refuses a fifth digit, because a correction that lands low used to turn "7788"
+into a name query that matched nobody and put the register door in front of the
+family. What the loop did not take: a labelled bar ("Space", in Clear's voice —
+fit to choose, but the parent would not spend a change on it), and the
+twin-delete row (fit only if the digit guard did not ship). Two follow-ups the
+panel asked for stay open: a stray hint on Clear's two-second hold, which
+cancels silently on a drift, and trimming a trailing mark from a wizard answer
+the way whitespace is trimmed.
 
 ---
 
