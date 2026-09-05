@@ -255,16 +255,17 @@ function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
   /* Any word, not the whole name: the app's matcher answers "al" with every
      Alvarez as well as every Alice, and a fixture that only matched from the
      first letter of the first name could not produce a list long enough to be
-     truncated. */
-  const needle = buffer.toLowerCase();
+     truncated. Word by word, because a buffer can carry a space — "Ramona Al"
+     is a parent typing a whole name — and the app answers it with the
+     children every typed word prefixes some word of. A fixture that took the
+     buffer as one needle could not photograph the space bar doing its job. */
+  const needles = buffer.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const matched =
-    buffer && !nobody
-      ? roster.filter((student) =>
-          `${student.firstName} ${student.lastName}`
-            .toLowerCase()
-            .split(/[\s-]+/)
-            .some((word) => word.startsWith(needle)),
-        )
+    needles.length > 0 && !nobody
+      ? roster.filter((student) => {
+          const words = `${student.firstName} ${student.lastName}`.toLowerCase().split(/[\s-]+/);
+          return needles.every((needle) => words.some((word) => word.startsWith(needle)));
+        })
       : [];
   /* Sliced like `searchStudents` slices, and carrying the same pre-slice total,
      so a capped list renders exactly what the app would render. */
