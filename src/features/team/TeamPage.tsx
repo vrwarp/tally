@@ -8,6 +8,14 @@
  * do. So withdrawing an invitation stops somebody arriving; deactivating a
  * profile is what removes access from somebody already here.
  *
+ * That is also why *Invited* lists only the addresses without a profile yet.
+ * Nothing consumes an invitation when it is used, so every address that ever
+ * signed in stayed on this card too, in both columns at once, under a heading
+ * that said they had not — beside a switch reading "may sign in" that could
+ * not touch them. The switch is gone entirely (see `@/services/access`) and the
+ * list is filtered, so what is on this card is what the card claims: people who
+ * have been let in and have not turned up.
+ *
  * Access used to come from a Planning Center List, and this screen used to say
  * so. It could not keep saying so: a List is generated from filter rules, so
  * "these twelve adults may see a roster of minors" was only expressible by
@@ -60,12 +68,7 @@ import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import {
-  inviteToTally,
-  setInvitationActive,
-  subscribeInvitations,
-  withdrawInvitation,
-} from '@/services/access';
+import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import { subscribeUsers, upsertUser } from '@/services/users';
 import type { Invitation, Role, UserProfile } from '@/types';
 
@@ -256,33 +259,19 @@ export function TeamPage() {
     }
   };
 
-  const patchInvitation = async (invitation: Invitation, active: boolean) => {
-    setBusyId(invitation.id);
-    try {
-      await setInvitationActive(invitation.id, active);
-    } catch {
-      show('Could not save that change.', { tone: 'error' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   /**
    * Puts a withdrawn invitation back, exactly as it was.
    *
    * The document id is derived from the address, so re-inviting writes the same
    * document the delete removed rather than a second one — which is what makes
-   * an undo possible at all here. The one thing `inviteToTally` cannot express
-   * is a suspended invitation: it always writes `active: true`. Restoring a
-   * switched-off address as switched-on would be an undo that quietly grants
-   * access, so the hold is put back explicitly.
+   * an undo possible at all here. Role and note are carried back over because
+   * an undo that returns somebody as a counselor they were not is not an undo.
    */
   const restoreInvitation = async (invitation: Invitation) => {
     if (!profile) return;
     setBusyId(invitation.id);
     try {
       await inviteToTally(invitation.email, invitation.role, profile.id, invitation.note);
-      if (!invitation.active) await setInvitationActive(invitation.id, false);
       show(`${invitation.email} invited again`, { tone: 'success' });
     } catch {
       show('Could not restore that invitation.', { tone: 'error' });
@@ -325,7 +314,32 @@ export function TeamPage() {
     : null;
 
   const columns = isAdmin ? COLUMNS_EDITABLE : COLUMNS_READ_ONLY;
-  const suspendedInvites = invitations?.filter((invitation) => !invitation.active).length ?? 0;
+
+  /*
+   * The invited list, minus everybody it has stopped being about.
+   *
+   * An invitation is not consumed when it is used. `provisionAccess` reads it
+   * once, writes `users/{uid}`, and leaves the document where it was — so an
+   * address that signed in a month ago went on sitting under "Addresses that
+   * may sign in but have not yet", in both cards at once, wearing a role the
+   * profile beside it had already overruled.
+   *
+   * Filtered rather than deleted on sign-in, because the document is the record
+   * of who invited whom and the way back in if a profile is ever lost.
+   *
+   * Held at `null` until the roster arrives: until then the screen cannot say
+   * which invitations are outstanding, and a count is a claim. A roster that
+   * failed outright is the one case it lists them unfiltered — the card beside
+   * this one is already carrying that error, and a list with a stale row in it
+   * is a better answer there than a card that says nothing.
+   */
+  const signedIn = users
+    ? new Set(users.map((member) => member.email.trim().toLowerCase()))
+    : null;
+  const pending =
+    invitations && (signedIn || usersError)
+      ? invitations.filter((invitation) => !signedIn?.has(invitation.email.trim().toLowerCase()))
+      : null;
 
   return (
     <PageFrame>
@@ -566,23 +580,18 @@ export function TeamPage() {
                     Invited
                     {/* No number at all when the read failed: a stale count is
                         the same false claim the empty state used to make. */}
-                    {invitations && !invitationsError ? (
+                    {pending && !invitationsError ? (
                       <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
-                        {invitations.length}
+                        {pending.length}
                       </span>
                     ) : null}
                   </h2>
-                  {/* Shut, the card would otherwise report a clean 4 when one of
-                      the four is switched off — or, when the read failed, say
-                      nothing whatever beside a "＋ Invite someone" that reads as
+                  {/* Shut, the card would otherwise say nothing whatever when
+                      the read failed, beside a "＋ Invite someone" that reads as
                       "nobody is waiting". The banner itself is inside the card. */}
                   {invitationsError ? (
                     <p className="mt-0.5 group-open:hidden lg:hidden">
                       <Badge tone="danger">Not loaded</Badge>
-                    </p>
-                  ) : suspendedInvites > 0 ? (
-                    <p className="mt-0.5 group-open:hidden lg:hidden">
-                      <Badge tone="danger">{suspendedInvites} suspended</Badge>
                     </p>
                   ) : null}
                   <p className="mt-0.5 hidden text-sm text-ink-500 lg:block">
@@ -635,7 +644,7 @@ export function TeamPage() {
                 <div className="px-4 py-3">
                   <ErrorBanner message={invitationsError} />
                 </div>
-              ) : !invitations ? (
+              ) : !pending ? (
                 <>
                   <span role="status" className="sr-only">
                     Loading invitations
@@ -644,14 +653,14 @@ export function TeamPage() {
                     <SkeletonRows count={2} />
                   </div>
                 </>
-              ) : invitations.length === 0 ? (
+              ) : pending.length === 0 ? (
                 <EmptyState
                   title="No pending invitations."
                   description="Everybody who has been invited has signed in."
                 />
               ) : (
                 <ul className="divide-y divide-ink-800">
-                  {invitations.map((invitation) => (
+                  {pending.map((invitation) => (
                     <li
                       key={invitation.id}
                       className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:flex-col lg:items-stretch lg:gap-2"
@@ -659,15 +668,10 @@ export function TeamPage() {
                       <Identity
                         title={invitation.email}
                         meta={
-                          // The exception leads the line and the granted role
-                          // speaks the roster's vocabulary: a pending Core team
-                          // is an elevation, and it used to hide in the grey.
+                          // The granted role speaks the roster's vocabulary: a
+                          // pending Core team is an elevation, and it used to
+                          // hide in the grey.
                           <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-400">
-                            {!invitation.active ? (
-                              <Badge tone="danger" className="first:-ml-1.5">
-                                Suspended
-                              </Badge>
-                            ) : null}
                             {invitation.role === 'counselor' ? (
                               <span>{ROLE_LABEL[invitation.role]}</span>
                             ) : (
@@ -682,22 +686,25 @@ export function TeamPage() {
                         }
                       />
                       {/*
-                        * The reversible control at the thumb's edge and the
-                        * destructive one at the other: they used to sit 12px
-                        * apart, both under 44px.
+                        * One control on the row, and it is the destructive one.
                         *
-                        * They were also the wrong way round in weight.
-                        * Withdrawing is a `deleteDoc` and it wore `ghost`, the
-                        * quietest variant in the system — quieter than the
-                        * *reversible* toggle beside it — and fired on one tap,
-                        * on a row where those two are the only two things a
-                        * thumb can land on. It now costs a second, red tap, the
-                        * shape the event page already uses for calling off a
+                        * There used to be a checkbox beside it reading "may
+                        * sign in", 12px away and under 44px. It was removed
+                        * rather than moved: the flag it wrote could only refuse
+                        * a *first* sign-in, so on the row of anybody who had
+                        * already arrived — the rows this card no longer shows —
+                        * it was a switch over access to a roster of minors that
+                        * changed nothing.
+                        *
+                        * What is left had the weights the wrong way round
+                        * anyway. Withdrawing is a `deleteDoc` and it wore
+                        * `ghost`, the quietest variant in the system, and fired
+                        * on one tap. It now costs a second, red tap, the shape
+                        * the event page already uses for calling off a
                         * gathering, and the toast that follows offers the way
-                        * back. The toggle is untouched: friction on the
-                        * reversible act is backwards.
+                        * back.
                         */}
-                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                         {confirmingWithdrawal === invitation.id ? (
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" onClick={() => setConfirmingWithdrawal(null)}>
@@ -723,12 +730,6 @@ export function TeamPage() {
                             Withdraw
                           </Button>
                         )}
-                        <AccessToggle
-                          checked={invitation.active}
-                          disabled={busyId === invitation.id}
-                          label={`${invitation.email} may sign in`}
-                          onChange={(active) => void patchInvitation(invitation, active)}
-                        />
                         {/* `basis-full` drops the consequence onto its own line
                             inside the same row rather than adding a wrapper the
                             three layouts would each have to be re-checked

@@ -9,25 +9,19 @@
  * The document id is derived from the address, never generated, which is the
  * whole of what makes inviting somebody twice safe. And a stored document is
  * read defensively: an invitation may have been written by an older version of
- * this app or by hand in the console, so a missing `active`, an unknown role,
- * or a missing `email` each has a defined answer rather than a crash on the
- * team screen.
+ * this app or by hand in the console, so an unknown role, a missing `email`, or
+ * the retired `active` flag each has a defined answer rather than a crash on
+ * the team screen.
  *
  * Firestore is mocked at the SDK boundary. These are claims about the writes
  * this module builds; whether the rules permit them is `firestore-tests`.
  */
 import { Timestamp } from 'firebase/firestore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  inviteToTally,
-  setInvitationActive,
-  subscribeInvitations,
-  withdrawInvitation,
-} from '@/services/access';
+import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import type { Invitation } from '@/types';
 
 const setDoc = vi.hoisted(() => vi.fn(async () => {}));
-const updateDoc = vi.hoisted(() => vi.fn(async () => {}));
 const deleteDoc = vi.hoisted(() => vi.fn(async () => {}));
 const onSnapshot = vi.hoisted(() => vi.fn(() => () => {}));
 const orderBy = vi.hoisted(() => vi.fn((field: string) => ({ orderBy: field })));
@@ -49,8 +43,8 @@ vi.mock('firebase/firestore', () => ({
   orderBy,
   onSnapshot,
   serverTimestamp: () => 'server-timestamp',
+  deleteField: () => 'delete-field',
   setDoc,
-  updateDoc,
   deleteDoc,
 }));
 
@@ -83,7 +77,6 @@ function published(docs: { id: string; data: Record<string, unknown> | undefined
 
 beforeEach(() => {
   setDoc.mockClear();
-  updateDoc.mockClear();
   deleteDoc.mockClear();
   onSnapshot.mockClear();
   orderBy.mockClear();
@@ -104,15 +97,23 @@ describe('inviteToTally', () => {
     expect(written().data).toMatchObject({ email: 'miriam@example.org' });
   });
 
-  it('writes the role, who invited them, and an active flag', () => {
+  it('writes the role and who invited them', () => {
     void inviteToTally('miriam@example.org', 'admin', 'uid-admin');
 
     expect(written().data).toMatchObject({
       role: 'admin',
-      active: true,
       invitedBy: 'uid-admin',
       invitedAt: 'server-timestamp',
     });
+  });
+
+  it('takes the retired pause flag off any document it rewrites', () => {
+    // The switch is gone, so the field is deleted rather than merged over: a
+    // value left on the record is one somebody reads later as still meaning
+    // something.
+    void inviteToTally('miriam@example.org', 'core', 'uid-admin');
+
+    expect(written().data).toMatchObject({ active: 'delete-field' });
   });
 
   it('merges, so changing somebody role does not blank the rest', () => {
@@ -149,26 +150,7 @@ describe('inviteToTally', () => {
   });
 });
 
-describe('pausing and withdrawing', () => {
-  it('pauses an invitation without retyping the address', async () => {
-    // A summer volunteer goes on hold and comes back in September.
-    await setInvitationActive('miriam@example,org', false);
-
-    expect(updateDoc).toHaveBeenCalledWith(
-      { path: 'invitations/miriam@example,org' },
-      { active: false },
-    );
-  });
-
-  it('restores one the same way', async () => {
-    await setInvitationActive('miriam@example,org', true);
-
-    expect(updateDoc).toHaveBeenCalledWith(
-      { path: 'invitations/miriam@example,org' },
-      { active: true },
-    );
-  });
-
+describe('withdrawing', () => {
   it('withdraws by deleting the document', async () => {
     await withdrawInvitation('miriam@example,org');
 
@@ -194,7 +176,6 @@ describe('subscribeInvitations', () => {
         data: {
           email: 'miriam@example.org',
           role: 'core',
-          active: true,
           invitedAt: new Timestamp(1_767_607_200, 0),
           invitedBy: 'uid-admin',
           note: 'Wednesday volunteer',
@@ -206,7 +187,6 @@ describe('subscribeInvitations', () => {
       id: 'miriam@example,org',
       email: 'miriam@example.org',
       role: 'core',
-      active: true,
       invitedAt: new Date(1_767_607_200_000),
       invitedBy: 'uid-admin',
       note: 'Wednesday volunteer',
@@ -266,18 +246,16 @@ describe('subscribeInvitations', () => {
     expect(invitation?.email).toBe('a.b@sub.example.org');
   });
 
-  it('treats an invitation with no flag as active', () => {
-    // Absent means "nobody has paused this", which is what every invitation
-    // written before the pause switch existed looks like.
-    const [invitation] = published([{ id: 'a@b,org', data: { active: undefined } }]);
+  it('drops the retired pause flag, however an old document left it', () => {
+    // The switch is gone from the screen and from the server. A `false` still
+    // sitting on a document written before that must not come back as a
+    // property the team screen could draw a "Suspended" badge from.
+    const rows = published([
+      { id: 'a@b,org', data: { active: false } },
+      { id: 'c@d,org', data: { active: true } },
+    ]);
 
-    expect(invitation?.active).toBe(true);
-  });
-
-  it('honours a paused flag', () => {
-    const [invitation] = published([{ id: 'a@b,org', data: { active: false } }]);
-
-    expect(invitation?.active).toBe(false);
+    for (const row of rows) expect(row).not.toHaveProperty('active');
   });
 
   it('falls back to the least privilege for an unknown role', () => {

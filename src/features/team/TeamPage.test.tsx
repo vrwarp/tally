@@ -9,12 +9,14 @@
  *    count badge reading `0` and an empty state asserting that everybody
  *    invited had already signed in — about access to a roster of minors.
  * 2. Withdrawing is a hard delete and wore the quietest variant in the system,
- *    fired on one tap, a thumb's width from the *reversible* access toggle. It
- *    now costs a confirming tap and the toast that follows offers the way back.
- *    The toggle keeps its single tap, and there is a test for that too, because
- *    "add friction" is the easy over-correction.
+ *    and fired on one tap. It now costs a confirming tap and the toast that
+ *    follows offers the way back.
  * 3. The loading skeletons are hidden from assistive tech, so without a
  *    sentence beside them a slow read and an empty list sound identical.
+ * 4. "Addresses that may sign in but have not yet" listed the ones who had.
+ *    Nothing consumes an invitation, so anybody who ever signed in stayed in
+ *    both columns of this screen at once — and the invited row's controls, on
+ *    the card about people who are not here, governed nobody.
  *
  * The read-only screen — a core member checking who is on the team — is
  * asserted on directly: every fix above adds something to the admin's view and
@@ -33,7 +35,6 @@ const subscribeUsers = vi.hoisted(() => vi.fn());
 const upsertUser = vi.hoisted(() => vi.fn());
 const subscribeInvitations = vi.hoisted(() => vi.fn());
 const inviteToTally = vi.hoisted(() => vi.fn());
-const setInvitationActive = vi.hoisted(() => vi.fn());
 const withdrawInvitation = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/authContext', () => ({ useAuth }));
@@ -41,7 +42,6 @@ vi.mock('@/services/users', () => ({ subscribeUsers, upsertUser }));
 vi.mock('@/services/access', () => ({
   subscribeInvitations,
   inviteToTally,
-  setInvitationActive,
   withdrawInvitation,
 }));
 
@@ -50,6 +50,7 @@ type InvitationsListener = (invitations: Invitation[]) => void;
 type Fail = (cause: Error) => void;
 
 let usersListener: UsersListener = () => {};
+let usersFailed: Fail = () => {};
 let invitationsListener: InvitationsListener = () => {};
 let invitationsFailed: Fail = () => {};
 
@@ -71,7 +72,6 @@ function makeInvitation(overrides: Partial<Invitation> = {}): Invitation {
     id: 'volunteer,example,org',
     email: 'volunteer@example.org',
     role: 'counselor',
-    active: true,
     invitedAt: new Date('2026-08-01T12:00:00'),
     invitedBy: ADMIN.id,
     ...overrides,
@@ -98,8 +98,9 @@ function useWideViewport() {
 beforeEach(() => {
   useWideViewport();
 
-  subscribeUsers.mockImplementation((next: UsersListener) => {
+  subscribeUsers.mockImplementation((next: UsersListener, onError: Fail) => {
     usersListener = next;
+    usersFailed = onError;
     return () => {};
   });
   subscribeInvitations.mockImplementation((next: InvitationsListener, onError: Fail) => {
@@ -110,7 +111,6 @@ beforeEach(() => {
 
   upsertUser.mockResolvedValue(undefined);
   inviteToTally.mockResolvedValue(undefined);
-  setInvitationActive.mockResolvedValue(undefined);
   withdrawInvitation.mockResolvedValue(undefined);
 
   useAuth.mockReturnValue({ profile: ADMIN, can: () => true });
@@ -166,6 +166,73 @@ describe('TeamPage — a failed read is not an empty list', () => {
 
     expect(screen.getByText('No pending invitations.')).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
+  });
+});
+
+describe('TeamPage — invited means invited, not arrived', () => {
+  /*
+   * The invitation is not consumed when somebody uses it: `provisionAccess`
+   * reads the document, writes the profile, and leaves the invitation where it
+   * was. So the address stayed under "Addresses that may sign in but have not
+   * yet" for as long as the deployment lived, counted in the badge, wearing the
+   * role it was invited with rather than the one the profile beside it now
+   * holds.
+   */
+  const arrived = makeInvitation({ id: 'sam,example,org', email: MATE.email, role: 'core' });
+
+  it('leaves out an address that already has a profile', () => {
+    renderTeam();
+    settleUsers();
+    deliverInvitations([arrived, makeInvitation()]);
+
+    // Once on the screen, in the card that decides their access.
+    expect(screen.getAllByText(MATE.email)).toHaveLength(1);
+    expect(screen.getByText('volunteer@example.org')).toBeInTheDocument();
+  });
+
+  it('matches however the address was typed into the invite box', () => {
+    renderTeam();
+    settleUsers();
+    deliverInvitations([makeInvitation({ id: 'sam,example,org', email: 'Sam@Example.org' })]);
+
+    expect(screen.getByText('No pending invitations.')).toBeInTheDocument();
+  });
+
+  it('counts what it lists', () => {
+    renderTeam();
+    settleUsers();
+    deliverInvitations([arrived, makeInvitation()]);
+
+    // The badge read `2` beside a list of one.
+    expect(screen.getByRole('heading', { name: 'Invited1' })).toBeInTheDocument();
+  });
+
+  it('says nobody is waiting when everybody invited has arrived', () => {
+    renderTeam();
+    settleUsers();
+    deliverInvitations([arrived]);
+
+    expect(screen.getByText('Everybody who has been invited has signed in.')).toBeInTheDocument();
+  });
+
+  it('waits for the roster before claiming anything is outstanding', () => {
+    // Invitations first, roster still in flight: until it lands the screen does
+    // not know which of these are pending, and a count is a claim.
+    renderTeam();
+    deliverInvitations([arrived]);
+
+    expect(screen.getByText('Loading invitations')).toBeInTheDocument();
+    expect(screen.queryByText('No pending invitations.')).not.toBeInTheDocument();
+  });
+
+  it('lists them unfiltered rather than emptied when the roster read fails', () => {
+    // The card beside this one is already carrying that error. A stale row here
+    // is a better answer than a card that has gone silent about who may arrive.
+    renderTeam();
+    act(() => usersFailed(new Error('Missing or insufficient permissions.')));
+    deliverInvitations([arrived]);
+
+    expect(screen.getByText(MATE.email)).toBeInTheDocument();
   });
 });
 
@@ -252,13 +319,16 @@ describe('TeamPage — withdrawing an invitation', () => {
     expect(screen.getByRole('button', { name: 'Yes, withdraw' }).className).toMatch(/danger/);
   });
 
-  it('leaves the reversible toggle at one tap', async () => {
-    const { user, invitation } = arrive();
+  it('offers no other control on the row', () => {
+    // The access checkbox that used to sit beside this one is gone: it wrote a
+    // flag that could only refuse a first sign-in, so on the rows this card
+    // used to carry — everybody who had already arrived — it was a switch over
+    // access to a roster of minors that did nothing.
+    const { invitation } = arrive();
 
-    await user.click(screen.getByRole('checkbox', { name: `${invitation.email} may sign in` }));
-
-    await waitFor(() => expect(setInvitationActive).toHaveBeenCalledWith(invitation.id, false));
-    expect(screen.queryByRole('button', { name: /^Yes,/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: `${invitation.email} may sign in` }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -285,17 +355,6 @@ describe('TeamPage — the way back from a delete', () => {
       expect(inviteToTally).toHaveBeenCalledWith(invitation.email, 'core', ADMIN.id, undefined),
     );
     expect(await screen.findByText(`${invitation.email} invited again`)).toBeInTheDocument();
-  });
-
-  it('does not switch a suspended invitation back on', async () => {
-    const invitation = makeInvitation({ active: false });
-    const user = await withdraw(invitation);
-
-    await user.click(screen.getByRole('button', { name: 'Undo' }));
-
-    // `inviteToTally` always writes `active: true`, so the hold has to be put
-    // back explicitly — an undo that quietly grants access is not an undo.
-    await waitFor(() => expect(setInvitationActive).toHaveBeenCalledWith(invitation.id, false));
   });
 
   it('says so when the restore fails, rather than nothing', async () => {

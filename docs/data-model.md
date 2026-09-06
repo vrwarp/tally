@@ -959,7 +959,14 @@ The allowlist: an admin saying "this Google address may sign in, as this". `emai
 lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`) —
 Firestore ids may not contain `/`, and `.` is legal but awkward to read.
 
-Fields: `email`, `role`, `active`, `invitedAt`, `invitedBy`, and an optional `note`.
+Fields: `email`, `role`, `invitedAt`, `invitedBy`, and an optional `note`.
+
+There is no `active` flag any more. There was one, drawn on the Team screen as a checkbox reading
+"may sign in", and it could only ever refuse a *first* sign-in — `provisionAccess` returns on the
+profile before it reads the invitation — so on the row for anybody who had already arrived it was a
+control over access to a roster of minors that changed nothing. Documents written before the removal
+may still carry the field: the rules still permit the key so a merge over one of those is not
+rejected, nothing reads it, and `inviteToTally` deletes it from any document it rewrites.
 
 Keyed by address rather than by uid because it is written *before* the person has ever signed in, and
 a uid does not exist until they do. Once they have, `users/{uid}` is the live authorisation and this
