@@ -44,6 +44,7 @@ import {
 import { applyKioskTheme } from './theme';
 import { loadBackdrop } from './backdrop';
 import { Backdrop } from './components/Backdrop';
+import { useOrphanClickGuard } from './components/tapGuard';
 import { tallyRender } from './renderTally';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
@@ -433,6 +434,13 @@ export function KioskApp() {
    * walkthrough runner and a bench with a real keyboard on it, not for the
    * lobby.
    */
+  /*
+   * A gesture outlives the control that answered it: see `useOrphanClickGuard`.
+   * Installed here because it is the whole kiosk's rule, not one screen's, and
+   * because this is where what the glass is showing is decided.
+   */
+  useOrphanClickGuard(`${phase}:${overlay?.kind ?? ''}`);
+
   const touchedAtRef = useRef(Date.now());
   useEffect(() => {
     const touched = () => {

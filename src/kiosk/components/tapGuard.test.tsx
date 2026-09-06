@@ -13,10 +13,11 @@
  * `fireEvent` defaults every coordinate to zero, and zero sits on the edge of a
  * zero rect.
  */
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TAP_SLOP_PX, useTap, useTapGuard } from './tapGuard';
+import { TAP_SLOP_PX, useOrphanClickGuard, useTap, useTapGuard } from './tapGuard';
 
 afterEach(cleanup);
 
@@ -167,5 +168,153 @@ describe('a row in a list that scrolls', () => {
     up(row, { clientX: 200, clientY: 140 + TAP_SLOP_PX * 4 });
 
     expect(onPick).not.toHaveBeenCalled();
+  });
+});
+
+describe('a click belonging to a press this screen never received', () => {
+  /*
+   * The per-control guards make React's own controls immune, because a lift is
+   * only an act on the control that took the press. What they cannot cover is
+   * the browser's own widgets: a `<summary>` toggles its `<details>` on a bare
+   * click, and that click can belong to a press made on the screen before.
+   *
+   * Which is not hypothetical — it is how opening the printer screen from the
+   * staff screen both opened the device chooser and popped the settings fold.
+   */
+  function Guarded({ children, screen = 'one' }: { children: React.ReactNode; screen?: string }) {
+    useOrphanClickGuard(screen);
+    return <>{children}</>;
+  }
+
+  /**
+   * The two screens, and the swap between them made the way the kiosk makes it.
+   *
+   * The row acts on `pointerup`, exactly as `useTap` does, so the *click* that
+   * finishes the same tap is dispatched after the second screen has replaced
+   * the first — which is the whole shape of the bug.
+   */
+  function Swapping({ onArrived }: { onArrived: () => void }) {
+    const [arrived, setArrived] = useState(false);
+    useOrphanClickGuard(arrived ? 'printer' : 'staff');
+    return arrived ? (
+      <button type="button" onClick={onArrived}>
+        the screen that arrived
+      </button>
+    ) : (
+      <button type="button" onPointerUp={() => setArrived(true)}>
+        the screen that was
+      </button>
+    );
+  }
+
+  it('stops a click whose press landed on a control that is gone', () => {
+    const acted = vi.fn();
+    render(<Swapping onArrived={acted} />);
+    const was = screen.getByRole('button', { name: 'the screen that was' });
+
+    fireEvent.pointerDown(was, { pointerId: 1 });
+    fireEvent.pointerUp(was, { pointerId: 1 });
+    // The first screen is gone; the browser now delivers the click of that same
+    // tap against whatever is under the finger, which is the second screen.
+    fireEvent.click(screen.getByRole('button', { name: 'the screen that arrived' }));
+
+    expect(acted).not.toHaveBeenCalled();
+  });
+
+  it('stops a click whose press landed on a different control', () => {
+    const acted = vi.fn();
+    render(
+      <Guarded>
+        <button type="button" id="elsewhere">
+          elsewhere
+        </button>
+        <button type="button" onClick={acted}>
+          here
+        </button>
+      </Guarded>,
+    );
+
+    fireEvent.pointerDown(document.getElementById('elsewhere') as HTMLElement, { pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'here' }));
+
+    expect(acted).not.toHaveBeenCalled();
+  });
+
+  it('lets an ordinary press-and-click through', () => {
+    const acted = vi.fn();
+    render(
+      <Guarded>
+        <button type="button" onClick={acted}>
+          here
+        </button>
+      </Guarded>,
+    );
+    const button = screen.getByRole('button');
+
+    fireEvent.pointerDown(button, { pointerId: 1 });
+    fireEvent.click(button);
+
+    expect(acted).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a click with no press at all through', () => {
+    // A keyboard Enter, or one a test dispatched: there is no gesture behind it
+    // for it to have been orphaned from.
+    const acted = vi.fn();
+    render(
+      <Guarded>
+        <button type="button" onClick={acted}>
+          here
+        </button>
+      </Guarded>,
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(acted).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets a press that a key interrupted, so it cannot swallow a later click', () => {
+    /*
+     * A press that never becomes a click — a scroll, a cancelled hold — would
+     * otherwise sit in the record until some unrelated click came along.
+     */
+    const acted = vi.fn();
+    render(
+      <Guarded>
+        <button type="button" id="scrolled">
+          scrolled
+        </button>
+        <button type="button" onClick={acted}>
+          here
+        </button>
+      </Guarded>,
+    );
+    const scrolled = document.getElementById('scrolled') as HTMLElement;
+
+    fireEvent.pointerDown(scrolled, { pointerId: 1 });
+    fireEvent.pointerCancel(scrolled, { pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'here' }));
+
+    expect(acted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not stop the browser’s own widgets from answering a real press', () => {
+    // The fold on the printer screen: guarded against a press it never had,
+    // still a disclosure the moment somebody actually presses it.
+    render(
+      <Guarded>
+        <details>
+          <summary>QL-810W · 62mm endless</summary>
+          <p>the settings</p>
+        </details>
+      </Guarded>,
+    );
+    const summary = screen.getByText('QL-810W · 62mm endless');
+
+    fireEvent.pointerDown(summary, { pointerId: 1 });
+    const stopped = !fireEvent.click(summary);
+
+    expect(stopped).toBe(false);
   });
 });
