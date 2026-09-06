@@ -271,8 +271,10 @@ export async function ready(): Promise<PrinterState> {
   }
 
   // Reconnection is this layer's job — the library reports connect and
-  // disconnect but never retries, and its README lists replugging mid-job as
-  // unverified. One reopen on a connect event is what a kiosk needs.
+  // disconnect but never reopens the device itself. One reopen on a connect
+  // event is what a kiosk needs, and upstream has now seen the whole sequence
+  // work on a QL-810W: an unplug mid-job is noticed in about a second and the
+  // printer needs nothing after it comes back.
   watching ??= watchConnectionEvents({
     connect: () => {
       void reopen();
