@@ -75,8 +75,13 @@ count rather than the head count (`12 in room · 18 checked in`), the two filter
 room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
 collecting children is the gesture repeated forty times a morning. A parent can also collect their
-own child at the lobby kiosk, with a two-second hold rather than a tap: a stray check-in corrects
-itself when the child walks in anyway, while a stray pickup claims somebody left the building.
+own child at the lobby kiosk, with the same single tap the arrival costs. It held for two seconds
+for a while — a stray check-in corrects itself when the child walks in anyway, while a stray pickup
+claims somebody left the building — and the gesture came off because that argument never weighed
+how often the button is pressed: it is the one control a parent meets every week, in a queue, at
+the end of a morning. What guards it now is the confirm screen itself, which costs the ordinary
+case nothing: every name is on the glass above the finger, only the ticked ones go, and the press
+has to lift inside the button it landed on.
 
 Two rules make it honest. **A missed check-out is not a miss** — attendance is untouched by any of
 it, so a morning where half the parents walked off without telling anybody counts exactly like one

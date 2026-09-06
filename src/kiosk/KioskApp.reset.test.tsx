@@ -14,7 +14,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -141,18 +140,6 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
-async function hold(text: RegExp | string): Promise<void> {
-  const button = screen.getByText(text).closest('button')!;
-  await act(async () => {
-    fireEvent.pointerDown(button);
-  });
-  await act(async () => {
-    // The grace before the count, and then the count.
-    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
-  });
-  await settle();
-}
-
 /** Dismiss the success screen the way a parent does — a tap anywhere on it. */
 async function tapSuccess(): Promise<void> {
   const anywhere = screen.getByText(/tap anywhere to carry on/i);
@@ -212,7 +199,7 @@ describe('returning home after a tap', () => {
     await type('ada');
     await pickAda();
 
-    await hold(/collect/i);
+    await tap(/collect/i);
     await tapSuccess();
 
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();

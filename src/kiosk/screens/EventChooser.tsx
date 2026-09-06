@@ -3,16 +3,22 @@
  *
  * The event is chosen by a person, never by the clock — the same product rule
  * as the main app's chooser. The gathering whose check-in window is open is
- * ringed and sorted first, but somebody still has to pick it, and confirming
- * is a two-second hold so a wandering hand cannot re-point the kiosk.
+ * ringed and sorted first, but somebody still has to pick it.
  *
- * The hold is on the rows as well as on the button: holding a gathering sets
- * the kiosk to it outright, so the usual setup is one gesture rather than a tap
- * and then a hold somewhere else on the screen. The button stays because it is
- * what says the word "hold" — the rows carry no such label, and a control whose
- * only instruction is a subtitle is a control most people tap once and give up
- * on. Tapping a row still only selects, which is what keeps the button honest
- * and what keeps a scrolling thumb from re-pointing anything.
+ * The hold is on the rows, and only on the rows: holding a gathering sets the
+ * kiosk to it outright, so the usual setup is one gesture rather than a tap and
+ * then a second press somewhere else on the screen. Tapping a row only selects,
+ * which is what keeps a scrolling thumb from re-pointing anything.
+ *
+ * The button below the list is a plain tap. It was a hold too, and two holds to
+ * do one thing was the kiosk asking twice: a volunteer who has already picked a
+ * row on a screen headed "Which gathering is this kiosk for?" has said which
+ * one, out loud, on the only screen where that question is asked — and the
+ * press guard already means the finger has to come off inside the button. The
+ * accident the hold was written against is the *other* path, a hand brushing a
+ * row on the way past, and that path still holds. What the button lost with it
+ * is the word "hold", which is why the subtitle under the question says the
+ * rows' gesture in as many words; it is the only place it is written down.
  *
  * Today, plus whatever is open — the same list the app's own chooser offers,
  * in the same words, for the same reason. The server sends the week because
@@ -124,7 +130,7 @@ export function EventChooser({
     [received, dayEndMs, nowMs],
   );
 
-  /** The row the hold button is about, or null while nothing is picked. */
+  /** The row the commit button is about, or null while nothing is picked. */
   const selectedEntry = selected === null ? null : (entries?.[selected] ?? null);
 
   useEffect(() => {
@@ -145,7 +151,7 @@ export function EventChooser({
   }, [services]);
 
   /**
-   * Sets the kiosk to one row, from either hold.
+   * Sets the kiosk to one row, from either way in — a held row, or the button.
    *
    * `setSelected` even though the screen is about to be replaced: a bind takes
    * a round trip, and for that second the ringed row has to be the one the
@@ -385,9 +391,9 @@ export function EventChooser({
           *
           * Here rather than behind a second hidden gesture: this screen is
           * already past the staff gate on the search screen, and a setup step
-          * nobody can find is a setup step nobody does. A plain button rather
-          * than a hold — the chooser's hold guards re-pointing a kiosk mid-
-          * service, and looking at the printer settings breaks nothing.
+          * nobody can find is a setup step nobody does. The rows' hold guards
+          * re-pointing a kiosk mid-service; looking at the printer settings
+          * breaks nothing, so this has never needed one.
           */}
         <button
           type="button"
@@ -402,35 +408,38 @@ export function EventChooser({
               : 'Label printer needs attention'}
         </button>
 
-        <HoldButton
-          onHeld={() => {
+        <button
+          type="button"
+          tabIndex={-1}
+          {...tap(() => {
             if (selected !== null) void bind(selected);
-          }}
+          })}
           className={`w-full rounded-xl p-5 text-xl font-semibold ${
             selected !== null && !binding
               ? 'bg-brand-600 text-white active:bg-brand-500'
               : 'pointer-events-none bg-ink-800 text-ink-500'
           }`}
+          /* What `HoldButton` used to set here, in the version a tap can have:
+             it swallowed the gesture outright, and a plain button only has to
+             stop a second press inside the double-tap window from zooming the
+             screen a volunteer is trying to set up. */
+          style={{ touchAction: 'manipulation' }}
         >
           {/*
-            * What is about to be bound, on the thing being held.
+            * What is about to be bound, on the thing being pressed.
             *
-            * The two seconds this button exists to spend were being spent
-            * looking at a label that named nothing: the row a volunteer picked
-            * is at the top of a tablet and the button is at the bottom — half a
-            * phone screen away, three quarters of a portrait kiosk — and where
-            * two sittings of one gathering are on the list, the row's border
-            * changing colour up there is not an answer to "which one". The
-            * hours are what disambiguate, so the hours are what this carries,
-            * and the mark comes with them because here it costs one character
-            * of a line that had nothing on it.
+            * The row a volunteer picked is at the top of a tablet and this
+            * button is at the bottom — half a phone screen away, three quarters
+            * of a portrait kiosk — and where two sittings of one gathering are
+            * on the list, the row's border changing colour up there is not an
+            * answer to "which one". The hours are what disambiguate, so the
+            * hours are what this carries, and the mark comes with them because
+            * here it costs one character of a line that had nothing on it.
             *
-            * *Above* the instruction, and that is not decoration. A thumb
-            * occludes downward from where it lands, so a fact printed under the
-            * label is a fact covered for exactly the two seconds it was added
-            * for — and a volunteer who lifts to read it has cancelled the hold
-            * they were reading about. The instruction goes under the finger
-            * instead: it has already been read, and the row above says it too.
+            * It mattered more when this was a hold, and it still earns the
+            * line: what is being confirmed reads before the word for
+            * confirming it, in that order, which is the order somebody
+            * checking their own work reads them in.
             *
             * The name truncates and the time does not. One `truncate` over the
             * whole run clipped from the right, which is where the clock is —
@@ -464,8 +473,8 @@ export function EventChooser({
               <span className="shrink-0 text-white">· {timeLabel(selectedEntry.startAt)}</span>
             </span>
           )}
-          {binding ? 'Setting up…' : selected !== null ? 'Hold to set kiosk' : 'Pick a gathering'}
-        </HoldButton>
+          {binding ? 'Setting up…' : selected !== null ? 'Set kiosk' : 'Pick a gathering'}
+        </button>
       </div>
     </div>
   );

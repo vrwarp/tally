@@ -44,7 +44,7 @@ import { expect } from '@playwright/test';
 import { gotoReady, openCheckIn, signIn, TEAM } from './support/auth';
 import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
-import { bindTo, hold, leaveGathering, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
+import { bindTo, leaveGathering, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'tour');
@@ -373,12 +373,12 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'The same family, at the end of the morning',
-        title: 'A pickup is a hold, not a tap',
+        title: 'The same row, offering the other direction',
         caption:
-          'The same row, hours later, offering the only thing left to do with a child who is already here. Two seconds of deliberate pressure rather than one tap, and that is not ceremony: marking a child collected is a claim that somebody took them out of the building, made on an unattended screen in a lobby — and unlike a stray check-in it does not correct itself when the child walks back in. Undoing one needs a volunteer and the main app.',
+          'The same row, hours later, offering the only thing left to do with a child who is already here. The button changes colour and verb and nothing else: a pickup is one press, exactly as the arrival was. It was a two-second hold for a while, on the argument that marking a child collected is a claim somebody took them out of the building and does not correct itself the way a stray check-in does — true, and still outweighed by how often it is asked. A gesture spent on the one control a parent presses every week makes the most-travelled path the slowest one. What guards it instead costs the ordinary case nothing: every name is on the glass above the finger, only the ticked ones go, and the press has to lift inside the button it landed on. Undoing one still needs a volunteer and the main app.',
       });
 
-      await hold(kiosk, 'button:has-text("Hold to collect")');
+      await kiosk.getByRole('button', { name: /^Collect$/ }).click();
       await expect(kiosk.getByText(/collected|picked up|welcome/i).first()).toBeVisible({
         timeout: 30_000,
       });
@@ -775,7 +775,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await kiosk.getByRole('button', { name: /Zuri/i }).first().click();
-      await expect(kiosk.getByRole('button', { name: /Hold to collect all 3/i })).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Collect all 3/i })).toBeVisible();
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
@@ -784,7 +784,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Arriving apart and leaving together is the ordinary case, not the exception — so the sibling the register cannot vouch for is still on the screen, in the list, one tap from ticked. Dropping her name would have been worse than leaving it unticked: a parent taking their family home should never have to go round the flow twice. The arrival decides what is *ticked*; the phone guess decides what is *shown*, and the two are different jobs.',
       });
 
-      await hold(kiosk, 'button:has-text("Hold to collect all 3")');
+      await kiosk.getByRole('button', { name: /Collect all 3/i }).click();
       // The words the success screen actually uses for a pickup — it says
       // "checked out", never "collected", which is what the button said.
       await expect(kiosk.getByText(/checked out\. See you next time/i)).toBeVisible({
@@ -795,7 +795,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'The same family, three hours later',
         title: 'Two seconds, once, for the whole family',
         caption:
-          'A pickup holds where a check-in taps, and it still holds for three children at once. The asymmetry is deliberate: a stray check-in is self-correcting when the child walks in anyway, and a stray *collection* is a claim on an unattended lobby screen that somebody took a child out of the building. Undoing one needs a volunteer and the main app. The arrival also works the other way round — a child the four-digit guess would never call family, a cousin or a neighbour\'s boy who came in the same press, is offered here and ticked.',
+          'One press takes three children home, the same way one press brought them in. The two directions were asymmetric for a while — the pickup held for two seconds — and the asymmetry lost to arithmetic rather than to argument: the case for it was a stray collection being the one mistake that does not correct itself, and the case against it was that a parent meets this button every single week, in a queue, at the end of a morning. The list is what does the guarding now, and it is doing it in this frame — a child the four-digit guess would never call family, a cousin or a neighbour\'s boy who came in the same press, is offered here and ticked, and every name is above the finger that is about to press.',
       });
 
       await backToSearch(kiosk);

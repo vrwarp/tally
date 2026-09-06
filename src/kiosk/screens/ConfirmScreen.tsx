@@ -1,16 +1,24 @@
 /**
  * "Is this you?" — one big name, one big button.
  *
- * The check-in itself is a single tap, not a hold: speed of confirmation is
- * the kiosk's whole point, and the worst a mis-tap can do is mark somebody
- * present who then walks in anyway. Undo lives with the staff in the main app,
+ * Both commits are a single tap, not a hold: speed of confirmation is the
+ * kiosk's whole point, and the worst a mis-tap can do is mark somebody present
+ * who then walks in anyway. Undo lives with the staff in the main app,
  * deliberately not here.
  *
- * A pickup holds for two seconds instead, and that is not ceremony. Marking
- * a child collected is a claim that somebody took them out of the building,
- * made on an unattended screen in a lobby — and unlike a stray check-in it is
- * not self-correcting when the child walks in anyway. Undoing one needs a
- * volunteer and the main app, so the gesture is worth a deliberate second.
+ * The pickup held for two seconds, and the argument for it was real: marking a
+ * child collected is a claim that somebody took them out of the building, made
+ * on an unattended screen in a lobby, and unlike a stray check-in it is not
+ * self-correcting when the child walks in anyway. What it did not survive was
+ * how often it is asked. A hold is a thing you teach somebody once; a hold on
+ * the one control a parent presses every single week is the kiosk making its
+ * most-travelled path its slowest, on the reasoning that the path is dangerous
+ * — and a queue at a door at ten past the hour is its own kind of dangerous.
+ * The guards that remain are the ones that cost the ordinary case nothing:
+ * every name is on the glass above the finger, only the ticked ones go, and
+ * the press has to lift inside the button it landed on (components/
+ * tapGuard.ts). The hold survives where the press is rare and the screen is
+ * not a parent's — the chooser's rows, the staff gate, the reprint below.
  *
  * ## The rest of the family
  *
@@ -445,18 +453,18 @@ export function ConfirmScreen({
         <div className="flex min-h-23 w-full shrink-0 items-center justify-center text-2xl font-semibold text-present-400">
           ✓ Already checked in
         </div>
-      ) : intent === 'check-out' ? (
-        <HoldButton
-          onHeld={() => onConfirm(chosen)}
-          /* `active:` because the bar no longer answers the touch: a hold waits
-             `HOLD_DELAY_MS` before it starts counting, and this button had
-             nothing else to say it had been pressed. The green button below it
-             has carried the same fill all along. */
-          className="w-full shrink-0 rounded-2xl bg-brand-600 p-7 text-3xl font-bold text-white active:bg-brand-500"
-        >
-          {others > 0 ? `Hold to collect all ${chosen.length}` : 'Hold to collect'}
-        </HoldButton>
       ) : (
+        /*
+          * One control for both directions, because with the pickup's hold gone
+          * they differ in nothing but a colour and a verb. Two branches drawing
+          * the same button is two places for the next change to the commit to
+          * land in one of.
+          *
+          * The colours are the ramps the rest of the kiosk already spends on
+          * these two acts: green is *present*, and belongs to the arrival; the
+          * brand ramp carries the collection, on this screen and on the row that
+          * offered it.
+          */
         <button
           type="button"
           tabIndex={-1}
@@ -466,13 +474,27 @@ export function ConfirmScreen({
             // a parent already turning to walk their child in feels this when
             // they have stopped looking at the screen. One buzz for the family,
             // not one per child: it says the button took, and the button is one.
+            //
+            // The pickup buzzed too when it was a hold, on the completion rather
+            // than on the lift. Same buzz, arriving at the same moment the act
+            // does — which is what it always meant.
             haptic();
             onConfirm(chosen);
           })}
-          className="w-full shrink-0 rounded-2xl bg-present-600 p-7 text-3xl font-bold text-white active:bg-present-500"
+          className={`w-full shrink-0 rounded-2xl p-7 text-3xl font-bold text-white ${
+            intent === 'check-out'
+              ? 'bg-brand-600 active:bg-brand-500'
+              : 'bg-present-600 active:bg-present-500'
+          }`}
           style={{ touchAction: 'manipulation' }}
         >
-          {others > 0 ? `Check in all ${chosen.length}` : 'Check in'}
+          {intent === 'check-out'
+            ? others > 0
+              ? `Collect all ${chosen.length}`
+              : 'Collect'
+            : others > 0
+              ? `Check in all ${chosen.length}`
+              : 'Check in'}
         </button>
       )}
 

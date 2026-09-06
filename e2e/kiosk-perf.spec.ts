@@ -497,7 +497,7 @@ test.describe('kiosk performance', () => {
    * Three minutes a scenario.
    *
    * The suite's minute is right for a test, which does one thing and asserts
-   * on it. A scenario here reboots a device, waits out a two-second hold, then
+   * on it. A scenario here reboots a device, pairs and binds it, then
    * types the same word twice — once for the clock and once for the profiler —
    * and the one that grows the church to four hundred children does all of that
    * behind a roster fetch. A timeout that fires mid-measurement produces a
@@ -576,7 +576,7 @@ test.describe('kiosk performance', () => {
 
   test('pairs and binds', async () => {
     // Setup, not measurement: the throttle comes off so the run does not spend
-    // a minute of wall clock proving that a two-second hold takes two seconds.
+    // a minute of wall clock on a pairing round trip it is not timing.
     await throttleCpu(cdp, 1);
     await pairKiosk(kiosk, staff);
     await bindTo(kiosk, /nursery/i);

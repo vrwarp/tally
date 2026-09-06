@@ -1,11 +1,12 @@
 /**
  * Setting a kiosk to a gathering, in one gesture or two.
  *
- * The screen used to ask for both: tap the row, then travel to the bottom of a
- * tablet and hold a separate button. Holding the row itself now does the whole
- * thing, and these pin the three claims that makes — that a hold on a row
- * binds *that* row, that a tap on one still only selects it, and that a finger
- * that came down on a row on its way to scrolling the list binds nothing.
+ * Holding a row does the whole thing, and these pin the three claims that
+ * makes — that a hold on a row binds *that* row, that a tap on one still only
+ * selects it, and that a finger that came down on a row on its way to scrolling
+ * the list binds nothing. The other way in is still there for anybody who taps:
+ * pick a row, then press the button at the foot of the screen, which is a plain
+ * tap now and has its own describe below.
  *
  * The last is the reason the rows wait for the lift rather than committing on
  * contact like the rest of the kiosk (see `components/tapGuard.ts`): a list
@@ -105,6 +106,23 @@ function down(element: HTMLElement): void {
   pointer('pointerdown', element, 100, 100);
 }
 
+/**
+ * A press on a button, start to finish.
+ *
+ * Without coordinates, unlike `down`/`up` above, and that is the difference
+ * between the two guards rather than an oversight: a button asks whether the
+ * finger came off *inside it* (`bounds` in components/tapGuard.ts) and jsdom
+ * measures every element as a zero-sized box at the origin, so the only lift
+ * that lands inside one is the one at 0,0. A row is measured by distance
+ * travelled instead, which is why it can be pressed at 100,100 and dragged.
+ */
+async function tapButton(element: HTMLElement): Promise<void> {
+  await act(async () => {
+    fireEvent.pointerDown(element, { pointerId: 2 });
+    fireEvent.pointerUp(element, { pointerId: 2 });
+  });
+}
+
 /** And coming off it, `offset` pixels further down the screen. */
 function up(element: HTMLElement, offset = 0): void {
   pointer('pointerup', element, 100, 100 + offset);
@@ -188,7 +206,7 @@ describe('holding a gathering', () => {
 });
 
 describe('tapping a gathering', () => {
-  it('only picks it, and arms the button that says the word', async () => {
+  it('only picks it, and arms the button at the foot of the screen', async () => {
     const bindEntry = vi.fn(async () => bindingFor(NURSERY));
     await renderChooser(servicesWith(bindEntry));
 
@@ -198,22 +216,51 @@ describe('tapping a gathering', () => {
     up(row('Nursery'));
 
     expect(bindEntry).not.toHaveBeenCalled();
-    expect(screen.getByText('Hold to set kiosk')).toBeInTheDocument();
+    expect(screen.getByText('Set kiosk')).toBeInTheDocument();
   });
 
-  it('leaves the button holding the kiosk to the picked gathering', async () => {
+  it('leaves the button one press from the picked gathering', async () => {
     const bindEntry = vi.fn(async () => bindingFor(NURSERY));
     const onBound = await renderChooser(servicesWith(bindEntry));
 
     down(row('Nursery'));
     up(row('Nursery'));
 
-    const button = screen.getByText('Hold to set kiosk').closest('button')!;
-    fireEvent.pointerDown(button, { pointerId: 2 });
-    await tick(HOLD_DELAY_MS + HOLD_MS);
+    await tapButton(screen.getByText('Set kiosk').closest('button')!);
+    await tick();
 
     expect(bindEntry).toHaveBeenCalledWith(NURSERY);
     expect(onBound).toHaveBeenCalledWith(bindingFor(NURSERY));
+  });
+
+  /*
+   * The button was a hold as well, and this is what a tap on it did then:
+   * nothing. Two holds to set one kiosk was the screen asking twice, on the one
+   * path where the person has already answered — they picked a row, on a screen
+   * headed with the question. The row's hold is the guard that matters, and it
+   * is untouched above.
+   */
+  it('and one press is all it asks for', async () => {
+    const bindEntry = vi.fn(async () => bindingFor(NURSERY));
+    await renderChooser(servicesWith(bindEntry));
+
+    down(row('Nursery'));
+    up(row('Nursery'));
+
+    const button = screen.getByText('Set kiosk').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 2 });
+    });
+    // The old gesture's whole length, spent on a button that has already
+    // committed: the bind happened on the lift, and waiting adds no second one.
+    await tick(HOLD_DELAY_MS + HOLD_MS);
+    expect(bindEntry).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.pointerUp(button, { pointerId: 2 });
+    });
+    await tick();
+    expect(bindEntry).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -266,11 +313,11 @@ describe('what a row says about its window', () => {
  * What the button says it is about to do.
  *
  * The row a volunteer picked is at the top of a tablet and the button is at the
- * bottom — half a phone screen away, three quarters of a portrait kiosk — so
- * for the two seconds of the hold, "Hold to set kiosk" named nothing. Where the
- * list holds two sittings of one gathering, that is the whole question.
+ * bottom — half a phone screen away, three quarters of a portrait kiosk — so a
+ * button reading only "Set kiosk" names nothing. Where the list holds two
+ * sittings of one gathering, that is the whole question.
  */
-describe('the hold button', () => {
+describe('the commit button', () => {
   it('names the gathering and the time it is about to bind', async () => {
     await renderChooser(servicesWith(vi.fn()));
     // Nothing picked: the button is a prompt and has nothing to name.
@@ -281,7 +328,7 @@ describe('the hold button', () => {
     up(picked);
     await tick();
 
-    const button = screen.getByText('Hold to set kiosk').closest('button')!;
+    const button = screen.getByText('Set kiosk').closest('button')!;
     expect(button).toHaveTextContent('Youth group');
     // The time, which is the fact two sittings of one gathering differ by.
     expect(button).toHaveTextContent(/\d{1,2}:\d{2}/);

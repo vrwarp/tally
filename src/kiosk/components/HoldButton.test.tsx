@@ -1,11 +1,11 @@
 /**
  * The two-second hold, and the one caller that needs it to be strict.
  *
- * `HoldButton` is deliberately forgiving by default: on the screens it was
- * written for — the pickup commit, the chooser's bind — the button *is* the
- * screen, the thumb is already on the thing it means, and two seconds is a long
- * time to ask anybody to hold still. There is nothing under those buttons for a
- * drift to have meant instead.
+ * `HoldButton` is deliberately forgiving by default: on a chooser row the thumb
+ * is already on the thing it means, and two seconds is a long time to ask
+ * anybody to hold still. The list under it is the browser's to arbitrate — it
+ * sends `pointercancel` the moment a press becomes a scroll — so a drift that
+ * survives that far is a thumb wobbling on the row it picked.
  *
  * The reprint offer on the already-checked-in screen is not that. It shares
  * glass with the band a parent's thumb travels through on its way to the green

@@ -6,6 +6,16 @@
  * lobby, and the gate only has to be beyond a wandering toddler and an
  * accidental brush, not beyond an adult who could also just unplug the thing.
  *
+ * Rare presses only, and that is the rule this file is now down to two callers
+ * by. It was on both commit buttons as well — the chooser's and the pickup's —
+ * and a gesture spent on the control a parent presses every week is a gesture
+ * that stops reading as *careful* and starts reading as *slow*; the screens
+ * themselves say what each of them weighed. What is left is a hold on a row
+ * that a wandering hand could otherwise re-point a kiosk with, and a hold on a
+ * reprint offer sitting on glass people lean on. Before adding a third, ask how
+ * often the person in front of it will do this: two seconds is affordable once
+ * a Sunday and insulting every Sunday.
+ *
  * The count does not start on contact. `HOLD_DELAY_MS` of stillness comes
  * first, and until it is spent the gesture is still anybody's — a thumb that
  * lands and immediately drags is scrolling the list, not holding a row. Past it
@@ -40,8 +50,8 @@
  * complete — and the pointer handlers that cancel them.
  *
  * The bar is a white wash, and has to be something like it. Every caller draws
- * this control on a dark surface — `bg-brand-600` on the two committing buttons,
- * `bg-ink-900` on the chooser's rows — so a fill tinted in the brand ramp
+ * this control on a dark surface — `bg-ink-900` on the chooser's rows,
+ * `bg-ink-800` on the reprint offer — so a fill tinted in the brand ramp
  * composites to within nothing of the button it covers, and the hold becomes
  * two seconds of a button doing visibly nothing. Which is not a subtle bug:
  * nobody keeps their thumb down for two seconds against no feedback, so the

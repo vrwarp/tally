@@ -262,8 +262,8 @@ interface SeedStudent {
    * their digit sets are equal or nested. Every other student here has a
    * parent of their own and a number of their own, so before this the whole
    * family half of the product — the ticked list on the confirm screen, one
-   * tap for three children, one hold to collect them all — could not happen in
-   * a seeded world at all. One household is enough to exercise it.
+   * tap for three children, one press to collect them all — could not happen
+   * in a seeded world at all. One household is enough to exercise it.
    */
   household?: string;
   /**
