@@ -64,5 +64,4 @@ export function subscribeInvitations(next: (list: Invitation[]) => void) {
 }
 
 export async function inviteToTally() {}
-export async function setInvitationActive() {}
 export async function withdrawInvitation() {}

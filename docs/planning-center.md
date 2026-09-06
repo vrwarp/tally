@@ -544,7 +544,7 @@ a mailbox left signed in on a shared phone was a way in that nobody was watching
 
 ```mermaid
 flowchart LR
-  A["Admin invites an address<br/>Team screen"] --> B["invitations/{emailKey}<br/>email · role · active"]
+  A["Admin invites an address<br/>Team screen"] --> B["invitations/{emailKey}<br/>email · role"]
   C["TALLY_ADMIN_EMAILS<br/>deploy-time"] --> F
   D["Volunteer signs in with Google"] --> E["Firebase uid, no profile<br/>status: pending"]
   E --> F["provisionAccess<br/>callable"]
@@ -565,7 +565,7 @@ flowchart LR
    an admin has since made it, so this path deliberately does *not* reset it from the invitation they
    originally arrived on.
 3. **`invitations/{emailKey}`** — an admin said this address may sign in, and with what starting
-   role. Consumed on first sign-in.
+   role. Read on first sign-in and never again.
 
 Anything else is "not on the roster", reported as a refusal rather than an error: a volunteer who has
 not been added yet is a normal thing to be.
@@ -573,7 +573,9 @@ not been added yet is a normal thing to be.
 ### Inviting and revoking
 
 **Team** (admin only, reached from the account menu). Invite a Google address with a role; they
-appear in the "Signed in" list the first time they use it.
+appear in the "Signed in" list the first time they use it, and drop off "Invited" at the same
+moment — the invitation document stays as the record of who invited whom, but the card is about
+addresses that have *not* been used yet and lists only those.
 
 The two lists do different jobs, and the difference matters when somebody has to be removed:
 

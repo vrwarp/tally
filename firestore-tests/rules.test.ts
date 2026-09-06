@@ -264,10 +264,21 @@ describe('invitations', () => {
     );
   });
 
-  it('lets an admin pause an invitation without retyping it in September', async () => {
+  it('lets an admin change the role on an address already invited', async () => {
     const db = asUser(env, UID.admin);
     await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
-    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc({ active: false })));
+    await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc({ role: 'core' })));
+  });
+
+  it('still admits a document carrying the retired active flag', async () => {
+    // The pause switch is gone and nothing reads the field, but invitations
+    // written before it went still carry it. A merge over one of those keeps it
+    // on the document, and rejecting the shape would strand the address on a
+    // screen whose only other control deletes it.
+    const db = asUser(env, UID.admin);
+    await assertSucceeds(
+      setDoc(doc(db, paths.invitation(key)), { ...invitationDoc(), active: false }),
+    );
   });
 });
 

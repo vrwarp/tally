@@ -1307,7 +1307,6 @@ function collectWrites(now: Date): {
       data: {
         email: member.email,
         role: member.role,
-        active: true,
         invitedAt: schoolYearStart(now),
         invitedBy: SEED_AUTHOR,
       },

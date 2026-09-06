@@ -19,7 +19,7 @@
  *      role is whatever an admin has since made it, so this path deliberately
  *      does *not* reset it from the invitation they arrived on.
  *   3. `invitations/{emailKey}` — an admin said this address may sign in, and
- *      with what starting role. Consumed on first sign-in.
+ *      with what starting role. Read on first sign-in and never again.
  *
  * Anything else is "not on the roster", which is reported as a refusal rather
  * than an error: a volunteer who has not been added yet is a normal thing to
@@ -52,11 +52,6 @@ export interface VerifiedCaller {
   displayName: string | null;
 }
 
-/** One invitation, as an admin left it. */
-export interface Invitation {
-  role: Role;
-  active: boolean;
-}
 
 function readRole(value: unknown): Role | null {
   return value === 'admin' || value === 'core' || value === 'counselor' ? value : null;
@@ -141,15 +136,22 @@ export async function provisionAccessForCaller(
     };
   }
 
+  /*
+   * The role, and nothing else.
+   *
+   * An invitation used to carry an `active` flag an admin could switch off from
+   * the Team screen, and this is where it was honoured. It is gone: the flag
+   * only ever governed a *first* sign-in — the branch above returns before this
+   * one for anybody with a profile — so on the screen it was a switch reading
+   * "may sign in" that did nothing for most of the rows it appeared on. An
+   * address that should not arrive is withdrawn; somebody already here is
+   * deactivated on their profile.
+   *
+   * Documents written before that removal may still carry the field, and it is
+   * deliberately not read: treating a stale `active: false` as a refusal would
+   * turn a flag nobody can see any more into a locked door nobody can explain.
+   */
   const invitation = inviteSnapshot.data() ?? {};
-  if (invitation.active === false) {
-    return {
-      status: 'inactive',
-      role: null,
-      message: 'Your invitation to Tally has been paused. Ask an admin to turn it back on.',
-    };
-  }
-
   const role = readRole(invitation.role) ?? 'counselor';
   await writeProfile(userRef, caller, email, role, existing, now);
   return { status: 'granted', role, message: 'Welcome to Tally.' };

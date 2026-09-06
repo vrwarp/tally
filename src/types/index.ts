@@ -129,12 +129,18 @@ export interface UserProfile extends Omit<UserProfileDoc, 'createdAt' | 'lastSee
  * custom field on every person in the church — an access decision living in a
  * system edited by a different set of people from the ones who should be
  * making it.
+ *
+ * There is no `active` flag. There was one, and it could only ever have refused
+ * a *first* sign-in — after that the profile decides — so on the Team screen it
+ * was a switch labelled "may sign in" that did nothing on most of the rows it
+ * appeared on. An address that should not arrive is withdrawn instead.
+ * Documents written before the removal may still carry the field; nothing reads
+ * it, and `inviteToTally` deletes it from any document it rewrites.
  */
 export interface InvitationDoc {
   /** The address as typed, for display. The document id is its `emailKey`. */
   email: string;
   role: Role;
-  active: boolean;
   invitedAt: Timestamp;
   invitedBy: string | null;
   /** Free text, for "Wednesday night volunteer" and the like. */

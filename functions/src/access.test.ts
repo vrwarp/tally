@@ -83,7 +83,7 @@ describe('provisionAccessForCaller', () => {
 
   it('grants access on an invitation and creates the profile', async () => {
     const db = new FakeFirestore();
-    db.seed(invitationPath(CALLER.email), { role: 'core', active: true });
+    db.seed(invitationPath(CALLER.email), { role: 'core' });
 
     const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
@@ -98,7 +98,7 @@ describe('provisionAccessForCaller', () => {
 
   it('defaults to the least privilege when an invitation names no role', async () => {
     const db = new FakeFirestore();
-    db.seed(invitationPath(CALLER.email), { active: true });
+    db.seed(invitationPath(CALLER.email), {});
 
     const result = await provisionAccessForCaller(db, CALLER, NOW, []);
     expect(result.role).toBe('counselor');
@@ -108,24 +108,31 @@ describe('provisionAccessForCaller', () => {
     // An invitation is written by an admin through the app, but it is still a
     // database document; a `role: "superuser"` must not become anything.
     const db = new FakeFirestore();
-    db.seed(invitationPath(CALLER.email), { role: 'superuser', active: true });
+    db.seed(invitationPath(CALLER.email), { role: 'superuser' });
 
     expect((await provisionAccessForCaller(db, CALLER, NOW, [])).role).toBe('counselor');
   });
 
-  it('pauses access for an invitation somebody turned off', async () => {
+  it('ignores the retired pause flag on an invitation written before it went', async () => {
+    /*
+     * `active` was a switch on the Team screen that could refuse a first
+     * sign-in. It is gone — it did nothing for anybody who already had a
+     * profile, which was most of the rows it appeared on — and a stale `false`
+     * left on a document must not go on refusing people at a door no admin can
+     * see any more. Withdrawing the invitation is how the no is said now.
+     */
     const db = new FakeFirestore();
     db.seed(invitationPath(CALLER.email), { role: 'counselor', active: false });
 
     const result = await provisionAccessForCaller(db, CALLER, NOW, []);
 
-    expect(result.status).toBe('inactive');
-    expect(db.get(userPath())).toBeUndefined();
+    expect(result).toMatchObject({ status: 'granted', role: 'counselor' });
+    expect(db.get(userPath())).toMatchObject({ active: true });
   });
 
   it('matches the invitation however the address was typed', async () => {
     const db = new FakeFirestore();
-    db.seed(invitationPath('Miriam.Achebe@Example.ORG'), { role: 'core', active: true });
+    db.seed(invitationPath('Miriam.Achebe@Example.ORG'), { role: 'core' });
 
     const result = await provisionAccessForCaller(
       db,
@@ -203,7 +210,7 @@ describe('provisionAccessForCaller', () => {
 
     it('does not make everybody else an admin', async () => {
       const db = new FakeFirestore();
-      db.seed(invitationPath(CALLER.email), { role: 'counselor', active: true });
+      db.seed(invitationPath(CALLER.email), { role: 'counselor' });
 
       const result = await provisionAccessForCaller(db, CALLER, NOW, [ADMIN_EMAIL]);
       expect(result.role).toBe('counselor');
@@ -213,7 +220,7 @@ describe('provisionAccessForCaller', () => {
   describe('somebody who has signed in before', () => {
     it('keeps the role an admin gave them, over the invitation they arrived on', async () => {
       const db = new FakeFirestore();
-      db.seed(invitationPath(CALLER.email), { role: 'counselor', active: true });
+      db.seed(invitationPath(CALLER.email), { role: 'counselor' });
       db.seed(userPath(), { email: CALLER.email, role: 'core', active: true });
 
       const result = await provisionAccessForCaller(db, CALLER, NOW, []);

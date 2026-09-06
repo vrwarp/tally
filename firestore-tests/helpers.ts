@@ -279,7 +279,6 @@ export function invitationDoc(overrides: Partial<InvitationDoc> = {}): Invitatio
   return {
     email: 'newcomer@example.org',
     role: 'counselor',
-    active: true,
     invitedAt: T0,
     invitedBy: UID.admin,
     ...overrides,
