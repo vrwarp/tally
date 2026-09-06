@@ -32,7 +32,7 @@
  * which handles the fling; the slop below covers the slower drag that ends with
  * the finger lifted back close to its start.
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 /**
  * How far a finger may travel between contact and lift and still mean "this
@@ -183,4 +183,117 @@ export function useTapGuard<T>(onTap: (value: T) => void): (value: T) => TapHand
  */
 export function useTap(): (run: () => void) => TapHandlers {
   return usePressGuard<() => void>((run) => run(), 'bounds');
+}
+
+/**
+ * Swallow a click that belongs to a press this screen never received.
+ *
+ * The guards above are per-control, and they cannot be the whole answer.
+ *
+ * A gesture is not one event. A tap is `pointerdown`, `pointerup`, then
+ * `click` — and the browser decides who receives that last one by hit-testing
+ * the coordinates *at the moment it dispatches it*, against whatever the DOM
+ * holds by then. Every control on this kiosk commits earlier than that:
+ * `useTap` on the lift, the keyboard on contact, `HoldButton` on a timer while
+ * the finger is still down. So a control that changes screens has already
+ * changed them before its own gesture has finished being delivered, and the
+ * leftovers land on the screen that arrived.
+ *
+ * That is not hypothetical. Opening the printer screen from the staff screen
+ * put the trailing click on **Choose a different printer** — the one call to
+ * `requestDevice` — at every viewport this kiosk runs at, so looking at a
+ * connected printer opened the browser's device chooser, every time.
+ *
+ * The guards above already make React's own controls immune: a lift is only an
+ * act on the control that took the press, so an orphan click reaches a handler
+ * that is not listening for it. What they cannot cover is the browser's own
+ * widgets. A `<summary>` toggles its `<details>` on a bare click, a `<label>`
+ * moves focus, an `<a>` navigates — none of that is ours to guard, and all of
+ * it answers a press made on another screen. The printer screen's settings
+ * fold opened by itself for exactly that reason.
+ *
+ * So the rule is enforced once, above both React's root listener and the
+ * browser's default action: **a click is not an act if the screen changed out
+ * from under the press that produced it.**
+ *
+ * `screen` is what the kiosk is showing — any string that changes when the
+ * glass does. It is the signal rather than "is the pressed node still in the
+ * document", because React reconciles: two screens that both put a button in
+ * the same slot share one DOM node, and the press would look untouched across
+ * a swap that replaced everything the person could see. Node identity is kept
+ * as a second net, for a screen that rearranges without changing its name.
+ *
+ * What it deliberately does not touch:
+ *
+ *  - **A click with no press at all.** A keyboard `Enter`, or one dispatched
+ *    by a test, has no gesture behind it to be orphaned from.
+ *  - **An ordinary click**, where the glass never changed and the press is the
+ *    control being clicked. That is every real press by a real finger.
+ *  - **A press that never became a click** — a scroll, a cancelled hold. The
+ *    record is dropped on `pointercancel`, on any key, and after
+ *    {@link GESTURE_MS}, so a stale one cannot swallow a later click.
+ */
+export const GESTURE_MS = 1000;
+
+export function useOrphanClickGuard(screen: string): void {
+  /* Null between gestures. `stale` is set by the screen changing while it is
+     still in flight, which is the whole question. */
+  const pressRef = useRef<{ node: Node | null; at: number; stale: boolean } | null>(null);
+
+  /*
+   * Layout, not passive: the swap happens inside the `pointerup` handler that
+   * commits it, and React flushes that render before the browser goes on to
+   * dispatch the click. A passive effect can land after the click it exists to
+   * catch.
+   */
+  useLayoutEffect(() => {
+    const press = pressRef.current;
+    if (press) press.stale = true;
+  }, [screen]);
+
+  useEffect(() => {
+    const remember = (event: Event) => {
+      pressRef.current = {
+        node: event.target instanceof Node ? event.target : null,
+        at: Date.now(),
+        stale: false,
+      };
+    };
+    const forget = () => {
+      pressRef.current = null;
+    };
+    const check = (event: MouseEvent) => {
+      const press = pressRef.current;
+      pressRef.current = null;
+      // Nothing to orphan it from, or too old to be this gesture's.
+      if (!press || Date.now() - press.at > GESTURE_MS) return;
+      if (!press.stale) {
+        // The second net: the control that took the press is still here and is
+        // the one being clicked. Either direction, because a press lands on the
+        // deepest node under the finger and a click may be reported against its
+        // parent.
+        const target = event.target;
+        if (
+          press.node?.isConnected &&
+          target instanceof Node &&
+          (press.node === target || press.node.contains(target) || target.contains(press.node))
+        ) {
+          return;
+        }
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    window.addEventListener('pointerdown', remember, { capture: true });
+    window.addEventListener('pointercancel', forget, { capture: true });
+    window.addEventListener('keydown', forget, { capture: true });
+    window.addEventListener('click', check, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', remember, { capture: true });
+      window.removeEventListener('pointercancel', forget, { capture: true });
+      window.removeEventListener('keydown', forget, { capture: true });
+      window.removeEventListener('click', check, { capture: true });
+    };
+  }, []);
 }

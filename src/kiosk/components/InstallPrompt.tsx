@@ -12,10 +12,19 @@
  * afterwards comes up unpaired. Saying "then pair it" is the part that saves a
  * second trip to the lobby.
  */
+import { useTap } from './tapGuard';
 import { isInstalled, needsManualInstall, promptInstall, useCanInstall } from '../install';
 
 export function InstallPrompt({ className = '' }: { className?: string }) {
   const canInstall = useCanInstall();
+  /*
+   * Guarded like every other control on the kiosk, and for the reason spelled
+   * out on the printer screen's unbind: a screen entered from a `useTap` row
+   * mounts *before* that tap's click is dispatched, so a bare `onClick` here
+   * answers a press nobody made on it. This button sits on the chooser, which
+   * is reached that way from the staff screen's `Change event`.
+   */
+  const tap = useTap();
 
   if (isInstalled()) return null;
 
@@ -25,8 +34,8 @@ export function InstallPrompt({ className = '' }: { className?: string }) {
         type="button"
         tabIndex={-1}
         data-testid="kiosk-install"
-        onClick={() => void promptInstall()}
-        className={`w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 ${className}`}
+        {...tap(() => void promptInstall())}
+        className={`w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 active:bg-ink-800 ${className}`}
       >
         Install the kiosk app on this device
       </button>

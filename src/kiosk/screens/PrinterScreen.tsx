@@ -415,9 +415,11 @@ export function PrinterScreen({
                         key={entry.identifier}
                         type="button"
                         tabIndex={-1}
-                        onClick={() => onLabelChange(entry.identifier)}
+                        {...tap(() => onLabelChange(entry.identifier))}
                         className={`rounded-lg px-4 py-2 text-ink-100 ${
-                          entry.identifier === label ? 'bg-brand-600' : 'bg-ink-800'
+                          entry.identifier === label
+                            ? 'bg-brand-600 active:bg-brand-500'
+                            : 'bg-ink-800 active:bg-ink-700'
                         }`}
                       >
                         {printing.labelName(entry)}
@@ -474,8 +476,8 @@ export function PrinterScreen({
               type="button"
               tabIndex={-1}
               disabled={busy || state.kind !== 'ready'}
-              onClick={() => void check()}
-              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 disabled:opacity-50 kiosk:text-lg"
+              {...tap(() => void check())}
+              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
               Check the printer
             </button>
@@ -483,21 +485,38 @@ export function PrinterScreen({
               type="button"
               tabIndex={-1}
               disabled={busy || state.kind !== 'ready'}
-              onClick={() => printing.testPrint()}
-              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 disabled:opacity-50 kiosk:text-lg"
+              {...tap(() => printing.testPrint())}
+              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
               Print a test label
             </button>
           </div>
 
-          {/* The one place requestDevice is called, and the reason this is a
-              real click: the browser only opens its chooser for a gesture. */}
+          {/*
+            * The one place requestDevice is called, and guarded like every
+            * other control here rather than left on a bare `onClick`.
+            *
+            * It used to be a bare one, on the belief that the chooser needs a
+            * *click* to count as a gesture. It does not: `pointerdown` grants
+            * transient activation for touch and `pointerup` for mouse, so
+            * `navigator.userActivation.isActive` is true inside the guard's
+            * `pointerup` — `preventDefault` on the press does not spend it.
+            *
+            * What the bare handler did instead was answer a press that was
+            * never made on it. The staff screen's rows act on `pointerup`, so
+            * the *click* that follows the same tap is dispatched after this
+            * screen has already mounted underneath the finger — and both
+            * screens centre their column, which put this button within a few
+            * pixels of the `Label printer` row across every viewport the kiosk
+            * runs at. So opening the printer screen opened the browser's device
+            * chooser, every time, on a printer that was already connected.
+            */}
           <button
             type="button"
             tabIndex={-1}
             disabled={busy}
-            onClick={() => void connect()}
-            className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 disabled:opacity-50 kiosk:text-lg"
+            {...tap(() => void connect())}
+            className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
           >
             {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
           </button>

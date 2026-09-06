@@ -38,6 +38,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { EventName } from '../components/EventName';
 import { HoldButton } from '../components/HoldButton';
 import { InstallPrompt } from '../components/InstallPrompt';
+import { useTap } from '../components/tapGuard';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
 import type { KioskBinding } from '../binding';
 import type { PrinterState } from '../printing';
@@ -77,6 +78,14 @@ export function EventChooser({
   onSetUpPrinter: () => void;
   onBound: (binding: KioskBinding) => void;
 }) {
+  /*
+   * See the note on the printer screen's unbind. A screen entered from a
+   * `useTap` row mounts before that tap's own click is dispatched, so a bare
+   * `onClick` on the screen that arrives answers a press nobody made on it —
+   * and this screen is reached that way, from the staff screen's `Change
+   * event`.
+   */
+  const tap = useTap();
   const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -383,8 +392,8 @@ export function EventChooser({
         <button
           type="button"
           tabIndex={-1}
-          onClick={onSetUpPrinter}
-          className="mb-3 w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400"
+          {...tap(onSetUpPrinter)}
+          className="mb-3 w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 active:bg-ink-800"
         >
           {printerState === null || printerState.kind === 'idle'
             ? 'Set up a label printer'
