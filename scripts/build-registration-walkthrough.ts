@@ -27,6 +27,10 @@ interface Shot {
   state: string;
   caption: string;
   orientation: Orientation;
+  /** The wizard step showing, named as `steps.ts` names it. */
+  step: string;
+  /** Taps from the resting search screen to this frame. */
+  taps: number;
 }
 
 /** One moment in the flow, as it looks on both shapes of tablet. */
@@ -35,6 +39,8 @@ interface Frame {
   flow: string;
   state: string;
   caption: string;
+  step: string;
+  taps: number;
   landscape?: Shot;
   portrait?: Shot;
 }
@@ -90,6 +96,13 @@ const frames: Frame[] = landscape.map((shot, index) => ({
   flow: shot.flow,
   state: shot.state,
   caption: shot.caption,
+  step: shot.step,
+  /*
+   * The landscape pass's count, not an average of the two. The taps are the
+   * same on both shapes — the flow does not branch on orientation — and one
+   * number per moment is what makes the column addable down the page.
+   */
+  taps: shot.taps,
   landscape: shot,
   portrait: portrait[index],
 }));
@@ -125,6 +138,8 @@ for (const group of flows) {
         <div class="frame__meta">
           <span class="frame__num">${String(index).padStart(2, '0')}</span>
           <span class="frame__state">${escapeHtml(frame.state)}</span>
+          <span class="frame__step">${escapeHtml(frame.step)}</span>
+          <span class="frame__taps">${frame.taps} ${frame.taps === 1 ? 'tap' : 'taps'} in</span>
         </div>
         <h3 class="frame__title">${escapeHtml(frame.title)}</h3>
         <p class="frame__caption">${escapeHtml(frame.caption)}</p>
@@ -316,6 +331,26 @@ const html = `<title>Registering a family — Tally</title>
     padding: 0.2rem 0.65rem;
   }
 
+  /*
+   * The step name and the running tap count. Both are metadata rather than
+   * prose and both are here for the same reason: a flow gets reworked by
+   * counting what it costs and by naming what each screen is, and neither of
+   * those survives being written into a caption.
+   */
+  .frame__step {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+  }
+
+  .frame__taps {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+  }
+
   .frame__title {
     font-family: var(--serif);
     font-weight: 600;
@@ -454,7 +489,14 @@ for (const group of flows) {
   md.push(`## ${group.flow}`, '');
   for (const frame of group.frames) {
     n += 1;
-    md.push(`### ${n}. ${frame.title}`, '', `*${frame.state}*`, '', frame.caption, '');
+    md.push(
+      `### ${n}. ${frame.title}`,
+      '',
+      `*${frame.state}* · \`${frame.step}\` · ${frame.taps} ${frame.taps === 1 ? 'tap' : 'taps'} from the resting screen`,
+      '',
+      frame.caption,
+      '',
+    );
     if (frame.landscape) {
       md.push(`![${frame.title} — landscape](shots/${frame.landscape.file})`, '');
     }
