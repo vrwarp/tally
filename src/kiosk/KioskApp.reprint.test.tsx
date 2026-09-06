@@ -105,6 +105,10 @@ const printing = {
   configure: vi.fn(async () => {}),
   pairPrinter: vi.fn(async () => null),
   checkPrinter: vi.fn(async () => null),
+  printerLog: vi.fn(() => []),
+  printerLogText: vi.fn(() => ''),
+  describeAge: vi.fn(() => 'just now'),
+  describeEntry: vi.fn(() => ''),
 } as unknown as KioskPrinting;
 
 const services = {

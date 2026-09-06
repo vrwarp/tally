@@ -40,6 +40,15 @@ export const KIOSK_KEYS = {
    * a byte of it.
    */
   printer: 'tally:kiosk:printer',
+  /**
+   * What has happened to that printer lately — see `printing/log.ts`.
+   *
+   * A bounded ring of events with no names in it, kept across the nightly
+   * reload on purpose: the reload is one of the things it exists to explain,
+   * and the question it answers — "why did the kiosk say the printer was
+   * unplugged?" — is asked the morning after.
+   */
+  printerLog: 'tally:kiosk:printerLog',
 } as const;
 
 export function readJson<T>(key: string): T | null {

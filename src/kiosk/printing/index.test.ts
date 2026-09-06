@@ -39,7 +39,10 @@ const usb = vi.hoisted(() => ({
   paired: [] as unknown[],
   /** What `requestPrinterDevice` does when the chooser opens. */
   request: null as null | (() => unknown),
-  watchers: null as null | { connect: () => void; disconnect: () => void },
+  watchers: null as null | {
+    connect: (device?: unknown) => void;
+    disconnect: (device?: unknown) => void;
+  },
   stopWatching: 0,
 }));
 
@@ -59,15 +62,23 @@ const tables = vi.hoisted(() => ({
   matched: [] as { identifier: string; name: string }[],
 }));
 
+/** A serial the printer might really carry, distinctive enough to grep the record for. */
+const SERIAL = '000M6Z401370';
+
 /** One printer, with the parts this module actually drives. */
 function makeDevice(overrides: Record<string, unknown> = {}) {
   const handlers = new Map<string, () => void>();
   return {
     model: '',
     opened: false,
-    /* What the core exposes of the USB device, and the only thing this module
-       reads off it: the name the printer puts on the bus. */
-    device: { productName: null as string | null },
+    /* What the core exposes of the USB device: the name the printer puts on
+       the bus, and the identity the record and the disconnect handler compare. */
+    device: {
+      vendorId: 1273,
+      productId: 8347,
+      serialNumber: SERIAL as string | null,
+      productName: null as string | null,
+    },
     on: vi.fn((event: string, handler: () => void) => handlers.set(event, handler)),
     open: vi.fn(async function (this: { opened: boolean }) {
       this.opened = true;
@@ -83,12 +94,15 @@ function makeDevice(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** What the module hands the library to narrate through. */
+type Tracer = { event: (category: string, name: string, data?: Record<string, unknown>) => void };
+
 vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
   BrotherQLPrinterCore: class {
     static getPairedDevices = vi.fn(async () => usb.paired);
     constructor(
       readonly device: unknown,
-      readonly options: { model: string },
+      readonly options: { model: string; diagnostics?: Tracer },
     ) {
       Object.assign(this, makeDevice(), { model: options.model, device });
       cores.made.push(this);
@@ -99,7 +113,10 @@ vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
     if (!usb.request) throw Object.assign(new Error('cancelled'), { code: 'selection-cancelled' });
     return usb.request();
   },
-  watchConnectionEvents: (handlers: { connect: () => void; disconnect: () => void }) => {
+  watchConnectionEvents: (handlers: {
+    connect: (device?: unknown) => void;
+    disconnect: (device?: unknown) => void;
+  }) => {
     usb.watchers = handlers;
     return () => {
       usb.stopWatching += 1;
@@ -387,7 +404,7 @@ describe('opening the printer at boot', () => {
 
     await printing.ready();
 
-    expect(await pairedDevicesCalls()).toContainEqual([{ model: 'QL-800' }]);
+    expect(await pairedDevicesCalls()).toContainEqual([expect.objectContaining({ model: 'QL-800' })]);
   });
 
   it('lets go of a transport that has already died before opening another', async () => {
@@ -1301,5 +1318,167 @@ describe('labelPreview', () => {
     const printing = await load();
 
     expect(printing.labelPreview(ADA, binding(null as never))).toEqual([]);
+  });
+});
+
+describe('what is written down', () => {
+  /*
+   * The record exists because, until it did, "the printer was unplugged" on a
+   * screen whose cable was still in was a question nothing could answer. What
+   * is pinned here is that the answer is in it — the browser's own error name,
+   * which device the browser meant, why the screens were told what they were
+   * told — and that two things never are: the chatter of a working printer,
+   * and a child's name.
+   */
+
+  /** The tracer the module handed the library with its last request for paired devices. */
+  async function tracer(): Promise<Tracer> {
+    const calls = await pairedDevicesCalls();
+    const options = calls.at(-1)?.[0] as { diagnostics?: Tracer } | undefined;
+    if (!options?.diagnostics) throw new Error('the library was given nothing to narrate through');
+    return options.diagnostics;
+  }
+
+  it('hands the library a tracer and keeps what it says, minus a label going out', async () => {
+    usb.paired = [makeDevice()];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    const narrate = await tracer();
+    narrate.event('transport', 'write-chunk', { at: 0, size: 16384 });
+    narrate.event('transport', 'disconnect', {
+      during: 'read',
+      error: 'NetworkError: A transfer error has occurred.',
+    });
+
+    const names = printing.printerLog().map((entry) => `${entry.category} ${entry.name}`);
+    expect(names).not.toContain('transport write-chunk');
+    expect(printing.printerLog().at(-1)).toMatchObject({
+      category: 'transport',
+      name: 'disconnect',
+      data: { during: 'read', error: 'NetworkError: A transfer error has occurred.' },
+    });
+  });
+
+  it('records a failed reopen with the browser’s own name for the failure', async () => {
+    // `describe()` cannot use a DOMException's name — its `code` is a number and
+    // the switch wants the library's strings — but the record can, and the
+    // name is the whole diagnosis: a transfer error on a device still present
+    // reads differently from a device that has gone.
+    configured();
+    const printing = await load();
+    await printing.ready();
+    (await pairedDevices()).mockRejectedValueOnce(
+      Object.assign(new Error('A transfer error has occurred.'), { name: 'NetworkError' }),
+    );
+
+    usb.watchers?.connect();
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('trouble'));
+
+    expect(printing.printerLog()).toContainEqual(
+      expect.objectContaining({
+        category: 'kiosk',
+        name: 'open-failed',
+        data: expect.objectContaining({
+          cause: 'usb-connect',
+          error: 'NetworkError',
+          message: 'A transfer error has occurred.',
+        }),
+      }),
+    );
+  });
+
+  it('says which state the screens were told, and why', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    device.emit('disconnect');
+
+    const states = printing.printerLog().filter((entry) => entry.category === 'state');
+    expect(states.map((entry) => [entry.name, entry.data?.cause])).toEqual([
+      ['ready', 'boot'],
+      ['trouble', 'transport-lost'],
+    ]);
+  });
+
+  it('does not write down a state that merely repeated itself', async () => {
+    // `ready()` runs again on every printer-screen exit, and each run republishes
+    // `ready` for an open printer. A record of heartbeats is not a record.
+    usb.paired = [makeDevice()];
+    configured();
+    const printing = await load();
+
+    await printing.ready();
+    await printing.ready();
+
+    expect(printing.printerLog().filter((entry) => entry.category === 'state')).toHaveLength(1);
+  });
+
+  it('writes down which device the browser said went away, without its serial', async () => {
+    usb.paired = [makeDevice()];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    usb.watchers?.disconnect({
+      vendorId: 1273,
+      productId: 8347,
+      serialNumber: SERIAL,
+      productName: 'QL-810W',
+    });
+
+    const entry = printing.printerLog().find((row) => row.category === 'usb' && row.name === 'disconnect');
+    expect(entry?.data).toEqual({
+      hasSerial: true,
+      vendorId: 1273,
+      productId: 8347,
+      productName: 'QL-810W',
+      ours: true,
+    });
+    expect(printing.printerLogText()).not.toContain(SERIAL);
+  });
+
+  it('knows another Brother device from its own', async () => {
+    usb.paired = [makeDevice()];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8200, serialNumber: 'other' });
+
+    const entry = printing.printerLog().find((row) => row.category === 'usb' && row.name === 'disconnect');
+    expect(entry?.data).toMatchObject({ ours: false });
+  });
+
+  it('keeps the record across a reload', async () => {
+    configured();
+    const before = await load();
+    await before.ready();
+    expect(before.printerLog().some((entry) => entry.name === 'ready')).toBe(true);
+
+    const after = await load();
+
+    expect(after.printerLog().some((entry) => entry.name === 'ready')).toBe(true);
+  });
+
+  it('never writes down a child’s name', async () => {
+    const printing = await load();
+    const job = {
+      studentId: 'pco_1',
+      name: 'Ada Nkemelu',
+      template: TEMPLATE,
+      values: { firstName: 'Ada' },
+    };
+
+    queue.options.onFailure?.({ code: 'printer-error', errors: [{ message: 'Out of labels.' }] }, job);
+    queue.options.onDropped?.('stale', job);
+
+    expect(printing.printerLogText()).toContain('label-failed');
+    expect(printing.printerLogText()).toContain('label-stale');
+    expect(printing.printerLogText()).not.toContain('Ada');
   });
 });

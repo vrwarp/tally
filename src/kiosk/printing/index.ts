@@ -31,6 +31,12 @@
  * so a paired printer is reopened silently at boot and held for the evening.
  * `queryStatus` is never called on the way to printing: it costs a round trip
  * and takes the printer's busy lock.
+ *
+ * **It writes down what happened.** Every state change, every device the
+ * browser listed or lost, every failed open with the browser's own error name,
+ * and everything the library's transport says about the wire, into `log.ts` —
+ * because "the printer was unplugged" on a screen whose cable is still in is a
+ * question the morning after, and until this existed nothing could answer it.
  */
 import {
   BrotherQLPrinterCore,
@@ -52,11 +58,16 @@ import {
   type PrinterConfig,
 } from './device';
 import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
+import { createPrinterLog, isNoise, type PrinterLogEntry } from './log';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
 export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from './device';
 export type { PrinterConfig } from './device';
+
+/* The record of what happened, and the two ways the printer screen reads a line of it. */
+export { describeAge, describeEntry } from './log';
+export type { PrinterLogEntry } from './log';
 
 /* What a child's tokens come to, kept reachable through the one handle. */
 export { tokenValuesFor } from './tokens';
@@ -140,7 +151,49 @@ export interface PrinterDetection {
 let state: PrinterState = { kind: 'idle' };
 const listeners = new Set<(state: PrinterState) => void>();
 
-function setState(next: PrinterState): void {
+/**
+ * The record of what happened — see `log.ts`. Module-level like the state,
+ * and for the same reason: there is one printer and one evening.
+ */
+const log = createPrinterLog();
+
+/**
+ * The library's diagnostics, pointed at the log.
+ *
+ * With a tracer attached the transport narrates every open, claim, stall,
+ * resync and timeout — and, the one that started all this, the exact browser
+ * error behind a `disconnect`. Without one it does not even build the event
+ * objects, which is what the kiosk did until now. The per-chunk chatter of a
+ * label going out is dropped on the way in; see `isNoise`.
+ */
+const tracer = {
+  event(category: string, name: string, data?: Record<string, unknown>): void {
+    if (!isNoise(name)) log.record(category, name, data);
+  },
+};
+
+/** Whether two states would read the same on a screen. */
+function sameState(a: PrinterState, b: PrinterState): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'trouble' && b.kind === 'trouble') return a.message === b.message;
+  return true;
+}
+
+/**
+ * `cause` is for the record: the same `trouble` arriving from a failed reopen
+ * and from a failed label are two different stories. A state that merely
+ * repeats itself — `ready` republished by a second `ready()` on an open
+ * printer — is not written down, so the record is transitions rather than
+ * heartbeats.
+ */
+function setState(next: PrinterState, cause: string): void {
+  if (!sameState(state, next)) {
+    log.record(
+      'state',
+      next.kind,
+      next.kind === 'trouble' ? { cause, message: next.message } : { cause },
+    );
+  }
   state = next;
   for (const listener of listeners) listener(next);
 }
@@ -204,6 +257,79 @@ function describe(error: unknown): { message: string; advice: string | null } {
   }
 }
 
+/**
+ * An error as the record wants it: names, never the object.
+ *
+ * The browser's own errors are `DOMException`s, and the interesting thing about
+ * one is its `name` — `NetworkError` is a transfer that failed on a device still
+ * present, `NotFoundError` one that has gone — which is exactly what `describe`
+ * above cannot use: a DOMException's `code` is a number, and the switch wants
+ * the library's strings. The library wraps the browser's error as `cause`, so
+ * both layers are kept.
+ */
+function errorInfo(error: unknown): Record<string, string> {
+  const info: Record<string, string> = {};
+  const failure = error as
+    | { name?: unknown; code?: unknown; message?: unknown; cause?: unknown }
+    | null
+    | undefined;
+  if (typeof failure?.name === 'string') info.error = failure.name;
+  if (typeof failure?.code === 'string') info.code = failure.code;
+  if (typeof failure?.message === 'string') info.message = failure.message;
+  const cause = failure?.cause as { name?: unknown; message?: unknown } | null | undefined;
+  if (typeof cause?.name === 'string') info.cause = cause.name;
+  if (typeof cause?.message === 'string') info.causeMessage = cause.message;
+  return info;
+}
+
+/** What the record may know about a USB device: what it is, never its serial. */
+interface UsbIdentity {
+  vendorId?: number;
+  productId?: number;
+  serialNumber?: string | null;
+  productName?: string | null;
+}
+
+function identity(
+  device: UsbIdentity | null | undefined,
+): Record<string, string | number | boolean> {
+  if (!device) return {};
+  const named: Record<string, string | number | boolean> = {
+    hasSerial: typeof device.serialNumber === 'string' && device.serialNumber.length > 0,
+  };
+  if (typeof device.vendorId === 'number') named.vendorId = device.vendorId;
+  if (typeof device.productId === 'number') named.productId = device.productId;
+  if (device.productName) named.productName = device.productName;
+  return named;
+}
+
+/**
+ * Whether a device the browser is talking about is the one this kiosk holds.
+ *
+ * The same object first — Chrome hands a page one `USBDevice` per device for
+ * as long as it stays plugged in — then vendor, product and serial, for the
+ * device that has been re-enumerated in between. Either side missing is taken
+ * as a yes: a kiosk holding no printer has nothing to defend, and the library
+ * filters these events to Brother devices already.
+ */
+function isOurs(
+  candidate: UsbIdentity | null | undefined,
+  ours: UsbIdentity | null | undefined,
+): boolean {
+  if (!candidate || !ours) return true;
+  if (candidate === ours) return true;
+  return (
+    candidate.vendorId === ours.vendorId &&
+    candidate.productId === ours.productId &&
+    (candidate.serialNumber ?? null) === (ours.serialNumber ?? null)
+  );
+}
+
+/** Whether the browser threw this page away and brought it back — Chrome says so on the document. */
+function wasDiscarded(): boolean {
+  return Boolean((document as { wasDiscarded?: boolean }).wasDiscarded);
+}
+
 /* -------------------------------------------------------------------------- */
 /* The worker                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -263,18 +389,29 @@ let printer: BrotherQLPrinterCore | null = null;
 let config: PrinterConfig | null = null;
 let opening: Promise<void> | null = null;
 let watching: (() => void) | null = null;
+let lifecycle: (() => void) | null = null;
 
 /** Attach to a device and hold it open for the evening. */
-async function adopt(device: BrotherQLPrinterCore, active: PrinterConfig): Promise<void> {
+async function adopt(
+  device: BrotherQLPrinterCore,
+  active: PrinterConfig,
+  cause: string,
+): Promise<void> {
   printer = device;
   device.model = active.model;
   device.on('disconnect', () => {
-    // The reader loop noticed the device go. Nothing to do but say so; the
-    // connect handler below picks it up again if it comes back.
-    setState({ kind: 'trouble', message: 'The printer was unplugged.', advice: 'Plug it back in.' });
+    // The reader loop's transfer was rejected. The library calls that a
+    // disconnect whatever the browser said, and the browser's own words are
+    // already in the record by now — they are the difference between a printer
+    // that left the bus and one still there behind a failed transfer.
+    log.record('kiosk', 'transport-lost', identity(device.device));
+    setState(
+      { kind: 'trouble', message: 'The printer was unplugged.', advice: 'Plug it back in.' },
+      'transport-lost',
+    );
   });
   await device.open();
-  setState({ kind: 'ready', config: active });
+  setState({ kind: 'ready', config: active }, cause);
 }
 
 /**
@@ -286,18 +423,21 @@ async function adopt(device: BrotherQLPrinterCore, active: PrinterConfig): Promi
 export async function ready(): Promise<PrinterState> {
   const stored = readPrinterConfig();
   if (!stored) {
-    setState({ kind: 'idle' });
+    setState({ kind: 'idle' }, 'boot');
     return state;
   }
   config = stored;
 
   if (!isWebUsbSupported()) {
-    setState({
-      kind: 'unsupported',
-      message: 'This browser cannot talk to a USB printer.',
-      // No advice: nobody in a lobby is going to change browser, and the person
-      // who can is reading the setup docs rather than this screen.
-    });
+    setState(
+      {
+        kind: 'unsupported',
+        message: 'This browser cannot talk to a USB printer.',
+        // No advice: nobody in a lobby is going to change browser, and the
+        // person who can is reading the setup docs rather than this screen.
+      },
+      'boot',
+    );
     return state;
   }
 
@@ -307,19 +447,58 @@ export async function ready(): Promise<PrinterState> {
   // work on a QL-810W: an unplug mid-job is noticed in about a second and the
   // printer needs nothing after it comes back.
   watching ??= watchConnectionEvents({
-    connect: () => {
-      void reopen();
+    connect: (device) => {
+      log.record('usb', 'connect', identity(device));
+      void reopen('usb-connect');
     },
-    disconnect: () => {
+    disconnect: (device) => {
+      log.record('usb', 'disconnect', { ...identity(device), ours: isOurs(device, printer?.device) });
       printer = null;
     },
   });
+  lifecycle ??= watchPageLifecycle();
 
-  await reopen();
+  log.record('kiosk', 'ready', {
+    model: stored.model,
+    label: stored.label,
+    discarded: wasDiscarded(),
+  });
+  await reopen('boot');
   return state;
 }
 
-async function reopen(): Promise<void> {
+/**
+ * The page's own comings and goings, written down.
+ *
+ * A tablet is not a page that runs uninterrupted — it is switched away from,
+ * locked, frozen by the platform and brought back days later — and the
+ * printer's transport does not survive all of that. These entries are what
+ * puts a lost printer next to the thing that lost it.
+ */
+function watchPageLifecycle(): () => void {
+  const onVisibility = () =>
+    log.record('page', 'visibilitychange', { visible: document.visibilityState === 'visible' });
+  const onPageShow = (event: Event) =>
+    log.record('page', 'pageshow', { persisted: (event as PageTransitionEvent).persisted });
+  const onPageHide = (event: Event) =>
+    log.record('page', 'pagehide', { persisted: (event as PageTransitionEvent).persisted });
+  const onFreeze = () => log.record('page', 'freeze');
+  const onResume = () => log.record('page', 'resume');
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pageshow', onPageShow);
+  window.addEventListener('pagehide', onPageHide);
+  document.addEventListener('freeze', onFreeze);
+  document.addEventListener('resume', onResume);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pageshow', onPageShow);
+    window.removeEventListener('pagehide', onPageHide);
+    document.removeEventListener('freeze', onFreeze);
+    document.removeEventListener('resume', onResume);
+  };
+}
+
+async function reopen(cause: string): Promise<void> {
   const active = config;
   if (!active) return;
   // A second connect event while the first reopen is still going would
@@ -329,23 +508,29 @@ async function reopen(): Promise<void> {
   opening = (async () => {
     try {
       if (printer?.opened) {
-        setState({ kind: 'ready', config: active });
+        setState({ kind: 'ready', config: active }, cause);
         return;
       }
-      // A transport that has already died cannot be reopened in place.
+      // A transport that has already died is closed rather than reopened in
+      // place, so whatever it still held is released before another claim.
       if (printer) await printer.close().catch(() => {});
       printer = null;
 
-      const paired = await BrotherQLPrinterCore.getPairedDevices({ model: active.model });
+      const paired = await BrotherQLPrinterCore.getPairedDevices({
+        model: active.model,
+        diagnostics: tracer,
+      });
       const first = paired[0];
+      log.record('usb', 'devices', { cause, count: paired.length, ...identity(first?.device) });
       if (!first) {
-        setState({ kind: 'unpaired' });
+        setState({ kind: 'unpaired' }, cause);
         return;
       }
-      await adopt(first, active);
+      await adopt(first, active, cause);
     } catch (error) {
+      log.record('kiosk', 'open-failed', { cause, ...errorInfo(error) });
       const { message, advice } = describe(error);
-      setState({ kind: 'trouble', message, advice });
+      setState({ kind: 'trouble', message, advice }, cause);
     } finally {
       opening = null;
     }
@@ -374,6 +559,7 @@ async function reopen(): Promise<void> {
 export async function pairPrinter(next: PrinterConfig): Promise<PrinterDetection | null> {
   try {
     const device = await requestPrinterDevice();
+    log.record('kiosk', 'pair', identity(device));
     // Before `adopt`, because the model decides the head width the rasteriser
     // builds for and the device is told its model once, here.
     const chosen: PrinterConfig = {
@@ -383,12 +569,20 @@ export async function pairPrinter(next: PrinterConfig): Promise<PrinterDetection
     writePrinterConfig(chosen);
     config = chosen;
     if (printer) await printer.close().catch(() => {});
-    await adopt(new BrotherQLPrinterCore(device, { model: chosen.model }), chosen);
+    await adopt(
+      new BrotherQLPrinterCore(device, { model: chosen.model, diagnostics: tracer }),
+      chosen,
+      'pair',
+    );
   } catch (error) {
     // Dismissing the chooser is not a failure worth colouring the screen for.
-    if ((error as { code?: string }).code === 'selection-cancelled') return null;
+    if ((error as { code?: string }).code === 'selection-cancelled') {
+      log.record('kiosk', 'pair-cancelled');
+      return null;
+    }
+    log.record('kiosk', 'pair-failed', errorInfo(error));
     const { message, advice } = describe(error);
-    setState({ kind: 'trouble', message, advice });
+    setState({ kind: 'trouble', message, advice }, 'pair-failed');
     return null;
   }
   return checkPrinter();
@@ -399,7 +593,8 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
   writePrinterConfig(next);
   config = next;
   if (printer) printer.model = next.model;
-  await reopen();
+  log.record('kiosk', 'configure', { model: next.model, label: next.label });
+  await reopen('configure');
   return state;
 }
 
@@ -414,8 +609,9 @@ async function readStatus(): Promise<PrinterStatus | null> {
   try {
     return await printer.queryStatus();
   } catch (error) {
+    log.record('kiosk', 'status-failed', errorInfo(error));
     const { message, advice } = describe(error);
-    setState({ kind: 'trouble', message, advice });
+    setState({ kind: 'trouble', message, advice }, 'status-failed');
     return null;
   }
 }
@@ -432,7 +628,7 @@ function suggested(status: PrinterStatus, model: string): readonly Label[] {
     return matchLabels(status, model);
   } catch (error) {
     const { message, advice } = describe(error);
-    setState({ kind: 'trouble', message, advice });
+    setState({ kind: 'trouble', message, advice }, 'tables');
     return [];
   }
 }
@@ -523,22 +719,29 @@ const queue = createLabelQueue({
     }
     // A label arriving while the printer is down should reopen it rather than
     // fail: the device may have been replugged without a connect event landing.
-    if (!printer?.opened) await reopen();
+    if (!printer?.opened) await reopen('label');
     if (!printer?.opened) throw new Error('No printer is connected.');
     await printer.sendRaw(result.job, { pageCount: result.pageCount });
-    if (state.kind === 'trouble' && config) setState({ kind: 'ready', config });
+    if (state.kind === 'trouble' && config) setState({ kind: 'ready', config }, 'label-printed');
   },
   onFailure: (error) => {
+    // The error and never the job: the job is a child's name and the words on
+    // their sticker, and the record lives on a lobby tablet for weeks.
+    log.record('kiosk', 'label-failed', errorInfo(error));
     const { message, advice } = describe(error);
-    setState({ kind: 'trouble', message, advice });
+    setState({ kind: 'trouble', message, advice }, 'label-failed');
   },
   onDropped: (reason) => {
     if (reason === 'stale') {
-      setState({
-        kind: 'trouble',
-        message: 'A label was skipped because it would have printed too late.',
-        advice: 'Check the printer.',
-      });
+      log.record('kiosk', 'label-stale');
+      setState(
+        {
+          kind: 'trouble',
+          message: 'A label was skipped because it would have printed too late.',
+          advice: 'Check the printer.',
+        },
+        'label-stale',
+      );
     }
   },
 });
@@ -685,4 +888,14 @@ export function testPrint(): void {
 /** Waiting labels, for the printer screen. */
 export function queueDepth(): number {
   return queue.depth();
+}
+
+/** What has happened to the printer lately, oldest first, for the printer screen. */
+export function printerLog(): readonly PrinterLogEntry[] {
+  return log.entries();
+}
+
+/** The same as text, one line per event, for a bug report. */
+export function printerLogText(): string {
+  return log.text();
 }

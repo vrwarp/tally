@@ -29,7 +29,7 @@
  * a label coming out proves the whole chain rather than just that the device
  * answers.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { haptic } from '@/lib/utils';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
@@ -47,6 +47,14 @@ import type {
 
 /** The models this was built against, offered first. */
 const PREFERRED_MODELS = ['QL-810W', 'QL-800', 'QL-820NWB'];
+
+/** How many of the printer's recent events the fold shows; the copy carries them all. */
+const MAX_EVENTS_SHOWN = 40;
+
+/** How long "Copied" stays up. */
+const COPY_FEEDBACK_MS = 2500;
+
+type CopyState = 'idle' | 'copied' | 'failed';
 
 function orderedModels(printing: KioskPrinting): string[] {
   const all = printing.modelIdentifiers();
@@ -163,11 +171,45 @@ export function PrinterScreen({
   const [label, setLabel] = useState(config.label);
   const [detection, setDetection] = useState<PrinterDetection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [copied, setCopied] = useState<CopyState>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowTap = useTapGuard(onReprint);
   const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
   useEffect(() => printing.subscribe(setState), [printing]);
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
+
+  const flash = (next: CopyState) => {
+    setCopied(next);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied('idle'), COPY_FEEDBACK_MS);
+  };
+
+  /**
+   * The record, onto the clipboard.
+   *
+   * Absent on http origins and inside a few in-app browsers. Say so rather than
+   * doing nothing, and put the text on the screen where it can be selected by
+   * hand — the same shape as the debug details in the main app.
+   */
+  const copyEvents = async () => {
+    if (!navigator.clipboard) {
+      flash('failed');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(printing.printerLogText());
+      flash('copied');
+    } catch {
+      flash('failed');
+    }
+  };
 
   const available = printing.labelsForModel(model);
   // A model change can leave the stored media unprintable on the new head —
@@ -238,6 +280,10 @@ export function PrinterScreen({
   const nameOf = (entry: Label) => printing.labelName(entry);
   const notice = detection ? detectionNotice(detection, label, nameOf) : null;
   const line = stateLine(state);
+  // Newest first, and read on every render rather than held in state: the
+  // record moves whenever the state does, which is what re-renders this.
+  const events = printing.printerLog().slice(-MAX_EVENTS_SHOWN).reverse();
+  const now = Date.now();
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -435,6 +481,78 @@ export function PrinterScreen({
                     <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
                   ))}
                 </div>
+              )}
+            </div>
+          </details>
+
+          {/*
+            * What has happened to the printer lately.
+            *
+            * For whoever is standing here with a screen that says the printer
+            * was unplugged and a cable that is still in. The record is the
+            * module's — every state change, every device the browser listed or
+            * lost, the browser's own name for each failure, and what the
+            * transport saw on the wire — and this is the only place it is
+            * read. Folded, because on an ordinary evening nobody needs it, and
+            * copyable, because the person who can read it is usually not the
+            * person standing here.
+            */}
+          <details
+            className="shrink-0 rounded-xl bg-ink-900"
+            onToggle={(event) => setEventsOpen((event.target as HTMLDetailsElement).open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0 truncate">Recent printer events</span>
+              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
+                {eventsOpen ? 'Hide' : 'Show'}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              {events.length === 0 ? (
+                <div className="text-sm text-ink-500 kiosk:text-base">
+                  Nothing has been written down yet.
+                </div>
+              ) : (
+                <div
+                  className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain scroll-touch font-mono text-xs text-ink-400 kiosk:text-sm"
+                  style={{ touchAction: 'pan-y' }}
+                >
+                  {events.map((entry, index) => (
+                    <div key={`${entry.t}-${index}`} className="flex gap-3">
+                      <span className="w-16 shrink-0 text-ink-500">
+                        {printing.describeAge(entry.t, now)}
+                      </span>
+                      <span className="min-w-0 break-all">{printing.describeEntry(entry)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  {...tap(() => void copyEvents())}
+                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                >
+                  {copied === 'copied' ? 'Copied' : 'Copy'}
+                </button>
+                {copied === 'failed' && (
+                  <span className="text-xs text-ink-500 kiosk:text-sm">
+                    Copying is blocked on this device — select the text below instead.
+                  </span>
+                )}
+                <span aria-live="polite" className="sr-only">
+                  {copied === 'copied' ? 'Printer events copied to the clipboard' : ''}
+                </span>
+              </div>
+              {copied === 'failed' && (
+                <textarea
+                  readOnly
+                  aria-label="Printer events"
+                  rows={6}
+                  value={printing.printerLogText()}
+                  className="w-full rounded-lg bg-ink-950 p-3 font-mono text-xs text-ink-300"
+                />
               )}
             </div>
           </details>
