@@ -1,306 +1,782 @@
 [
   {
     "flow": "Finding the door",
-    "state": "Not on the roster",
-    "title": "No match",
-    "caption": "What a family nobody has met used to meet here was \"No match — please see a leader\", and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has ever met needs a form.",
-    "file": "landscape-01-no-match.png",
-    "orientation": "landscape"
+    "state": "Nobody has typed anything",
+    "step": "search",
+    "title": "The kiosk at rest",
+    "caption": "Where every journey in this document starts, and the only screen a family sees before they touch anything. The door out of it is already on the glass, in the row above the keyboard — it has to be: a parent told \"just put your name in\" types their child's name, gets somebody else's Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke never moves the keyboard.",
+    "file": "landscape-01-the-kiosk-at-rest.png",
+    "orientation": "landscape",
+    "taps": 0
   },
   {
     "flow": "Finding the door",
     "state": "Not on the roster",
-    "title": "The standing offer",
-    "caption": "The door is also on the screen before anybody types, in the row above the keyboard. It has to be: a parent told \"just put your name in\" types their child's name, gets somebody else's Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke still never moves the keyboard.",
-    "file": "landscape-02-the-standing-offer.png",
-    "orientation": "landscape"
+    "step": "search (no match)",
+    "title": "No match",
+    "caption": "What a family nobody has met used to meet here was \"No match — please see a leader\", and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has ever met needs a form.",
+    "file": "landscape-02-no-match.png",
+    "orientation": "landscape",
+    "taps": 4
   },
   {
-    "flow": "Right here",
-    "state": "Registering",
-    "title": "The field says what it is",
+    "flow": "Your child",
+    "state": "Registering — question 1 of 6",
+    "step": "child-first",
+    "title": "Child's first name",
     "caption": "One tap from the offer and the first question is up — the QR screen that used to stand between them retired with the phone form it pointed at. One question per screen in the frame the search already uses. The readout names the field rather than saying \"type here\", which matters most on the two steps where the answer could belong to either person in the room: \"Child's last name\" and \"Your last name\" are the same box until one of them says which.",
-    "file": "landscape-03-the-field-says-what-it-is.png",
-    "orientation": "landscape"
+    "file": "landscape-03-child-s-first-name.png",
+    "orientation": "landscape",
+    "taps": 5
   },
   {
-    "flow": "Right here",
-    "state": "Registering",
+    "flow": "Your child",
+    "state": "Registering — question 1 of 6",
+    "step": "child-first (typed)",
     "title": "Capitals, and a key to argue with them",
     "caption": "The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce.",
     "file": "landscape-04-capitals-and-a-key-to-argue-with-them.png",
-    "orientation": "landscape"
+    "orientation": "landscape",
+    "taps": 10
   },
   {
-    "flow": "Right here",
-    "state": "Registering",
+    "flow": "Your child",
+    "state": "Registering — question 2 of 6",
+    "step": "child-last",
+    "title": "Child's last name, with nothing to carry",
+    "caption": "The first child of a new family is the one time this box opens empty — there is no previous child to borrow a surname from, and the kiosk does not know the family yet. Every later surname in this run arrives prefilled. An identical-looking screen that behaves differently four frames from now is worth seeing twice.",
+    "file": "landscape-05-child-s-last-name-with-nothing-to-carry.png",
+    "orientation": "landscape",
+    "taps": 11
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 2 of 6",
+    "step": "child-last (typed)",
+    "title": "A surname nobody can spell for them",
+    "caption": "Twelve keystrokes on glass, and the only check on them is a parent reading the readout above the keys. This is the screen where a typo becomes a roster row, a sticker and a record in the church's database — and the readout is deliberately the same object the search screen taught them to read two taps ago.",
+    "file": "landscape-06-a-surname-nobody-can-spell-for-them.png",
+    "orientation": "landscape",
+    "taps": 21
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 3 of 6",
+    "step": "child-grade",
     "title": "Grade, or none",
-    "caption": "Thirteen chips and \"No grade\", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on \"No grade\" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo.",
-    "file": "landscape-05-grade-or-none.png",
-    "orientation": "landscape"
+    "caption": "Fourteen chips and \"No grade\", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on \"No grade\" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo. Choosing is the whole step: a chip advances, so there is no state between picking and moving on.",
+    "file": "landscape-07-grade-or-none.png",
+    "orientation": "landscape",
+    "taps": 22
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies",
     "title": "Allergies, only where they can land",
-    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
-    "file": "landscape-06-allergies-only-where-they-can-land.png",
-    "orientation": "landscape"
+    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes.",
+    "file": "landscape-08-allergies-only-where-they-can-land.png",
+    "orientation": "landscape",
+    "taps": 23
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies (typed)",
+    "title": "A real note, typed on a lobby keyboard",
+    "caption": "The minority answer, and the one nobody has photographed before. The field takes digits as well as letters — \"Type 1 diabetes\", \"EpiPen 0.3\" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard's geometry on every screen including search. Whether a parent can say what they need to say inside that alphabet is a fair thing to argue about, and this is the frame to argue about it on.",
+    "file": "landscape-09-a-real-note-typed-on-a-lobby-keyboard.png",
+    "orientation": "landscape",
+    "taps": 44
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies (ticked)",
     "title": "Ticked, and the box goes quiet",
-    "caption": "What the tick does, rather than only that it is there. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into — which is the whole point of a control that exists to stop people writing the word \"none\" into a medical field. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
-    "file": "landscape-07-ticked-and-the-box-goes-quiet.png",
-    "orientation": "landscape"
+    "caption": "What the tick does, rather than only that it is there — and here it does it to a note that was actually typed. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
+    "file": "landscape-10-ticked-and-the-box-goes-quiet.png",
+    "orientation": "landscape",
+    "taps": 45
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "One child banked",
+    "step": "another",
     "title": "Anybody else?",
     "caption": "The fork that makes this worth doing at a kiosk at all: a parent with three children walks the loop three times rather than queueing three times. Who is on the list so far is named above the buttons, because the question cannot be answered against a parent's memory of what they typed forty seconds ago — least of all the parent of four, who is exactly who this loop is for. It is also the last chance to catch a child entered twice, or one whose name went in wrong.",
-    "file": "landscape-08-anybody-else.png",
-    "orientation": "landscape"
+    "file": "landscape-11-anybody-else.png",
+    "orientation": "landscape",
+    "taps": 46
   },
   {
-    "flow": "Right here",
-    "state": "Two children",
+    "flow": "Child 2",
+    "state": "Second child — question 1 of 4",
+    "step": "child-first (child 2)",
+    "title": "Round two, from the top",
+    "caption": "The loop returns to exactly the screen the run opened on, with the header counting: \"Child 2\" rather than \"Your child\". Nothing else is carried into the first-name question, and nothing could be. The honest question about this frame is whether a parent who has just answered four questions can tell they are at the start of four more.",
+    "file": "landscape-12-round-two-from-the-top.png",
+    "orientation": "landscape",
+    "taps": 47
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 1 of 4",
+    "step": "child-first (child 2, typed)",
+    "title": "Three letters, same keyboard",
+    "caption": "Identical mechanics to the first child, photographed anyway: the repeats are the part of this flow most likely to be worth cutting, and a document that showed them once could not be used to argue about them.",
+    "file": "landscape-13-three-letters-same-keyboard.png",
+    "orientation": "landscape",
+    "taps": 50
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 2 of 4",
+    "step": "child-last (carried)",
     "title": "The surname, carried",
-    "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot.",
-    "file": "landscape-09-the-surname-carried.png",
-    "orientation": "landscape"
+    "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot. It is still a full screen and a full tap for an answer the kiosk already has.",
+    "file": "landscape-14-the-surname-carried.png",
+    "orientation": "landscape",
+    "taps": 51
   },
   {
-    "flow": "Right here",
-    "state": "Two children",
+    "flow": "Child 2",
+    "state": "Second child — question 3 of 4",
+    "step": "child-grade (child 2)",
+    "title": "Grade again, with no memory",
+    "caption": "Fourteen chips a second time, opening on the same default as the first child rather than near the sibling just entered. Families arrive in bands — a four-year-old and a six-year-old, not a four-year-old and a fifteen-year-old — so whether this grid should lean on the answer above it is a real question this frame exists to ask.",
+    "file": "landscape-15-grade-again-with-no-memory.png",
+    "orientation": "landscape",
+    "taps": 52
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 4 of 4",
+    "step": "child-allergies (child 2)",
+    "title": "Allergies, asked again from scratch",
+    "caption": "Each child answers for themselves: the tick is cleared on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine.",
+    "file": "landscape-16-allergies-asked-again-from-scratch.png",
+    "orientation": "landscape",
+    "taps": 53
+  },
+  {
+    "flow": "Child 2",
+    "state": "Two children banked",
+    "step": "another (two children)",
     "title": "Both of them, named",
-    "caption": "The same fork one child later. Nothing about this screen asks a parent to remember anything.",
-    "file": "landscape-10-both-of-them-named.png",
-    "orientation": "landscape"
+    "caption": "The same fork one child later, with the allergy note from the first child printed under her name — this list is the family checking their own typing, the one moment the person reading the note is the person who wrote it. Nothing about this screen asks a parent to remember anything.",
+    "file": "landscape-17-both-of-them-named.png",
+    "orientation": "landscape",
+    "taps": 55
   },
   {
-    "flow": "Right here",
-    "state": "Two children, one adult",
+    "flow": "And you",
+    "state": "Adult — question 1 of 3",
+    "step": "guardian-first",
+    "title": "Your first name",
+    "caption": "The wizard turns to the adult, and the header says so: \"And you\". The readout carries the whole of the distinction between this screen and the four before it — the frame, the keyboard and the button are identical, and \"Your first name\" is the only thing on the glass that says whose name is wanted. Worth deciding whether that is enough at arm's length in a lobby.",
+    "file": "landscape-18-your-first-name.png",
+    "orientation": "landscape",
+    "taps": 56
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 1 of 3",
+    "step": "guardian-first (typed)",
+    "title": "Typed, and the door is still open",
+    "caption": "Nothing on this screen says the number two questions away is the part that matters, or that the name is what a volunteer will use to find this family at pickup. The step is cheap; whether it earns its place before the phone number is a fair question.",
+    "file": "landscape-19-typed-and-the-door-is-still-open.png",
+    "orientation": "landscape",
+    "taps": 61
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 2 of 3",
+    "step": "guardian-last (carried)",
+    "title": "Your last name, borrowed from the child",
+    "caption": "Prefilled with the first child's surname, which is right far more often than it is wrong and is one Clear away when it is not — a step-parent, a different name, a family that does not share one. The prefill is silent: nothing on the screen says where those letters came from, so a parent who does share the name presses Next, and a parent who does not has to notice.",
+    "file": "landscape-20-your-last-name-borrowed-from-the-child.png",
+    "orientation": "landscape",
+    "taps": 62
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone",
     "title": "A dialer, for the one question that is a number",
     "caption": "The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family's key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church's own database and to be reduced to four digits for the kiosk index.",
-    "file": "landscape-11-a-dialer-for-the-one-question-that-is-a-number.png",
-    "orientation": "landscape"
+    "file": "landscape-21-a-dialer-for-the-one-question-that-is-a-number.png",
+    "orientation": "landscape",
+    "taps": 63
   },
   {
-    "flow": "Right here",
-    "state": "Two children, one adult",
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone (partial)",
+    "title": "Grouped as they are typed",
+    "caption": "Six digits in, and the readout is already punctuating them the way a phone number is read aloud. Next stays dead until there are ten: an incomplete number is refused on the glass rather than after a round trip.",
+    "file": "landscape-22-grouped-as-they-are-typed.png",
+    "orientation": "landscape",
+    "taps": 69
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone (complete)",
     "title": "Ten digits",
-    "caption": "Grouped as they are typed. A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.",
-    "file": "landscape-12-ten-digits.png",
-    "orientation": "landscape"
+    "caption": "A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too. This is the last keystroke of the run; everything after it is a decision, not typing.",
+    "file": "landscape-23-ten-digits.png",
+    "orientation": "landscape",
+    "taps": 73
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
     "state": "Ready to check in",
+    "step": "confirm",
     "title": "Does this look right?",
-    "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act.",
-    "file": "landscape-13-does-this-look-right.png",
-    "orientation": "landscape"
+    "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act. Back reopens the previous question — it does not walk into an earlier child, so a wrong name three screens up is a restart.",
+    "file": "landscape-24-does-this-look-right.png",
+    "orientation": "landscape",
+    "taps": 74
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
+    "state": "The call is in flight",
+    "step": "submitting",
+    "title": "One moment",
+    "caption": "Cancel goes invisible while the call is out, because a half-written family is worse than a slow one — but look at the other corner: **Back** is still there, and on this step `goBack` has no case, so it falls through to closing the whole flow. The write still lands; the family loses the screen that teaches them their four digits. Everything else here is absence: \"Saving…\" and a header, and no sense of how long, for a callable that writes children, a household and a check-in. This is the one frame in the document whose timing is arranged — the request is held for a second and a half so the screen exists long enough to photograph.",
+    "file": "landscape-25-one-moment.png",
+    "orientation": "landscape",
+    "taps": 75
+  },
+  {
+    "flow": "And you",
     "state": "On the roster, checked in",
+    "step": "success",
     "title": "Next time, just type those four digits",
-    "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app.",
-    "file": "landscape-14-next-time-just-type-those-four-digits.png",
-    "orientation": "landscape"
+    "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app. It clears itself after eight seconds.",
+    "file": "landscape-26-next-time-just-type-those-four-digits.png",
+    "orientation": "landscape",
+    "taps": 75
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
     "state": "Findable",
+    "step": "search (by last 4)",
     "title": "And it works immediately",
     "caption": "Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church's backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.",
-    "file": "landscape-15-and-it-works-immediately.png",
-    "orientation": "landscape"
+    "file": "landscape-27-and-it-works-immediately.png",
+    "orientation": "landscape",
+    "taps": 80
   },
   {
     "flow": "The second child",
     "state": "On the confirm screen",
+    "step": "confirm (check-in)",
     "title": "The other door, in the same slot",
     "caption": "A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.",
-    "file": "landscape-16-the-other-door-in-the-same-slot.png",
-    "orientation": "landscape"
+    "file": "landscape-28-the-other-door-in-the-same-slot.png",
+    "orientation": "landscape",
+    "taps": 86
   },
   {
     "flow": "The second child",
     "state": "Searching the roster first",
+    "step": "sibling search",
     "title": "The cheaper answer, offered first",
     "caption": "Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family's own rows greyed and inert so nobody taps a child twice, and keeps \"add a new child\" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.",
-    "file": "landscape-17-the-cheaper-answer-offered-first.png",
-    "orientation": "landscape"
+    "file": "landscape-29-the-cheaper-answer-offered-first.png",
+    "orientation": "landscape",
+    "taps": 87
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 1 of 4",
+    "step": "child-first (sibling mode)",
+    "title": "\"Another child\", not \"their brother\"",
+    "caption": "The same first question, under a header that refuses to claim a relationship: the kiosk inferred kinship from four phone digits, and this wizard is reached from the screen that exists for everyone that inference is wrong about — a cousin, a neighbour's boy, a child on a different number. \"Another child\" is the only relationship it can actually vouch for: they arrived together.",
+    "file": "landscape-30-another-child-not-their-brother.png",
+    "orientation": "landscape",
+    "taps": 88
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 2 of 4",
+    "step": "child-last (sibling mode, empty)",
+    "title": "The surname it does not carry",
+    "caption": "Empty — and this is the frame that shows why every step deserves a photograph. The prefill offers the surname of the previous child *in this run*, and a sibling run has none: the family being joined is on the confirm screen behind the wizard, not in the draft. The kiosk knows which household this is well enough to file the child into it, and still asks a parent to type a surname it is holding.",
+    "file": "landscape-31-the-surname-it-does-not-carry.png",
+    "orientation": "landscape",
+    "taps": 94
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 3 of 4",
+    "step": "child-grade (sibling mode)",
+    "title": "Grade, unchanged by any of it",
+    "caption": "The same fourteen chips, opening on the same default, for a child whose siblings the kiosk has on screen. Nothing about the family it is joining narrows the grid.",
+    "file": "landscape-32-grade-unchanged-by-any-of-it.png",
+    "orientation": "landscape",
+    "taps": 99
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 4 of 4",
+    "step": "child-allergies (sibling mode)",
+    "title": "Allergies, for the joining child",
+    "caption": "Asked here too, and on the same terms: the note goes to the reviewer and then upstream, and the kiosk keeps a marker rather than the text.",
+    "file": "landscape-33-allergies-for-the-joining-child.png",
+    "orientation": "landscape",
+    "taps": 100
+  },
+  {
+    "flow": "The second child",
+    "state": "One child banked",
+    "step": "another (sibling mode)",
+    "title": "Anybody else, on the sibling path too",
+    "caption": "The loop is the same one the family wizard uses — a parent bringing two new children to a household the church already has walks it twice. The fork is worth seeing on this path because the run it ends is two questions long, and a screen that exists to offer a repeat sits at the end of it either way.",
+    "file": "landscape-34-anybody-else-on-the-sibling-path-too.png",
+    "orientation": "landscape",
+    "taps": 102
   },
   {
     "flow": "The second child",
     "state": "Two questions, no adult",
+    "step": "confirm (sibling mode)",
     "title": "Joining the family that exists",
     "caption": "No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.",
-    "file": "landscape-18-joining-the-family-that-exists.png",
-    "orientation": "landscape"
+    "file": "landscape-35-joining-the-family-that-exists.png",
+    "orientation": "landscape",
+    "taps": 103
+  },
+  {
+    "flow": "The second child",
+    "state": "The call is in flight",
+    "step": "submitting (sibling mode)",
+    "title": "One moment, again",
+    "caption": "The same spinner, at the end of a run a quarter as long, and held the same way. What a family waits on here is identical to what the six-question run waits on, which is a point in the sibling path's favour and an argument about the other one.",
+    "file": "landscape-36-one-moment-again.png",
+    "orientation": "landscape",
+    "taps": 104
   },
   {
     "flow": "The second child",
     "state": "Checked in, held for review",
+    "step": "success (sibling mode)",
     "title": "Recorded, not decided",
-    "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.",
-    "file": "landscape-19-recorded-not-decided.png",
-    "orientation": "landscape"
+    "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides. Note what this screen does *not* say: there is no four-digit line here, because a sibling run never asked for a number.",
+    "file": "landscape-37-recorded-not-decided.png",
+    "orientation": "landscape",
+    "taps": 104
+  },
+  {
+    "flow": "The edges",
+    "state": "Six children — the cap",
+    "step": "another (at MAX_CHILDREN)",
+    "title": "As many as one go takes",
+    "caption": "Six is the wizard's cap and the server's. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. The list above the buttons is also, at six rows, doing the most work it will ever do.",
+    "file": "landscape-38-as-many-as-one-go-takes.png",
+    "orientation": "landscape",
+    "taps": 174
+  },
+  {
+    "flow": "The edges",
+    "state": "Six children on one confirm",
+    "step": "confirm (six children)",
+    "title": "Six rows and a button",
+    "caption": "The last screen before a record goes upstream, holding as much as it ever has to. The list hangs from the bottom against the button on purpose — on a portrait tablet a family's children used to sit a thousand pixels from the control that files them — and this is the frame that shows what that costs when the list is long. Whether the parent of six can check six names here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.",
+    "file": "landscape-39-six-rows-and-a-button.png",
+    "orientation": "landscape",
+    "taps": 195
+  },
+  {
+    "flow": "Finding the door",
+    "state": "Nobody has typed anything",
+    "step": "search",
+    "title": "The kiosk at rest",
+    "caption": "Where every journey in this document starts, and the only screen a family sees before they touch anything. The door out of it is already on the glass, in the row above the keyboard — it has to be: a parent told \"just put your name in\" types their child's name, gets somebody else's Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke never moves the keyboard.",
+    "file": "portrait-01-the-kiosk-at-rest.png",
+    "orientation": "portrait",
+    "taps": 0
   },
   {
     "flow": "Finding the door",
     "state": "Not on the roster",
+    "step": "search (no match)",
     "title": "No match",
     "caption": "What a family nobody has met used to meet here was \"No match — please see a leader\", and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has ever met needs a form.",
-    "file": "portrait-01-no-match.png",
-    "orientation": "portrait"
+    "file": "portrait-02-no-match.png",
+    "orientation": "portrait",
+    "taps": 4
   },
   {
-    "flow": "Finding the door",
-    "state": "Not on the roster",
-    "title": "The standing offer",
-    "caption": "The door is also on the screen before anybody types, in the row above the keyboard. It has to be: a parent told \"just put your name in\" types their child's name, gets somebody else's Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke still never moves the keyboard.",
-    "file": "portrait-02-the-standing-offer.png",
-    "orientation": "portrait"
-  },
-  {
-    "flow": "Right here",
-    "state": "Registering",
-    "title": "The field says what it is",
+    "flow": "Your child",
+    "state": "Registering — question 1 of 6",
+    "step": "child-first",
+    "title": "Child's first name",
     "caption": "One tap from the offer and the first question is up — the QR screen that used to stand between them retired with the phone form it pointed at. One question per screen in the frame the search already uses. The readout names the field rather than saying \"type here\", which matters most on the two steps where the answer could belong to either person in the room: \"Child's last name\" and \"Your last name\" are the same box until one of them says which.",
-    "file": "portrait-03-the-field-says-what-it-is.png",
-    "orientation": "portrait"
+    "file": "portrait-03-child-s-first-name.png",
+    "orientation": "portrait",
+    "taps": 5
   },
   {
-    "flow": "Right here",
-    "state": "Registering",
+    "flow": "Your child",
+    "state": "Registering — question 1 of 6",
+    "step": "child-first (typed)",
     "title": "Capitals, and a key to argue with them",
     "caption": "The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce.",
     "file": "portrait-04-capitals-and-a-key-to-argue-with-them.png",
-    "orientation": "portrait"
+    "orientation": "portrait",
+    "taps": 10
   },
   {
-    "flow": "Right here",
-    "state": "Registering",
+    "flow": "Your child",
+    "state": "Registering — question 2 of 6",
+    "step": "child-last",
+    "title": "Child's last name, with nothing to carry",
+    "caption": "The first child of a new family is the one time this box opens empty — there is no previous child to borrow a surname from, and the kiosk does not know the family yet. Every later surname in this run arrives prefilled. An identical-looking screen that behaves differently four frames from now is worth seeing twice.",
+    "file": "portrait-05-child-s-last-name-with-nothing-to-carry.png",
+    "orientation": "portrait",
+    "taps": 11
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 2 of 6",
+    "step": "child-last (typed)",
+    "title": "A surname nobody can spell for them",
+    "caption": "Twelve keystrokes on glass, and the only check on them is a parent reading the readout above the keys. This is the screen where a typo becomes a roster row, a sticker and a record in the church's database — and the readout is deliberately the same object the search screen taught them to read two taps ago.",
+    "file": "portrait-06-a-surname-nobody-can-spell-for-them.png",
+    "orientation": "portrait",
+    "taps": 21
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 3 of 6",
+    "step": "child-grade",
     "title": "Grade, or none",
-    "caption": "Thirteen chips and \"No grade\", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on \"No grade\" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo.",
-    "file": "portrait-05-grade-or-none.png",
-    "orientation": "portrait"
+    "caption": "Fourteen chips and \"No grade\", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on \"No grade\" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo. Choosing is the whole step: a chip advances, so there is no state between picking and moving on.",
+    "file": "portrait-07-grade-or-none.png",
+    "orientation": "portrait",
+    "taps": 22
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies",
     "title": "Allergies, only where they can land",
-    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes. Ticking empties the box and greys it out. The note goes to the reviewer and then upstream; the kiosk keeps a marker, never the text.",
-    "file": "portrait-06-allergies-only-where-they-can-land.png",
-    "orientation": "portrait"
+    "caption": "The fourth question, and it only exists when the church's own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say \"nothing\" collects \"None\" and \"N/A\" as though they were notes.",
+    "file": "portrait-08-allergies-only-where-they-can-land.png",
+    "orientation": "portrait",
+    "taps": 23
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies (typed)",
+    "title": "A real note, typed on a lobby keyboard",
+    "caption": "The minority answer, and the one nobody has photographed before. The field takes digits as well as letters — \"Type 1 diabetes\", \"EpiPen 0.3\" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard's geometry on every screen including search. Whether a parent can say what they need to say inside that alphabet is a fair thing to argue about, and this is the frame to argue about it on.",
+    "file": "portrait-09-a-real-note-typed-on-a-lobby-keyboard.png",
+    "orientation": "portrait",
+    "taps": 44
+  },
+  {
+    "flow": "Your child",
+    "state": "Registering — question 4 of 6",
+    "step": "child-allergies (ticked)",
     "title": "Ticked, and the box goes quiet",
-    "caption": "What the tick does, rather than only that it is there. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into — which is the whole point of a control that exists to stop people writing the word \"none\" into a medical field. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
-    "file": "portrait-07-ticked-and-the-box-goes-quiet.png",
-    "orientation": "portrait"
+    "caption": "What the tick does, rather than only that it is there — and here it does it to a note that was actually typed. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.",
+    "file": "portrait-10-ticked-and-the-box-goes-quiet.png",
+    "orientation": "portrait",
+    "taps": 45
   },
   {
-    "flow": "Right here",
-    "state": "One child",
+    "flow": "Your child",
+    "state": "One child banked",
+    "step": "another",
     "title": "Anybody else?",
     "caption": "The fork that makes this worth doing at a kiosk at all: a parent with three children walks the loop three times rather than queueing three times. Who is on the list so far is named above the buttons, because the question cannot be answered against a parent's memory of what they typed forty seconds ago — least of all the parent of four, who is exactly who this loop is for. It is also the last chance to catch a child entered twice, or one whose name went in wrong.",
-    "file": "portrait-08-anybody-else.png",
-    "orientation": "portrait"
+    "file": "portrait-11-anybody-else.png",
+    "orientation": "portrait",
+    "taps": 46
   },
   {
-    "flow": "Right here",
-    "state": "Two children",
+    "flow": "Child 2",
+    "state": "Second child — question 1 of 4",
+    "step": "child-first (child 2)",
+    "title": "Round two, from the top",
+    "caption": "The loop returns to exactly the screen the run opened on, with the header counting: \"Child 2\" rather than \"Your child\". Nothing else is carried into the first-name question, and nothing could be. The honest question about this frame is whether a parent who has just answered four questions can tell they are at the start of four more.",
+    "file": "portrait-12-round-two-from-the-top.png",
+    "orientation": "portrait",
+    "taps": 47
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 1 of 4",
+    "step": "child-first (child 2, typed)",
+    "title": "Three letters, same keyboard",
+    "caption": "Identical mechanics to the first child, photographed anyway: the repeats are the part of this flow most likely to be worth cutting, and a document that showed them once could not be used to argue about them.",
+    "file": "portrait-13-three-letters-same-keyboard.png",
+    "orientation": "portrait",
+    "taps": 50
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 2 of 4",
+    "step": "child-last (carried)",
     "title": "The surname, carried",
-    "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot.",
-    "file": "portrait-09-the-surname-carried.png",
-    "orientation": "portrait"
+    "caption": "The second child's last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot. It is still a full screen and a full tap for an answer the kiosk already has.",
+    "file": "portrait-14-the-surname-carried.png",
+    "orientation": "portrait",
+    "taps": 51
   },
   {
-    "flow": "Right here",
-    "state": "Two children",
+    "flow": "Child 2",
+    "state": "Second child — question 3 of 4",
+    "step": "child-grade (child 2)",
+    "title": "Grade again, with no memory",
+    "caption": "Fourteen chips a second time, opening on the same default as the first child rather than near the sibling just entered. Families arrive in bands — a four-year-old and a six-year-old, not a four-year-old and a fifteen-year-old — so whether this grid should lean on the answer above it is a real question this frame exists to ask.",
+    "file": "portrait-15-grade-again-with-no-memory.png",
+    "orientation": "portrait",
+    "taps": 52
+  },
+  {
+    "flow": "Child 2",
+    "state": "Second child — question 4 of 4",
+    "step": "child-allergies (child 2)",
+    "title": "Allergies, asked again from scratch",
+    "caption": "Each child answers for themselves: the tick is cleared on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine.",
+    "file": "portrait-16-allergies-asked-again-from-scratch.png",
+    "orientation": "portrait",
+    "taps": 53
+  },
+  {
+    "flow": "Child 2",
+    "state": "Two children banked",
+    "step": "another (two children)",
     "title": "Both of them, named",
-    "caption": "The same fork one child later. Nothing about this screen asks a parent to remember anything.",
-    "file": "portrait-10-both-of-them-named.png",
-    "orientation": "portrait"
+    "caption": "The same fork one child later, with the allergy note from the first child printed under her name — this list is the family checking their own typing, the one moment the person reading the note is the person who wrote it. Nothing about this screen asks a parent to remember anything.",
+    "file": "portrait-17-both-of-them-named.png",
+    "orientation": "portrait",
+    "taps": 55
   },
   {
-    "flow": "Right here",
-    "state": "Two children, one adult",
+    "flow": "And you",
+    "state": "Adult — question 1 of 3",
+    "step": "guardian-first",
+    "title": "Your first name",
+    "caption": "The wizard turns to the adult, and the header says so: \"And you\". The readout carries the whole of the distinction between this screen and the four before it — the frame, the keyboard and the button are identical, and \"Your first name\" is the only thing on the glass that says whose name is wanted. Worth deciding whether that is enough at arm's length in a lobby.",
+    "file": "portrait-18-your-first-name.png",
+    "orientation": "portrait",
+    "taps": 56
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 1 of 3",
+    "step": "guardian-first (typed)",
+    "title": "Typed, and the door is still open",
+    "caption": "Nothing on this screen says the number two questions away is the part that matters, or that the name is what a volunteer will use to find this family at pickup. The step is cheap; whether it earns its place before the phone number is a fair question.",
+    "file": "portrait-19-typed-and-the-door-is-still-open.png",
+    "orientation": "portrait",
+    "taps": 61
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 2 of 3",
+    "step": "guardian-last (carried)",
+    "title": "Your last name, borrowed from the child",
+    "caption": "Prefilled with the first child's surname, which is right far more often than it is wrong and is one Clear away when it is not — a step-parent, a different name, a family that does not share one. The prefill is silent: nothing on the screen says where those letters came from, so a parent who does share the name presses Next, and a parent who does not has to notice.",
+    "file": "portrait-20-your-last-name-borrowed-from-the-child.png",
+    "orientation": "portrait",
+    "taps": 62
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone",
     "title": "A dialer, for the one question that is a number",
     "caption": "The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family's key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church's own database and to be reduced to four digits for the kiosk index.",
-    "file": "portrait-11-a-dialer-for-the-one-question-that-is-a-number.png",
-    "orientation": "portrait"
+    "file": "portrait-21-a-dialer-for-the-one-question-that-is-a-number.png",
+    "orientation": "portrait",
+    "taps": 63
   },
   {
-    "flow": "Right here",
-    "state": "Two children, one adult",
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone (partial)",
+    "title": "Grouped as they are typed",
+    "caption": "Six digits in, and the readout is already punctuating them the way a phone number is read aloud. Next stays dead until there are ten: an incomplete number is refused on the glass rather than after a round trip.",
+    "file": "portrait-22-grouped-as-they-are-typed.png",
+    "orientation": "portrait",
+    "taps": 69
+  },
+  {
+    "flow": "And you",
+    "state": "Adult — question 3 of 3",
+    "step": "guardian-phone (complete)",
     "title": "Ten digits",
-    "caption": "Grouped as they are typed. A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.",
-    "file": "portrait-12-ten-digits.png",
-    "orientation": "portrait"
+    "caption": "A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too. This is the last keystroke of the run; everything after it is a decision, not typing.",
+    "file": "portrait-23-ten-digits.png",
+    "orientation": "portrait",
+    "taps": 73
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
     "state": "Ready to check in",
+    "step": "confirm",
     "title": "Does this look right?",
-    "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act.",
-    "file": "portrait-13-does-this-look-right.png",
-    "orientation": "portrait"
+    "caption": "The whole family on one screen, and one button. Everything before this was reversible with Back; this is the point where two children join the ministry's roster and are marked present, as a single act. Back reopens the previous question — it does not walk into an earlier child, so a wrong name three screens up is a restart.",
+    "file": "portrait-24-does-this-look-right.png",
+    "orientation": "portrait",
+    "taps": 74
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
+    "state": "The call is in flight",
+    "step": "submitting",
+    "title": "One moment",
+    "caption": "Cancel goes invisible while the call is out, because a half-written family is worse than a slow one — but look at the other corner: **Back** is still there, and on this step `goBack` has no case, so it falls through to closing the whole flow. The write still lands; the family loses the screen that teaches them their four digits. Everything else here is absence: \"Saving…\" and a header, and no sense of how long, for a callable that writes children, a household and a check-in. This is the one frame in the document whose timing is arranged — the request is held for a second and a half so the screen exists long enough to photograph.",
+    "file": "portrait-25-one-moment.png",
+    "orientation": "portrait",
+    "taps": 75
+  },
+  {
+    "flow": "And you",
     "state": "On the roster, checked in",
+    "step": "success",
     "title": "Next time, just type those four digits",
-    "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app.",
-    "file": "portrait-14-next-time-just-type-those-four-digits.png",
-    "orientation": "portrait"
+    "caption": "Both children exist, both are checked in against tonight's gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app. It clears itself after eight seconds.",
+    "file": "portrait-26-next-time-just-type-those-four-digits.png",
+    "orientation": "portrait",
+    "taps": 75
   },
   {
-    "flow": "Right here",
+    "flow": "And you",
     "state": "Findable",
+    "step": "search (by last 4)",
     "title": "And it works immediately",
     "caption": "Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church's backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.",
-    "file": "portrait-15-and-it-works-immediately.png",
-    "orientation": "portrait"
+    "file": "portrait-27-and-it-works-immediately.png",
+    "orientation": "portrait",
+    "taps": 80
   },
   {
     "flow": "The second child",
     "state": "On the confirm screen",
+    "step": "confirm (check-in)",
     "title": "The other door, in the same slot",
     "caption": "A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.",
-    "file": "portrait-16-the-other-door-in-the-same-slot.png",
-    "orientation": "portrait"
+    "file": "portrait-28-the-other-door-in-the-same-slot.png",
+    "orientation": "portrait",
+    "taps": 86
   },
   {
     "flow": "The second child",
     "state": "Searching the roster first",
+    "step": "sibling search",
     "title": "The cheaper answer, offered first",
     "caption": "Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family's own rows greyed and inert so nobody taps a child twice, and keeps \"add a new child\" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.",
-    "file": "portrait-17-the-cheaper-answer-offered-first.png",
-    "orientation": "portrait"
+    "file": "portrait-29-the-cheaper-answer-offered-first.png",
+    "orientation": "portrait",
+    "taps": 87
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 1 of 4",
+    "step": "child-first (sibling mode)",
+    "title": "\"Another child\", not \"their brother\"",
+    "caption": "The same first question, under a header that refuses to claim a relationship: the kiosk inferred kinship from four phone digits, and this wizard is reached from the screen that exists for everyone that inference is wrong about — a cousin, a neighbour's boy, a child on a different number. \"Another child\" is the only relationship it can actually vouch for: they arrived together.",
+    "file": "portrait-30-another-child-not-their-brother.png",
+    "orientation": "portrait",
+    "taps": 88
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 2 of 4",
+    "step": "child-last (sibling mode, empty)",
+    "title": "The surname it does not carry",
+    "caption": "Empty — and this is the frame that shows why every step deserves a photograph. The prefill offers the surname of the previous child *in this run*, and a sibling run has none: the family being joined is on the confirm screen behind the wizard, not in the draft. The kiosk knows which household this is well enough to file the child into it, and still asks a parent to type a surname it is holding.",
+    "file": "portrait-31-the-surname-it-does-not-carry.png",
+    "orientation": "portrait",
+    "taps": 94
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 3 of 4",
+    "step": "child-grade (sibling mode)",
+    "title": "Grade, unchanged by any of it",
+    "caption": "The same fourteen chips, opening on the same default, for a child whose siblings the kiosk has on screen. Nothing about the family it is joining narrows the grid.",
+    "file": "portrait-32-grade-unchanged-by-any-of-it.png",
+    "orientation": "portrait",
+    "taps": 102
+  },
+  {
+    "flow": "The second child",
+    "state": "Sibling — question 4 of 4",
+    "step": "child-allergies (sibling mode)",
+    "title": "Allergies, for the joining child",
+    "caption": "Asked here too, and on the same terms: the note goes to the reviewer and then upstream, and the kiosk keeps a marker rather than the text.",
+    "file": "portrait-33-allergies-for-the-joining-child.png",
+    "orientation": "portrait",
+    "taps": 103
+  },
+  {
+    "flow": "The second child",
+    "state": "One child banked",
+    "step": "another (sibling mode)",
+    "title": "Anybody else, on the sibling path too",
+    "caption": "The loop is the same one the family wizard uses — a parent bringing two new children to a household the church already has walks it twice. The fork is worth seeing on this path because the run it ends is two questions long, and a screen that exists to offer a repeat sits at the end of it either way.",
+    "file": "portrait-34-anybody-else-on-the-sibling-path-too.png",
+    "orientation": "portrait",
+    "taps": 105
   },
   {
     "flow": "The second child",
     "state": "Two questions, no adult",
+    "step": "confirm (sibling mode)",
     "title": "Joining the family that exists",
     "caption": "No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.",
-    "file": "portrait-18-joining-the-family-that-exists.png",
-    "orientation": "portrait"
+    "file": "portrait-35-joining-the-family-that-exists.png",
+    "orientation": "portrait",
+    "taps": 106
+  },
+  {
+    "flow": "The second child",
+    "state": "The call is in flight",
+    "step": "submitting (sibling mode)",
+    "title": "One moment, again",
+    "caption": "The same spinner, at the end of a run a quarter as long, and held the same way. What a family waits on here is identical to what the six-question run waits on, which is a point in the sibling path's favour and an argument about the other one.",
+    "file": "portrait-36-one-moment-again.png",
+    "orientation": "portrait",
+    "taps": 107
   },
   {
     "flow": "The second child",
     "state": "Checked in, held for review",
+    "step": "success (sibling mode)",
     "title": "Recorded, not decided",
-    "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides.",
-    "file": "portrait-19-recorded-not-decided.png",
-    "orientation": "portrait"
+    "caption": "Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides. Note what this screen does *not* say: there is no four-digit line here, because a sibling run never asked for a number.",
+    "file": "portrait-37-recorded-not-decided.png",
+    "orientation": "portrait",
+    "taps": 107
+  },
+  {
+    "flow": "The edges",
+    "state": "Six children — the cap",
+    "step": "another (at MAX_CHILDREN)",
+    "title": "As many as one go takes",
+    "caption": "Six is the wizard's cap and the server's. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. The list above the buttons is also, at six rows, doing the most work it will ever do.",
+    "file": "portrait-38-as-many-as-one-go-takes.png",
+    "orientation": "portrait",
+    "taps": 177
+  },
+  {
+    "flow": "The edges",
+    "state": "Six children on one confirm",
+    "step": "confirm (six children)",
+    "title": "Six rows and a button",
+    "caption": "The last screen before a record goes upstream, holding as much as it ever has to. The list hangs from the bottom against the button on purpose — on a portrait tablet a family's children used to sit a thousand pixels from the control that files them — and this is the frame that shows what that costs when the list is long. Whether the parent of six can check six names here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.",
+    "file": "portrait-39-six-rows-and-a-button.png",
+    "orientation": "portrait",
+    "taps": 198
   }
 ]

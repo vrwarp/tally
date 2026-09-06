@@ -132,6 +132,18 @@ export class SimulatorStore {
     this.failWith = null;
     this.nextPersonId = 6_600_001;
     this.nextCheckInsId = 9001;
+    /*
+     * The households the seed has built, forgotten with the org they belonged
+     * to. Left behind, this map points at household ids the reset has just
+     * thrown away, and `seedStudent` believes them: the first child of a
+     * household joins a household that no longer exists and *does not create
+     * the parent*, so the second seed of a process silently produces a
+     * ministry whose siblings share no phone number. Everything keyed on that
+     * number — the kiosk's four-digit search, `familyOf`, the sibling
+     * registration — then finds nothing, on data that looks right in every
+     * other respect.
+     */
+    this.seededHouseholds.clear();
   }
 
   /**
