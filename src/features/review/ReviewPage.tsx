@@ -208,7 +208,7 @@ export function ReviewPage() {
         </h1>
         <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
           Two doors, one queue: families who put themselves on the roster at the lobby kiosk, and
-          parent contacts a counselor was given beside a visitor they quick-added. Everybody named
+          contacts a counselor was given beside a visitor they quick-added. Everybody named
           here is on the roster and was checked in — no adult has gone into the church&rsquo;s
           database yet. Soonest to be cleared first.
         </p>
@@ -235,7 +235,7 @@ export function ReviewPage() {
         <Card>
           <EmptyState
             title="Nothing waiting."
-            description="A family who registers at the lobby kiosk, or a parent’s details a counselor takes at a door, waits here until somebody approves them."
+            description="A family who registers at the lobby kiosk, or an adult’s details a counselor takes at a door, waits here until somebody approves them."
           />
         </Card>
       ) : (
@@ -333,7 +333,7 @@ export interface ApproveDecision {
   withRegistrationIds?: string[];
   /** The adult they picked out of the candidates. */
   guardianPersonId?: string;
-  /** They saw the candidates and said none of them is the parent. */
+  /** They saw the candidates and said none of them is the adult. */
   createNewGuardian?: boolean;
   /** Who each child already is, for the children a reviewer answered about. */
   childDecisions?: { studentId: string; personId?: string; createNew?: boolean }[];
@@ -684,8 +684,8 @@ function GuardianEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    const first = checkName(firstName, "The parent's first name");
-    const last = checkName(lastName, "The parent's last name");
+    const first = checkName(firstName, "The adult's first name");
+    const last = checkName(lastName, "The adult's last name");
     const number = checkPhone(phone);
     setErrors({
       firstName: first.ok ? undefined : first.error,
@@ -713,7 +713,7 @@ function GuardianEditor({
   return (
     <form onSubmit={submit} className="rounded-xl bg-ink-950 px-3 py-3 ring-1 ring-brand-500/40">
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-ink-200">Editing the parent</p>
+        <p className="text-sm font-semibold text-ink-200">Editing the adult</p>
         {refusal ? <ErrorBanner message={refusal} /> : null}
 
         <div className="grid gap-3 lg:grid-cols-3">
@@ -860,7 +860,7 @@ function RegistrationCard({
   /**
    * A card whose only outstanding half is the adult.
    *
-   * Two kinds of record arrive here, and they want the same sentences. A parent
+   * Two kinds of record arrive here, and they want the same sentences. An adult
    * contact a counselor took down beside a quick-added visitor was never about
    * the child — that child was on the roster and queued upstream before the
    * card existed. A kiosk family whose children landed and whose guardian did
@@ -886,7 +886,7 @@ function RegistrationCard({
    *     left unheld with their children still absent upstream. The retry is
    *     about the children, and the button has to keep saying so.
    */
-  const parentOnly =
+  const adultOnly =
     row.guardian !== null &&
     row.children.length > 0 &&
     row.children.every((child) => child.studentId !== null && !child.pendingReview) &&
@@ -1011,7 +1011,7 @@ function RegistrationCard({
   /**
    * What a press does to the adult, as a sentence rather than a clause.
    *
-   * On a parent-only card the adult *is* the press, so the clause that hangs off
+   * On an adult-only card the adult *is* the press, so the clause that hangs off
    * the end of a kiosk card's sentence has to become the subject of its own —
    * "Adds Rosa Delgado to the church's database, who is added as a new person"
    * says "added" twice and reads as two different additions.
@@ -1050,7 +1050,7 @@ function RegistrationCard({
   /**
    * Whether the child answers are about to make the adult answer moot.
    *
-   * `createFamily` refuses outright — before the parent is resolved at all — if
+   * `createFamily` refuses outright — before the adult is resolved at all — if
    * any child it is about to place already has an adult in their family. Linking
    * a child to somebody the church already has is exactly how that becomes true,
    * so a reviewer can pick an adult, pick a household, press the button and get
@@ -1153,7 +1153,7 @@ function RegistrationCard({
         {expiringSoon ? (
           <p className={STRIP}>
             When it clears, the phone number goes with it — and{' '}
-            {parentOnly && row.children.length === 1 ? `${named} stays` : 'the children stay'} on
+            {adultOnly && row.children.length === 1 ? `${named} stays` : 'the children stay'} on
             Tally&rsquo;s roster with nobody attached to them.
           </p>
         ) : null}
@@ -1169,7 +1169,7 @@ function RegistrationCard({
         */}
         {row.source === 'counselor' ? (
           <p className={STRIP}>
-            A counselor added {named} at the door and was given a parent&rsquo;s details.{' '}
+            A counselor added {named} at the door and was given an adult&rsquo;s details.{' '}
             {held.length === 0
               ? `${named} is already on the roster and already queued for the church’s database`
               : `${named} is on the roster`}{' '}
@@ -1251,7 +1251,7 @@ function RegistrationCard({
                 Offered for as long as the adult has not been written, which is
                 not the same question as whether the children are held — and
                 `settled` alone got it backwards on the two cards that matter
-                most. A counselor's parent contact is settled from the moment it
+                most. A counselor's contact is settled from the moment it
                 is created (its child was quick-added at a door and never held)
                 and the adult is the entire point of it. A kiosk family whose
                 children landed but whose guardian was refused is settled too,
@@ -1290,7 +1290,7 @@ function RegistrationCard({
           </div>
         ) : row.anchors.length > 0 ? (
           /*
-            No guardian, and nothing wrong with that: this is a parent adding a
+            No guardian, and nothing wrong with that: this is an adult adding a
             child to a family the church already has. Their adult is on file
             upstream already, which is why the wizard did not ask again — and
             saying "this registration did not finish" here, as an earlier
@@ -1317,9 +1317,9 @@ function RegistrationCard({
 
           Above the children, because it changes what the card *is* rather than
           what one row of it means: a reviewer who has not seen this reads two
-          families and approves twice, which is how one parent ended up heading
+          families and approves twice, which is how one adult ended up heading
           two households in a database that cannot merge them. The backends now
-          survive that press either way — the second approval finds the parent's
+          survive that press either way — the second approval finds the adult's
           own household instead of founding a second — but survived is not the
           same as understood, and a reviewer deciding about the Nguyens should
           be told there are two cards of them.
@@ -1399,7 +1399,7 @@ function RegistrationCard({
           chooser could not show, since "none of these selected" and "add as new
           selected" were different-looking states with the same consequence.
         */}
-        {row.guardian && adults.length > 0 && (!row.settled || parentOnly) ? (
+        {row.guardian && adults.length > 0 && (!row.settled || adultOnly) ? (
           <div className={STRIP}>
             <p>
               The church already has {adults.length === 1 ? 'somebody' : `${adults.length} people`}{' '}
@@ -1447,7 +1447,7 @@ function RegistrationCard({
               <li className="flex flex-wrap items-center justify-between gap-2">
                 {/*
                   Named as an option rather than asserted as a fact. "None of
-                  them is this parent" is a sentence the card is in no position
+                  them is this adult" is a sentence the card is in no position
                   to say, and reads especially oddly sitting there pre-selected
                   — which is exactly what it now does whenever no candidate's
                   number matches.
@@ -1536,7 +1536,7 @@ function RegistrationCard({
           The one interaction between the two halves of this card that a
           reviewer cannot see coming.
 
-          `createFamily` refuses before it resolves the parent at all if any
+          `createFamily` refuses before it resolves the adult at all if any
           child it is placing already has an adult in their family — so linking
           a child to somebody the church already has can quietly discard the
           adult, and the household, that were just chosen above. Said plainly,
@@ -1635,7 +1635,7 @@ function RegistrationCard({
               </Decision>
               <Decision
                 caption={
-                  parentOnly ? (
+                  adultOnly ? (
                     <span className="text-warn-400">
                       {adultSentence} Nothing added to the church&rsquo;s database can be deleted or
                       taken back.
@@ -1665,7 +1665,7 @@ function RegistrationCard({
                   disabled={locked}
                   aria-busy={busy || undefined}
                 >
-                  {parentOnly
+                  {adultOnly
                     ? `Yes — add ${row.guardian!.firstName}`
                     : `Yes — add ${held.length === 1 ? listNames(held) : `${held.length} children`}`}
                 </Button>
@@ -1686,8 +1686,8 @@ function RegistrationCard({
                           so — and it stops being the primary, because the
                           instrument that ends the job is below it.
                         */
-                        `Tries ${row.guardian?.firstName ?? 'the parent'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
-                      : parentOnly
+                        `Tries ${row.guardian?.firstName ?? 'the adult'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
+                      : adultOnly
                         ? /*
                             The narrow card's sentence. Nothing here is about the
                             child — they are on the roster either way — so the
@@ -1706,8 +1706,8 @@ function RegistrationCard({
                   aria-busy={busy || undefined}
                 >
                   {guardianRefused
-                    ? `Try ${row.guardian?.firstName ?? 'the parent'} again`
-                    : parentOnly
+                    ? `Try ${row.guardian?.firstName ?? 'the adult'} again`
+                    : adultOnly
                       ? `Add ${row.guardian!.firstName}`
                       : row.settled
                         ? 'Finish adding them'
@@ -1718,7 +1718,7 @@ function RegistrationCard({
               {confirmingDiscard ? (
                 <Decision
                   caption={
-                    parentOnly ? (
+                    adultOnly ? (
                       <span className="text-warn-400">
                         Forgets {formatPhone(row.guardian!.phone)} for good — it is the only copy.{' '}
                         {named} stays on the roster exactly as they are, and nobody is added to the
@@ -1741,7 +1741,7 @@ function RegistrationCard({
                       onClick={onDiscard}
                       disabled={locked}
                     >
-                      {parentOnly ? 'Yes, forget the number' : 'Yes, take them off'}
+                      {adultOnly ? 'Yes, forget the number' : 'Yes, take them off'}
                     </Button>
                     <Button
                       variant="ghost"
@@ -1755,7 +1755,7 @@ function RegistrationCard({
               ) : (
                 <Decision
                   caption={
-                    parentOnly
+                    adultOnly
                       ? // The one card where "Not ours" cannot mean "take them
                         // off the roster": the discard leaves an unheld student
                         // alone, deliberately, and a leader who wants that child
@@ -1772,7 +1772,7 @@ function RegistrationCard({
                     onClick={() => setConfirmingDiscard(true)}
                     disabled={locked}
                   >
-                    {parentOnly ? 'Forget the number' : 'Not ours'}
+                    {adultOnly ? 'Forget the number' : 'Not ours'}
                   </Button>
                 </Decision>
               )}

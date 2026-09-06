@@ -42,7 +42,7 @@ export interface MiaListProps {
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
-   * Called when a row has just put a parent contact into Planning Center — the
+   * Called when a row has just put a contact into Planning Center — the
    * screen holds a session-wide answer about who can be reached, and that row
    * has just changed it.
    */
@@ -588,7 +588,7 @@ function MiaRow({
         name, which is right — but only where there is room, and at 360px it
         is 56 of the 278px the two controls need. Below `sm` the strip starts
         at the row's edge instead, which is what keeps "Resolve…" on the same
-        line as "Contact parent" on an iPhone SE, a 13 mini and most Android
+        line as "Contact adult" on an iPhone SE, a 13 mini and most Android
         handsets rather than wrapping and giving back 40px of the 85 this
         change just bought.
       */}
@@ -621,7 +621,7 @@ function MiaRow({
           As a bare ghost it read as a link floating at the end of the row —
           on a laptop, where the strip folds into a column, it was text with
           no edges beside a filled pill, which is not a state this design
-          system has. So it takes the same shell as Contact parent and sheds
+          system has. So it takes the same shell as Contact adult and sheds
           the fill: a ring and muted text against the page rather than a
           raised face. The two are then legible as what they are — the thing
           a leader does about this student on the phone, and the thing they

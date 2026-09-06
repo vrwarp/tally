@@ -29,7 +29,7 @@ So the split is now:
 | --- | --- | --- |
 | Who is on the roster | Tally | `students/{id}` — a document *is* the membership |
 | Who may sign in | Tally | `invitations/{emailKey}`, plus `TALLY_ADMIN_EMAILS` |
-| Names, grades, parent contact, allergies | Planning Center | read on demand, stored nowhere |
+| Names, grades, contact details, allergies | Planning Center | read on demand, stored nowhere |
 | Attendance, RSVPs | Tally | Planning Center has no concept of them |
 
 This is the operational guide: how to get credentials, what every setting does, how counselor access
@@ -407,10 +407,10 @@ is upstream. Deleting a date of birth is not a correction anybody makes from a r
 browser cannot see the setting, and offering an editable box that the write path then refuses is
 worse than showing it read-only.
 
-### Parent contacts (`full` only)
+### Contacts (`full` only)
 
 Every screen that finds a student nobody can reach says so and points at Planning Center, because
-that is where the answer lives — Tally has held no parent contact of its own since the mirror was
+that is where the answer lives — Tally has held no contact details of its own since the mirror was
 removed. Under `full`, one screen can also fix it in place: the student's page offers a phone/email
 form, and `setParentContact` writes it upstream.
 
@@ -464,7 +464,7 @@ than about a field, so it has a human in the loop at the one point that matters:
 
 `PcoPersonDetails.adultCreatable` is the gate: `full` *and* nobody in the household yet. It and
 `contactWritable` are mirror images — on a `full` install exactly one of them is true — which is what
-lets one screen offer "add a number" and "add a parent" from the same place without deciding which.
+lets one screen offer "add a number" and "add an adult" from the same place without deciding which.
 
 The fields Planning Center owns once a student is linked are listed in `PCO_MANAGED_STUDENT_FIELDS`:
 first name, last name, grade, allergies, status. Notes, attendance and RSVP data are Tally's alone
@@ -607,7 +607,7 @@ There is no scheduled anything. Five reads, and each one is somebody looking at 
 | The roster | Opening check-in, the students list, or a refresh | One sweep of `where[child]=true`, plus one request per roster member the sweep did not cover |
 | One person's details | Opening a student's page | One request, plus one per household |
 | The allergy notes | Check-in, for the rows the roster already flagged | One request per flagged student, once per session |
-| Who has a parent contact | Opening Insights | One sweep of `where[child]=false`, on top of the roster read it reuses |
+| Who has a contact | Opening Insights | One sweep of `where[child]=false`, on top of the roster read it reuses |
 | A directory search | Typing in "Add from Planning Center" | One request per keystroke burst |
 
 The roster read is the interesting one, because it has to turn Tally's membership into people. It

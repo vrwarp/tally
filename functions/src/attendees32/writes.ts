@@ -913,7 +913,7 @@ export async function addParent(
     const firstName = trimmed(options.firstName);
     const lastName = trimmed(options.lastName) ?? readString(resolved.data, 'lastName');
     if (!firstName || !lastName) {
-      return refuse('nothing-to-write', 'A parent needs at least a first name.');
+      return refuse('nothing-to-write', 'An adult needs at least a first name.');
     }
 
     if (!options.createNew) {
@@ -1040,7 +1040,7 @@ export async function addParent(
     skipped,
     candidates: [],
     message: createdPerson
-      ? 'Created the parent in Attendees and filed them into the family.'
+      ? 'Created the adult in Attendees and filed them into the family.'
       : 'Filed the existing person into the family.',
   };
 }
@@ -1307,7 +1307,7 @@ export async function createFamily(
 
   const firstName = trimmed(options.firstName);
   const lastName = trimmed(options.lastName) ?? '';
-  if (!firstName) return refuse('no-linked-children', "The parent's name is missing.");
+  if (!firstName) return refuse('no-linked-children', "The adult's name is missing.");
 
   const relationIds = await resolveRelationIds(options);
   if (relationIds.parent === null || relationIds.child === null) {

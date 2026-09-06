@@ -45,15 +45,15 @@ beforeEach(() => {
 });
 
 describe('the door form', () => {
-  it('opens on three fields and nothing about a parent', () => {
+  it('opens on three fields and nothing about an adult', () => {
     open();
     expect(screen.getByLabelText(/^first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^last name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/grade/i)).toBeInTheDocument();
     // The section exists as an offer, not as fields: a counselor with six people
     // waiting reads three boxes.
-    expect(screen.queryByLabelText(/parent/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add parent contact/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/adult/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add a contact/i })).toBeInTheDocument();
   });
 
   it('saves and checks in with no parent, exactly as it always did', async () => {
@@ -70,15 +70,15 @@ describe('the door form', () => {
   });
 });
 
-describe('the parent contact', () => {
+describe('the contact', () => {
   it('opens with the surname already carried across', async () => {
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
 
-    expect(screen.getByLabelText(/parent last name/i)).toHaveValue('Fields');
-    expect(screen.getByLabelText(/parent first name/i)).toHaveValue('');
+    expect(screen.getByLabelText(/adult’s last name/i)).toHaveValue('Fields');
+    expect(screen.getByLabelText(/adult’s first name/i)).toHaveValue('');
   });
 
   it('lets a counselor open it, type nothing, and still save', async () => {
@@ -87,8 +87,8 @@ describe('the parent contact', () => {
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
-    await user.clear(screen.getByLabelText(/parent last name/i));
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.clear(screen.getByLabelText(/adult’s last name/i));
     await user.click(screen.getByRole('button', { name: /save & check in/i }));
 
     await waitFor(() => expect(quickAddAndCheckIn).toHaveBeenCalledTimes(1));
@@ -99,8 +99,8 @@ describe('the parent contact', () => {
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
-    await user.type(screen.getByLabelText(/parent first name/i), 'Dana');
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.type(screen.getByLabelText(/adult’s first name/i), 'Dana');
     await user.click(screen.getByRole('button', { name: /save & check in/i }));
 
     expect(await screen.findByText(/10-digit number/i)).toBeInTheDocument();
@@ -109,13 +109,13 @@ describe('the parent contact', () => {
     expect(quickAddAndCheckIn).not.toHaveBeenCalled();
   });
 
-  it('sends the parent after the child, and only after', async () => {
+  it('sends the adult after the child, and only after', async () => {
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
-    await user.type(screen.getByLabelText(/parent first name/i), 'Dana');
-    await user.type(screen.getByLabelText(/parent phone/i), '5550103344');
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.type(screen.getByLabelText(/adult’s first name/i), 'Dana');
+    await user.type(screen.getByLabelText(/adult’s phone/i), '5550103344');
     await user.click(screen.getByRole('button', { name: /save & check in/i }));
 
     await waitFor(() => expect(recordVisitorParent).toHaveBeenCalledTimes(1));
@@ -129,20 +129,20 @@ describe('the parent contact', () => {
     expect(recordVisitorParent.mock.calls[0]![0].registrationId).toMatch(/^[A-Za-z0-9-]{20,64}$/);
   });
 
-  it('says the parent failed without saying the check-in did', async () => {
+  it('says the contact failed without saying the check-in did', async () => {
     recordVisitorParent.mockRejectedValue(new Error('offline'));
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
-    await user.type(screen.getByLabelText(/parent first name/i), 'Dana');
-    await user.type(screen.getByLabelText(/parent phone/i), '5550103344');
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.type(screen.getByLabelText(/adult’s first name/i), 'Dana');
+    await user.type(screen.getByLabelText(/adult’s phone/i), '5550103344');
     await user.click(screen.getByRole('button', { name: /save & check in/i }));
 
     // The child is on the roster whatever happens next, so the sentence names
     // what actually did not land. "Could not save Robin" would send a counselor
     // back to add a student who is already there.
-    expect(await screen.findByText(/parent contact did not save/i)).toBeInTheDocument();
+    expect(await screen.findByText(/contact did not save/i)).toBeInTheDocument();
     expect(screen.queryByText(/could not save Robin/i)).not.toBeInTheDocument();
   });
 
@@ -150,9 +150,9 @@ describe('the parent contact', () => {
     const user = userEvent.setup();
     open();
     await typeVisitor(user);
-    await user.click(screen.getByRole('button', { name: /add parent contact/i }));
-    await user.type(screen.getByLabelText(/parent first name/i), 'Dana');
-    await user.type(screen.getByLabelText(/parent phone/i), '5550103344');
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.type(screen.getByLabelText(/adult’s first name/i), 'Dana');
+    await user.type(screen.getByLabelText(/adult’s phone/i), '5550103344');
     await user.click(screen.getByRole('button', { name: /remove/i }));
     await user.click(screen.getByRole('button', { name: /save & check in/i }));
 

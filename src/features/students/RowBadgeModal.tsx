@@ -3,7 +3,7 @@
  *
  * The roster's badges used to be labels. Every one of them names something a
  * leader would then have to go and do somewhere else: open the student, read
- * the allergy, find the parent, remember to come back. That is four navigations
+ * the allergy, find the contact, remember to come back. That is four navigations
  * to answer a question the row already asked, and on a list of eighty-five it
  * is the reason the flags get scanned past rather than worked.
  *
@@ -56,7 +56,7 @@ export interface RowBadgeModalProps {
 
 const TITLES: Record<Exclude<RowBadgeAction, 'queued'>, string> = {
   allergy: 'Allergies',
-  contact: 'Parent contact',
+  contact: 'Contact',
   visitor: 'Still a visitor?',
   birthday: 'Birthday',
   inactive: 'No longer on the roster',
@@ -150,7 +150,7 @@ function AllergyPanel({ student }: { student: Student }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Parent contact                                                              */
+/* Contact details                                                             */
 /* -------------------------------------------------------------------------- */
 
 /*

@@ -85,7 +85,7 @@ describe('FollowUpActions', () => {
 
     // The row fetches on sight — the button is the evidence, and it is offered
     // only once there is somebody behind it.
-    await userEvent.click(await screen.findByRole('button', { name: /Contact parent/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Contact the adult/ }));
 
     expect(
       await screen.findByRole('link', { name: /Text Wen Chen about Iris Chen at/ }),
@@ -104,7 +104,7 @@ describe('FollowUpActions', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('offers the fix when the record has no way to reach a parent', async () => {
+  it('offers the fix when the record has no way to reach an adult', async () => {
     getPersonDetails.mockResolvedValue({ data: details() });
 
     mount(inPlanningCenter());
@@ -117,7 +117,7 @@ describe('FollowUpActions', () => {
      * row's lookup landed.
      */
     expect(
-      await screen.findByRole('button', { name: 'Add parent contact for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Add a contact for Iris Chen' }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/no parent contact for Iris Chen/)).not.toBeInTheDocument();
   });
@@ -130,11 +130,11 @@ describe('FollowUpActions', () => {
     mount(inPlanningCenter());
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Add parent contact for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Add a contact for Iris Chen' }),
     );
 
     // Straight into the form — the press that opened it was the question.
-    expect(await screen.findByLabelText('Parent phone')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Adult’s phone')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
     expect(screen.getByText(/Saved onto Wen Chen in Planning Center/)).toBeInTheDocument();
   });
@@ -145,14 +145,14 @@ describe('FollowUpActions', () => {
     mount(inPlanningCenter());
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Add parent contact for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Add a contact for Iris Chen' }),
     );
 
     expect(await screen.findByRole('link', { name: 'Add it there' })).toHaveAttribute(
       'href',
       'https://people.planningcenteronline.com/people/AC4021',
     );
-    expect(screen.queryByLabelText('Parent phone')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Adult’s phone')).not.toBeInTheDocument();
   });
 
   it('does not ask about a student Planning Center has never heard of', async () => {
@@ -172,7 +172,7 @@ describe('FollowUpActions', () => {
     // "Parent", not "Contact": none of these details belong to the 9th grader
     // whose name is on the row above them.
     expect(
-      await screen.findByRole('group', { name: 'Parent contact for Iris Chen' }),
+      await screen.findByRole('group', { name: 'Contact for Iris Chen' }),
     ).toBeInTheDocument();
   });
 
@@ -190,7 +190,7 @@ describe('FollowUpActions', () => {
      * screen reader otherwise hears ten identical controls.
      */
     expect(
-      await screen.findByRole('button', { name: 'Contact parent for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Contact the adult for Iris Chen' }),
     ).toBeInTheDocument();
   });
 
@@ -198,20 +198,20 @@ describe('FollowUpActions', () => {
     getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
-    await userEvent.click(await screen.findByRole('button', { name: /Contact parent/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Contact the adult/ }));
 
     // A control reading "Iris Chen … Call" invites the one reading that is
     // wrong: Tally holds no contact details for a 14-year-old and never will.
     expect(await screen.findByRole('link', { name: /Call Wen Chen/ })).toHaveTextContent(
-      'Call parent',
+      'Call',
     );
-    expect(screen.getByRole('link', { name: /Text Wen Chen/ })).toHaveTextContent('Text parent');
+    expect(screen.getByRole('link', { name: /Text Wen Chen/ })).toHaveTextContent('Text');
   });
 
   it('names the student on the row button, not just inside the dialog', async () => {
     /*
      * A call list is a run of these, and behind the dialog they are otherwise
-     * identical controls. A screen reader hearing "Contact parent" nine times
+     * identical controls. A screen reader hearing "Contact adult" nine times
      * has no way to tell which row it is on.
      */
     getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
@@ -219,7 +219,7 @@ describe('FollowUpActions', () => {
     mount(inPlanningCenter());
 
     expect(
-      await screen.findByRole('button', { name: 'Contact parent for Iris Chen' }),
+      await screen.findByRole('button', { name: 'Contact the adult for Iris Chen' }),
     ).toBeInTheDocument();
   });
 
@@ -245,7 +245,7 @@ describe('FollowUpActions', () => {
 
     mount(inPlanningCenter());
 
-    await screen.findByRole('button', { name: /Contact parent/ });
+    await screen.findByRole('button', { name: /Contact the adult/ });
 
     /*
      * `Modal` keeps its children mounted and lets the `<dialog>` hide them, so
@@ -256,7 +256,7 @@ describe('FollowUpActions', () => {
     expect(copies.filter((node) => node.closest('dialog') === null)).toHaveLength(0);
     expect(copies.filter((node) => node.closest('dialog') !== null)).toHaveLength(1);
 
-    await userEvent.click(screen.getByRole('button', { name: /Contact parent/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Contact the adult/ }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('(925) 336-6692');
   });
 });

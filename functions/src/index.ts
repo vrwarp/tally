@@ -764,7 +764,7 @@ interface PersonDetailsResponse extends PersonDetails {
  *
  * Separate from the roster on purpose. This is the data minimisation the PRD
  * asks for made structural: a counselor checking people in at a door never
- * receives a minor's parent's phone number, because the screen they are on
+ * receives a minor's contact phone number, because the screen they are on
  * never asks for it.
  */
 export const getPersonDetails = onCall<
@@ -953,7 +953,7 @@ export const getParentContactStatus = onCall<
      *
      * A visitor Tally pushed upstream keeps their own document id, so the
      * roster read does not carry them and this question had no answer for
-     * them — and "no answer" is not "no parent", so the dashboard could only
+     * them — and "no answer" is not "no contact", so the dashboard could only
      * fall back to the flag on their document, which says `false` for ever. A
      * contact added through Tally, written upstream and confirmed by the very
      * next read left them on the "incomplete profiles" list anyway. Asking
@@ -983,7 +983,7 @@ export const getParentContactStatus = onCall<
       return reportBackendFailure(
         first.backend.displayName,
         first.error,
-        'check which students have a parent contact',
+        'check which students have a contact',
       );
     }
 

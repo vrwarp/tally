@@ -36,7 +36,7 @@ import {
 const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Attendees. Visitors stay queued until this is turned on.',
   create: 'Tally creates attendees it has not seen before, but never edits an existing one.',
-  full: 'Tally creates attendees, and Edit profile saves a linked student’s name, grade, allergies and birthday straight to Attendees. It can also add a parent to the family and fill in their phone or email.',
+  full: 'Tally creates attendees, and Edit profile saves a linked student’s name, grade, allergies and birthday straight to Attendees. It can also add an adult to the family and fill in their phone or email.',
 };
 
 export function BackendsSection() {

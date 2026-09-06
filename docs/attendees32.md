@@ -3,7 +3,7 @@
 [Attendees](https://github.com/vrwarp/attendees32) is a Django event-management system with its own
 people, families and attendance. To Tally it is a **people backend** — the same role Planning Center
 plays, through the same interface ([backends.md](./backends.md)): person data for the roster, read
-live and stored nowhere; write-back for new students, profile edits and parent contacts; and a
+live and stored nowhere; write-back for new students, profile edits and contacts; and a
 one-time import of a meet's attendance history. Firestore stays the system of record for events,
 attendance and RSVPs.
 
@@ -76,7 +76,7 @@ paths:
 | grade | `infos.fixed.grade` | Read and written as the number Attendees holds, `-1` (Pre-K) through `12`. Not clamped into the configured band — the band decides who is on the roster, not what grade a child is in. |
 | birthday | `actual_birthday`, else `estimated_birthday` | Attendees documents year **1800** as "day known, year unknown"; Tally reads either into its year-free `MM-DD` and writes a full date to `actual_birthday` or a day-only as `estimated_birthday: 1800-MM-DD`. (Planning Center's equivalent sentinel is 1885 — each backend keeps its own.) |
 | allergies | `infos.fixed.allergies` | Attendees has no native field; this follows its own `infos.fixed.*` precedent and rides the same PATCH as profile edits. |
-| parent contact | family `Folk` co-members' `infos.contacts.phone1/email1` | A parent is an adult co-member of a category-0 (family) folk whose `Relation` is an emergency contact and not `child`. Fill-only-when-empty, like Planning Center. |
+| contact | family `Folk` co-members' `infos.contacts.phone1/email1` | A parent is an adult co-member of a category-0 (family) folk whose `Relation` is an emergency contact and not `child`. Fill-only-when-empty, like Planning Center. |
 | roster membership | `AttendingMeet` on the configured meet | Creates ride `X-Add-Folk: new`, `X-Folk-Role: child`, `X-Join-Meet`, `X-Join-Character`, so a pushed student appears correctly in Attendees' own UI. |
 
 Reads run off one TTL-cached, paginated org sweep of `datagrid_data_attendee` (the plural endpoints

@@ -25,10 +25,10 @@ test.describe('quick-add visitor', () => {
     await expect(dialog.getByLabel(/first name/i)).toBeVisible();
     await expect(dialog.getByLabel(/last name/i)).toBeVisible();
     await expect(dialog.getByLabel(/grade/i)).toBeVisible();
-    await expect(dialog.getByLabel(/parent|allergy|allergies|phone/i)).toHaveCount(0);
+    await expect(dialog.getByLabel(/adult|allergy|allergies|phone/i)).toHaveCount(0);
     // The parent contact is an offer, not a field. A counselor reads three
     // boxes and a button they can ignore.
-    await expect(dialog.getByRole('button', { name: /add parent contact/i })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /add a contact/i })).toBeVisible();
   });
 
   test('saves and checks in without leaving the roster', async ({ page, signedInAs, firestore }) => {
@@ -100,12 +100,12 @@ test.describe('quick-add visitor', () => {
     const dialog = page.getByRole('dialog', { name: /add a visitor/i });
     await dialog.getByLabel(/^first name/i).fill(CHILD.first);
     await dialog.getByLabel(/^last name/i).fill(CHILD.last);
-    await dialog.getByRole('button', { name: /add parent contact/i }).click();
+    await dialog.getByRole('button', { name: /add a contact/i }).click();
 
     // The surname the counselor has already typed, offered again.
-    await expect(dialog.getByLabel(/parent last name/i)).toHaveValue(CHILD.last);
-    await dialog.getByLabel(/parent first name/i).fill('Yuki');
-    await dialog.getByLabel(/parent phone/i).fill('5550166622');
+    await expect(dialog.getByLabel(/adult’s last name/i)).toHaveValue(CHILD.last);
+    await dialog.getByLabel(/adult’s first name/i).fill('Yuki');
+    await dialog.getByLabel(/adult’s phone/i).fill('5550166622');
     await dialog.getByRole('button', { name: /save & check in|save and check in/i }).click();
 
     // The child is checked in on the counselor's own screen, exactly as they

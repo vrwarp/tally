@@ -598,14 +598,14 @@ describe('parent contact', () => {
     personDetails.current = details();
     open(linked());
 
-    expect(screen.getByRole('button', { name: /Add parent contact/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add a contact/ })).toBeInTheDocument();
   });
 
   it('points upstream when there is no adult in the household to write onto', () => {
     personDetails.current = details({ householdAdult: false, contactWritable: false });
     open(linked());
 
-    expect(screen.queryByRole('button', { name: /Add parent contact/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add a contact/ })).not.toBeInTheDocument();
     expect(screen.getByText(/no adult in this household/)).toBeInTheDocument();
   });
 
@@ -614,7 +614,7 @@ describe('parent contact', () => {
     open(linked());
 
     expect(screen.getByText(/510/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Add parent contact/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add a contact/ })).not.toBeInTheDocument();
   });
 });
 

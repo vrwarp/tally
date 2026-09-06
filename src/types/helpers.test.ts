@@ -144,7 +144,7 @@ describe('the upstream-edit predicates', () => {
 });
 
 describe('computeProfileComplete', () => {
-  it('is complete once either way of reaching a parent exists', () => {
+  it('is complete once either way of reaching an adult exists', () => {
     expect(computeProfileComplete({ contactPhone: '5550100' })).toBe(true);
     expect(computeProfileComplete({ contactEmail: 'a@example.org' })).toBe(true);
   });

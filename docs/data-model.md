@@ -236,7 +236,7 @@ before they exist anywhere upstream.
 | `grade` | -1–12, or absent | Owned by the linked backend; `-1` is Pre-K and `0` is kindergarten — Planning Center's own numbering, which Attendees carries too. **Absent is a real state**, and the honest one: a child below Pre-K has no grade, and neither does an adult on a hand-picked roster. It used to be a required number paired with a `gradeOnFile` boolean — a nullable field spelled as a sentinel plus a flag, which every reader had to remember to consult and which the sync set from whether the upstream value was *blank* rather than whether it had been clamped. A real 3rd grader therefore arrived asserting they were in 6th. Absent rather than `null` because `validStudent` reads `!('grade' in d.keys()) || d.grade is int`. Which grades a deployment actually *reads* is `minGrade`/`maxGrade`, still 6–12 by default. |
 | `notes` | string \| null | Tally's own, free text. |
 | `status` | `'active' \| 'inactive'` | Inactive students leave the roster but keep their history. |
-| `isVisitor` | boolean | Set by quick-add. Cleared automatically once a parent contact exists. |
+| `isVisitor` | boolean | Set by quick-add. Cleared automatically once a contact exists. |
 | `profileComplete`, `searchName`, `firstAttendedAt`, `lastAttendedAt` | — | Denormalised; see above. |
 | `pcoPersonId` | string \| null | The **Planning Center** person, and only that — the field predates the second backend and keeps its meaning forever. Null for a student Planning Center does not hold. |
 | `upstreamBackend`, `upstreamPersonId` | `'pco' \| 'a32'` \| string, or absent | The generic linkage pair: which people-backend holds this student, and as whom. Planning Center writes both fields *and* the legacy `pcoPersonId`; Attendees writes only these. Absent generics with a bare `pcoPersonId` still mean Planning Center, which is what makes the scheme migration-free. |
@@ -858,7 +858,7 @@ what make every write downstream safe to repeat.
 | --- | --- | --- |
 | `status` | `'pending' \| 'complete'` | A `pending` document is resumed rather than restarted: every write downstream is keyed by the ids below, so replaying is repeating, not duplicating. |
 | `studentIds` | string[] | Pre-allocated before the batch, which is the whole mechanism. |
-| `source` | `'kiosk' \| 'counselor' \| 'qr'` | `'counselor'` is a parent contact taken at a door beside a quick-added visitor — the child is already live, and the card is about the adult alone. `'qr'` is legacy — the retired phone form wrote it until Aug 2026; such records drain on the 30-day sweep. The read side (this table's parsers, the review card's "from their own phone" subtitle) stays tolerant until they are gone. |
+| `source` | `'kiosk' \| 'counselor' \| 'qr'` | `'counselor'` is a contact taken at a door beside a quick-added visitor — the child is already live, and the card is about the adult alone. `'qr'` is legacy — the retired phone form wrote it until Aug 2026; such records drain on the 30-day sweep. The read side (this table's parsers, the review card's "from their own phone" subtitle) stays tolerant until they are gone. |
 | `eventId`, `checkedIn`, `childCount`, `last4` | — | Enough to answer a completed call again. |
 | `guardian` | `{ firstName, lastName, phone }` \| null | **The exception below.** Null only on a sibling registration, where the family is already identified. On a `counselor` record it is the whole point of the document. |
 | `children` | `{ firstName, lastName, grade }[]` | The form as typed, so a reviewer sees what the family wrote and not only what the roster now says. On a `counselor` record it is read back off the student document instead — there is no second typing to preserve, and the name a reviewer decides a household by should be the name on the roster. |
@@ -883,7 +883,7 @@ a lobby screen cannot decide identity) would otherwise mean *losing* the guardia
 `noMirroredPersonalData` in `firestore.rules` forbids a parent's name or number on a student document
 and there is nowhere else for it to go.
 
-A counselor's parent contact lands here for exactly the same reason, and the reasoning transfers
+A counselor's contact lands here for exactly the same reason, and the reasoning transfers
 without weakening. The rule it runs into is the same rule — a student document may not carry a
 parent — and the decision it defers is the same decision: `addParent`, the core team's own path,
 exists because "is this the David Kim the church already has?" is a question a person answers with
@@ -896,7 +896,7 @@ So it waits here, and "waits" is enforced rather than asserted:
 - **No client can read it.** The collection is deny-all in both directions. The only way to see it is
   the `listPendingRegistrations` callable, which is core team only — the same role that may already
   push a student into the church's database.
-- **It may be corrected, never widened.** `amendRegistration` (core team, `functions/src/kiosk/amend.ts`) rewrites one child or the adult on a registration that is still held — the third answer between approving a misspelling into a database with no delete and discarding a real family. It corrects fields that are already here; it cannot add a person, and it refuses a child who has already been pushed or merged. The adult is editable for as long as the adult has not been written — this record's survival is the evidence, since it is deleted the moment the guardian lands — so a counselor's parent contact and a kiosk family whose guardian was refused are both still correctable, and only `lastErrorKind: 'children'` (guardian written, children still to retry) is refused. A corrected number moves the family between buckets in [`kioskIndex/phones`](#kioskindexphones) in both directions, so the digits they mistyped stop finding their children.
+- **It may be corrected, never widened.** `amendRegistration` (core team, `functions/src/kiosk/amend.ts`) rewrites one child or the adult on a registration that is still held — the third answer between approving a misspelling into a database with no delete and discarding a real family. It corrects fields that are already here; it cannot add a person, and it refuses a child who has already been pushed or merged. The adult is editable for as long as the adult has not been written — this record's survival is the evidence, since it is deleted the moment the guardian lands — so a counselor's contact and a kiosk family whose guardian was refused are both still correctable, and only `lastErrorKind: 'children'` (guardian written, children still to retry) is refused. A corrected number moves the family between buckets in [`kioskIndex/phones`](#kioskindexphones) in both directions, so the digits they mistyped stop finding their children.
 - **It is deleted on decision.** Approve or discard, the document goes. An approval whose family
   write *failed* keeps it, with the reason, so pressing the button again can still finish the job —
   that is the only case where it survives a review.

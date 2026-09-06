@@ -4,7 +4,7 @@
  * A visitor's second visit is decided in the week after their first, so this
  * list is deliberately short-lived: it shows who arrived, which gathering they
  * arrived at, and the fastest way to say "great to meet you". Most of these
- * students were quick-added at the door and still have no parent contact, so
+ * students were quick-added at the door and still have no contact, so
  * the row's action is either "reach them" or "finish their profile" — never
  * both, and never nothing.
  *
@@ -47,7 +47,7 @@ export interface NewVisitorListProps {
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
-   * Student id -> whether Planning Center holds a way to reach a parent, from
+   * Student id -> whether Planning Center holds a way to reach an adult, from
    * `useAdultContact`.
    *
    * The second half of the answer, and the reason this is a prop rather than
@@ -63,7 +63,7 @@ export interface NewVisitorListProps {
    */
   reachable?: ReadonlyMap<string, boolean>;
   /**
-   * Called when a row has just put a parent contact into Planning Center, so
+   * Called when a row has just put a contact into Planning Center, so
    * the map above — which said the opposite a second ago — is asked again.
    */
   onContactAdded?: () => void;
@@ -151,7 +151,7 @@ function NewVisitorRow({
   /*
    * The same resolution `computeIncompleteProfiles` uses, and it has to stay the
    * same one: this list and the "incomplete profiles" list below it sit on one
-   * screen, and a student can only be missing a parent contact on both or on
+   * screen, and a student can only be missing a contact on both or on
    * neither. Tally's own flag wins where it has one — a visitor who exists
    * nowhere else cannot be looked up — and `null` on either side means unasked.
    */
@@ -194,7 +194,7 @@ function NewVisitorRow({
         ) : null}
 
         {unreachable ? (
-          <Badge tone="warn" title="No parent contact on file">
+          <Badge tone="warn" title="No contact on file">
             <span aria-hidden="true">⚠</span>
             Incomplete
           </Badge>

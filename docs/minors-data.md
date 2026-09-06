@@ -3,7 +3,7 @@
 The ministry stores data about children, so the roster is deliberately thin. Tally holds:
 
 - first and last name, and grade,
-- one parent or guardian contact — name, phone, email,
+- one contact for an adult in the family — name, phone, email,
 - allergies and a free-text notes line, both optional,
 - attendance: which gatherings a student was marked present at, and by whom,
 - for one-off trips: whether they RSVP'd yes, no or maybe.
@@ -14,19 +14,50 @@ card numbers, no fees, no record of who has paid. Waivers and payments are not T
 those live on a clipboard and in a cash box, and a stale second copy in an app is worse than none.
 Nothing is stored that would not already be on a church check-in card.
 
-One parent contact can now be taken at a door as well as at the kiosk — quick-add asks for it,
+One contact can now be taken at a door as well as at the kiosk — quick-add asks for it,
 optionally, when the adult who brought the child is standing there. It is held exactly where the
 kiosk's is: on a TTL'd registration record no client can read, until a core-team member attaches it
 to a household upstream. Nothing about it reaches a student document, and no screen a counselor can
 open ever reads one back.
 
-Most of that list is not Tally's to hold. Names, grades, parent contact and allergies live in
+Most of that list is not Tally's to hold. Names, grades, contact details and allergies live in
 Planning Center and are read when needed; `students/{id}` holds only what Tally owns — notes, when
 they first turned up — plus the complete record for a quick-added visitor who does not exist
 upstream yet.
 
 The field-by-field version of all of this, including the two deliberate brushes with contact data, is
 [the data model](data-model.md#what-is-not-stored).
+
+## What that adult is called
+
+**"The adult" for the person, "contact" for their details.** Never "parent", anywhere a user can
+read it.
+
+The app called them a parent until Sep 2026, and it was wrong often enough to matter. The person who
+brings a child to a church hall on a Friday is very often a grandmother, an aunt, an older sibling or
+the neighbour who drives — and the app was telling a leader on the phone, in as many words, that it
+was ringing somebody's parent. Worse, it was doing so on evidence it never had: the Attendees read
+that finds this person (`findContactCandidates`) accepts *any* family relation the church has flagged
+as an emergency contact, so a grandparent qualifies on exactly the same footing as a mother, and
+Planning Center's own vocabulary for the role is the hedged compound `parent_guardian`. Tally was
+narrowing a word its own sources had deliberately left wide.
+
+"Guardian" is no better: it claims a legal standing a family friend does not have. So the rule is to
+claim nothing. Where the name is known, use the name; where it is not, say *the contact on file* or
+*the adult on file* rather than inventing a relationship to fill the gap.
+
+Three consequences worth knowing:
+
+- **The word still has one job.** None of these numbers belong to the student, and a control that
+  read "Aaron Sun … Call" on a list of 12-year-olds would invite exactly the wrong reading. "Adult"
+  rules the student out as flatly as "parent" did, and claims nothing further.
+- **The kiosk was already right** and can stay as it is. It asks the person standing at it in the
+  second person — *And you*, *Your first name*, *This is how you check in next time* — which names
+  nobody's relationship to anybody. The internal name for that record is still `guardian`; it is
+  never rendered.
+- **Upstream vocabulary is not ours to change.** `parent_guardian` (Planning Center's
+  `household_role`) and `parent`/`father`/`mother`/`guardian` (Attendees' relation titles) are wire
+  values. They are read and written verbatim.
 
 ## The kiosk is the narrowest surface
 
@@ -87,7 +118,7 @@ of four hundred students would mean four hundred upstream reads to place a scree
 phone numbers on somebody's laptop, permanently and outside anything this app can see.
 [`contactList.ts`](../src/features/dashboard/contactList.ts) already refuses the same thing for a
 clipboard, which is the weaker case. What the follow-up files carry instead is
-`parent_contact_on_file`, a three-state column where blank means *nobody has looked* — the same
+`contact_on_file`, a three-state column where blank means *nobody has looked* — the same
 distinction the badges draw on screen.
 
 The birthday is out for a second reason on top of the first: Tally stores `MM-DD` precisely because

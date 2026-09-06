@@ -8,7 +8,7 @@
  *   1. **Add a parent.** Planning Center has no adult in the household at all,
  *      so there is nobody to put a number on. Tally creates the person, and the
  *      household when there is none.
- *   2. **Add parent contact.** There is an adult and nobody has recorded a way
+ *   2. **Add a contact.** There is an adult and nobody has recorded a way
  *      to reach them. One form, two fields.
  *
  * The two are photographed as one continuous story on the same student, because
@@ -79,8 +79,8 @@ async function openStudent(page: Page, name: string): Promise<void> {
   await page.getByRole('heading', { name, level: 1 }).waitFor({ timeout: 30_000 });
 }
 
-const parentContactHeading = (page: Page) =>
-  page.getByRole('heading', { name: 'Parent contact', exact: true });
+const contactHeading = (page: Page) =>
+  page.getByRole('heading', { name: 'Contact', exact: true });
 
 test('capture the parent flows', async ({ page, signedInAs }) => {
   test.setTimeout(300_000);
@@ -127,7 +127,7 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   /* ---- Flow 1: a student with no family on file -------------------------- */
 
   await openStudent(page, 'Trevor Boyd');
-  await show(parentContactHeading(page));
+  await show(contactHeading(page));
   await capture(page, {
     flow: 'Adding a parent',
     title: 'Nobody to ring',
@@ -135,8 +135,8 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
       'Trevor is on the roster and Planning Center has no adult in his household at all — the office has never reached a parent. Until write-back was turned up, this said so and pointed at Planning Center, which is a dead end on a phone at a door. It now offers to fix it, and says exactly what is missing: not a phone number, a person.',
   });
 
-  await page.getByRole('button', { name: /Add a parent/ }).click();
-  const firstName = page.getByLabel('Parent first name');
+  await page.getByRole('button', { name: /Add an adult/ }).click();
+  const firstName = page.getByLabel('Adult’s first name');
   await firstName.waitFor({ timeout: 15_000 });
   await firstName.fill('Marta');
   await show(firstName);
@@ -148,10 +148,10 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   });
 
   await page.getByRole('button', { name: 'Save to Planning Center' }).click();
-  await expect(page.getByRole('button', { name: /Add parent contact/ })).toBeVisible({
+  await expect(page.getByRole('button', { name: /Add a contact/ })).toBeVisible({
     timeout: 30_000,
   });
-  await show(parentContactHeading(page));
+  await show(contactHeading(page));
   await capture(page, {
     flow: 'Adding a parent',
     title: 'A household that did not exist a second ago',
@@ -161,8 +161,8 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
 
   /* ---- Flow 2: a number for the adult who is now there -------------------- */
 
-  await page.getByRole('button', { name: /Add parent contact/ }).click();
-  const phone = page.getByLabel('Parent phone');
+  await page.getByRole('button', { name: /Add a contact/ }).click();
+  const phone = page.getByLabel('Adult’s phone');
   await phone.waitFor({ timeout: 15_000 });
   // The field takes digits and groups them itself, so this is what a leader
   // actually presses.
@@ -177,7 +177,7 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
 
   await page.getByRole('button', { name: 'Save to Planning Center' }).click();
   await expect(page.getByRole('link', { name: /^Call / })).toBeVisible({ timeout: 30_000 });
-  await show(parentContactHeading(page));
+  await show(contactHeading(page));
   await capture(page, {
     flow: 'Adding a phone number',
     title: 'Reachable',
@@ -188,16 +188,16 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   /* ---- Flow 3: the parent the church already has -------------------------- */
 
   await openStudent(page, 'Kai Alofa');
-  await page.getByRole('button', { name: /Add a parent/ }).click();
-  await page.getByLabel('Parent first name').fill('Linh');
-  await page.getByLabel('Parent last name').fill('Nguyen');
+  await page.getByRole('button', { name: /Add an adult/ }).click();
+  await page.getByLabel('Adult’s first name').fill('Linh');
+  await page.getByLabel('Adult’s last name').fill('Nguyen');
   await page.getByRole('button', { name: 'Save to Planning Center' }).click();
 
   // The candidate rows are whole-row buttons, labelled with the choice they
   // make — the same shape a student row on the check-in screen has.
-  const thisIsThem = page.getByRole('button', { name: /is Kai's parent/ });
+  const thisIsThem = page.getByRole('button', { name: /is the adult to call for Kai/ });
   await thisIsThem.waitFor({ timeout: 30_000 });
-  await show(page.getByText(/Is this Kai's parent\?/));
+  await show(page.getByText(/Is this the adult to call for Kai\?/));
   await capture(page, {
     flow: 'The duplicate check',
     title: 'Planning Center already has a Linh Nguyen',
@@ -207,7 +207,7 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
 
   await thisIsThem.click();
   await expect(page.getByRole('link', { name: /^Call / })).toBeVisible({ timeout: 30_000 });
-  await show(parentContactHeading(page));
+  await show(contactHeading(page));
   await capture(page, {
     flow: 'The duplicate check',
     title: 'Joined, not duplicated',

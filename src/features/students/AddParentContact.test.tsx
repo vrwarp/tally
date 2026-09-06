@@ -64,7 +64,7 @@ describe('AddParentContact', () => {
     it('points at Planning Center rather than offering a form', () => {
       mount(onRoster(), details({ contactWritable: false }));
 
-      expect(screen.queryByRole('button', { name: /Add parent contact/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Add a contact/ })).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Add it there' })).toHaveAttribute(
         'href',
         'https://people.planningcenteronline.com/people/AC4200014',
@@ -77,7 +77,7 @@ describe('AddParentContact', () => {
       mount(onRoster(), details({ contactWritable: false, householdAdult: false }));
 
       expect(screen.getByText(/no adult in this household/)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Add parent contact/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Add a contact/ })).not.toBeInTheDocument();
     });
 
     it('tells a Tally-only visitor they have to reach Planning Center first', () => {
@@ -92,7 +92,7 @@ describe('AddParentContact', () => {
       // gone upstream. Neither is a state to offer a write from.
       mount(onRoster(), null);
 
-      expect(screen.queryByRole('button', { name: /Add parent contact/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Add a contact/ })).not.toBeInTheDocument();
     });
   });
 
@@ -109,8 +109,8 @@ describe('AddParentContact', () => {
         <AddParentContact student={onRoster()} details={details()} onAdded={vi.fn()} defaultOpen />,
       );
 
-      expect(screen.getByLabelText('Parent phone')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /＋ Add parent contact/ })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Adult’s phone')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /＋ Add a contact/ })).not.toBeInTheDocument();
     });
 
     it('hands Cancel back to whoever opened it', async () => {
@@ -140,13 +140,13 @@ describe('AddParentContact', () => {
         />,
       );
 
-      expect(screen.queryByLabelText('Parent phone')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Adult’s phone')).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Add it there' })).toBeInTheDocument();
     });
   });
 
   describe('when Tally may write', () => {
-    it('saves a number onto the parent and re-reads', async () => {
+    it('saves a number onto the adult and re-reads', async () => {
       setParentContact.mockResolvedValue({
         data: {
           status: 'updated',
@@ -158,8 +158,8 @@ describe('AddParentContact', () => {
       });
       const onAdded = mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '(510) 555-0142');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       await waitFor(() => expect(onAdded).toHaveBeenCalled());
@@ -178,8 +178,8 @@ describe('AddParentContact', () => {
     it('will not send something nobody could ring or email', async () => {
       mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent phone'), '4102');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '4102');
 
       expect(screen.getByText(/not a number anybody could ring/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
@@ -194,9 +194,9 @@ describe('AddParentContact', () => {
        */
       mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent email'), 'wen@example.org');
-      await userEvent.type(screen.getByLabelText('Parent phone'), '4102');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s email'), 'wen@example.org');
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '4102');
 
       expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
     });
@@ -215,8 +215,8 @@ describe('AddParentContact', () => {
       });
       const onAdded = mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent email'), 'wen@example.org');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s email'), 'wen@example.org');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       expect(
@@ -237,8 +237,8 @@ describe('AddParentContact', () => {
       });
       const onAdded = mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent email'), 'wen@example.org');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s email'), 'wen@example.org');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       // Not an error: the screen is simply out of date, which is what a re-read
@@ -251,13 +251,13 @@ describe('AddParentContact', () => {
       setParentContact.mockRejectedValue(new Error('offline'));
       const onAdded = mount(onRoster(), details());
 
-      await userEvent.click(screen.getByRole('button', { name: /Add parent contact/ }));
-      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+      await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '(510) 555-0142');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       expect(await screen.findByText(/Could not reach Planning Center/)).toBeInTheDocument();
       // Retyping a number because the wifi dropped is the thing worth avoiding.
-      expect(screen.getByLabelText('Parent phone')).toHaveValue('510-555-0142');
+      expect(screen.getByLabelText('Adult’s phone')).toHaveValue('510-555-0142');
       expect(onAdded).not.toHaveBeenCalled();
     });
   });
@@ -286,17 +286,17 @@ describe('AddParentContact', () => {
     };
 
     const openForm = async () => {
-      await userEvent.click(screen.getByRole('button', { name: /Add a parent/ }));
+      await userEvent.click(screen.getByRole('button', { name: /Add an adult/ }));
     };
 
     it('offers to add one instead of pointing at Planning Center', async () => {
       mount(onRoster(), noFamily());
 
-      expect(screen.getByRole('button', { name: /Add a parent/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Add an adult/ })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Add it there' })).not.toBeInTheDocument();
 
       await openForm();
-      expect(screen.getByLabelText(/Parent first name/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Adult’s first name/)).toBeInTheDocument();
     });
 
     /** Right far more often than not, and one edit away when it is not. */
@@ -304,16 +304,16 @@ describe('AddParentContact', () => {
       mount(onRoster(), noFamily());
       await openForm();
 
-      expect(screen.getByLabelText(/Parent last name/)).toHaveValue('Lee');
+      expect(screen.getByLabelText(/Adult’s last name/)).toHaveValue('Lee');
     });
 
-    it('creates the parent with whatever contact details were typed', async () => {
+    it('creates the adult with whatever contact details were typed', async () => {
       addParent.mockResolvedValue(added);
       const onAdded = mount(onRoster(), noFamily());
 
       await openForm();
-      await userEvent.type(screen.getByLabelText(/Parent first name/), 'Dana');
-      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+      await userEvent.type(screen.getByLabelText(/Adult’s first name/), 'Dana');
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '(510) 555-0142');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       await waitFor(() => expect(onAdded).toHaveBeenCalled());
@@ -329,11 +329,11 @@ describe('AddParentContact', () => {
       expect(show).toHaveBeenCalledWith(added.data.message, { tone: 'success' });
     });
 
-    it('will not send a parent with no name', async () => {
+    it('will not send an adult with no name', async () => {
       mount(onRoster(), noFamily());
       await openForm();
 
-      await userEvent.type(screen.getByLabelText('Parent phone'), '(510) 555-0142');
+      await userEvent.type(screen.getByLabelText('Adult’s phone'), '(510) 555-0142');
 
       expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
       expect(addParent).not.toHaveBeenCalled();
@@ -363,7 +363,7 @@ describe('AddParentContact', () => {
         addParent.mockResolvedValueOnce(candidates);
         const onAdded = mount(onRoster(), noFamily());
         await openForm();
-        await userEvent.type(screen.getByLabelText(/Parent first name/), 'Wen');
+        await userEvent.type(screen.getByLabelText(/Adult’s first name/), 'Wen');
         await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
         return onAdded;
       };
@@ -380,7 +380,7 @@ describe('AddParentContact', () => {
         const onAdded = await askThenOffer();
         addParent.mockResolvedValueOnce(added);
 
-        await userEvent.click(await screen.findByRole('button', { name: /is Janet's parent/ }));
+        await userEvent.click(await screen.findByRole('button', { name: /is the adult to call for Janet/ }));
 
         await waitFor(() => expect(onAdded).toHaveBeenCalled());
         expect(addParent).toHaveBeenLastCalledWith(
@@ -421,7 +421,7 @@ describe('AddParentContact', () => {
       const onAdded = mount(onRoster(), noFamily());
 
       await openForm();
-      await userEvent.type(screen.getByLabelText(/Parent first name/), 'Dana');
+      await userEvent.type(screen.getByLabelText(/Adult’s first name/), 'Dana');
       await userEvent.click(screen.getByRole('button', { name: 'Save to Planning Center' }));
 
       await waitFor(() => expect(onAdded).toHaveBeenCalled());

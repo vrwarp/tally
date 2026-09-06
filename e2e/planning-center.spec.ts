@@ -166,7 +166,7 @@ test.describe('Planning Center', () => {
     await page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first().click();
 
     // The detail screen exists to answer "who do I call", so it asks eagerly.
-    await expect(page.getByText(/parent contact/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/contact/i).first()).toBeVisible({ timeout: 20_000 });
 
     /*
      * A real number, on screen. Firestore holds none — the sibling test asserts

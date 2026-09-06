@@ -24,7 +24,7 @@
  *
  * ## The three-state contact column
  *
- * `parent_contact_on_file` is blank when *nobody has looked*, which is the
+ * `contact_on_file` is blank when *nobody has looked*, which is the
  * honest answer for most students — a roster read does not fetch households, so
  * it cannot tell an unreachable family from one it never asked about. Rendering
  * that as "no" in a file nobody can hover over is worse than doing it in a
@@ -64,7 +64,7 @@ function columns(context: RosterCsvContext): CsvColumn<Student>[] {
     { header: 'first_attended', value: (student) => isoDate(student.firstAttendedAt) },
     { header: 'last_attended', value: (student) => isoDate(student.lastAttendedAt) },
     {
-      header: 'parent_contact_on_file',
+      header: 'contact_on_file',
       value: (student) => {
         // Three states. Blank is "nobody looked", not "nobody can be reached".
         if (student.status !== 'active') return '';

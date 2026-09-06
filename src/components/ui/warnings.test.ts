@@ -67,12 +67,12 @@ describe('the amber rule', () => {
     expect(warningGlyph('allergy')).toBe('⚠');
   });
 
-  it('keeps a missing parent contact clerical', () => {
+  it('keeps a missing contact clerical', () => {
     // The demotion this table exists for. Amber here is what teaches a
     // counselor that amber is usually paperwork.
     expect(warningTone('incomplete-profile')).toBe('neutral');
     expect(warningGlyph('incomplete-profile')).toBeNull();
-    expect(warningLabel('incomplete-profile')).toBe('Missing parent contact');
+    expect(warningLabel('incomplete-profile')).toBe('No contact on file');
   });
 });
 

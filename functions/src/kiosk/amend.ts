@@ -46,7 +46,7 @@
  * **The adult**, for as long as the adult has not been written — and the
  * record's own survival is the evidence for that, since it is deleted the
  * moment the guardian lands. Deliberately not keyed on whether the children
- * are held, which two real cards make wrong: a counselor's parent contact is a
+ * are held, which two real cards make wrong: a counselor's contact is a
  * record whose child was never held and whose adult is the whole point, and a
  * kiosk family whose guardian was refused is kept precisely so somebody can
  * try the adult again.
@@ -448,7 +448,7 @@ async function amendGuardian(context: {
    * that is about to be deleted and nothing the church can see.
    *
    * This deliberately does *not* key on whether the children are held, which is
-   * what it used to do and what two real cards make wrong. A counselor's parent
+   * what it used to do and what two real cards make wrong. A counselor's contact
    * contact (`source: 'counselor'`) is a record whose child was never held —
    * they were quick-added at a door and queued in the ordinary way — and whose
    * adult is the entire point of it. And a kiosk family whose children landed
@@ -458,13 +458,13 @@ async function amendGuardian(context: {
    */
   if (record.lastErrorKind === 'children') {
     return refused(
-      'The parent on this registration has already been added to the church’s database — what is left to retry is the children. Correct their details there.',
+      'The adult on this registration has already been added to the church’s database — what is left to retry is the children. Correct their details there.',
     );
   }
 
   const corrected = {
-    firstName: parseName(guardian.firstName, "The parent's first name"),
-    lastName: parseName(guardian.lastName, "The parent's last name"),
+    firstName: parseName(guardian.firstName, "The adult's first name"),
+    lastName: parseName(guardian.lastName, "The adult's last name"),
     phone: parseRegistrationPhone(guardian.phone),
   };
 

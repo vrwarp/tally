@@ -125,7 +125,7 @@ not a gathering this screen can say anything about.
   taken out — same wrappers, same type, and one bar at the full `MAX_BAR_PX`,
   which is what the tallest real bar always is. A hand-measured block was ten
   pixels short.
-- **A student's parent contact** reserves the two pills and the line beneath
+- **A student's contact** reserves the two pills and the line beneath
   them, and that line reserves two lines on a phone: a name with a number is
   one, a name with a number and an address is two, and which of those a family
   has is the last thing the page finds out.
@@ -140,7 +140,7 @@ not a gathering this screen can say anything about.
   column, so both of its dimensions are things the rest of the row can feel.
   Inside 18rem the phone number wraps under Call and Text, so the answer is
   68px against the 48 reserved: every row grew 12px as its own lookup landed
-  and pushed the rows below it down. And "Looking up parent contact…" is 198px
+  and pushed the rows below it down. And "Looking up contact…" is 198px
   against the pills' 288, so every row also widened 91px, dragging the streak
   badge and the end of the student's name leftward. Both are reserved at their
   settled values for exactly the widths the cap applies to, and handed back at

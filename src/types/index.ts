@@ -1270,7 +1270,7 @@ export interface PcoPersonDetails {
    * The mirror image of `contactWritable`: exactly one of the two is ever true
    * on a `full` install, because a household either has an adult to put a
    * number on or it does not. That is what lets one screen offer "add a number"
-   * and "add a parent" from the same place without deciding which it is.
+   * and "add an adult" from the same place without deciding which it is.
    */
   adultCreatable: boolean;
 }

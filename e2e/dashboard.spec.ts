@@ -83,7 +83,7 @@ test.describe('dashboard', () => {
     // Each block names its student, so a list that reveals everything at once
     // does not read as a run of loose phone numbers. That label is also the
     // only thing here that is stable while the contents are still loading.
-    const blocks = page.getByRole('group', { name: /^Parent contact for / });
+    const blocks = page.getByRole('group', { name: /^Contact for / });
     await expect(blocks.first()).toBeVisible();
 
     const names = (
@@ -94,7 +94,7 @@ test.describe('dashboard', () => {
 
     const reachable: string[] = [];
     for (const name of names) {
-      const block = page.getByRole('group', { name: `Parent contact for ${name}` }).first();
+      const block = page.getByRole('group', { name: `Contact for ` }).first();
 
       /*
        * Three honest outcomes: a way to reach them, the form that adds one —
@@ -111,9 +111,9 @@ test.describe('dashboard', () => {
        * none. So the row's claim is the button, and the claim that the button
        * leads somewhere is made once, below, by opening it.
        */
-      const reachOut = block.getByRole('button', { name: `Contact parent for ${name}` });
+      const reachOut = block.getByRole('button', { name: `Contact the adult for ` });
       const addOne = block.getByRole('button', {
-        name: new RegExp(`^Add parent contact for ${escapeForRegExp(name)}`),
+        name: new RegExp(`^Add a contact for ${escapeForRegExp(name)}`),
       });
       const nobodyToCall = block.getByText(
         /no longer has a record for|Not in Planning Center yet/,
@@ -138,9 +138,9 @@ test.describe('dashboard', () => {
      */
     const first = reachable[0]!;
     await page
-      .getByRole('group', { name: `Parent contact for ${first}` })
+      .getByRole('group', { name: `Contact for ` })
       .first()
-      .getByRole('button', { name: `Contact parent for ${first}` })
+      .getByRole('button', { name: `Contact the adult for ` })
       .click();
 
     await expect(
@@ -182,8 +182,8 @@ test.describe('dashboard', () => {
      * land finds nothing — which is a pass-shaped failure. Wait for the first.
      */
     const stuck = page
-      .getByRole('group', { name: /^Parent contact for / })
-      .filter({ has: page.getByRole('button', { name: /^Add parent contact for / }) });
+      .getByRole('group', { name: /^Contact for / })
+      .filter({ has: page.getByRole('button', { name: /^Add a contact for / }) });
     await expect(stuck.first()).toBeVisible({ timeout: 20_000 });
 
     /*
@@ -199,7 +199,7 @@ test.describe('dashboard', () => {
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: /new faces/i }) })
       .first();
-    const prompt = newFaces.getByRole('button', { name: /^Add parent contact for / }).first();
+    const prompt = newFaces.getByRole('button', { name: /^Add a contact for / }).first();
     await expect(prompt).toBeVisible({ timeout: 20_000 });
 
     // And it opens here rather than somewhere else. The dialog is the whole
@@ -207,7 +207,7 @@ test.describe('dashboard', () => {
     await prompt.click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(
-      page.getByRole('dialog').getByText(/Planning Center|parent/i).first(),
+      page.getByRole('dialog').getByText(/Planning Center|adult/i).first(),
     ).toBeVisible({ timeout: 20_000 });
   });
 
@@ -264,12 +264,12 @@ test.describe('dashboard', () => {
     const incomplete = page.getByRole('heading', { name: /incomplete profiles/i }).first();
     const count = async () => Number(/(\d+)/.exec(await incomplete.innerText())?.[1] ?? 0);
 
-    await expect(page.getByText(/seen at friday fellowship, with no parent phone or email/i))
+    await expect(page.getByText(/seen at friday fellowship, with no phone or email/i))
       .toBeVisible();
     const scoped = await count();
 
     await tabs.getByRole('button', { name: 'All' }).click();
-    await expect(page.getByText(/active students with no parent phone or email/i)).toBeVisible();
+    await expect(page.getByText(/active students with no phone or email/i)).toBeVisible();
     // The seed keeps students with no parent contact at both gatherings and at
     // neither, so narrowing has to drop somebody.
     await expect.poll(count).toBeGreaterThan(scoped);

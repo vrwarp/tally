@@ -10,7 +10,7 @@
  *    an emergency — so the row states how long it has been waiting and colours
  *    accordingly.
  *  - A student the church already has on file whose Planning Center profile has
- *    no parent contact on it. Nothing was "added" here and nothing is waiting on
+ *    no contact on it. Nothing was "added" here and nothing is waiting on
  *    Tally: somebody has to put a number into Planning Center, and the row says
  *    so rather than inventing an age for a record Tally never created.
  */
@@ -45,7 +45,7 @@ export interface IncompleteProfileListProps {
   loading?: boolean;
   /**
    * True while Planning Center is still being asked which profiles have a
-   * parent contact. Said out loud: a list that is still counting looks exactly
+   * a contact. Said out loud: a list that is still counting looks exactly
    * like a list with nothing on it.
    */
   checking?: boolean;
@@ -54,7 +54,7 @@ export interface IncompleteProfileListProps {
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
-   * Called when a row has just put a parent contact into Planning Center — the
+   * Called when a row has just put a contact into Planning Center — the
    * answer this whole list is built from, and the row has just changed it.
    */
   onContactAdded?: () => void;
@@ -79,8 +79,8 @@ export function IncompleteProfileList({
         count={loading ? undefined : students.length}
         description={
           gatheringTitle
-            ? `Seen at ${gatheringTitle}, with no parent phone or email on file.`
-            : 'Active students with no parent phone or email on file.'
+            ? `Seen at ${gatheringTitle}, with no phone or email on file for an adult.`
+            : 'Active students with no phone or email on file for an adult.'
         }
         action={
           // The real control, disabled at zero, so a loading header is the
@@ -112,14 +112,14 @@ export function IncompleteProfileList({
       ) : students.length === 0 ? (
         checking ? (
           <p className="flex items-center gap-2 px-3 py-2 text-xs text-ink-500">
-            <Spinner /> Checking who has a parent contact…
+            <Spinner /> Checking who has a contact…
           </p>
         ) : error ? null : (
           <EmptyState
             title={
               gatheringTitle
-                ? `Everyone at ${gatheringTitle} has a parent contact.`
-                : 'Every profile has a parent contact.'
+                ? `Everyone at ${gatheringTitle} has a contact.`
+                : 'Every profile has a contact.'
             }
             description={
               gatheringTitle
@@ -213,7 +213,7 @@ function IncompleteRow({
                   Tally invented is not a fact worth the width. */}
               {grade ? `${grade} · ` : ''}
               {days === null
-                ? 'no parent contact in Planning Center'
+                ? 'no contact in Planning Center'
                 : `added ${formatShortDate(student.createdAt)}`}
             </span>
             {/* Kept, because its tone is graduated — neutral at a day, warn at a

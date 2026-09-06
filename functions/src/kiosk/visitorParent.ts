@@ -106,8 +106,8 @@ export function parseRecordVisitorParentRequest(data: unknown): ParsedVisitorPar
     studentId,
     registrationId,
     guardian: {
-      firstName: parseName(rawGuardian.firstName, "The parent's first name"),
-      lastName: parseName(rawGuardian.lastName, "The parent's last name"),
+      firstName: parseName(rawGuardian.firstName, "The adult's first name"),
+      lastName: parseName(rawGuardian.lastName, "The adult's last name"),
       phone: parseRegistrationPhone(rawGuardian.phone),
     },
     eventId: typeof body.eventId === 'string' && body.eventId.trim().length > 0
@@ -155,7 +155,7 @@ export async function recordVisitorParent(
   const student = snapshot.data() ?? {};
   if (student.status === 'inactive') refuse('That student is no longer on the roster.');
   if (student.pendingReview === true) {
-    refuse('That student is already waiting to be reviewed, with a parent on their record.');
+    refuse('That student is already waiting to be reviewed, with an adult on their record.');
   }
 
   const child: RegistrationChild = {
@@ -181,7 +181,7 @@ export async function recordVisitorParent(
         .get();
       checkedIn = attendance.exists;
     } catch (error) {
-      logger.warn('Could not confirm the check-in behind a recorded parent', {
+      logger.warn('Could not confirm the check-in behind a recorded contact', {
         studentId: request.studentId,
         error: String(error),
       });
@@ -223,7 +223,7 @@ export async function recordVisitorParent(
     return {
       status: 'already-recorded',
       last4,
-      message: 'That parent is already waiting to be reviewed.',
+      message: 'That adult is already waiting to be reviewed.',
     };
   }
 
@@ -244,7 +244,7 @@ export async function recordVisitorParent(
       await ref.set({ possibleDuplicateOf }, { merge: true });
     }
   } catch (error) {
-    logger.warn('Could not scan for duplicates behind a recorded parent', {
+    logger.warn('Could not scan for duplicates behind a recorded contact', {
       registrationId: request.registrationId,
       error: String(error),
     });
@@ -268,7 +268,7 @@ export async function recordVisitorParent(
     await patchPhonesNow(db, last4, [request.studentId]);
     await bumpPulse(db, ['phones'], now, { logger });
   } catch (error) {
-    logger.warn('Could not patch the kiosk phone index for a recorded parent', {
+    logger.warn('Could not patch the kiosk phone index for a recorded contact', {
       registrationId: request.registrationId,
       error: String(error),
     });
@@ -278,7 +278,7 @@ export async function recordVisitorParent(
 
   // The child and the counselor, by id. The parent's name and number are on the
   // document this line is about; they are not going into a log as well.
-  logger.info('Recorded a parent contact taken at a door; held for review', {
+  logger.info('Recorded a contact taken at a door; held for review', {
     registrationId: request.registrationId,
     studentId: request.studentId,
     checkedIn,
@@ -287,6 +287,6 @@ export async function recordVisitorParent(
   return {
     status: 'recorded',
     last4,
-    message: 'Parent contact saved for the core team to add.',
+    message: 'Contact saved for the core team to add.',
   };
 }

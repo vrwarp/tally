@@ -265,7 +265,7 @@ The first pass over the logic core, in the order the sweep reached them:
   archive fallback was written to stop.
 - **`usePastEvents` restarted from a stale boundary**, and its retry button sat
   under its own error message for the length of a round trip.
-- **Every Attendees student's parent contact was invisible.** `usePersonDetails`
+- **Every Attendees student's contact was invisible.** `usePersonDetails`
   worked out who to ask about with `personIdFromStudentId`, which is the
   *Planning Center* compatibility helper and answers null for an `a32_` id by
   design — so the hook reported `unavailable`, which is the sentence written for

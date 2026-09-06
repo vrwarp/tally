@@ -372,7 +372,7 @@ describe('useAdultContact', () => {
     expect(seen[0]).toBe(false);
   });
 
-  it('does not remember an outage as "nobody has a parent"', async () => {
+  it('does not remember an outage as "nobody has a contact"', async () => {
     getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
     const first = renderHook(() => useAdultContact());
     await waitFor(() => expect(first.result.current.error).not.toBeNull());

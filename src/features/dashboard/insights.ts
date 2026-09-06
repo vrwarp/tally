@@ -820,7 +820,7 @@ export function computeNewVisitors(
 }
 
 /**
- * Profiles still missing a parent contact (Journey 3's handoff).
+ * Profiles still missing a contact (Journey 3's handoff).
  *
  * Two sources, because there are two kinds of unreachable student and only one
  * of them is a Tally record:
@@ -836,7 +836,7 @@ export function computeNewVisitors(
  *
  * Without the second source this list was empty in every ministry that runs its
  * roster off Planning Center — while the follow-up rows above it said, in so
- * many words, "Planning Center has no parent contact for this student".
+ * many words, "Planning Center has no contact for this student".
  *
  * A student in neither source is one nobody has an answer for — a roster entry
  * that could not be read, or a read that has not landed yet — and is left off.

@@ -2,7 +2,7 @@
  * Journey 3: a student nobody has ever seen walks in.
  *
  * Three fields, one button, done. That is still the whole of the fast path, and
- * the ordering below is deliberate: nothing about a parent is on screen until
+ * the ordering below is deliberate: nothing about an adult is on screen until
  * somebody asks for it, because a door volunteer with six people behind them is
  * answering "who is this?" and nothing else.
  *
@@ -16,13 +16,13 @@
  * behind a disclosure, costs the queue nothing and is the difference between a
  * reachable family and a follow-up call nobody makes.
  *
- * What it is not is a decision. Tally holds no parent contact on a student —
+ * What it is not is a decision. Tally holds no contact details on a student —
  * `noMirroredPersonalData` in `firestore.rules` forbids it, permanently — so
  * what is typed here goes onto a review record and a core-team member decides
  * which David Kim it is on a Tuesday, on the Review screen, with the church's
  * database in front of them. See functions/src/kiosk/visitorParent.ts.
  *
- * Everything else about this person — allergies, an email, a second parent — is
+ * Everything else about this person — allergies, an email, a second adult — is
  * still the core team's problem later, and the incomplete profile is still the
  * handoff signal.
  */
@@ -48,7 +48,7 @@ function defaultGrade(event: Pick<TallyEvent, 'requiresCheckOut'>): Grade | null
 }
 
 /**
- * The id this press submits the parent under, reused if it has to be retried.
+ * The id this press submits the adult under, reused if it has to be retried.
  *
  * The server claims the record with `create()`, so a call whose answer was lost
  * cannot leave a second copy of one family's number behind. `randomUUID` needs
@@ -92,17 +92,17 @@ export function QuickAddVisitorModal({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [grade, setGrade] = useState<Grade | null>(() => defaultGrade(event));
-  /** Whether the parent questions exist on screen at all. Never open by default. */
-  const [askingParent, setAskingParent] = useState(false);
-  const [parentFirst, setParentFirst] = useState('');
-  const [parentLast, setParentLast] = useState('');
-  const [contactPhone, setParentPhone] = useState('');
+  /** Whether the adult questions exist on screen at all. Never open by default. */
+  const [askingAdult, setAskingAdult] = useState(false);
+  const [adultFirst, setAdultFirst] = useState('');
+  const [adultLast, setAdultLast] = useState('');
+  const [adultPhone, setAdultPhone] = useState('');
   const [errors, setErrors] = useState<{
     firstName?: string;
     lastName?: string;
-    parentFirst?: string;
-    parentLast?: string;
-    contactPhone?: string;
+    adultFirst?: string;
+    adultLast?: string;
+    adultPhone?: string;
   }>({});
 
   useEffect(() => {
@@ -111,29 +111,29 @@ export function QuickAddVisitorModal({
     setFirstName(parts[0] ?? '');
     setLastName(parts.slice(1).join(' '));
     setGrade(defaultGrade(event));
-    setAskingParent(false);
-    setParentFirst('');
-    setParentLast('');
-    setParentPhone('');
+    setAskingAdult(false);
+    setAdultFirst('');
+    setAdultLast('');
+    setAdultPhone('');
     setErrors({});
   }, [open, initialName, event]);
 
   /*
-   * Whether anybody has actually answered the parent questions.
+   * Whether anybody has actually answered the adult questions.
    *
-   * Opening the section is not answering it: a counselor who taps "Add parent
+   * Opening the section is not answering it: a counselor who taps "Add a
    * contact", is handed the child instead and taps Save must not be stopped by
    * a required field they never asked for. A name or a number in the boxes is
    * what turns it into an answer — and once it is one, all of it is required,
-   * because half a parent is a record nobody can ring.
+   * because half an adult is a record nobody can ring.
    */
-  const parentAnswered =
-    askingParent && (parentFirst.trim() !== '' || phoneDigits(contactPhone) !== '');
+  const adultAnswered =
+    askingAdult && (adultFirst.trim() !== '' || phoneDigits(adultPhone) !== '');
 
-  const openParent = () => {
-    setAskingParent(true);
+  const openAdult = () => {
+    setAskingAdult(true);
     // Right far more often than it is wrong, and one edit away when it is not.
-    if (parentLast.trim() === '') setParentLast(lastName.trim());
+    if (adultLast.trim() === '') setAdultLast(lastName.trim());
   };
 
   const handleSubmit = (submitted: FormEvent<HTMLFormElement>) => {
@@ -141,22 +141,22 @@ export function QuickAddVisitorModal({
 
     const first = firstName.trim();
     const last = lastName.trim();
-    const guardianFirst = parentFirst.trim();
-    const guardianLast = parentLast.trim();
-    const digits = phoneDigits(contactPhone);
+    const adultFirstName = adultFirst.trim();
+    const adultLastName = adultLast.trim();
+    const digits = phoneDigits(adultPhone);
 
     const found = {
       firstName: first ? undefined : 'Required',
       lastName: last ? undefined : 'Required',
-      parentFirst: !parentAnswered || guardianFirst ? undefined : 'Required',
-      parentLast: !parentAnswered || guardianLast ? undefined : 'Required',
+      adultFirst: !adultAnswered || adultFirstName ? undefined : 'Required',
+      adultLast: !adultAnswered || adultLastName ? undefined : 'Required',
       /*
        * Ten digits or nothing. A name with no number leaves the family exactly
        * as unreachable as they were, which is the one thing this section exists
        * to change — and the four digits at the end of it are what the family
        * will type at the lobby kiosk next Sunday.
        */
-      contactPhone: !parentAnswered
+      adultPhone: !adultAnswered
         ? undefined
         : digits.length === 10
           ? undefined
@@ -168,8 +168,8 @@ export function QuickAddVisitorModal({
     }
 
     const name = `${first} ${last}`;
-    const guardian = parentAnswered
-      ? { firstName: guardianFirst, lastName: guardianLast, phone: digits }
+    const guardian = adultAnswered
+      ? { firstName: adultFirstName, lastName: adultLastName, phone: digits }
       : null;
     const registrationId = newRegistrationId();
 
@@ -210,7 +210,7 @@ export function QuickAddVisitorModal({
           eventId: event.id,
         });
       } catch {
-        show(`${first} is checked in, but the parent contact did not save.`, { tone: 'error' });
+        show(`${first} is checked in, but the contact did not save.`, { tone: 'error' });
       }
     })();
   };
@@ -220,7 +220,7 @@ export function QuickAddVisitorModal({
       open={open}
       onClose={onClose}
       title="Add a visitor"
-      description="A parent contact is optional, and goes to the core team to add."
+      description="A contact is optional, and goes to the core team to add."
       size="sm"
       footer={
         <>
@@ -273,17 +273,17 @@ export function QuickAddVisitorModal({
 
         {/*
           Below the button, always. The three fields above are the job; this is
-          the thing a counselor does when the parent happens to be standing
+          the thing a counselor does when the adult happens to be standing
           there, and it must never be between a thumb and Save.
         */}
-        {askingParent ? (
+        {askingAdult ? (
           /*
             A nested panel on the modal's own ground, on the same rung the
             review card's notices use: enough separation to read as "a second
             thing", not enough to read as a second dialog.
           */
           <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-800/40 p-3 ring-1 ring-ink-700">
-            <legend className="sr-only">Parent contact</legend>
+            <legend className="sr-only">Contact details</legend>
 
             {/*
               The boxes first, the reason underneath. The reason is read once
@@ -293,36 +293,36 @@ export function QuickAddVisitorModal({
             */}
             <div className="grid grid-cols-2 gap-3">
               <TextField
-                label="Parent first name"
-                value={parentFirst}
-                onChange={(changed) => setParentFirst(changed.target.value)}
-                error={errors.parentFirst ?? null}
+                label="Adult’s first name"
+                value={adultFirst}
+                onChange={(changed) => setAdultFirst(changed.target.value)}
+                error={errors.adultFirst ?? null}
                 autoCapitalize="words"
                 autoComplete="off"
                 enterKeyHint="next"
               />
               <TextField
-                label="Parent last name"
-                value={parentLast}
-                onChange={(changed) => setParentLast(changed.target.value)}
-                error={errors.parentLast ?? null}
+                label="Adult’s last name"
+                value={adultLast}
+                onChange={(changed) => setAdultLast(changed.target.value)}
+                error={errors.adultLast ?? null}
                 autoCapitalize="words"
                 autoComplete="off"
                 enterKeyHint="next"
               />
             </div>
             <PhoneField
-              label="Parent phone"
-              value={contactPhone}
-              onValueChange={setParentPhone}
-              error={errors.contactPhone ?? null}
+              label="Adult’s phone"
+              value={adultPhone}
+              onValueChange={setAdultPhone}
+              error={errors.adultPhone ?? null}
               autoComplete="tel"
               enterKeyHint="done"
             />
 
             <div className="flex items-end justify-between gap-3">
               <p className="text-xs text-ink-500">
-                Held for the core team to add. Tally keeps no parent details on a student.
+                Held for the core team to add. Tally keeps no contact details on a student.
               </p>
               {/*
                 A way back out, because the section is optional and a counselor
@@ -336,15 +336,15 @@ export function QuickAddVisitorModal({
                 size="sm"
                 className="-mb-1 -mr-2 shrink-0"
                 onClick={() => {
-                  setAskingParent(false);
-                  setParentFirst('');
-                  setParentLast('');
-                  setParentPhone('');
+                  setAskingAdult(false);
+                  setAdultFirst('');
+                  setAdultLast('');
+                  setAdultPhone('');
                   setErrors((held) => ({
                     ...held,
-                    parentFirst: undefined,
-                    parentLast: undefined,
-                    contactPhone: undefined,
+                    adultFirst: undefined,
+                    adultLast: undefined,
+                    adultPhone: undefined,
                   }));
                 }}
               >
@@ -353,8 +353,8 @@ export function QuickAddVisitorModal({
             </div>
           </fieldset>
         ) : (
-          <Button type="button" variant="secondary" size="sm" className="self-start" onClick={openParent}>
-            ＋ Add parent contact
+          <Button type="button" variant="secondary" size="sm" className="self-start" onClick={openAdult}>
+            ＋ Add a contact
           </Button>
         )}
       </form>

@@ -475,7 +475,14 @@ export function StudentDetailPage() {
   const backendName = backendLabelOf(student);
   const phone = details?.contactPhone?.trim() ?? '';
   const email = details?.contactEmail?.trim() ?? '';
-  const parentLabel = details?.contactName?.trim() || `${name}'s parent`;
+  /*
+   * The name on file, or a phrase that claims nothing. It used to fall back to
+   * `${name}'s parent`, which asserted a relationship Tally has never been told:
+   * the adult on a child's record is as often a grandmother, an aunt or a family
+   * friend, and the upstream read that finds them takes any family relation
+   * flagged as an emergency contact.
+   */
+  const contactLabel = details?.contactName?.trim() || 'the contact on file';
 
   /*
    * Whether anyone can actually be reached — answered from what is on screen.
@@ -483,7 +490,7 @@ export function StudentDetailPage() {
    * This screen is the one place that has the contact details in hand, so it
    * does not have to trust the roster's flag. That matters because the flag is
    * usually `null`: a roster read does not hydrate households, and reading
-   * `null` as "incomplete" put a warning badge directly above a parent's phone
+   * `null` as "incomplete" put a warning badge directly above an adult's phone
    * number. Until the lookup lands, nobody is accused of anything.
    */
   const unreachable = details ? !phone && !email : student.profileComplete === false;
@@ -641,7 +648,7 @@ export function StudentDetailPage() {
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
             {recordGone ? <Badge tone="danger">{backendName} record missing</Badge> : null}
-            {unreachable && !recordGone ? <Badge tone="warn">Missing parent contact</Badge> : null}
+            {unreachable && !recordGone ? <Badge tone="warn">No contact on file</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>
@@ -708,12 +715,12 @@ export function StudentDetailPage() {
           <div className="flex flex-col gap-4 px-4 py-3">
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                Parent contact
+                Contact
               </h3>
               {recordGone ? (
                 <p className="mt-1 text-sm text-warn-400">
                   {backendName} no longer has a record for {name} — deleted or merged there.
-                  Parent contact lives on that record, so there is nothing to show until it is
+                  Contact details live on that record, so there is nothing to show until it is
                   sorted out below.
                 </p>
               ) : detailsError ? (
@@ -738,7 +745,7 @@ export function StudentDetailPage() {
                     <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
                     <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
                   </div>
-                  {/* Two lines of it on a phone, where a parent's name, number
+                  {/* Two lines of it on a phone, where an adult's name, number
                       and address are two lines — the same room the settled line
                       below holds open, so the swap paints rather than moves. */}
                   <div
@@ -757,14 +764,14 @@ export function StudentDetailPage() {
                       <>
                         <ContactLink
                           href={`tel:${dialable(phone)}`}
-                          label={`Call ${parentLabel} at ${formatPhone(phone)}`}
+                          label={`Call ${contactLabel} at ${formatPhone(phone)}`}
                           icon="📞"
                         >
                           Call
                         </ContactLink>
                         <ContactLink
                           href={`sms:${dialable(phone)}`}
-                          label={`Text ${parentLabel} at ${formatPhone(phone)}`}
+                          label={`Text ${contactLabel} at ${formatPhone(phone)}`}
                           icon="💬"
                         >
                           Text
@@ -774,7 +781,7 @@ export function StudentDetailPage() {
                     {email ? (
                       <ContactLink
                         href={`mailto:${email}`}
-                        label={`Email ${parentLabel} at ${email}`}
+                        label={`Email ${contactLabel} at ${email}`}
                         icon="✉"
                       >
                         Email
@@ -1123,7 +1130,7 @@ export function StudentDetailPage() {
         open={editorOpen}
         onClose={() => setEditorOpen(false)}
         student={student}
-        // An edit that reached Planning Center changed the allergies and parent
+        // An edit that reached Planning Center changed the allergies and contact
         // contact this page is showing, not just the roster row behind it.
         onSaved={refreshDetails}
       />

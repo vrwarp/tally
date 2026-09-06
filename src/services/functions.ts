@@ -187,7 +187,7 @@ export const getPersonDetails = httpsCallable<
     /**
      * Skip the server's held answer.
      *
-     * For after a *write*, and only then. The screens that add a parent or a
+     * For after a *write*, and only then. The screens that add an adult or a
      * number re-read the moment the write lands, which is well inside the few
      * seconds a read may be reused for — and the answer they would get back is
      * the one from before their own edit, on the one screen where that reads as

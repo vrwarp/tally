@@ -1307,7 +1307,7 @@ export async function discardRegistration(options: {
         ? // Nobody was held, so nobody comes off — the record was carrying an
           // adult and nothing else, which is what a counselor's is, and what a
           // kiosk family's becomes once their children have been approved.
-          'The parent’s details are gone. Nothing changed on the roster.'
+          'The adult’s details are gone. Nothing changed on the roster.'
         : deactivated === 1
           ? 'Taken off the roster. Their check-in history is kept.'
           : `${deactivated} students taken off the roster. Their check-in history is kept.`,

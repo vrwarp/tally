@@ -296,7 +296,7 @@ describe('StudentsPage roster rows', () => {
     expect(badge).toHaveTextContent('Allergy');
   });
 
-  it('states a missing parent contact as a neutral chip, never as amber', () => {
+  it('states a missing contact as a neutral chip, never as amber', () => {
     renderRoster([
       makeStudent({
         id: 's1',
@@ -307,7 +307,7 @@ describe('StudentsPage roster rows', () => {
       }),
     ]);
 
-    const badge = within(row(/Aaron/)).getByRole('button', { name: /add a parent contact/i });
+    const badge = within(row(/Aaron/)).getByRole('button', { name: /add a contact/i });
     expect(badge).not.toHaveClass(AMBER);
     expect(badge).toHaveTextContent('No contact');
   });

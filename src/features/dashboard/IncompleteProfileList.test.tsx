@@ -53,7 +53,7 @@ describe('IncompleteProfileList', () => {
     ]);
 
     expect(
-      within(row!).getByRole('button', { name: 'Add parent contact for Kylie Novak' }),
+      within(row!).getByRole('button', { name: 'Add a contact for Kylie Novak' }),
     ).toBeInTheDocument();
   });
 
@@ -109,15 +109,15 @@ describe('IncompleteProfileList', () => {
     ]);
 
     expect(screen.getByText('Nobody on file')).toBeInTheDocument();
-    expect(screen.getByText(/no parent contact in Planning Center/)).toBeInTheDocument();
+    expect(screen.getByText(/no contact in Planning Center/)).toBeInTheDocument();
     expect(screen.queryByText(/1970/)).not.toBeInTheDocument();
   });
 
   it('says it is still counting rather than showing an empty list', () => {
     show([], { checking: true });
 
-    expect(screen.getByText(/Checking who has a parent contact/)).toBeInTheDocument();
-    expect(screen.queryByText(/Every profile has a parent contact/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Checking who has a contact/)).toBeInTheDocument();
+    expect(screen.queryByText(/Every profile has a contact/)).not.toBeInTheDocument();
   });
 
   it('admits it when the check could not be made', () => {
@@ -125,13 +125,13 @@ describe('IncompleteProfileList', () => {
 
     expect(screen.getByText(/Could not reach Planning Center/)).toBeInTheDocument();
     // "Nobody is waiting" would be a claim this screen cannot make right now.
-    expect(screen.queryByText(/Every profile has a parent contact/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Every profile has a contact/)).not.toBeInTheDocument();
   });
 
   it('says nobody is waiting only once it knows', () => {
     show([]);
 
-    expect(screen.getByText(/Every profile has a parent contact/)).toBeInTheDocument();
+    expect(screen.getByText(/Every profile has a contact/)).toBeInTheDocument();
   });
 
   /*
@@ -144,13 +144,13 @@ describe('IncompleteProfileList', () => {
       gatheringTitle: 'Friday Fellowship',
     });
 
-    expect(screen.getByText(/Seen at Friday Fellowship, with no parent phone or email/)).toBeInTheDocument();
+    expect(screen.getByText(/Seen at Friday Fellowship, with no phone or email/)).toBeInTheDocument();
   });
 
   it('does not claim the whole ministry is fine when only one gathering is', () => {
     show([], { gatheringTitle: 'Friday Fellowship' });
 
-    expect(screen.getByText('Everyone at Friday Fellowship has a parent contact.')).toBeInTheDocument();
+    expect(screen.getByText('Everyone at Friday Fellowship has a contact.')).toBeInTheDocument();
     // Somebody unreachable may well be sitting on another tab, and this must not
     // be read as "nobody is waiting".
     expect(screen.getByText(/may still be on another tab/)).toBeInTheDocument();

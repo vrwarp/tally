@@ -27,7 +27,7 @@ import { GRADES, type PcoEffectiveSettings, type PcoWriteBackMode } from '@/type
 const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.',
   create: 'Tally creates people it has not seen before, after searching for a match. It never edits an existing person.',
-  full: 'Tally creates people, and Edit profile becomes editable for students Planning Center already has — first name, last name, grade and medical notes are saved there. A leader can also add a parent, and the household if there is none. It offers anybody Planning Center already has by that name before creating a second record, and never overwrites a number on file.',
+  full: 'Tally creates people, and Edit profile becomes editable for students Planning Center already has — first name, last name, grade and medical notes are saved there. A leader can also add an adult, and the household if there is none. It offers anybody Planning Center already has by that name before creating a second record, and never overwrites a number on file.',
 };
 
 /** A cache measured in minutes stops being a cache and starts being a mirror. */

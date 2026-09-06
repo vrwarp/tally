@@ -13,7 +13,7 @@
  * scoped list below answers for that chain alone; "All" merges them, one row per
  * student, worst streak winning.
  *
- * That includes the profiles missing a parent contact, which is the one list
+ * That includes the profiles missing a contact, which is the one list
  * here that is not about attendance at all — but "who do we see on a Friday and
  * cannot reach" is a real question, and a card that ignored the tabs read as
  * though picking a gathering had done nothing.
@@ -441,15 +441,15 @@ export function DashboardPage() {
   );
 
   /*
-   * Who has a parent on file is Planning Center's answer, not the roster's: a
+   * Who has a contact on file is Planning Center's answer, not the roster's: a
    * roster read reports `profileComplete: null` for everybody, because
    * hydrating households is not work a counselor should wait through at a door.
    * Asked here, by the one screen that lists the students nobody can reach.
    */
-  const parentContact = useAdultContact();
+  const adultContact = useAdultContact();
   const incompleteRows = useMemo(
-    () => computeIncompleteProfiles(students, parentContact.reachable),
-    [students, parentContact.reachable],
+    () => computeIncompleteProfiles(students, adultContact.reachable),
+    [students, adultContact.reachable],
   );
 
   /*
@@ -458,8 +458,8 @@ export function DashboardPage() {
    * once here rather than in three cards, so all three files agree.
    */
   const exportContext = useMemo(
-    () => ({ reachable: parentContact.reachable, backends: rosterBackends }),
-    [parentContact.reachable, rosterBackends],
+    () => ({ reachable: adultContact.reachable, backends: rosterBackends }),
+    [adultContact.reachable, rosterBackends],
   );
   /*
    * Narrowed to the gathering the tabs are showing, like every other list here.
@@ -525,12 +525,12 @@ export function DashboardPage() {
   const awaitingRoster = rosterLoading && !rosterSettled;
   /*
    * The same rule, for the same reason, about the other read this screen makes:
-   * who has a parent contact is a separate question put to Planning Center, and
+   * who has a contact is a separate question put to Planning Center, and
    * until it answers the only unreachable students Tally can name are its own
    * quick-adds. A tile that says "5" and becomes "12" a second later has already
    * been read and believed.
    */
-  const awaitingContacts = parentContact.loading && !parentContact.loaded;
+  const awaitingContacts = adultContact.loading && !adultContact.loaded;
   const awaiting = awaitingHistory || awaitingRoster;
   /** The dash a tile shows rather than a zero it would have to take back. */
   const pending = (value: number) => (awaitingRoster ? '—' : value);
@@ -593,7 +593,7 @@ export function DashboardPage() {
       key="incomplete"
       label="Incomplete"
       value={awaitingContacts ? '—' : pending(summary.incompleteCount)}
-      hint="no parent contact"
+      hint="no contact on file"
       tone={
         !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
       }
@@ -783,7 +783,7 @@ export function DashboardPage() {
               threshold={settings.miaConsecutiveMisses}
               loading={awaiting}
               gatheringTitle={activeGathering?.title ?? null}
-              onContactAdded={parentContact.refresh}
+              onContactAdded={adultContact.refresh}
               exportContext={exportContext}
               onResolve={handleResolve}
               sessionReleases={sessionReleases}
@@ -838,8 +838,8 @@ export function DashboardPage() {
               windowDays={settings.newVisitorWindowDays}
               loading={awaiting}
               gatheringTitle={activeGathering?.title ?? null}
-              reachable={parentContact.reachable}
-              onContactAdded={parentContact.refresh}
+              reachable={adultContact.reachable}
+              onContactAdded={adultContact.refresh}
               exportContext={exportContext}
             />
           ) : null}
@@ -860,9 +860,9 @@ export function DashboardPage() {
             now={now}
             loading={awaitingRoster}
             checking={awaitingContacts}
-            error={parentContact.error}
+            error={adultContact.error}
             gatheringTitle={activeGathering?.title ?? null}
-            onContactAdded={parentContact.refresh}
+            onContactAdded={adultContact.refresh}
             exportContext={exportContext}
           />
 

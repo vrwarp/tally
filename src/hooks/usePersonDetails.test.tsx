@@ -191,7 +191,7 @@ describe('when the read fails', () => {
     const { result } = renderHook(() => usePersonDetails(linked()));
 
     await waitFor(() => expect(result.current.error).toBeTruthy());
-    expect(result.current.error).toBe('Only the core team can see parent contact details.');
+    expect(result.current.error).toBe('Only the core team can see contact details.');
   });
 
   it('does not memoise a failure', async () => {

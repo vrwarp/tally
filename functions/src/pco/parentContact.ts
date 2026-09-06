@@ -190,7 +190,7 @@ export async function setParentContact(
   if (config.writeBack !== 'full') {
     return result(
       'disabled',
-      'Adding a parent contact from Tally is switched off. A leader can turn on full write-back in Settings, or add the number in Planning Center.',
+      'Adding a contact from Tally is switched off. A leader can turn on full write-back in Settings, or add the number in Planning Center.',
     );
   }
 
@@ -229,7 +229,7 @@ export async function setParentContact(
   if (!parent) {
     return result(
       'no-household-adult',
-      'Planning Center has no adult in this household. Somebody has to add the parent there before a number can go on them.',
+      'Planning Center has no adult in this household. Somebody has to add the adult there before a number can go on them.',
     );
   }
 
@@ -252,14 +252,14 @@ export async function setParentContact(
   if (wrote.length === 0) {
     return result(
       'already-set',
-      `Planning Center already has contact details for ${parent.name ?? 'this parent'}. Nothing was changed.`,
+      `Planning Center already has contact details for ${parent.name ?? 'this adult'}. Nothing was changed.`,
       { contactName: parent.name, skipped },
     );
   }
 
   // The person id, never the number: this line ends up in a log a church admin
   // may read, and the contact detail itself has no business being in one.
-  logger.info('Added a parent contact in Planning Center', {
+  logger.info('Added a contact in Planning Center', {
     studentId,
     parentPersonId: parent.id,
     wrote,
@@ -268,7 +268,7 @@ export async function setParentContact(
 
   return result(
     'updated',
-    `Added ${wrote.join(' and ')} for ${parent.name ?? 'the parent'} in Planning Center.`,
+    `Added ${wrote.join(' and ')} for ${parent.name ?? 'the adult'} in Planning Center.`,
     { contactName: parent.name, wrote, skipped },
   );
 }

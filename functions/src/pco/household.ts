@@ -392,7 +392,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
   if (config.writeBack !== 'full') {
     return result(
       'disabled',
-      'Adding a parent from Tally is switched off. A leader can turn on full write-back in Settings, or add the family in Planning Center.',
+      'Adding an adult from Tally is switched off. A leader can turn on full write-back in Settings, or add the family in Planning Center.',
     );
   }
 
@@ -402,7 +402,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
   const givenFirstName = trimmed(options.firstName);
 
   if (!chosenId && !givenFirstName) {
-    return result('nothing-to-write', "Enter the parent's name.");
+    return result('nothing-to-write', "Enter the adult's name.");
   }
 
   const target = await resolveStudentPerson(db, studentId);
@@ -523,7 +523,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
       },
     });
     if (!created.data?.id) {
-      return result('not-an-adult', 'Planning Center returned no person id for the new parent.');
+      return result('not-an-adult', 'Planning Center returned no person id for the new adult.');
     }
     parentId = created.data.id;
     parentPerson = created.data;
@@ -578,7 +578,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
 
   // Ids and field names only. This line ends up in a log a church admin may
   // read, and a parent's number has no business being in one.
-  logger.info('Added a parent in Planning Center', {
+  logger.info('Added an adult in Planning Center', {
     studentId,
     parentPersonId: parentId,
     createdPerson,
@@ -795,7 +795,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
   const firstName = trimmed(options.firstName);
   const lastName = trimmed(options.lastName) ?? '';
   if (!firstName) {
-    return familyResult('no-linked-children', "The parent's name is missing.");
+    return familyResult('no-linked-children', "The adult's name is missing.");
   }
 
   /* ---- Which children reached Planning Center ----------------------------- */
@@ -980,7 +980,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
       },
     });
     if (!created.data?.id) {
-      return familyResult('no-linked-children', 'Planning Center returned no person id for the new parent.');
+      return familyResult('no-linked-children', 'Planning Center returned no person id for the new adult.');
     }
     parentId = created.data.id;
     parentPerson = created.data;
