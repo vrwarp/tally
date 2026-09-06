@@ -489,7 +489,7 @@ function slug(value: string): string {
  * as the kiosk is concerned — see `SeedStudent.household` and `src/kiosk/family.ts`.
  */
 /*
- * Outside the generated range on purpose. `parentPhone` numbers everybody else
+ * Outside the generated range on purpose. `contactPhone` numbers everybody else
  * `(555) 555-0100` upward by index, so a household picked from inside that band
  * would hand its four digits to an unrelated student and invent a sibling —
  * `familyOf` groups on equal digit sets and would have no way to tell.
@@ -499,7 +499,7 @@ const HOUSEHOLD_PHONES: Record<string, string> = {
   delgado: '(555) 555-0592',
 };
 
-function parentPhone(index: number, seed?: SeedStudent): string {
+function contactPhone(index: number, seed?: SeedStudent): string {
   const shared = seed?.household ? HOUSEHOLD_PHONES[seed.household] : undefined;
   if (shared) return shared;
   // 555-01xx is the reserved fictional range, and ten digits so `formatPhone`
@@ -507,7 +507,7 @@ function parentPhone(index: number, seed?: SeedStudent): string {
   return `(555) 555-${String(100 + index).padStart(4, '0')}`;
 }
 
-function parentEmail(seed: SeedStudent): string {
+function contactEmail(seed: SeedStudent): string {
   return `${slug(seed.parent ?? '')}@example.org`.replace(/-/g, '.');
 }
 
@@ -593,9 +593,9 @@ function simulatorPayload(students: readonly BuiltStudent[], now: Date) {
           allergies: seed.allergies ?? null,
           birthdate: seedBirthdate(seed, index, now),
           status: seed.band === 'inactive' ? ('inactive' as const) : ('active' as const),
-          parentName: seed.parent ?? null,
-          parentPhone: contact === 'phone' || contact === 'both' ? parentPhone(index, seed) : null,
-          parentEmail: contact === 'email' || contact === 'both' ? parentEmail(seed) : null,
+          contactName: seed.parent ?? null,
+          contactPhone: contact === 'phone' || contact === 'both' ? contactPhone(index, seed) : null,
+          contactEmail: contact === 'email' || contact === 'both' ? contactEmail(seed) : null,
           householdKey: seed.household ?? null,
         };
       }),

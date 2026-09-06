@@ -79,7 +79,7 @@ describe('toStudent', () => {
     // missing contact details.
     const understated = toStudent(
       fakeSnapshot({
-        data: { profileComplete: true, parentPhone: '555-0100', parentEmail: 'a@b.org' },
+        data: { profileComplete: true, contactPhone: '555-0100', contactEmail: 'a@b.org' },
       }),
     );
 

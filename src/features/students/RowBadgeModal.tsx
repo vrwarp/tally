@@ -23,7 +23,7 @@ import { ParentContactPanel } from '@/features/students/ParentContactModal';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
-import { invalidateParentContact } from '@/hooks/useParentContact';
+import { invalidateAdultContact } from '@/hooks/useAdultContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import {
   birthdayState,
@@ -403,7 +403,7 @@ function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void
       }
 
       invalidatePersonDetails(student.id);
-      invalidateParentContact();
+      invalidateAdultContact();
       // The server's sentence, because only the server knows which backend a
       // queued student was just sent to.
       show(result.data.message || `${student.firstName} is in ${backendLabelOf(student)}.`);

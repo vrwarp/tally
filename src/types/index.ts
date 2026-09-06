@@ -250,7 +250,7 @@ export interface StudentDoc {
 /*
  * What is deliberately absent from `StudentDoc`
  * ---------------------------------------------
- * `parentName`, `parentPhone`, `parentEmail`, `allergies`.
+ * `contactName`, `contactPhone`, `contactEmail`, `allergies`.
  *
  * Tally used to mirror all four out of Planning Center and keep them in step
  * with a sweep every six hours. That meant a permanent second copy of several
@@ -504,10 +504,10 @@ export function editedFields(edit: Pick<UpstreamEdit, 'patch'>): UpstreamEditFie
  * Phone or email is enough — Journey 3 only asks for "emergency contact number".
  */
 export function computeProfileComplete(input: {
-  parentPhone?: string | null;
-  parentEmail?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
 }): boolean {
-  return Boolean(input.parentPhone?.trim() || input.parentEmail?.trim());
+  return Boolean(input.contactPhone?.trim() || input.contactEmail?.trim());
 }
 
 export function studentFullName(student: Pick<Student, 'firstName' | 'lastName'>): string {
@@ -1214,9 +1214,9 @@ export interface PcoPersonDetails {
   pcoPersonId: string;
   /** Which backend answered — and whose write-back the flags below describe. */
   backendId?: BackendId;
-  parentName: string | null;
-  parentPhone: string | null;
-  parentEmail: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
   allergies: string | null;
   /**
    * The birthday with its year — `YYYY-MM-DD` — or `MM-DD` when Planning
@@ -1272,7 +1272,7 @@ export interface PcoPersonDetails {
    * number on or it does not. That is what lets one screen offer "add a number"
    * and "add a parent" from the same place without deciding which it is.
    */
-  parentCreatable: boolean;
+  adultCreatable: boolean;
 }
 
 /**
@@ -1333,7 +1333,7 @@ export interface BackendStatus {
   /** Present only on an enabled backend. */
   capabilities: {
     writeBack: PcoWriteBackMode;
-    parentCreatable: boolean;
+    adultCreatable: boolean;
     mergeAware: boolean;
     listsSupported: boolean;
     historyImportSupported: boolean;

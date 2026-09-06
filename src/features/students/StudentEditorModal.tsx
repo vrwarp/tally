@@ -751,7 +751,7 @@ function ParentContactSection({
   loading: boolean;
   onAdded: () => void;
 }) {
-  const onFile = details?.parentPhone || details?.parentEmail ? details : null;
+  const onFile = details?.contactPhone || details?.contactEmail ? details : null;
   const backend = student ? backendOfStudent(student) : null;
   const label = student ? backendLabelOf(student) : 'Planning Center';
 
@@ -770,12 +770,12 @@ function ParentContactSection({
         // path only ever fills a gap, and never overwrites what is on file.
         <>
           <p className="mt-1 text-sm text-ink-100">
-            {onFile.parentName ? `${onFile.parentName} · ` : ''}
-            {onFile.parentPhone ? (
-              <span className="tabular-nums">{formatPhone(onFile.parentPhone)}</span>
+            {onFile.contactName ? `${onFile.contactName} · ` : ''}
+            {onFile.contactPhone ? (
+              <span className="tabular-nums">{formatPhone(onFile.contactPhone)}</span>
             ) : null}
-            {onFile.parentPhone && onFile.parentEmail ? ' · ' : ''}
-            {onFile.parentEmail ? <span className="break-all">{onFile.parentEmail}</span> : null}
+            {onFile.contactPhone && onFile.contactEmail ? ' · ' : ''}
+            {onFile.contactEmail ? <span className="break-all">{onFile.contactEmail}</span> : null}
           </p>
           <p className="mt-1 text-xs text-ink-500">
             Kept in {label}.

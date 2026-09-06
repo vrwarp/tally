@@ -90,7 +90,7 @@ test.describe('Attendees (attendees32)', () => {
     expect(membership.data.upstreamBackend).toBe('a32');
     expect(membership.id).toBe(`a32_${String(membership.data.upstreamPersonId)}`);
     expect(membership.data.pcoPersonId ?? null).toBeNull();
-    expect(membership.data.parentPhone ?? null).toBeNull();
+    expect(membership.data.contactPhone ?? null).toBeNull();
     expect(membership.data.allergies ?? null).toBeNull();
 
     await dialog.getByRole('button', { name: /done/i }).click();

@@ -473,9 +473,9 @@ export function StudentDetailPage() {
   const grade = gradeSentence(student);
   const backend = backendOfStudent(student);
   const backendName = backendLabelOf(student);
-  const phone = details?.parentPhone?.trim() ?? '';
-  const email = details?.parentEmail?.trim() ?? '';
-  const parentLabel = details?.parentName?.trim() || `${name}'s parent`;
+  const phone = details?.contactPhone?.trim() ?? '';
+  const email = details?.contactEmail?.trim() ?? '';
+  const parentLabel = details?.contactName?.trim() || `${name}'s parent`;
 
   /*
    * Whether anyone can actually be reached — answered from what is on screen.
@@ -789,7 +789,7 @@ export function StudentDetailPage() {
                       whole attendance card below from stepping down when the
                       answer arrives. */}
                   <p className="mt-2 min-h-10 text-sm text-ink-300 sm:min-h-5">
-                    {details?.parentName ? `${details.parentName} · ` : ''}
+                    {details?.contactName ? `${details.contactName} · ` : ''}
                     {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
                     {phone && email ? ' · ' : ''}
                     {email ? <span className="break-all">{email}</span> : null}

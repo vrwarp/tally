@@ -68,7 +68,7 @@ test.describe('Planning Center', () => {
     const documents = await firestore.collection('students');
     expect(documents.length).toBeGreaterThan(0);
     for (const student of documents) {
-      expect(Object.keys(student.data)).not.toContain('parentPhone');
+      expect(Object.keys(student.data)).not.toContain('contactPhone');
       expect(Object.keys(student.data)).not.toContain('allergies');
     }
   });
@@ -83,9 +83,9 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
 
     for (const student of await firestore.collection('students')) {
-      expect(student.data.parentName ?? null).toBeNull();
-      expect(student.data.parentPhone ?? null).toBeNull();
-      expect(student.data.parentEmail ?? null).toBeNull();
+      expect(student.data.contactName ?? null).toBeNull();
+      expect(student.data.contactPhone ?? null).toBeNull();
+      expect(student.data.contactEmail ?? null).toBeNull();
       expect(student.data.allergies ?? null).toBeNull();
     }
   });
@@ -108,8 +108,8 @@ test.describe('Planning Center', () => {
       firstName: 'Wendell',
       lastName: 'Ashgrove',
       grade: 10,
-      parentName: 'Marta Ashgrove',
-      parentPhone: '555-0177',
+      contactName: 'Marta Ashgrove',
+      contactPhone: '555-0177',
     });
 
     await signedInAs('core');

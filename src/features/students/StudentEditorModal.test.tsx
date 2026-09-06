@@ -123,15 +123,15 @@ function linked(overrides: Partial<Student> = {}): Student {
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '4200003',
-    parentName: 'Marisol Delgado',
-    parentPhone: null,
-    parentEmail: null,
+    contactName: 'Marisol Delgado',
+    contactPhone: null,
+    contactEmail: null,
     allergies: 'Severe peanut allergy — EpiPen in her bag',
     birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
-    parentCreatable: false,
+    adultCreatable: false,
     ...overrides,
   };
 }
@@ -610,7 +610,7 @@ describe('parent contact', () => {
   });
 
   it('shows what is on file rather than offering to add a second number', () => {
-    personDetails.current = details({ parentPhone: '(510) 555-0142' });
+    personDetails.current = details({ contactPhone: '(510) 555-0142' });
     open(linked());
 
     expect(screen.getByText(/510/)).toBeInTheDocument();

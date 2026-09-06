@@ -16,7 +16,7 @@
  */
 import { Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { invalidateParentContact } from '@/hooks/useParentContact';
+import { invalidateAdultContact } from '@/hooks/useAdultContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { backendLabelOf, studentFullName, type Student } from '@/types';
@@ -76,7 +76,7 @@ export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPa
         // student's details, the session-wide "who can we reach" map the chip
         // count reads, and the roster row itself.
         invalidatePersonDetails(student.id);
-        invalidateParentContact();
+        invalidateAdultContact();
         refresh();
         void refreshRoster(true);
         onAdded?.();

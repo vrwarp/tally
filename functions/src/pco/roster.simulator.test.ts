@@ -26,7 +26,7 @@ import { createTtlCache, type TtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import {
   fetchAllergyNotes,
-  fetchParentContactStatus,
+  fetchAdultContactStatus,
   fetchPersonDetails,
   fetchRoster,
   pcoStudentId,
@@ -182,7 +182,7 @@ describe('fetchRoster', () => {
     });
 
     for (const person of people) {
-      expect(Object.keys(person)).not.toContain('parentPhone');
+      expect(Object.keys(person)).not.toContain('contactPhone');
       expect(Object.keys(person)).not.toContain('allergies');
     }
   });
@@ -433,7 +433,7 @@ describe('searchPeople', () => {
  * follow-up rows above it, which read one student at a time, were saying
  * "Planning Center has no parent contact for this student" out loud.
  */
-describe('fetchParentContactStatus', () => {
+describe('fetchAdultContactStatus', () => {
   const ROSTER = [
     FIXTURE_IDS.amara,
     FIXTURE_IDS.marcusNoAdultAtHome,
@@ -445,7 +445,7 @@ describe('fetchParentContactStatus', () => {
 
   it('names the students nobody can be reached about', async () => {
     const world = harness();
-    const { reachable } = await fetchParentContactStatus({
+    const { reachable } = await fetchAdultContactStatus({
       ...world,
       config: baseConfig(),
       personIds: ROSTER,
@@ -460,7 +460,7 @@ describe('fetchParentContactStatus', () => {
     // Either is enough to follow up on, which is what `computeProfileComplete`
     // has always said and what this must not quietly disagree with.
     const world = harness();
-    const { reachable } = await fetchParentContactStatus({
+    const { reachable } = await fetchAdultContactStatus({
       ...world,
       config: baseConfig(),
       personIds: ROSTER,
@@ -481,7 +481,7 @@ describe('fetchParentContactStatus', () => {
      * them is lying to somebody working a call list.
      */
     const world = harness();
-    const { reachable } = await fetchParentContactStatus({
+    const { reachable } = await fetchAdultContactStatus({
       ...world,
       config: baseConfig(),
       personIds: ROSTER,
@@ -489,7 +489,7 @@ describe('fetchParentContactStatus', () => {
 
     for (const personId of ROSTER) {
       const details = await fetchPersonDetails({ ...world, config: baseConfig(), personId });
-      const hasContact = Boolean(details?.parentPhone ?? details?.parentEmail);
+      const hasContact = Boolean(details?.contactPhone ?? details?.contactEmail);
       expect(reachable[pcoStudentId(personId)], `disagreed about ${personId}`).toBe(hasContact);
     }
   });
@@ -499,7 +499,7 @@ describe('fetchParentContactStatus', () => {
     // there", and putting a deleted-upstream student on a call list as
     // unreachable sends somebody to fix the wrong thing.
     const world = harness();
-    const { reachable, unresolved } = await fetchParentContactStatus({
+    const { reachable, unresolved } = await fetchAdultContactStatus({
       ...world,
       config: baseConfig(),
       personIds: [FIXTURE_IDS.amara, '4209999'],
@@ -511,7 +511,7 @@ describe('fetchParentContactStatus', () => {
 
   it('carries no contact details, only the fact that there are some', async () => {
     const world = harness();
-    const status = await fetchParentContactStatus({
+    const status = await fetchAdultContactStatus({
       ...world,
       config: baseConfig(),
       personIds: ROSTER,
@@ -529,13 +529,13 @@ describe('fetchParentContactStatus', () => {
 
     await fetchRoster({ ...world, config, personIds: ROSTER });
     const afterRoster = world.requests.length;
-    await fetchParentContactStatus({ ...world, config, personIds: ROSTER });
+    await fetchAdultContactStatus({ ...world, config, personIds: ROSTER });
     const afterStatus = world.requests.length;
 
     // The adult sweep is new work; asking who is on the roster again is not.
     expect(afterStatus).toBeGreaterThan(afterRoster);
 
-    const second = await fetchParentContactStatus({ ...world, config, personIds: ROSTER });
+    const second = await fetchAdultContactStatus({ ...world, config, personIds: ROSTER });
     expect(second.cached).toBe(true);
     expect(world.requests.length).toBe(afterStatus);
   });
@@ -551,7 +551,7 @@ describe('fetchPersonDetails', () => {
     });
 
     expect(details?.allergies).toBeTruthy();
-    expect(details?.parentPhone ?? details?.parentEmail).toBeTruthy();
+    expect(details?.contactPhone ?? details?.contactEmail).toBeTruthy();
     // The year among them. The roster row for this same student carries
     // `06-28` and nothing more; this read is the one a screen showing her
     // profile makes, and it is where an edit form gets the date it opens on.
@@ -566,7 +566,7 @@ describe('fetchPersonDetails', () => {
       personId: FIXTURE_IDS.amara,
     });
 
-    expect(details?.parentName).toBeTruthy();
+    expect(details?.contactName).toBeTruthy();
   });
 
   it('returns null for somebody who is not there', async () => {

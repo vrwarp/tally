@@ -291,7 +291,7 @@ const server = await createServer({
       { find: /^@\/context\/authContext$/, replacement: stubs },
       { find: /^@\/context\/toastContext$/, replacement: stubs },
       { find: /^@\/hooks\/useEventSnapshots$/, replacement: stubs },
-      { find: /^@\/hooks\/useParentContact$/, replacement: stubs },
+      { find: /^@\/hooks\/useAdultContact$/, replacement: stubs },
       { find: /^@\/hooks\/usePersonDetails$/, replacement: stubs },
       { find: /^@\/hooks\/useNow$/, replacement: stubs },
       { find: /^@\//, replacement: `${src}/` },

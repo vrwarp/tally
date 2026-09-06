@@ -78,15 +78,15 @@ function ContactParentButton({
   details,
 }: {
   student: Student;
-  details: { parentName?: string | null; parentPhone?: string | null; parentEmail?: string | null };
+  details: { contactName?: string | null; contactPhone?: string | null; contactEmail?: string | null };
 }) {
   const [open, setOpen] = useState(false);
   const { show } = useToast();
 
   const name = studentFullName(student);
-  const phone = details.parentPhone?.trim() ?? '';
-  const email = details.parentEmail?.trim() ?? '';
-  const parent = details.parentName?.trim() || `${name}'s parent`;
+  const phone = details.contactPhone?.trim() ?? '';
+  const email = details.contactEmail?.trim() ?? '';
+  const parent = details.contactName?.trim() || `${name}'s parent`;
 
   /** The same guard `CopyContactsButton` uses: absent on http and in some
       in-app browsers, and saying so beats silently doing nothing. */
@@ -247,8 +247,8 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
 
   const name = studentFullName(student);
   const label = backendLabelOf(student);
-  const phone = details?.parentPhone?.trim() ?? '';
-  const email = details?.parentEmail?.trim() ?? '';
+  const phone = details?.contactPhone?.trim() ?? '';
+  const email = details?.contactEmail?.trim() ?? '';
 
   let body: ReactNode;
 

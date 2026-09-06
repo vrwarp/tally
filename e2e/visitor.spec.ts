@@ -126,8 +126,8 @@ test.describe('quick-add visitor', () => {
     expect(created.data.pendingReview ?? false).toBe(false);
     // And nothing about the parent on the student, which is the rule the
     // registration record exists to keep.
-    expect(created.data.parentPhone).toBeUndefined();
-    expect(created.data.parentName).toBeUndefined();
+    expect(created.data.contactPhone).toBeUndefined();
+    expect(created.data.contactName).toBeUndefined();
 
     const records = await firestore.until(
       'kioskRegistrations',

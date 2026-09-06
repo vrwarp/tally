@@ -32,7 +32,7 @@ import { findStudentCandidates, pushPendingStudents, pushStudent } from './pushS
 import { recreateStudent } from './recreate.js';
 import {
   fetchAllergyNotes,
-  fetchParentContactStatus,
+  fetchAdultContactStatus,
   fetchPersonDetails,
   fetchRoster,
   personDetailsCacheKey,
@@ -85,7 +85,7 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
     displayName: PCO_DISPLAY_NAME,
     capabilities: {
       writeBack: config.writeBack,
-      parentCreatable: true,
+      adultCreatable: true,
       mergeAware: true,
       listsSupported: true,
       historyImportSupported: true,
@@ -99,8 +99,8 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       fetchPersonDetails({ client, config, cache, personId, force }),
     fetchAllergyNotes: ({ personIds, force }) =>
       fetchAllergyNotes({ client, config, cache, personIds, force }),
-    fetchParentContactStatus: ({ personIds, force }) =>
-      fetchParentContactStatus({ client, config, cache, personIds, force }),
+    fetchAdultContactStatus: ({ personIds, force }) =>
+      fetchAdultContactStatus({ client, config, cache, personIds, force }),
     collectPhoneLast4: ({ personIds, force }) =>
       collectPhoneLast4({ client, config, cache, personIds, force }),
 

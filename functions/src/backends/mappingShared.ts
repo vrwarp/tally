@@ -106,10 +106,10 @@ export function emailKey(email: string): string {
 
 /** Must stay identical to `computeProfileComplete` in src/types/index.ts. */
 export function computeProfileComplete(input: {
-  parentPhone?: string | null;
-  parentEmail?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
 }): boolean {
-  return Boolean(input.parentPhone?.trim() || input.parentEmail?.trim());
+  return Boolean(input.contactPhone?.trim() || input.contactEmail?.trim());
 }
 
 /**

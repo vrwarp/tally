@@ -96,13 +96,13 @@ export function QuickAddVisitorModal({
   const [askingParent, setAskingParent] = useState(false);
   const [parentFirst, setParentFirst] = useState('');
   const [parentLast, setParentLast] = useState('');
-  const [parentPhone, setParentPhone] = useState('');
+  const [contactPhone, setParentPhone] = useState('');
   const [errors, setErrors] = useState<{
     firstName?: string;
     lastName?: string;
     parentFirst?: string;
     parentLast?: string;
-    parentPhone?: string;
+    contactPhone?: string;
   }>({});
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export function QuickAddVisitorModal({
    * because half a parent is a record nobody can ring.
    */
   const parentAnswered =
-    askingParent && (parentFirst.trim() !== '' || phoneDigits(parentPhone) !== '');
+    askingParent && (parentFirst.trim() !== '' || phoneDigits(contactPhone) !== '');
 
   const openParent = () => {
     setAskingParent(true);
@@ -143,7 +143,7 @@ export function QuickAddVisitorModal({
     const last = lastName.trim();
     const guardianFirst = parentFirst.trim();
     const guardianLast = parentLast.trim();
-    const digits = phoneDigits(parentPhone);
+    const digits = phoneDigits(contactPhone);
 
     const found = {
       firstName: first ? undefined : 'Required',
@@ -156,7 +156,7 @@ export function QuickAddVisitorModal({
        * to change — and the four digits at the end of it are what the family
        * will type at the lobby kiosk next Sunday.
        */
-      parentPhone: !parentAnswered
+      contactPhone: !parentAnswered
         ? undefined
         : digits.length === 10
           ? undefined
@@ -313,9 +313,9 @@ export function QuickAddVisitorModal({
             </div>
             <PhoneField
               label="Parent phone"
-              value={parentPhone}
+              value={contactPhone}
               onValueChange={setParentPhone}
-              error={errors.parentPhone ?? null}
+              error={errors.contactPhone ?? null}
               autoComplete="tel"
               enterKeyHint="done"
             />
@@ -344,7 +344,7 @@ export function QuickAddVisitorModal({
                     ...held,
                     parentFirst: undefined,
                     parentLast: undefined,
-                    parentPhone: undefined,
+                    contactPhone: undefined,
                   }));
                 }}
               >

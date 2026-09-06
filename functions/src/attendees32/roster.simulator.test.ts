@@ -20,7 +20,7 @@ import { createTtlCache, type TtlCache } from '../pco/cache.js';
 import { createA32Client, type A32Client } from './client.js';
 import {
   fetchAllergyNotes,
-  fetchParentContactStatus,
+  fetchAdultContactStatus,
   fetchPersonDetails,
   fetchRoster,
   searchPeople,
@@ -154,9 +154,9 @@ describe('fetchPersonDetails', () => {
     const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Priya') });
     expect(details).toMatchObject({
       allergies: 'Tree nuts',
-      parentName: 'Meena Raghunathan',
-      parentPhone: '555-0311',
-      parentEmail: 'meena.raghunathan@example.org',
+      contactName: 'Meena Raghunathan',
+      contactPhone: '555-0311',
+      contactEmail: 'meena.raghunathan@example.org',
       householdAdult: true,
     });
   });
@@ -174,9 +174,9 @@ describe('fetchPersonDetails', () => {
   it('tells a family with nobody reachable apart from no family at all', async () => {
     const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Nkechi') });
     expect(details).toMatchObject({
-      parentName: null,
-      parentPhone: null,
-      parentEmail: null,
+      contactName: null,
+      contactPhone: null,
+      contactEmail: null,
       householdAdult: false,
     });
   });
@@ -200,9 +200,9 @@ describe('fetchAllergyNotes', () => {
   });
 });
 
-describe('fetchParentContactStatus', () => {
+describe('fetchAdultContactStatus', () => {
   it('reports who has a reachable adult, keyed by Tally student id', async () => {
-    const status = await fetchParentContactStatus({
+    const status = await fetchAdultContactStatus({
       client,
       config,
       cache,

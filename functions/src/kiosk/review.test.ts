@@ -39,7 +39,7 @@ function familyResult(
 ): CreateFamilyResult {
   return {
     status,
-    parentName: null,
+    contactName: null,
     parentPersonId: null,
     createdPerson: false,
     createdHousehold: false,
@@ -62,13 +62,13 @@ function backendWith(
     id: 'pco',
     displayName: 'Planning Center',
     /*
-     * `parentCreatable: true` regardless of the mode, because that is what both
+     * `adultCreatable: true` regardless of the mode, because that is what both
      * real adapters do — it says the adapter knows how to build a family, not
      * that this deployment permits one. The write-back mode is only discovered
      * inside `createFamily`, which answers `disabled`. A double that folded the
      * two together would hide exactly the case below.
      */
-    capabilities: { writeBack, parentCreatable: true },
+    capabilities: { writeBack, adultCreatable: true },
     pushStudent: vi.fn(async () => ({ status: 'created' })),
     updateStudentProfile: vi.fn(async () => ({ status: 'updated' })),
     createFamily: vi.fn(async () => familyResult('created', 'Added the family.')),
@@ -506,7 +506,7 @@ describe('approving', () => {
   it('finishes under create-only write-back, and says the guardian went nowhere', async () => {
     const db = dbWithRegistration();
     /*
-     * `parentCreatable` is hardcoded true on both adapters — it says the
+     * `adultCreatable` is hardcoded true on both adapters — it says the
      * adapter knows how, not that the deployment allows it. The write-back mode
      * is only discovered inside `createFamily`, which answers `disabled`, so
      * that answer is what has to be recognised as finished.

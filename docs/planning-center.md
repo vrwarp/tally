@@ -416,7 +416,7 @@ form, and `setParentContact` writes it upstream.
 
 What that path may do is deliberately narrow:
 
-- It writes onto the adult **already** in the student's household, chosen by `findParentCandidate` —
+- It writes onto the adult **already** in the student's household, chosen by `findAdultCandidate` —
   the same ranking the read path uses to decide whose number to *show*. If the two disagreed, a
   leader could add a number and watch the row go on saying nobody can be reached.
 - It creates nothing: no Person, no Household, no HouseholdMembership. A student whose family is not
@@ -462,7 +462,7 @@ than about a field, so it has a human in the loop at the one point that matters:
   `writeContactOnto` the narrow path uses, which skips a field already on file — including on an
   adult somebody picked from the candidate list, who may well already have a mobile recorded.
 
-`PcoPersonDetails.parentCreatable` is the gate: `full` *and* nobody in the household yet. It and
+`PcoPersonDetails.adultCreatable` is the gate: `full` *and* nobody in the household yet. It and
 `contactWritable` are mirror images — on a `full` install exactly one of them is true — which is what
 lets one screen offer "add a number" and "add a parent" from the same place without deciding which.
 

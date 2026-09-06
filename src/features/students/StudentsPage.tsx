@@ -35,7 +35,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
-import { useParentContact } from '@/hooks/useParentContact';
+import { useAdultContact } from '@/hooks/useAdultContact';
 import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
@@ -132,7 +132,7 @@ export function StudentsPage() {
    * Tally's own quick-adds and disagreed with the dashboard tile beside it in
    * the sidebar: seven there, five here, same three words.
    */
-  const { reachable } = useParentContact();
+  const { reachable } = useAdultContact();
 
   /*
    * The queue, keyed by student, so a row does not scan a list to draw a mark.

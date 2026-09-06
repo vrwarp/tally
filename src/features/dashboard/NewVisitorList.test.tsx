@@ -114,14 +114,14 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: null,
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: null,
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: true,
         profileWritable: true,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 
@@ -144,9 +144,9 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: '(510) 706-7079',
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: '(510) 706-7079',
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: false,
@@ -188,14 +188,14 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200099',
-        parentName: 'Wen Lee',
-        parentPhone: '(510) 706-7079',
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: '(510) 706-7079',
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: false,
         profileWritable: false,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 
@@ -238,14 +238,14 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: null,
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: null,
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: true,
         profileWritable: true,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 

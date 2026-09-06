@@ -27,7 +27,7 @@ import {
   NO_EXPORT_CONTEXT,
   type FollowUpCsvContext,
 } from '@/features/dashboard/followUpCsv';
-import { hasNoParentContact, reachableFor } from '@/features/dashboard/insights';
+import { hasNoAdultContact, reachableFor } from '@/features/dashboard/insights';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
@@ -48,7 +48,7 @@ export interface NewVisitorListProps {
   gatheringTitle?: string | null;
   /**
    * Student id -> whether Planning Center holds a way to reach a parent, from
-   * `useParentContact`.
+   * `useAdultContact`.
    *
    * The second half of the answer, and the reason this is a prop rather than
    * something each row works out. `profileComplete` is `null` on every student
@@ -155,7 +155,7 @@ function NewVisitorRow({
    * neither. Tally's own flag wins where it has one — a visitor who exists
    * nowhere else cannot be looked up — and `null` on either side means unasked.
    */
-  const unreachable = hasNoParentContact(student.profileComplete, reachable);
+  const unreachable = hasNoAdultContact(student.profileComplete, reachable);
 
   return (
     <li className="px-3 py-2">

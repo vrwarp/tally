@@ -302,9 +302,9 @@ export async function createSimulatorStudent(input: {
   firstName: string;
   lastName: string;
   grade: number;
-  parentName?: string;
-  parentPhone?: string;
-  parentEmail?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
   allergies?: string;
   /** The same person's Attendees UUID, recorded as the `attendees_uuid` field. */
   attendeesUuid?: string;

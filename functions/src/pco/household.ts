@@ -40,7 +40,7 @@ import {
   compareIds,
   contactFieldsOnFile,
   displayFirstName,
-  findParentCandidate,
+  findContactCandidate,
   getIncluded,
   nameGradeKey,
   phoneNumbersOf,
@@ -132,7 +132,7 @@ export interface HouseholdSummary {
 
 export interface AddParentResult {
   status: AddParentStatus;
-  parentName: string | null;
+  contactName: string | null;
   /** Set once a parent is in place, so the caller can show who it landed on. */
   parentPersonId: string | null;
   /** True when Tally created the person rather than using one already there. */
@@ -176,7 +176,7 @@ function result(
 ): AddParentResult {
   return {
     status,
-    parentName: null,
+    contactName: null,
     parentPersonId: null,
     createdPerson: false,
     createdHousehold: false,
@@ -437,12 +437,12 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
    * upstream while it sat open — in which case the right answer is a number on
    * the adult who is now there, not a second parent beside them.
    */
-  const existingAdult = findParentCandidate(loaded.person, loaded.index);
+  const existingAdult = findContactCandidate(loaded.person, loaded.index);
   if (existingAdult) {
     return result(
       'already-has-adult',
       `Planning Center now has ${existingAdult.name ?? 'an adult'} in this household. Close this and add the contact to them instead.`,
-      { parentName: existingAdult.name, parentPersonId: existingAdult.id },
+      { contactName: existingAdult.name, parentPersonId: existingAdult.id },
     );
   }
 
@@ -610,7 +610,7 @@ export async function addParent(options: AddParentOptions): Promise<AddParentRes
       ? `Added ${name}${built} in Planning Center${contact}.`
       : `Put ${name} in this household${contact}.`,
     {
-      parentName: name || null,
+      contactName: name || null,
       parentPersonId: parentId,
       createdPerson,
       createdHousehold,
@@ -640,7 +640,7 @@ export type CreateFamilyStatus =
 
 export interface CreateFamilyResult {
   status: CreateFamilyStatus;
-  parentName: string | null;
+  contactName: string | null;
   parentPersonId: string | null;
   createdPerson: boolean;
   createdHousehold: boolean;
@@ -701,7 +701,7 @@ function familyResult(
 ): CreateFamilyResult {
   return {
     status,
-    parentName: null,
+    contactName: null,
     parentPersonId: null,
     createdPerson: false,
     createdHousehold: false,
@@ -869,7 +869,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
     .sort(compareIds)[0];
   const anchorAdult = anchorHouseholdId
     ? anchors
-        .map((child) => findParentCandidate(child.loaded.person, child.loaded.index))
+        .map((child) => findContactCandidate(child.loaded.person, child.loaded.index))
         .find((candidate) => candidate !== null && candidate !== undefined)
     : null;
 
@@ -899,7 +899,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
         ? `${linked.length === 1 ? 'That child was' : 'Those children were'} already in ${anchorAdult.name ?? 'the'} household.`
         : `Added ${joined.length === 1 ? 'the child' : `all ${joined.length} children`} to ${anchorAdult.name ?? 'the existing'} household — no second family was created.`,
       {
-        parentName: anchorAdult.name,
+        contactName: anchorAdult.name,
         parentPersonId: anchorAdult.id,
         linkedChildren: linked.map((entry) => entry.studentId),
       },
@@ -914,13 +914,13 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
    * enough to make inventing another one wrong.
    */
   for (const child of linked) {
-    const existingAdult = findParentCandidate(child.loaded.person, child.loaded.index);
+    const existingAdult = findContactCandidate(child.loaded.person, child.loaded.index);
     if (existingAdult) {
       return familyResult(
         'already-has-family',
         `Planning Center already has ${existingAdult.name ?? 'an adult'} in this family.`,
         {
-          parentName: existingAdult.name,
+          contactName: existingAdult.name,
           parentPersonId: existingAdult.id,
           linkedChildren: linked.map((entry) => entry.studentId),
         },
@@ -1141,7 +1141,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
       ? `Added ${name} and a household with ${linked.length === 1 ? 'their child' : `their ${linked.length} children`} in Planning Center.`
       : `Put ${linked.length === 1 ? 'the child' : `all ${linked.length} children`} in ${name}'s household.`,
     {
-      parentName: name || null,
+      contactName: name || null,
       parentPersonId: parentId,
       createdPerson,
       createdHousehold,

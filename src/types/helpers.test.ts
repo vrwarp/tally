@@ -145,17 +145,17 @@ describe('the upstream-edit predicates', () => {
 
 describe('computeProfileComplete', () => {
   it('is complete once either way of reaching a parent exists', () => {
-    expect(computeProfileComplete({ parentPhone: '5550100' })).toBe(true);
-    expect(computeProfileComplete({ parentEmail: 'a@example.org' })).toBe(true);
+    expect(computeProfileComplete({ contactPhone: '5550100' })).toBe(true);
+    expect(computeProfileComplete({ contactEmail: 'a@example.org' })).toBe(true);
   });
 
   it('is incomplete with neither, and with whitespace pretending to be either', () => {
     expect(computeProfileComplete({})).toBe(false);
-    expect(computeProfileComplete({ parentPhone: null, parentEmail: null })).toBe(false);
+    expect(computeProfileComplete({ contactPhone: null, contactEmail: null })).toBe(false);
     // The trim is the point: a field holding a space is not a way to reach
     // anybody, and this flag is what the "Incomplete profiles" query reads.
-    expect(computeProfileComplete({ parentPhone: '   ' })).toBe(false);
-    expect(computeProfileComplete({ parentEmail: '  ' })).toBe(false);
+    expect(computeProfileComplete({ contactPhone: '   ' })).toBe(false);
+    expect(computeProfileComplete({ contactEmail: '  ' })).toBe(false);
   });
 });
 

@@ -55,7 +55,7 @@ import {
   type BackendCapabilities,
   type CheckInsEventSummary,
   type CheckInsImportSummary,
-  type ParentContactStatus,
+  type AdultContactStatus,
   type PcoListSummary,
   type PeopleBackend,
   type PersonDetails,
@@ -756,7 +756,7 @@ interface PersonDetailsResponse extends PersonDetails {
    * adult is on file, because adding a second one from a form whose premise was
    * "nobody can be reached" is how a household ends up with two mothers.
    */
-  parentCreatable: boolean;
+  adultCreatable: boolean;
 }
 
 /**
@@ -808,8 +808,8 @@ export const getPersonDetails = onCall<
         backendId: backend.id,
         contactWritable: details.householdAdult && writeBackFull,
         profileWritable: writeBackFull,
-        parentCreatable:
-          writeBackFull && !details.householdAdult && backend.capabilities.parentCreatable,
+        adultCreatable:
+          writeBackFull && !details.householdAdult && backend.capabilities.adultCreatable,
       };
     } catch (error) {
       return reportBackendFailure(backend.displayName, error, 'load this student');
@@ -924,15 +924,15 @@ export const getAllergyNotes = onCall<
  * privacy cost of `getPersonDetails` for a screen that only counts.
  *
  * Core team only, and separate from `getRoster` on purpose — see
- * `fetchParentContactStatus`. The roster is what a door volunteer waits for;
+ * `fetchAdultContactStatus`. The roster is what a door volunteer waits for;
  * this is a Tuesday-morning question asked from the insights screen.
  */
 export const getParentContactStatus = onCall<
   { force?: boolean } | undefined,
-  Promise<ParentContactStatus>
+  Promise<AdultContactStatus>
 >(
   { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
-  async (request): Promise<ParentContactStatus> => {
+  async (request): Promise<AdultContactStatus> => {
     await requireCoreTeam(request.auth?.uid);
 
     const registry = await createRegistry(db());
@@ -964,7 +964,7 @@ export const getParentContactStatus = onCall<
       enabled.map(async (backendId) => {
         const backend = registry.get(backendId)!;
         try {
-          const status = await backend.fetchParentContactStatus({
+          const status = await backend.fetchAdultContactStatus({
             personIds: scanIdsFor(scan, backendId),
             force,
           });
@@ -976,7 +976,7 @@ export const getParentContactStatus = onCall<
     );
 
     const answered = settled.filter(
-      (entry): entry is typeof entry & { status: ParentContactStatus } => entry.status !== null,
+      (entry): entry is typeof entry & { status: AdultContactStatus } => entry.status !== null,
     );
     if (answered.length === 0) {
       const first = settled[0]!;

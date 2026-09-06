@@ -8,7 +8,7 @@
  * into a child's profile.
  */
 import { describe, expect, it } from 'vitest';
-import { buildIncludedIndex, extractParentContact, isYouth, mapPersonToStudent } from './mapping.js';
+import { buildIncludedIndex, extractAdultContact, isYouth, mapPersonToStudent } from './mapping.js';
 import type { PcoPerson } from './types.js';
 
 /**
@@ -115,10 +115,10 @@ describe('Planning Center mapping properties', () => {
     expect(typeof isYouth(person, { minGrade: 6, maxGrade: 12 })).toBe('boolean');
   });
 
-  forEachPerson('extractParentContact never throws and is stable', (person) => {
+  forEachPerson('extractAdultContact never throws and is stable', (person) => {
     const index = buildIncludedIndex([]);
-    const first = extractParentContact(person, index);
-    const second = extractParentContact(person, index);
+    const first = extractAdultContact(person, index);
+    const second = extractAdultContact(person, index);
 
     // A contact that changed between syncs would rewrite the record every run.
     expect(second).toEqual(first);

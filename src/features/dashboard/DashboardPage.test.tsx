@@ -18,11 +18,11 @@ import { makeSettings } from '../../../tests/factories';
 
 const useData = vi.hoisted(() => vi.fn());
 const useEventSnapshots = vi.hoisted(() => vi.fn());
-const useParentContact = vi.hoisted(() => vi.fn());
+const useAdultContact = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/dataContext', () => ({ useData }));
 vi.mock('@/hooks/useEventSnapshots', () => ({ useEventSnapshots }));
-vi.mock('@/hooks/useParentContact', () => ({ useParentContact }));
+vi.mock('@/hooks/useAdultContact', () => ({ useAdultContact }));
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show: vi.fn() }) }));
 vi.mock('@/context/authContext', () => ({
   useAuth: () => ({
@@ -61,7 +61,7 @@ function emptyMinistry(overrides: Record<string, unknown> = {}) {
     canWork: () => true,
     ...overrides,
   });
-  useParentContact.mockReturnValue({
+  useAdultContact.mockReturnValue({
     reachable: new Map(),
     loading: false,
     loaded: true,
@@ -82,7 +82,7 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     useData.mockReset();
     useEventSnapshots.mockReset();
-    useParentContact.mockReset();
+    useAdultContact.mockReset();
   });
 
   it('says nothing has been recorded rather than answering with zeros', () => {

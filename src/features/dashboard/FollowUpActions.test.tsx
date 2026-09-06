@@ -57,15 +57,15 @@ function inPlanningCenter() {
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '4021',
-    parentName: 'Wen Chen',
-    parentPhone: null,
-    parentEmail: null,
+    contactName: 'Wen Chen',
+    contactPhone: null,
+    contactEmail: null,
     allergies: null,
     birthdate: null,
     householdAdult: true,
     contactWritable: false,
     profileWritable: false,
-    parentCreatable: false,
+    adultCreatable: false,
     ...overrides,
   };
 }
@@ -79,7 +79,7 @@ describe('FollowUpActions', () => {
   });
 
   it('looks the contact up without being asked', async () => {
-    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 
@@ -165,7 +165,7 @@ describe('FollowUpActions', () => {
   });
 
   it('names the student it belongs to, so a list of these is readable', async () => {
-    getPersonDetails.mockResolvedValue({ data: details({ parentEmail: 'wen@example.org' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactEmail: 'wen@example.org' }) });
 
     mount(inPlanningCenter());
 
@@ -177,7 +177,7 @@ describe('FollowUpActions', () => {
   });
 
   it('gives the button the whole of the student name, not just a role', async () => {
-    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 
@@ -195,7 +195,7 @@ describe('FollowUpActions', () => {
   });
 
   it('says whose number it is on the buttons themselves', async () => {
-    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
     await userEvent.click(await screen.findByRole('button', { name: /Contact parent/ }));
@@ -214,7 +214,7 @@ describe('FollowUpActions', () => {
      * identical controls. A screen reader hearing "Contact parent" nine times
      * has no way to tell which row it is on.
      */
-    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 
@@ -241,7 +241,7 @@ describe('FollowUpActions', () => {
      * dialog prints the number at `text-xl` with a copy button under it, which
      * is a better answer to "read me these digits" than 12px of grey.
      */
-    getPersonDetails.mockResolvedValue({ data: details({ parentPhone: '(925) 336-6692' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactPhone: '(925) 336-6692' }) });
 
     mount(inPlanningCenter());
 

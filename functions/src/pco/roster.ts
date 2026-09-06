@@ -25,14 +25,14 @@ import { followPersonLink, isPersonGoneError } from './personLink.js';
 import {
   addToIncludedIndex,
   buildIncludedIndex,
-  extractParentContact,
-  findParentCandidate,
+  extractAdultContact,
+  findContactCandidate,
   fullBirthdayOf,
   hasContactDetails,
   mapPersonToStudent,
   pcoGrade,
   type IncludedIndex,
-  type ParentContact,
+  type AdultContact,
 } from './mapping.js';
 import {
   PCO_TYPES,
@@ -110,7 +110,7 @@ export interface RosterPerson {
 }
 
 /** The sensitive fields, fetched only when a screen actually shows them. */
-export interface PersonDetails extends ParentContact {
+export interface PersonDetails extends AdultContact {
   pcoPersonId: string;
   allergies: string | null;
   /**
@@ -234,7 +234,7 @@ export interface RosterHydration {
    * kept out of `RosterPerson`, because a counselor at a door has no use for it
    * and this is the module that decides what leaves the server.
    *
-   * `fetchParentContactStatus` is the one thing that reads it.
+   * `fetchAdultContactStatus` is the one thing that reads it.
    */
   households: Record<string, string[]>;
   /**
@@ -482,7 +482,7 @@ async function hydratedRoster(
 /* Who can be reached                                                          */
 /* -------------------------------------------------------------------------- */
 
-export interface ParentContactStatus {
+export interface AdultContactStatus {
   /**
    * Tally student id -> whether Planning Center holds a way to reach an adult
    * in that student's household. A student the roster could not resolve is
@@ -564,9 +564,9 @@ async function sweepReachableAdults(client: PcoClient): Promise<Map<string, stri
  * question about their *absence* — the whole list is students nobody can reach,
  * so there is nothing to send.
  */
-export async function fetchParentContactStatus(
+export async function fetchAdultContactStatus(
   options: RosterOptions & { personIds: readonly string[] },
-): Promise<ParentContactStatus> {
+): Promise<AdultContactStatus> {
   const { client, config, cache } = options;
   const now = options.now ?? new Date();
 
@@ -795,16 +795,16 @@ export async function fetchPersonDetails(
         maxGrade: config.maxGrade,
         now,
       });
-      const contact = extractParentContact(person, index);
+      const contact = extractAdultContact(person, index);
 
       return {
         pcoPersonId: person.id,
         allergies: mapped.allergies,
         birthdate: fullBirthdayOf(person),
-        parentName: contact.parentName,
-        parentPhone: contact.parentPhone,
-        parentEmail: contact.parentEmail,
-        householdAdult: findParentCandidate(person, index) !== null,
+        contactName: contact.contactName,
+        contactPhone: contact.contactPhone,
+        contactEmail: contact.contactEmail,
+        householdAdult: findContactCandidate(person, index) !== null,
       };
     },
     options.force,

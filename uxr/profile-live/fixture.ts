@@ -136,15 +136,15 @@ export const SUBJECT = STUDENTS[0]!;
 export const DETAILS: PcoPersonDetails = {
   pcoPersonId: '101',
   backendId: 'pco',
-  parentName: 'Wei Chen',
-  parentPhone: '5551234567',
-  parentEmail: 'wei.chen@example.com',
+  contactName: 'Wei Chen',
+  contactPhone: '5551234567',
+  contactEmail: 'wei.chen@example.com',
   allergies: 'Peanuts — carries an EpiPen in her bag.',
   birthdate: '2011-03-14',
   householdAdult: true,
   contactWritable: false,
   profileWritable: true,
-  parentCreatable: false,
+  adultCreatable: false,
 } as PcoPersonDetails;
 
 /* ---- Enough calendar for the profile's attendance card ------------------- */

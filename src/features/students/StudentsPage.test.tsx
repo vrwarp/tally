@@ -31,7 +31,7 @@ import type { Student, UpstreamEdit } from '@/types';
 
 const useData = vi.hoisted(() => vi.fn());
 const useAuth = vi.hoisted(() => vi.fn());
-const useParentContact = vi.hoisted(() => vi.fn());
+const useAdultContact = vi.hoisted(() => vi.fn());
 const getPersonDetails = vi.hoisted(() => vi.fn());
 const updateStudent = vi.hoisted(() => vi.fn(async () => {}));
 const downloadCsv = vi.hoisted(() => vi.fn<(filename: string, contents: string) => void>());
@@ -45,9 +45,9 @@ vi.mock('@/lib/download', () => ({
 
 vi.mock('@/context/dataContext', () => ({ useData }));
 vi.mock('@/context/authContext', () => ({ useAuth }));
-vi.mock('@/hooks/useParentContact', () => ({
-  useParentContact,
-  invalidateParentContact: vi.fn(),
+vi.mock('@/hooks/useAdultContact', () => ({
+  useAdultContact,
+  invalidateAdultContact: vi.fn(),
 }));
 
 /*
@@ -111,7 +111,7 @@ function renderRoster(
   // `useAuth().user` is the Firebase Auth user, not the profile document —
   // `uid` is what every write in this feature stamps itself with.
   useAuth.mockReturnValue({ user: { uid: 'counselor-1' } });
-  useParentContact.mockReturnValue({
+  useAdultContact.mockReturnValue({
     reachable: new Map(Object.entries(reachable)),
     loading: false,
     loaded: true,

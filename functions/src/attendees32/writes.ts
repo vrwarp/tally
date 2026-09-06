@@ -48,9 +48,9 @@ import {
   birthdayPatch,
   contactsOf,
   displayFirstNameOf,
-  findParentCandidates,
+  findContactCandidates,
   mapAttendeeToRosterPerson,
-  parentContactOf,
+  adultContactOf,
 } from './mapping.js';
 import { loadFamilyEdges } from './roster.js';
 import {
@@ -719,7 +719,7 @@ export async function setParentContact(
   if (config.writeBack !== 'full') {
     return {
       status: 'disabled',
-      parentName: null,
+      contactName: null,
       wrote: [],
       skipped: [],
       message:
@@ -732,7 +732,7 @@ export async function setParentContact(
   if (!phone && !email) {
     return {
       status: 'nothing-to-write',
-      parentName: null,
+      contactName: null,
       wrote: [],
       skipped: [],
       message: 'Neither a usable phone number nor a usable email was supplied.',
@@ -741,12 +741,12 @@ export async function setParentContact(
 
   const resolved = await resolveA32Person(db, studentId);
   if (!resolved.exists || !resolved.active) {
-    return { status: 'no-student', parentName: null, wrote: [], skipped: [], message: 'That student is not on the roster.' };
+    return { status: 'no-student', contactName: null, wrote: [], skipped: [], message: 'That student is not on the roster.' };
   }
   if (!resolved.personId) {
     return {
       status: 'not-in-planning-center',
-      parentName: null,
+      contactName: null,
       wrote: [],
       skipped: [],
       message: 'This student has no Attendees record yet; push them first.',
@@ -757,12 +757,12 @@ export async function setParentContact(
     loadFamilyEdges(client, resolved.personId),
     allRelations(options),
   ]);
-  const candidates = findParentCandidates(resolved.personId, edges, relations);
+  const candidates = findContactCandidates(resolved.personId, edges, relations);
   const chosen = candidates[0];
   if (!chosen) {
     return {
       status: 'no-household-adult',
-      parentName: null,
+      contactName: null,
       wrote: [],
       skipped: [],
       message: 'Attendees has no adult in this family to attach the contact to.',
@@ -770,7 +770,7 @@ export async function setParentContact(
   }
 
   const parent = await client.get<A32Attendee>(API.attendeeById(chosen.id));
-  const onFile = parentContactOf(parent);
+  const onFile = adultContactOf(parent);
 
   const wrote: Array<'phone' | 'email'> = [];
   const skipped: Array<'phone' | 'email'> = [];
@@ -778,14 +778,14 @@ export async function setParentContact(
   if (phone) {
     // Fill-only-when-empty, same as the Planning Center flow: never overwrite
     // a number already on file.
-    if (onFile.parentPhone) skipped.push('phone');
+    if (onFile.contactPhone) skipped.push('phone');
     else {
       contacts.phone1 = phone;
       wrote.push('phone');
     }
   }
   if (email) {
-    if (onFile.parentEmail) skipped.push('email');
+    if (onFile.contactEmail) skipped.push('email');
     else {
       contacts.email1 = email;
       wrote.push('email');
@@ -795,7 +795,7 @@ export async function setParentContact(
   if (wrote.length === 0) {
     return {
       status: 'already-set',
-      parentName: onFile.parentName,
+      contactName: onFile.contactName,
       wrote: [],
       skipped,
       message: 'Attendees already has this contact on file.',
@@ -807,7 +807,7 @@ export async function setParentContact(
 
   return {
     status: 'updated',
-    parentName: onFile.parentName,
+    contactName: onFile.contactName,
     wrote,
     skipped,
     message: `Saved the parent's ${wrote.join(' and ')} to Attendees.`,
@@ -845,7 +845,7 @@ export async function addParent(
   const { db, client, config, studentId } = options;
   const refuse = (status: AddParentResult['status'], message: string, extra: Partial<AddParentResult> = {}): AddParentResult => ({
     status,
-    parentName: null,
+    contactName: null,
     parentPersonId: null,
     createdPerson: false,
     createdHousehold: false,
@@ -883,7 +883,7 @@ export async function addParent(
       "Attendees is missing its 'parent'/'child' relation vocabulary; run setup_tally_integration.",
     );
   }
-  const existingCandidates = findParentCandidates(studentPersonId, edges, relations);
+  const existingCandidates = findContactCandidates(studentPersonId, edges, relations);
   if (existingCandidates.length > 0) {
     return refuse(
       'already-has-adult',
@@ -897,7 +897,7 @@ export async function addParent(
   /* ---- An adult chosen from a previous round ----------------------------- */
   let parentId: string | null;
   let createdPerson = false;
-  let parentName: string | null;
+  let contactName: string | null;
 
   if (options.personId) {
     let chosen: A32Attendee;
@@ -908,7 +908,7 @@ export async function addParent(
       throw error;
     }
     parentId = chosen.id;
-    parentName = parentContactOf(chosen).parentName;
+    contactName = adultContactOf(chosen).contactName;
   } else {
     const firstName = trimmed(options.firstName);
     const lastName = trimmed(options.lastName) ?? readString(resolved.data, 'lastName');
@@ -934,11 +934,11 @@ export async function addParent(
             attendee.last_name ?? '',
           );
           if (name !== theirs) continue;
-          const contact = parentContactOf(attendee);
+          const contact = adultContactOf(attendee);
           candidates.push({
             pcoPersonId: attendee.id,
-            name: contact.parentName ?? `${firstName} ${lastName}`,
-            reachable: contact.parentPhone !== null || contact.parentEmail !== null,
+            name: contact.contactName ?? `${firstName} ${lastName}`,
+            reachable: contact.contactPhone !== null || contact.contactEmail !== null,
           });
         }
       }
@@ -961,7 +961,7 @@ export async function addParent(
     parentId = created?.id ?? null;
     if (!parentId) return refuse('nothing-to-write', 'Attendees returned no attendee id.');
     createdPerson = true;
-    parentName = `${firstName} ${lastName}`;
+    contactName = `${firstName} ${lastName}`;
   }
 
   /* ---- The family folk, joined or created -------------------------------- */
@@ -1005,17 +1005,17 @@ export async function addParent(
   const skipped: Array<'phone' | 'email'> = [];
   if (phone || email) {
     const parent = await client.get<A32Attendee>(API.attendeeById(parentId));
-    const onFile = parentContactOf(parent);
+    const onFile = adultContactOf(parent);
     const contacts = { ...((parent.infos ?? {}).contacts ?? {}) } as Record<string, string>;
     if (phone) {
-      if (onFile.parentPhone) skipped.push('phone');
+      if (onFile.contactPhone) skipped.push('phone');
       else {
         contacts.phone1 = phone;
         wrote.push('phone');
       }
     }
     if (email) {
-      if (onFile.parentEmail) skipped.push('email');
+      if (onFile.contactEmail) skipped.push('email');
       else {
         contacts.email1 = email;
         wrote.push('email');
@@ -1032,7 +1032,7 @@ export async function addParent(
 
   return {
     status: 'added',
-    parentName,
+    contactName,
     parentPersonId: parentId,
     createdPerson,
     createdHousehold,
@@ -1237,7 +1237,7 @@ export async function findAdultCandidates(
       const { phone: onFile, email } = contactsOf(attendee);
       candidates.push({
         personId: attendee.id,
-        name: parentContactOf(attendee).parentName ?? `${firstName} ${lastName}`.trim(),
+        name: adultContactOf(attendee).contactName ?? `${firstName} ${lastName}`.trim(),
         reachable: onFile !== null || email !== null,
         corroborated: phone
           ? allPhonesOf(attendee).some((held) => phoneDigits(held) === phoneDigits(phone))
@@ -1287,7 +1287,7 @@ export async function createFamily(
     extra: Partial<CreateFamilyResult> = {},
   ): CreateFamilyResult => ({
     status,
-    parentName: null,
+    contactName: null,
     parentPersonId: null,
     createdPerson: false,
     createdHousehold: false,
@@ -1366,7 +1366,7 @@ export async function createFamily(
   const anchorFolkIds = anchors.flatMap((child) => familyFolkIdsOf(child.personId, child.edges));
   const anchorFolkId = anchorFolkIds[0];
   const anchorHasAdult = anchors.some(
-    (child) => findParentCandidates(child.personId, child.edges, relations).length > 0,
+    (child) => findContactCandidates(child.personId, child.edges, relations).length > 0,
   );
 
   if (anchorFolkId && anchorHasAdult) {
@@ -1391,7 +1391,7 @@ export async function createFamily(
     }
     return {
       status: 'already-has-family',
-      parentName: null,
+      contactName: null,
       parentPersonId: null,
       createdPerson: false,
       createdHousehold: false,
@@ -1406,7 +1406,7 @@ export async function createFamily(
   }
 
   for (const child of linked) {
-    if (findParentCandidates(child.personId, child.edges, relations).length > 0) {
+    if (findContactCandidates(child.personId, child.edges, relations).length > 0) {
       return refuse('already-has-family', 'This family already has an adult on file.', {
         linkedChildren: linked.map((entry) => entry.studentId),
       });
@@ -1566,17 +1566,17 @@ export async function createFamily(
   const skipped: Array<'phone' | 'email'> = [];
   if (phone || email) {
     const parent = await client.get<A32Attendee>(API.attendeeById(parentId));
-    const onFile = parentContactOf(parent);
+    const onFile = adultContactOf(parent);
     const contacts = { ...((parent.infos ?? {}).contacts ?? {}) } as Record<string, string>;
     if (phone) {
-      if (onFile.parentPhone) skipped.push('phone');
+      if (onFile.contactPhone) skipped.push('phone');
       else {
         contacts.phone1 = phone;
         wrote.push('phone');
       }
     }
     if (email) {
-      if (onFile.parentEmail) skipped.push('email');
+      if (onFile.contactEmail) skipped.push('email');
       else {
         contacts.email1 = email;
         wrote.push('email');
@@ -1593,7 +1593,7 @@ export async function createFamily(
 
   return {
     status: createdPerson ? 'created' : 'joined',
-    parentName: `${firstName} ${lastName}`.trim(),
+    contactName: `${firstName} ${lastName}`.trim(),
     parentPersonId: parentId,
     createdPerson,
     createdHousehold,

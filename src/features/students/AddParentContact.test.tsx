@@ -35,15 +35,15 @@ function onRoster(overrides: Partial<Student> = {}) {
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '4200014',
-    parentName: 'Wen Lee',
-    parentPhone: null,
-    parentEmail: null,
+    contactName: 'Wen Lee',
+    contactPhone: null,
+    contactEmail: null,
     allergies: null,
     birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
-    parentCreatable: false,
+    adultCreatable: false,
     ...overrides,
   };
 }
@@ -150,7 +150,7 @@ describe('AddParentContact', () => {
       setParentContact.mockResolvedValue({
         data: {
           status: 'updated',
-          parentName: 'Wen Lee',
+          contactName: 'Wen Lee',
           wrote: ['phone'],
           skipped: [],
           message: 'Added phone for Wen Lee in Planning Center.',
@@ -207,7 +207,7 @@ describe('AddParentContact', () => {
       setParentContact.mockResolvedValue({
         data: {
           status: 'no-household-adult',
-          parentName: null,
+          contactName: null,
           wrote: [],
           skipped: [],
           message: 'Planning Center has no adult in this household.',
@@ -229,7 +229,7 @@ describe('AddParentContact', () => {
       setParentContact.mockResolvedValue({
         data: {
           status: 'already-set',
-          parentName: 'Wen Lee',
+          contactName: 'Wen Lee',
           wrote: [],
           skipped: ['email'],
           message: 'Planning Center already has contact details for Wen Lee.',
@@ -269,12 +269,12 @@ describe('AddParentContact', () => {
    * visitors arrive at the door with nobody upstream is most of them.
    */
   describe('when there is no adult to put a number on', () => {
-    const noFamily = () => details({ contactWritable: false, householdAdult: false, parentCreatable: true });
+    const noFamily = () => details({ contactWritable: false, householdAdult: false, adultCreatable: true });
 
     const added = {
       data: {
         status: 'added',
-        parentName: 'Dana Whitfield',
+        contactName: 'Dana Whitfield',
         parentPersonId: '5200099',
         createdPerson: true,
         createdHousehold: false,
@@ -348,7 +348,7 @@ describe('AddParentContact', () => {
       const candidates = {
         data: {
           status: 'existing-people',
-          parentName: null,
+          contactName: null,
           parentPersonId: null,
           createdPerson: false,
           createdHousehold: false,
@@ -408,7 +408,7 @@ describe('AddParentContact', () => {
       addParent.mockResolvedValue({
         data: {
           status: 'already-has-adult',
-          parentName: 'Wen Lee',
+          contactName: 'Wen Lee',
           parentPersonId: '5200003',
           createdPerson: false,
           createdHousehold: false,

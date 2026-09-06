@@ -273,10 +273,21 @@ service cloud.firestore {
        * This is the mirror-removal made enforceable rather than merely
        * intended: a future screen that "just" saves a phone number here would
        * be rejected by the database, not caught in review.
+       *
+       * Both spellings of the contact triple are named. `contactName` and its
+       * two siblings are what the app calls those fields now; `parentName` and
+       * its two are what it called them before the terminology change. Dropping
+       * the old three would reopen the exact hole this function exists to
+       * close — a rule that denies only the current name is one rename away
+       * from denying nothing — and the field a client is forbidden to write is
+       * not a name the client gets to choose.
        */
       function noMirroredPersonalData() {
         let keys = request.resource.data.keys();
-        return !('parentName' in keys)
+        return !('contactName' in keys)
+          && !('contactPhone' in keys)
+          && !('contactEmail' in keys)
+          && !('parentName' in keys)
           && !('parentPhone' in keys)
           && !('parentEmail' in keys)
           && !('allergies' in keys);

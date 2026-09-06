@@ -40,7 +40,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
-import { useParentContact } from '@/hooks/useParentContact';
+import { useAdultContact } from '@/hooks/useAdultContact';
 import { useTransitions } from '@/hooks/useTransitions';
 import { AttendanceTrend } from '@/features/dashboard/AttendanceTrend';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';
@@ -446,7 +446,7 @@ export function DashboardPage() {
    * hydrating households is not work a counselor should wait through at a door.
    * Asked here, by the one screen that lists the students nobody can reach.
    */
-  const parentContact = useParentContact();
+  const parentContact = useAdultContact();
   const incompleteRows = useMemo(
     () => computeIncompleteProfiles(students, parentContact.reachable),
     [students, parentContact.reachable],

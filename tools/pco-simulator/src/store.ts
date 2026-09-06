@@ -492,9 +492,9 @@ export class SimulatorStore {
     /** `YYYY-MM-DD`, or absent for a profile nobody has finished. */
     birthdate?: string | null;
     status?: 'active' | 'inactive';
-    parentName?: string | null;
-    parentPhone?: string | null;
-    parentEmail?: string | null;
+    contactName?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
     /**
      * The same person's id in Attendees, recorded the way the church records
      * it: a custom field. Seeding one creates the `attendees_uuid` field
@@ -540,7 +540,7 @@ export class SimulatorStore {
     // No parent named means a student the church has on file but cannot reach —
     // exactly the case the "incomplete profile" list exists for, so it has to
     // be expressible here.
-    if (!input.parentName) return student;
+    if (!input.contactName) return student;
 
     /*
      * A sibling arriving at a household that already exists joins it, and does
@@ -559,15 +559,15 @@ export class SimulatorStore {
       return student;
     }
 
-    const [parentFirst, ...rest] = input.parentName.trim().split(/\s+/);
+    const [parentFirst, ...rest] = input.contactName.trim().split(/\s+/);
     const parent = this.createPerson({
-      first_name: parentFirst ?? input.parentName,
+      first_name: parentFirst ?? input.contactName,
       last_name: rest.join(' ') || input.lastName,
       child: false,
     });
 
-    if (input.parentPhone) this.addPhone(parent.id, input.parentPhone);
-    if (input.parentEmail) this.addEmail(parent.id, input.parentEmail);
+    if (input.contactPhone) this.addPhone(parent.id, input.contactPhone);
+    if (input.contactEmail) this.addEmail(parent.id, input.contactEmail);
 
     const household: SimHousehold = {
       id: `H${this.org.households.length + 1000}`,

@@ -15,7 +15,7 @@
  */
 import type { A32Config } from '../config.js';
 import { cacheKey, type TtlCache } from '../pco/cache.js';
-import type { ParentContactStatus, PersonDetails, PersonSearchResult, RosterPerson, RosterResult } from '../pco/roster.js';
+import type { AdultContactStatus, PersonDetails, PersonSearchResult, RosterPerson, RosterResult } from '../pco/roster.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import { isA32GoneError, type A32Client } from './client.js';
 import {
@@ -23,10 +23,10 @@ import {
   allergiesOf,
   contactsOf,
   displayFirstNameOf,
-  findParentCandidates,
+  findContactCandidates,
   fullBirthdayOf,
   mapAttendeeToRosterPerson,
-  parentContactOf,
+  adultContactOf,
   statusOf,
 } from './mapping.js';
 import { API, type A32Attendee, type A32FolkAttendee, type A32Relation } from './types.js';
@@ -241,9 +241,9 @@ export async function fetchPersonDetails(
         loadFamilyEdges(client, personId),
         cachedRelations(options),
       ]);
-      const candidates = findParentCandidates(personId, edges, relations);
+      const candidates = findContactCandidates(personId, edges, relations);
 
-      let contact = { parentName: null as string | null, parentPhone: null as string | null, parentEmail: null as string | null };
+      let contact = { contactName: null as string | null, contactPhone: null as string | null, contactEmail: null as string | null };
       for (const candidate of candidates) {
         let parent: A32Attendee;
         try {
@@ -252,15 +252,15 @@ export async function fetchPersonDetails(
           if (isA32GoneError(error)) continue;
           throw error;
         }
-        const extracted = parentContactOf(parent);
+        const extracted = adultContactOf(parent);
         // The first candidate names the parent; the first with a way to reach
         // them supplies the contact. Usually the same person.
-        if (!contact.parentName) contact = { ...contact, parentName: extracted.parentName };
-        if (extracted.parentPhone || extracted.parentEmail) {
+        if (!contact.contactName) contact = { ...contact, contactName: extracted.contactName };
+        if (extracted.contactPhone || extracted.contactEmail) {
           contact = {
-            parentName: contact.parentName ?? extracted.parentName,
-            parentPhone: extracted.parentPhone,
-            parentEmail: extracted.parentEmail,
+            contactName: contact.contactName ?? extracted.contactName,
+            contactPhone: extracted.contactPhone,
+            contactEmail: extracted.contactEmail,
           };
           break;
         }
@@ -306,9 +306,9 @@ export async function fetchAllergyNotes(
 /* Who can be reached                                                          */
 /* -------------------------------------------------------------------------- */
 
-export async function fetchParentContactStatus(
+export async function fetchAdultContactStatus(
   options: A32FlowOptions & { personIds: readonly string[] },
-): Promise<ParentContactStatus> {
+): Promise<AdultContactStatus> {
   const { cache } = options;
   const now = options.now ?? new Date();
   const wanted = [...new Set(options.personIds)];
@@ -341,7 +341,7 @@ export async function fetchParentContactStatus(
     const familyEdges = ownEdges
       .flatMap((edge) => membersByFolk.get(edge.folk.id) ?? [])
       .filter((edge, index, all) => all.findIndex((other) => other.id === edge.id) === index);
-    const candidates = findParentCandidates(personId, familyEdges, relations);
+    const candidates = findContactCandidates(personId, familyEdges, relations);
     reachable[studentIdFor('a32', personId)] = candidates.some((candidate) => {
       const parent = swept.get(candidate.id);
       if (!parent) return false;

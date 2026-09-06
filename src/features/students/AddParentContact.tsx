@@ -8,7 +8,7 @@
  *
  *   - `contactWritable`: Planning Center has an adult in the household and
  *     nobody has put a number on them. One form, two fields, done.
- *   - `parentCreatable`: there is no adult at all. That is not a missing field,
+ *   - `adultCreatable`: there is no adult at all. That is not a missing field,
  *     it is a missing person, so the form asks for a name as well — and Tally
  *     creates the parent, and the household if there is none.
  *
@@ -108,7 +108,7 @@ export function AddParentContact({
   }
 
   const writable = details?.contactWritable === true;
-  const creatable = details?.parentCreatable === true;
+  const creatable = details?.adultCreatable === true;
 
   /* ---- Tally may not write at all ---------------------------------------- */
   if (!writable && !creatable) {
@@ -241,7 +241,7 @@ function ContactForm({
   return (
     <form onSubmit={(event) => void submit(event)} className="mt-2 flex flex-col gap-3">
       <p className="text-xs text-ink-500">
-        Saved onto {details?.parentName ?? `${name}'s parent`} in {backendLabelOf(student)}. Either
+        Saved onto {details?.contactName ?? `${name}'s parent`} in {backendLabelOf(student)}. Either
         field is enough.
       </p>
 

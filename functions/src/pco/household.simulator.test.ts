@@ -121,8 +121,8 @@ describe('addParent against the simulator', () => {
       // The read path — the same one the student's page uses — now finds them.
       const details = await detailsFor(MARCUS);
       expect(details?.householdAdult).toBe(true);
-      expect(details?.parentName).toBe('Dana Whitfield');
-      expect(details?.parentPhone).toMatch(/0142/);
+      expect(details?.contactName).toBe('Dana Whitfield');
+      expect(details?.contactPhone).toMatch(/0142/);
     });
 
     it('creates them as an adult, not another child on the roster', async () => {
@@ -160,7 +160,7 @@ describe('addParent against the simulator', () => {
 
       expect(result.wrote).toEqual(['phone', 'email']);
       const details = await detailsFor(MARCUS);
-      expect(details?.parentEmail).toBe('dana.whitfield@example.com');
+      expect(details?.contactEmail).toBe('dana.whitfield@example.com');
     });
 
     it('is fine with a parent who has no contact details yet', async () => {
@@ -208,8 +208,8 @@ describe('addParent against the simulator', () => {
       );
 
       const details = await detailsFor(student.id);
-      expect(details?.parentName).toBe('Ruth Fontaine');
-      expect(details?.parentPhone).toMatch(/0188/);
+      expect(details?.contactName).toBe('Ruth Fontaine');
+      expect(details?.contactPhone).toMatch(/0188/);
     });
   });
 
@@ -244,7 +244,7 @@ describe('addParent against the simulator', () => {
       expect(h.store.people).toHaveLength(before);
 
       const details = await detailsFor(MARCUS);
-      expect(details?.parentName).toBe('Rosa Delgado');
+      expect(details?.contactName).toBe('Rosa Delgado');
     });
 
     it('creates a new person anyway when told the match is somebody else', async () => {
@@ -318,7 +318,7 @@ describe('addParent against the simulator', () => {
       });
 
       expect(result.status).toBe('already-has-adult');
-      expect(result.parentName).toBeTruthy();
+      expect(result.contactName).toBeTruthy();
       expect(h.store.people).toHaveLength(before);
     });
 
