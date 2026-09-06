@@ -2,7 +2,7 @@
  * One night's register, as a spreadsheet.
  *
  * For the person doing follow-up who was not on the bus, the parent asking
- * whether their child was collected on the 12th, and whoever is reconciling the
+ * whether their child was checked out on the 12th, and whoever is reconciling the
  * register against a paper sign-up sheet.
  *
  * ## Two columns for who checked somebody in, deliberately

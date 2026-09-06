@@ -565,7 +565,7 @@ function jobFor(
  *
  * The counterpart to `services.warmStudentDates`, and the reason a label is
  * moving by the time the tick paints. Callers gate this on the intent being a
- * check-in: a collection prints nothing, so warming one is work thrown away.
+ * check-in: a check-out prints nothing, so warming one is work thrown away.
  */
 export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
   const template = binding.labelTemplate;

@@ -81,7 +81,7 @@ describe('buildRegisterCsv — conditional columns', () => {
     expect(headers).not.toContain('checked_out_at');
   });
 
-  it('carries the check-out columns on a room children are collected from', () => {
+  it('carries the check-out columns on a room children are checked out from', () => {
     const headers = registerCsvHeaders(context(makeEvent({ requiresCheckOut: true })));
     expect(headers).toContain('checked_out_at');
     expect(headers).toContain('checked_out_by');

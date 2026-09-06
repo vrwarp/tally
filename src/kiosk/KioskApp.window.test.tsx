@@ -14,7 +14,7 @@
  * recording a Friday somebody forgot is real work and recording a Friday that
  * has not happened yet is always a mistake. This file pins the kiosk to the
  * same rule, and pins the one asymmetry that makes it the right rule: a *closed*
- * window still writes, because a family collected at nine from a gathering
+ * window still writes, because a family checked out at nine from a gathering
  * whose doors shut at eight really did walk out of the building.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';

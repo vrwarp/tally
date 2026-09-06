@@ -1880,9 +1880,9 @@ describe('check-out never touches attendance', () => {
   const events = makeWeeklyEvents({ count: 4, seriesId: FRIDAY, requiresCheckOut: true });
   const settings = makeSettings();
 
-  /** Everybody there; `collected` were handed back, the rest never were. */
-  const night = (event: TallyEvent, present: string[], collected: string[] = []) =>
-    makeSnapshot(event, present, present.length > 0, collected);
+  /** Everybody there; `checkedOut` were handed back, the rest never were. */
+  const night = (event: TallyEvent, present: string[], checkedOut: string[] = []) =>
+    makeSnapshot(event, present, present.length > 0, checkedOut);
 
   it('still reads a gathering as held when nobody was checked out', () => {
     const snapshots = [night(events[0]!, ['ada', 'bo'])];
@@ -1893,7 +1893,7 @@ describe('check-out never touches attendance', () => {
 
   it('does not turn a student with no pickup into a miss', () => {
     const student = makeStudent({ id: 'ada', createdAt: LONG_AGO });
-    // Present every night, collected on none of them.
+    // Present every night, checked out on none of them.
     const snapshots = events.map((event) => night(event, [student.id]));
 
     expect(computeMia([student], snapshots, settings)).toEqual([]);

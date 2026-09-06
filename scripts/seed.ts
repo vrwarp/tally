@@ -262,7 +262,7 @@ interface SeedStudent {
    * their digit sets are equal or nested. Every other student here has a
    * parent of their own and a number of their own, so before this the whole
    * family half of the product — the ticked list on the confirm screen, one
-   * tap for three children, one press to collect them all — could not happen
+   * tap for three children, one press to check them all out — could not happen
    * in a seeded world at all. One household is enough to exercise it.
    */
   household?: string;
@@ -451,7 +451,7 @@ interface BuiltEvent {
   isOneOff: boolean;
   /** One-offs only: the roster is closed to the students who RSVP'd. */
   requiresRsvp: boolean;
-  /** The roster is ternary: children are checked in and then collected. */
+  /** The roster is ternary: children are checked in and then checked out. */
   requiresCheckOut: boolean;
   /** What the kiosk prints at check-in, or null for nothing. */
   labelTemplate: LabelTemplate | null;
@@ -768,8 +768,8 @@ function buildEvents(now: Date): BuiltEvent[] {
     isOneOff: true,
     requiresRsvp: false,
     requiresCheckOut: true,
-    // The one seeded gathering that prints. A room children are collected
-    // from is what labels are for, and it means `npm run seed` leaves the
+    // The one seeded gathering that prints. A room children are checked
+    // out from is what labels are for, and it means `npm run seed` leaves the
     // kiosk's printing path reachable without configuring an event first.
     labelTemplate: DEFAULT_LABEL_TEMPLATE,
     // The one themed gathering, for the same reason it is the one that prints:

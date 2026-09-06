@@ -43,9 +43,9 @@ export interface FilterBarProps {
    * their slots — see `CheckInPage`.
    */
   tracksCheckOut?: boolean;
-  /** Checked in and not yet collected. */
+  /** Checked in and not yet checked out. */
   inRoomCount?: number;
-  /** Checked in and collected. */
+  /** Checked in and checked out. */
   checkedOutCount?: number;
 }
 
@@ -182,7 +182,7 @@ export function FilterBar({
                 </Chip>
                 <Chip
                   active={focus === 'checkedOut'}
-                  label="Show students who have been collected"
+                  label="Show students who have been checked out"
                   onPress={() => setFocus('checkedOut')}
                 >
                   Checked out

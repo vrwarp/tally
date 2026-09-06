@@ -162,7 +162,7 @@ function checkedInIds(): string[] {
     .sort();
 }
 
-function collectedIds(): string[] {
+function checkOutCalls(): string[] {
   return vi
     .mocked(services.performCheckOut)
     .mock.calls.map((call) => call[0].studentId)
@@ -255,7 +255,7 @@ describe('checking a family in together', () => {
   });
 });
 
-describe('collecting a family together', () => {
+describe('checking a family out together', () => {
   /*
    * The pickup was a two-second hold, and a test here pinned that a tap alone
    * did nothing. It is one tap now — see the note at the top of ConfirmScreen
@@ -263,7 +263,7 @@ describe('collecting a family together', () => {
    * never depended on the gesture: one press, both children, and nothing
    * checked *in* on a screen that hands them back.
    */
-  it('collects both on one press', async () => {
+  it('checks both out on one press', async () => {
     present = new Set([MARCUS.id, AMARA.id]);
     await mount();
     await type('0134');
@@ -282,7 +282,7 @@ describe('collecting a family together', () => {
     expect(services.performCheckIn).not.toHaveBeenCalled();
   });
 
-  it('does not offer a sibling who has already been collected', async () => {
+  it('does not offer a sibling who has already been checked out', async () => {
     present = new Set([MARCUS.id, AMARA.id]);
     checkedOut = new Set([AMARA.id]);
     await mount();
@@ -309,7 +309,7 @@ describe('collecting a family together', () => {
  * that it still *shows* the guess, because a family that arrived in two waves
  * usually leaves in one.
  */
-describe('collecting the ones who came in together', () => {
+describe('checking out the ones who came in together', () => {
   it('ticks the arrival, and lists a sibling who came separately without ticking them', async () => {
     present = new Set([AMARA.id, MARCUS.id]);
     arrivals = new Map([
@@ -330,7 +330,7 @@ describe('collecting the ones who came in together', () => {
     );
 
     await tap(/^check out$/i);
-    expect(collectedIds()).toEqual(['s-amara']);
+    expect(checkOutCalls()).toEqual(['s-amara']);
   });
 
   it('ticks a child the phone index never called family, when they arrived together', async () => {
@@ -354,7 +354,7 @@ describe('collecting the ones who came in together', () => {
       'true',
     );
     await tap(/check out all 2/i);
-    expect(collectedIds()).toEqual(['s-amara', 's-maya']);
+    expect(checkOutCalls()).toEqual(['s-amara', 's-maya']);
   });
 
   it('falls back to the guess when nothing was ever stated', async () => {
@@ -371,7 +371,7 @@ describe('collecting the ones who came in together', () => {
       'true',
     );
     await tap(/check out all 2/i);
-    expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
+    expect(checkOutCalls()).toEqual(['s-amara', 's-marcus']);
   });
 
   it('records one arrival per press, shared by everyone it checked in', async () => {
@@ -389,7 +389,7 @@ describe('collecting the ones who came in together', () => {
   it('gives a child checked in alone an arrival of their own', async () => {
     /*
      * Not "no arrival". A solo check-in is a statement, and it is what stops a
-     * sibling dropped off later from arriving pre-ticked for collection —
+     * sibling dropped off later from arriving pre-ticked for check-out —
      * which is the whole difference between this and a null.
      */
     await mount();
@@ -419,7 +419,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     expect(screen.getByText(/Another child/i)).toBeTruthy();
   });
 
-  it('is never offered on a collection', async () => {
+  it('is never offered on a check-out', async () => {
     // A parent taking a child home is answering a different question, and the
     // roster is read once at boot — so this is a kiosk that started the morning
     // with Maya already here.
@@ -607,6 +607,6 @@ describe('pre-selecting only the children this gathering expects', () => {
     await pick('Amara Osei');
 
     await tap(/check out all 2/i);
-    expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
+    expect(checkOutCalls()).toEqual(['s-amara', 's-marcus']);
   });
 });

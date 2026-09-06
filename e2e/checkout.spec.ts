@@ -1,8 +1,8 @@
 /**
- * A room children are collected from, rather than a register of who came.
+ * A room children are checked out from, rather than a register of who came.
  *
  * The seeded `Nursery` gathering turns check-out on, which makes the roster
- * ternary: absent, in the room, collected. What these check is the pair of
+ * ternary: absent, in the room, checked out. What these check is the pair of
  * claims that make the feature honest — that the live count is the one a
  * volunteer works from, and that none of it touches attendance. A missed
  * check-out is not a miss, and the head count never moves.
@@ -33,7 +33,7 @@ async function nurseryId(): Promise<string> {
  * Two reasons. Taking `.first()` off a roster still streaming in from Planning
  * Center picks whichever name happened to arrive, and the list re-sorts under
  * it as the rest land. And the suite runs one worker against one dataset, so a
- * test that leaves somebody collected would take the next test's row away.
+ * test that leaves somebody checked out would take the next test's row away.
  */
 const COLLECTED = 'Aisha Rahman';
 const RETURNED = 'Amara Osei';
@@ -95,14 +95,14 @@ test.describe('check-out', () => {
       page.getByRole('button', { name: /show students still in the room/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /show students who have been collected/i }),
+      page.getByRole('button', { name: /show students who have been checked out/i }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /show checked-in students only/i })).toHaveCount(
       0,
     );
   });
 
-  test('collects a child without disturbing the check-in underneath', async ({
+  test('checks a child out without disturbing the check-in underneath', async ({
     page,
     signedInAs,
     firestore,
@@ -228,12 +228,12 @@ test.describe('check-out', () => {
     await openCheckIn(page);
 
     // The chips a check-out roster spends its two slots on are simply not here,
-    // and no row offers to collect anybody.
+    // and no row offers to check anybody out.
     await expect(page.getByRole('button', { name: /show students still in the room/i })).toHaveCount(
       0,
     );
     await expect(
-      page.getByRole('button', { name: /show students who have been collected/i }),
+      page.getByRole('button', { name: /show students who have been checked out/i }),
     ).toHaveCount(0);
     await expect(page.getByRole('button', { name: /show checked-in students only/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Check out / })).toHaveCount(0);

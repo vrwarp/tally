@@ -565,7 +565,7 @@ export function DashboardPage() {
    *
    * Assembled first and measured second, because the template has to answer
    * their number rather than assert one: four is the usual answer, but the
-   * check-out tile is non-null for any ministry that collects children, and a
+   * check-out tile is non-null for any ministry that checks children out, and a
    * fifth tile in a four-wide template wrapped into an implicit second row —
    * an orphan on a laptop, a half-width one under a 2+2 on a phone, for
    * exactly the ministries the feature exists for.
@@ -598,7 +598,7 @@ export function DashboardPage() {
         !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
       }
     />,
-    /* Only for a ministry that actually collects children — see
+    /* Only for a ministry that actually checks children out — see
        `checkOutRate`. Neutral whatever it says: this is a record of what got
        written down, not a score. */
     ...(summary.checkOutRate !== null

@@ -7,7 +7,7 @@
  * deliberately not here.
  *
  * The pickup held for two seconds, and the argument for it was real: marking a
- * child collected is a claim that somebody took them out of the building, made
+ * child checked out is a claim that somebody took them out of the building, made
  * on an unattended screen in a lobby, and unlike a stray check-in it is not
  * self-correcting when the child walks in anyway. What it did not survive was
  * how often it is asked. A hold is a thing you teach somebody once; a hold on
@@ -85,7 +85,7 @@ export function ConfirmScreen({
   intent: KioskIntent;
   /**
    * Others this tap could cover — already filtered to the ones a confirm would
-   * do the very same thing to. A check-in screen never offers a collection.
+   * do the very same thing to. A check-in screen never offers a check-out.
    */
   family: readonly KioskStudent[];
   /**
@@ -104,7 +104,7 @@ export function ConfirmScreen({
    * "why is there a print control on a parent's screen at all".
    *
    * Only ever anything but `'none'` on the `done` branch: a check-in prints a
-   * label of its own, and a collection prints nothing.
+   * label of its own, and a check-out prints nothing.
    */
   reprintOffer: ReprintOffer;
   onReprint: () => void;
@@ -113,7 +113,7 @@ export function ConfirmScreen({
   onConfirm: (chosen: KioskStudent[]) => void;
   /**
    * Opens the "who else is with them" screen against this family. Absent when
-   * there is nothing to anchor to — a collection, or a kiosk with no
+   * there is nothing to anchor to — a check-out, or a kiosk with no
    * registration flow.
    */
   onFindSibling?: (anchors: KioskStudent[]) => void;
@@ -174,7 +174,7 @@ export function ConfirmScreen({
    * treatment: it is read after the decision has already been made.
    */
   /*
-   * Only on a check-in. A collection is not the moment to change who is on the
+   * Only on a check-in. A check-out is not the moment to change who is on the
    * roster — a parent taking a child home is answering a different question —
    * and a child who is already checked in has no button for the offer to sit
    * above.
@@ -462,7 +462,7 @@ export function ConfirmScreen({
           *
           * The colours are the ramps the rest of the kiosk already spends on
           * these two acts: green is *present*, and belongs to the arrival; the
-          * brand ramp carries the collection, on this screen and on the row that
+          * brand ramp carries the check-out, on this screen and on the row that
           * offered it.
           */
         <button

@@ -240,7 +240,7 @@ function offeredUntil(endAt: Date, checkInClosesAt: Date): number {
  *
  * It also keeps one that has *finished* but whose check-in window has not, for
  * the same span `bindingIsLive` uses. Without it a kiosk that reboots during
- * pickup could not get back to the gathering it was collecting for: it would
+ * pickup could not get back to the gathering it was checking children out for: it would
  * sit at an empty chooser while a queue formed in the lobby. The chooser
  * labels these rather than letting them look upcoming.
  */

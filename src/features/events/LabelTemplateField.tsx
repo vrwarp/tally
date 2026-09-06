@@ -266,7 +266,7 @@ export function LabelTemplateField({
     <div className="flex flex-col gap-3">
       <CheckboxField
         label="Print a label at check-in"
-        hint="For a room children are collected from. Needs a Brother QL plugged into the kiosk."
+        hint="For a room children are checked out from. Needs a Brother QL plugged into the kiosk."
         checked={value !== null}
         onChange={(changed) =>
           onChange(changed.target.checked ? structuredClone(DEFAULT_LABEL_TEMPLATE) : null)

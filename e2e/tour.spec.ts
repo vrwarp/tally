@@ -159,7 +159,7 @@ const CAST: Record<
     /*
      * Act 1's family, seeded. A different one per pass, because the two passes
      * share one emulator: the second would otherwise walk up to the child the
-     * first checked in *and collected*, whose row correctly offers neither.
+     * first checked in *and checked out*, whose row correctly offers neither.
      *
      * Both of them are regulars of the gathering the kiosk binds to, which is
      * now a requirement rather than a coincidence — the search is scoped to the
@@ -365,7 +365,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       /*
        * The other half of a nursery's day. The seeded Nursery tracks check-out,
-       * which is why the same row now offers a collection instead of a
+       * which is why the same row now offers a check-out instead of a
        * check-in: a child who is present can only be picked up.
        */
       await typeOnKiosk(kiosk, cast.doorFirst);
@@ -651,7 +651,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * The sibling Act 1's prediction left unticked, arriving on her own.
        *
        * She has to be somebody *not yet checked in*: the offer is
-       * deliberately absent on a collection — the seeded Nursery tracks
+       * deliberately absent on a check-out — the seeded Nursery tracks
        * check-out, so a child who is already present gets a pickup screen,
        * and a pickup is not the moment to add somebody to the roster. A
        * family arriving is.
@@ -1055,8 +1055,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       /*
        * Tried in order rather than named outright: by this point in the tour
-       * several of these children have been checked in *and collected*, and a
-       * collected child's confirm screen is a different frame than the one
+       * several of these children have been checked in *and checked out*, and a
+       * checked-out child's confirm screen is a different frame than the one
        * this caption claims.
        */
       for (const candidate of [cast.guestChild, cast.familyChild, cast.door]) {

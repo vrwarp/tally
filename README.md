@@ -29,7 +29,7 @@ door who sees an empty screen concludes the app is broken.
 - **One-off trips** carry their own RSVP list, so the counselor at the bus door sees the trip list
   rather than the whole ministry.
 - **Check-out**, per gathering, for rooms where children are handed back: absent, in the room,
-  collected. Attendance is never touched by it.
+  checked out. Attendance is never touched by it.
 - **A lobby kiosk** where a parent finds their family by the last four digits of a phone number,
   checks their children in, and prints a label. A family nobody has met registers right there — a
   short wizard, one question at a time — and lands on a review queue rather than in the church's

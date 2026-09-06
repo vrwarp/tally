@@ -69,12 +69,12 @@ the trip is a core-team decision made before the door, not at it.
 Tally deliberately stops there. It does not track signed waivers, fees or payments: those are
 someone's clipboard and someone's cash box, and a half-kept copy in an app is worse than none.
 
-**Journey 4b — the nursery, where children are collected.** A gathering can turn on **check-out**,
-which makes the roster ternary: absent, in the room, collected. The header leads with the live room
+**Journey 4b — the nursery, where children are checked out.** A gathering can turn on **check-out**,
+which makes the roster ternary: absent, in the room, checked out. The header leads with the live room
 count rather than the head count (`12 in room · 18 checked in`), the two filter chips become "In
 room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
-collecting children is the gesture repeated forty times a morning. A parent can also collect their
+checking children out is the gesture repeated forty times a morning. A parent can also check out their
 own child at the lobby kiosk, with the same single tap the arrival costs. It held for two seconds
 for a while — a stray check-in corrects itself when the child walks in anyway, while a stray pickup
 claims somebody left the building — and the gesture came off because that argument never weighed

@@ -4,7 +4,7 @@
  * The interesting claim is the one that used to be false: a gathering that has
  * *finished* but whose check-in window has not must stay on the list. Without
  * it, a kiosk that reboots or unbinds during pickup cannot get back to the
- * gathering it was collecting for — it sits at an empty chooser while a queue
+ * gathering it was checking children out for — it sits at an empty chooser while a queue
  * forms in the lobby, which is precisely when it is needed most.
  */
 import { describe, expect, it } from 'vitest';

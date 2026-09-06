@@ -193,7 +193,7 @@ describe('returning home after a tap', () => {
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
   });
 
-  it('clears the search after a collection too', async () => {
+  it('clears the search after a check-out too', async () => {
     present = new Set([ADA.id]);
     await mount();
     await type('ada');

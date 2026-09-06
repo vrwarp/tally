@@ -10,7 +10,7 @@
  * and the layer is at opacity 0 in every other state. Not "heavily dimmed":
  * zero. Everything above this in the stack assumes an opaque page — the
  * results ramp is a painted gradient to `ink-950`, a checked-in row is
- * `present-600/20` over the page, the collected state is an opacity step —
+ * `present-600/20` over the page, the checked-out state is an opacity step —
  * and a photograph left visible under any of them turns those constructions
  * arbitrary. The overlays (confirm, success, staff) render transparent over
  * the same page, so zero here is also what keeps the tick screen exactly as

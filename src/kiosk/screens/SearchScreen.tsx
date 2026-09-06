@@ -362,14 +362,14 @@ const SearchConsole = memo(function SearchConsole({
 const ResultRow = memo(function ResultRow({
   student,
   present,
-  collected,
+  checkedOut,
   tracksCheckOut,
   rowTap,
 }: {
   student: KioskStudent;
   present: boolean;
   /** Present, and handed back — only ever true where check-out is tracked. */
-  collected: boolean;
+  checkedOut: boolean;
   tracksCheckOut: boolean;
   rowTap: (student: KioskStudent) => TapHandlers;
 }) {
@@ -396,18 +396,18 @@ const ResultRow = memo(function ResultRow({
          checking a child in *resized their row*, which is the one thing
          this list promises never to do. */
       className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
-        collected
+        checkedOut
           ? 'bg-ink-800/50 opacity-60'
           : present
             ? 'bg-present-600/20'
             : 'bg-ink-800 active:bg-ink-600'
-      } ${inert || collected ? '' : 'active:bg-ink-600'}`}
+      } ${inert || checkedOut ? '' : 'active:bg-ink-600'}`}
     >
       <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
         {student.firstName} {student.lastName}
       </span>
       <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
-        {collected ? (
+        {checkedOut ? (
           <span className="font-semibold text-ink-400">Checked out</span>
         ) : present && tracksCheckOut ? (
           <span className="font-semibold text-brand-300">Tap to check out</span>
@@ -1042,11 +1042,11 @@ export function SearchScreen({
                * Three states where check-out is tracked, two everywhere else.
                *
                * A present child stops being an inert "already done" row and
-               * becomes the collect target — which is the whole pickup flow.
-               * A collected one goes inert again, dimmed, so a parent cannot
+               * becomes the check-out target — which is the whole pickup flow.
+               * A checked-out one goes inert again, dimmed, so a parent cannot
                * hand the same child back twice.
                */
-              collected={tracksCheckOut && checkedOutIds.has(student.id)}
+              checkedOut={tracksCheckOut && checkedOutIds.has(student.id)}
               tracksCheckOut={tracksCheckOut}
               rowTap={rowTap}
             />

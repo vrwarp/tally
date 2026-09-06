@@ -647,7 +647,7 @@ describe('the boundaries of a typed answer', () => {
 });
 
 describe('the grade question', () => {
-  it('opens on the middle of the band, and on none where children are collected', () => {
+  it('opens on the middle of the band, and on none where children are checked out', () => {
     expect(defaultGrade(false)).toBe(9);
     // A nursery child has no grade to type, and "No grade" is the answer rather
     // than a field somebody has to clear forty times a morning.

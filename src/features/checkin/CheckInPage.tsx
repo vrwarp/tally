@@ -138,7 +138,7 @@ const FOCUS_EMPTY: Record<RosterFocus, string> = {
   participated: "Nobody has been to this gathering yet.",
   checkedIn: "Nobody is checked in yet.",
   inRoom: "Nobody is in the room.",
-  checkedOut: "Nobody has been collected yet.",
+  checkedOut: "Nobody has been checked out yet.",
 };
 
 export function CheckInPage() {
@@ -1090,7 +1090,7 @@ export function CheckInPage() {
                       : appliedFocus === "checkedIn"
                         ? "tap the check mark to undo"
                         : appliedFocus === "inRoom"
-                          ? "tap Out when somebody collects them"
+                          ? "tap Out when somebody checks them out"
                           : appliedFocus === "checkedOut"
                             ? "tap ↺ to put somebody back"
                             : undefined

@@ -97,7 +97,7 @@ const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
  * this walkthrough registers four frames earlier.
  *
  * "Another child" only stands on a check-in: `askSibling` in ConfirmScreen is
- * gated on `intent === 'check-in'`, because a parent collecting a child is
+ * gated on `intent === 'check-in'`, because a parent checking a child out is
  * answering a different question and a child already on the register has no
  * button for the offer to sit above. A registration checks its own children in
  * as part of the act, so the family that has just been through the wizard is

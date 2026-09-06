@@ -1144,11 +1144,11 @@ export function computeSummary(args: {
    * how many did we record handing back?") is the same on both.
    */
   let tracked = 0;
-  let collected = 0;
+  let checkedOut = 0;
   for (const snapshot of args.snapshots) {
     if (!snapshot.event.requiresCheckOut) continue;
     tracked += snapshot.presentStudentIds.size;
-    collected += snapshot.checkedOutStudentIds.size;
+    checkedOut += snapshot.checkedOutStudentIds.size;
   }
 
   return {
@@ -1158,6 +1158,6 @@ export function computeSummary(args: {
     miaCount: args.mia.length,
     newVisitorCount: args.newVisitors.length,
     incompleteCount: args.incomplete.length,
-    checkOutRate: tracked === 0 ? null : Math.round((collected / tracked) * 100),
+    checkOutRate: tracked === 0 ? null : Math.round((checkedOut / tracked) * 100),
   };
 }

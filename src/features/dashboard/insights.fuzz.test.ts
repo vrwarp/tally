@@ -353,7 +353,7 @@ describe('dashboard insight properties', () => {
     for (const value of Object.values(counts)) expect(value).toBeGreaterThanOrEqual(0);
     if (checkOutRate !== null) {
       expect(checkOutRate).toBeGreaterThanOrEqual(0);
-      // A percentage of check-ins that were collected, and a collected child
+      // A percentage of check-ins that were checked out, and a checked-out child
       // was necessarily checked in — so it can never run over 100.
       expect(checkOutRate).toBeLessThanOrEqual(100);
     }

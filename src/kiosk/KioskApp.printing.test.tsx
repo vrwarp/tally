@@ -9,7 +9,7 @@
  *
  * None of that is visible in the UI, which is exactly why it is tested here. The
  * pickup flow will be edited again, and the failure mode is silent — a printer
- * quietly producing a label per collection, and a roll gone by the end of the
+ * quietly producing a label per check-out, and a roll gone by the end of the
  * service.
  *
  * The other claim is the one the whole design rests on: printing cannot break a
@@ -215,7 +215,7 @@ describe('printing from the kiosk flow', () => {
     expect(printing.printLabel).not.toHaveBeenCalled();
   });
 
-  it('does not print when a child is collected', async () => {
+  it('does not print when a child is checked out', async () => {
     // Ada is already here, and this gathering hands children back, so the tap
     // is a check-out.
     present = new Set([ADA.id]);
@@ -241,7 +241,7 @@ describe('printing from the kiosk flow', () => {
     expect(printing.printLabel).not.toHaveBeenCalled();
   });
 
-  it('does not print for a child who has already been collected', async () => {
+  it('does not print for a child who has already been checked out', async () => {
     present = new Set([ADA.id]);
     checkedOut = new Set([ADA.id]);
     await mount();
@@ -358,9 +358,9 @@ describe('a family checked in together', () => {
     expect(vi.mocked(printing.printLabel).mock.calls[0]?.[0].id).toBe(ADA.id);
   });
 
-  it('warms nothing for a family being collected', async () => {
-    // Both are here, and this gathering hands children back: two collections,
-    // and a collection has never produced a sticker.
+  it('warms nothing for a family being checked out', async () => {
+    // Both are here, and this gathering hands children back: two check-outs,
+    // and a check-out has never produced a sticker.
     asSiblings();
     present = new Set([ADA.id, BYRON.id]);
     await mount();

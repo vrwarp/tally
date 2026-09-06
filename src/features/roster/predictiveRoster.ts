@@ -57,7 +57,7 @@ export type RosterFocus =
   | 'participated'
   | 'checkedIn'
   /**
-   * Checked in and not yet collected — the live room count, and the only
+   * Checked in and not yet checked out — the live room count, and the only
    * number a nursery volunteer is actually working from. Both of these are
    * stood down to `all` on an event that does not track check-out, so a
    * leftover value cannot strand somebody on a filter whose chip is not on
@@ -122,9 +122,9 @@ export interface RosterView {
      * missed pickup must never reduce a head count.
      */
     present: number;
-    /** Checked in and not collected. `inRoom + checkedOut === present`. */
+    /** Checked in and not checked out. `inRoom + checkedOut === present`. */
     inRoom: number;
-    /** Checked in and collected. */
+    /** Checked in and checked out. */
     checkedOut: number;
     /** Students eligible for this event, before search filtering. */
     eligible: number;
