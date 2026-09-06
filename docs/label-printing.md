@@ -37,20 +37,39 @@ What follows is what that person has to do.
    then answer **Leave …**. That is the staff gate — it returns to the event
    chooser. A tap on Clear still just clears the search box; only the hold asks.
 3. Press **Set up a label printer**.
-4. Pick the **model**. This cannot be detected: the USB product id does not map
-   reliably to a model and the status packet's model byte is only a bring-up
-   hint, so it has to match the machine in front of you.
-5. Pick the **loaded label**. Press **Check the printer** and it will offer what
-   the printer senses — though 62 mm tape matches both `62` and `62red` and the
-   printer cannot tell them apart, so confirm rather than assume.
-6. Press **Connect a printer** and choose it in the browser's dialog. This is
+4. Press **Connect a printer** and choose it in the browser's dialog. This is
    the only step that needs a person: the browser opens its device chooser only
    in response to a real gesture. Everything afterwards — reconnecting at boot,
    printing, reading status — needs none, so the kiosk can run unattended for
    weeks and reopen the printer by itself after the nightly reload.
-7. Press **Print a test label**. It goes through the whole chain — worker,
+5. **Read the line it comes back with.** Connecting asks the printer what it is
+   and what is in it, and sets the kiosk to the answers — so in the ordinary
+   case there is nothing left to fill in. The line says what was taken, and it
+   says when something had to be guessed:
+
+   - *Read off the printer: QL-810W, 62mm x 29mm die-cut.* Nothing to do.
+   - *…is more than one roll. Set to 62mm endless…* — 62 mm tape is both `62`
+     and `62red` and the printer cannot tell them apart, so the plain one was
+     taken. If the black/red roll is what is loaded, the other is one press
+     away.
+   - *The printer did not say which model it is* — the name it puts on the USB
+     bus matched nothing in the table, so whatever the model list was already
+     showing is what the kiosk is set to. Open **Change** and pick the machine
+     in front of you.
+
+   Both answers stay editable under **Change** whatever the line says. The model
+   is a good guess and not an authority: `brother_ql` has no model detection,
+   the USB product *id* does not map reliably, and the status packet's model
+   byte is only a bring-up hint. What is read is the product *name*, which every
+   QL this has met gets right.
+6. Press **Print a test label**. It goes through the whole chain — worker,
    rasteriser, transport — so a label coming out means the feature works, not
    just that the device answered.
+
+Changed the roll later? **Check the printer** does the same reading again and
+sets the kiosk to what it finds. It is deliberately not done at boot: a kiosk
+that reopened its printer at 4am must not quietly turn a `62red` somebody chose
+into the `62` a status packet cannot tell it from.
 
 The model and the roll are stored on **this device**, not on the event. Changing
 rolls is a change here, not an edit to every gathering. How the sticker is
@@ -332,9 +351,10 @@ bigger roll leaves room over. Turn **Text size** up — see
 [Shaping the sticker](#shaping-the-sticker).
 
 **Refused with a size error.** The roll in the printer is not the one the kiosk
-is set to. Die-cut media has to match exactly — the rasteriser refuses rather
-than resampling, because a name badge silently scaled to the wrong size is worse
-than one that did not print.
+is set to. Press **Check the printer** on the printer screen and it will read the
+loaded roll and set the kiosk to it. Die-cut media has to match exactly — the
+rasteriser refuses rather than resampling, because a name badge silently scaled
+to the wrong size is worse than one that did not print.
 
 **Grey and thin rather than black.** Text below about 2 mm stops rendering
 reliably on a 300 dpi thermal head. The renderer will not shrink past that

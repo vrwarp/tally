@@ -2,19 +2,22 @@
  * Which printer this kiosk has, and what is loaded in it.
  *
  * A fact about the machine on this shelf, so it lives in this device's own
- * localStorage rather than on an event or in Firestore. Two fields, and both of
- * them have to be here because neither can be discovered:
+ * localStorage rather than on an event or in Firestore. Two fields, and both are
+ * stored rather than asked for at print time because neither is certain enough
+ * to be re-derived under a parent's thumb:
  *
- * **The model.** `brother_ql` has no model detection and cannot have one — the
- * USB product id is not a reliable map to a model, and the status packet's model
- * byte is documented as a bring-up hint. So a staff member picks it once, on the
- * printer screen, and the answer is remembered.
+ * **The model.** Filled in from the name the printer puts on the USB bus when it
+ * is connected — see `detect.ts`. That is a good default and not an authority:
+ * `brother_ql` has no model detection, the USB product *id* is not a reliable
+ * map, and the status packet's model byte is documented as a bring-up hint. A
+ * device the table cannot place leaves whatever was already set, and the printer
+ * screen's list is what settles it.
  *
  * **The media.** The printer *does* report the width and length it senses, and
  * `suggestLabels` maps that back onto the label table — but not uniquely: 62mm
  * tape is both `62` and `62red`, and the packet cannot tell black tape from
- * black/red. So detection is offered as a shortcut on the setup screen and the
- * stored answer is what actually prints.
+ * black/red. So connecting takes the plainer of the matches, says it did, and
+ * the stored answer is what actually prints.
  *
  * What is *not* here is anything about how the sticker is arranged — the
  * margins, the quarter turn, a fixed length. Those started here and moved to the

@@ -39,10 +39,12 @@ import {
   watchConnectionEvents,
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
+import type { Label } from '@vrwarp/brother-ql-webusb/labels';
 import { fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
 import { allergyFor, forgetAllergies, forgetAllergy, startAllergyLookup } from './allergy';
+import { matchLabels, modelFromProductName, preferredLabel } from './detect';
 import { tokenValuesFor } from './tokens';
 import {
   readPrinterConfig,
@@ -80,7 +82,6 @@ export type { AllergySource } from './allergy';
  */
 export { labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
 export { modelIdentifiers } from '@vrwarp/brother-ql-webusb/models';
-export { suggestLabels } from '@vrwarp/brother-ql-webusb/printer-core';
 export type { Label } from '@vrwarp/brother-ql-webusb/labels';
 export type { PrinterStatus } from '@vrwarp/brother-ql-webusb/printer-core';
 
@@ -101,6 +102,36 @@ export type PrinterState =
   | { kind: 'unpaired' }
   | { kind: 'ready'; config: PrinterConfig }
   | { kind: 'trouble'; message: string; advice: string | null };
+
+/**
+ * What asking the printer about itself came to.
+ *
+ * Handed back by {@link pairPrinter} and {@link checkPrinter} so the setup
+ * screen can both show the filled-in answers and say how much of them was a
+ * guess. Everything in here has already been applied — this is a report, not a
+ * proposal.
+ */
+export interface PrinterDetection {
+  /** What the kiosk is set to now, printer's answers included. */
+  config: PrinterConfig;
+  /**
+   * Whether the model came off the printer rather than being left as it was.
+   *
+   * False means the USB product string matched nothing in the model table, and
+   * the list on the setup screen is still somebody's to answer.
+   */
+  modelFromPrinter: boolean;
+  /**
+   * Every roll the sensed media could be. Empty when nothing matched, or when
+   * the printer could not be asked.
+   *
+   * More than one is the interesting case: `config.label` is then the plainest
+   * of them rather than a fact, and the screen says which was taken.
+   */
+  matched: readonly Label[];
+  /** The packet those came from, or `null` if the printer did not answer. */
+  status: PrinterStatus | null;
+}
 
 /* -------------------------------------------------------------------------- */
 /* State, and who is listening                                                 */
@@ -322,26 +353,43 @@ async function reopen(): Promise<void> {
 }
 
 /**
- * Show the browser's device chooser and remember what was picked.
+ * Show the browser's device chooser, then ask whatever was picked what it is.
  *
  * The one place a user gesture is required, which is why it is only ever reached
  * from a button on the printer screen. Everything after pairing — reopening at
  * boot, printing, reading status — needs none.
+ *
+ * `next` is what the screen was showing when the button was pressed, and it is
+ * the fallback rather than the answer: a printer that names itself on the bus
+ * and reports the roll it can see has just answered both of the questions that
+ * screen exists to ask, and making somebody answer them again from a list is
+ * asking them to confirm a guess against a fact. See {@link checkPrinter} for
+ * what is and is not taken on trust.
+ *
+ * `null` when nothing was connected — a dismissed chooser, or a failure the
+ * state now carries.
  */
-export async function pairPrinter(next: PrinterConfig): Promise<PrinterState> {
+export async function pairPrinter(next: PrinterConfig): Promise<PrinterDetection | null> {
   try {
     const device = await requestPrinterDevice();
-    writePrinterConfig(next);
-    config = next;
+    // Before `adopt`, because the model decides the head width the rasteriser
+    // builds for and the device is told its model once, here.
+    const chosen: PrinterConfig = {
+      model: modelFromProductName(device.productName) ?? next.model,
+      label: next.label,
+    };
+    writePrinterConfig(chosen);
+    config = chosen;
     if (printer) await printer.close().catch(() => {});
-    await adopt(new BrotherQLPrinterCore(device, { model: next.model }), next);
+    await adopt(new BrotherQLPrinterCore(device, { model: chosen.model }), chosen);
   } catch (error) {
     // Dismissing the chooser is not a failure worth colouring the screen for.
-    if ((error as { code?: string }).code === 'selection-cancelled') return state;
+    if ((error as { code?: string }).code === 'selection-cancelled') return null;
     const { message, advice } = describe(error);
     setState({ kind: 'trouble', message, advice });
+    return null;
   }
-  return state;
+  return checkPrinter();
 }
 
 /** Change the model or media without re-pairing. */
@@ -356,10 +404,10 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
 /**
  * Ask the printer what it has loaded.
  *
- * Only from the setup screen. It costs a round trip and takes the busy lock, so
- * it must never be on the way to a label.
+ * Only from the setup screen, and only through {@link checkPrinter}. It costs a
+ * round trip and takes the busy lock, so it must never be on the way to a label.
  */
-export async function readStatus(): Promise<PrinterStatus | null> {
+async function readStatus(): Promise<PrinterStatus | null> {
   if (!printer?.opened) return null;
   try {
     return await printer.queryStatus();
@@ -368,6 +416,67 @@ export async function readStatus(): Promise<PrinterStatus | null> {
     setState({ kind: 'trouble', message, advice });
     return null;
   }
+}
+
+/**
+ * The rolls the sensed media could be, or none if the tables refuse the model.
+ *
+ * `labelsForModel` throws on an identifier it does not carry, which a config
+ * written by an older kiosk — or edited by hand — can still be. That is worth
+ * saying on the screen and is not worth failing a button press over.
+ */
+function suggested(status: PrinterStatus, model: string): readonly Label[] {
+  try {
+    return matchLabels(status, model);
+  } catch (error) {
+    const { message, advice } = describe(error);
+    setState({ kind: 'trouble', message, advice });
+    return [];
+  }
+}
+
+/**
+ * What the printer says it is and what it says is in it, adopted.
+ *
+ * The setup screen's two questions, answered by the machine that knows. Both
+ * answers are taken — the config is written and the kiosk is set to them — and
+ * both are reported back, because neither is certain in the same way:
+ *
+ * **The model** is the name the device puts on the USB bus. Right on every QL
+ * this has met, and `null` rather than a guess for one it cannot place, in which
+ * case whatever was already set is kept and `modelFromPrinter` says so.
+ *
+ * **The roll** is sensed, and may not resolve to one entry in the table: 62mm
+ * tape is both `62` and `62red` and the packet cannot tell them apart. Every
+ * match is returned in `matched`, the plainest is taken, and a screen with more
+ * than one of them in hand owes somebody a sentence about it.
+ *
+ * Deliberately not on the boot path. A kiosk reopening its printer at 4am must
+ * not overwrite a deliberate `62red` with the roll a status packet cannot
+ * distinguish from it — this runs when a person connects a printer or presses
+ * the button that says it will.
+ *
+ * `null` when there is no open printer to ask, which is a screen state rather
+ * than a failure.
+ */
+export async function checkPrinter(): Promise<PrinterDetection | null> {
+  const active = config;
+  if (!active || !printer?.opened) return null;
+
+  const detected = modelFromProductName(printer.device?.productName);
+  // Before the status read rather than after it: a read that fails leaves
+  // trouble on the state, and `configure` reopens and would paint over it.
+  if (detected !== null && detected !== active.model) {
+    await configure({ model: detected, label: active.label });
+  }
+  const model = config?.model ?? active.model;
+
+  const status = await readStatus();
+  const matched = status ? suggested(status, model) : [];
+  const label = preferredLabel(matched)?.identifier ?? config?.label ?? active.label;
+  if (label !== config?.label) await configure({ model, label });
+
+  return { config: { model, label }, modelFromPrinter: detected !== null, matched, status };
 }
 
 /* -------------------------------------------------------------------------- */

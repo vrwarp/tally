@@ -103,9 +103,8 @@ const printing = {
   labelName: vi.fn(() => '62 × 29mm'),
   modelIdentifiers: vi.fn(() => ['QL-810W']),
   configure: vi.fn(async () => {}),
-  pairPrinter: vi.fn(async () => {}),
-  readStatus: vi.fn(async () => null),
-  suggestLabels: vi.fn(() => []),
+  pairPrinter: vi.fn(async () => null),
+  checkPrinter: vi.fn(async () => null),
 } as unknown as KioskPrinting;
 
 const services = {
