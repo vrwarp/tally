@@ -26,7 +26,7 @@ A family who registered themselves at the lobby kiosk on Friday, waiting on Tues
 
 ### The editor takes the row, not a dialog
 
-One person at a time, in place. A dialog would cover the duplicate candidates — which are exactly what this edit may change — and on a phone it would cover the card entirely. Notice what has gone grey: approve, “Not ours”, and every other Correct button on the card. A card mid-correction is a card whose facts are in flux, and the approve caption names children by names somebody is in the middle of changing. Each control carries its sentence above it, in the card’s own grammar — and the one above Save changes as soon as the name does, which is the next frame but one.
+One person at a time, in place. A dialog would cover the duplicate candidates — which are exactly what this edit may change — and on a phone it would cover the card entirely. Notice what has gone grey: approve, “Not ours”, and every other Edit button on the card. A card mid-correction is a card whose facts are in flux, and the approve caption names children by names somebody is in the middle of changing. Each control carries its sentence above it, in the card’s own grammar — and the one above Save changes as soon as the name does, which is the next frame but one.
 
 ![The editor takes the row, not a dialog](web/desktop-02-the-editor-takes-the-row-not-a-dialog.jpg)
 
@@ -90,7 +90,7 @@ The grade is a filter on the check-in roster and one of the two discriminators o
 
 ### A corrected family, and a decision that can now be made
 
-Saved, and the grade now matches the roster row it is being compared against — which is the comparison a reviewer settles next. Every fact on the card is one somebody has checked; the collision the correction surfaced is still held, deliberately, because it is a real question and the approve button stays shut until it is answered. Nothing corrected here has touched the church’s database: that is what makes it safe, and it is why a child who has already been pushed gets no Correct button at all but a pointer to their own page, which knows how to carry a rename upstream.
+Saved, and the grade now matches the roster row it is being compared against — which is the comparison a reviewer settles next. Every fact on the card is one somebody has checked; the collision the correction surfaced is still held, deliberately, because it is a real question and the approve button stays shut until it is answered. Nothing corrected here has touched the church’s database: that is what makes it safe, and it is why a child who has already been pushed gets no Edit button at all but a pointer to their own page, which knows how to carry a rename upstream.
 
 ![A corrected family, and a decision that can now be made](web/desktop-09-a-corrected-family-and-a-decision-that-can-now-be-made.jpg)
 

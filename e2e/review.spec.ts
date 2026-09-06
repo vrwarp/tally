@@ -192,7 +192,7 @@ test.describe('reviewing a family the kiosk recorded', () => {
 
       /* ---- The correction ------------------------------------------------ */
 
-      await card.getByRole('button', { name: new RegExp(`Correct Micheal ${SURNAME}`, 'i') }).click();
+      await card.getByRole('button', { name: new RegExp(`Edit Micheal ${SURNAME}`, 'i') }).click();
       // Everything else on the card is held while a correction is open: its
       // facts are in flux, and the approve caption names children by names
       // somebody is in the middle of changing.

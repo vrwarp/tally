@@ -386,7 +386,7 @@ export const JOURNEYS: Journey[] = [
     now:
       'Correcting re-asks the roster in the same breath — and the corrected spelling collides with a child the church already has, so the card comes back with the candidate offered and the approve button held. A correction is also the one thing that **drops the answers above it**: they were made against a name and a number that have just changed.',
     tryIt:
-      'Press Correct on the child, change “Micheal” to “Michael”, and save. The collision the fix created appears, and the approve button shuts.',
+      'Press Edit on the child, change “Micheal” to “Michael”, and save. The collision the fix created appears, and the approve button shuts.',
     row: registration({
       registrationId: 'corrections',
       guardian: { firstName: 'MOM', lastName: 'Lee', phone: '5550163344' },
