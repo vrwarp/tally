@@ -7,15 +7,13 @@
  *
  * What is pinned here is not the offer itself so much as its edges, which are
  * where a bulk action goes wrong: that it only ever offers what the button says
- * it will do, that a name unticked is a child left alone, that a family's
- * pickup still costs a two-second hold, and that one confirm produces one
- * write per child and no more.
+ * it will do, that a name unticked is a child left alone, and that one confirm
+ * produces one write per child and no more.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -157,18 +155,6 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
-async function hold(text: RegExp | string): Promise<void> {
-  const button = screen.getByText(text).closest('button')!;
-  await act(async () => {
-    fireEvent.pointerDown(button);
-  });
-  await act(async () => {
-    // The grace before the count, and then the count.
-    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
-  });
-  await settle();
-}
-
 function checkedInIds(): string[] {
   return vi
     .mocked(services.performCheckIn)
@@ -270,7 +256,14 @@ describe('checking a family in together', () => {
 });
 
 describe('collecting a family together', () => {
-  it('collects both on one hold, and still asks for the hold', async () => {
+  /*
+   * The pickup was a two-second hold, and a test here pinned that a tap alone
+   * did nothing. It is one tap now — see the note at the top of ConfirmScreen
+   * for what that traded away and why — so what is left to pin is the half that
+   * never depended on the gesture: one press, both children, and nothing
+   * checked *in* on a screen that hands them back.
+   */
+  it('collects both on one press', async () => {
     present = new Set([MARCUS.id, AMARA.id]);
     await mount();
     await type('0134');
@@ -278,16 +271,7 @@ describe('collecting a family together', () => {
 
     expect(screen.getByText(/Collecting anyone else/i)).toBeTruthy();
 
-    // A tap is not enough for a pickup, however many children it covers.
-    const button = screen.getByText(/hold to collect all 2/i).closest('button')!;
-    await act(async () => {
-      fireEvent.pointerDown(button);
-      fireEvent.pointerUp(button);
-    });
-    await settle();
-    expect(services.performCheckOut).not.toHaveBeenCalled();
-
-    await hold(/hold to collect all 2/i);
+    await tap(/collect all 2/i);
 
     expect(
       vi
@@ -306,7 +290,7 @@ describe('collecting a family together', () => {
     await pick('Marcus Osei');
 
     expect(screen.queryByText(/anyone else/i)).toBeNull();
-    await hold(/hold to collect/i);
+    await tap(/collect/i);
 
     expect(vi.mocked(services.performCheckOut).mock.calls.map((call) => call[0].studentId)).toEqual([
       's-marcus',
@@ -345,7 +329,7 @@ describe('collecting the ones who came in together', () => {
       'false',
     );
 
-    await hold(/^hold to collect$/i);
+    await tap(/^collect$/i);
     expect(collectedIds()).toEqual(['s-amara']);
   });
 
@@ -369,7 +353,7 @@ describe('collecting the ones who came in together', () => {
     expect(screen.getByText('Maya Chen').closest('button')!.getAttribute('aria-pressed')).toBe(
       'true',
     );
-    await hold(/hold to collect all 2/i);
+    await tap(/collect all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-maya']);
   });
 
@@ -386,7 +370,7 @@ describe('collecting the ones who came in together', () => {
     expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
       'true',
     );
-    await hold(/hold to collect all 2/i);
+    await tap(/collect all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
   });
 
@@ -444,7 +428,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await type('2200');
     await pick('Maya Chen');
 
-    expect(screen.getByText(/hold to collect/i)).toBeTruthy();
+    expect(screen.getByText(/collect/i)).toBeTruthy();
     expect(screen.queryByText(/Another child/i)).toBeNull();
   });
 
@@ -622,7 +606,7 @@ describe('pre-selecting only the children this gathering expects', () => {
     await type('7788');
     await pick('Amara Osei');
 
-    await hold(/hold to collect all 2/i);
+    await tap(/collect all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
   });
 });

@@ -200,13 +200,15 @@ test.describe('the kiosk', () => {
       await expect(collectable).toBeVisible({ timeout: 15_000 });
       await collectable.click();
 
-      // A hold, not a tap: a stray pickup needs staff and the main app to undo.
-      await expect(kiosk.getByText(/hold to collect/i)).toBeVisible();
-      const button = kiosk.getByText(/hold to collect/i);
+      // One press, the same as the arrival — the gesture the pickup used to
+      // cost is gone; see the note at the top of ConfirmScreen for the trade.
+      // A real press rather than a synthesised click, because the button
+      // commits on the lift and only if the lift lands inside it.
+      const button = kiosk.getByRole('button', { name: /^Collect$/ });
+      await expect(button).toBeVisible();
       const box = (await button.boundingBox())!;
       await kiosk.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await kiosk.mouse.down();
-      await kiosk.waitForTimeout(3700);
       await kiosk.mouse.up();
 
       await expect(kiosk.getByText(/see you next time/i)).toBeVisible();
@@ -281,7 +283,7 @@ test.describe('the kiosk', () => {
       // The confirm screen offers a check-in or says they are already done.
       // What it must never offer here is a pickup: the flag gates the flow,
       // and this gathering does not carry it.
-      await expect(kiosk.getByText(/hold to collect/i)).toHaveCount(0);
+      await expect(kiosk.getByRole('button', { name: /^Collect/ })).toHaveCount(0);
       await expect(
         kiosk.getByRole('button', { name: /^Check in$/ }).or(kiosk.getByText(/already checked in/i)),
       ).toBeVisible();
@@ -516,7 +518,7 @@ test.describe('the kiosk', () => {
       const collectable = kiosk.getByText(/tap to collect/i).first();
       await expect(collectable).toBeVisible({ timeout: 15_000 });
       await collectable.click();
-      await hold(kiosk, 'button:has-text("Hold to collect")');
+      await kiosk.getByRole('button', { name: /^Collect$/ }).click();
       await expect(kiosk.getByText(/checked out/i)).toBeVisible({ timeout: 15_000 });
 
       expect(await recordedLabels(kiosk)).toHaveLength(1);

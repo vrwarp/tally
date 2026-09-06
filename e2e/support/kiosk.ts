@@ -57,9 +57,9 @@ export async function openKiosk(
 /**
  * Presses and holds, the way a thumb does.
  *
- * Both holds on the kiosk cancel on pointer-leave — `HoldButton` in JavaScript,
- * the Clear key's staff gate in CSS `:active` — so this has to be a real press
- * at a real position rather than a synthesised click.
+ * Every hold on the kiosk cancels on pointer-leave — `HoldButton` in
+ * JavaScript, the Clear key's staff gate in CSS `:active` — so this has to be a
+ * real press at a real position rather than a synthesised click.
  *
  * Half way through, the progress is checked in *pixels* — see
  * `expectProgressShows`. Unconditionally: this used to take an `invisible`
@@ -194,17 +194,19 @@ export async function readPairingCode(kiosk: Page): Promise<string> {
 }
 
 /**
- * Binds the kiosk to a gathering by name — the row, then the two-second hold.
+ * Binds the kiosk to a gathering by name — the row, then the button.
  *
  * The two-gesture route on purpose, even though holding the row does the whole
- * thing now: this is the path with the labelled button on it, and it is the one
- * that would break silently if the button and the rows ever disagreed about
- * which gathering is picked. The one-gesture route has a test of its own in
- * `kiosk.spec.ts`.
+ * thing in one: this is the path with the labelled button on it, and it is the
+ * one that would break silently if the button and the rows ever disagreed about
+ * which gathering is picked. The one-gesture route — the row's hold, which is
+ * the only hold left on this screen — has a test of its own in `kiosk.spec.ts`.
  */
 export async function bindTo(kiosk: Page, title: string | RegExp): Promise<void> {
   await kiosk.getByRole('button', { name: title }).first().click();
-  await hold(kiosk, 'button:has-text("Hold to set kiosk")');
+  // Not anchored at the start: the button also names the gathering and its
+  // start time above the instruction, and both are in its accessible name.
+  await kiosk.getByRole('button', { name: /Set kiosk$/ }).click();
   await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
     timeout: 30_000,
   });

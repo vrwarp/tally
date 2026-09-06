@@ -20,7 +20,6 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
-import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
@@ -180,25 +179,6 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
-/**
- * Press and hold, for the controls that need it.
- *
- * A collection is a two-second hold rather than a tap — marking a child
- * collected is a claim that somebody took them out of the building — so this has
- * to run the clock, not just touch the glass.
- */
-async function hold(text: RegExp | string): Promise<void> {
-  const button = screen.getByText(text).closest('button')!;
-  await act(async () => {
-    fireEvent.pointerDown(button);
-  });
-  await act(async () => {
-    // The grace before the count, and then the count.
-    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
-  });
-  await settle();
-}
-
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
@@ -244,7 +224,7 @@ describe('printing from the kiosk flow', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
 
-    await hold(/collect/i);
+    await tap(/collect/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(1);
@@ -388,7 +368,7 @@ describe('a family checked in together', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
 
-    await hold(/hold to collect all 2/i);
+    await tap(/collect all 2/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(2);

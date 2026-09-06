@@ -233,11 +233,11 @@ describe('the press-and-hold gate', () => {
     const onHeld = vi.fn();
     render(
       <HoldButton onHeld={onHeld}>
-        Hold to collect
+        Hold to print a name tag
       </HoldButton>,
     );
 
-    press(screen.getByText('Hold to collect'));
+    press(screen.getByText('Hold to print a name tag'));
     expect(vibrate).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(HOLD_DELAY_MS + HOLD_MS);
@@ -252,11 +252,11 @@ describe('the press-and-hold gate', () => {
     const onHeld = vi.fn();
     render(
       <HoldButton onHeld={onHeld}>
-        Hold to collect
+        Hold to print a name tag
       </HoldButton>,
     );
 
-    const button = screen.getByText('Hold to collect');
+    const button = screen.getByText('Hold to print a name tag');
     press(button);
     vi.advanceTimersByTime(HOLD_DELAY_MS + HOLD_MS - 100);
     fireEvent.pointerUp(button);
