@@ -74,6 +74,7 @@ const printing = {
     return () => {};
   }),
   printedTonight: vi.fn(() => []),
+  closePrinter: vi.fn(async () => {}),
   labelPreview: vi.fn(() => []),
 } as unknown as KioskPrinting;
 
@@ -277,6 +278,48 @@ describe('a kiosk coming back', () => {
     await settle();
 
     expect(screen.getByText(SEARCH)).toBeTruthy();
+  });
+});
+
+describe('the four o’clock reload', () => {
+  /*
+   * The reload is what drops the WebUSB handle, and until now it dropped it
+   * with the page — the next page's claim racing the browser's teardown of the
+   * last one. What is pinned is the order: the printer is let go of on purpose,
+   * and the reload waits for that.
+   */
+  it('lets go of the printer before reloading', async () => {
+    vi.setSystemTime(new Date(2026, 8, 6, 4, 5, 0));
+    const reload = vi.fn();
+    const location = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...location, reload },
+    });
+    try {
+      // Nothing bound, and nobody at the glass for long enough.
+      await mount(
+        binding({
+          startAtMs: Date.now() - 2 * 86_400_000,
+          endAtMs: Date.now() - 86_400_000,
+          checkInClosesAtMs: Date.now() - 86_400_000,
+        }),
+      );
+      expect(screen.getByText(CHOOSER)).toBeTruthy();
+
+      await wait(ABANDONED_MS + ONE_TICK_MS);
+
+      const closed = vi.mocked(printing.closePrinter).mock;
+      expect(closed.calls).toEqual([['reload']]);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(closed.invocationCallOrder[0]).toBeLessThan(reload.mock.invocationCallOrder[0]);
+
+      // The tick after it does not start a second one.
+      await wait(ONE_TICK_MS);
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: location });
+    }
   });
 });
 

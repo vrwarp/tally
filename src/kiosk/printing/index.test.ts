@@ -21,6 +21,7 @@
  * something to put in front of a volunteer.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as Printing from '@/kiosk/printing';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 import type { LabelJob, QueueOptions, RasterResult } from '@/kiosk/printing/queue';
@@ -88,8 +89,11 @@ function makeDevice(overrides: Record<string, unknown> = {}) {
     }),
     sendRaw: vi.fn(async () => {}),
     queryStatus: vi.fn(async () => ({ media: '62x29' })),
-    /** Fires whatever the module registered with `on`. */
-    emit: (event: string) => handlers.get(event)?.(),
+    /** Fires whatever the module registered with `on`; a dead transport is not open. */
+    emit(this: { opened: boolean }, event: string) {
+      if (event === 'disconnect') this.opened = false;
+      handlers.get(event)?.();
+    },
     ...overrides,
   };
 }
@@ -98,6 +102,9 @@ function makeDevice(overrides: Record<string, unknown> = {}) {
 type Tracer = { event: (category: string, name: string, data?: Record<string, unknown>) => void };
 
 vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
+  getPairedPrinterDevices: vi.fn(async () =>
+    usb.paired.map((core) => (core as { device: unknown }).device),
+  ),
   BrotherQLPrinterCore: class {
     static getPairedDevices = vi.fn(async () => usb.paired);
     constructor(
@@ -224,10 +231,20 @@ function binding(template = TEMPLATE): KioskBinding {
   } as unknown as KioskBinding;
 }
 
-/** A fresh module instance, since all of this is module-level state. */
+let loaded: typeof Printing | null = null;
+
+/**
+ * A fresh module instance, since all of this is module-level state.
+ *
+ * The one before it is told to stop listening first: its bus watchers and
+ * page listeners live on the same document as the next instance's, and an
+ * instance left listening answers events meant for its successor.
+ */
 async function load() {
+  loaded?.unwatch();
   vi.resetModules();
-  return import('@/kiosk/printing');
+  loaded = await import('@/kiosk/printing');
+  return loaded;
 }
 
 /**
@@ -240,6 +257,7 @@ async function pairedDevices() {
   const core = await import('@vrwarp/brother-ql-webusb/printer-core');
   return core.BrotherQLPrinterCore.getPairedDevices as unknown as {
     mockRejectedValueOnce: (cause: unknown) => void;
+    mockRejectedValue: (cause: unknown) => void;
   };
 }
 
@@ -249,11 +267,45 @@ async function pairedDevicesCalls(): Promise<unknown[][]> {
     .mock.calls;
 }
 
+/** The browser's device list, as the recovery and a wake ask for it. */
+async function listedDevices() {
+  const core = await import('@vrwarp/brother-ql-webusb/printer-core');
+  return core.getPairedPrinterDevices as unknown as { mock: { calls: unknown[][] } };
+}
+
+/** Lets the promise chains inside the module settle without moving the clock. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+}
+
+/**
+ * Moves the clock and lets everything it set off finish.
+ *
+ * A timer armed for "now" from inside another timer's promise chain is put a
+ * millisecond into the future by the fake clock — its guard against a timer
+ * that re-arms itself forever — so the clock is nudged that far once more.
+ */
+async function tick(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+  await settle();
+  await vi.advanceTimersByTimeAsync(1);
+  await settle();
+}
+
+/** jsdom has no way to set `visibilityState`, so it is redefined per test. */
+function visibility(state: DocumentVisibilityState) {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+}
+
 function configured(model = 'QL-810W', label = '62x29') {
   window.localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model, label }));
 }
 
 beforeEach(() => {
+  // The module keeps timers — a grace period, a backoff, a boot search — and a
+  // superseded instance's timer must not fire into the next test's devices.
+  vi.useFakeTimers();
+  visibility('visible');
   window.localStorage.clear();
   usb.supported = true;
   usb.paired = [];
@@ -278,6 +330,13 @@ beforeEach(() => {
   queue.printedTonight.mockReturnValue([]);
   queue.depth.mockReturnValue(0);
   vi.stubGlobal('__E2E_HOOKS__', false);
+});
+
+afterEach(() => {
+  loaded?.unwatch();
+  loaded = null;
+  vi.clearAllTimers();
+  vi.useRealTimers();
 });
 
 describe('opening the printer at boot', () => {
@@ -305,7 +364,7 @@ describe('opening the printer at boot', () => {
     configured();
     const printing = await load();
 
-    await expect(printing.ready()).resolves.toEqual({ kind: 'unpaired' });
+    await expect(printing.ready()).resolves.toEqual({ kind: 'unpaired', searching: true });
   });
 
   it('reopens the printer this kiosk was set up with', async () => {
@@ -339,7 +398,7 @@ describe('opening the printer at boot', () => {
     configured();
     const printing = await load();
     await printing.ready();
-    expect(printing.currentState()).toEqual({ kind: 'unpaired' });
+    expect(printing.currentState()).toMatchObject({ kind: 'unpaired' });
 
     usb.paired = [makeDevice()];
     usb.watchers?.connect();
@@ -378,7 +437,10 @@ describe('opening the printer at boot', () => {
     await expect(printing.checkPrinter()).resolves.toBeNull();
   });
 
-  it('says the printer was unplugged when the reader loop notices', async () => {
+  it('gives a dead transport a moment before saying anything', async () => {
+    // The library's `disconnect` is "a transfer was rejected", which a printer
+    // still on the bus does now and then. What follows is `recovering without
+    // a human` below; what is pinned here is that nothing is said yet.
     const device = makeDevice();
     usb.paired = [device];
     configured();
@@ -387,11 +449,7 @@ describe('opening the printer at boot', () => {
 
     device.emit('disconnect');
 
-    expect(printing.currentState()).toEqual({
-      kind: 'trouble',
-      message: 'The printer was unplugged.',
-      advice: 'Plug it back in.',
-    });
+    expect(printing.currentState().kind).toBe('ready');
   });
 
   it('asks for the printer this kiosk was set up with, not for any printer', async () => {
@@ -615,7 +673,7 @@ describe('changing the media without re-pairing', () => {
 
     const state = await printing.configure({ model: 'QL-810W', label: '62' });
 
-    expect(state).toEqual({ kind: 'unpaired' });
+    expect(state).toMatchObject({ kind: 'unpaired' });
   });
 });
 
@@ -793,6 +851,25 @@ describe('what a screen is told when something is wrong', () => {
     });
     expect(await troubleFrom({ code: 'transfer-timeout' })).toMatchObject({
       message: 'The printer stopped responding.',
+    });
+    expect(await troubleFrom({ code: 'status-timeout' })).toMatchObject({
+      message: 'The printer stopped responding.',
+    });
+    expect(await troubleFrom({ code: 'status-timeout', pagesPrinted: 0 })).toMatchObject({
+      message: 'The printer stopped responding.',
+    });
+    // Every page came out and then the printer said nothing more: the sticker
+    // is in the tray, and "stopped responding" would send somebody to power-
+    // cycle a printer that is fine.
+    expect(await troubleFrom({ code: 'status-timeout', pagesPrinted: 1 })).toEqual({
+      kind: 'trouble',
+      message: 'The printer went quiet after printing.',
+      advice: 'If the next label does not come out, turn it off and on again.',
+    });
+    expect(await troubleFrom({ code: 'busy' })).toEqual({
+      kind: 'trouble',
+      message: 'The printer is busy with a label.',
+      advice: 'Try again in a moment.',
     });
     expect(await troubleFrom({ code: 'raster' })).toMatchObject({
       message: 'This label does not fit the media the kiosk is set to.',
@@ -1238,7 +1315,7 @@ describe('sending', () => {
     configured();
     const printing = await load();
     await printing.ready();
-    device.emit('disconnect');
+    usb.watchers?.disconnect(device.device);
     expect(printing.currentState().kind).toBe('trouble');
 
     await queue.options.send(result);
@@ -1396,7 +1473,9 @@ describe('what is written down', () => {
     const printing = await load();
     await printing.ready();
 
+    usb.paired = [];
     device.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
 
     const states = printing.printerLog().filter((entry) => entry.category === 'state');
     expect(states.map((entry) => [entry.name, entry.data?.cause])).toEqual([
@@ -1480,5 +1559,429 @@ describe('what is written down', () => {
     expect(printing.printerLogText()).toContain('label-failed');
     expect(printing.printerLogText()).toContain('label-stale');
     expect(printing.printerLogText()).not.toContain('Ada');
+  });
+});
+
+describe('recovering without a human', () => {
+  /*
+   * The library's `disconnect` means "the reader loop's transfer was
+   * rejected". A printer that left the bus does that; so does one still there
+   * behind one failed transfer in the millions an evening sends, which used to
+   * be shown as "unplugged" and left there until somebody re-paired it — the
+   * next label would have fixed it silently. Now the kiosk waits a moment for
+   * the browser to say the device went, asks what is still listed, and reopens
+   * a printer that is there.
+   */
+
+  /** A printer whose reader loop just reported the device gone. */
+  async function lost() {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(state.kind));
+    device.emit('disconnect');
+    return { device, printing, seen };
+  }
+
+  it('waits before asking whether the printer is still there', async () => {
+    const { printing } = await lost();
+    const listed = await listedDevices();
+
+    await vi.advanceTimersByTimeAsync(printing.RECOVERY_GRACE_MS - 1);
+    expect(listed.mock.calls).toHaveLength(0);
+    expect(printing.currentState().kind).toBe('ready');
+
+    await tick(1);
+    expect(listed.mock.calls).toHaveLength(1);
+  });
+
+  it('reopens a printer the browser still lists, without a word to the screen', async () => {
+    const { device, printing, seen } = await lost();
+
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(device.close).toHaveBeenCalled();
+    expect(device.open).toHaveBeenCalledTimes(2);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+    expect(seen).not.toContain('trouble');
+  });
+
+  it('says unplugged only when the browser no longer lists the printer', async () => {
+    const { device, printing } = await lost();
+    usb.paired = [];
+
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: 'The printer was unplugged.',
+      advice: 'Plug it back in.',
+    });
+    expect(device.close).toHaveBeenCalled();
+    await expect(printing.checkPrinter()).resolves.toBeNull();
+
+    // And it comes back the way it always did: with the connect event.
+    const returned = makeDevice();
+    usb.paired = [returned];
+    usb.watchers?.connect(returned.device);
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('ready'));
+  });
+
+  it('keeps trying with backoff, and only the second failure is shown', async () => {
+    const { device, printing } = await lost();
+    device.open.mockRejectedValue(
+      Object.assign(new Error('held'), { code: 'claim-failed', platformHint: 'Close the other tab.' }),
+    );
+
+    // The first attempt is immediate and silent.
+    await tick(printing.RECOVERY_GRACE_MS);
+    expect(device.open).toHaveBeenCalledTimes(2);
+    expect(printing.currentState().kind).toBe('ready');
+
+    // The second is the one that gets to colour the screen, with the real error.
+    await tick(1_000);
+    expect(device.open).toHaveBeenCalledTimes(3);
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: 'Something else on this device is holding the printer.',
+      advice: 'Close the other tab.',
+    });
+
+    await tick(5_000);
+    expect(device.open).toHaveBeenCalledTimes(4);
+    await tick(30_000);
+    expect(device.open).toHaveBeenCalledTimes(5);
+    await tick(60_000);
+    expect(device.open).toHaveBeenCalledTimes(6);
+    await tick(60_000);
+    expect(device.open).toHaveBeenCalledTimes(7);
+
+    // The other tab lets go.
+    device.open.mockImplementation(async function (this: { opened: boolean }) {
+      this.opened = true;
+    });
+    await tick(60_000);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+
+    await tick(600_000);
+    expect(device.open).toHaveBeenCalledTimes(8);
+  });
+
+  it('stops trying once the connect event has done the job', async () => {
+    const { device, printing } = await lost();
+    device.open.mockRejectedValue({ code: 'claim-failed' });
+    await tick(printing.RECOVERY_GRACE_MS + 1_000);
+    expect(printing.currentState().kind).toBe('trouble');
+
+    const replacement = makeDevice();
+    usb.paired = [replacement];
+    usb.watchers?.connect(replacement.device);
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('ready'));
+    const asked = (await pairedDevicesCalls()).length;
+
+    await tick(600_000);
+
+    expect((await pairedDevicesCalls()).length).toBe(asked);
+  });
+
+  it('lets a label reopen it at once rather than waiting for the timer', async () => {
+    const { device, printing } = await lost();
+
+    await queue.options.send({ job: new Uint8Array(4), pageCount: 1 });
+
+    expect(device.sendRaw).toHaveBeenCalled();
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+    const asked = (await pairedDevicesCalls()).length;
+    await tick(printing.RECOVERY_GRACE_MS + 60_000);
+    expect((await pairedDevicesCalls()).length).toBe(asked);
+  });
+
+  it('ignores a disconnect from a printer it had already let go of', async () => {
+    const first = makeDevice();
+    usb.paired = [first];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    usb.request = () => ({
+      productName: 'QL-810W',
+      vendorId: 1273,
+      productId: 8347,
+      serialNumber: 'another',
+    });
+    await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    const listed = await listedDevices();
+
+    first.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(listed.mock.calls).toHaveLength(0);
+    expect(printing.currentState().kind).toBe('ready');
+  });
+
+  it('does not blame an unplug for a label that died with the transport', async () => {
+    // The label failed because the transport did; the recovery is about to
+    // decide whether the printer left or merely dropped a transfer, and
+    // "unplugged" painted here would answer before it has looked.
+    const { printing } = await lost();
+
+    queue.options.onFailure?.(
+      { code: 'disconnected' },
+      { studentId: 'pco_1', name: 'Ada', template: TEMPLATE, values: {} },
+    );
+
+    expect(printing.currentState().kind).toBe('ready');
+    expect(printing.printerLogText()).toContain('label-failed');
+  });
+});
+
+describe('the browser’s own disconnect', () => {
+  it('closes and says unplugged when it is this kiosk’s printer', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    usb.watchers?.disconnect(device.device);
+
+    expect(device.close).toHaveBeenCalled();
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: 'The printer was unplugged.',
+      advice: 'Plug it back in.',
+    });
+  });
+
+  it('ignores another Brother device going away', async () => {
+    // The library filters these to Brother devices, not to this one.
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8200, serialNumber: 'another' });
+
+    expect(device.close).not.toHaveBeenCalled();
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
+  it('settles a recovery that was still waiting to decide', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.emit('disconnect');
+
+    usb.watchers?.disconnect(device.device);
+    const listed = await listedDevices();
+    await tick(printing.RECOVERY_GRACE_MS + 1_000);
+
+    expect(listed.mock.calls).toHaveLength(0);
+    expect(printing.currentState().kind).toBe('trouble');
+  });
+});
+
+describe('waking up', () => {
+  /*
+   * A tablet switched away from, locked, or frozen by the platform comes back
+   * to the same page with the same transport, and the transport may not have
+   * survived — and a device that left while the page was frozen fired its
+   * events into a page that was not listening.
+   */
+  it('reopens on a wake when the printer is not open', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.opened = false;
+
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    await vi.waitFor(() => expect(device.open).toHaveBeenCalledTimes(2));
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
+  it('lets go on a wake when the printer is no longer listed', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    usb.paired = [];
+
+    window.dispatchEvent(new Event('pageshow'));
+
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('trouble'));
+    expect(device.close).toHaveBeenCalled();
+  });
+
+  it('leaves an open, listed printer alone', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    document.dispatchEvent(new Event('resume'));
+    await settle();
+
+    expect(device.open).toHaveBeenCalledTimes(1);
+    expect(device.close).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while hidden', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.opened = false;
+    visibility('hidden');
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    await settle();
+
+    expect(device.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the printer when the page goes away, with the record on the device', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    window.dispatchEvent(new Event('pagehide'));
+    await settle();
+
+    expect(device.close).toHaveBeenCalled();
+    await expect(printing.checkPrinter()).resolves.toBeNull();
+    const stored = JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printerLog) ?? 'null') as {
+      entries: { category: string; name: string }[];
+    };
+    const names = stored.entries.map((entry) => `${entry.category} ${entry.name}`);
+    expect(names).toContain('page pagehide');
+    expect(names).toContain('kiosk close');
+  });
+
+  it('lets go even when the close hangs', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.close.mockImplementation(() => new Promise(() => {}));
+
+    let done = false;
+    void printing.closePrinter('reload').then(() => {
+      done = true;
+    });
+    await tick(printing.CLOSE_CAP_MS);
+
+    expect(done).toBe(true);
+  });
+});
+
+describe('looking for the printer at boot', () => {
+  /*
+   * A printer still enumerating after the nightly reload, or after the tablet
+   * woke, is not listed on the first look. Settling on "not connected" at once
+   * — in the same words as a kiosk nobody set up — is what used to send a
+   * volunteer to the chooser for a printer that turned up two seconds later.
+   */
+  it('keeps looking for about ten seconds before settling', async () => {
+    configured();
+    const printing = await load();
+
+    await printing.ready();
+    expect(printing.currentState()).toEqual({ kind: 'unpaired', searching: true });
+    expect((await pairedDevicesCalls()).length).toBe(1);
+
+    await tick(2_000);
+    expect((await pairedDevicesCalls()).length).toBe(2);
+    await tick(3_000);
+    expect((await pairedDevicesCalls()).length).toBe(3);
+    expect(printing.currentState()).toEqual({ kind: 'unpaired', searching: true });
+
+    await tick(5_000);
+    expect((await pairedDevicesCalls()).length).toBe(4);
+    expect(printing.currentState()).toEqual({ kind: 'unpaired', searching: false });
+
+    await tick(600_000);
+    expect((await pairedDevicesCalls()).length).toBe(4);
+  });
+
+  it('finds a printer that turned up late', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const device = makeDevice();
+    usb.paired = [device];
+
+    await tick(2_000);
+
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+    await tick(600_000);
+    expect(device.open).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts over rather than doubling up when ready() runs again', async () => {
+    // `ready()` runs again on every printer-screen exit.
+    configured();
+    const printing = await load();
+
+    await printing.ready();
+    await printing.ready();
+    await tick(10_000);
+
+    expect((await pairedDevicesCalls()).length).toBe(2 + 3);
+  });
+
+  it('says out loud what the last look ran into', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    (await pairedDevices()).mockRejectedValue({ code: 'claim-failed', platformHint: 'Close it.' });
+
+    await tick(5_000);
+    expect(printing.currentState()).toEqual({ kind: 'unpaired', searching: true });
+
+    await tick(5_000);
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: 'Something else on this device is holding the printer.',
+      advice: 'Close it.',
+    });
+  });
+});
+
+describe('checking a busy printer', () => {
+  it('waits for the queue to drain before asking', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    let release: () => void = () => {};
+    queue.idle.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const checking = printing.checkPrinter();
+    await settle();
+    expect(device.queryStatus).not.toHaveBeenCalled();
+
+    release();
+    await checking;
+    expect(device.queryStatus).toHaveBeenCalled();
   });
 });

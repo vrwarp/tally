@@ -405,7 +405,9 @@ export function EventChooser({
             ? 'Set up a label printer'
             : printerState.kind === 'ready'
               ? 'Label printer connected'
-              : 'Label printer needs attention'}
+              : printerState.kind === 'unpaired' && printerState.searching
+                ? 'Looking for the label printer…'
+                : 'Label printer needs attention'}
         </button>
 
         <button

@@ -37,9 +37,17 @@
  * and everything the library's transport says about the wire, into `log.ts` —
  * because "the printer was unplugged" on a screen whose cable is still in is a
  * question the morning after, and until this existed nothing could answer it.
+ *
+ * **It reconnects by itself.** The library's `disconnect` means "a transfer was
+ * rejected", which a printer still on the bus does now and then, and the
+ * browser's `disconnect` means the device left. The first used to be shown as
+ * the second and left there until somebody re-paired; now it is given a
+ * moment for the browser to confirm, checked against the device list, and
+ * reopened with backoff if the printer is still there. See `startRecovery`.
  */
 import {
   BrotherQLPrinterCore,
+  getPairedPrinterDevices,
   isWebUsbSupported,
   requestPrinterDevice,
   watchConnectionEvents,
@@ -110,7 +118,13 @@ declare const __E2E_HOOKS__: boolean;
 export type PrinterState =
   | { kind: 'idle' }
   | { kind: 'unsupported'; message: string }
-  | { kind: 'unpaired' }
+  /**
+   * Set up with a printer the browser does not list. `searching` while the
+   * boot retry is still looking — the printer may just be slow to enumerate
+   * after a reload — and false once it has settled, which is when a screen
+   * should say so in words.
+   */
+  | { kind: 'unpaired'; searching: boolean }
   | { kind: 'ready'; config: PrinterConfig }
   | { kind: 'trouble'; message: string; advice: string | null };
 
@@ -176,6 +190,7 @@ const tracer = {
 function sameState(a: PrinterState, b: PrinterState): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === 'trouble' && b.kind === 'trouble') return a.message === b.message;
+  if (a.kind === 'unpaired' && b.kind === 'unpaired') return a.searching === b.searching;
   return true;
 }
 
@@ -238,9 +253,23 @@ function describe(error: unknown): { message: string; advice: string | null } {
         message: 'The printer is in Editor Lite mode.',
         advice: 'Hold the Editor Lite button until its light goes out.',
       };
-    case 'transfer-timeout':
-    case 'status-timeout':
+    case 'status-timeout': {
+      // The library waits for the printer to say it is ready for the next job
+      // after the last page. A printer that printed every page and then went
+      // quiet is not one that stopped responding — the sticker is in the tray.
+      const printed = (error as { pagesPrinted?: unknown }).pagesPrinted;
+      if (typeof printed === 'number' && printed > 0) {
+        return {
+          message: 'The printer went quiet after printing.',
+          advice: 'If the next label does not come out, turn it off and on again.',
+        };
+      }
       return { message: 'The printer stopped responding.', advice: 'Turn it off and on again.' };
+    }
+    case 'transfer-timeout':
+      return { message: 'The printer stopped responding.', advice: 'Turn it off and on again.' };
+    case 'busy':
+      return { message: 'The printer is busy with a label.', advice: 'Try again in a moment.' };
     case 'raster':
       return {
         message: 'This label does not fit the media the kiosk is set to.',
@@ -391,6 +420,162 @@ let opening: Promise<void> | null = null;
 let watching: (() => void) | null = null;
 let lifecycle: (() => void) | null = null;
 
+/**
+ * How long a dead transport is given for the browser to say the device has
+ * gone, before the kiosk goes and looks for itself.
+ *
+ * A real unplug rejects the pending transfer and fires the browser's own
+ * `disconnect` within a few hundred milliseconds of each other, in either
+ * order. A transfer that failed on a printer still there fires only the
+ * first. Waiting this long is what tells them apart without a device list.
+ */
+export const RECOVERY_GRACE_MS = 1_500;
+
+/**
+ * How long between attempts to reopen a printer that is still on the bus.
+ *
+ * The first attempt is immediate and silent — most of these are one rejected
+ * transfer, and the reopen simply works. The second is the one that gets to
+ * colour the screen, with the real error. The last interval repeats: a claim
+ * held by another tab is released when that tab closes, and a kiosk that
+ * stopped asking would never notice.
+ */
+export const RECOVERY_BACKOFF_MS = [1_000, 5_000, 30_000, 60_000] as const;
+
+/**
+ * How long a configured printer the browser does not list at boot is looked
+ * for before the screen says so. A printer still enumerating after the
+ * nightly reload, or after the tablet woke, turns up inside this.
+ */
+export const BOOT_RETRY_MS = [2_000, 3_000, 5_000] as const;
+
+/** Longest a close is waited for before the page moves on without it. */
+export const CLOSE_CAP_MS = 2_000;
+
+type Timer = ReturnType<typeof setTimeout>;
+
+/** A transport that died with its printer still listed, being brought back. */
+let recovery: { dead: BrotherQLPrinterCore; timer: Timer | null; attempt: number } | null = null;
+
+/** The boot-time search for a printer the browser has not listed yet. */
+let bootRetry: { timer: Timer | null; step: number } | null = null;
+
+function stopBootRetry(): void {
+  if (bootRetry?.timer) clearTimeout(bootRetry.timer);
+  bootRetry = null;
+}
+
+/** Nothing pending: the printer is open, gone for good, or being let go of. */
+function cancelTimers(): void {
+  if (recovery?.timer) clearTimeout(recovery.timer);
+  recovery = null;
+  stopBootRetry();
+}
+
+/**
+ * The printer has gone: let go of it and say so.
+ *
+ * Reached from the browser's own `disconnect` for this device, from a dead
+ * transport whose device the browser no longer lists, and from a wake that
+ * finds the device missing. The connect watcher is what brings it back.
+ */
+function lose(gone: BrotherQLPrinterCore, cause: string): void {
+  cancelTimers();
+  if (printer === gone) printer = null;
+  void gone.close().catch(() => {});
+  setState(
+    { kind: 'trouble', message: 'The printer was unplugged.', advice: 'Plug it back in.' },
+    cause,
+  );
+}
+
+/**
+ * The library says the transport died. Was that the printer leaving, or one
+ * rejected transfer on a printer still there?
+ *
+ * Nothing is said to the screens yet. A real unplug announces itself through
+ * the browser's `disconnect` inside the grace period and `lose` takes over;
+ * otherwise `decide` asks the browser what it lists.
+ */
+function startRecovery(dead: BrotherQLPrinterCore): void {
+  if (recovery?.dead === dead) return;
+  if (recovery?.timer) clearTimeout(recovery.timer);
+  recovery = {
+    dead,
+    attempt: 0,
+    timer: setTimeout(() => {
+      void decide(dead);
+    }, RECOVERY_GRACE_MS),
+  };
+}
+
+async function decide(dead: BrotherQLPrinterCore): Promise<void> {
+  // Overtaken: the browser said it went, a connect event or a label reopened
+  // it, or the kiosk let go of it in the meantime.
+  if (printer !== dead || !config) {
+    recovery = null;
+    return;
+  }
+  let devices: UsbIdentity[] | null;
+  try {
+    devices = await getPairedPrinterDevices();
+  } catch (error) {
+    log.record('kiosk', 'devices-failed', { cause: 'transport-lost', ...errorInfo(error) });
+    devices = null;
+  }
+  if (printer !== dead || !config) {
+    recovery = null;
+    return;
+  }
+  if (devices) {
+    const present = devices.some((device) => isOurs(device, dead.device));
+    log.record('usb', 'devices', {
+      cause: 'transport-lost',
+      count: devices.length,
+      present,
+      same: devices.includes(dead.device),
+    });
+    if (!present) {
+      lose(dead, 'transport-lost');
+      return;
+    }
+  }
+  scheduleAttempt(dead, 0);
+}
+
+function scheduleAttempt(dead: BrotherQLPrinterCore, attempt: number): void {
+  const delay =
+    attempt === 0 ? 0 : RECOVERY_BACKOFF_MS[Math.min(attempt - 1, RECOVERY_BACKOFF_MS.length - 1)];
+  recovery = {
+    dead,
+    attempt,
+    timer: setTimeout(() => {
+      void attemptReopen(dead, attempt);
+    }, delay),
+  };
+}
+
+async function attemptReopen(dead: BrotherQLPrinterCore, attempt: number): Promise<void> {
+  // Never from a timer onto a printer that is already open: `reopen` would
+  // republish `ready`, and the printer screen redraws on every publish.
+  if (!config || printer?.opened) {
+    recovery = null;
+    return;
+  }
+  log.record('kiosk', 'recovery', { attempt });
+  await reopen('recovery', { quiet: attempt === 0 });
+  if (printer?.opened) {
+    recovery = null;
+    return;
+  }
+  // The printer left while this was looking. The connect watcher owns it now.
+  if (state.kind === 'unpaired') {
+    recovery = null;
+    return;
+  }
+  scheduleAttempt(dead, attempt + 1);
+}
+
 /** Attach to a device and hold it open for the evening. */
 async function adopt(
   device: BrotherQLPrinterCore,
@@ -400,17 +585,18 @@ async function adopt(
   printer = device;
   device.model = active.model;
   device.on('disconnect', () => {
+    // A core this module has already let go of has nothing to say.
+    if (printer !== device) return;
     // The reader loop's transfer was rejected. The library calls that a
     // disconnect whatever the browser said, and the browser's own words are
     // already in the record by now — they are the difference between a printer
-    // that left the bus and one still there behind a failed transfer.
+    // that left the bus and one still there behind a failed transfer. Which
+    // of the two it was is decided in a moment, not here.
     log.record('kiosk', 'transport-lost', identity(device.device));
-    setState(
-      { kind: 'trouble', message: 'The printer was unplugged.', advice: 'Plug it back in.' },
-      'transport-lost',
-    );
+    startRecovery(device);
   });
   await device.open();
+  cancelTimers();
   setState({ kind: 'ready', config: active }, cause);
 }
 
@@ -449,11 +635,16 @@ export async function ready(): Promise<PrinterState> {
   watching ??= watchConnectionEvents({
     connect: (device) => {
       log.record('usb', 'connect', identity(device));
+      cancelTimers();
       void reopen('usb-connect');
     },
     disconnect: (device) => {
-      log.record('usb', 'disconnect', { ...identity(device), ours: isOurs(device, printer?.device) });
-      printer = null;
+      // The library filters these to Brother devices, not to this one. A second
+      // Brother device leaving the bus must not cost the kiosk the printer it
+      // is holding.
+      const ours = isOurs(device, printer?.device);
+      log.record('usb', 'disconnect', { ...identity(device), ours });
+      if (printer && ours) lose(printer, 'usb-disconnect');
     },
   });
   lifecycle ??= watchPageLifecycle();
@@ -463,8 +654,89 @@ export async function ready(): Promise<PrinterState> {
     label: stored.label,
     discarded: wasDiscarded(),
   });
+  // Searching until proven otherwise — a printer the browser has not listed
+  // yet is looked for a little longer before the screen says it is missing.
+  // Cancel-then-restart, because this runs again on every printer-screen exit.
+  stopBootRetry();
+  bootRetry = { timer: null, step: 0 };
   await reopen('boot');
+  if (state.kind === 'unpaired') scheduleBootStep();
+  else stopBootRetry();
   return state;
+}
+
+function scheduleBootStep(): void {
+  if (!bootRetry) return;
+  const step = bootRetry.step;
+  bootRetry.timer = setTimeout(() => {
+    void bootStep(step);
+  }, BOOT_RETRY_MS[step]);
+}
+
+async function bootStep(step: number): Promise<void> {
+  if (!bootRetry || !config || printer?.opened) {
+    stopBootRetry();
+    return;
+  }
+  // The last look is the one that gets to say what it found; the ones before
+  // it are silent, so the screen reads "looking" rather than flickering.
+  const last = step + 1 >= BOOT_RETRY_MS.length;
+  if (last) bootRetry = null;
+  else bootRetry.step = step + 1;
+  await reopen(last ? 'boot-settled' : 'boot-retry', { quiet: !last });
+  if (!last) scheduleBootStep();
+}
+
+/**
+ * The page is back: is the printer?
+ *
+ * A tablet switched away from, locked, or frozen by the platform comes back to
+ * the same page with the same transport, and the transport may not have
+ * survived. Not open is reopened; open is checked against the browser's list,
+ * because a device that left while the page was frozen fired its events into
+ * a page that was not listening.
+ */
+async function verify(cause: string): Promise<void> {
+  if (!config) return;
+  if (!printer?.opened) {
+    await reopen(cause);
+    return;
+  }
+  const held = printer;
+  let devices: UsbIdentity[];
+  try {
+    devices = await getPairedPrinterDevices();
+  } catch (error) {
+    log.record('kiosk', 'devices-failed', { cause, ...errorInfo(error) });
+    return;
+  }
+  if (printer !== held) return;
+  const present = devices.some((device) => isOurs(device, held.device));
+  log.record('usb', 'devices', { cause, count: devices.length, present });
+  if (!present) lose(held, cause);
+}
+
+/**
+ * Let go of the printer on purpose.
+ *
+ * Before the page goes away — `pagehide`, and the ~4am reload in `KioskApp`
+ * — so the interface is released rather than dropped with the document, and
+ * the next page cannot race the browser's teardown for the claim. Capped:
+ * a close that hangs must not hold up a reload. Idempotent, so both callers
+ * can use it.
+ */
+export async function closePrinter(cause: string): Promise<void> {
+  cancelTimers();
+  const held = printer;
+  printer = null;
+  log.record('kiosk', 'close', { cause, opened: held?.opened ?? false });
+  if (!held) return;
+  await Promise.race([
+    held.close().catch(() => {}),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, CLOSE_CAP_MS);
+    }),
+  ]);
 }
 
 /**
@@ -476,14 +748,24 @@ export async function ready(): Promise<PrinterState> {
  * puts a lost printer next to the thing that lost it.
  */
 function watchPageLifecycle(): () => void {
-  const onVisibility = () =>
-    log.record('page', 'visibilitychange', { visible: document.visibilityState === 'visible' });
-  const onPageShow = (event: Event) =>
+  const onVisibility = () => {
+    const visible = document.visibilityState === 'visible';
+    log.record('page', 'visibilitychange', { visible });
+    if (visible) void verify('wake:visibilitychange');
+  };
+  const onPageShow = (event: Event) => {
     log.record('page', 'pageshow', { persisted: (event as PageTransitionEvent).persisted });
-  const onPageHide = (event: Event) =>
+    void verify('wake:pageshow');
+  };
+  const onPageHide = (event: Event) => {
     log.record('page', 'pagehide', { persisted: (event as PageTransitionEvent).persisted });
+    void closePrinter('pagehide');
+  };
   const onFreeze = () => log.record('page', 'freeze');
-  const onResume = () => log.record('page', 'resume');
+  const onResume = () => {
+    log.record('page', 'resume');
+    void verify('wake:resume');
+  };
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pageshow', onPageShow);
   window.addEventListener('pagehide', onPageHide);
@@ -498,7 +780,13 @@ function watchPageLifecycle(): () => void {
   };
 }
 
-async function reopen(cause: string): Promise<void> {
+/**
+ * `quiet` keeps a failure out of the state: the first recovery attempt and the
+ * boot retry's early looks are silent, because most of them succeed and a
+ * screen that flickered through "unplugged" on the way to "ready" has told a
+ * volunteer something that was not true. A success is never quiet.
+ */
+async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise<void> {
   const active = config;
   if (!active) return;
   // A second connect event while the first reopen is still going would
@@ -520,23 +808,42 @@ async function reopen(cause: string): Promise<void> {
         model: active.model,
         diagnostics: tracer,
       });
-      const first = paired[0];
-      log.record('usb', 'devices', { cause, count: paired.length, ...identity(first?.device) });
-      if (!first) {
-        setState({ kind: 'unpaired' }, cause);
+      const chosen = chooseDevice(paired, active.model);
+      log.record('usb', 'devices', { cause, count: paired.length, ...identity(chosen?.device) });
+      if (!chosen) {
+        if (!options.quiet) setState({ kind: 'unpaired', searching: bootRetry !== null }, cause);
         return;
       }
-      await adopt(first, active, cause);
+      await adopt(chosen, active, cause);
     } catch (error) {
       log.record('kiosk', 'open-failed', { cause, ...errorInfo(error) });
-      const { message, advice } = describe(error);
-      setState({ kind: 'trouble', message, advice }, cause);
+      if (!options.quiet) {
+        const { message, advice } = describe(error);
+        setState({ kind: 'trouble', message, advice }, cause);
+      }
     } finally {
       opening = null;
     }
   })();
 
   return opening;
+}
+
+/**
+ * The paired device that is the configured printer, or the first one.
+ *
+ * `getPairedDevices` hands back every Brother device the origin was ever
+ * granted, whatever `model` it was asked for — the option names the core, it
+ * filters nothing — so a lobby with a label printer and a receipt printer both
+ * paired used to reopen whichever the browser listed first.
+ */
+function chooseDevice(
+  paired: readonly BrotherQLPrinterCore[],
+  model: string,
+): BrotherQLPrinterCore | undefined {
+  return (
+    paired.find((core) => modelFromProductName(core.device?.productName) === model) ?? paired[0]
+  );
 }
 
 /**
@@ -658,6 +965,10 @@ function suggested(status: PrinterStatus, model: string): readonly Label[] {
  * than a failure.
  */
 export async function checkPrinter(): Promise<PrinterDetection | null> {
+  // A label in flight holds the printer's busy lock, and a status read that
+  // walks into it fails with a sentence a volunteer cannot act on. Let the
+  // queue empty first; it is a second at most.
+  await queue.idle();
   const active = config;
   if (!active || !printer?.opened) return null;
 
@@ -728,6 +1039,10 @@ const queue = createLabelQueue({
     // The error and never the job: the job is a child's name and the words on
     // their sticker, and the record lives on a lobby tablet for weeks.
     log.record('kiosk', 'label-failed', errorInfo(error));
+    // A label that died with the transport is the recovery's to explain: it is
+    // deciding whether the printer left or merely dropped a transfer, and
+    // painting "unplugged" here would answer before it has looked.
+    if ((error as { code?: unknown } | null)?.code === 'disconnected' && recovery) return;
     const { message, advice } = describe(error);
     setState({ kind: 'trouble', message, advice }, 'label-failed');
   },
@@ -888,6 +1203,23 @@ export function testPrint(): void {
 /** Waiting labels, for the printer screen. */
 export function queueDepth(): number {
   return queue.depth();
+}
+
+/**
+ * Stop listening to the bus and the page, and drop whatever was pending.
+ *
+ * The listeners are meant to live for the page — a kiosk that stopped
+ * watching for its printer coming back is the fault this module exists to
+ * fix — so nothing in the kiosk calls this. Tests do: they load this module
+ * afresh for every case, on one shared document, and an instance that kept
+ * listening would answer events meant for the next.
+ */
+export function unwatch(): void {
+  watching?.();
+  watching = null;
+  lifecycle?.();
+  lifecycle = null;
+  cancelTimers();
 }
 
 /** What has happened to the printer lately, oldest first, for the printer screen. */

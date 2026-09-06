@@ -902,6 +902,9 @@ export function KioskApp() {
     if (binding && !bindingIsLive(binding, Date.now())) leaveGathering();
   }, [binding, leaveGathering, unattended]);
 
+  /** Set once the reload is under way, so the next tick does not start another. */
+  const reloadingRef = useRef(false);
+
   useEffect(() => {
     const tick = setInterval(() => {
       sweepBinding();
@@ -909,11 +912,19 @@ export function KioskApp() {
       // accumulates; 4am while unbound-or-idle is that moment, and the
       // no-cache kiosk.html makes it double as the update channel.
       if (unattended() && isQuietHour() && (!binding || !bindingIsLive(binding, Date.now()))) {
-        window.location.reload();
+        if (reloadingRef.current) return;
+        reloadingRef.current = true;
+        // Let go of the printer first. The reload is what drops the WebUSB
+        // handle, and an interface released on purpose is one the next page
+        // cannot race the browser's teardown for. Capped inside, so a close
+        // that hangs cannot hold the reload up.
+        void (printing ? printing.closePrinter('reload') : Promise.resolve()).finally(() => {
+          window.location.reload();
+        });
       }
     }, 60_000);
     return () => clearInterval(tick);
-  }, [binding, sweepBinding, unattended]);
+  }, [binding, printing, sweepBinding, unattended]);
 
   /*
    * And again the moment the kiosk is looked at.

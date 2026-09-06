@@ -62,12 +62,30 @@ function orderedModels(printing: KioskPrinting): string[] {
   return [...preferred, ...all.filter((model) => !preferred.includes(model))];
 }
 
+/**
+ * What a kiosk set up with a printer it cannot find is told to do.
+ *
+ * The Android sentence is there because on Android it is the whole story: a
+ * printer that lost power or its cable, however briefly, is one the browser
+ * can no longer match to its grant, and only the chooser brings it back. See
+ * docs/label-printing.md.
+ */
+const UNPAIRED_ADVICE =
+  'Check its power and cable. A printer that lost power on an Android tablet has to be connected again from this screen.';
+
 function stateLine(state: PrinterState): { text: string; tone: string } {
   switch (state.kind) {
     case 'ready':
       return { text: 'Connected and ready.', tone: 'text-present-400' };
     case 'unpaired':
-      return { text: 'No printer connected yet.', tone: 'text-ink-400' };
+      // Set up with a printer, which is what makes this different from `idle`
+      // below: the browser is not listing the one this kiosk was given.
+      return state.searching
+        ? { text: 'Looking for the printer this kiosk was set up with…', tone: 'text-ink-400' }
+        : {
+            text: 'The printer this kiosk was set up with is not connected.',
+            tone: 'text-warn-400',
+          };
     case 'unsupported':
       return { text: state.message, tone: 'text-warn-400' };
     case 'trouble':
@@ -277,6 +295,24 @@ export function PrinterScreen({
     }
   };
 
+  /**
+   * Look for the printer again without the chooser.
+   *
+   * The module reopens by itself after a dropped transfer and on a connect
+   * event, so this is for the case neither covers: a volunteer who has just
+   * pushed a cable back in and wants to know now, not on the next label.
+   */
+  const lookAgain = async () => {
+    setBusy(true);
+    try {
+      await printing.ready();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const canLookAgain =
+    state.kind === 'trouble' || (state.kind === 'unpaired' && !state.searching);
+
   const nameOf = (entry: Label) => printing.labelName(entry);
   const notice = detection ? detectionNotice(detection, label, nameOf) : null;
   const line = stateLine(state);
@@ -292,6 +328,9 @@ export function PrinterScreen({
         <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>{line.text}</div>
         {state.kind === 'trouble' && state.advice && (
           <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{state.advice}</div>
+        )}
+        {state.kind === 'unpaired' && !state.searching && (
+          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{UNPAIRED_ADVICE}</div>
         )}
       </div>
 
@@ -629,15 +668,28 @@ export function PrinterScreen({
             * runs at. So opening the printer screen opened the browser's device
             * chooser, every time, on a printer that was already connected.
             */}
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={busy}
-            {...tap(() => void connect())}
-            className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-          >
-            {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
-          </button>
+          <div className={`grid shrink-0 gap-3 ${canLookAgain ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {canLookAgain && (
+              <button
+                type="button"
+                tabIndex={-1}
+                disabled={busy}
+                {...tap(() => void lookAgain())}
+                className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
+              >
+                Look again
+              </button>
+            )}
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={busy}
+              {...tap(() => void connect())}
+              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
+            >
+              {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
+            </button>
+          </div>
         </div>
       </div>
 
