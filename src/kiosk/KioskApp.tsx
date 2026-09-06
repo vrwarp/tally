@@ -97,7 +97,7 @@ type Phase = 'booting' | 'pairing' | 'choosing' | 'printer' | 'ready';
  *
  * `intent` is what a confirm would do, decided once when the row is tapped so
  * the confirm and the success screen cannot disagree — a register refresh
- * landing mid-tap must not turn "Collect" into "already checked in" under a
+ * landing mid-tap must not turn "Check out" into "already checked in" under a
  * parent's thumb.
  */
 export type KioskIntent = 'check-in' | 'check-out' | 'done';

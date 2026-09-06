@@ -269,9 +269,9 @@ describe('collecting a family together', () => {
     await type('0134');
     await pick('Marcus Osei');
 
-    expect(screen.getByText(/Collecting anyone else/i)).toBeTruthy();
+    expect(screen.getByText(/Checking out anyone else/i)).toBeTruthy();
 
-    await tap(/collect all 2/i);
+    await tap(/check out all 2/i);
 
     expect(
       vi
@@ -290,7 +290,7 @@ describe('collecting a family together', () => {
     await pick('Marcus Osei');
 
     expect(screen.queryByText(/anyone else/i)).toBeNull();
-    await tap(/collect/i);
+    await tap(/check out/i);
 
     expect(vi.mocked(services.performCheckOut).mock.calls.map((call) => call[0].studentId)).toEqual([
       's-marcus',
@@ -329,7 +329,7 @@ describe('collecting the ones who came in together', () => {
       'false',
     );
 
-    await tap(/^collect$/i);
+    await tap(/^check out$/i);
     expect(collectedIds()).toEqual(['s-amara']);
   });
 
@@ -353,7 +353,7 @@ describe('collecting the ones who came in together', () => {
     expect(screen.getByText('Maya Chen').closest('button')!.getAttribute('aria-pressed')).toBe(
       'true',
     );
-    await tap(/collect all 2/i);
+    await tap(/check out all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-maya']);
   });
 
@@ -370,7 +370,7 @@ describe('collecting the ones who came in together', () => {
     expect(screen.getByText('Marcus Osei').closest('button')!.getAttribute('aria-pressed')).toBe(
       'true',
     );
-    await tap(/collect all 2/i);
+    await tap(/check out all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
   });
 
@@ -428,7 +428,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     await type('2200');
     await pick('Maya Chen');
 
-    expect(screen.getByText(/collect/i)).toBeTruthy();
+    expect(screen.getByText(/check out/i)).toBeTruthy();
     expect(screen.queryByText(/Another child/i)).toBeNull();
   });
 
@@ -606,7 +606,7 @@ describe('pre-selecting only the children this gathering expects', () => {
     await type('7788');
     await pick('Amara Osei');
 
-    await tap(/collect all 2/i);
+    await tap(/check out all 2/i);
     expect(collectedIds()).toEqual(['s-amara', 's-marcus']);
   });
 });

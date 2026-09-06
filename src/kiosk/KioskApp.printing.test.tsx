@@ -224,7 +224,7 @@ describe('printing from the kiosk flow', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
 
-    await tap(/collect/i);
+    await tap(/check out/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(1);
@@ -368,7 +368,7 @@ describe('a family checked in together', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
 
-    await tap(/collect all 2/i);
+    await tap(/check out all 2/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(2);

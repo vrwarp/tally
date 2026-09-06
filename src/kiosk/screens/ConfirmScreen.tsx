@@ -188,7 +188,7 @@ export function ConfirmScreen({
             whose nearest noun was the child's name — "not this child, show me a
             different one", to exactly the parent this exists for. */}
         <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
-          {intent === 'check-out' ? 'Collecting anyone else?' : 'Anyone else?'}
+          {intent === 'check-out' ? 'Checking out anyone else?' : 'Anyone else?'}
         </div>
 
         {family.length > 0 && (
@@ -490,8 +490,8 @@ export function ConfirmScreen({
         >
           {intent === 'check-out'
             ? others > 0
-              ? `Collect all ${chosen.length}`
-              : 'Collect'
+              ? `Check out all ${chosen.length}`
+              : 'Check out'
             : others > 0
               ? `Check in all ${chosen.length}`
               : 'Check in'}

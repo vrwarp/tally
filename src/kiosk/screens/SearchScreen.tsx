@@ -408,9 +408,9 @@ const ResultRow = memo(function ResultRow({
       </span>
       <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
         {collected ? (
-          <span className="font-semibold text-ink-400">Collected</span>
+          <span className="font-semibold text-ink-400">Checked out</span>
         ) : present && tracksCheckOut ? (
-          <span className="font-semibold text-brand-300">Tap to collect</span>
+          <span className="font-semibold text-brand-300">Tap to check out</span>
         ) : present ? (
           <span className="font-semibold text-present-400">✓ Checked in</span>
         ) : (
@@ -887,12 +887,12 @@ export function SearchScreen({
               {/*
                 * One sentence, in both modes.
                 *
-                * It carried "…to check in or collect" at a pickup gathering,
+                * It carried "…to check in or check out" at a pickup gathering,
                 * which said the mode twice on one screen — the header had it
                 * too — and wrapped this line onto two, ending in a one-word
                 * orphan. Neither copy was where the answer actually is: the
-                * row itself says "Tap to collect", "✓ Checked in" or a dimmed
-                * "Collected", and that is a thing a parent acts on rather than
+                * row itself says "Tap to check out", "✓ Checked in" or a dimmed
+                * "Checked out", and that is a thing a parent acts on rather than
                 * files.
                 *
                 * `ink-400`, the same step as the line above it. At `ink-500`

@@ -199,7 +199,7 @@ describe('returning home after a tap', () => {
     await type('ada');
     await pickAda();
 
-    await tap(/collect/i);
+    await tap(/check out/i);
     await tapSuccess();
 
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();

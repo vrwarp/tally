@@ -196,7 +196,7 @@ test.describe('the kiosk', () => {
       await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
-      const collectable = kiosk.getByText(/tap to collect/i).first();
+      const collectable = kiosk.getByText(/tap to check out/i).first();
       await expect(collectable).toBeVisible({ timeout: 15_000 });
       await collectable.click();
 
@@ -204,7 +204,7 @@ test.describe('the kiosk', () => {
       // cost is gone; see the note at the top of ConfirmScreen for the trade.
       // A real press rather than a synthesised click, because the button
       // commits on the lift and only if the lift lands inside it.
-      const button = kiosk.getByRole('button', { name: /^Collect$/ });
+      const button = kiosk.getByRole('button', { name: /^Check out$/ });
       await expect(button).toBeVisible();
       const box = (await button.boundingBox())!;
       await kiosk.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -283,13 +283,13 @@ test.describe('the kiosk', () => {
       // The confirm screen offers a check-in or says they are already done.
       // What it must never offer here is a pickup: the flag gates the flow,
       // and this gathering does not carry it.
-      await expect(kiosk.getByRole('button', { name: /^Collect/ })).toHaveCount(0);
+      await expect(kiosk.getByRole('button', { name: /^Check out/ })).toHaveCount(0);
       await expect(
         kiosk.getByRole('button', { name: /^Check in$/ }).or(kiosk.getByText(/already checked in/i)),
       ).toBeVisible();
 
       await kiosk.getByRole('button', { name: /back/i }).click();
-      await expect(kiosk.getByText(/tap to collect/i)).toHaveCount(0);
+      await expect(kiosk.getByText(/tap to check out/i)).toHaveCount(0);
     } finally {
       await context.close();
     }
@@ -515,10 +515,10 @@ test.describe('the kiosk', () => {
       // label went on at the door — so the count must not move.
       await kiosk.getByText(/welcome/i).click();
       await findOnKiosk(kiosk, LABELLED);
-      const collectable = kiosk.getByText(/tap to collect/i).first();
+      const collectable = kiosk.getByText(/tap to check out/i).first();
       await expect(collectable).toBeVisible({ timeout: 15_000 });
       await collectable.click();
-      await kiosk.getByRole('button', { name: /^Collect$/ }).click();
+      await kiosk.getByRole('button', { name: /^Check out$/ }).click();
       await expect(kiosk.getByText(/checked out/i)).toBeVisible({ timeout: 15_000 });
 
       expect(await recordedLabels(kiosk)).toHaveLength(1);
