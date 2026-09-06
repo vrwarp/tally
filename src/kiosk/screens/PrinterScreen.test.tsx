@@ -88,9 +88,27 @@ function mount(printing: KioskPrinting, config = { model: 'QL-800', label: '62' 
   );
 }
 
+/**
+ * A real tap: down and up on the same control, as a finger makes it.
+ *
+ * At the origin because `useTap` asks whether the lift landed inside the
+ * control's box, and jsdom lays nothing out — every `getBoundingClientRect` is
+ * a zero-sized box at 0,0, so 0,0 is the only point inside one.
+ */
 async function press(name: RegExp): Promise<void> {
+  const button = screen.getByRole('button', { name });
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name }));
+    fireEvent.pointerDown(button, { pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerUp(button, { pointerId: 1, clientX: 0, clientY: 0 });
+  });
+}
+
+/** The same, for a control found by its words rather than its role. */
+async function pressText(text: string): Promise<void> {
+  const button = screen.getByText(text, { selector: 'button' });
+  await act(async () => {
+    fireEvent.pointerDown(button, { pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerUp(button, { pointerId: 1, clientX: 0, clientY: 0 });
   });
 }
 
@@ -141,9 +159,7 @@ describe('connecting a printer', () => {
     expect(screen.getByText(/Set to 62mm endless/)).toBeInTheDocument();
 
     // And the other one is one press away, not a select somebody has to open.
-    await act(async () => {
-      fireEvent.click(screen.getByText(RED_NAME, { selector: 'button' }));
-    });
+    await pressText(RED_NAME);
     expect(printing.configure).toHaveBeenCalledWith({ model: 'QL-810W', label: '62red' });
     expect(screen.getByText(/Set to 62mm endless \(black\/red\/white\)/)).toBeInTheDocument();
   });
@@ -212,5 +228,52 @@ describe('checking a printer that is already connected', () => {
     await press(/Check the printer/);
 
     expect(screen.getByText('The cover is open.')).toBeInTheDocument();
+  });
+});
+
+describe('a press this screen never received', () => {
+  /*
+   * The staff screen's rows act on `pointerup`, so the *click* that finishes
+   * the same tap is dispatched after this screen has already mounted under the
+   * finger — and both screens centre their column, which put the unbind within
+   * a few pixels of the `Label printer` row at every viewport the kiosk runs
+   * at. On a bare `onClick` that opened the browser's device chooser every
+   * single time somebody looked at a printer that was already connected.
+   *
+   * jsdom cannot stage the swap — it does not hit-test a click against the DOM
+   * that replaced the one the press landed on — so what is pinned here is the
+   * property that makes the swap harmless: a click with no press of its own on
+   * the control is not an act. Every control on this screen has to hold it,
+   * which is why they are all guarded rather than only the one that was caught.
+   */
+  it('does not open the chooser for a click with no press behind it', async () => {
+    const printing = handleWith(detection());
+    mount(printing);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Choose a different printer/ }));
+    });
+
+    expect(printing.pairPrinter).not.toHaveBeenCalled();
+  });
+
+  it('does not read the printer, print, or change the roll for one either', async () => {
+    const printing = handleWith(
+      detection({ config: { model: 'QL-810W', label: '62' }, matched: [PLAIN_62, RED_62] }),
+    );
+    mount(printing);
+    // Open the fold so the chips are reachable, then click without pressing.
+    await press(/Connect a printer|Choose a different printer/);
+    printing.pairPrinter.mockClear();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Check the printer/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Print a test label/ }));
+      fireEvent.click(screen.getByText(RED_NAME, { selector: 'button' }));
+    });
+
+    expect(printing.checkPrinter).not.toHaveBeenCalled();
+    expect(printing.testPrint).not.toHaveBeenCalled();
+    expect(printing.configure).not.toHaveBeenCalled();
   });
 });
