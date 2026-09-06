@@ -208,10 +208,15 @@ reason is gone.
 
 ---
 
-## 4. Plan
+## 4. What was done, and what is left
 
-Phased so instrumentation lands first and the field log says which mechanism fires before the
-behaviour changes. Kiosk-side only; the library needs no change (upstream improvements are §4.6).
+Phased so the instrumentation landed first — the field record says which mechanism fires — and
+the behaviour change followed. Phases 1 to 4 are on this branch, one commit each: the record
+(`src/kiosk/printing/log.ts`, the tracer wiring and the *Recent printer events* fold), the recovery
+(`src/kiosk/printing/index.ts`, the printer screen's wording and **Look again**, the close before
+the nightly reload), their tests, and the documentation in `docs/label-printing.md`. Phase 5 is
+setup on the kiosk itself and Phase 6 is upstream; neither is code here. The library needs no
+change for any of the kiosk-side work.
 
 ### Event flow after the change
 
@@ -230,7 +235,7 @@ any   ──visible/pageshow/resume     ──▶ not opened ? reopen : presence
 any   ──pagehide / pre-reload       ──▶ cancel timers, close (capped 2 s), printer=null
 ```
 
-### Phase 1 — Record what happens (no behaviour change)
+### Phase 1 — Record what happens (no behaviour change) — done
 
 **`src/kiosk/storage.ts`**: add `KIOSK_KEYS.printerLog = 'tally:kiosk:printerLog'` — a bounded ring
 of printer events, no names, kept across the nightly reload because that reload is one of the
@@ -278,7 +283,7 @@ on toggle and on state change.
 Budget: text only; `log.ts` plus wiring is ~2–3 kB gzipped against 11 kB of headroom in the printing
 chunk; the screen additions land in the first-paint budget and stay library-free.
 
-### Phase 2 — Recover without a human
+### Phase 2 — Recover without a human — done
 
 **`src/kiosk/printing/index.ts`**:
 
@@ -335,7 +340,7 @@ connect it again from this screen." A **Look again** button (`printing.ready()`)
 settled `unpaired`, so a manual retry no longer has to go through the chooser.
 `EventChooser.tsx:398-402` and `StaffScreen` wording checked against the new state shape.
 
-### Phase 3 — Tests
+### Phase 3 — Tests — done
 
 `src/kiosk/printing/log.test.ts` (new): `isNoise`, capacity bound keeps order and drops the oldest,
 persisted on every record, seeds from a previous page, ignores a corrupt/foreign key, `sanitizeData`
@@ -372,7 +377,7 @@ blocked; **Look again** calls `ready()`. Optional `KioskApp.reload.test.tsx`: at
 Stryker: `src/kiosk/printing/**` is mutated at a 90% threshold — every new branch and constant needs
 a killing test (`node scripts/mutate.mjs src/kiosk/printing/log.ts` / `index.ts` for a narrowed run).
 
-### Phase 4 — Docs (`docs/label-printing.md`)
+### Phase 4 — Docs (`docs/label-printing.md`) — done
 
 - Setup step 4: the kiosk reopens the printer itself after the nightly reload and after a USB
   hiccup; add **set Auto Power Off (AC/DC) to None** (factory default 60 minutes; Wi-Fi also
@@ -386,7 +391,7 @@ a killing test (`node scripts/mutate.mjs src/kiosk/printing/log.ts` / `index.ts`
   with a serial; `WebUsbAllowDevicesForUrls` for managed devices (§4.5).
 - Line 325: "step 6" → "step 4". Intro test list: add `log.test.ts`.
 
-### Phase 5 — Setup and platform (no code)
+### Phase 5 — Setup and platform (no code) — to do on the kiosk
 
 - **Auto Power Off (AC/DC) = None** on the printer; printer on mains and a powered hub the tablet
   does not switch off; tablet on mains, screen never sleeping, Chrome excluded from battery
@@ -402,7 +407,7 @@ a killing test (`node scripts/mutate.mjs src/kiosk/printing/log.ts` / `index.ts`
 - If the log shows §2.5 recurring, prefer ChromeOS for the printing kiosk: it keeps the grant across
   re-attaches and reconnects silently.
 
-### Phase 6 — Upstream (`@vrwarp/brother-ql-webusb`, separate PR)
+### Phase 6 — Upstream (`@vrwarp/brother-ql-webusb`, separate PR) — to do
 
 - In the read loop, distinguish `NotFoundError` (gone) from `NetworkError`/`AbortError` (fault) and
   carry the underlying error on the `disconnect` event, or emit a separate `fault` event.
