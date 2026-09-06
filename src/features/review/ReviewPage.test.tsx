@@ -1173,7 +1173,7 @@ describe('correcting what the family typed', () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Robin Fields/i }));
     const first = screen.getByLabelText('First name');
     await user.clear(first);
     await user.type(first, 'Robyn');
@@ -1199,7 +1199,7 @@ describe('correcting what the family typed', () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Robin Fields/i }));
     const first = screen.getByLabelText('First name');
     await user.clear(first);
     await user.type(first, 'Room 3');
@@ -1215,7 +1215,7 @@ describe('correcting what the family typed', () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Robin Fields/i }));
 
     // A card mid-correction is a card whose facts are in flux: the approve
     // caption names children by names somebody is in the middle of changing.
@@ -1228,7 +1228,7 @@ describe('correcting what the family typed', () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Dana Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Dana Fields/i }));
     const phone = screen.getByLabelText('Phone');
     await user.clear(phone);
     await user.type(phone, '5550103355');
@@ -1252,7 +1252,7 @@ describe('correcting what the family typed', () => {
     });
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Robin Fields/i }));
     await user.click(screen.getByRole('button', { name: /Save the correction/i }));
 
     await waitFor(() =>
@@ -1277,7 +1277,7 @@ describe('correcting what the family typed', () => {
     });
     mount();
 
-    await user.click(await screen.findByRole('button', { name: /Correct Robin Fields/i }));
+    await user.click(await screen.findByRole('button', { name: /Edit Robin Fields/i }));
     await user.click(screen.getByRole('button', { name: /Save the correction/i }));
 
     expect(await screen.findByText(/already been added to the church/i)).toBeInTheDocument();
@@ -1342,7 +1342,7 @@ describe('correcting what the family typed', () => {
     mount();
 
     expect(
-      await screen.findByRole('button', { name: /Correct Dana Fields/i }),
+      await screen.findByRole('button', { name: /Edit Dana Fields/i }),
     ).toBeInTheDocument();
   });
 
@@ -1360,7 +1360,7 @@ describe('correcting what the family typed', () => {
     mount();
 
     expect(await screen.findByText('(555) 010-3344')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Correct Dana Fields/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Edit Dana Fields/i })).toBeNull();
   });
 
   it('offers no correction on a child who is already upstream', async () => {
@@ -1388,10 +1388,10 @@ describe('correcting what the family typed', () => {
     // Tally could rename its own copy; the church's database would keep the old
     // spelling, and a button whose only outcome is a refusal is worse than none.
     expect(await screen.findByText('Robin Fields')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Correct Robin Fields/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Edit Robin Fields/i })).toBeNull();
     // The adult is a different question and is deliberately still offered: this
     // record is kept precisely so somebody can try the guardian again.
-    expect(screen.getByRole('button', { name: /Correct Dana Fields/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit Dana Fields/i })).toBeInTheDocument();
   });
 });
 

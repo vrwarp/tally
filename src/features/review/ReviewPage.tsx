@@ -29,7 +29,7 @@
  * queue behind them. A card reading "Micheal Okonkwo" used to leave a reviewer
  * choosing between a misspelling made permanent in a database with no delete
  * and discarding a real family along with the only phone number Tally holds for
- * them. **Correct** is the proportionate answer: one person at a time, in
+ * them. **Edit** is the proportionate answer: one person at a time, in
  * place, with the rest of the card held while it is open — see
  * `functions/src/kiosk/amend.ts` for why it is a callable rather than a field
  * write, and docs/review-corrections.md for the journeys it serves.
@@ -442,10 +442,10 @@ const STRIP = 'rounded-xl bg-ink-800/50 px-3 py-2 text-sm text-ink-300 ring-1 ri
  * the screen in the most consequential clothes. It is still a 44px target,
  * because a reviewer holding a phone has to be able to hit it.
  *
- * `label` is the accessible name — "Correct Robin Fields's details" — because
- * six identical "Correct"s down a card is a screen reader's list of nothing.
+ * `label` is the accessible name — "Edit Robin Fields's details" — because
+ * six identical "Edit"s down a card is a screen reader's list of nothing.
  */
-function CorrectButton({
+function EditButton({
   label,
   disabled,
   onClick,
@@ -462,7 +462,7 @@ function CorrectButton({
       onClick={onClick}
       className="flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm text-brand-400 ring-1 ring-ink-800 transition-colors hover:bg-ink-900 disabled:opacity-60 pointer-fine:min-h-8"
     >
-      Correct
+      Edit
     </button>
   );
 }
@@ -478,7 +478,7 @@ export interface ChildFields {
 /**
  * The foot of an editor, in the card's own grammar.
  *
- * A sentence bound to each control, Cancel in the slot the "Correct" button
+ * A sentence bound to each control, Cancel in the slot the "Edit" button
  * was, and the commit second. Saving is not one of this screen's three
  * decisions — nothing here reaches the church's database — and the caption's
  * job is to say so out loud, because a form on a card whose other buttons are
@@ -584,7 +584,7 @@ function ChildEditor({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-ink-200">Correcting {nameOf(child)}</p>
+      <p className="text-sm font-semibold text-ink-200">Editing {nameOf(child)}</p>
       {refusal ? <ErrorBanner message={refusal} /> : null}
 
       <div className="grid gap-3 lg:grid-cols-3">
@@ -713,7 +713,7 @@ function GuardianEditor({
   return (
     <form onSubmit={submit} className="rounded-xl bg-ink-950 px-3 py-3 ring-1 ring-brand-500/40">
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-ink-200">Correcting the parent</p>
+        <p className="text-sm font-semibold text-ink-200">Editing the parent</p>
         {refusal ? <ErrorBanner message={refusal} /> : null}
 
         <div className="grid gap-3 lg:grid-cols-3">
@@ -1264,8 +1264,8 @@ function RegistrationCard({
                 callable refuses that one for the same reason.
               */}
               {row.lastErrorKind === 'children' ? null : (
-                <CorrectButton
-                  label={`Correct ${nameOf(row.guardian)}’s details`}
+                <EditButton
+                  label={`Edit ${nameOf(row.guardian)}’s details`}
                   disabled={locked}
                   onClick={() => setEditing({ kind: 'guardian' })}
                 />
@@ -1944,8 +1944,8 @@ function ChildRow({
           <span className="shrink-0 text-xs text-ink-400">Added</span>
         )}
         {correctable ? (
-          <CorrectButton
-            label={`Correct ${nameOf(child)}\u2019s details`}
+          <EditButton
+            label={`Edit ${nameOf(child)}\u2019s details`}
             disabled={disabled}
             onClick={onEdit}
           />

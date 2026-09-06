@@ -46,7 +46,7 @@ duplicate warning, and a blue **Approve and add** button. There is no warning
 *because* of the typo: the door's duplicate scan matched on the name as typed,
 and `Micheal` collides with nobody.
 
-She taps **Correct** on the child's row, fixes the spelling, and saves. The card
+She taps **Edit** on the child's row, fixes the spelling, and saves. The card
 comes back changed: `Michael Okonkwo`, a **Possible duplicate** badge, the
 approve button held, and `Michael Okonkwo · 4th grade · Same phone digits on
 file` offered as a candidate to merge into. A toast says *"Saved — and one
@@ -68,7 +68,7 @@ Approving this creates a **person** in Planning Center called MOM MARCHETTI,
 attached to a household, for ever. This is the one field on the screen that
 becomes a contact card somebody will later try to phone.
 
-Rita taps **Correct** beside the phone number, types `Renata Marchetti`, saves.
+Rita taps **Edit** beside the phone number, types `Renata Marchetti`, saves.
 The card's title changes with it, and a caption under the phone now reads *"Typed
 at the kiosk as MOM Marchetti."* — so a colleague opening the card on Thursday
 can see this is a correction and not the form.
@@ -149,7 +149,7 @@ building has met.
 ### 2. A correction is not a decision, and must not be dressed as one.
 
 Every `Button` on this card either writes to a database with no undo or refuses
-to. **Correct** is therefore *not* a Button: it is the same quiet ringed target
+to. **Edit** is therefore *not* a Button: it is the same quiet ringed target
 as **Undo**, at 44px so a thumb can still land it. Giving the least consequential
 control on the screen the most consequential clothes is how a reviewer learns to
 distrust the blue ones.
@@ -174,7 +174,7 @@ is the right place to say so.
 
 While an editor is open, everything else on the card is disabled — approve,
 discard, merge, the same-family group, the guardian candidates, and the other
-rows' **Correct** buttons. Two reasons, and the second is the real one:
+rows' **Edit** buttons. Two reasons, and the second is the real one:
 
 - two open forms on a phone is a wall of boxes with two Saves in it; and
 - **a card mid-correction is a card whose facts are in flux.** The duplicate
@@ -243,7 +243,7 @@ needs.
 
 ### 10. Only offer it where it can still matter — and that is a different question for each half.
 
-No **Correct** button appears on a child who has been pushed or folded into
+No **Edit** button appears on a child who has been pushed or folded into
 another roster row. Each would either lie about what it can change or edit a
 document nobody will read.
 

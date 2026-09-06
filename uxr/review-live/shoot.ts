@@ -83,9 +83,9 @@ const STEPS: Step[] = [
     journey: 'Journey A — the misspelling that would have become permanent',
     title: 'The editor takes the row, not a dialog',
     caption:
-      'One person at a time, in place. A dialog would cover the duplicate candidates — which are exactly what this edit may change — and on a phone it would cover the card entirely. Notice what has gone grey: approve, “Not ours”, and every other Correct button on the card. A card mid-correction is a card whose facts are in flux, and the approve caption names children by names somebody is in the middle of changing. Each control carries its sentence above it, in the card’s own grammar — and the one above Save changes as soon as the name does, which is the next frame but one.',
+      'One person at a time, in place. A dialog would cover the duplicate candidates — which are exactly what this edit may change — and on a phone it would cover the card entirely. Notice what has gone grey: approve, “Not ours”, and every other Edit button on the card. A card mid-correction is a card whose facts are in flux, and the approve caption names children by names somebody is in the middle of changing. Each control carries its sentence above it, in the card’s own grammar — and the one above Save changes as soon as the name does, which is the next frame but one.',
     run: async (page, card) => {
-      await card.getByRole('button', { name: new RegExp(`Correct Micheal ${SURNAME}`) }).click();
+      await card.getByRole('button', { name: new RegExp(`Edit Micheal ${SURNAME}`) }).click();
       await page.waitForTimeout(200);
     },
   },
@@ -117,7 +117,7 @@ const STEPS: Step[] = [
     caption:
       'Under the corrected name, a rung quieter, the card has stopped claiming to be the form: “Typed at the kiosk as Micheal Okonkwo.” A colleague opening this on Thursday can see at a glance why the roster’s Michael was not offered at the door. Now the adult. Approving this would create a person in Planning Center called MOM, attached to a household, for ever — and it is the one field on this screen somebody will later try to phone. The kiosk asked “who is bringing them?” and a parent in a hurry answered the question they thought was being asked.',
     run: async (page, card) => {
-      await card.getByRole('button', { name: new RegExp(`Correct MOM ${SURNAME}`) }).click();
+      await card.getByRole('button', { name: new RegExp(`Edit MOM ${SURNAME}`) }).click();
       await page.waitForTimeout(200);
     },
   },
@@ -148,7 +148,7 @@ const STEPS: Step[] = [
     caption:
       'The grade is a filter on the check-in roster and one of the two discriminators on the merge picker above — a candidate whose grade matches is drawn emphasised, because a name alone often cannot tell two children apart, so a wrong grade makes the duplicate comparison worse exactly where somebody is leaning on it. “No grade” is the first option and an answer rather than a blank: a child too young for one has none. The allergy note is pushed into the church’s medical notes on approval and is what a leader reads afterwards — the only field on this screen with a safety consequence, and the last chance to fix it.',
     run: async (page, card) => {
-      await card.getByRole('button', { name: new RegExp(`Correct Michael ${SURNAME}`) }).click();
+      await card.getByRole('button', { name: new RegExp(`Edit Michael ${SURNAME}`) }).click();
       await page.waitForTimeout(200);
       await card.getByLabel('Grade').selectOption({ label: '4th grade' });
       await card.getByLabel('Allergies').fill('Peanut allergy — carries an EpiPen in his bag');
@@ -159,7 +159,7 @@ const STEPS: Step[] = [
     journey: 'The end of the job',
     title: 'A corrected family, and a decision that can now be made',
     caption:
-      'Saved, and the grade now matches the roster row it is being compared against — which is the comparison a reviewer settles next. Every fact on the card is one somebody has checked; the collision the correction surfaced is still held, deliberately, because it is a real question and the approve button stays shut until it is answered. Nothing corrected here has touched the church’s database: that is what makes it safe, and it is why a child who has already been pushed gets no Correct button at all but a pointer to their own page, which knows how to carry a rename upstream.',
+      'Saved, and the grade now matches the roster row it is being compared against — which is the comparison a reviewer settles next. Every fact on the card is one somebody has checked; the collision the correction surfaced is still held, deliberately, because it is a real question and the approve button stays shut until it is answered. Nothing corrected here has touched the church’s database: that is what makes it safe, and it is why a child who has already been pushed gets no Edit button at all but a pointer to their own page, which knows how to carry a rename upstream.',
     run: async (page, card) => {
       await card.getByRole('button', { name: /Save the correction/ }).click();
       await page.waitForTimeout(700);
