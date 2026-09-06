@@ -73,7 +73,7 @@ test.describe('Planning Center', () => {
     }
   });
 
-  test('a minor’s parent contact is never written to Firestore', async ({
+  test('a minor’s contact details are never written to Firestore', async ({
     signedInAs,
     firestore,
   }) => {
@@ -155,7 +155,7 @@ test.describe('Planning Center', () => {
     await expect(page.getByRole('link', { name: /Wendell/ })).toBeVisible({ timeout: 30_000 });
   });
 
-  test('parent contact is fetched for one student, on the screen that shows it', async ({
+  test('contact details are fetched for one student, on the screen that shows it', async ({
     page,
     signedInAs,
   }) => {
@@ -166,7 +166,9 @@ test.describe('Planning Center', () => {
     await page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first().click();
 
     // The detail screen exists to answer "who do I call", so it asks eagerly.
-    await expect(page.getByText(/contact/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Contact', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
 
     /*
      * A real number, on screen. Firestore holds none — the sibling test asserts

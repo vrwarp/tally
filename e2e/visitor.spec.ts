@@ -87,7 +87,7 @@ test.describe('quick-add visitor', () => {
     await expect(dialog).toBeVisible();
   });
 
-  test('takes a parent contact when one is offered, and holds it for review', async ({
+  test('takes a contact when one is offered, and holds it for review', async ({
     page,
     signedInAs,
     firestore,

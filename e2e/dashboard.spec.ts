@@ -66,7 +66,7 @@ test.describe('dashboard', () => {
      * The PRD asks for actionable insights rather than a data table: a row that
      * cannot be acted on is a row somebody has to copy into their phone by hand.
      *
-     * Parent contact lives in Planning Center and is read one person at a time,
+     * Contact details live in Planning Center and are read one person at a time,
      * which used to be spent as a tap: the row offered to fetch it. The reads
      * are cached now, so the row just fetches, and "actionable" means every one
      * of them settles on something a leader can act on.
@@ -75,7 +75,7 @@ test.describe('dashboard', () => {
      * only pretend: it poked the first row and demanded a phone number. Which
      * student sorts first moves with the clock — `computeMia` orders by
      * consecutive misses, and the seed's `edge` band drifts across that
-     * threshold as gatherings come and go. Two of those students have no parent
+     * threshold as gatherings come and go. Two of those students have no adult
      * in Planning Center *on purpose* (Trevor Boyd's note says the office has
      * never reached one), so the old assertion passed or failed depending on
      * the hour the suite happened to run.
@@ -90,11 +90,11 @@ test.describe('dashboard', () => {
       await blocks.evaluateAll((groups) =>
         groups.map((group) => group.getAttribute('aria-label') ?? ''),
       )
-    ).map((label) => label.replace(/^Parent contact for /, ''));
+    ).map((label) => label.replace(/^Contact for /, ''));
 
     const reachable: string[] = [];
     for (const name of names) {
-      const block = page.getByRole('group', { name: `Contact for ` }).first();
+      const block = page.getByRole('group', { name: `Contact for ${name}` }).first();
 
       /*
        * Three honest outcomes: a way to reach them, the form that adds one —
@@ -111,7 +111,7 @@ test.describe('dashboard', () => {
        * none. So the row's claim is the button, and the claim that the button
        * leads somewhere is made once, below, by opening it.
        */
-      const reachOut = block.getByRole('button', { name: `Contact the adult for ` });
+      const reachOut = block.getByRole('button', { name: `Contact the adult for ${name}` });
       const addOne = block.getByRole('button', {
         name: new RegExp(`^Add a contact for ${escapeForRegExp(name)}`),
       });
@@ -125,7 +125,7 @@ test.describe('dashboard', () => {
 
     // And at least one row really produced a number or an address, so this is
     // exercising the Planning Center read rather than tallying excuses. The
-    // seed's `drifted` band — the five absent 4+ weeks — all have a parent.
+    // seed's `drifted` band — the five absent 4+ weeks — all have an adult.
     expect(reachable.length, 'not one follow-up row yielded any contact details').toBeGreaterThan(
       0,
     );
@@ -138,9 +138,9 @@ test.describe('dashboard', () => {
      */
     const first = reachable[0]!;
     await page
-      .getByRole('group', { name: `Contact for ` })
+      .getByRole('group', { name: `Contact for ${first}` })
       .first()
-      .getByRole('button', { name: `Contact the adult for ` })
+      .getByRole('button', { name: `Contact the adult for ${first}` })
       .click();
 
     await expect(
