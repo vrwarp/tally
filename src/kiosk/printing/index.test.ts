@@ -43,12 +43,31 @@ const usb = vi.hoisted(() => ({
   stopWatching: 0,
 }));
 
+/**
+ * What the library's own tables say, for the tests about detection.
+ *
+ * The real ones are exercised in `detect.test.ts`, which needs no transport;
+ * here they only have to be answerable, so a test can put two rolls in front of
+ * the chooser and see which one the module takes.
+ */
+const tables = vi.hoisted(() => ({
+  /** Every model identifier, for reading a name off the USB bus. */
+  models: [] as string[],
+  /** What `labelsForModel` offers: the rolls that fit the head. */
+  fits: [] as { identifier: string; name: string }[],
+  /** What the status packet is taken to match, before the fit filter. */
+  matched: [] as { identifier: string; name: string }[],
+}));
+
 /** One printer, with the parts this module actually drives. */
 function makeDevice(overrides: Record<string, unknown> = {}) {
   const handlers = new Map<string, () => void>();
   return {
     model: '',
     opened: false,
+    /* What the core exposes of the USB device, and the only thing this module
+       reads off it: the name the printer puts on the bus. */
+    device: { productName: null as string | null },
     on: vi.fn((event: string, handler: () => void) => handlers.set(event, handler)),
     open: vi.fn(async function (this: { opened: boolean }) {
       this.opened = true;
@@ -71,7 +90,7 @@ vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
       readonly device: unknown,
       readonly options: { model: string },
     ) {
-      Object.assign(this, makeDevice(), { model: options.model });
+      Object.assign(this, makeDevice(), { model: options.model, device });
       cores.made.push(this);
     }
   },
@@ -86,13 +105,13 @@ vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
       usb.stopWatching += 1;
     };
   },
-  suggestLabels: () => [],
+  suggestLabels: () => tables.matched,
 }));
 vi.mock('@vrwarp/brother-ql-webusb/labels', () => ({
-  labelName: (id: string) => id,
-  labelsForModel: () => [],
+  labelName: (label: { identifier: string; name?: string }) => label.name ?? label.identifier,
+  labelsForModel: () => tables.fits,
 }));
-vi.mock('@vrwarp/brother-ql-webusb/models', () => ({ modelIdentifiers: () => [] }));
+vi.mock('@vrwarp/brother-ql-webusb/models', () => ({ modelIdentifiers: () => tables.models }));
 
 /* -------------------------------------------------------------------------- */
 /* The worker, the queue, the allergy lookup                                   */
@@ -225,6 +244,9 @@ beforeEach(() => {
   usb.watchers = null;
   usb.stopWatching = 0;
   cores.made = [];
+  tables.models = [];
+  tables.fits = [];
+  tables.matched = [];
   worker.posted = [];
   worker.reply = null;
   worker.started = 0;
@@ -332,11 +354,11 @@ describe('opening the printer at boot', () => {
     configured();
     const printing = await load();
     await printing.ready();
-    await expect(printing.readStatus()).resolves.not.toBeNull();
+    await expect(printing.checkPrinter()).resolves.not.toBeNull();
 
     usb.watchers?.disconnect();
 
-    await expect(printing.readStatus()).resolves.toBeNull();
+    await expect(printing.checkPrinter()).resolves.toBeNull();
   });
 
   it('says the printer was unplugged when the reader loop notices', async () => {
@@ -459,9 +481,9 @@ describe('pairing', () => {
     usb.request = () => ({ raw: true });
     const printing = await load();
 
-    const state = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
 
-    expect(state.kind).toBe('ready');
+    expect(printing.currentState().kind).toBe('ready');
     expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
       model: 'QL-810W',
       label: '62x29',
@@ -472,9 +494,10 @@ describe('pairing', () => {
     // Not a failure worth colouring the screen for.
     const printing = await load();
 
-    const state = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    const found = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
 
-    expect(state).toEqual({ kind: 'idle' });
+    expect(found).toBeNull();
+    expect(printing.currentState()).toEqual({ kind: 'idle' });
     expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
   });
 
@@ -484,13 +507,50 @@ describe('pairing', () => {
     };
     const printing = await load();
 
-    const state = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    const found = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
 
-    expect(state).toEqual({
+    expect(found).toBeNull();
+    expect(printing.currentState()).toEqual({
       kind: 'trouble',
       message: 'Something else on this device is holding the printer.',
       advice: 'Close it.',
     });
+  });
+
+  it('takes the model off the printer rather than off the screen', async () => {
+    /*
+     * The whole point of connecting rather than answering a list: the screen's
+     * two selects were showing whatever the last kiosk was set to, and the
+     * machine that was just plugged in knows better than both of them.
+     */
+    tables.models = ['QL-800', 'QL-810W', 'QL-1110NWB'];
+    usb.request = () => ({ productName: 'Brother QL-1110NWB' });
+    const printing = await load();
+
+    const found = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+
+    expect(found?.config.model).toBe('QL-1110NWB');
+    expect(found?.modelFromPrinter).toBe(true);
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toMatchObject({
+      model: 'QL-1110NWB',
+    });
+    // And the device is told, because the head width the rasteriser builds for
+    // comes from the model and nothing later re-states it.
+    expect(cores.made.at(-1)).toMatchObject({ model: 'QL-1110NWB' });
+  });
+
+  it('keeps what the screen was showing for a printer it cannot place', async () => {
+    // A name that matches nothing is not a reason to guess a model: a wrong one
+    // rasters name badges at the wrong head width and prints something that
+    // looks almost right.
+    tables.models = ['QL-800', 'QL-810W'];
+    usb.request = () => ({ productName: 'Brother PT-9800PCN' });
+    const printing = await load();
+
+    const found = await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+
+    expect(found?.config.model).toBe('QL-810W');
+    expect(found?.modelFromPrinter).toBe(false);
   });
 });
 
@@ -542,50 +602,135 @@ describe('changing the media without re-pairing', () => {
   });
 });
 
-describe('reading the status', () => {
+describe('asking the printer what it is', () => {
+  /** A printer holding one roll the tables can name unambiguously. */
+  function loaded(overrides: Record<string, unknown> = {}) {
+    tables.models = ['QL-800', 'QL-810W'];
+    tables.fits = [
+      { identifier: '62', name: '62mm endless' },
+      { identifier: '62x29', name: '62mm x 29mm die-cut' },
+    ];
+    tables.matched = [{ identifier: '62x29', name: '62mm x 29mm die-cut' }];
+    const device = makeDevice(overrides);
+    usb.paired = [device];
+    configured();
+    return device;
+  }
+
   it('has nothing to say with no printer open', async () => {
     const printing = await load();
 
-    await expect(printing.readStatus()).resolves.toBeNull();
+    await expect(printing.checkPrinter()).resolves.toBeNull();
   });
 
   it('has nothing to say for a printer that is there but shut', async () => {
     // Open is the part that matters: a device the origin is paired with but
     // has not claimed answers nothing, and asking it would throw on the setup
     // screen rather than showing the media it is waiting to be told about.
-    const device = makeDevice();
-    usb.paired = [device];
-    configured();
+    const device = loaded();
     const printing = await load();
     await printing.ready();
     device.opened = false;
 
-    await expect(printing.readStatus()).resolves.toBeNull();
+    await expect(printing.checkPrinter()).resolves.toBeNull();
     expect(device.queryStatus).not.toHaveBeenCalled();
   });
 
   it('asks the printer what it has loaded', async () => {
-    const device = makeDevice();
-    usb.paired = [device];
-    configured();
+    loaded();
     const printing = await load();
     await printing.ready();
 
-    await expect(printing.readStatus()).resolves.toEqual({ media: '62x29' });
+    await expect(printing.checkPrinter()).resolves.toMatchObject({
+      status: { media: '62x29' },
+      config: { model: 'QL-810W', label: '62x29' },
+      matched: [{ identifier: '62x29' }],
+    });
+  });
+
+  it('sets the kiosk to the roll it can see', async () => {
+    // The reason this is not a suggestion any more. A kiosk left on the roll
+    // somebody put in it last month prints a name badge at a size the
+    // rasteriser refuses, and the volunteer holding the child sees nothing at
+    // all come out.
+    const device = loaded();
+    configured('QL-810W', '62');
+    const printing = await load();
+    await printing.ready();
+
+    const found = await printing.checkPrinter();
+
+    expect(found?.config.label).toBe('62x29');
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
+      model: 'QL-810W',
+      label: '62x29',
+    });
+    expect(device.opened).toBe(true);
+  });
+
+  it('takes the plainer of two rolls it cannot tell apart, and says which', async () => {
+    /*
+     * 62mm tape is both `62` and `62red` and the packet cannot see the
+     * difference. The special roll is the one somebody went out of their way to
+     * buy, so the guess is the ordinary one — and every match comes back so the
+     * screen can say a guess was made.
+     */
+    loaded();
+    tables.matched = [
+      { identifier: '62red', name: '62mm endless (black/red/white)' },
+      { identifier: '62', name: '62mm endless' },
+    ];
+    tables.fits = tables.matched;
+    const printing = await load();
+    await printing.ready();
+
+    const found = await printing.checkPrinter();
+
+    expect(found?.config.label).toBe('62');
+    expect(found?.matched.map((entry) => entry.identifier)).toEqual(['62red', '62']);
+  });
+
+  it('leaves the roll alone when nothing in the tables matches what is loaded', async () => {
+    // Better the answer somebody gave than one nobody did: a label the table
+    // does not carry is a roll this kiosk cannot print on either way, and
+    // clearing the stored one would only lose the last thing that worked.
+    loaded();
+    tables.matched = [];
+    const printing = await load();
+    await printing.ready();
+
+    const found = await printing.checkPrinter();
+
+    expect(found?.config.label).toBe('62x29');
+    expect(found?.matched).toEqual([]);
+  });
+
+  it('never selects a roll the printer screen would not offer', async () => {
+    // `suggestLabels` applies the media table and the restriction lists but not
+    // whether the label fits the head. The select's own list does, and this
+    // must not be able to set something that list does not contain.
+    loaded();
+    tables.matched = [{ identifier: '102', name: '102mm endless' }];
+    tables.fits = [{ identifier: '62x29', name: '62mm x 29mm die-cut' }];
+    const printing = await load();
+    await printing.ready();
+
+    const found = await printing.checkPrinter();
+
+    expect(found?.config.label).toBe('62x29');
+    expect(found?.matched).toEqual([]);
   });
 
   it('turns a failed read into trouble rather than throwing', async () => {
-    const device = makeDevice({
+    loaded({
       queryStatus: vi.fn(async () => {
         throw Object.assign(new Error('timed out'), { code: 'status-timeout' });
       }),
     });
-    usb.paired = [device];
-    configured();
     const printing = await load();
     await printing.ready();
 
-    await expect(printing.readStatus()).resolves.toBeNull();
+    await expect(printing.checkPrinter()).resolves.toMatchObject({ status: null, matched: [] });
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
       message: 'The printer stopped responding.',

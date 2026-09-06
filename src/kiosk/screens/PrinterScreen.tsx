@@ -7,16 +7,23 @@
  * Everything here is staff-facing: a parent never sees this screen, and a parent
  * never sees a printer error anywhere else either.
  *
- * Two things have to be chosen by a person, because neither can be discovered:
+ * Two things decide what a badge comes out as — which printer, and what is on
+ * its spindle — and the printer answers both when it is connected. `Connect a
+ * printer` reads the model off the USB product string and the roll off a status
+ * packet, sets the kiosk to them, and says what it did. `Check the printer`
+ * does the same afterwards, which is what somebody who has just changed a roll
+ * presses.
  *
- * **The model.** `brother_ql` has no model detection and cannot have one. The
- * status packet carries a model byte documented as a bring-up hint, and the USB
- * product id is not a reliable map. So this is a list.
+ * Neither answer is certain, so both stay editable and the notice above the
+ * settings says which was a guess:
  *
- * **The media.** The printer does report the width and length it senses, and
- * `suggestLabels` maps that back onto the label table — but 62mm tape is both
- * `62` and `62red` and the packet cannot tell them apart, so detection is a
- * shortcut offered next to the list rather than a replacement for it.
+ * **The model** is the name the device puts on the bus. Right on every QL this
+ * has met and unplaceable on one the library does not carry, in which case the
+ * list is still somebody's to answer and the notice says so.
+ *
+ * **The media** is sensed, but 62mm tape is both `62` and `62red` and the
+ * packet cannot tell them apart. The plainer roll is taken, every match is
+ * offered as a chip, and the notice names the one that was chosen.
  *
  * The test print goes through the real path — worker, rasteriser, transport — so
  * a label coming out proves the whole chain rather than just that the device
@@ -30,7 +37,13 @@ import type { KioskPrinting } from '../KioskApp';
 // Type-only. Every value this screen needs from the library arrives through the
 // `printing` handle, because this component is referenced statically by KioskApp
 // and a direct import would put the transport into the first-paint graph.
-import type { PrintedLabel, PrinterConfig, PrinterState, PrinterStatus } from '../printing';
+import type {
+  Label,
+  PrintedLabel,
+  PrinterConfig,
+  PrinterDetection,
+  PrinterState,
+} from '../printing';
 
 /** The models this was built against, offered first. */
 const PREFERRED_MODELS = ['QL-810W', 'QL-800', 'QL-820NWB'];
@@ -54,6 +67,58 @@ function stateLine(state: PrinterState): { text: string; tone: string } {
     default:
       return { text: 'No printer set up on this kiosk.', tone: 'text-ink-400' };
   }
+}
+
+/**
+ * What the printer just told us, as the sentence a volunteer needs.
+ *
+ * Above the settings rather than inside them, because the settings are folded:
+ * a roll that had to be guessed is exactly the thing somebody would never open
+ * a `details` to discover.
+ *
+ * `label` is the *current* selection rather than the detected one, so the line
+ * stays true after somebody takes the other chip.
+ */
+function detectionNotice(
+  detection: PrinterDetection,
+  label: string,
+  nameOf: (entry: Label) => string,
+): { lines: string[]; tone: string } | null {
+  // The printer did not answer. The state line at the top of the screen is
+  // already saying why, and saying it twice helps nobody.
+  if (!detection.status) return null;
+
+  const media = `${detection.status.mediaWidthMm}mm ${
+    detection.status.mediaType === 'die-cut' ? 'die-cut' : 'continuous'
+  }`;
+  const lines: string[] = [];
+  let tone = 'text-ink-400';
+
+  if (!detection.modelFromPrinter) {
+    lines.push(
+      `The printer did not say which model it is — check that ${detection.config.model} is right.`,
+    );
+    tone = 'text-warn-400';
+  }
+
+  const chosen = detection.matched.find((entry) => entry.identifier === label);
+  if (detection.matched.length === 0) {
+    lines.push(`${media} is loaded, and no roll this printer takes is that size.`);
+    tone = 'text-warn-400';
+  } else if (detection.matched.length > 1) {
+    lines.push(
+      `${media} is loaded, which is more than one roll. Set to ${nameOf(
+        chosen ?? detection.matched[0],
+      )} — change it below if that is not what is on the spindle.`,
+    );
+    tone = 'text-warn-400';
+  } else {
+    lines.push(
+      `Read off the printer: ${detection.config.model}, ${nameOf(detection.matched[0])}.`,
+    );
+  }
+
+  return { lines, tone };
 }
 
 /** "6:41 PM", the way every other time on this device is written. */
@@ -96,7 +161,7 @@ export function PrinterScreen({
   const [state, setState] = useState<PrinterState>(() => printing.currentState());
   const [model, setModel] = useState(config.model);
   const [label, setLabel] = useState(config.label);
-  const [status, setStatus] = useState<PrinterStatus | null>(null);
+  const [detection, setDetection] = useState<PrinterDetection | null>(null);
   const [busy, setBusy] = useState(false);
   const rowTap = useTapGuard(onReprint);
   const tap = useTap();
@@ -137,17 +202,41 @@ export function PrinterScreen({
     void apply({ model, label: nextLabel });
   };
 
-  const detect = async () => {
+  /**
+   * Take what the printer says about itself, on either of the two doors to it.
+   *
+   * The module has already written the config and set the kiosk to it, so this
+   * is the screen catching up with a decision rather than making one — which is
+   * why the selects are set from `found.config` and not from what was asked
+   * for.
+   */
+  const adopt = (found: PrinterDetection | null) => {
+    if (!found) return;
+    setDetection(found);
+    setModel(found.config.model);
+    setLabel(found.config.label);
+  };
+
+  const check = async () => {
     setBusy(true);
     try {
-      const read = await printing.readStatus();
-      setStatus(read);
+      adopt(await printing.checkPrinter());
     } finally {
       setBusy(false);
     }
   };
 
-  const suggested = status ? printing.suggestLabels(status, model) : [];
+  const connect = async () => {
+    setBusy(true);
+    try {
+      adopt(await printing.pairPrinter({ model, label }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const nameOf = (entry: Label) => printing.labelName(entry);
+  const notice = detection ? detectionNotice(detection, label, nameOf) : null;
   const line = stateLine(state);
 
   return (
@@ -238,6 +327,26 @@ export function PrinterScreen({
 
         <div className="flex shrink-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
           {/*
+            * What connecting just found out, outside the fold.
+            *
+            * The two settings below it are answered by the printer now, so the
+            * job of this column is no longer to ask — it is to show the answers
+            * and be honest about the one of them that is a guess. A roll chosen
+            * for somebody because the packet could not choose is the sentence
+            * this screen most owes a volunteer, and it cannot live inside a
+            * `details` nobody has a reason to open.
+            */}
+          {notice && (
+            <div className="shrink-0 rounded-xl bg-ink-900 p-4">
+              {notice.lines.map((text) => (
+                <div key={text} className={`text-sm kiosk:text-base ${notice.tone}`}>
+                  {text}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/*
             * Settings chosen once at unboxing, folded to what they are set to.
             * `details` rather than a state flag: the browser already owns this
             * and the kiosk bundle has a budget.
@@ -255,6 +364,7 @@ export function PrinterScreen({
               <label className="flex flex-col gap-1">
                 <span className="text-sm text-ink-400 kiosk:text-base">Printer model</span>
                 <select
+                  aria-label="Printer model"
                   value={model}
                   onChange={(event) => onModelChange(event.target.value)}
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
@@ -266,13 +376,15 @@ export function PrinterScreen({
                   ))}
                 </select>
                 <span className="text-xs text-ink-500 kiosk:text-sm">
-                  There is no way to detect this — it has to match the printer on the shelf.
+                  Filled in from the printer when it was connected. It has to match the machine on
+                  the shelf, so change it if it does not.
                 </span>
               </label>
 
               <label className="flex flex-col gap-1">
                 <span className="text-sm text-ink-400 kiosk:text-base">Loaded label</span>
                 <select
+                  aria-label="Loaded label"
                   value={labelIsAvailable ? label : (available[0]?.identifier ?? label)}
                   onChange={(event) => onLabelChange(event.target.value)}
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
@@ -284,36 +396,40 @@ export function PrinterScreen({
                   ))}
                 </select>
                 <span className="text-xs text-ink-500 kiosk:text-sm">
-                  What is in the printer now. Events describe what the label says, never its size.
+                  What is in the printer now, sensed when it was connected. Events describe what the
+                  label says, never its size.
                 </span>
               </label>
 
-              {suggested.length > 0 && (
+              {/* Only when the packet could not choose. One match is already the
+                  answer in the select above, and a chip saying "use what you
+                  are using" is a control that does nothing. */}
+              {detection && detection.matched.length > 1 && (
                 <div className="rounded-xl bg-ink-950 p-4">
                   <div className="pb-2 text-sm text-ink-400 kiosk:text-base">
-                    {status?.mediaWidthMm}mm{' '}
-                    {status?.mediaType === 'die-cut' ? 'die-cut' : 'continuous'} detected
-                    {suggested.length > 1 && ' — more than one label matches, so pick the right one'}
+                    The printer cannot tell these two apart. Which is on the spindle?
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {suggested.map((entry) => (
+                    {detection.matched.map((entry) => (
                       <button
                         key={entry.identifier}
                         type="button"
                         tabIndex={-1}
                         onClick={() => onLabelChange(entry.identifier)}
-                        className="rounded-lg bg-ink-800 px-4 py-2 text-ink-100"
+                        className={`rounded-lg px-4 py-2 text-ink-100 ${
+                          entry.identifier === label ? 'bg-brand-600' : 'bg-ink-800'
+                        }`}
                       >
-                        Use {printing.labelName(entry)}
+                        {printing.labelName(entry)}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {status && status.errors.length > 0 && (
+              {detection && detection.status && detection.status.errors.length > 0 && (
                 <div className="rounded-xl bg-ink-950 p-4 text-sm text-warn-400 kiosk:text-base">
-                  {status.errors.map((flag) => (
+                  {detection.status.errors.map((flag) => (
                     <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
                   ))}
                 </div>
@@ -358,7 +474,7 @@ export function PrinterScreen({
               type="button"
               tabIndex={-1}
               disabled={busy || state.kind !== 'ready'}
-              onClick={() => void detect()}
+              onClick={() => void check()}
               className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 disabled:opacity-50 kiosk:text-lg"
             >
               Check the printer
@@ -380,7 +496,7 @@ export function PrinterScreen({
             type="button"
             tabIndex={-1}
             disabled={busy}
-            onClick={() => void printing.pairPrinter({ model, label })}
+            onClick={() => void connect()}
             className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 disabled:opacity-50 kiosk:text-lg"
           >
             {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}

@@ -137,9 +137,8 @@ const printing = {
       ? { kind: 'trouble' as const, message: 'The cover is open.', advice: 'Close it and try again.' }
       : { kind: 'ready' as const, config: { model: 'QL-810W', label: '62' } },
   configure: async () => {},
-  pairPrinter: async () => {},
-  readStatus: async () => null,
-  suggestLabels: () => [],
+  pairPrinter: async () => null,
+  checkPrinter: async () => null,
   testPrint: () => {},
 } as unknown as KioskPrinting;
 
