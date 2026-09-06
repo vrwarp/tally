@@ -111,10 +111,72 @@ describe('the kiosk keyboard', () => {
 
     // The staggering spacers, which are part of the delegated container and
     // land under a thumb aiming at A or Z.
-    press(container.querySelector('.flex-\\[0\\.5\\]')!);
+    press(container.querySelector('[data-gap]')!);
 
     expect(onKey).not.toHaveBeenCalled();
     expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('types the straight apostrophe, whatever the key shows', () => {
+    const onKey = vi.fn();
+    render(<Keyboard onKey={onKey} />);
+
+    // The key wears a typographer's ’; the buffers accept the straight mark,
+    // and for as long as the key typed what it showed, O'Brien registered as
+    // Obrien with a buzz and no letter.
+    press(screen.getByLabelText('Apostrophe'));
+    press(screen.getByLabelText('Hyphen'));
+
+    expect(onKey.mock.calls.map(([key]) => key)).toEqual([
+      { kind: 'char', value: "'" },
+      { kind: 'char', value: '-' },
+    ]);
+  });
+
+  it('keeps each mark the only thing inside its key', () => {
+    render(<Keyboard onKey={vi.fn()} />);
+
+    // The handler types a key's text when it is one character long; a second
+    // child, or a stray space, would silently fall the hyphen back to its name.
+    expect(screen.getByLabelText('Hyphen').textContent).toBe('-');
+    expect(screen.getByLabelText('Apostrophe').textContent).toBe('’');
+  });
+});
+
+describe('the kiosk keyboard’s geometry', () => {
+  /** A key's span on the board's twenty-cell track, read off its classes. */
+  function span(element: Element): number {
+    return Number(/col-span-(\d+)/.exec(element.className)?.[1]);
+  }
+
+  it('centres the space bar: both flanks of the bottom row weigh the same', () => {
+    render(<Keyboard onKey={vi.fn()} />);
+
+    const row = screen.getByLabelText('Space').parentElement!;
+    const spans = [...row.children].map(span);
+    // Clear · space · ’ · - — 4 · 12 · 2 · 2 of twenty, so the bar's centre is
+    // the board's midline by construction, on every glass.
+    expect(spans).toEqual([4, 12, 2, 2]);
+    expect(spans.reduce((a, b) => a + b, 0)).toBe(20);
+  });
+
+  it('lays every row on the same twenty cells', () => {
+    const { container } = render(<Keyboard onKey={vi.fn()} shift="off" />);
+
+    for (const row of container.firstElementChild!.children) {
+      expect([...row.children].map(span).reduce((a, b) => a + b, 0)).toBe(20);
+    }
+  });
+
+  it('gives the two seams that cost something more air than the rest', () => {
+    const { container } = render(<Keyboard onKey={vi.fn()} />);
+
+    // Clear gives 8px back on its bar side; the bottom row sits under a deeper
+    // gutter than the 6px between the rows above.
+    expect(screen.getByText('Clear').className).toMatch(/\bmr-2\b/);
+    const rows = [...container.firstElementChild!.children];
+    expect(rows.at(-1)!.className).toMatch(/\bmt-\[10px\]/);
+    for (const row of rows.slice(0, -1)) expect(row.className).not.toMatch(/\bmt-/);
   });
 });
 

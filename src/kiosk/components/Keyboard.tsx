@@ -27,6 +27,26 @@
  * every key and a finger expects it: on a tablet flat on a table, where a
  * parent is watching the readout rather than their thumb, it is the only
  * confirmation that the glass took the press at all.
+ *
+ * Geometry, in one measuring system. Every row is a grid of twenty half-column
+ * cells with the board's one gap: a letter is two cells, the home row's stagger
+ * one, the Z row's flanks three, Clear four, the bar twelve. It used to be
+ * flex, each row dividing the width minus its own gap count, so a "1.5-unit"
+ * key was three different widths on one glass and the bottom row — four keys
+ * on seven units under rows of ten — put the space bar from the midline to the
+ * bezel with the hyphen key sitting exactly on the row's midpoint. A parent's
+ * friend called the keyboard weird; three rounds of critique measured what
+ * they meant (`docs/refinements.md`). Now every edge of the bottom row is an
+ * edge of the rows above it and the bar's centre is the board's, to the pixel.
+ *
+ * Two seams on this board carry unequal consequences, and both get more air
+ * than the 6px between two letters. Clear wipes the buffer with no undo, so it
+ * gives 8px back on its bar side — off Clear rather than off the bar, which
+ * keeps the bar on its axis and its columns. And a correction is the commonest
+ * gesture here: ⌫ sits over the hyphen and, on the wizard, ⇧ over Clear, so
+ * every key is 2px shorter than it was and the ten freed pixels all sit under
+ * the Z row. A low miss lands on nothing. The board's height is unchanged and
+ * no row is a different height from any other.
  */
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
@@ -59,8 +79,10 @@ const KEY_CLASS =
   /* `tall:` steps the keys up on a screen stood on end — see the variant's
      note in index.css. A kiosk is read and reached at arm's length by
      somebody standing, so a key that is comfortable in a hand is small on
-     a shelf. */
-  'flex h-14 min-w-0 flex-1 select-none items-center justify-center rounded-lg ' +
+     a shelf. The two heights are 3.5rem and 4rem less 2px: the trim that pays
+     for the deeper gutter above the bottom row (see the header), invisible on
+     its own and the same on every row. */
+  'flex h-[3.375rem] min-w-0 select-none items-center justify-center rounded-lg ' +
   /* Solid here, tinted by context: while the gathering's photograph is up,
      the search screen's `kiosk-has-backdrop` class turns these fills to 80%
      glass (see index.css) — the room glints in the gutters, the caps hold
@@ -68,7 +90,25 @@ const KEY_CLASS =
      is the feedback. Every screen without that class, the wizard's and the
      reprint search's keyboards included, keeps this keyboard byte-identical
      to the one that shipped. */
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-16 kiosk:text-2xl';
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-[3.875rem] kiosk:text-2xl';
+
+/*
+ * One row of the track. Twenty cells rather than ten so the home row's
+ * half-key stagger and the Z row's key-and-a-half flanks are whole cells too;
+ * `col-span-*` on each key is the whole of a key's geometry.
+ */
+const ROW_CLASS = 'grid grid-cols-[repeat(20,minmax(0,1fr))] gap-1.5';
+
+/*
+ * The two marks a name can carry, set as key labels rather than as raw glyphs.
+ * At the letters' size an apostrophe is 5×8px of ink on a 73px key and a
+ * hyphen 7×4 — both critics and both consultants read them as blank plates —
+ * so each is one type step up. The apostrophe is left where an apostrophe
+ * sits in a word, high; levelled with the hyphen it read as a comma. Nothing
+ * else may go inside these two buttons: `onPointerDown` reads the button's
+ * text, and a second child would silently fall it back to `data-key`.
+ */
+const MARK_CLASS = 'block text-3xl leading-none kiosk:text-4xl';
 
 export const Keyboard = memo(function Keyboard({
   onKey,
@@ -159,6 +199,17 @@ export const Keyboard = memo(function Keyboard({
     else if (key === 'clear') handlerRef.current({ kind: 'clear' });
     else if (key === 'shift') handlerRef.current({ kind: 'shift' });
     else if (key === 'space') handlerRef.current({ kind: 'char', value: ' ' });
+    /*
+     * The apostrophe types the straight mark (U+0027) whatever glyph the key
+     * shows. The label is a typographer's ’, and for as long as this branch
+     * read the label the key emitted U+2019 — which `NAME_CHARACTER` and
+     * `ALLERGY_CHARACTER` in registration/steps.ts do not accept, so on the
+     * wizard the press buzzed and nothing appeared, and O'Brien went onto the
+     * sticker and into the church's database as Obrien. One character can now
+     * reach a buffer as an apostrophe, and the auto-shift after it, the
+     * exports and the office's own typing all agree on which one.
+     */
+    else if (key === "'") handlerRef.current({ kind: 'char', value: "'" });
     else {
       /*
        * The character in the case the key is *showing*. Read off the label
@@ -185,15 +236,17 @@ export const Keyboard = memo(function Keyboard({
       onPointerDown={onPointerDown}
     >
       {ROWS.map((row, i) => (
-        <div key={i} className="flex gap-1.5">
-          {/* Stagger the letter rows the way every keyboard does. */}
-          {i === 2 && <div className="flex-[0.5]" />}
-          {/* The bottom row's leading slot: a spacer where there is no shift
-              key, the shift key where there is. Same width either way, so the
+        <div key={i} className={ROW_CLASS}>
+          {/* Stagger the letter rows the way every keyboard does. `data-gap`
+              names the glass a finger can land on that does nothing, so the
+              tests can find it without knowing how wide it is. */}
+          {i === 2 && <div data-gap className="col-span-1" />}
+          {/* The Z row's leading slot: a spacer where there is no shift key,
+              the shift key where there is. Same width either way, so the
               letters under a thumb sit in the same place on both screens. */}
           {i === 3 &&
             (shift === undefined ? (
-              <div className="flex-[1.5]" />
+              <div data-gap className="col-span-3" />
             ) : (
               <button
                 type="button"
@@ -201,33 +254,45 @@ export const Keyboard = memo(function Keyboard({
                 data-key="shift"
                 aria-label={shift === 'lock' ? 'Caps lock on' : shift === 'on' ? 'Shift on' : 'Shift'}
                 aria-pressed={shift !== 'off'}
-                className={`${KEY_CLASS} flex-[1.5] text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
+                className={`${KEY_CLASS} col-span-3 text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
               >
                 {shift === 'lock' ? '⇪' : '⇧'}
               </button>
             ))}
           {row.map((key) => (
-            <button key={key} type="button" tabIndex={-1} data-key={key} className={KEY_CLASS}>
+            <button key={key} type="button" tabIndex={-1} data-key={key} className={`${KEY_CLASS} col-span-2`}>
               {/* Digits have no case; a letter wears the shift state, so every
                   key shows exactly what it will produce. */}
               {capitals ? key : key.toLowerCase()}
             </button>
           ))}
-          {i === 2 && <div className="flex-[0.5]" />}
+          {i === 2 && <div data-gap className="col-span-1" />}
           {i === 3 && (
             <button
               type="button"
               tabIndex={-1}
               data-key="backspace"
               aria-label="Delete"
-              className={`${KEY_CLASS} flex-[1.5] text-2xl`}
+              className={`${KEY_CLASS} col-span-3 text-2xl`}
             >
               ⌫
             </button>
           )}
         </div>
       ))}
-      <div className="flex gap-1.5">
+      {/*
+        * The bottom row: Clear · space · ’ · -, on the same twenty cells as
+        * the rows above — 4 · 12 · 2 · 2. Both flanks weigh the same, so the
+        * bar's centre is the board's midline, and the two marks continue the
+        * O/P and M/⌫ columns rather than sitting between Clear and the bar,
+        * where the one key a parent must aim at on the wizard shared a seam
+        * with the one key that wipes what they typed.
+        *
+        * `mt-[10px]` on top of the container's gap is the 16px gutter the
+        * trimmed keys paid for: what sits under ⌫ here is a mark that goes on
+        * a sticker, and what sits under ⇧ on the wizard is Clear.
+        */}
+      <div className={`${ROW_CLASS} mt-[10px]`}>
         <button
           type="button"
           tabIndex={-1}
@@ -236,7 +301,11 @@ export const Keyboard = memo(function Keyboard({
           onPointerUp={onClearHeld ? cancelHold : undefined}
           onPointerLeave={onClearHeld ? cancelHold : undefined}
           onPointerCancel={onClearHeld ? cancelHold : undefined}
-          className={`${KEY_CLASS} flex-[1.5] text-base font-medium text-ink-300 ${
+          /* `mr-2`: Clear gives 8px back on its bar side, so the seam between
+             the most-tapped key on the row and the only one with no undo is
+             14px where every other seam is 6. Off Clear rather than off the
+             bar, which keeps the bar on its axis and both its column edges. */
+          className={`${KEY_CLASS} col-span-4 mr-2 text-base font-medium text-ink-300 ${
             onClearHeld ? 'kiosk-hold-key' : ''
           }`}
           style={
@@ -250,6 +319,9 @@ export const Keyboard = memo(function Keyboard({
         >
           Clear
         </button>
+        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} col-span-12`}>
+          &nbsp;
+        </button>
         {/*
           * The two punctuation marks that appear in names.
           *
@@ -259,15 +331,14 @@ export const Keyboard = memo(function Keyboard({
           * called Anne-Marie should not become Annemarie because the lobby
           * keyboard had no hyphen. Two keys rather than a punctuation layer,
           * on the one static layout: a keystroke still never changes geometry.
+          * A letter wide each, in the far corner under ⌫, where a miss costs a
+          * mark a parent can see in the readout rather than the whole field.
           */}
-        <button type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={KEY_CLASS}>
-          &rsquo;
+        <button type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={`${KEY_CLASS} col-span-2`}>
+          <span className={MARK_CLASS}>&rsquo;</span>
         </button>
-        <button type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={KEY_CLASS}>
-          -
-        </button>
-        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} flex-[3.5]`}>
-          &nbsp;
+        <button type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={`${KEY_CLASS} col-span-2`}>
+          <span className={`${MARK_CLASS} -translate-y-[0.04em]`}>-</span>
         </button>
       </div>
     </div>

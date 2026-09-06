@@ -951,6 +951,15 @@ export function KioskApp() {
       if (next.length > MAX_BUFFER) return current;
       // Four digits answer the phone index completely; a fifth is noise.
       if (/^\d{5,}$/.test(next)) return current;
+      /*
+       * A mark on digits is a miss, not a query. The keyboard's ’ and - sit
+       * under ⌫, and a correction that lands low used to turn "7788" into
+       * "7788-", which is no longer a phone query: the family's rows vanished
+       * behind a name search that matches nobody and the register door filled
+       * the screen. Refused like the fifth digit — the key still buzzes, the
+       * readout still says 7788, and the next press lands where it was aimed.
+       */
+      if (/^\d+$/.test(current) && /^['’-]$/.test(key.value)) return current;
       return next.replace(/\s{2,}/g, ' ');
     });
   }, []);
