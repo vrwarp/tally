@@ -69,6 +69,10 @@ export const MAX_VALUE_LENGTH = 160;
  * What is kept is everything that is *not* the ordinary shape of a label going
  * out — opens, claims, stalls, resyncs, timeouts, errors, disconnects.
  */
+/* Stryker disable all: a module-level constant is a *static* mutant — evaluated
+   once when the module loads, before Stryker can activate the mutant for any one
+   test — so a change here reports as survived whatever the tests say. The set's
+   contents are asserted outright in `log.test.ts`. */
 const NOISE = new Set([
   'write-chunk',
   'status-packet',
@@ -78,6 +82,7 @@ const NOISE = new Set([
   'page-completed',
   'job-done',
 ]);
+/* Stryker restore all */
 
 export function isNoise(name: string): boolean {
   return NOISE.has(name);
@@ -94,18 +99,14 @@ export function sanitizeData(
 ): Record<string, PrinterLogValue> | undefined {
   if (!data) return undefined;
   const clean: Record<string, PrinterLogValue> = {};
-  let kept = 0;
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'string') {
       clean[key] = value.length > MAX_VALUE_LENGTH ? `${value.slice(0, MAX_VALUE_LENGTH)}…` : value;
     } else if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
       clean[key] = value;
-    } else {
-      continue;
     }
-    kept += 1;
   }
-  return kept === 0 ? undefined : clean;
+  return Object.keys(clean).length === 0 ? undefined : clean;
 }
 
 interface StoredLog {
@@ -145,8 +146,9 @@ function restore(capacity: number): PrinterLogEntry[] {
   return entries.slice(-capacity);
 }
 
+/** Strings quoted, so a message with spaces in it stays one value; numbers and booleans as they are. */
 function formatValue(value: PrinterLogValue): string {
-  return typeof value === 'string' ? JSON.stringify(value) : String(value);
+  return JSON.stringify(value);
 }
 
 /** The category and name, then `key=value` pairs — the line without its time. */
@@ -195,7 +197,7 @@ export function createPrinterLog(
     record(category, name, data) {
       const clean = sanitizeData(data);
       entries.push(clean ? { t: now(), category, name, data: clean } : { t: now(), category, name });
-      if (entries.length > capacity) entries.splice(0, entries.length - capacity);
+      while (entries.length > capacity) entries.shift();
       // Written on every record rather than debounced: after the noise filter
       // an evening is a few dozen of these, and the entry most worth keeping is
       // the one written just before the page went away.
