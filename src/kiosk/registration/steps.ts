@@ -134,8 +134,13 @@ export interface RegistrationState {
    * than derived because the run's own position is exactly what reopening a row
    * throws away — `step` is the reopened question now, and nothing else
    * remembers where they were.
+   *
+   * The buffer travels with it. A parent taps a row *while* answering something
+   * — ten digits typed and not yet committed — and coming back to an empty box
+   * would lose work they can see on the screen, silently, for having noticed a
+   * typo. Their own half-answer is not on any record to be read back off.
    */
-  resume: StepKind | null;
+  resume: { step: StepKind; buffer: string } | null;
   /**
    * Whether "No allergies" is ticked on the allergies step.
    *
@@ -537,7 +542,12 @@ export function reopen(
 ): RegistrationState {
   const editing = child !== null && child < state.children.length ? child : null;
   if (step === state.step && editing === state.editing) return state;
-  const moved = { ...state, editing, resume: state.resume ?? state.step };
+  const moved = {
+    ...state,
+    editing,
+    // Their own half-answer travels with the place it was being given.
+    resume: state.resume ?? { step: state.step, buffer: state.buffer },
+  };
   return { ...moved, ...landOn(moved, step) };
 }
 
@@ -596,8 +606,14 @@ export function advance(state: RegistrationState): RegistrationState {
    * in front of a queue, to fix one letter.
    */
   if (state.resume !== null) {
+    const { step, buffer } = state.resume;
     const committed = { ...commitAnswer(state, value), editing: null, resume: null };
-    return { ...committed, ...landOn(committed, state.resume) };
+    return {
+      ...committed,
+      ...landOn(committed, step),
+      buffer,
+      shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
+    };
   }
 
   switch (state.step) {
@@ -926,7 +942,7 @@ export function questionList(state: QuestionListState): QuestionSection[] {
    * the parent will be put back. The list is drawn from the run, and the
    * reopened question is painted over it afterwards.
    */
-  const at = state.resume ?? state.step;
+  const at = state.resume?.step ?? state.step;
   const onChild = isChildStep(at);
   const onAdult = isAdultStep(at);
   /* The draft is the last child of the run while its own questions are up. */
@@ -1027,8 +1043,14 @@ export function goBack(state: RegistrationState): RegistrationState | null {
    * where they were rather than into the run behind the question they tapped.
    */
   if (state.resume !== null) {
+    const { step, buffer } = state.resume;
     const cancelled = { ...state, editing: null, resume: null };
-    return { ...cancelled, ...landOn(cancelled, state.resume) };
+    return {
+      ...cancelled,
+      ...landOn(cancelled, step),
+      buffer,
+      shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
+    };
   }
 
   switch (state.step) {

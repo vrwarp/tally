@@ -1278,33 +1278,42 @@ test.describe('kiosk performance', () => {
     const started = Date.now();
     await kiosk.getByRole('button', { name: /Register your child/i }).click();
 
+    const next = () => kiosk.getByRole('button', { name: /^Next$/ }).click();
+
     await step('first child', async () => {
       await typeOnKiosk(kiosk, 'WREN');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await next();
       await kiosk.locator('[data-key="clear"]').click();
       await typeOnKiosk(kiosk, surname);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await next();
+      // A chip selects; Next leaves the question, as on every other step.
       await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
+      await next();
+    });
+
+    /*
+     * The adult before the second child, which is the order the flow asks in:
+     * "Anybody else?" has gone and its offer stands on the confirm screen, so
+     * another child is added after the family has been written out.
+     */
+    await step('the parent', async () => {
+      await typeOnKiosk(kiosk, 'DANA');
+      await next();
+      await kiosk.locator('[data-key="clear"]').click();
+      await typeOnKiosk(kiosk, surname);
+      await next();
+      await typeOnKiosk(kiosk, '5550149911');
+      await next();
     });
 
     await step('second child', async () => {
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       // The surname arrives already filled in from the first child.
       await typeOnKiosk(kiosk, 'FOX');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await next();
+      await next();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-    });
-
-    await step('the parent', async () => {
-      await typeOnKiosk(kiosk, 'DANA');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, surname);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await typeOnKiosk(kiosk, '5550149911');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await next();
     });
 
     await step('submit → checked in', async () => {
