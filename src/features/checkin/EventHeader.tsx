@@ -16,6 +16,7 @@ import { chainKey } from '@/lib/materialize';
 import { formatEventDay, formatEventWindow, formatShortDate, isCheckInOpen } from '@/lib/time';
 import { startOfDay } from '@/lib/time';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface EventHeaderProps {
   event: TallyEvent;
@@ -43,6 +44,7 @@ export function EventHeader({
   inRoom = 0,
   tracksCheckOut = false,
 }: EventHeaderProps) {
+  const t = useTranslations('EventHeader');
   const navigate = useNavigate();
   const { access } = useData();
   const [accessOpen, setAccessOpen] = useState(false);
@@ -74,8 +76,16 @@ export function EventHeader({
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-bold leading-tight text-ink-50">{event.title}</h1>
           <p className="mt-0.5 truncate text-xs text-ink-400">
-            {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
-            {event.location ? ` · ${event.location}` : ''}
+            {event.location
+              ? t('whenWithLocation', {
+                  when: formatEventDay(event.startAt, now),
+                  window: formatEventWindow(event),
+                  location: event.location,
+                })
+              : t('when', {
+                  when: formatEventDay(event.startAt, now),
+                  window: formatEventWindow(event),
+                })}
           </p>
         </div>
 
@@ -91,11 +101,11 @@ export function EventHeader({
               remembered as. A screen reader user needs the same pair. */}
           <span className="sr-only">
             {tracksCheckOut
-              ? `${inRoom} of ${present} checked-in students still in the room, out of ${eligible} eligible`
-              : `${present} of ${eligible} students checked in`}
+              ? t('spokenInRoom', { inRoom, present, eligible })
+              : t('spokenPresent', { present, eligible })}
           </span>
           <span className="mt-1 block text-[11px] uppercase tracking-wide text-ink-500">
-            {tracksCheckOut ? 'in room' : 'present'}
+            {tracksCheckOut ? t('unitInRoom') : t('unitPresent')}
           </span>
         </p>
       </div>
@@ -132,7 +142,7 @@ export function EventHeader({
         */}
         {!isToday ? (
           <Badge tone="warn" title="This gathering is not today's">
-            {event.startAt < now ? 'Past gathering' : 'Not today'}
+            {event.startAt < now ? t('pastGathering') : t('notToday')}
           </Badge>
         ) : null}
 
@@ -154,8 +164,8 @@ export function EventHeader({
           onClick={() => setAccessOpen(true)}
           aria-label={
             restricted
-              ? `Who's on this gathering — ${onGathering} ${onGathering === 1 ? 'person' : 'people'}`
-              : "Who's on this gathering — everyone on the team"
+              ? t('whoCount', { count: onGathering })
+              : t('whoEveryone')
           }
           className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
@@ -174,7 +184,7 @@ export function EventHeader({
         </Link>
 
         <select
-          aria-label="Switch event"
+          aria-label={t('switchEvent')}
           value={event.id}
           onChange={(changed) => navigate(`/event/${changed.target.value}`)}
           /* It flexes because on a phone it is the widest control here and the
@@ -193,7 +203,7 @@ export function EventHeader({
 
       {!open ? (
         <p className="mt-2 text-[11px] text-warn-400">
-          Check-in window is closed — you can still record attendance.
+          {t('windowClosed')}
         </p>
       ) : null}
 

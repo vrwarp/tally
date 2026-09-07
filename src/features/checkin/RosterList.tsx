@@ -24,6 +24,7 @@ import { memo, useCallback, type CSSProperties, type KeyboardEvent, type RefObje
 import { StudentRow, type StudentRowMode } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/utils';
 import type { RosterEntry } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface RosterListProps {
   title: string;
@@ -95,7 +96,7 @@ export const RosterList = memo(function RosterList({
   title,
   entries,
   description,
-  emptyLabel = 'Nobody matches these filters.',
+  emptyLabel,
   tone = 'default',
   showRecentHint = false,
   onPress,
@@ -114,6 +115,7 @@ export const RosterList = memo(function RosterList({
   listRef,
   onLeave,
 }: RosterListProps) {
+  const t = useTranslations('CheckIn');
   /*
    * The list walk.
    *
@@ -169,7 +171,7 @@ export const RosterList = memo(function RosterList({
   );
 
   return (
-    <section className="pb-3" aria-label={`${title}, ${entries.length}`}>
+    <section className="pb-3" aria-label={t('listAria', { title, count: entries.length })}>
       {/* `px-3` matches a row's own inner padding, not the page's gutter — that
           is the page's job now — so the heading's words sit over the names
           below them rather than 12px to their left. */}
@@ -194,7 +196,7 @@ export const RosterList = memo(function RosterList({
       </h2>
 
       {entries.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-ink-500">{emptyLabel}</p>
+        <p className="px-3 py-3 text-sm text-ink-500">{emptyLabel ?? t('emptyAll')}</p>
       ) : (
         /* The hairline is for the first row's ring, which is painted outside its
            card and therefore in the last pixel of the heading above it — and the

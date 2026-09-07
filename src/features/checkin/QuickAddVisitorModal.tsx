@@ -33,6 +33,7 @@ import { gradeDescription, haptic } from '@/lib/utils';
 import { quickAddAndCheckIn } from '@/services/attendance';
 import { recordVisitorParent } from '@/services/functions';
 import { GRADES, type Grade, type TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /**
  * What the grade field opens on.
@@ -86,6 +87,8 @@ export function QuickAddVisitorModal({
   initialName,
   onAdded,
 }: QuickAddVisitorModalProps) {
+  const t = useTranslations('QuickAdd');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const formId = useId();
 
@@ -146,10 +149,10 @@ export function QuickAddVisitorModal({
     const digits = phoneDigits(adultPhone);
 
     const found = {
-      firstName: first ? undefined : 'Required',
-      lastName: last ? undefined : 'Required',
-      adultFirst: !adultAnswered || adultFirstName ? undefined : 'Required',
-      adultLast: !adultAnswered || adultLastName ? undefined : 'Required',
+      firstName: first ? undefined : tCommon('required'),
+      lastName: last ? undefined : tCommon('required'),
+      adultFirst: !adultAnswered || adultFirstName ? undefined : tCommon('required'),
+      adultLast: !adultAnswered || adultLastName ? undefined : tCommon('required'),
       /*
        * Ten digits or nothing. A name with no number leaves the family exactly
        * as unreachable as they were, which is the one thing this section exists
@@ -160,14 +163,14 @@ export function QuickAddVisitorModal({
         ? undefined
         : digits.length === 10
           ? undefined
-          : 'A 10-digit number',
+          : t('phoneInvalid'),
     };
     if (Object.values(found).some(Boolean)) {
       setErrors(found);
       return;
     }
 
-    const name = `${first} ${last}`;
+    const name = t('fullName', { first, last });
     const guardian = adultAnswered
       ? { firstName: adultFirstName, lastName: adultLastName, phone: digits }
       : null;
@@ -178,7 +181,7 @@ export function QuickAddVisitorModal({
     // here would only hold the counselor at a spinner.
     onClose();
     haptic();
-    show(`${name} added and checked in`, { tone: 'success' });
+    show(t('added', { name }), { tone: 'success' });
     onAdded?.(name);
 
     void (async () => {
@@ -190,7 +193,7 @@ export function QuickAddVisitorModal({
           uid,
         });
       } catch {
-        show(`Could not save ${name}. Please add them again.`, { tone: 'error' });
+        show(t('saveFailed', { name }), { tone: 'error' });
         return;
       }
 
@@ -210,7 +213,7 @@ export function QuickAddVisitorModal({
           eventId: event.id,
         });
       } catch {
-        show(`${first} is checked in, but the contact did not save.`, { tone: 'error' });
+        show(t('contactFailed', { name: first }), { tone: 'error' });
       }
     })();
   };
@@ -219,23 +222,23 @@ export function QuickAddVisitorModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Add a visitor"
-      description="A contact is optional, and goes to the core team to add."
+      title={t('title')}
+      description={t('description')}
       size="sm"
       footer={
         <>
           <Button variant="secondary" size="lg" onClick={onClose}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button type="submit" form={formId} size="lg">
-            Save &amp; check in
+            {t('save')}
           </Button>
         </>
       }
     >
       <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-4">
         <TextField
-          label="First name"
+          label={tCommon('firstName')}
           value={firstName}
           onChange={(changed) => setFirstName(changed.target.value)}
           error={errors.firstName ?? null}
@@ -245,7 +248,7 @@ export function QuickAddVisitorModal({
           required
         />
         <TextField
-          label="Last name"
+          label={tCommon('lastName')}
           value={lastName}
           onChange={(changed) => setLastName(changed.target.value)}
           error={errors.lastName ?? null}
@@ -255,7 +258,7 @@ export function QuickAddVisitorModal({
           required
         />
         <SelectField
-          label="Grade"
+          label={tCommon('grade')}
           value={grade ?? ''}
           onChange={(changed) =>
             setGrade(changed.target.value === '' ? null : (Number(changed.target.value) as Grade))
@@ -263,7 +266,7 @@ export function QuickAddVisitorModal({
         >
           {/* A real answer, not a blank one to be filled in later: a child too
               young for a grade has none, and the document simply omits it. */}
-          <option value="">No grade</option>
+          <option value="">{tCommon('noGrade')}</option>
           {GRADES.map((value) => (
             <option key={value} value={value}>
               {gradeDescription(value)}
@@ -283,7 +286,7 @@ export function QuickAddVisitorModal({
             thing", not enough to read as a second dialog.
           */
           <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-800/40 p-3 ring-1 ring-ink-700">
-            <legend className="sr-only">Contact details</legend>
+            <legend className="sr-only">{t('contactLegend')}</legend>
 
             {/*
               The boxes first, the reason underneath. The reason is read once
@@ -293,7 +296,7 @@ export function QuickAddVisitorModal({
             */}
             <div className="grid grid-cols-2 gap-3">
               <TextField
-                label="Adult’s first name"
+                label={t('adultFirst')}
                 value={adultFirst}
                 onChange={(changed) => setAdultFirst(changed.target.value)}
                 error={errors.adultFirst ?? null}
@@ -302,7 +305,7 @@ export function QuickAddVisitorModal({
                 enterKeyHint="next"
               />
               <TextField
-                label="Adult’s last name"
+                label={t('adultLast')}
                 value={adultLast}
                 onChange={(changed) => setAdultLast(changed.target.value)}
                 error={errors.adultLast ?? null}
@@ -312,7 +315,7 @@ export function QuickAddVisitorModal({
               />
             </div>
             <PhoneField
-              label="Adult’s phone"
+              label={t('adultPhone')}
               value={adultPhone}
               onValueChange={setAdultPhone}
               error={errors.adultPhone ?? null}
@@ -322,7 +325,7 @@ export function QuickAddVisitorModal({
 
             <div className="flex items-end justify-between gap-3">
               <p className="text-xs text-ink-500">
-                Held for the core team to add. Tally keeps no contact details on a student.
+                {t('contactHint')}
               </p>
               {/*
                 A way back out, because the section is optional and a counselor
@@ -348,13 +351,13 @@ export function QuickAddVisitorModal({
                   }));
                 }}
               >
-                Remove
+                {tCommon('remove')}
               </Button>
             </div>
           </fieldset>
         ) : (
           <Button type="button" variant="secondary" size="sm" className="self-start" onClick={openAdult}>
-            ＋ Add a contact
+            {t('addContact')}
           </Button>
         )}
       </form>

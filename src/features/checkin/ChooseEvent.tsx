@@ -32,6 +32,7 @@ import { usePastEvents } from '@/hooks/usePastEvents';
 import { isCheckInOpen, startOfDay } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /**
  * How many finished gatherings the catch-up tail offers.
@@ -51,6 +52,7 @@ export interface ChooseEventProps {
 /* -------------------------------------------------------------------------- */
 
 function CatchUp({ before, now }: { before: Date; now: Date }) {
+  const t = useTranslations('ChooseEvent');
   const { events, loading } = usePastEvents(before, CATCH_UP);
   const { canWork } = useData();
 
@@ -97,10 +99,10 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
         id="catch-up"
         className="pb-1 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
-        Catch up
+        {t('catchUpTitle')}
       </h2>
       <p className="pb-2 text-xs text-ink-500">
-        Nobody took the register? Open one of these and add them now.
+        {t('catchUpBody')}
       </p>
       <ul className="flex flex-col gap-2">
         {finished.map((event) => (
@@ -119,6 +121,7 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
 /* -------------------------------------------------------------------------- */
 
 export function ChooseEvent({ events, now }: ChooseEventProps) {
+  const t = useTranslations('ChooseEvent');
   const { can } = useAuth();
   const { canWork } = useData();
 
@@ -199,12 +202,12 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
         {mine.length > 0 ? (
           <section aria-labelledby="choose-heading">
             <h1 id="choose-heading" className="pb-1 text-xl font-bold text-ink-50">
-              {mine.length === 1 ? 'On today' : 'Which gathering?'}
+              {mine.length === 1 ? t('headingOne') : t('headingMany')}
             </h1>
             <p className="pb-3 text-sm text-ink-500">
               {mine.length === 1
-                ? 'Open it to start checking students in.'
-                : 'Pick the one you are standing at — attendance is filed against it.'}
+                ? t('descriptionOne')
+                : t('descriptionMany')}
             </p>
 
             {/* Two to a row once there are two. A lone card keeps the column —
@@ -217,7 +220,7 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
                   event={event}
                   now={now}
                   to={`/event/${event.id}`}
-                  cta={isCheckInOpen(event, now) ? 'Start check-in' : 'Take attendance'}
+                  cta={isCheckInOpen(event, now) ? t('ctaStart') : t('ctaTakeAttendance')}
                 />
               ))}
             </div>
@@ -232,13 +235,13 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
              * one that is refusing. A counselor who reads the first goes and asks
              * somebody; one who reads the second concludes Tally is broken.
              */
-            title={locked.length > 0 ? "Nothing you're on today" : 'Nothing on today'}
+            title={locked.length > 0 ? t('emptyLockedTitle') : t('emptyTitle')}
             description={
               locked.length > 0
-                ? `${locked.length === 1 ? 'One gathering is' : `${locked.length} gatherings are`} on today that you have not been added to. They are listed below — ask whoever is named to add you.`
+                ? t('emptyLockedBody', { count: locked.length })
                 : can('core')
-                  ? 'Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.'
-                  : 'Nothing is scheduled for today. Ask the core team if a gathering is missing.'
+                  ? t('emptyCoreBody')
+                  : t('emptyBody')
             }
             action={
               can('core') ? (
@@ -246,7 +249,7 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
                   to="/events"
                   className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
                 >
-                  Go to events
+                  {t('goToEvents')}
                 </Link>
               ) : undefined
             }

@@ -24,6 +24,7 @@ import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
 import { cn, gradeLabel, gradeSentence, initials, NO_GRADE, sameItems } from '@/lib/utils';
 import { studentFullName, type RosterEntry } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /**
  * What the row is being used for.
@@ -137,6 +138,7 @@ export const StudentRow = memo(function StudentRow({
   onUndoCheckOut,
   tracksCheckOut = false,
 }: StudentRowProps) {
+  const t = useTranslations('StudentRow');
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
   const grade = gradeLabel(student);
@@ -170,18 +172,24 @@ export const StudentRow = memo(function StudentRow({
   // hand-picked roster. The clause goes rather than announcing a grade Tally
   // invented, which on this screen is read aloud beside a name.
   const spokenGrade = gradeSentence(student);
-  const gradeClause = spokenGrade ? `, ${spokenGrade}` : '';
+  /*
+   * Who this row is about, as one noun phrase rather than a name with a
+   * clause appended. English puts the grade after a comma; Chinese puts it in
+   * brackets — and every sentence below takes the finished phrase, so a
+   * translator moves it once rather than in eight places.
+   */
+  const who = spokenGrade ? t('whoWithGrade', { name, grade: spokenGrade }) : name;
   const action = swapping
     ? isSwapSource
-      ? `${name}${gradeClause} — the check-in being moved`
+      ? t('ariaSwapSource', { who })
       : here
-        ? `${name}${gradeClause} — already checked in`
-        : `Move the check-in to ${name}${gradeClause}`
+        ? t('ariaAlreadyCheckedIn', { who })
+        : t('ariaMoveTo', { who })
     : gone
-      ? `More actions for ${name}${gradeClause}, checked out at ${formatClock(attendance!.checkedOutAt!)}`
+      ? t('ariaMoreCheckedOut', { who, time: formatClock(attendance!.checkedOutAt!) })
       : here
-        ? `More actions for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-        : `Check in ${name}${gradeClause}`;
+        ? t('ariaMoreCheckedIn', { who, time: formatClock(attendance.checkedInAt) })
+        : t('ariaCheckIn', { who });
   /*
    * Nothing inside the row is announced on its own, so the note has to be part
    * of a label or it is not read out at all — and this is the label it belongs
@@ -192,7 +200,7 @@ export const StudentRow = memo(function StudentRow({
    * Last, after the action: the verb is what a screen reader user is scanning
    * for, and hearing "allergy" first on every flagged row would bury it.
    */
-  const label = allergyNote ? `${action}. Allergy: ${allergyNote}` : action;
+  const label = allergyNote ? t('ariaWithAllergy', { action, note: allergyNote }) : action;
 
   const actionsId = `row-actions-${student.id}`;
 
@@ -317,7 +325,7 @@ export const StudentRow = memo(function StudentRow({
                   */}
                   {unavailable ? (
                     <span className="text-[11px] font-medium text-ink-400">
-                      {isSwapSource ? 'The check-in being moved' : 'Already checked in'}
+                      {isSwapSource ? t('chipSwapSource') : t('chipAlreadyCheckedIn')}
                     </span>
                   ) : null}
                   {/*
@@ -333,7 +341,7 @@ export const StudentRow = memo(function StudentRow({
                   {showHint && !unavailable ? (
                     <span
                       className="text-[11px] font-medium tabular-nums text-ink-500"
-                      title={`Attended ${recentHits} of the last ${recentWindow}`}
+                      title={t('recentTitle', { hits: recentHits, window: recentWindow })}
                     >
                       {recentHits} of {recentWindow}
                     </span>
@@ -419,10 +427,10 @@ export const StudentRow = memo(function StudentRow({
                 aria-busy={busy || undefined}
                 aria-label={
                   gone
-                    ? `Put ${name}${gradeClause} back in the room — checked out at ${formatClock(attendance.checkedOutAt!)}`
+                    ? t('ariaPutBack', { who, time: formatClock(attendance.checkedOutAt!) })
                     : tracksCheckOut
-                      ? `Check out ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
-                      : `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
+                      ? t('ariaCheckOut', { who, time: formatClock(attendance.checkedInAt) })
+                      : t('ariaUndoCheckIn', { who, time: formatClock(attendance.checkedInAt) })
                 }
                 className={cn(
                   // `ml-2` is the dead strip: a transparent margin inside the
@@ -475,7 +483,7 @@ export const StudentRow = memo(function StudentRow({
               type="button"
               onClick={() => onUndo?.(entry)}
               disabled={busy}
-              aria-label={`Undo the check-in for ${name}`}
+              aria-label={t('ariaUndoShort', { name })}
               className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
             >
               Undo
@@ -484,7 +492,7 @@ export const StudentRow = memo(function StudentRow({
             {canOpenProfile ? (
               <Link
                 to={`/students/${student.id}`}
-                aria-label={`Open the profile for ${name}`}
+                aria-label={t('ariaOpenProfile', { name })}
                 className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
               >
                 Profile
@@ -495,13 +503,13 @@ export const StudentRow = memo(function StudentRow({
               type="button"
               onClick={() => onSwap?.(entry)}
               disabled={busy}
-              aria-label={`Wrong person — move ${name}’s check-in to somebody else`}
+              aria-label={t('ariaWrongPerson', { name })}
               className={cn(
                 ACTION,
                 'bg-brand-500/10 text-brand-300 ring-brand-500/30 hover:bg-brand-500/20',
               )}
             >
-              Wrong person
+              {t('wrongPerson')}
             </button>
           </div>
         ) : null}

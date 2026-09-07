@@ -24,6 +24,41 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Common.required": {
+    "source": "Required",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.cancel": {
+    "source": "Cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.remove": {
+    "source": "Remove",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.grade": {
+    "source": "Grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.noGrade": {
+    "source": "No grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.firstName": {
+    "source": "First name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.lastName": {
+    "source": "Last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Nav.checkIn": {
     "source": "Check in",
     "zh-Hans": "todo",
@@ -1256,6 +1291,636 @@
   },
   "Ledger.note": {
     "source": " — “{note}”",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusAll": {
+    "source": "Roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusRecent": {
+    "source": "Recent",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusParticipated": {
+    "source": "Participated",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusCheckedIn": {
+    "source": "Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusInRoom": {
+    "source": "In room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.focusCheckedOut": {
+    "source": "Checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.results": {
+    "source": "Results",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyAll": {
+    "source": "Nobody matches these filters.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyRecent": {
+    "source": "No regulars on this roster yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyParticipated": {
+    "source": "Nobody has been to this gathering yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyCheckedIn": {
+    "source": "Nobody is checked in yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyInRoom": {
+    "source": "Nobody is in the room.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyCheckedOut": {
+    "source": "Nobody has been checked out yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapGone": {
+    "source": "That check-in is gone — there is nothing left to move.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapPrompt": {
+    "source": "Who should this be?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapSearchPlaceholder": {
+    "source": "Search for the right student…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapLeave": {
+    "source": "Leave it where it is",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapAddVisitor": {
+    "source": "Add as visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyRosterError": {
+    "source": "The roster could not be read",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyNoRsvp": {
+    "source": "Nobody has RSVP’d yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyNoRoster": {
+    "source": "Nobody on this roster yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyRosterErrorBody": {
+    "source": "Check-in still works: quick-add anyone who walks in, and they will be counted.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyNoRsvpBody": {
+    "source": "This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.emptyNoRosterBody": {
+    "source": "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.noMatchTitle": {
+    "source": "No match for “{query}”",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.noMatchSwapBody": {
+    "source": "Nobody by that name to move this check-in to. Leave it and add them as a visitor instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.noMatchBody": {
+    "source": "First time here? Add them as a visitor — it takes three fields.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintSwap": {
+    "source": "tap the right student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintRecent": {
+    "source": "from the last {count, plural, one {# gathering} other {# gatherings}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintParticipatedHere": {
+    "source": "been here in the last {count, plural, one {# gathering} other {# gatherings}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintParticipatedEver": {
+    "source": "checked in at least once before",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintCheckedIn": {
+    "source": "tap the check mark to undo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintInRoom": {
+    "source": "tap Out when somebody checks them out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.hintCheckedOut": {
+    "source": "tap ↺ to put somebody back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.showAllParticipated": {
+    "source": "Show all {count} who have participated",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.showAllStudents": {
+    "source": "Show all {count} students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.frozen": {
+    "source": "{name} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.errorCheckIn": {
+    "source": "Could not check in {name}. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceCheckedIn": {
+    "source": "{name} checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.errorUndo": {
+    "source": "Could not undo {name}. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceRemoved": {
+    "source": "{name} removed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.toastUndid": {
+    "source": "Undid {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.errorCheckOut": {
+    "source": "Could not check out {name}. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceCheckedOut": {
+    "source": "{name} checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.errorUndoCheckOut": {
+    "source": "Could not undo the check-out for {name}. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceBackInRoom": {
+    "source": "{name} back in the room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.errorSwap": {
+    "source": "Could not move the check-in to {name}. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceSwapped": {
+    "source": "{when} check-in moved from {wrong} to {right}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.toastSwapped": {
+    "source": "{wrong} → {right}, still {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.announceAdded": {
+    "source": "{name} added and checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.filterGroup": {
+    "source": "Show",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.chipRecentLabel": {
+    "source": "Show likely regulars only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.chipParticipatedLabel": {
+    "source": "Show only students who have been here before",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.chipInRoomLabel": {
+    "source": "Show students still in the room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.chipCheckedOutLabel": {
+    "source": "Show students who have been checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.chipCheckedInLabel": {
+    "source": "Show checked-in students only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.searchPlaceholder": {
+    "source": "Search students…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.searchAria": {
+    "source": "Search students by name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.quickAddAria": {
+    "source": "Quick add a visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.listAria": {
+    "source": "{title}, {count}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.allGrades": {
+    "source": "All grades",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.someGrades": {
+    "source": "{count} grades",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.gradeFilterAria": {
+    "source": "Filter by grade, {summary}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.backToCheckIn": {
+    "source": "‹ Check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.archivedNote": {
+    "source": "This night is older than the few months Tally keeps loaded, so it opens as a record of what happened rather than a roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.archivedEmptyTitle": {
+    "source": "Nobody was checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.archivedEmptyBody": {
+    "source": "Tally reads a finished gathering with no attendance as one that did not happen — it is not a miss for anybody.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.formerStudent": {
+    "source": "Former student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.whoWithGrade": {
+    "source": "{name}, {grade}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaSwapSource": {
+    "source": "{who} — the check-in being moved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaAlreadyCheckedIn": {
+    "source": "{who} — already checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaMoveTo": {
+    "source": "Move the check-in to {who}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaMoreCheckedOut": {
+    "source": "More actions for {who}, checked out at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaMoreCheckedIn": {
+    "source": "More actions for {who}, checked in at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaCheckIn": {
+    "source": "Check in {who}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaWithAllergy": {
+    "source": "{action}. Allergy: {note}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.chipSwapSource": {
+    "source": "The check-in being moved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.chipAlreadyCheckedIn": {
+    "source": "Already checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.recentTitle": {
+    "source": "Attended {hits} of the last {window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaPutBack": {
+    "source": "Put {who} back in the room — checked out at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaCheckOut": {
+    "source": "Check out {who}, checked in at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaUndoCheckIn": {
+    "source": "Undo check-in for {who}, checked in at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaUndoShort": {
+    "source": "Undo the check-in for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaOpenProfile": {
+    "source": "Open the profile for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.ariaWrongPerson": {
+    "source": "Wrong person — move {name}’s check-in to somebody else",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentRow.wrongPerson": {
+    "source": "Wrong person",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.title": {
+    "source": "Add a visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.description": {
+    "source": "A contact is optional, and goes to the core team to add.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.save": {
+    "source": "Save & check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.phoneInvalid": {
+    "source": "A 10-digit number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.fullName": {
+    "source": "{first} {last}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.added": {
+    "source": "{name} added and checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.saveFailed": {
+    "source": "Could not save {name}. Please add them again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.contactFailed": {
+    "source": "{name} is checked in, but the contact did not save.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.contactLegend": {
+    "source": "Contact details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.adultFirst": {
+    "source": "Adult’s first name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.adultLast": {
+    "source": "Adult’s last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.adultPhone": {
+    "source": "Adult’s phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.contactHint": {
+    "source": "Held for the core team to add. Tally keeps no contact details on a student.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "QuickAdd.addContact": {
+    "source": "＋ Add a contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.catchUpTitle": {
+    "source": "Catch up",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.catchUpBody": {
+    "source": "Nobody took the register? Open one of these and add them now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.headingOne": {
+    "source": "On today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.headingMany": {
+    "source": "Which gathering?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.descriptionOne": {
+    "source": "Open it to start checking students in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.descriptionMany": {
+    "source": "Pick the one you are standing at — attendance is filed against it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.ctaStart": {
+    "source": "Start check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.ctaTakeAttendance": {
+    "source": "Take attendance",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.emptyLockedTitle": {
+    "source": "Nothing you're on today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.emptyTitle": {
+    "source": "Nothing on today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.emptyLockedBody": {
+    "source": "{count, plural, one {One gathering is} other {# gatherings are}} on today that you have not been added to. They are listed below — ask whoever is named to add you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.emptyCoreBody": {
+    "source": "Nothing is scheduled for today. The calendar, and everything already held, is on the Events tab.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.emptyBody": {
+    "source": "Nothing is scheduled for today. Ask the core team if a gathering is missing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ChooseEvent.goToEvents": {
+    "source": "Go to events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.whenWithLocation": {
+    "source": "{when} · {window} · {location}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.when": {
+    "source": "{when} · {window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.spokenInRoom": {
+    "source": "{inRoom} of {present} checked-in students still in the room, out of {eligible} eligible",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.spokenPresent": {
+    "source": "{present} of {eligible} students checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.unitInRoom": {
+    "source": "in room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.unitPresent": {
+    "source": "present",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.pastGathering": {
+    "source": "Past gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.notToday": {
+    "source": "Not today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.whoCount": {
+    "source": "Who's on this gathering — {count, plural, one {# person} other {# people}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.whoEveryone": {
+    "source": "Who's on this gathering — everyone on the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.switchEvent": {
+    "source": "Switch event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.windowClosed": {
+    "source": "Check-in window is closed — you can still record attendance.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

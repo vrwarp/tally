@@ -14,6 +14,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { cn, gradeDescription, gradeName } from '@/lib/utils';
 import { GRADES, type Grade } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Breathing room between the bottom of the panel and the bottom of the screen. */
 const PANEL_MARGIN = 12;
@@ -36,16 +37,23 @@ export interface GradeFilterProps {
   available?: readonly Grade[];
 }
 
-function summarise(grades: readonly Grade[]): string {
-  if (grades.length === 0) return 'All grades';
+/** The three keys the chip's summary needs, as a narrow function type. */
+type GradeFilterTranslator = (
+  key: 'allGrades' | 'someGrades',
+  values?: Record<string, number>,
+) => string;
+
+function summarise(t: GradeFilterTranslator, grades: readonly Grade[]): string {
+  if (grades.length === 0) return t('allGrades');
   if (grades.length === 1) return gradeDescription(grades[0]!);
   // Past two, the ordinals are longer than the chip and get truncated to
   // something unreadable ("6th, 7th, 9…"), so the count carries it instead.
   if (grades.length === 2) return grades.map((grade) => gradeName(grade)).join(', ');
-  return `${grades.length} grades`;
+  return t('someGrades', { count: grades.length });
 }
 
 export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
+  const t = useTranslations('CheckIn');
   /*
    * Always in `GRADES` order, and always including anything already selected —
    * a chip that is on must stay switchable off even if the roster moved out
@@ -130,7 +138,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={`Filter by grade, ${summarise(grades).toLowerCase()}`}
+        aria-label={t('gradeFilterAria', { summary: summarise(t, grades).toLowerCase() })}
         /* Inset, like the chips beside it — the sticky search band ends flush
            with the top of this row and painted over an outside ring. */
         className={cn(
@@ -140,7 +148,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
             : 'bg-ink-900 text-ink-400 inset-ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
         )}
       >
-        {summarise(grades)}
+        {summarise(t, grades)}
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-3.5">
           <path
             d="m5 8 5 5 5-5"
@@ -167,7 +175,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         >
           <Option
             checked={grades.length === 0}
-            label="All grades"
+            label={t('allGrades')}
             onToggle={() => onChange([])}
           />
           <span aria-hidden="true" className="my-1 block h-px bg-ink-800" />
