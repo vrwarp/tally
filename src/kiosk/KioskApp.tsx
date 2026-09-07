@@ -31,6 +31,7 @@ import type { PrinterState } from './printing';
 // The same arrangement again for the registration wizard: a screen most
 // families never reach must not sit on the path to the one they all use.
 import type * as RegistrationModule from './registration';
+import type { Grade } from '@/types';
 import {
   bindingIsLive,
   clearBinding,
@@ -1711,6 +1712,69 @@ export function KioskApp() {
   );
 
   /**
+   * The run whose stickers have already gone, so they cannot go twice.
+   *
+   * A registration prints from two places now — the saving screen, five seconds
+   * in, and `onRegistered` when the callable answers — and on a slow evening
+   * both happen. Keyed by the run rather than by a boolean because "Try again"
+   * re-enters the submit under the same `registrationId`: a retry that reached
+   * `onRegistered` must not put a second sticker on the tape for a child
+   * already wearing one.
+   */
+  const printedRunRef = useRef<string | null>(null);
+
+  /**
+   * The stickers, before anybody knows whether the family was written.
+   *
+   * Five seconds into a save that has not come back — see `PROCESSING_MS`. The
+   * label needs nothing from the server: every token on it is a name the parent
+   * typed or a fact about the gathering, and the allergy note is the one the
+   * wizard was told rather than the one no lookup can answer. What is missing
+   * is the child's id, so the label is queued under the run's own — and adopted
+   * onto the real one in `onRegistered`, because the log rows downstream are
+   * looked back up on the roster by it.
+   *
+   * The risk this takes is bounded and deliberate: it only ever happens on a
+   * save already slow enough to have held a parent for five seconds, which is
+   * also the window in which they are still standing here to be told if it then
+   * fails. See the timeout wording in `RegistrationFlow`.
+   */
+  const onEarlyPrint = useCallback(
+    (
+      registrationId: string,
+      children: readonly { firstName: string; lastName: string; grade: Grade | null; allergies: string }[],
+    ) => {
+      if (!prints || !binding || !printing) return;
+      printedRunRef.current = registrationId;
+      for (const [index, child] of children.entries()) {
+        try {
+          const id = printing.pendingLabelId(registrationId, index);
+          printing.rememberAllergyNote(id, child.allergies);
+          printing.printLabel(
+            {
+              id,
+              firstName: child.firstName,
+              lastName: child.lastName,
+              grade: child.grade,
+              // Nothing searches this row — it is a label's worth of a child,
+              // not a roster entry, and it is gone as soon as the real one
+              // lands. `tokenValuesFor` reads neither field.
+              searchName: '',
+              hasAllergies: child.allergies !== '',
+            },
+            binding,
+          );
+        } catch {
+          // Same rule as everywhere else a label is queued: a printer may not
+          // reach back into the screen a family is standing at.
+        }
+      }
+      setPrintTick((tick) => tick + 1);
+    },
+    [binding, printing, prints],
+  );
+
+  /**
    * A family that exists now, and did not a second ago.
    *
    * The server has already written them, checked them in and patched the phone
@@ -1727,6 +1791,8 @@ export function KioskApp() {
       checkedIn: boolean;
       /** The arrival the server recorded for them — the registration's own id. */
       registrationId: string;
+      /** The allergy answers as typed, index-aligned with `children`. */
+      notes: readonly string[];
     }) => {
       if (!services || !binding) return;
       const added = services.applyRegistration({
@@ -1765,11 +1831,58 @@ export function KioskApp() {
           for (const student of added) next.set(student.id, result.registrationId);
           return next;
         });
+        /*
+         * And when, which is what the parent's ten-minute reprint hold is
+         * measured against — see `reprintOffer.ts`.
+         *
+         * `onConfirm` has always written this and this path never did, so
+         * `reprintStanding` found no entry for a just-registered child and
+         * answered `ask`: the one hold built for *I checked in just now and no
+         * sticker came out* was unavailable to the only families whose label
+         * this kiosk had just printed for the first time. A registration is a
+         * check-in this kiosk performed, by the same definition `onConfirm`
+         * uses, so it is recorded the same way.
+         */
+        const checkedInAt = Date.now();
+        setCheckedInAtMs((held) => {
+          const next = new Map(held);
+          for (const student of added) next.set(student.id, checkedInAt);
+          return next;
+        });
+      }
+
+      /*
+       * The stickers already went, on the saving screen, under this run's own
+       * id — so what is left is to tell the printing module who those children
+       * turned out to be. Nothing is queued here: a second sticker per child is
+       * a staff reprint, never a consequence of a slow call answering.
+       */
+      if (printing && printedRunRef.current === result.registrationId) {
+        for (const [index, student] of added.entries()) {
+          printing.adoptStudentId(
+            printing.pendingLabelId(result.registrationId, index),
+            student.id,
+          );
+        }
+        setPrintTick((tick) => tick + 1);
+        return;
       }
 
       if (prints && result.checkedIn) {
-        for (const student of added) {
+        for (const [index, student] of added.entries()) {
           try {
+            /*
+             * The note first, because the sticker is drawn from it.
+             *
+             * This is the one child on the kiosk whose allergy cannot be looked
+             * up: registration mints a Tally-owned id, `fetchAllergyNote` has
+             * no upstream person to ask about and answers null, and a null
+             * under a set flag prints the bare word `Allergy`. The parent typed
+             * the real thing four screens ago, so it is handed over rather than
+             * asked for. A child whose answer was "none" seeds an empty string,
+             * which is what the lookup would have resolved to anyway.
+             */
+            printing?.rememberAllergyNote(student.id, result.notes[index] ?? '');
             printing?.printLabel(student, binding);
           } catch {
             // Deliberately swallowed, exactly as in `onConfirm`: a printer
@@ -1900,8 +2013,10 @@ export function KioskApp() {
               ...(carryNotes ? { allergies: notes } : {}),
             });
           }}
-          onRegistered={(result) =>
+          onEarlyPrint={onEarlyPrint}
+          onRegistered={(result, notes) =>
             onRegistered({
+              notes,
               children: result.children.map((child) => ({
                 id: child.studentId,
                 firstName: child.firstName,

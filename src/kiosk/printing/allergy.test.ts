@@ -24,6 +24,7 @@ import {
   allergyFor,
   forgetAllergies,
   forgetAllergy,
+  rememberAllergyNote,
   setAllergySource,
   startAllergyLookup,
   usesAllergyToken,
@@ -290,5 +291,54 @@ describe('what is kept, and for how long', () => {
 
     await expect(allergyFor('pco_0')).resolves.toBeUndefined();
     await expect(allergyFor('pco_8')).resolves.toBe('note for pco_8');
+  });
+});
+
+describe('the note a parent typed, which no lookup can answer', () => {
+  it('prints what they wrote rather than the word "Allergy"', async () => {
+    /*
+     * The bug this exists for, end to end. A child registered at the kiosk gets
+     * a Tally-owned id; `fetchAllergyNote` has no upstream person to ask about
+     * and answers null; a null under a set flag is read as *flagged but
+     * unreadable*. So the parent typed "Peanuts — EpiPen in the bag" and the
+     * sticker said `Allergy`.
+     */
+    setAllergySource(async () => null);
+    const registered = student({ id: 'tally-abc123' });
+
+    rememberAllergyNote(registered.id, 'Peanuts — EpiPen in the bag');
+    startAllergyLookup(registered, PRINTS_ALLERGY);
+
+    await expect(allergyFor(registered.id)).resolves.toBe('Peanuts — EpiPen in the bag');
+  });
+
+  it('asks nobody about a child it has already been told about', async () => {
+    const source = vi.fn(async () => 'Peanuts');
+    setAllergySource(source);
+
+    rememberAllergyNote('tally-abc123', 'Latex');
+    startAllergyLookup(student({ id: 'tally-abc123' }), PRINTS_ALLERGY);
+
+    expect(source).not.toHaveBeenCalled();
+  });
+
+  it('reads an empty answer the way the lookup does, so the line drops', async () => {
+    // "No allergies" is the answer most families give, and it must produce a
+    // tidy label rather than one with a hole where a warning would go.
+    rememberAllergyNote('tally-abc123', '');
+    startAllergyLookup(student({ id: 'tally-abc123', hasAllergies: false }), PRINTS_ALLERGY);
+
+    await expect(allergyFor('tally-abc123')).resolves.toBe('');
+  });
+
+  it('is held on the same terms a fetched note is, and evicted the same way', async () => {
+    setAllergySource(async (id) => `note for ${id}`);
+
+    rememberAllergyNote('tally-first', 'Latex');
+    for (let index = 0; index < 8; index += 1) {
+      startAllergyLookup(student({ id: `pco_${index}` }), PRINTS_ALLERGY);
+    }
+
+    await expect(allergyFor('tally-first')).resolves.toBeUndefined();
   });
 });

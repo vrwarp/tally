@@ -19,7 +19,7 @@
  * collect it is retired; it is gated on the binding's `allergiesSupported`,
  * which is the same write-back check that form made before showing its field.
  */
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -64,6 +64,39 @@ const INACTIVITY_MS = 90_000;
  */
 const SUCCESS_AUTO_RETURN_MS = 8_000;
 
+/**
+ * How long the first bar takes, and — if the callable has not answered by then
+ * — when the name tags go anyway.
+ *
+ * Five seconds is not a guess about the call; it is the length of wait at which
+ * a screen with nothing moving on it stops reading as *working* and starts
+ * reading as *broken*. A save that comes back inside it never spends it: the
+ * bar completes early and the second one is never drawn, so the common evening
+ * is unchanged and the risk of a sticker outrunning its registration is
+ * confined to the calls that were already slow.
+ */
+export const PROCESSING_MS = 5_000;
+
+/**
+ * The completion beat.
+ *
+ * Long enough for a bar to be seen arriving at its end, short enough not to be
+ * a wait. Without it a fast save paints a bar at a fifth of its width and then
+ * takes the screen away, and progress that vanishes part-drawn reads as
+ * *cancelled* — the exact impression the bar is there to prevent.
+ */
+export const SNAP_MS = 300;
+
+/**
+ * Where the saving screen is, which is not quite where the run is.
+ *
+ * `state.step` says `submitting` for the whole window; this says which half of
+ * it. `processing` is the first bar, `saving` is the second — reached only by a
+ * call that has already cost a parent five seconds, and the point at which
+ * their name tags are printed. `finishing` is the beat above.
+ */
+type SavePhase = 'processing' | 'saving' | 'finishing';
+
 type Action =
   | { type: 'key'; key: KioskKey }
   | { type: 'next' }
@@ -74,7 +107,41 @@ type Action =
   | { type: 'no-allergies' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: RegisterFamilyResult }
-  | { type: 'failed' };
+  | { type: 'failed'; cause: FailureCause };
+
+/**
+ * Which of the two ways a submit ends badly, because they want different
+ * sentences and — once a sticker has already come out — different instructions.
+ *
+ * `refused` is the server saying no: it read the request and would not do it,
+ * and nothing was written. `gave-up` is the SDK's own seventy-second deadline
+ * with the call still in the air. They used to be the same generic line, which
+ * was safe while a failure meant no sticker existed. It is not safe now: the
+ * deadline is a client giving up, not a cancellation — the function runs to its
+ * own hundred and twenty seconds — so at the moment this screen paints, whether
+ * the family was written is genuinely unknown, and the family is holding name
+ * tags. Claiming failure there would be a lie half the time.
+ */
+type FailureCause = 'refused' | 'gave-up';
+
+/**
+ * What the SDK calls its own timeout. Prefixed `functions/` on the error, which
+ * is why this is matched with `includes` — the same idiom `onConfirm` uses on
+ * `permission-denied`.
+ */
+const DEADLINE_EXCEEDED = 'deadline-exceeded';
+
+function messageFor(cause: FailureCause): string {
+  return cause === 'gave-up'
+    ? /*
+       * Deliberately not "we could not save that". We do not know that, and the
+       * one thing on this screen we *do* know is in the parent's hand — so the
+       * sentence starts from the tags and points at somebody who can look it up
+       * rather than sending a family away believing they are not registered.
+       */
+      'This is taking longer than expected. Your name tags have printed — please check with a leader before you go.'
+    : 'We could not save that just now — please see a leader.';
+}
 
 /*
  * A plain function, not a factory. It used to close over `requiresCheckOut` for
@@ -102,11 +169,7 @@ function reduce(state: RegistrationState, action: Action): RegistrationState {
     case 'submitted':
       return { ...state, step: 'success', last4: action.result.last4 };
     case 'failed':
-      return {
-        ...state,
-        step: 'error',
-        message: 'We could not save that just now — please see a leader.',
-      };
+      return { ...state, step: 'error', message: messageFor(action.cause) };
   }
 }
 
@@ -127,8 +190,27 @@ export interface RegistrationFlowProps {
     guardian: { firstName: string; lastName: string; phone: string } | null;
     anchorStudentIds: string[];
   }) => Promise<RegisterFamilyResult>;
-  /** Everybody registered and checked in — the caller greens their rows and prints. */
-  onRegistered: (result: RegisterFamilyResult) => void;
+  /**
+   * Everybody registered and checked in — the caller greens their rows and
+   * prints.
+   *
+   * `notes` is the allergy answer as the parent typed it, index-aligned with
+   * `result.children` — the server echoes the request's own order, so the two
+   * cannot drift. It rides beside the result rather than inside it because it
+   * never went upstream and came back: it is the one thing on a kiosk sticker
+   * the kiosk was *told* rather than having to ask, and the ask cannot succeed
+   * for a child this new. See `rememberAllergyNote`.
+   */
+  onRegistered: (result: RegisterFamilyResult, notes: readonly string[]) => void;
+  /**
+   * Print the name tags now, without waiting to hear whether the family was
+   * written — `PROCESSING_MS` into a call that has not answered.
+   *
+   * Called at most once per run. The caller keys the labels by the run and
+   * adopts the real ids when the response lands, so a sticker that outran its
+   * registration is still the same sticker afterwards.
+   */
+  onEarlyPrint: (registrationId: string, children: readonly DraftChild[]) => void;
   /** Back to search: cancelled, timed out, or finished. */
   onClose: () => void;
 }
@@ -140,6 +222,7 @@ export function RegistrationFlow({
   anchors,
   submit,
   onRegistered,
+  onEarlyPrint,
   onClose,
 }: RegistrationFlowProps) {
   // Absent on a binding written before the flag existed, and absent means no.
@@ -177,11 +260,26 @@ export function RegistrationFlow({
 
   /* ---- The call ---------------------------------------------------------- */
 
+  const [savePhase, setSavePhase] = useState<SavePhase>('processing');
+  /**
+   * Whether this run's name tags have already gone.
+   *
+   * Separate from the phase because it survives it: once the tags are out the
+   * second meter stays on the screen through `finishing`, and the first one
+   * keeps saying so.
+   */
+  const [tagsOut, setTagsOut] = useState(false);
+  /** Which way the last attempt ended badly, for the header above the sentence. */
+  const [failure, setFailure] = useState<FailureCause | null>(null);
+  /** The completion beat's timer, cleared if this screen goes first. */
+  const finishRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(finishRef.current), []);
   const submittedRef = useRef(false);
   const runSubmit = useCallback(() => {
     if (submittedRef.current) return;
     submittedRef.current = true;
     haptic();
+    setSavePhase('processing');
     dispatch({ type: 'submitting' });
     void submit({
       registrationId: state.registrationId,
@@ -195,12 +293,42 @@ export function RegistrationFlow({
         // A retry re-sends the same registrationId, which is what makes the
         // callable answer rather than create a second family.
         submittedRef.current = false;
-        dispatch({ type: 'submitted', result });
-        onRegistered(result);
+        /*
+         * The roster half now, the screen half a beat later.
+         *
+         * `onRegistered` is what greens their rows, makes them searchable and —
+         * unless the saving screen already did it — prints. None of that waits
+         * for an animation. What waits is the step change: the bar is given
+         * `SNAP_MS` to be seen arriving at its end, because a bar that is
+         * replaced part-drawn reads as a thing that stopped rather than a thing
+         * that finished.
+         */
+        onRegistered(
+          result,
+          state.children.map((child) => child.allergies),
+        );
+        setSavePhase('finishing');
+        finishRef.current = setTimeout(() => dispatch({ type: 'submitted', result }), SNAP_MS);
       })
-      .catch(() => {
+      .catch((error: { code?: string }) => {
         submittedRef.current = false;
-        dispatch({ type: 'failed' });
+        /*
+         * The cause, and nothing else off the error.
+         *
+         * The server's refusals are written for this screen — "We could not
+         * find that family. Please register as a new family, or see a leader."
+         * — but not all of them are: the same `invalid-argument` carries
+         * "allergies must line up with children." and "anchorStudentIds must be
+         * a list.", which are developer grammar and only reachable from a
+         * malformed request. A lobby is the wrong place to find out which one
+         * came back, so the sentence is chosen here from the shape of the
+         * failure rather than relayed from the wire.
+         */
+        const cause: FailureCause = error.code?.includes(DEADLINE_EXCEEDED)
+          ? 'gave-up'
+          : 'refused';
+        setFailure(cause);
+        dispatch({ type: 'failed', cause });
       });
   }, [
     submit,
@@ -211,6 +339,29 @@ export function RegistrationFlow({
     anchorIds,
     onRegistered,
   ]);
+
+  /* ---- Five seconds in, with nothing back ---------------------------------- */
+
+  /*
+   * The handoff: the first bar ends, the name tags go, and the second bar takes
+   * over for however long the call still needs.
+   *
+   * Armed on entering `submitting` and disarmed by leaving it, so a save that
+   * answers first never reaches this and the tags print the ordinary way, from
+   * `onRegistered`, against ids the server has already given. Only a call that
+   * has held a parent for five seconds prints ahead of its own answer — which
+   * is also the case where the tags in their hand are the only thing on this
+   * screen that is certainly true.
+   */
+  useEffect(() => {
+    if (state.step !== 'submitting' || savePhase !== 'processing') return;
+    const timer = setTimeout(() => {
+      onEarlyPrint(state.registrationId, state.children);
+      setTagsOut(true);
+      setSavePhase('saving');
+    }, PROCESSING_MS);
+    return () => clearTimeout(timer);
+  }, [state.step, state.registrationId, state.children, savePhase, onEarlyPrint]);
 
   useEffect(() => {
     if (state.step !== 'success') return;
@@ -262,13 +413,33 @@ export function RegistrationFlow({
         See the same rule on the search screen's root for the mechanism. */
     <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto_auto]">
       <Header
-        title={titleFor(state, childNumber)}
+        /*
+         * "Something went wrong" is right for a refusal and wrong for a
+         * deadline: the body below it says we do not know what happened, and a
+         * header that has already decided contradicts it in larger type.
+         */
+        title={
+          state.step === 'error' && failure === 'gave-up'
+            ? 'Taking a while'
+            : titleFor(state, childNumber)
+        }
         subtitle={subtitleFor(state, binding)}
         onBack={() => {
           haptic(8);
           if (goBack(state) === null) onClose();
           else dispatch({ type: 'back' });
         }}
+        /*
+         * Both controls go while the call is in the air, and Back is the one
+         * that mattered: `goBack` has no case for `submitting`, so it answered
+         * null and this handler read null as "there is nowhere back, close the
+         * wizard" — which dropped a parent on the search screen mid-flight. The
+         * registration still landed and the stickers still came out, because
+         * `onRegistered` belongs to `KioskApp` and outlives this unmount; what
+         * the parent lost was the screen with their four digits on it, which is
+         * the only thing this whole run is for.
+         */
+        canBack={state.step !== 'submitting'}
         canClose={state.step !== 'submitting'}
         onClose={onClose}
       />
@@ -346,13 +517,13 @@ export function RegistrationFlow({
             )}
           </>
         ) : (
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-3 pb-6">
           {state.step === 'submitting' && (
-            <p className="pt-10 text-center text-xl text-ink-400">Saving…</p>
+            <SavingScreen roster={state.children} phase={savePhase} tagsOut={tagsOut} />
           )}
 
           {state.step === 'success' && (
-            <div className="flex flex-col items-center gap-4 pt-6 text-center">
+            <div className="flex flex-col items-center gap-4 text-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-present-600/20 text-5xl">
                 ✓
               </div>
@@ -368,7 +539,7 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'error' && (
-            <div className="flex flex-col gap-4 pt-6 text-center">
+            <div className="flex flex-col gap-5 text-center">
               <p className="text-xl text-ink-200">{state.message}</p>
               <Big label="Try again" tone="brand" onPick={runSubmit} />
             </div>
@@ -533,6 +704,136 @@ export function RegistrationFlow({
 }
 
 /**
+ * How long the second meter is drawn to run for.
+ *
+ * Not a prediction — the callable's own deadline is seventy seconds and this is
+ * just past it, so the bar is still moving whenever there is anything to wait
+ * for. The easing is what carries the meaning: it decelerates hard, so the
+ * distance left never closes and the meter cannot promise an arrival it does
+ * not know about.
+ */
+const SLOW_METER_MS = 75_000;
+
+/** Where a meter starts, so it reads as a bar rather than as an empty track. */
+const METER_FLOOR = 0.03;
+
+/**
+ * One meter, and what it is a meter of.
+ *
+ * `running` is the phase's own curve; `full` is the completion beat. The arm is
+ * two frames rather than one because a transition set in the same paint as its
+ * starting value does not run — the browser has nothing to interpolate from.
+ */
+function Meter({
+  label,
+  mode,
+  slow,
+}: {
+  label: string;
+  mode: 'running' | 'full';
+  slow: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const first = requestAnimationFrame(() => setArmed(true));
+    return () => cancelAnimationFrame(first);
+  }, []);
+
+  const scale =
+    mode === 'full' ? 1 : !armed ? METER_FLOOR : slow ? 0.985 : 1;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="kiosk-meter">
+        <div
+          data-testid="save-meter-fill"
+          className={`kiosk-meter-fill ${mode === 'full' ? 'kiosk-meter-done' : ''}`}
+          style={{
+            transform: `scaleX(${scale})`,
+            transitionDuration:
+              mode === 'full' ? `${SNAP_MS}ms` : slow ? `${SLOW_METER_MS}ms` : `${PROCESSING_MS}ms`,
+            // Linear where the end is known and near, and a hard deceleration
+            // where it is neither.
+            transitionTimingFunction:
+              mode === 'full' ? 'ease-out' : slow ? 'cubic-bezier(0, 0.55, 0.1, 1)' : 'linear',
+          }}
+        />
+      </div>
+      <p className="text-center text-lg text-ink-400 kiosk:text-xl">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * The screen a family looks at while the callable is in the air.
+ *
+ * It used to be the word "Saving…" under the word "One moment" on an otherwise
+ * empty screen — two phrasings of the same idea, nothing moving, and four
+ * fifths of a lobby tablet blank. A screen with nothing happening on it is
+ * indistinguishable from a screen that has crashed, and the parent's own answer
+ * to that is to press something.
+ *
+ * So it shows the two things it actually knows. The family, because the wait is
+ * *about* them and the names are the one content this screen can be certain of
+ * — the same rows the confirm just showed, held still so the last thing a
+ * parent read is still there. And the progress, in the only honest shape
+ * available: a first meter that ends where the name tags print, and — for the
+ * saves slow enough to need it — a second that keeps moving without ever
+ * claiming to arrive.
+ *
+ * The two meters stack rather than replace one another. A single track running
+ * to its end and starting again at nothing reads as progress lost, whatever the
+ * label says; two rows, the first one finished and staying finished, read as a
+ * thing with a step behind it. What makes that legible rather than decorative
+ * is that the step between them is real: the name tags come out.
+ */
+function SavingScreen({
+  roster,
+  phase,
+  tagsOut,
+}: {
+  roster: readonly DraftChild[];
+  phase: SavePhase;
+  tagsOut: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-2">
+        {roster.map((child, index) => (
+          <div
+            key={index}
+            data-testid="saving-child"
+            className="flex h-14 items-center justify-between gap-3 rounded-xl bg-ink-900 px-5 kiosk:h-16"
+          >
+            <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+              {`${child.firstName} ${child.lastName}`.trim()}
+            </span>
+            {child.grade !== null && (
+              <span className="shrink-0 text-base text-ink-500 kiosk:text-lg">
+                {gradeDescription(child.grade)}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-7">
+        <Meter
+          label={tagsOut ? 'Name tags printing' : 'Checking them in…'}
+          mode={phase === 'processing' ? 'running' : 'full'}
+          slow={false}
+        />
+        {/* Only for the saves that earned it. Most evenings this is never
+            drawn, and the screen is one meter that fills and is gone. */}
+        {tagsOut && (
+          <Meter label="Saving…" mode={phase === 'finishing' ? 'full' : 'running'} slow />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * The confirm's console: the fork, and the commit.
  *
  * Its own component because it is the one console that is not a question's —
@@ -608,12 +909,14 @@ function Header({
   title,
   subtitle,
   onBack,
+  canBack,
   canClose,
   onClose,
 }: {
   title: string;
   subtitle: string;
   onBack: () => void;
+  canBack: boolean;
   canClose: boolean;
   onClose: () => void;
 }) {
@@ -637,11 +940,18 @@ function Header({
      * name.
      */
     <div className="grid grid-cols-[auto_1fr_auto] items-start gap-1 px-2 pt-[max(0.75rem,var(--spacing-safe-top))] pb-2">
+      {/* Reserved rather than removed while the call is in flight, the same way
+          Cancel opposite is, and for the same reason: the title is centred on
+          what is left between the two slots, so dropping one would shift it. */}
       <button
         type="button"
         tabIndex={-1}
-        {...tap(onBack)}
-        className="h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
+        {...tap(() => {
+          if (canBack) onBack();
+        })}
+        className={`h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800 ${
+          canBack ? '' : 'invisible'
+        }`}
       >
         ← Back
       </button>

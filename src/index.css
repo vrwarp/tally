@@ -1153,6 +1153,47 @@
 }
 
 /*
+ * The saving screen's meters.
+ *
+ * `transform`, never `width`: this runs on the cheapest tablet in the building
+ * while a callable is in flight and a rasteriser is warming a label on the same
+ * core, and a width transition relayouts the row on every frame of it. Scaling
+ * a fixed-width bar from its left edge is composited and costs the main thread
+ * nothing — which is the whole reason the second meter can afford to run for a
+ * minute without anybody watching it in a profiler.
+ *
+ * The durations and the easing come from the element, because they are what
+ * distinguish the two meters: the first is linear over a known five seconds,
+ * the second decelerates toward an end it never reaches. Nothing here needs a
+ * reduced-motion rule of its own — the global one below zeroes both.
+ */
+.kiosk-meter {
+  overflow: hidden;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-ink-800);
+}
+
+.kiosk-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-brand-500);
+  transform-origin: left center;
+  transition-property: transform;
+  will-change: transform;
+}
+
+/*
+ * A step that is finished, in the green this app already spends on "checked
+ * in". Two full-width brand bars say the same thing twice and leave a parent
+ * reading the labels to find out which one is still working; the colour says it
+ * before the words do.
+ */
+.kiosk-meter-done {
+  background: var(--color-present-600);
+}
+
+/*
  * Dialog entrances. `<dialog>` is `display: none` while closed, so both of
  * these run on open without any mount/unmount bookkeeping in React.
  */
