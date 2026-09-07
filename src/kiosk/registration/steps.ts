@@ -478,6 +478,39 @@ export function answerAnother(
 }
 
 /**
+ * Back onto the fork, which means un-banking the child that leaving it banked.
+ *
+ * `answerAnother` commits the draft into `children` and resets the draft, so
+ * the two steps that can be reached *through* the fork — the adult's first
+ * question, and a sibling run's confirm — both stand on a state whose draft is
+ * blank. Returning to the fork without undoing that put a nameless row in the
+ * list `familyOf` builds, because on this step it renders `children` plus the
+ * draft; pressing on then banked that blank child for real and the callable
+ * refused the whole registration on `parseName`. A family who pressed Back once
+ * met "We could not save that just now — please see a leader."
+ *
+ * So the way back onto the fork is the exact inverse of the way off it: the
+ * last banked child returns to the draft it was made from, which is also what
+ * lets Back keep walking into that child's own questions to fix a name.
+ */
+function reopenFork(state: RegistrationState): RegistrationState {
+  const banked = state.children[state.children.length - 1];
+  // Stryker disable next-line ConditionalExpression,OptionalChaining: nothing
+  // reaches the fork from in front of it without having banked a child —
+  // `answerAnother` is the only door and it always commits one. The fallback is
+  // here so the function is total rather than resting on that argument.
+  const undo = banked === undefined;
+  return {
+    ...state,
+    children: undo ? state.children : state.children.slice(0, -1),
+    draft: banked ?? state.draft,
+    step: 'another',
+    buffer: '',
+    shift: 'on',
+  };
+}
+
+/**
  * One step back, for the parent who mistyped the question before.
  *
  * Deliberately shallow: it reopens the previous question with its answer in the
@@ -525,7 +558,7 @@ export function goBack(state: RegistrationState): RegistrationState | null {
           }
         : { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':
-      return { ...state, step: 'another', buffer: '', shift: 'on' };
+      return reopenFork(state);
     case 'guardian-last':
       return {
         ...state,
@@ -542,7 +575,7 @@ export function goBack(state: RegistrationState): RegistrationState | null {
       };
     case 'confirm':
       return state.mode === 'sibling'
-        ? { ...state, step: 'another', buffer: '', shift: 'on' }
+        ? reopenFork(state)
         : {
             ...state,
             step: 'guardian-phone',

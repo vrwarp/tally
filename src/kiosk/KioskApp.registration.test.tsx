@@ -414,6 +414,29 @@ describe('the four things a parent touches', () => {
     expect(screen.getAllByText('Friday Fellowship').length).toBeGreaterThan(0);
   });
 
+  it('shows one child, not one and a blank, when a parent backs out of the adult questions', async () => {
+    /*
+     * The fork banks the child it was asked about and starts a fresh draft, so
+     * a parent who pressed "That's everyone", thought better of it and pressed
+     * Back used to arrive at a fork listing their child *and* a nameless one —
+     * and pressing on banked that blank for real, which the callable refused on
+     * its name. Changing your mind once cost you the whole registration.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await tap("That's everyone");
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+
+    await tap(/Back/);
+
+    expect(screen.getByText('Anybody else?')).toBeTruthy();
+    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    // A blank draft seated beside them would be wearing this gathering's
+    // default grade, which is the one grade nobody on this form chose.
+    expect(screen.queryByText('9th grade')).toBeNull();
+  });
+
   it('offers a shift key, and types what the key is showing', async () => {
     await mount();
     await tap(/Register your child/);

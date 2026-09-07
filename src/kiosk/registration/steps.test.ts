@@ -695,6 +695,82 @@ describe('going back from the fork', () => {
 
     expect(goBack(held)).toMatchObject({ step: 'another', buffer: '', shift: 'on' });
   });
+
+  it('un-banks the child on the way, rather than seating a nameless one beside them', () => {
+    /*
+     * `answerAnother` commits the draft and blanks it, so a parent who pressed
+     * "That's everyone" and then Back arrived at a fork whose list — `children`
+     * plus the draft — carried a second, nameless child. Pressing on banked
+     * that blank for real, and the callable refused the whole registration on
+     * its name: the family met "We could not save that just now — please see a
+     * leader" for having changed their mind once.
+     */
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, false, false);
+    expect(held.step).toBe('guardian-first');
+
+    const back = goBack(held)!;
+
+    expect(back.step).toBe('another');
+    expect(familyOf(back)).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+    // And the family that comes back off the fork is the one that went on to
+    // it — banked once, not twice, and not one and a half.
+    expect(answerAnother(back, false, false).children).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+  });
+
+  it('un-banks on the sibling path too, where the confirm is what the fork leads to', () => {
+    let held = initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
+    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
+    held = answerAnother(held, false, false);
+
+    const back = goBack(held)!;
+
+    expect(back.children).toHaveLength(0);
+    expect(familyOf(back)).toEqual([
+      { firstName: 'Byron', lastName: 'Lovelace', grade: 1, allergies: '' },
+    ]);
+  });
+
+  it('leaves the earlier children alone, and only the last one on the draft', () => {
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, true, false);
+    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
+    held = answerAnother(held, false, false);
+
+    const back = goBack(held)!;
+
+    expect(back.children).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+    expect(back.draft).toEqual({
+      firstName: 'Byron',
+      lastName: 'Lovelace',
+      grade: 1,
+      allergies: '',
+    });
+  });
+
+  it('keeps walking back into that child’s own questions, so a wrong name is reachable', () => {
+    /*
+     * The other half of un-banking, and the reason it is worth more than a
+     * missing blank row. A parent who spots a mistyped name two screens later
+     * has Back and nothing else; it has to reach the box that holds the name,
+     * with the name in it, rather than stopping at a fork that has forgotten
+     * which child it is talking about.
+     */
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = answerAnother(held, false, false);
+
+    let back = goBack(held)!;
+    back = goBack(back)!;
+    back = goBack(back)!;
+
+    expect(back).toMatchObject({ step: 'child-last', buffer: 'Lovelace' });
+  });
 });
 
 describe('going back', () => {
