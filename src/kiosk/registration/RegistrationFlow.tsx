@@ -74,7 +74,41 @@ type Action =
   | { type: 'no-allergies' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: RegisterFamilyResult }
-  | { type: 'failed' };
+  | { type: 'failed'; cause: FailureCause };
+
+/**
+ * Which of the two ways a submit ends badly, because they want different
+ * sentences and — once a sticker has already come out — different instructions.
+ *
+ * `refused` is the server saying no: it read the request and would not do it,
+ * and nothing was written. `gave-up` is the SDK's own seventy-second deadline
+ * with the call still in the air. They used to be the same generic line, which
+ * was safe while a failure meant no sticker existed. It is not safe now: the
+ * deadline is a client giving up, not a cancellation — the function runs to its
+ * own hundred and twenty seconds — so at the moment this screen paints, whether
+ * the family was written is genuinely unknown, and the family is holding name
+ * tags. Claiming failure there would be a lie half the time.
+ */
+type FailureCause = 'refused' | 'gave-up';
+
+/**
+ * What the SDK calls its own timeout. Prefixed `functions/` on the error, which
+ * is why this is matched with `includes` — the same idiom `onConfirm` uses on
+ * `permission-denied`.
+ */
+const DEADLINE_EXCEEDED = 'deadline-exceeded';
+
+function messageFor(cause: FailureCause): string {
+  return cause === 'gave-up'
+    ? /*
+       * Deliberately not "we could not save that". We do not know that, and the
+       * one thing on this screen we *do* know is in the parent's hand — so the
+       * sentence starts from the tags and points at somebody who can look it up
+       * rather than sending a family away believing they are not registered.
+       */
+      'This is taking longer than expected. Your name tags have printed — please check with a leader before you go.'
+    : 'We could not save that just now — please see a leader.';
+}
 
 /*
  * A plain function, not a factory. It used to close over `requiresCheckOut` for
@@ -102,11 +136,7 @@ function reduce(state: RegistrationState, action: Action): RegistrationState {
     case 'submitted':
       return { ...state, step: 'success', last4: action.result.last4 };
     case 'failed':
-      return {
-        ...state,
-        step: 'error',
-        message: 'We could not save that just now — please see a leader.',
-      };
+      return { ...state, step: 'error', message: messageFor(action.cause) };
   }
 }
 
@@ -211,9 +241,24 @@ export function RegistrationFlow({
           state.children.map((child) => child.allergies),
         );
       })
-      .catch(() => {
+      .catch((error: { code?: string }) => {
         submittedRef.current = false;
-        dispatch({ type: 'failed' });
+        /*
+         * The cause, and nothing else off the error.
+         *
+         * The server's refusals are written for this screen — "We could not
+         * find that family. Please register as a new family, or see a leader."
+         * — but not all of them are: the same `invalid-argument` carries
+         * "allergies must line up with children." and "anchorStudentIds must be
+         * a list.", which are developer grammar and only reachable from a
+         * malformed request. A lobby is the wrong place to find out which one
+         * came back, so the sentence is chosen here from the shape of the
+         * failure rather than relayed from the wire.
+         */
+        dispatch({
+          type: 'failed',
+          cause: error.code?.includes(DEADLINE_EXCEEDED) ? 'gave-up' : 'refused',
+        });
       });
   }, [
     submit,

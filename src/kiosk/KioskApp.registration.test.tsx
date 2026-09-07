@@ -105,6 +105,8 @@ let answer: RegisterFamilyResult = {
 };
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
+/** What the callable rejects with, when it does. */
+let registerError: { code?: string } = { code: 'functions/internal' };
 /**
  * Holds the callable open so a test can stand on the saving screen.
  *
@@ -165,7 +167,7 @@ const services = {
         releaseRegister = resolve;
       });
     }
-    if (registerFails) throw new Error('offline');
+    if (registerFails) throw registerError;
     return answer;
   }),
   refreshDirectory: vi.fn(
@@ -298,6 +300,7 @@ beforeEach(() => {
   localStorage.clear();
   sent = [];
   registerFails = false;
+  registerError = { code: 'functions/internal' };
   registerHangs = false;
   releaseRegister = () => {};
   phoneIndex = {};
@@ -778,6 +781,40 @@ describe('when it does not work', () => {
     expect(sent).toHaveLength(2);
     expect(sent[1]!.registrationId).toBe(sent[0]!.registrationId);
     expect(screen.getByText('3344')).toBeTruthy();
+  });
+
+  it('does not tell a family it failed when all that happened is we gave up waiting', async () => {
+    /*
+     * The SDK's seventy-second deadline is a client giving up, not a
+     * cancellation — the function runs to its own hundred and twenty seconds,
+     * so it may yet write the family after this screen paints. Saying "we could
+     * not save that" there is a lie half the time, and the half it is wrong
+     * about walks out believing they are not registered. It says what it knows
+     * instead: the tags are out, ask somebody who can look it up.
+     */
+    registerFails = true;
+    registerError = { code: 'functions/deadline-exceeded' };
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+
+    expect(screen.getByText(/taking longer than expected/i)).toBeTruthy();
+    expect(screen.queryByText(/could not save that/i)).toBeNull();
+    // Still retryable, and still under the same id — the whole reason giving up
+    // early is safe at all.
+    registerFails = false;
+    await tap('Try again');
+    expect(sent[1]!.registrationId).toBe(sent[0]!.registrationId);
+  });
+
+  it('still says so plainly when the server actually refused', async () => {
+    registerFails = true;
+    registerError = { code: 'functions/invalid-argument' };
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+
+    expect(screen.getByText(/could not save that/i)).toBeTruthy();
   });
 });
 
