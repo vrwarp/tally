@@ -34,7 +34,8 @@
  * described over the phone; the prompt is what makes it safe to be findable.
  */
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { tallyRender } from '../renderTally';
 import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -48,9 +49,10 @@ import {
   type KioskBinding,
 } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
+import { useGrades } from '@/hooks/usePureStrings';
 
-function gradeLabel(grade: number | null): string {
-  return grade === null ? '' : gradeDescription(grade);
+function gradeLabel(grades: GradeStrings, grade: number | null): string {
+  return grade === null ? '' : gradeDescription(grades, grade);
 }
 
 
@@ -373,6 +375,7 @@ const ResultRow = memo(function ResultRow({
   tracksCheckOut: boolean;
   rowTap: (student: KioskStudent) => TapHandlers;
 }) {
+  const grades = useGrades();
   tallyRender('ResultRow');
   const inert = present && !tracksCheckOut;
   return (
@@ -414,7 +417,7 @@ const ResultRow = memo(function ResultRow({
         ) : present ? (
           <span className="font-semibold text-present-400">✓ Checked in</span>
         ) : (
-          gradeLabel(student.grade)
+          gradeLabel(grades, student.grade)
         )}
       </span>
     </button>

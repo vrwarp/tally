@@ -41,10 +41,12 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useRsvps } from '@/hooks/useAttendance';
-import { cn, createSearchMatcher, gradeLabel, NO_GRADE, sortByName } from '@/lib/utils';
+import { cn, createSearchMatcher, sortByName } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { addRsvps, removeRsvp, setRsvpStatus } from '@/services/rsvps';
 import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 const STATUS_OPTIONS: { value: RsvpStatus; label: 'statusYes' | 'statusMaybe' | 'statusNo'; active: string }[] = [
   { value: 'yes', label: 'statusYes', active: 'bg-present-500/20 text-present-400 ring-present-500/40' },
@@ -78,6 +80,7 @@ function AddStudentsModal({
   candidates: readonly Student[];
   onAdd: (studentIds: string[]) => Promise<void>;
 }) {
+  const grades = useGrades();
   const t = useTranslations('Rsvp');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -191,7 +194,7 @@ function AddStudentsModal({
                       {studentFullName(student)}
                     </span>
                     <span className="shrink-0 text-xs text-ink-500">
-                      {gradeLabel(student) ?? NO_GRADE}
+                      {gradeLabel(grades, student) ?? grades('none')}
                     </span>
                   </button>
                 </li>
@@ -209,6 +212,7 @@ export interface RsvpManagerProps {
 }
 
 export function RsvpManager({ event }: RsvpManagerProps) {
+  const grades = useGrades();
   const t = useTranslations('Rsvp');
   const { students } = useData();
   const { user } = useAuth();
@@ -239,7 +243,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
       .sort((a, b) =>
         a.student && b.student ? sortByName(a.student, b.student) : a.name.localeCompare(b.name),
       );
-  }, [rsvps, studentsById]);
+  }, [rsvps, studentsById, t]);
 
   const summary = useMemo(
     () => ({
@@ -385,7 +389,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                       <span className="truncate font-semibold text-ink-50">{row.name}</span>
                       {row.student ? (
                         <span className="shrink-0 text-xs text-ink-500">
-                          {gradeLabel(row.student) ?? NO_GRADE}
+                          {gradeLabel(grades, row.student) ?? grades('none')}
                         </span>
                       ) : null}
                     </p>

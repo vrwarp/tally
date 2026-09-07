@@ -24,7 +24,7 @@ import { useToast } from '@/context/toastContext';
 import { addRosterMember, importPlanningCenterList, searchPlanningCenterPeople } from '@/services/functions';
 import { fetchPlanningCenterLists } from '@/services/planningCenter';
 import { pcoErrorReport } from '@/lib/pcoErrors';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { cn } from '@/lib/utils';
 import {
   BACKEND_LABELS,
@@ -35,6 +35,7 @@ import {
   type PcoPersonSearchResult,
 } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /** Which backend a search row came from; every row can say. */
 function backendOf(person: PcoPersonSearchResult): BackendId {
@@ -57,6 +58,7 @@ export function AddFromPlanningCenterModal({
   onRoster,
 }: AddFromPlanningCenterModalProps) {
   const t = useTranslations('AddStudent');
+  const grades = useGrades();
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
 
@@ -140,7 +142,7 @@ export function AddFromPlanningCenterModal({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, query]);
+  }, [open, query, t]);
 
   const add = async (person: PcoPersonSearchResult) => {
     setAddingId(person.pcoPersonId);
@@ -285,7 +287,7 @@ export function AddFromPlanningCenterModal({
                       <span className="block text-xs text-ink-500">
                         {person.grade === null
                           ? t('noGradeIn', { backend: backendName })
-                          : gradeDescription(person.grade)}
+                          : gradeDescription(grades, person.grade)}
                         {person.child ? '' : ' · not marked as a child'}
                         {person.status === 'inactive' ? t('inactiveIn', { backend: backendName }) : ''}
                       </span>

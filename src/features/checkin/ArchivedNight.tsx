@@ -20,9 +20,10 @@
 import { Link } from 'react-router-dom';
 import { EmptyState } from '@/components/ui';
 import { formatClock, formatEventDay, formatEventWindow } from '@/lib/time';
-import { gradeLabel, NO_GRADE } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type AttendanceRecord, type Student, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export interface ArchivedNightProps {
   event: TallyEvent;
@@ -33,6 +34,7 @@ export interface ArchivedNightProps {
 }
 
 export function ArchivedNight({ event, attendance, students, now }: ArchivedNightProps) {
+  const grades = useGrades();
   const t = useTranslations('CheckIn');
   const byId = new Map(students.map((student) => [student.id, student]));
 
@@ -88,7 +90,7 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
                 </span>
                 {student ? (
                   <span className="shrink-0 text-xs text-ink-500">
-                    {gradeLabel(student) ?? NO_GRADE}
+                    {gradeLabel(grades, student) ?? grades('none')}
                   </span>
                 ) : null}
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">

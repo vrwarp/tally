@@ -34,7 +34,7 @@
 import { isUnreachable } from '@/features/dashboard/insights';
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
-import { gradeLabel } from '@/lib/utils';
+import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
 import type { Student } from '@/types';
 
@@ -45,7 +45,7 @@ export interface RosterCsvContext {
   backends: readonly RosterBackendStatus[];
 }
 
-function columns(context: RosterCsvContext): CsvColumn<Student>[] {
+function columns(grades: GradeStrings, context: RosterCsvContext): CsvColumn<Student>[] {
   return [
     // Never `id`: a file whose first header cell is `ID` is parsed as SYLK by
     // Excel and refused outright.
@@ -58,7 +58,7 @@ function columns(context: RosterCsvContext): CsvColumn<Student>[] {
     { header: 'grade', value: (student) => student.grade },
     // …and the label beside it, because `gradeName` answers `K` for 0 and
     // `Pre-K` for -1, and a spreadsheet cannot sort those back into place.
-    { header: 'grade_label', value: (student) => gradeLabel(student) },
+    { header: 'grade_label', value: (student) => gradeLabel(grades, student) },
     { header: 'status', value: (student) => student.status },
     { header: 'is_visitor', value: (student) => student.isVisitor },
     { header: 'first_attended', value: (student) => isoDate(student.firstAttendedAt) },
@@ -97,13 +97,14 @@ function columns(context: RosterCsvContext): CsvColumn<Student>[] {
  *   expects eight rows, and the alternative bug is invisible in the file.
  */
 export function buildRosterCsv(
+  grades: GradeStrings,
   students: readonly Student[],
   context: RosterCsvContext,
 ): string {
-  return toCsv(columns(context), students);
+  return toCsv(columns(grades, context), students);
 }
 
 /** Exported for the test that guards the SYLK rule. */
-export function rosterCsvHeaders(context: RosterCsvContext): string[] {
-  return columns(context).map((column) => column.header);
+export function rosterCsvHeaders(grades: GradeStrings, context: RosterCsvContext): string[] {
+  return columns(grades, context).map((column) => column.header);
 }

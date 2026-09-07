@@ -69,7 +69,7 @@ export function PlanningCenterCard() {
     } catch {
       setStored(null);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void check();

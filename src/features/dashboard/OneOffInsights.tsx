@@ -21,9 +21,11 @@ import {
 import { exportFilename } from '@/lib/csv';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeSentence, initials } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { gradeSentence } from '@/lib/grades';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export interface OneOffRecapListProps {
   items: readonly OneOffRecap[];
@@ -108,6 +110,7 @@ export function OneOffOnlyList({
   className,
   exportContext = NO_EXPORT_CONTEXT,
 }: OneOffOnlyListProps & { className?: string; exportContext?: FollowUpCsvContext }) {
+  const grades = useGrades();
   const t = useTranslations('OneOff');
   if (items.length === 0) return null;
 
@@ -132,7 +135,7 @@ export function OneOffOnlyList({
             <ExportCsvButton
               build={() => ({
                 filename: exportFilename({ kind: 'follow-up', scope: 'met-once', at: new Date() }),
-                contents: buildOneOffOnlyCsv(items, exportContext),
+                contents: buildOneOffOnlyCsv(grades, items, exportContext),
               })}
               count={items.length}
               noun="students"
@@ -143,7 +146,7 @@ export function OneOffOnlyList({
 
       <ul className="divide-y divide-ink-800">
         {items.map((item) => {
-          const grade = gradeSentence(item.student);
+          const grade = gradeSentence(grades, item.student);
 
           return (
             <li key={item.student.id} className="px-3 py-2">

@@ -53,14 +53,8 @@ import {
 } from '@/lib/birthday';
 import { exportFilename } from '@/lib/csv';
 import { formatSeenShort } from '@/lib/time';
-import {
-  cn,
-  createSearchMatcher,
-  gradeName,
-  gradeSentence,
-  initials,
-  NO_GRADE,
-} from '@/lib/utils';
+import { cn, createSearchMatcher, initials } from '@/lib/utils';
+import { gradeName, gradeSentence } from '@/lib/grades';
 import {
   GRADES,
   backendLabelOf,
@@ -71,13 +65,14 @@ import {
   type Student,
   type UpstreamEdit,
 } from '@/types';
-import { useSyncStripStrings } from '@/hooks/usePureStrings';
+import { useSyncStripStrings, useGrades } from '@/hooks/usePureStrings';
 import { useTranslations } from 'use-intl';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
 export function StudentsPage() {
+  const grades = useGrades();
   const t = useTranslations('Students');
   const tErrors = useTranslations('Errors');
   const {
@@ -285,9 +280,9 @@ export function StudentsPage() {
         ],
       }),
       // `visible`, never `students`: the file is the rows on screen.
-      contents: buildRosterCsv(visible, { reachable, backends: rosterBackends }),
+      contents: buildRosterCsv(grades, visible, { reachable, backends: rosterBackends }),
     }),
-    [visible, reachable, rosterBackends, isFiltered, backendsDown.length],
+    [visible, reachable, rosterBackends, isFiltered, backendsDown.length, grades],
   );
 
   return (
@@ -486,7 +481,7 @@ export function StudentsPage() {
             <option value="">{t('allGrades')}</option>
             {GRADES.map((value) => (
               <option key={value} value={value}>
-                {gradeName(value)}
+                {gradeName(grades, value)}
               </option>
             ))}
           </SelectField>
@@ -736,10 +731,11 @@ const StudentListRow = memo(function StudentListRow({
   uid: string | null;
   onBadge: (student: Student, action: RowBadgeAction) => void;
 }) {
+  const grades = useGrades();
   const t = useTranslations('Students');
   const name = `${student.firstName} ${student.lastName}`;
   const birthday = birthdayState(student.birthday, now);
-  const spokenGrade = gradeSentence(student);
+  const spokenGrade = gradeSentence(grades, student);
 
   return (
     /*
@@ -883,7 +879,7 @@ const StudentListRow = memo(function StudentListRow({
             only below `lg`; the wide layout has a lane for this.
           */}
           <span className="shrink-0 lg:w-20 lg:text-right">
-            {spokenGrade ?? NO_GRADE}
+            {spokenGrade ?? grades('none')}
           </span>
           {/*
             The job mark rides in the row's meta line below `lg`, and beside

@@ -41,6 +41,9 @@ import {
   type TranslationState,
   type TranslationStatus,
 } from '../src/lib/translationState';
+// @ts-expect-error — plain Node ESM, deliberately untyped: it also runs
+// standalone with `--check`, with no toolchain around it.
+import { write as writeKioskSlices } from './sync-kiosk-messages.mjs';
 
 const MESSAGES_DIR = path.join(process.cwd(), 'messages');
 const STATE_FILE = path.join(MESSAGES_DIR, 'translation-state.json');
@@ -344,7 +347,12 @@ async function main(): Promise<void> {
     );
     for (const line of reviewedSkipped) console.warn(`  ${line}`);
   }
-  console.log('\nCatalogues and translation-state.json written.');
+  // The kiosk carries a slice of these rather than the whole file, and a stale
+  // slice is a lobby screen showing keys. Rewritten here so it can never lag the
+  // catalogue it is cut from; `tests/messages.test.ts` fails if it does anyway.
+  writeKioskSlices();
+
+  console.log('\nCatalogues, kiosk slices and translation-state.json written.');
 }
 
 main().catch((err: unknown) => {

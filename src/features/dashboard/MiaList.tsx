@@ -24,10 +24,12 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeSentence, initials, sortByName } from '@/lib/utils';
+import { initials, sortByName } from '@/lib/utils';
+import { gradeSentence } from '@/lib/grades';
 import { sessionReleaseKey, type SessionRelease } from '@/features/dashboard/sessionRelease';
 import { TRANSITION_REASON_LABEL, studentFullName, type MiaStudent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export interface MiaListProps {
   items: readonly MiaStudent[];
@@ -77,6 +79,7 @@ export function MiaList({
   undoBusyKey = null,
 }: MiaListProps) {
   const t = useTranslations('Mia');
+  const grades = useGrades();
   const students = items.map((item) => item.student);
 
   /*
@@ -145,7 +148,7 @@ export function MiaList({
                     scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                     at: new Date(),
                   }),
-                  contents: buildMiaCsv(items, exportContext),
+                  contents: buildMiaCsv(grades, items, exportContext),
                 })}
                 count={items.length}
                 noun="students"
@@ -361,10 +364,11 @@ function MiaRow({
   onContactAdded?: () => void;
   onResolve?: (item: MiaStudent) => void;
 }) {
+  const grades = useGrades();
   const t = useTranslations('Mia');
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
-  const grade = gradeSentence(student);
+  const grade = gradeSentence(grades, student);
   // Every row that names a gathering can be released from it; an unseen row
   // can only be re-answered when a release produced it (same act, other
   // reason). A plain unseen row's remedy stays what it always was — a phone

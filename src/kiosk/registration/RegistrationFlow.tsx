@@ -20,7 +20,9 @@
  * which is the same write-back check that form made before showing its field.
  */
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
+import { haptic, NO_GRADE } from '@/lib/utils';
+import { gradeDescription, type GradeStrings } from '@/lib/grades';
+import { useGrades } from '@/hooks/usePureStrings';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import type { KioskBinding } from '../binding';
@@ -1127,13 +1129,14 @@ function GradeChips({
   picked: boolean;
   onPick: (grade: Grade | null) => void;
 }) {
+  const grades = useGrades();
   return (
     <div className="mx-auto grid w-full grid-cols-4 gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0">
       {GRADES.map((year) => (
         <GradeChip
           key={year}
-          label={gradeChipLabel(year)}
-          hint={gradeDescription(year)}
+          label={gradeChipLabel(grades, year)}
+          hint={gradeDescription(grades, year)}
           selected={picked && grade === year}
           onPick={() => onPick(year)}
         />
@@ -1142,7 +1145,11 @@ function GradeChips({
           reading position one, styled like the fourteen real values, it reads
           as the default — and what it produces is a grade-less record for the
           core team to adjudicate. */}
-      <GradeChip label={NO_GRADE} selected={picked && grade === null} onPick={() => onPick(null)} />
+      <GradeChip
+        label={grades('none')}
+        selected={picked && grade === null}
+        onPick={() => onPick(null)}
+      />
     </div>
   );
 }
@@ -1236,9 +1243,16 @@ function GradeChip({
  * as `String(grade)` right here put a chip reading "-1" at the top left of the
  * grid, in first reading position, in front of the parent of a four-year-old.
  */
-function gradeChipLabel(grade: Grade): string {
-  if (grade === PRE_K) return 'Pre-K';
-  return grade === 0 ? 'K' : String(grade);
+/**
+ * The chip's face: `Pre-K`, `K`, or the bare numeral.
+ *
+ * Not `gradeName`, which would print an English ordinal ("9th") the chip has no
+ * room for — a grid of four columns wants the number alone. Only the two grades
+ * that are words rather than positions come out of the catalogue.
+ */
+function gradeChipLabel(grades: GradeStrings, grade: Grade): string {
+  if (grade === PRE_K) return grades('preK');
+  return grade === 0 ? grades('shortK') : String(grade);
 }
 
 function titleFor(state: RegistrationState, childNumber: number): string {

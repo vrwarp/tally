@@ -1,0 +1,10 @@
+{
+  "Grades": {
+    "preK": "Pre-K",
+    "shortK": "K",
+    "kindergarten": "Kindergarten",
+    "ordinal": "{grade, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}",
+    "ordinalWithNoun": "{grade, selectordinal, one {#st grade} two {#nd grade} few {#rd grade} other {#th grade}}",
+    "none": "No grade"
+  }
+}

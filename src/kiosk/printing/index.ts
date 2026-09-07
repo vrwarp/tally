@@ -73,6 +73,7 @@ import {
 } from './device';
 import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
 import { createPrinterLog, isNoise, type PrinterLogEntry } from './log';
+import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
@@ -1073,6 +1074,7 @@ const queue = createLabelQueue({
 });
 
 function jobFor(
+  grades: GradeStrings,
   student: KioskStudent,
   binding: KioskBinding,
   template: LabelTemplate,
@@ -1085,7 +1087,7 @@ function jobFor(
     // looking for the child they can see.
     name: `${student.firstName} ${student.lastName}`.trim(),
     template,
-    values: tokenValuesFor(student, binding),
+    values: tokenValuesFor(grades, student, binding),
   };
 }
 
@@ -1096,13 +1098,17 @@ function jobFor(
  * moving by the time the tick paints. Callers gate this on the intent being a
  * check-in: a check-out prints nothing, so warming one is work thrown away.
  */
-export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
+export function warmLabel(
+  grades: GradeStrings,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
   const template = binding.labelTemplate;
   if (!template) return;
   // Before the queue, not after: `warm` starts rasterising synchronously, and
   // the rasteriser is what waits for this.
   startAllergyLookup(student, template);
-  queue.warm(jobFor(student, binding, template));
+  queue.warm(jobFor(grades, student, binding, template));
 }
 
 /**
@@ -1112,13 +1118,17 @@ export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
  * success screen has already been set, and nothing about a sticker may reach
  * back into a screen that has told a parent their child is checked in.
  */
-export function printLabel(student: KioskStudent, binding: KioskBinding): void {
+export function printLabel(
+  grades: GradeStrings,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
   const template = binding.labelTemplate;
   if (!template) return;
   // A no-op when `warmLabel` already started it, and the reason this is not
   // simply left to the warm: the printer screen reaches `printLabel` too.
   startAllergyLookup(student, template);
-  queue.print(jobFor(student, binding, template));
+  queue.print(jobFor(grades, student, binding, template));
 }
 
 /**
@@ -1171,8 +1181,12 @@ export function forgetLabel(studentId: string): void {
  * second one, and `docs/kiosk-reprint.md` for why a wider parent-facing reprint
  * is a roll of labels on the floor.
  */
-export function reprintLabel(student: KioskStudent, binding: KioskBinding): void {
-  printLabel(student, binding);
+export function reprintLabel(
+  grades: GradeStrings,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
+  printLabel(grades, student, binding);
 }
 
 /**
@@ -1184,10 +1198,14 @@ export function reprintLabel(student: KioskStudent, binding: KioskBinding): void
  * Lines that come to nothing are dropped exactly as the renderer drops them, so
  * the preview cannot promise a line the label will not have.
  */
-export function labelPreview(student: KioskStudent, binding: KioskBinding): string[] {
+export function labelPreview(
+  grades: GradeStrings,
+  student: KioskStudent,
+  binding: KioskBinding,
+): string[] {
   const template = binding.labelTemplate;
   if (!template) return [];
-  const values = tokenValuesFor(student, binding);
+  const values = tokenValuesFor(grades, student, binding);
   return template.lines
     .map((line) => fillLabelTokens(line.text, values))
     .filter((text) => text.length > 0);

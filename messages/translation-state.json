@@ -6693,5 +6693,35 @@
     "source": "Show every gathering they came to",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Grades.preK": {
+    "source": "Pre-K",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grades.shortK": {
+    "source": "K",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grades.kindergarten": {
+    "source": "Kindergarten",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grades.ordinal": {
+    "source": "{grade, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grades.ordinalWithNoun": {
+    "source": "{grade, selectordinal, one {#st grade} two {#nd grade} few {#rd grade} other {#th grade}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grades.none": {
+    "source": "No grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

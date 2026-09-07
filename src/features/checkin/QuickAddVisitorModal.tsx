@@ -29,11 +29,13 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Button, Modal, PhoneField, SelectField, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { quickAddAndCheckIn } from '@/services/attendance';
 import { recordVisitorParent } from '@/services/functions';
 import { GRADES, type Grade, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /**
  * What the grade field opens on.
@@ -87,6 +89,7 @@ export function QuickAddVisitorModal({
   initialName,
   onAdded,
 }: QuickAddVisitorModalProps) {
+  const grades = useGrades();
   const t = useTranslations('QuickAdd');
   const tCommon = useTranslations('Common');
   const { show } = useToast();
@@ -269,7 +272,7 @@ export function QuickAddVisitorModal({
           <option value="">{tCommon('noGrade')}</option>
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {gradeDescription(value)}
+              {gradeDescription(grades, value)}
             </option>
           ))}
         </SelectField>

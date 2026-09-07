@@ -10,6 +10,9 @@ import { buildRosterCsv, rosterCsvHeaders } from '@/features/students/rosterCsv'
 import type { RosterBackendStatus } from '@/services/functions';
 import { makeStudent } from '../../../tests/factories';
 import type { Student } from '@/types';
+import { testGrades } from '@/test/translator';
+
+const grades = testGrades();
 
 const NO_CONTEXT = { reachable: new Map<string, boolean>(), backends: [] as RosterBackendStatus[] };
 
@@ -19,35 +22,35 @@ function row(csv: string, index: number): string[] {
 }
 
 function cell(csv: string, rowIndex: number, header: string): string {
-  const headers = rosterCsvHeaders(NO_CONTEXT);
+  const headers = rosterCsvHeaders(grades, NO_CONTEXT);
   return row(csv, rowIndex)[headers.indexOf(header)]!;
 }
 
 describe('buildRosterCsv — shape', () => {
   it('never names its first column ID, which Excel would read as SYLK', () => {
-    expect(rosterCsvHeaders(NO_CONTEXT)[0]).toBe('student_id');
+    expect(rosterCsvHeaders(grades, NO_CONTEXT)[0]).toBe('student_id');
   });
 
   it('writes a header and one row per student', () => {
-    const csv = buildRosterCsv([makeStudent({ id: 'pco_1' }), makeStudent({ id: 'pco_2' })], NO_CONTEXT);
+    const csv = buildRosterCsv(grades, [makeStudent({ id: 'pco_1' }), makeStudent({ id: 'pco_2' })], NO_CONTEXT);
     expect(csv.trimEnd().split('\r\n')).toHaveLength(3);
   });
 
   it('holds no parent contact details, no allergy note and no birthday', () => {
-    const headers = rosterCsvHeaders(NO_CONTEXT).join(' ');
+    const headers = rosterCsvHeaders(grades, NO_CONTEXT).join(' ');
     expect(headers).not.toMatch(/parent_name|parent_phone|parent_email|allergy_note|birthday/);
   });
 });
 
 describe('buildRosterCsv — grade', () => {
   it('carries the number and the label separately', () => {
-    const csv = buildRosterCsv([makeStudent({ id: 'pco_1', grade: 9 })], NO_CONTEXT);
+    const csv = buildRosterCsv(grades, [makeStudent({ id: 'pco_1', grade: 9 })], NO_CONTEXT);
     expect(cell(csv, 0, 'grade')).toBe('9');
     expect(cell(csv, 0, 'grade_label')).toBe('9th');
   });
 
   it('renders kindergarten as 0 and K, never as a blank or "0th"', () => {
-    const csv = buildRosterCsv([makeStudent({ id: 'pco_1', grade: 0 })], NO_CONTEXT);
+    const csv = buildRosterCsv(grades, [makeStudent({ id: 'pco_1', grade: 0 })], NO_CONTEXT);
     expect(cell(csv, 0, 'grade')).toBe('0');
     expect(cell(csv, 0, 'grade_label')).toBe('K');
   });
@@ -55,7 +58,7 @@ describe('buildRosterCsv — grade', () => {
   it('leaves both blank for somebody who holds no grade', () => {
     // No grade is an answer, not a gap to be filled in with a zero — which
     // would claim a nursery child is in kindergarten.
-    const csv = buildRosterCsv([makeStudent({ id: 'pco_1', grade: null })], NO_CONTEXT);
+    const csv = buildRosterCsv(grades, [makeStudent({ id: 'pco_1', grade: null })], NO_CONTEXT);
     expect(cell(csv, 0, 'grade')).toBe('');
     expect(cell(csv, 0, 'grade_label')).toBe('');
   });
@@ -63,7 +66,7 @@ describe('buildRosterCsv — grade', () => {
 
 describe('buildRosterCsv — the three-state contact column', () => {
   function contact(student: Student, reachable = new Map<string, boolean>()): string {
-    return cell(buildRosterCsv([student], { ...NO_CONTEXT, reachable }), 0, 'contact_on_file');
+    return cell(buildRosterCsv(grades, [student], { ...NO_CONTEXT, reachable }), 0, 'contact_on_file');
   }
 
   it('is blank when nobody has looked', () => {
@@ -113,7 +116,7 @@ describe('buildRosterCsv — multi-backend', () => {
   ];
 
   it('names each row’s own backend and dates it against that backend’s read', () => {
-    const csv = buildRosterCsv(
+    const csv = buildRosterCsv(grades, 
       [makeStudent({ id: 'pco_1' }), makeStudent({ id: 'a32_abc' })],
       { reachable: new Map(), backends },
     );
@@ -128,7 +131,7 @@ describe('buildRosterCsv — multi-backend', () => {
   });
 
   it('leaves the system blank for a visitor no backend holds', () => {
-    const csv = buildRosterCsv([makeStudent({ id: 'tallyId', upstreamPushPending: true })], {
+    const csv = buildRosterCsv(grades, [makeStudent({ id: 'tallyId', upstreamPushPending: true })], {
       reachable: new Map(),
       backends,
     });
@@ -141,17 +144,17 @@ describe('buildRosterCsv — multi-backend', () => {
 describe('buildRosterCsv — awkward values', () => {
   it('neutralises a note that would execute as a formula on open', () => {
     const student = makeStudent({ id: 'pco_1', notes: '=HYPERLINK("http://x","click")' });
-    const csv = buildRosterCsv([student], NO_CONTEXT);
+    const csv = buildRosterCsv(grades, [student], NO_CONTEXT);
     expect(csv).toContain('"\'=HYPERLINK');
   });
 
   it('carries a nickname composite through unharmed', () => {
     const student = makeStudent({ id: 'pco_1', firstName: 'Benson “蔡秉洲”', lastName: 'Tsai' });
-    expect(buildRosterCsv([student], NO_CONTEXT)).toContain('Benson “蔡秉洲”,Tsai');
+    expect(buildRosterCsv(grades, [student], NO_CONTEXT)).toContain('Benson “蔡秉洲”,Tsai');
   });
 
   it('names the keeper on a merged row rather than dropping it silently', () => {
     const student = { ...makeStudent({ id: 'pco_1' }), mergedIntoStudentId: 'pco_9' };
-    expect(cell(buildRosterCsv([student], NO_CONTEXT), 0, 'merged_into_student_id')).toBe('pco_9');
+    expect(cell(buildRosterCsv(grades, [student], NO_CONTEXT), 0, 'merged_into_student_id')).toBe('pco_9');
   });
 });

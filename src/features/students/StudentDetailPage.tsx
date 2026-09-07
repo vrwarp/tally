@@ -67,7 +67,8 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, gradeSentence, initials } from '@/lib/utils';
+import { cn, formatPhone, initials } from '@/lib/utils';
+import { gradeSentence } from '@/lib/grades';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
@@ -94,6 +95,7 @@ import {
   type TransitionReason,
 } from '@/types';
 import { useLocale, useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -122,6 +124,7 @@ function dialable(phone: string): string {
 }
 
 export function StudentDetailPage() {
+  const grades = useGrades();
   const t = useTranslations('StudentDetail');
   const tCommon = useTranslations('Common');
   const locale = useLocale();
@@ -309,7 +312,7 @@ export function StudentDetailPage() {
       groups.push({ key: ONE_OFF_GROUP, title: t('oneOffEvents'), standing: null, entries: oneOff });
     }
     return groups;
-  }, [snapshots, series, student, settings]);
+  }, [snapshots, series, student, settings, t]);
 
   /*
    * The aging-out record for this student (docs/aging-out.md), and the page's
@@ -474,7 +477,7 @@ export function StudentDetailPage() {
   }
 
   const name = studentFullName(student);
-  const grade = gradeSentence(student);
+  const grade = gradeSentence(grades, student);
   const backend = backendOfStudent(student);
   const backendName = backendLabelOf(student);
   const phone = details?.contactPhone?.trim() ?? '';

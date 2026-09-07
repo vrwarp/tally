@@ -22,9 +22,11 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
 import { formatClock } from '@/lib/time';
-import { cn, gradeLabel, gradeSentence, initials, NO_GRADE, sameItems } from '@/lib/utils';
+import { cn, initials, sameItems } from '@/lib/utils';
+import { gradeLabel, gradeSentence } from '@/lib/grades';
 import { studentFullName, type RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /**
  * What the row is being used for.
@@ -138,10 +140,11 @@ export const StudentRow = memo(function StudentRow({
   onUndoCheckOut,
   tracksCheckOut = false,
 }: StudentRowProps) {
+  const grades = useGrades();
   const t = useTranslations('StudentRow');
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
-  const grade = gradeLabel(student);
+  const grade = gradeLabel(grades, student);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
   const swapping = mode === 'swap';
@@ -171,7 +174,7 @@ export const StudentRow = memo(function StudentRow({
   // Null for somebody Planning Center holds no grade for — an adult on a
   // hand-picked roster. The clause goes rather than announcing a grade Tally
   // invented, which on this screen is read aloud beside a name.
-  const spokenGrade = gradeSentence(student);
+  const spokenGrade = gradeSentence(grades, student);
   /*
    * Who this row is about, as one noun phrase rather than a name with a
    * clause appended. English puts the grade after a comma; Chinese puts it in
@@ -307,7 +310,7 @@ export const StudentRow = memo(function StudentRow({
                   <span className="font-normal text-ink-300">{student.lastName}</span>
                 </span>
                 <span className="shrink-0 text-xs font-medium text-ink-500">
-                  {grade ?? NO_GRADE}
+                  {grade ?? grades('none')}
                 </span>
               </span>
 

@@ -42,7 +42,8 @@ import {
   readBirthdayField,
 } from '@/lib/birthdayField';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatPhone, gradeDescription } from '@/lib/utils';
+import { formatPhone } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
@@ -60,6 +61,7 @@ import {
   type UpstreamEditPatch,
 } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);
@@ -143,6 +145,7 @@ export interface StudentEditorModalProps {
 }
 
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
+  const grades = useGrades();
   const t = useTranslations('StudentEditor');
   const tCommon = useTranslations('Common');
   const { user, profile } = useAuth();
@@ -644,7 +647,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           {gradeUnknown || !student ? <option value="">{tCommon('noGrade')}</option> : null}
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {gradeDescription(value)}
+              {gradeDescription(grades, value)}
             </option>
           ))}
         </SelectField>

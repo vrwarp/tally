@@ -80,6 +80,7 @@ import { SearchScreen } from './screens/SearchScreen';
 import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 import { NotOpenScreen } from './screens/NotOpenScreen';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
@@ -321,6 +322,7 @@ function isQuietHour(): boolean {
 
 export function KioskApp() {
   tallyRender('KioskApp');
+  const grades = useGrades();
   const [phase, setPhase] = useState<Phase>('booting');
   const [services, setServices] = useState<KioskServices | null>(null);
   const [printing, setPrinting] = useState<KioskPrinting | null>(null);
@@ -1515,7 +1517,7 @@ export function KioskApp() {
          */
         if (prints) {
           try {
-            printing?.printLabel(student, binding);
+            printing?.printLabel(grades, student, binding);
             // The printer screen lists what has been attempted tonight, and the
             // log is the queue's rather than React's — this is what tells a
             // screen that is open to read it again.
@@ -1526,7 +1528,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, printing, prints, binding, uid],
+    [services, printing, prints, binding, uid, grades],
   );
 
   /**
@@ -1545,7 +1547,7 @@ export function KioskApp() {
     (student: KioskStudent) => {
       if (!binding || !printing) return;
       try {
-        printing.reprintLabel(student, binding);
+        printing.reprintLabel(grades, student, binding);
       } catch {
         // Same reasoning as the check-in path: a sticker may never reach back
         // into the screen that asked for it.
@@ -1554,7 +1556,7 @@ export function KioskApp() {
       setSentId(student.id);
       setPrintTick((tick) => tick + 1);
     },
-    [binding, printing],
+    [binding, printing, grades],
   );
 
   /**
@@ -1609,8 +1611,8 @@ export function KioskApp() {
 
   const labelLinesFor = useCallback(
     (student: KioskStudent): string[] =>
-      binding && printing ? printing.labelPreview(student, binding) : [],
-    [binding, printing],
+      binding && printing ? printing.labelPreview(grades, student, binding) : [],
+    [binding, printing, grades],
   );
 
   /**
@@ -1883,7 +1885,7 @@ export function KioskApp() {
              * which is what the lookup would have resolved to anyway.
              */
             printing?.rememberAllergyNote(student.id, result.notes[index] ?? '');
-            printing?.printLabel(student, binding);
+            printing?.printLabel(grades, student, binding);
           } catch {
             // Deliberately swallowed, exactly as in `onConfirm`: a printer
             // cannot be allowed to contradict a screen that has told a family
@@ -1892,7 +1894,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, binding, printing, prints],
+    [services, binding, printing, prints, grades],
   );
 
   /* ---- Render ------------------------------------------------------------- */
@@ -2137,7 +2139,7 @@ export function KioskApp() {
               // Warmed on the tap, the same trick the confirm screen plays: the
               // rasterising is a few hundred thousand pixels in a worker and
               // this is the slack while the confirm is on its way up.
-              printing?.warmLabel(student, binding);
+              printing?.warmLabel(grades, student, binding);
               setOverlay({ kind: 'reprint-confirm', student, from: 'reprint' });
             }}
             onDone={leaveStaff}
@@ -2177,7 +2179,7 @@ export function KioskApp() {
                */
               const student = students.find((row) => row.id === label.studentId);
               if (student) {
-                printing?.warmLabel(student, binding);
+                printing?.warmLabel(grades, student, binding);
                 setOverlay({ kind: 'reprint-confirm', student, from: 'printer' });
               }
             }}
@@ -2262,7 +2264,7 @@ export function KioskApp() {
              * group, and the button at the end says how many it covers.
              */
             services?.warmStudentDates(found.id);
-            printing?.warmLabel(found, binding);
+            printing?.warmLabel(grades, found, binding);
             setBuffer('');
             setOverlay({ ...from, family: [...from.family, found] });
           }}
@@ -2311,7 +2313,7 @@ export function KioskApp() {
               const member = overlay.family.find((row) => row.id === studentId);
               if (member) {
                 services?.warmStudentDates(member.id);
-                if (prints) printing?.warmLabel(member, binding);
+                if (prints) printing?.warmLabel(grades, member, binding);
               }
             }
             setOverlay({ ...overlay, skipped: next });
@@ -2385,8 +2387,8 @@ export function KioskApp() {
            */
           for (const member of taking) services?.warmStudentDates(member.id);
           if (prints && intent === 'check-in') {
-            printing?.warmLabel(student, binding);
-            for (const member of taking) printing?.warmLabel(member, binding);
+            printing?.warmLabel(grades, student, binding);
+            for (const member of taking) printing?.warmLabel(grades, member, binding);
           }
           setOverlay({
             kind: 'confirm',

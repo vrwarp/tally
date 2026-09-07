@@ -45,10 +45,12 @@
  * again would return the same people they are standing in front of. Name only.
  */
 import { useEffect, useMemo, useRef } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { searchStudents, MAX_RESULTS, type KioskStudent } from '../search';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export function SiblingScreen({
   student,
@@ -74,6 +76,7 @@ export function SiblingScreen({
   onRegister: () => void;
   onBack: () => void;
 }) {
+  const grades = useGrades();
   /*
    * Name only — `last4Index` is deliberately not threaded in. The four digits
    * are how this family was found a moment ago, so searching them again
@@ -177,7 +180,7 @@ export function SiblingScreen({
                   ) : found.grade === null ? (
                     ''
                   ) : (
-                    gradeDescription(found.grade)
+                    gradeDescription(grades, found.grade)
                   )}
                 </span>
               </button>

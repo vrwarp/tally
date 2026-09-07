@@ -16,6 +16,9 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { LOCALES } from '@/lib/locales';
+// @ts-expect-error — plain Node ESM, deliberately untyped: it has to run
+// standalone as `--check` with no toolchain around it.
+import { KIOSK_NAMESPACES, stale as staleKioskSlices, usedNamespaces } from '../scripts/sync-kiosk-messages.mjs';
 import {
   QUOTED_IN,
   SAME_VALUE_GROUPS,
@@ -144,5 +147,33 @@ describe('message catalogues', () => {
     expect(stale, 'English changed since translation — run `npm run translate`').toEqual([]);
     const untracked = [...enFlat.keys()].filter((key) => !(key in state));
     expect(untracked, 'keys missing from translation-state — run `npm run translate`').toEqual([]);
+  });
+});
+
+/**
+ * The kiosk's slice of the catalogue.
+ *
+ * `messages/kiosk/*.json` is generated: the lobby tablet is handed the few
+ * namespaces its own screens reach, because the whole 85 kB file would land in
+ * a first paint that `scripts/check-kiosk-budget.mjs` holds to 127 kB gzipped.
+ * A generated copy is only defensible while it is provably current, and a
+ * namespace the kiosk asks for but the slice does not carry renders its own key
+ * on a screen a parent is standing at — so both directions fail here.
+ */
+describe('the kiosk message slice', () => {
+  it('is in sync with the catalogues it is cut from', () => {
+    expect(staleKioskSlices()).toEqual([]);
+  });
+
+  it('carries every namespace the kiosk actually asks for', () => {
+    for (const namespace of usedNamespaces() as string[]) {
+      expect(KIOSK_NAMESPACES as string[], `src/kiosk asks for ${namespace}`).toContain(namespace);
+    }
+  });
+
+  it('names only namespaces that exist in en.json', () => {
+    for (const namespace of KIOSK_NAMESPACES as string[]) {
+      expect(en, `KIOSK_NAMESPACES lists ${namespace}`).toHaveProperty(namespace);
+    }
   });
 });

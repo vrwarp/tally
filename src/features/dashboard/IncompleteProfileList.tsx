@@ -26,9 +26,11 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import { formatShortDate } from '@/lib/time';
-import { gradeSentence, initials } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { gradeSentence } from '@/lib/grades';
 import { studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /** Past this many days an unfinished profile stops being a fresh to-do. */
 const STALE_DAYS = 7;
@@ -74,6 +76,7 @@ export function IncompleteProfileList({
   exportContext = NO_EXPORT_CONTEXT,
 }: IncompleteProfileListProps) {
   const t = useTranslations('Incomplete');
+  const grades = useGrades();
   return (
     <Card>
       <CardHeader
@@ -96,7 +99,7 @@ export function IncompleteProfileList({
                   scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                   at: now,
                 }),
-                contents: buildIncompleteProfileCsv(students, exportContext, now),
+                contents: buildIncompleteProfileCsv(grades, students, exportContext, now),
               })}
               count={students.length}
               noun="students"
@@ -168,9 +171,10 @@ function IncompleteRow({
   now: Date;
   onContactAdded?: () => void;
 }) {
+  const grades = useGrades();
   const t = useTranslations('Incomplete');
   const days = waitingDays(student, now);
-  const grade = gradeSentence(student);
+  const grade = gradeSentence(grades, student);
   const tone =
     days === null ? 'warn' : days >= VERY_STALE_DAYS ? 'danger' : days >= STALE_DAYS ? 'warn' : 'neutral';
   const badge =

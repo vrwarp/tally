@@ -56,13 +56,15 @@
  * things a parent came to this screen to do.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { tallyRender } from '../renderTally';
 import { HoldButton } from '../components/HoldButton';
 import type { ReprintOffer } from '../reprintOffer';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /** A sibling row and the gap under it — the pitch the list quantises to. */
 const ROW_HEIGHT = 64;
@@ -119,6 +121,7 @@ export function ConfirmScreen({
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
+  const grades = useGrades();
   tallyRender('ConfirmScreen');
   // Whose ticks start off. Decided by the caller — see `skippedFor` — because
   // it depends on things this screen has no business knowing about.
@@ -347,7 +350,7 @@ export function ConfirmScreen({
             {student.firstName} {student.lastName}
           </div>
           {student.grade !== null && (
-            <div className="pt-3 text-2xl text-ink-400">{gradeDescription(student.grade)}</div>
+            <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
           )}
         </div>
 

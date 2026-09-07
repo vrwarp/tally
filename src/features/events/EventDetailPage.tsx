@@ -60,11 +60,12 @@ import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
 import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
-import { cn, gradeLabel, NO_GRADE } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
-import { useRecurrenceStrings } from '@/hooks/usePureStrings';
+import { useRecurrenceStrings, useGrades } from '@/hooks/usePureStrings';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -76,6 +77,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 export function EventDetailPage() {
+  const grades = useGrades();
   const t = useTranslations('EventDetail');
   const recurrenceStrings = useRecurrenceStrings();
   const { eventId } = useParams();
@@ -209,7 +211,7 @@ export function EventDetailPage() {
   const registerExportRows = registerRows(event, attendance, exportRsvps, studentsById);
   const buildRegisterExport = () => ({
     filename: exportFilename({ kind: 'register', scope: event.title, at: event.startAt }),
-    contents: buildRegisterCsv(registerExportRows, {
+    contents: buildRegisterCsv(grades, registerExportRows, {
       event,
       // Resolved here rather than inside the builder, which has no business
       // holding a Firestore subscription.
@@ -464,7 +466,7 @@ export function EventDetailPage() {
                         </span>
                         {student ? (
                           <span className="shrink-0 text-xs text-ink-500">
-                            {gradeLabel(student) ?? NO_GRADE}
+                            {gradeLabel(grades, student) ?? grades('none')}
                           </span>
                         ) : null}
                         <span className="shrink-0 text-xs tabular-nums text-ink-500">

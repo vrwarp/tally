@@ -27,12 +27,14 @@
  * shipping search screen dropped the ring from its quiet control.
  */
 import { useEffect } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskStudent } from '../search';
 import { StaffMark } from '../components/StaffMark';
 import { useOverflowFade } from '../components/useOverflowFade';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /**
  * Fewer than the parent screen's eight, and this screen's own number.
@@ -64,8 +66,8 @@ export interface ReprintOutcome {
  * only by the keystrokes this screen can see.
  */
 
-function gradeLabel(grade: number | null): string {
-  return grade === null ? '' : gradeDescription(grade);
+function gradeLabel(grades: GradeStrings, grade: number | null): string {
+  return grade === null ? '' : gradeDescription(grades, grade);
 }
 
 export function ReprintScreen({
@@ -105,6 +107,7 @@ export function ReprintScreen({
   onPick: (student: KioskStudent) => void;
   onDone: () => void;
 }) {
+  const grades = useGrades();
   const rowTap = useTapGuard(onPick);
   const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
@@ -297,7 +300,7 @@ export function ReprintScreen({
                           {' · '}
                         </>
                       )}
-                      {gradeLabel(student.grade)}
+                      {gradeLabel(grades, student.grade)}
                       {present && !justSent && (
                         <>
                           {' · '}

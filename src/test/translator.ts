@@ -17,7 +17,19 @@
 import { createTranslator } from 'use-intl';
 import { DEFAULT_LOCALE } from '@/lib/locales';
 import en from '../../messages/en.json';
+import type { GradeStrings } from '@/lib/grades';
 
 export function testTranslator<Namespace extends keyof typeof en>(namespace: Namespace) {
   return createTranslator({ locale: DEFAULT_LOCALE, messages: en, namespace });
+}
+
+/**
+ * The grade names, in the shape `lib/grades.ts` takes.
+ *
+ * Its own export because half a dozen pure formatters need it and the cast is
+ * the same every time: `GradeStrings` is a narrow call signature, and
+ * `createTranslator` is typed against the whole catalogue.
+ */
+export function testGrades(): GradeStrings {
+  return testTranslator('Grades') as unknown as GradeStrings;
 }

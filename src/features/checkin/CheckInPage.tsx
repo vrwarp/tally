@@ -331,7 +331,7 @@ export function CheckInPage() {
     if (!swapForId || swapSource) return;
     setSwapForId(null);
     show(t("swapGone"), { tone: "info" });
-  }, [swapForId, swapSource, show]);
+  }, [swapForId, swapSource, show, t]);
 
   // The action strip is a check-in's own, so an undo — this counselor's or the
   // other phone's — takes it away with the check mark it was hanging off.
@@ -492,7 +492,7 @@ export function CheckInPage() {
       show(frozen, { tone: 'error' });
       return true;
     },
-    [show],
+    [show, t],
   );
 
   /**
@@ -569,7 +569,7 @@ export function CheckInPage() {
         }
       });
     },
-    [event, user, query, flash, write, refuseFrozen],
+    [event, user, query, flash, write, refuseFrozen, t],
   );
 
   const handleUndo = useCallback(
@@ -586,7 +586,7 @@ export function CheckInPage() {
         show(t("toastUndid", { name }), { tone: "info" });
       });
     },
-    [event, show, write],
+    [event, show, write, t],
   );
 
   const handleCheckOut = useCallback(
@@ -606,7 +606,7 @@ export function CheckInPage() {
         await checkOut(event.id, entry.student.id, user.uid);
       });
     },
-    [event, user, write, refuseFrozen],
+    [event, user, write, refuseFrozen, t],
   );
 
   const handleUndoCheckOut = useCallback(
@@ -622,7 +622,7 @@ export function CheckInPage() {
         await undoCheckOut(event.id, entry.student.id);
       });
     },
-    [event, write, refuseFrozen],
+    [event, write, refuseFrozen, t],
   );
 
   /**
@@ -662,7 +662,7 @@ export function CheckInPage() {
         },
       );
     },
-    [event, user, swapSource, flash, show, write, refuseFrozen],
+    [event, user, swapSource, flash, show, write, refuseFrozen, t],
   );
 
   /**

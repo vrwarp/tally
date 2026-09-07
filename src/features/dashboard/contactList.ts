@@ -1,4 +1,4 @@
-import { gradeLabel } from '@/lib/utils';
+import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import { studentFullName, type Student } from '@/types';
 import type { PcoPersonDetails } from '@/types';
 
@@ -28,6 +28,7 @@ export type ContactListTranslator = (
 
 export function buildContactList(
   t: ContactListTranslator,
+  grades: GradeStrings,
   title: string,
   students: readonly Student[],
   contacts: ReadonlyMap<string, PcoPersonDetails> = new Map(),
@@ -39,7 +40,7 @@ export function buildContactList(
     // The bracket goes rather than filling with a grade nobody holds: this
     // paste lands in a group chat, where "(6th)" beside an adult's name is a
     // claim about them that whoever reads it has no way to check.
-    const grade = gradeLabel(student);
+    const grade = gradeLabel(grades, student);
     return grade
       ? t('listRowWithGrade', { name: studentFullName(student), grade, contact })
       : t('listRow', { name: studentFullName(student), contact });

@@ -31,9 +31,11 @@ import { hasNoAdultContact, reachableFor } from '@/features/dashboard/insights';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { exportFilename } from '@/lib/csv';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeLabel, initials, NO_GRADE } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type NewVisitor } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 export interface NewVisitorListProps {
   items: readonly NewVisitor[];
@@ -82,6 +84,7 @@ export function NewVisitorList({
   exportContext = NO_EXPORT_CONTEXT,
 }: NewVisitorListProps) {
   const t = useTranslations('NewVisitors');
+  const grades = useGrades();
   return (
     <Card>
       <CardHeader
@@ -104,7 +107,7 @@ export function NewVisitorList({
                   scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                   at: new Date(),
                 }),
-                contents: buildNewVisitorCsv(items, exportContext),
+                contents: buildNewVisitorCsv(grades, items, exportContext),
               })}
               count={items.length}
               noun="students"
@@ -148,6 +151,7 @@ function NewVisitorRow({
   reachable: boolean | undefined;
   onContactAdded?: () => void;
 }) {
+  const grades = useGrades();
   const t = useTranslations('NewVisitors');
   const { student, firstEventTitle, firstAttendedAt } = visitor;
 
@@ -179,7 +183,7 @@ function NewVisitorRow({
               {studentFullName(student)}
             </span>
             <span className="shrink-0 text-xs text-ink-500">
-              {gradeLabel(student) ?? NO_GRADE}
+              {gradeLabel(grades, student) ?? grades('none')}
             </span>
           </span>
           <span className="truncate text-xs text-ink-500">

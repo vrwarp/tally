@@ -74,7 +74,7 @@ export function BackendsSection() {
     } catch {
       setStored(null);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void check();

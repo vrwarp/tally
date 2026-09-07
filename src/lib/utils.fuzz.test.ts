@@ -10,7 +10,9 @@ import { describe, expect } from 'vitest';
 import { forAll } from '../../tests/fuzz/property';
 import { arbitraryString } from '../../tests/fuzz/arbitrary';
 import type { Rng } from '../../tests/fuzz/prng';
-import { formatPhone, initials, matchesQuery, normalizeForSearch, ordinalGrade, partition, sortByName } from './utils';
+import { formatPhone, initials, matchesQuery, normalizeForSearch, partition, sortByName } from './utils';
+import { gradeName } from './grades';
+import { testGrades } from '@/test/translator';
 
 const pair = (rng: Rng) => ({ haystack: arbitraryString(rng), needle: arbitraryString(rng) });
 
@@ -155,8 +157,10 @@ describe('utility properties', () => {
     expect(matchesQuery(name, letter)).toBe(normalizeForSearch(name).includes(letter));
   });
 
-  forAll('ordinalGrade always produces a label', (rng) => rng.int(-5, 30), (grade) => {
-    const label = ordinalGrade(grade);
+  forAll('every grade gets a label, and one that names it', (rng) => rng.int(1, 30), (grade) => {
+    // From 1 up: the two grades below it are words rather than positions —
+    // `K` and `Pre-K` carry no numeral at all, which is the point of them.
+    const label = gradeName(testGrades(), grade);
     expect(typeof label).toBe('string');
     expect(label).toContain(String(grade));
   });

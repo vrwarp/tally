@@ -155,7 +155,7 @@ function DeleteGatheringModal({
     return () => {
       cancelled = true;
     };
-  }, [open, scope, chain]);
+  }, [open, scope, chain, t]);
 
   const handleDelete = async () => {
     if (!ready) return;

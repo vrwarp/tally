@@ -20,10 +20,11 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { savePlanningCenterConfig, type PcoConfigDraft } from '@/services/planningCenter';
 import { GRADES, type PcoEffectiveSettings, type PcoWriteBackMode } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 const WRITE_BACK_HINT = {
   off: 'pcoWriteHintOff',
@@ -74,6 +75,7 @@ export function PlanningCenterEditor({
 }: PlanningCenterEditorProps) {
   const t = useTranslations('Backends');
   const tCommon = useTranslations('Common');
+  const grades = useGrades();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
@@ -163,7 +165,7 @@ export function PlanningCenterEditor({
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
@@ -175,7 +177,7 @@ export function PlanningCenterEditor({
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>

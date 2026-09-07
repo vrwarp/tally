@@ -18,7 +18,7 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import {
   saveAttendees32Config,
   type A32ConfigDraft,
@@ -26,6 +26,7 @@ import {
 } from '@/services/backends';
 import { GRADES, type PcoWriteBackMode } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 const WRITE_BACK_HINT = {
   off: 'a32WriteHintOff',
@@ -77,6 +78,7 @@ export function Attendees32Editor({
 }: Attendees32EditorProps) {
   const t = useTranslations('Backends');
   const tCommon = useTranslations('Common');
+  const grades = useGrades();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
@@ -198,7 +200,7 @@ export function Attendees32Editor({
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
@@ -210,7 +212,7 @@ export function Attendees32Editor({
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>

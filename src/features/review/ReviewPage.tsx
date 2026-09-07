@@ -54,7 +54,8 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { checkAllergyNote, checkName, checkPhone } from '@/lib/registrationFields';
 import { formatRelative } from '@/lib/time';
-import { cn, formatPhoneInput, gradeDescription, gradeSentence, initials } from '@/lib/utils';
+import { cn, formatPhoneInput, initials } from '@/lib/utils';
+import { gradeDescription, gradeSentence, type GradeStrings } from '@/lib/grades';
 import {
   amendRegistration,
   approveRegistration,
@@ -68,6 +69,7 @@ import {
   type StudentCandidate,
 } from '@/services/functions';
 import { GRADES } from '@/types';
+import { useGrades } from '@/hooks/usePureStrings';
 
 const DAY_MS = 24 * 60 * 60_000;
 /** Under a week left before the sweep takes the record. */
@@ -84,9 +86,9 @@ function nameOf(child: { firstName: string; lastName: string }): string {
 }
 
 /** A roster row a duplicate might be. Named enough to tell two children apart. */
-function summaryLabel(summary: ReviewStudentSummary): string {
+function summaryLabel(grades: GradeStrings, summary: ReviewStudentSummary): string {
   if (!summary.known) return 'A student on the roster';
-  const grade = gradeSentence(summary) ?? 'no grade on file';
+  const grade = gradeSentence(grades, summary) ?? 'no grade on file';
   return `${nameOf(summary)} · ${grade}`;
 }
 
@@ -541,6 +543,7 @@ function ChildEditor({
   onCancel: () => void;
   onSave: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
+  const grades = useGrades();
   const [firstName, setFirstName] = useState(child.firstName);
   const [lastName, setLastName] = useState(child.lastName);
   const [grade, setGrade] = useState<number | null>(child.grade);
@@ -615,7 +618,7 @@ function ChildEditor({
           <option value="">No grade</option>
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {gradeDescription(value)}
+              {gradeDescription(grades, value)}
             </option>
           ))}
         </SelectField>
@@ -789,6 +792,7 @@ function RegistrationCard({
   onUnmerge,
   onAmend,
 }: RegistrationCardProps) {
+  const grades = useGrades();
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
   /**
@@ -1302,7 +1306,7 @@ function RegistrationCard({
                 family from four phone digits. A reviewer deciding on a Tuesday
                 should be told what was established, not what was guessed. */}
             Another child, added alongside somebody the church already has:{' '}
-            {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
+            {row.anchors.map((anchor) => summaryLabel(grades, anchor)).join(', ')}. Approving joins that
             household rather than making a second one, and asks for no new adult.
           </p>
         ) : (
@@ -1868,6 +1872,7 @@ function ChildRow({
   onCancelEdit: () => void;
   onSaveChild: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
+  const grades = useGrades();
   const candidates = candidatesFor(child);
   const upstream = upstreamFor(child);
 
@@ -1908,7 +1913,7 @@ function ChildRow({
             )}
           </span>
           <span className="block truncate text-xs text-ink-500">
-            {gradeSentence(child) ?? 'No grade given'}
+            {gradeSentence(grades, child) ?? 'No grade given'}
           </span>
           {/*
             The allergy on its own line, a rung up the ramp. Joined to the grade
@@ -1928,7 +1933,7 @@ function ChildRow({
             <span className={cn('mt-0.5 block', CAPTION)}>
               Typed at the kiosk as {nameOf(child.typedAs)}
               {child.typedAs.grade !== child.grade
-                ? `, ${gradeSentence(child.typedAs) ?? 'no grade'}`
+                ? `, ${gradeSentence(grades, child.typedAs) ?? 'no grade'}`
                 : ''}
               .
             </span>
@@ -1971,9 +1976,9 @@ function ChildRow({
             applied to the absence of one.
           */}
           <span className={CAPTION}>
-            {keeperLabel(child) ? (
+            {keeperLabel(grades, child) ? (
               <>
-                Merged into <span className="text-ink-300">{keeperLabel(child)}</span>. Their
+                Merged into <span className="text-ink-300">{keeperLabel(grades, child)}</span>. Their
                 check-ins are kept together.
               </>
             ) : (
@@ -2131,7 +2136,7 @@ function ChildRow({
                           {candidate.name}
                           {' · '}
                           <span className="text-ink-400">
-                            {gradeSentence(candidate) ?? 'no grade on file'}
+                            {gradeSentence(grades, candidate) ?? 'no grade on file'}
                           </span>
                         </span>
                         {/*
@@ -2211,6 +2216,7 @@ function CandidateButton({
   disabled: boolean;
   onChoose: () => void;
 }) {
+  const grades = useGrades();
   const sameGrade = candidate.grade !== null && candidate.grade === child.grade;
   return (
     <button
@@ -2236,7 +2242,7 @@ function CandidateButton({
         {candidate.known ? nameOf(candidate) : 'A student on the roster'}
         {' · '}
         <span className={sameGrade ? 'font-semibold text-ink-100' : 'text-ink-400'}>
-          {gradeSentence(candidate) ?? 'no grade on file'}
+          {gradeSentence(grades, candidate) ?? 'no grade on file'}
         </span>
       </span>
       <span className={cn('mt-0.5', candidate.sharesFamilyDigits ? 'text-ink-300' : 'text-ink-500', 'text-sm lg:text-xs')}>
@@ -2258,14 +2264,14 @@ function CandidateButton({
  * whose next press bakes the association into a push with no delete. The hints
  * remain the fallback for a payload from an older callable.
  */
-function keeperLabel(child: PendingRegistrationChild): string | null {
+function keeperLabel(grades: GradeStrings, child: PendingRegistrationChild): string | null {
   const keeper =
     child.mergedInto ??
     child.possibleDuplicates.find(
       (candidate) => candidate.studentId === child.mergedIntoStudentId,
     );
   if (!keeper || !keeper.known) return null;
-  return summaryLabel(keeper);
+  return summaryLabel(grades, keeper);
 }
 
 /**

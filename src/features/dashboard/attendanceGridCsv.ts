@@ -46,7 +46,7 @@
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
 import { sessionOutcome } from '@/lib/sessionHistory';
-import { gradeLabel } from '@/lib/utils';
+import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
 import type { EventAttendanceSnapshot, Student } from '@/types';
 
@@ -133,6 +133,7 @@ export interface AttendanceGridCsvContext {
 }
 
 export function buildAttendanceGridCsv(
+  grades: GradeStrings,
   grid: AttendanceGrid,
   context: AttendanceGridCsvContext,
 ): string {
@@ -141,7 +142,7 @@ export function buildAttendanceGridCsv(
     { header: 'first_name', value: (row) => row.student.firstName },
     { header: 'last_name', value: (row) => row.student.lastName },
     { header: 'grade', value: (row) => row.student.grade },
-    { header: 'grade_label', value: (row) => gradeLabel(row.student) },
+    { header: 'grade_label', value: (row) => gradeLabel(grades, row.student) },
     { header: 'source_system', value: (row) => studentSource(row.student).system },
     {
       header: 'source_read_at',

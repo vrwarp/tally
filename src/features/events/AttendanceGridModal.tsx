@@ -33,6 +33,7 @@ import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
+import { useGrades } from '@/hooks/usePureStrings';
 import { useTranslations } from 'use-intl';
 
 /** Presets rather than a date picker: these are the three questions asked. */
@@ -49,6 +50,7 @@ export interface AttendanceGridModalProps {
 
 export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps) {
   const t = useTranslations('Grid');
+  const grades = useGrades();
   const { events, series, students, canWork, rosterBackends } = useData();
 
   const gatherings = useMemo(
@@ -133,7 +135,7 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
               scope: gathering?.title ?? null,
               at: new Date(),
             }),
-            contents: buildAttendanceGridCsv(grid!, { backends: rosterBackends }),
+            contents: buildAttendanceGridCsv(grades, grid!, { backends: rosterBackends }),
           })}
           count={grid && grid.gatherings.length > 0 ? rowCount : 0}
           noun="students"

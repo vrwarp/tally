@@ -14,6 +14,7 @@ import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import type { RecurrenceStrings } from '@/lib/recurrence';
 import type { SyncStripStrings } from '@/features/students/syncStripCopy';
+import type { GradeStrings } from '@/lib/grades';
 
 export function useRecurrenceStrings(): RecurrenceStrings {
   const t = useTranslations('Recurrence');
@@ -42,4 +43,15 @@ export function useSyncStripStrings(): SyncStripStrings {
     () => ({ t: t as unknown as SyncStripStrings['t'], locale }),
     [t, locale],
   );
+}
+
+/**
+ * The grade catalogue, for `lib/grades.ts`.
+ *
+ * A component calls this; a pure formatter takes the result as an argument.
+ * `useTranslations` already returns a stable function per (locale, messages),
+ * so there is nothing to memoise.
+ */
+export function useGrades(): GradeStrings {
+  return useTranslations('Grades') as unknown as GradeStrings;
 }

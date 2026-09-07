@@ -14,6 +14,7 @@ import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { buildContactList } from '@/features/dashboard/contactList';
+import { useGrades } from '@/hooks/usePureStrings';
 import { backendLabelOf, studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
 
@@ -422,6 +423,7 @@ export interface CopyContactsButtonProps {
 
 export function CopyContactsButton({ students, title }: CopyContactsButtonProps) {
   const t = useTranslations('FollowUp');
+  const grades = useGrades();
   const { show } = useToast();
 
   const copy = async () => {
@@ -436,7 +438,7 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
       // Names and grades only. Pulling contact details for everybody would mean
       // one Planning Center read per student to build a list that mostly gets
       // skimmed — and would put a screenful of adults' numbers on a clipboard.
-      await navigator.clipboard.writeText(buildContactList(t, title, students));
+      await navigator.clipboard.writeText(buildContactList(t, grades, title, students));
       show(t('copiedNames', { count: students.length }), {
         tone: 'success',
       });

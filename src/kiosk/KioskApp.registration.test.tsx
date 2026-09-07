@@ -423,7 +423,7 @@ describe('registering a family', () => {
     await commit('Check in Robin and Sam');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(2);
-    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
+    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[1].firstName))
       .toEqual(['Robin', 'Sam']);
   });
 

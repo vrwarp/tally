@@ -23,6 +23,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/index.css';
 import { KioskApp } from './KioskApp';
+import { KioskIntlProvider } from './KioskIntlProvider';
 import { bindingIsLive, readBinding } from './binding';
 import { applyKioskTheme } from './theme';
 
@@ -33,6 +34,8 @@ if (bound && bindingIsLive(bound, Date.now())) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <KioskApp />
+    <KioskIntlProvider>
+      <KioskApp />
+    </KioskIntlProvider>
   </StrictMode>,
 );
