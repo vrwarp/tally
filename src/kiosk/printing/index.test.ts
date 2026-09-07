@@ -367,7 +367,7 @@ describe('opening the printer at boot', () => {
 
     await expect(printing.ready()).resolves.toEqual({
       kind: 'unsupported',
-      message: 'This browser cannot talk to a USB printer.',
+      message: { key: 'troubleUnsupported' },
     });
   });
 
@@ -513,8 +513,8 @@ describe('opening the printer at boot', () => {
     await vi.waitFor(() =>
       expect(printing.currentState()).toEqual({
         kind: 'trouble',
-        message: 'Lid open',
-        advice: 'Check the lid, the roll and the cutter.',
+        message: { text: 'Lid open' },
+        advice: { key: 'adviceLidRollCutter' },
       }),
     );
   });
@@ -530,7 +530,7 @@ describe('opening the printer at boot', () => {
     await vi.waitFor(() =>
       expect(printing.currentState()).toMatchObject({
         kind: 'trouble',
-        message: 'The printer reported a problem.',
+        message: { key: 'troubleReported' },
       }),
     );
   });
@@ -616,8 +616,8 @@ describe('pairing', () => {
     expect(found).toBeNull();
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'Something else on this device is holding the printer.',
-      advice: 'Close it.',
+      message: { key: 'troubleHeld' },
+      advice: { text: 'Close it.' },
     });
   });
 
@@ -837,8 +837,8 @@ describe('asking the printer what it is', () => {
     await expect(printing.checkPrinter()).resolves.toMatchObject({ status: null, matched: [] });
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'The printer stopped responding.',
-      advice: 'Turn it off and on again.',
+      message: { key: 'troubleUnresponsive' },
+      advice: { key: 'adviceOffAndOn' },
     });
   });
 });
@@ -858,53 +858,53 @@ describe('what a screen is told when something is wrong', () => {
       await troubleFrom({ code: 'printer-error', errors: [{ message: 'The lid is open.' }] }),
     ).toEqual({
       kind: 'trouble',
-      message: 'The lid is open.',
-      advice: 'Check the lid, the roll and the cutter.',
+      message: { text: 'The lid is open.' },
+      advice: { key: 'adviceLidRollCutter' },
     });
   });
 
   it('has words of its own when the printer complained without saying what', async () => {
     expect(await troubleFrom({ code: 'printer-error', errors: [] })).toMatchObject({
-      message: 'The printer reported a problem.',
+      message: { key: 'troubleReported' },
     });
   });
 
   it('names each failure a volunteer can act on', async () => {
     expect(await troubleFrom({ code: 'disconnected' })).toMatchObject({
-      message: 'The printer was unplugged.',
-      advice: 'Plug it back in.',
+      message: { key: 'troubleUnplugged' },
+      advice: { key: 'advicePlugBackIn' },
     });
     expect(await troubleFrom({ code: 'editor-lite' })).toMatchObject({
-      message: 'The printer is in Editor Lite mode.',
-      advice: 'Hold the Editor Lite button until its light goes out.',
+      message: { key: 'troubleEditorLite' },
+      advice: { key: 'adviceEditorLite' },
     });
     expect(await troubleFrom({ code: 'transfer-timeout' })).toEqual({
       kind: 'trouble',
-      message: 'The printer stopped responding.',
-      advice: 'Turn it off and on again.',
+      message: { key: 'troubleUnresponsive' },
+      advice: { key: 'adviceOffAndOn' },
     });
     expect(await troubleFrom({ code: 'status-timeout' })).toMatchObject({
-      message: 'The printer stopped responding.',
+      message: { key: 'troubleUnresponsive' },
     });
     expect(await troubleFrom({ code: 'status-timeout', pagesPrinted: 0 })).toMatchObject({
-      message: 'The printer stopped responding.',
+      message: { key: 'troubleUnresponsive' },
     });
     // Every page came out and then the printer said nothing more: the sticker
     // is in the tray, and "stopped responding" would send somebody to power-
     // cycle a printer that is fine.
     expect(await troubleFrom({ code: 'status-timeout', pagesPrinted: 1 })).toEqual({
       kind: 'trouble',
-      message: 'The printer went quiet after printing.',
-      advice: 'If the next label does not come out, turn it off and on again.',
+      message: { key: 'troubleQuietAfterPrint' },
+      advice: { key: 'adviceNextLabel' },
     });
     expect(await troubleFrom({ code: 'busy' })).toEqual({
       kind: 'trouble',
-      message: 'The printer is busy with a label.',
-      advice: 'Try again in a moment.',
+      message: { key: 'troubleBusy' },
+      advice: { key: 'adviceTryAgain' },
     });
     expect(await troubleFrom({ code: 'raster' })).toMatchObject({
-      message: 'This label does not fit the media the kiosk is set to.',
-      advice: 'Check the label size on this screen.',
+      message: { key: 'troubleLabelFit' },
+      advice: { key: 'adviceLabelSize' },
     });
   });
 
@@ -912,7 +912,7 @@ describe('what a screen is told when something is wrong', () => {
     for (const code of ['unknown-model', 'unknown-label']) {
       expect(await troubleFrom({ code })).toEqual({
         kind: 'trouble',
-        message: 'This kiosk is set up for a printer it cannot find.',
+        message: { key: 'troubleNotFound' },
         advice: null,
       });
     }
@@ -921,12 +921,14 @@ describe('what a screen is told when something is wrong', () => {
   it('falls through to what an unrecognised failure said', async () => {
     // An unknown failure that says nothing is worse than one that says too
     // much.
-    expect(await troubleFrom(new Error('USB stall'))).toMatchObject({ message: 'USB stall' });
+    expect(await troubleFrom(new Error('USB stall'))).toMatchObject({
+      message: { text: 'USB stall' },
+    });
   });
 
   it('has a sentence for a failure with nothing to say at all', async () => {
     expect(await troubleFrom({ code: 'something-new' })).toMatchObject({
-      message: 'The label did not print.',
+      message: { key: 'troubleDidNotPrint' },
       advice: null,
     });
   });
@@ -1369,7 +1371,7 @@ describe('the queue’s two ways of not printing', () => {
 
     expect(printing.currentState()).toMatchObject({
       kind: 'trouble',
-      message: 'Out of labels.',
+      message: { text: 'Out of labels.' },
     });
   });
 
@@ -1385,8 +1387,8 @@ describe('the queue’s two ways of not printing', () => {
 
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'A label was skipped because it would have printed too late.',
-      advice: 'Check the printer.',
+      message: { key: 'troubleStale' },
+      advice: { key: 'adviceCheckPrinter' },
     });
   });
 
@@ -1648,8 +1650,8 @@ describe('recovering without a human', () => {
 
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'The printer was unplugged.',
-      advice: 'Plug it back in.',
+      message: { key: 'troubleUnplugged' },
+      advice: { key: 'advicePlugBackIn' },
     });
     expect(device.close).toHaveBeenCalled();
     await expect(printing.checkPrinter()).resolves.toBeNull();
@@ -1677,8 +1679,8 @@ describe('recovering without a human', () => {
     expect(device.open).toHaveBeenCalledTimes(3);
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'Something else on this device is holding the printer.',
-      advice: 'Close the other tab.',
+      message: { key: 'troubleHeld' },
+      advice: { text: 'Close the other tab.' },
     });
 
     await tick(5_000);
@@ -1782,8 +1784,8 @@ describe('the browser’s own disconnect', () => {
     expect(device.close).toHaveBeenCalled();
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'The printer was unplugged.',
-      advice: 'Plug it back in.',
+      message: { key: 'troubleUnplugged' },
+      advice: { key: 'advicePlugBackIn' },
     });
   });
 
@@ -1987,8 +1989,8 @@ describe('looking for the printer at boot', () => {
     await tick(5_000);
     expect(printing.currentState()).toEqual({
       kind: 'trouble',
-      message: 'Something else on this device is holding the printer.',
-      advice: 'Close it.',
+      message: { key: 'troubleHeld' },
+      advice: { text: 'Close it.' },
     });
   });
 });
@@ -2110,7 +2112,7 @@ describe('what the record says, exactly', () => {
     expect(said(printing).slice(3)).toEqual([
       'kiosk transport-lost hasSerial=true vendorId=1273 productId=8347',
       'usb devices cause="transport-lost" count=0 present=false same=false',
-      'state trouble cause="transport-lost" message="The printer was unplugged."',
+      'state trouble cause="transport-lost" message="troubleUnplugged"',
     ]);
   });
 
@@ -2142,7 +2144,7 @@ describe('what the record says, exactly', () => {
 
     expect(said(printing).slice(3)).toEqual([
       'usb disconnect hasSerial=true vendorId=1273 productId=8347 ours=true',
-      'state trouble cause="usb-disconnect" message="The printer was unplugged."',
+      'state trouble cause="usb-disconnect" message="troubleUnplugged"',
       'usb connect hasSerial=true vendorId=1273 productId=8347',
       'usb devices cause="usb-connect" count=1 hasSerial=true vendorId=1273 productId=8347',
       'state ready cause="usb-connect"',
@@ -2174,7 +2176,7 @@ describe('what the record says, exactly', () => {
     await failed.pairPrinter({ model: 'QL-810W', label: '62x29' });
     expect(said(failed)).toEqual([
       'kiosk pair-failed error="Error" code="claim-failed" message="nope"',
-      'state trouble cause="pair-failed" message="Something else on this device is holding the printer."',
+      'state trouble cause="pair-failed" message="troubleHeld"',
     ]);
   });
 
@@ -2193,7 +2195,7 @@ describe('what the record says, exactly', () => {
 
     expect(said(printing).slice(3)).toEqual([
       'kiosk status-failed error="Error" code="status-timeout" message="timed out"',
-      'state trouble cause="status-failed" message="The printer stopped responding."',
+      'state trouble cause="status-failed" message="troubleUnresponsive"',
     ]);
   });
 
@@ -2209,7 +2211,7 @@ describe('what the record says, exactly', () => {
       'kiosk label-failed code="printer-error"',
       'state trouble cause="label-failed" message="Out of labels."',
       'kiosk label-stale',
-      'state trouble cause="label-stale" message="A label was skipped because it would have printed too late."',
+      'state trouble cause="label-stale" message="troubleStale"',
       'state ready cause="label-printed"',
     ]);
   });
@@ -2308,7 +2310,7 @@ describe('what the record says, exactly', () => {
     expect(said(printing).slice(3)).toEqual([
       'usb connect',
       'kiosk open-failed cause="usb-connect" error="BrotherQLError" code="disconnected" message="The printer was disconnected." underlying="NotFoundError" underlyingMessage="The device was disconnected."',
-      'state trouble cause="usb-connect" message="The printer was unplugged."',
+      'state trouble cause="usb-connect" message="troubleUnplugged"',
     ]);
   });
 
@@ -2511,7 +2513,9 @@ describe('the recovery, at its edges', () => {
 
     queue.options.onFailure?.({ code: 'disconnected' }, JOB);
 
-    expect(printing.currentState()).toMatchObject({ message: 'The printer was unplugged.' });
+    expect(printing.currentState()).toMatchObject({
+      message: { key: 'troubleUnplugged' },
+    });
   });
 
   it('stops trying once the printer has left between the verdict and the attempt', async () => {
@@ -2545,7 +2549,10 @@ describe('the recovery, at its edges', () => {
 
     queue.options.onFailure?.({ code: 'printer-error', errors: [{ message: 'Out of labels.' }] }, JOB);
 
-    expect(printing.currentState()).toMatchObject({ kind: 'trouble', message: 'Out of labels.' });
+    expect(printing.currentState()).toMatchObject({
+      kind: 'trouble',
+      message: { text: 'Out of labels.' },
+    });
   });
 
   it('is cancelled by a connect event before it has decided', async () => {
@@ -2668,11 +2675,11 @@ describe('asking the printer what it is, at its edges', () => {
       expect(found).toMatchObject({ matched: [] });
       expect(printing.currentState()).toEqual({
         kind: 'trouble',
-        message: 'This kiosk is set up for a printer it cannot find.',
+        message: { key: 'troubleNotFound' },
         advice: null,
       });
       expect(said(printing).at(-1)).toBe(
-        'state trouble cause="tables" message="This kiosk is set up for a printer it cannot find."',
+        'state trouble cause="tables" message="troubleNotFound"',
       );
     } finally {
       Object.defineProperty(tables, 'fits', { configurable: true, writable: true, value: [] });

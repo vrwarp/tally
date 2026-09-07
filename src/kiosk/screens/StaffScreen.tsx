@@ -42,7 +42,10 @@
  * and the budget for the extra came off the word `Staff`, which nobody walked
  * over here to read.
  */
+import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
+import { usePrinterNote } from '../printerNote';
+import type { PrinterNote } from '../printing';
 import { EventName } from '../components/EventName';
 import { useTap } from '../components/tapGuard';
 
@@ -118,7 +121,7 @@ export function StaffScreen({
    * through the printer door to find out which. The fault costs nothing to say
    * here and can save the trip.
    */
-  trouble?: string | null;
+  trouble?: PrinterNote | null;
   onReprint: () => void;
   onPrinter: () => void;
   onChangeEvent: () => void;
@@ -126,6 +129,8 @@ export function StaffScreen({
   onHideBackdrop: () => void;
   onStay: () => void;
 }) {
+  const t = useTranslations('Staff');
+  const printerNote = usePrinterNote();
   const tap = useTap();
 
   /*
@@ -148,11 +153,11 @@ export function StaffScreen({
          * marks *where the status lives* rather than *that something changed* is
          * decoration wearing hierarchy's clothes.
          */
-        { text: 'Ready', tone: 'text-ink-400' }
+        { text: t('statusReady'), tone: 'text-ink-400' }
       : printer === 'trouble'
-        ? { text: 'Trouble', tone: 'text-warn-400' }
+        ? { text: t('statusTrouble'), tone: 'text-warn-400' }
         : /* The statement above this row is carrying the news in this state. */
-          { text: 'Not set up', tone: 'text-ink-400' };
+          { text: t('statusNotSetUp'), tone: 'text-ink-400' };
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center kiosk:gap-10">
@@ -192,7 +197,7 @@ export function StaffScreen({
            * volunteer actually needs is the sentence.
            */
           <p className={STATEMENT}>
-            No printer on this kiosk — set one up below to print name tags here.
+            {t('noPrinterHere')}
           </p>
         ) : (
           <div className="flex flex-col">
@@ -205,7 +210,7 @@ export function StaffScreen({
               })}
               className={DOOR}
             >
-              Reprint a name tag
+              {t('reprint')}
             </button>
             {/* One slot in the group's rhythm, not two. */}
             {printer === 'trouble' && (
@@ -228,8 +233,9 @@ export function StaffScreen({
                  and a shared left edge rather than by proximity, and the row
                  below wears the same amber. */
               <p className="px-5 text-left text-lg text-warn-400 kiosk:px-6 kiosk:text-2xl">
-                {(trouble ?? 'The printer needs attention').replace(/\.$/, '')} — a name tag
-                may not come out.
+                {t('troubleLine', {
+                  trouble: (printerNote(trouble) || t('printerNeedsAttention')).replace(/\.$/, ''),
+                })}
               </p>
             )}
           </div>
@@ -244,7 +250,7 @@ export function StaffScreen({
           })}
           className={DOOR}
         >
-          <span className="min-w-0 truncate">Label printer</span>
+          <span className="min-w-0 truncate">{t('labelPrinter')}</span>
           <span className={`shrink-0 font-normal whitespace-nowrap ${printerLine.tone}`}>
             {printerLine.text}
           </span>
@@ -259,7 +265,7 @@ export function StaffScreen({
           })}
           className={DOOR}
         >
-          Change event
+          {t('changeEvent')}
         </button>
 
         {/*
@@ -281,7 +287,7 @@ export function StaffScreen({
             })}
             className={DOOR}
           >
-            Hide the photo
+            {t('hideThePhoto')}
           </button>
         )}
       </div>
@@ -300,7 +306,7 @@ export function StaffScreen({
           })}
           className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:h-24 kiosk:text-3xl"
         >
-          Keep checking in
+          {t('keepCheckingIn')}
         </button>
       </div>
     </div>

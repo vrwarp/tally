@@ -281,8 +281,10 @@ describe('printing from the kiosk flow', () => {
   it('says nothing to a parent about the printer', async () => {
     vi.mocked(printing.currentState).mockReturnValue({
       kind: 'trouble',
-      message: 'No media when printing',
-      advice: 'Check the roll.',
+      // The printer library's own words, which is one of the two notes that
+      // is not a key of ours — see `PrinterNote`.
+      message: { text: 'No media when printing' },
+      advice: { text: 'Check the roll.' },
     });
 
     await mount();

@@ -165,20 +165,36 @@ export function formatEntry(entry: PrinterLogEntry): string {
 }
 
 /**
+ * The five ages this log can report, as a narrow call signature.
+ *
+ * `Intl.RelativeTimeFormat` is deliberately not used: it says "3 minutes ago"
+ * where this wants "3 min ago", and the unit here is abbreviated because the
+ * fold is a column of forty entries read at arm's length.
+ */
+export type AgeStrings = (
+  key: 'justNow' | 'secondsAgo' | 'minutesAgo' | 'hoursAgo' | 'daysAgo',
+  values?: Record<string, number>,
+) => string;
+
+/**
  * How long ago, in the words a volunteer reads at arm's length.
  *
  * Coarse on purpose: the fold is for seeing that the printer went quiet "3 min
  * ago" rather than for timing anything, which is what `text()` is for.
+ *
+ * Takes its words rather than holding them, the way every other pure formatter
+ * in this repo does — this module imports nothing and cannot reach a
+ * translator.
  */
-export function describeAge(t: number, now: number): string {
+export function describeAge(strings: AgeStrings, t: number, now: number): string {
   const seconds = Math.max(0, Math.round((now - t) / 1000));
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds} s ago`;
+  if (seconds < 10) return strings('justNow');
+  if (seconds < 60) return strings('secondsAgo', { count: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60) return strings('minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.floor(hours / 24)} d ago`;
+  if (hours < 24) return strings('hoursAgo', { count: hours });
+  return strings('daysAgo', { count: Math.floor(hours / 24) });
 }
 
 export function createPrinterLog(

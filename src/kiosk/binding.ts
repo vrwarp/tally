@@ -265,7 +265,18 @@ export function eventWindow(binding: KioskBinding): string {
  * after supper" rather than as "this tablet is set to next week". The date is
  * the fact that makes a misbinding obvious to the one person who can fix it.
  */
-export function opensAtLabel(binding: KioskBinding, nowMs: number): string {
+export function opensAtLabel(
+  /**
+   * "{day} at {time}", from the catalogue.
+   *
+   * The connector is a word, and not the same word everywhere — Chinese puts
+   * the date first and needs none at all. This module has no React in it, so
+   * the caller hands the sentence in.
+   */
+  dayAtTime: (values: { day: string; time: string }) => string,
+  binding: KioskBinding,
+  nowMs: number,
+): string {
   const opensAtMs = binding.checkInOpensAtMs ?? binding.startAtMs;
   const opens = new Date(opensAtMs);
   const at = clock(opensAtMs);
@@ -275,5 +286,5 @@ export function opensAtLabel(binding: KioskBinding, nowMs: number): string {
     month: 'short',
     day: 'numeric',
   });
-  return `${day} at ${at}`;
+  return dayAtTime({ day, time: at });
 }

@@ -499,6 +499,11 @@ export function SearchScreen({
 }) {
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
+  const tDoor = useTranslations('Door');
+  const dayAtTime = useCallback(
+    (values: { day: string; time: string }) => tDoor('dayAtTime', values),
+    [tDoor],
+  );
   const now = Date.now();
   const closed = windowHasClosed(binding, now);
   /*
@@ -530,7 +535,7 @@ export function SearchScreen({
    * one of these strings actually changes — see SearchHeader.
    */
   const headerLine = notOpenYet
-    ? t('opensWhen', { when: opensAtLabel(binding, now) })
+    ? t('opensWhen', { when: opensAtLabel(dayAtTime, binding, now) })
     : closed
       ? t('windowClosed')
       : hours;

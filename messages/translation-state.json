@@ -7434,6 +7434,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Door.dayAtTime": {
+    "source": "{day} at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Confirm.back": {
     "source": "← Back",
     "zh-Hans": "todo",
@@ -7581,6 +7586,126 @@
   },
   "Staff.leaveEvent": {
     "source": "Leave <event></event>",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.noPrinterHere": {
+    "source": "No printer on this kiosk — set one up below to print name tags here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.reprint": {
+    "source": "Reprint a name tag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.troubleLine": {
+    "source": "{trouble} — a name tag may not come out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.printerNeedsAttention": {
+    "source": "The printer needs attention",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.labelPrinter": {
+    "source": "Label printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.statusReady": {
+    "source": "Ready",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.statusTrouble": {
+    "source": "Trouble",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.statusNotSetUp": {
+    "source": "Not set up",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.changeEvent": {
+    "source": "Change event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.hideThePhoto": {
+    "source": "Hide the photo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.reprintNoRegisterChange": {
+    "source": "Nobody is checked in or out from this screen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.reprintPrinterAttention": {
+    "source": "Printer needs attention.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.reprintInvitation": {
+    "source": "Tap a name to see what will print, then confirm. Nothing about the register changes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.nameTagSent": {
+    "source": "Name tag sent",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.checkedIn": {
+    "source": "✓ Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.moreNamesMatch": {
+    "source": "More names match — keep typing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.doneBackToCheckIn": {
+    "source": "Done — back to check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.someOfNames": {
+    "source": "{shown} of {total} names",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.nameCount": {
+    "source": "{count, plural, one {# name} other {# names}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.back": {
+    "source": "← Back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.noTagTonight": {
+    "source": "No name tag printed tonight.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.lastPrintedAt": {
+    "source": "Last printed at {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.printTagFor": {
+    "source": "Print {name}'s name tag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.printNameTag": {
+    "source": "Print name tag",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -7761,6 +7886,486 @@
   },
   "Chooser.pickAGathering": {
     "source": "Pick a gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.couldNotSave": {
+    "source": "We could not save that just now — please see a leader.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.noAllergies": {
+    "source": "No allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.addAnotherChild": {
+    "source": "Add another child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.thatsEveryone": {
+    "source": "That's everyone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.maxChildren": {
+    "source": "That is as many as one go takes — a leader can add the rest.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.joiningNamed": {
+    "source": "Joining {names}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.joiningYourFamily": {
+    "source": "Joining your family.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.saving": {
+    "source": "Saving…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.welcomeLine": {
+    "source": "{names} {count, plural, one {is} other {are}} checked in. Welcome!",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.nextTime": {
+    "source": "Next time, just type <digits>{last4}</digits> — the last 4 digits of your phone.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.tryAgain": {
+    "source": "Try again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkIn": {
+    "source": "Check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkInEveryone": {
+    "source": "Check in everyone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.done": {
+    "source": "Done",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.back": {
+    "source": "← Back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.cancel": {
+    "source": "Cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleAnotherChild": {
+    "source": "Another child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleYourChild": {
+    "source": "Your child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleChildNumber": {
+    "source": "Child {number}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleAnother": {
+    "source": "Anybody else?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleGuardian": {
+    "source": "And you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleConfirm": {
+    "source": "Does this look right?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleSubmitting": {
+    "source": "One moment",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleSuccess": {
+    "source": "All done",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.titleError": {
+    "source": "Something went wrong",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.subtitleGrade": {
+    "source": "What grade are they in?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.subtitleAllergies": {
+    "source": "Any allergies we should know about?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.subtitleAnother": {
+    "source": "You can add the whole family in one go.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.subtitlePhone": {
+    "source": "This is how you check in next time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderChildFirst": {
+    "source": "Child's first name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderChildLast": {
+    "source": "Child's last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderAllergies": {
+    "source": "Allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderYourFirst": {
+    "source": "Your first name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderYourLast": {
+    "source": "Your last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.placeholderPhone": {
+    "source": "Your phone number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleReported": {
+    "source": "The printer reported a problem.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceLidRollCutter": {
+    "source": "Check the lid, the roll and the cutter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleUnplugged": {
+    "source": "The printer was unplugged.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.advicePlugBackIn": {
+    "source": "Plug it back in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleHeld": {
+    "source": "Something else on this device is holding the printer.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleEditorLite": {
+    "source": "The printer is in Editor Lite mode.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceEditorLite": {
+    "source": "Hold the Editor Lite button until its light goes out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleQuietAfterPrint": {
+    "source": "The printer went quiet after printing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceNextLabel": {
+    "source": "If the next label does not come out, turn it off and on again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleUnresponsive": {
+    "source": "The printer stopped responding.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceOffAndOn": {
+    "source": "Turn it off and on again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleBusy": {
+    "source": "The printer is busy with a label.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceTryAgain": {
+    "source": "Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleLabelFit": {
+    "source": "This label does not fit the media the kiosk is set to.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceLabelSize": {
+    "source": "Check the label size on this screen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleNotFound": {
+    "source": "This kiosk is set up for a printer it cannot find.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleDidNotPrint": {
+    "source": "The label did not print.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleUnsupported": {
+    "source": "This browser cannot talk to a USB printer.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.troubleStale": {
+    "source": "A label was skipped because it would have printed too late.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.adviceCheckPrinter": {
+    "source": "Check the printer.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.title": {
+    "source": "Label printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.tagsTonight": {
+    "source": "Name tags tonight",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.nothingPrinted": {
+    "source": "Nothing has printed on this kiosk tonight.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.model": {
+    "source": "Printer model",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.modelHint": {
+    "source": "Filled in from the printer when it was connected. It has to match the machine on the shelf, so change it if it does not.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.loadedLabel": {
+    "source": "Loaded label",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.loadedLabelHint": {
+    "source": "What is in the printer now, sensed when it was connected. Events describe what the label says, never its size.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.whichOnSpindle": {
+    "source": "The printer cannot tell these two apart. Which is on the spindle?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.recentEvents": {
+    "source": "Recent printer events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.nothingWritten": {
+    "source": "Nothing has been written down yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.copyBlocked": {
+    "source": "Copying is blocked on this device — select the text below instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.reprint": {
+    "source": "Reprint a name tag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.checkPrinter": {
+    "source": "Check the printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.testPrint": {
+    "source": "Print a test label",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.lookAgain": {
+    "source": "Look again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.checkPowerAndCable": {
+    "source": "Check its power and cable. A printer that lost power on an Android tablet has to be connected again from this screen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.connectedReady": {
+    "source": "Connected and ready.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.looking": {
+    "source": "Looking for the printer this kiosk was set up with…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.notConnected": {
+    "source": "The printer this kiosk was set up with is not connected.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.noPrinter": {
+    "source": "No printer set up on this kiosk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.didNotPrint": {
+    "source": "Did not print",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.eventsCopied": {
+    "source": "Printer events copied to the clipboard",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.events": {
+    "source": "Printer events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.chooseDifferent": {
+    "source": "Choose a different printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.connectPrinter": {
+    "source": "Connect a printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.modelUnknown": {
+    "source": "The printer did not say which model it is — check that {model} is right.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.mediaUnknown": {
+    "source": "{media} is loaded, and no roll this printer takes is that size.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.readOff": {
+    "source": "Read off the printer: {model}, {label}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.justNow": {
+    "source": "just now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.secondsAgo": {
+    "source": "{count} s ago",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.minutesAgo": {
+    "source": "{count} min ago",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.hoursAgo": {
+    "source": "{count} h ago",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.daysAgo": {
+    "source": "{count} d ago",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.mediaAmbiguous": {
+    "source": "{media} is loaded, which is more than one roll. Set to {label} — change it below if that is not what is on the spindle.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.mediaDieCut": {
+    "source": "{width}mm die-cut",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Printer.mediaContinuous": {
+    "source": "{width}mm continuous",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.title": {
+    "source": "Pair this kiosk",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.howTo": {
+    "source": "In Tally, tap your name and choose <kiosk>Kiosk</kiosk>, then enter this code.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.gettingCode": {
+    "source": "Getting a code…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.noCode": {
+    "source": "Can’t reach Tally right now. Trying again shortly…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.stuck": {
+    "source": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

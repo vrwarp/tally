@@ -32,6 +32,7 @@ import { haptic } from '@/lib/utils';
 import type { KioskStudent } from '../search';
 import { StaffMark } from '../components/StaffMark';
 import { useTap } from '../components/tapGuard';
+import { useTranslations } from 'use-intl';
 
 export function ReprintConfirmScreen({
   student,
@@ -51,6 +52,7 @@ export function ReprintConfirmScreen({
   onPrint: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations('Staff');
   const tap = useTap();
 
   /* The inactivity return lives on the gate — see `StaffSession`. */
@@ -75,7 +77,7 @@ export function ReprintConfirmScreen({
               at the kiosk. It does not repeat the name: the sticker is one line
               under it and says it in black on white. */}
           <div className="text-xl text-ink-200 kiosk:text-2xl">
-            {printedAt ? `Last printed at ${printedAt}.` : 'No name tag printed tonight.'}
+            {printedAt ? t('lastPrintedAt', { when: printedAt }) : t('noTagTonight')}
           </div>
         </div>
 
@@ -121,7 +123,9 @@ export function ReprintConfirmScreen({
              child, which is right for an eye and wrong for anything reading the
              control on its own — a test, or a volunteer using a screen reader.
              The name is on the button too, where it costs no pixels. */
-          aria-label={`Print ${student.firstName} ${student.lastName}'s name tag`}
+          aria-label={t('printTagFor', {
+            name: `${student.firstName} ${student.lastName}`,
+          })}
           {...tap(() => {
             haptic();
             onPrint();
@@ -132,7 +136,7 @@ export function ReprintConfirmScreen({
           {/* Four words fitted the phone's measure on one line; five did not,
               and a committing button that wraps ragged is the one control here
               nobody should have to read twice. */}
-          Print name tag
+          {t('printNameTag')}
         </button>
       </div>
 
@@ -143,7 +147,7 @@ export function ReprintConfirmScreen({
         className="mt-8 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
         style={{ touchAction: 'manipulation' }}
       >
-        ← Back
+        {t('back')}
       </button>
     </div>
   );

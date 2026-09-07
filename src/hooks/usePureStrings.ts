@@ -55,3 +55,4 @@ export function useSyncStripStrings(): SyncStripStrings {
 export function useGrades(): GradeStrings {
   return useTranslations('Grades') as unknown as GradeStrings;
 }
+

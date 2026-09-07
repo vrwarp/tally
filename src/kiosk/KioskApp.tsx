@@ -324,6 +324,11 @@ function isQuietHour(): boolean {
 export function KioskApp() {
   tallyRender('KioskApp');
   const tDoor = useTranslations('Door');
+  // The connector `opensAtLabel` needs; see there for why it is handed in.
+  const dayAtTime = useCallback(
+    (values: { day: string; time: string }) => tDoor('dayAtTime', values),
+    [tDoor],
+  );
   const grades = useGrades();
   const [phase, setPhase] = useState<Phase>('booting');
   const [services, setServices] = useState<KioskServices | null>(null);
@@ -1414,7 +1419,7 @@ export function KioskApp() {
        * and `done` writes nothing at all.
        */
       if (intent === 'check-in' && !windowHasOpened(binding, Date.now())) {
-        setOverlay({ kind: 'not-open', opensAt: opensAtLabel(binding, Date.now()) });
+        setOverlay({ kind: 'not-open', opensAt: opensAtLabel(dayAtTime, binding, Date.now()) });
         return;
       }
 
@@ -1530,7 +1535,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, printing, prints, binding, uid, grades],
+    [services, printing, prints, binding, uid, grades, dayAtTime],
   );
 
   /**
@@ -1680,9 +1685,9 @@ export function KioskApp() {
 
   const refuseAsNotOpen = useCallback(() => {
     if (!binding) return;
-    setOverlay({ kind: 'not-open', opensAt: opensAtLabel(binding, Date.now()) });
+    setOverlay({ kind: 'not-open', opensAt: opensAtLabel(dayAtTime, binding, Date.now()) });
     setBuffer('');
-  }, [binding]);
+  }, [binding, dayAtTime]);
 
   const startWizard = useCallback(() => {
     if (!arrivalsOpen()) {

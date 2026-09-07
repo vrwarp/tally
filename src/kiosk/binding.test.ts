@@ -21,6 +21,10 @@ import {
   writeBinding,
   type KioskBinding,
 } from '@/kiosk/binding';
+import { testTranslator } from '@/test/translator';
+
+const tDoor = testTranslator('Door');
+const dayAtTime = (values: { day: string; time: string }) => tDoor('dayAtTime', values);
 
 /** Doors close before the gathering ends. The editor refuses to save this, but
  *  `firestore.rules` permits it, so a seed or a migration can produce one. */
@@ -154,13 +158,13 @@ describe('opensAtLabel', () => {
   it('gives the clock alone when it opens today', () => {
     const later = NOON + 2 * 3_600_000;
     const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: later };
-    expect(opensAtLabel(binding, NOON)).toBe(at(later));
+    expect(opensAtLabel(dayAtTime, binding, NOON)).toBe(at(later));
   });
 
   it('carries the day when it does not — the misbinding this is for', () => {
     const nextWeek = NOON + 7 * 24 * 3_600_000;
     const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: nextWeek };
-    const label = opensAtLabel(binding, NOON);
+    const label = opensAtLabel(dayAtTime, binding, NOON);
     expect(label).toContain(at(nextWeek));
     expect(label).toMatch(/^\w+day, /);
   });
@@ -169,7 +173,7 @@ describe('opensAtLabel', () => {
     // Nothing else to say, and saying nothing would be worse: a legacy binding
     // never reaches this label anyway, so the fallback only has to be honest.
     expect(WINDOW_TRAILS.checkInOpensAtMs).toBeUndefined();
-    expect(opensAtLabel(WINDOW_TRAILS, WINDOW_TRAILS.startAtMs)).toBe(at(WINDOW_TRAILS.startAtMs));
+    expect(opensAtLabel(dayAtTime, WINDOW_TRAILS, WINDOW_TRAILS.startAtMs)).toBe(at(WINDOW_TRAILS.startAtMs));
   });
 });
 
