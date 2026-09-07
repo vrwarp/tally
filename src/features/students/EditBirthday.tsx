@@ -66,13 +66,14 @@ export function BirthdayField({
   disabled,
   now,
 }: BirthdayFieldProps) {
+  const tCommon = useTranslations('Common');
   const birthdayStrings = useBirthdayStrings();
   const note = describeBirthdayField(birthdayStrings, value, { onFile, now });
   const wrong = error ?? (note.tone === 'bad' ? note.say : null);
 
   return (
     <MaskedField
-      label="Birthday"
+      label={tCommon('birthday')}
       value={value}
       onValueChange={onChange}
       format={formatBirthdayInput}

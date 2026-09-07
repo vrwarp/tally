@@ -147,7 +147,7 @@ export function EventHeader({
           failure this app has, so that one keeps its capsule and its colour.
         */}
         {!isToday ? (
-          <Badge tone="warn" title="This gathering is not today's">
+          <Badge tone="warn" title={t('notTodayTitle')}>
             {event.startAt < now ? t('pastGathering') : t('notToday')}
           </Badge>
         ) : null}

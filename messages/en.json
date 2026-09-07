@@ -11,7 +11,27 @@
     "grade": "Grade",
     "noGrade": "No grade",
     "firstName": "First name",
-    "lastName": "Last name"
+    "lastName": "Last name",
+    "close": "Close",
+    "dismiss": "Dismiss",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search",
+    "role": "Role",
+    "theme": "Theme",
+    "birthday": "Birthday",
+    "profile": "Profile",
+    "attendance": "Attendance",
+    "later": "Later",
+    "next": "Next",
+    "grades": "Grades",
+    "gathering": "Gathering",
+    "unit": "Unit",
+    "size": "Size",
+    "align": "Align",
+    "bold": "Bold",
+    "copies": "Copies"
   },
   "Nav": {
     "checkIn": "Check in",
@@ -460,7 +480,8 @@
     "whoCount": "Who's on this gathering — {count, plural, one {# person} other {# people}}",
     "whoEveryone": "Who's on this gathering — everyone on the team",
     "switchEvent": "Switch event",
-    "windowClosed": "Check-in window is closed — you can still record attendance."
+    "windowClosed": "Check-in window is closed — you can still record attendance.",
+    "notTodayTitle": "This gathering is not today's"
   },
   "Theme": {
     "cardTitle": "Appearance",
@@ -600,7 +621,9 @@
     "a32GradeBandNote": "The band a student with no grade in Attendees lands in, and the range the app understands at all.",
     "a32CacheHintOff": "Off. Every screen asks Attendees directly — slower, and always current.",
     "a32CacheHintOn": "Eight counselors opening Tally in the same minute cost one read instead of eight. A name corrected in Attendees appears within {seconds} seconds.",
-    "a32ApiAddressHint": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run."
+    "a32ApiAddressHint": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run.",
+    "a32EditorDescription": "Everything except the token. Changes apply to every counselor's next read.",
+    "pcoEditorDescription": "Everything except the credentials. Changes apply to every counselor's next read."
   },
   "Team": {
     "title": "Team",
@@ -973,7 +996,9 @@
     "skippedGuests": "{count, plural, one {# one-time guest skipped (no Planning Center person behind the name)} other {# one-time guests skipped (no Planning Center person behind the name)}}",
     "duplicatesCollapsed": "{count, plural, one {# duplicate check-in collapsed} other {# duplicate check-ins collapsed}}",
     "keptRows": "{count, plural, one {# row kept as Tally recorded them} other {# rows kept as Tally recorded them}}",
-    "listDown": "{backends} could not be asked for its events just now — this list is from the rest."
+    "listDown": "{backends} could not be asked for its events just now — this list is from the rest.",
+    "descriptionMulti": "Bring an event's whole attendance history into Tally: every time it met, everyone who attended, and every check-in. The source is only read — nothing there changes.",
+    "descriptionPco": "Bring a Check-Ins event's whole history into Tally: every time it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes."
   },
   "KioskTheme": {
     "fieldLabel": "Kiosk colours",
@@ -1555,7 +1580,8 @@
     "noCheckIns": "Tally has no check-ins on record for them.",
     "allLoaded": "That is everything on record.",
     "showMore": "Show more",
-    "showMoreAria": "Show every gathering they came to"
+    "showMoreAria": "Show every gathering they came to",
+    "readFailed": "Could not read this student's attendance history."
   },
   "Grades": {
     "preK": "Pre-K",
@@ -1710,7 +1736,11 @@
     "installBody": "To keep this kiosk on the home screen: Share → Add to Home Screen, then pair the installed app.",
     "shiftOn": "Shift on",
     "shift": "Shift",
-    "dayAtTime": "{day} at {time}"
+    "dayAtTime": "{day} at {time}",
+    "delete": "Delete",
+    "space": "Space",
+    "apostrophe": "Apostrophe",
+    "hyphen": "Hyphen"
   },
   "Confirm": {
     "back": "← Back",
@@ -1845,7 +1875,9 @@
     "placeholderAllergies": "Allergies",
     "placeholderYourFirst": "Your first name",
     "placeholderYourLast": "Your last name",
-    "placeholderPhone": "Your phone number"
+    "placeholderPhone": "Your phone number",
+    "delete": "Delete",
+    "next": "Next"
   },
   "Printer": {
     "troubleReported": "The printer reported a problem.",

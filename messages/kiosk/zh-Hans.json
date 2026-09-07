@@ -16,6 +16,40 @@
     "setKiosk": "Set kiosk",
     "pickAGathering": "Pick a gathering"
   },
+  "Common": {
+    "language": "Language",
+    "loadingRoster": "Loading the roster",
+    "loadingHistory": "Loading attendance history",
+    "loading": "Loading…",
+    "loadingAria": "Loading",
+    "required": "Required",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "grade": "Grade",
+    "noGrade": "No grade",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "close": "Close",
+    "dismiss": "Dismiss",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search",
+    "role": "Role",
+    "theme": "Theme",
+    "birthday": "Birthday",
+    "profile": "Profile",
+    "attendance": "Attendance",
+    "later": "Later",
+    "next": "Next",
+    "grades": "Grades",
+    "gathering": "Gathering",
+    "unit": "Unit",
+    "size": "Size",
+    "align": "Align",
+    "bold": "Bold",
+    "copies": "Copies"
+  },
   "Confirm": {
     "back": "← Back",
     "checkedIn": "✓ Checked in",
@@ -54,7 +88,11 @@
     "installBody": "To keep this kiosk on the home screen: Share → Add to Home Screen, then pair the installed app.",
     "shiftOn": "Shift on",
     "shift": "Shift",
-    "dayAtTime": "{day} at {time}"
+    "dayAtTime": "{day} at {time}",
+    "delete": "Delete",
+    "space": "Space",
+    "apostrophe": "Apostrophe",
+    "hyphen": "Hyphen"
   },
   "Grades": {
     "preK": "Pre-K",
@@ -164,7 +202,9 @@
     "placeholderAllergies": "Allergies",
     "placeholderYourFirst": "Your first name",
     "placeholderYourLast": "Your last name",
-    "placeholderPhone": "Your phone number"
+    "placeholderPhone": "Your phone number",
+    "delete": "Delete",
+    "next": "Next"
   },
   "Search": {
     "searchEveryone": "Search everyone",

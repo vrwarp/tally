@@ -120,6 +120,7 @@ export interface RecurrenceFieldProps {
 }
 
 export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFieldProps) {
+  const tCommon = useTranslations('Common');
   const time = useTimeFormats();
   const t = useTranslations('Recurrence');
   const recurrenceStrings = useRecurrenceStrings();
@@ -218,7 +219,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
               onValueChange={(interval) => patch({ interval })}
             />
             <SelectField
-              label="Unit"
+              label={tCommon('unit')}
               value={value.frequency}
               onChange={(changed) =>
                 handleFrequencyChange(changed.target.value as RecurrenceFrequency)

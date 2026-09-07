@@ -175,6 +175,7 @@ export function LabelTemplateField({
   value: LabelTemplate | null;
   onChange: (next: LabelTemplate | null) => void;
 }) {
+  const tCommon = useTranslations('Common');
   const t = useTranslations('LabelTemplate');
   const [media, setMedia] = useState<string>(PREVIEW_MEDIA[0].id);
   const chosen = PREVIEW_MEDIA.find((entry) => entry.id === media) ?? PREVIEW_MEDIA[0];
@@ -373,7 +374,7 @@ export function LabelTemplateField({
 
                       <div className="flex flex-wrap items-end gap-2">
                         <SelectField
-                          label="Size"
+                          label={tCommon('size')}
                           value={line.size}
                           className="min-w-28"
                           onChange={(changed) =>
@@ -387,7 +388,7 @@ export function LabelTemplateField({
                           ))}
                         </SelectField>
                         <SelectField
-                          label="Align"
+                          label={tCommon('align')}
                           value={line.align}
                           className="min-w-28"
                           onChange={(changed) =>
@@ -402,7 +403,7 @@ export function LabelTemplateField({
                         </SelectField>
                         <div className="pb-1">
                           <CheckboxField
-                            label="Bold"
+                            label={tCommon('bold')}
                             checked={line.bold}
                             onChange={(changed) => patchLine(index, { bold: changed.target.checked })}
                           />
@@ -489,7 +490,7 @@ export function LabelTemplateField({
                   </button>
 
                   <SelectField
-                    label="Copies"
+                    label={tCommon('copies')}
                     value={String(value.copies)}
                     className="min-w-24"
                     onChange={(changed) => onChange({ ...value, copies: Number(changed.target.value) })}

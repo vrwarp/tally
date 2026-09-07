@@ -72,6 +72,7 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
 export function StudentsPage() {
+  const tCommon = useTranslations('Common');
   const grades = useGrades();
   const t = useTranslations('Students');
   const tErrors = useTranslations('Errors');
@@ -448,7 +449,7 @@ export function StudentsPage() {
             it can scroll sideways. */}
         <div className="lg:min-w-56 lg:flex-1">
           <TextField
-            label="Search"
+            label={tCommon('search')}
             type="search"
             inputMode="search"
             enterKeyHint="search"
@@ -472,7 +473,7 @@ export function StudentsPage() {
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:w-[28rem] lg:shrink-0 lg:grid-cols-2">
           <SelectField
-            label="Grade"
+            label={tCommon('grade')}
             value={grade ?? ''}
             onChange={(changed) =>
               setGrade(changed.target.value ? (Number(changed.target.value) as Grade) : null)
@@ -487,7 +488,7 @@ export function StudentsPage() {
           </SelectField>
 
           <SelectField
-            label="Status"
+            label={tCommon('status')}
             value={status}
             onChange={(changed) => setStatus(changed.target.value as StatusFilter)}
           >

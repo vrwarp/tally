@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { swallowTrailingClick, type Press } from '@/components/ui/trailingClick';
+import { useTranslations } from 'use-intl';
 
 /**
  * How wide the panel is allowed to get once it stops being a sheet. Phones
@@ -72,6 +73,7 @@ export function Modal({
   footer,
   size = 'md',
 }: ModalProps) {
+  const tCommon = useTranslations('Common');
   const dialogRef = useRef<HTMLDialogElement>(null);
   /**
    * Has anybody put anything into this dialog since it opened?
@@ -282,7 +284,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={tCommon('close')}
             className={
               '-mr-2 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg ' +
               'text-2xl leading-none text-ink-400 hover:bg-ink-800 hover:text-ink-100 ' +

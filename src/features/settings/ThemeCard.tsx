@@ -79,6 +79,7 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
 }
 
 export function ThemeCard({ className }: { className?: string }) {
+  const tCommon = useTranslations('Common');
   const t = useTranslations('Theme');
   const { preference, theme, setPreference } = useTheme();
 
@@ -105,7 +106,7 @@ export function ThemeCard({ className }: { className?: string }) {
       <div className="flex flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:gap-4">
         <div
           role="radiogroup"
-          aria-label="Theme"
+          aria-label={tCommon('theme')}
           className="grid grid-cols-3 gap-2 lg:w-80 lg:max-w-md lg:shrink-0"
         >
           {THEME_PREFERENCES.map((option) => {

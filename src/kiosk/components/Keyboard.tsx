@@ -274,7 +274,7 @@ export const Keyboard = memo(function Keyboard({
               type="button"
               tabIndex={-1}
               data-key="backspace"
-              aria-label="Delete"
+              aria-label={t('delete')}
               className={`${KEY_CLASS} col-span-3 text-2xl`}
             >
               ⌫
@@ -321,7 +321,7 @@ export const Keyboard = memo(function Keyboard({
         >
           Clear
         </button>
-        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} col-span-12`}>
+        <button type="button" tabIndex={-1} data-key="space" aria-label={t('space')} className={`${KEY_CLASS} col-span-12`}>
           &nbsp;
         </button>
         {/*
@@ -336,10 +336,10 @@ export const Keyboard = memo(function Keyboard({
           * A letter wide each, in the far corner under ⌫, where a miss costs a
           * mark a parent can see in the readout rather than the whole field.
           */}
-        <button type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={`${KEY_CLASS} col-span-2`}>
+        <button type="button" tabIndex={-1} data-key="'" aria-label={t('apostrophe')} className={`${KEY_CLASS} col-span-2`}>
           <span className={MARK_CLASS}>&rsquo;</span>
         </button>
-        <button type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={`${KEY_CLASS} col-span-2`}>
+        <button type="button" tabIndex={-1} data-key="-" aria-label={t('hyphen')} className={`${KEY_CLASS} col-span-2`}>
           <span className={`${MARK_CLASS} -translate-y-[0.04em]`}>-</span>
         </button>
       </div>

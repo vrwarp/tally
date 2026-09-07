@@ -134,7 +134,7 @@ export function PlanningCenterEditor({
       open={open}
       onClose={onClose}
       title={t('pcoEditorTitle')}
-      description="Everything except the credentials. Changes apply to every counselor's next read."
+      description={t('pcoEditorDescription')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>

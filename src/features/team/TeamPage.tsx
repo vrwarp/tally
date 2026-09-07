@@ -156,6 +156,7 @@ function Identity({
 }
 
 export function TeamPage() {
+  const tCommon = useTranslations('Common');
   const time = useTimeFormats();
   const t = useTranslations('Team');
   const { profile, can } = useAuth();
@@ -624,7 +625,7 @@ export function TeamPage() {
                   hint={t('googleAddressHint')}
                 />
                 <SelectField
-                  label="Role"
+                  label={tCommon('role')}
                   value={inviteRole}
                   onChange={(event) => setInviteRole(event.target.value as Role)}
                 >

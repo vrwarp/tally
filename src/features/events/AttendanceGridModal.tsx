@@ -49,6 +49,7 @@ export interface AttendanceGridModalProps {
 }
 
 export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps) {
+  const tCommon = useTranslations('Common');
   const t = useTranslations('Grid');
   const grades = useGrades();
   const { events, series, students, canWork, rosterBackends } = useData();
@@ -152,7 +153,7 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
         ) : (
           <>
             <SelectField
-              label="Gathering"
+              label={tCommon('gathering')}
               value={selected}
               onChange={(changed) => setChain(changed.target.value)}
             >

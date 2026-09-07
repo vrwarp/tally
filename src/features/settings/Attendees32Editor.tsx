@@ -135,7 +135,7 @@ export function Attendees32Editor({
       open={open}
       onClose={onClose}
       title={t('a32EditorTitle')}
-      description="Everything except the token. Changes apply to every counselor's next read."
+      description={t('a32EditorDescription')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>

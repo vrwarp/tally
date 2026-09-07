@@ -61,7 +61,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
         </p>
 
         {error ? (
-          <ErrorBanner message="Could not read this student's attendance history." />
+          <ErrorBanner message={t('readFailed')} />
         ) : null}
 
         {started && entries.length > 0 ? (

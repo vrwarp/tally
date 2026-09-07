@@ -40,6 +40,7 @@ export const LOCALES = ['en', 'zh-Hans', 'zh-Hant'];
  */
 export const KIOSK_NAMESPACES = [
   'Chooser',
+  'Common',
   'Confirm',
   'Door',
   'Grades',

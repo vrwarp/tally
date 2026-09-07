@@ -433,6 +433,7 @@ function QuickAction({
 /* -------------------------------------------------------------------------- */
 
 export function EventsPage() {
+  const tCommon = useTranslations('Common');
   const t = useTranslations('Events');
   const { events, series, loading, canWork } = useData();
   const { user } = useAuth();
@@ -694,7 +695,7 @@ export function EventsPage() {
             uncancelling={uncancelling}
           />
           <RowSection
-            title="Later"
+            title={tCommon('later')}
             events={later}
             now={now}
             onUncancel={onUncancel}

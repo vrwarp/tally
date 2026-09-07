@@ -59,6 +59,7 @@ function summarise(
 }
 
 export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
+  const tCommon = useTranslations('Common');
   const t = useTranslations('CheckIn');
   const names = useGrades();
   /*
@@ -171,7 +172,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         <div
           id={panelId}
           role="group"
-          aria-label="Grades"
+          aria-label={tCommon('grades')}
           style={{ maxHeight }}
           /* Anchored right: the chip is pinned to the right-hand end of the
              filter row, and a left-anchored panel would hang off a phone and

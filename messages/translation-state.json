@@ -59,6 +59,106 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Common.close": {
+    "source": "Close",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.dismiss": {
+    "source": "Dismiss",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.status": {
+    "source": "Status",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.active": {
+    "source": "Active",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.inactive": {
+    "source": "Inactive",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.search": {
+    "source": "Search",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.role": {
+    "source": "Role",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.theme": {
+    "source": "Theme",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.birthday": {
+    "source": "Birthday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.profile": {
+    "source": "Profile",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.attendance": {
+    "source": "Attendance",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.later": {
+    "source": "Later",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.next": {
+    "source": "Next",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.grades": {
+    "source": "Grades",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.gathering": {
+    "source": "Gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.unit": {
+    "source": "Unit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.size": {
+    "source": "Size",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.align": {
+    "source": "Align",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.bold": {
+    "source": "Bold",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.copies": {
+    "source": "Copies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Nav.checkIn": {
     "source": "Check in",
     "zh-Hans": "todo",
@@ -2054,6 +2154,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "EventHeader.notTodayTitle": {
+    "source": "This gathering is not today's",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Theme.cardTitle": {
     "source": "Appearance",
     "zh-Hans": "todo",
@@ -2721,6 +2826,16 @@
   },
   "Backends.a32ApiAddressHint": {
     "source": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32EditorDescription": {
+    "source": "Everything except the token. Changes apply to every counselor's next read.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoEditorDescription": {
+    "source": "Everything except the credentials. Changes apply to every counselor's next read.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4496,6 +4611,16 @@
   },
   "Import.listDown": {
     "source": "{backends} could not be asked for its events just now — this list is from the rest.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.descriptionMulti": {
+    "source": "Bring an event's whole attendance history into Tally: every time it met, everyone who attended, and every check-in. The source is only read — nothing there changes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.descriptionPco": {
+    "source": "Bring a Check-Ins event's whole history into Tally: every time it met, everyone who attended, and every check-in. Planning Center is only read — nothing there changes.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -7229,6 +7354,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "EarlierAttendance.readFailed": {
+    "source": "Could not read this student's attendance history.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Grades.preK": {
     "source": "Pre-K",
     "zh-Hans": "todo",
@@ -7974,6 +8104,26 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Door.delete": {
+    "source": "Delete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.space": {
+    "source": "Space",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.apostrophe": {
+    "source": "Apostrophe",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.hyphen": {
+    "source": "Hyphen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Confirm.back": {
     "source": "← Back",
     "zh-Hans": "todo",
@@ -8596,6 +8746,16 @@
   },
   "Register.placeholderPhone": {
     "source": "Your phone number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.delete": {
+    "source": "Delete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.next": {
+    "source": "Next",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },

@@ -721,7 +721,7 @@ export function StudentDetailPage() {
       */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
         <Card>
-          <CardHeader title="Profile" />
+          <CardHeader title={tCommon('profile')} />
           <div className="flex flex-col gap-4 px-4 py-3">
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
@@ -850,7 +850,10 @@ export function StudentDetailPage() {
             />
 
             <dl className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
-              <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
+              <Detail
+                label={tCommon('status')}
+                value={student.status === 'active' ? tCommon('active') : tCommon('inactive')}
+              />
               <Detail
                 label={t('firstSeen')}
                 value={seen.firstSeenAt ? time.shortDate(seen.firstSeenAt) : 'Never'}
@@ -983,7 +986,7 @@ export function StudentDetailPage() {
 
         <Card>
           <CardHeader
-            title="Attendance"
+            title={tCommon('attendance')}
             description={`The last year, by gathering — ${recentEvents.length} finished ${
               recentEvents.length === 1 ? 'gathering' : 'gatherings'
             }.`}
