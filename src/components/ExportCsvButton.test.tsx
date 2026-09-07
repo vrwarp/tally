@@ -86,7 +86,10 @@ describe('ExportCsvButton', () => {
     render(<ExportCsvButton build={build} count={3} noun="students" />);
     await userEvent.click(screen.getByRole('button'));
 
-    expect(show).toHaveBeenCalledWith('Could not save the file on this device.', { tone: 'error' });
+    expect(show).toHaveBeenCalledWith(
+      'Could not save the file on this device. Try again, or open Tally on a computer.',
+      { tone: 'error' },
+    );
   });
 
   it('hedges in a browser that will show the file instead of saving it', async () => {

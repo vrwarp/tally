@@ -69,6 +69,11 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
    * 概覽. See docs/i18n.md Phase 2.
    */
   ['Dashboard.title', 'Nav.insights'],
+  /*
+   * The tile and the list it opens, same as the three rows above it — added
+   * once the copy audit retired "MIA" and both landed on the same plain words.
+   */
+  ['Dashboard.tileMia', 'Mia.title'],
   ['Team.title', 'Nav.team'],
   ['Settings.title', 'Nav.settings'],
 

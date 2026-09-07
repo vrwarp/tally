@@ -165,7 +165,7 @@ describe('useAdultContact', () => {
     const offline = renderHook(() => useAdultContact());
     await waitFor(() =>
       expect(offline.result.current.error).toBe(
-        'Could not check which profiles are incomplete — the people system did not answer.',
+        'Could not check which profiles are incomplete — your church directory did not answer.',
       ),
     );
   });

@@ -91,7 +91,7 @@ describe('PlanningCenterCard', () => {
 
     expect(await screen.findByText('Connected')).toBeInTheDocument();
     expect(screen.getByText('Roster')).toBeInTheDocument();
-    expect(screen.getByText('Write-back')).toBeInTheDocument();
+    expect(screen.getByText('What Tally may change')).toBeInTheDocument();
     expect(screen.getByText('Freshness')).toBeInTheDocument();
   });
 

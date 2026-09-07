@@ -142,7 +142,7 @@ async function tap(text: RegExp | string): Promise<void> {
 
 /** Dismiss the success screen the way a parent does — a tap anywhere on it. */
 async function tapSuccess(): Promise<void> {
-  const anywhere = screen.getByText(/tap anywhere to carry on/i);
+  const anywhere = screen.getByText(/tap anywhere to continue/i);
   await act(async () => {
     fireEvent.pointerDown(anywhere);
     fireEvent.pointerUp(anywhere);

@@ -222,7 +222,7 @@ describe('the label maps a row prints from', () => {
     // names a key, and en.json says what it renders as.
     const t = testTranslator('Transitions');
     expect(t(TRANSITION_REASON_LABEL['moved-on'])).toBe('Moved on within the ministry');
-    expect(t(TRANSITION_REASON_LABEL.departed)).toBe('No longer with us');
+    expect(t(TRANSITION_REASON_LABEL.departed)).toBe('Left the ministry');
   });
 });
 

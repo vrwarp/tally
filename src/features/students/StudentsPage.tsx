@@ -329,8 +329,6 @@ export function StudentsPage() {
         </Button>
         <div className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
           {/*
-            {t('twoWaysShort')}
-
             Both are quiet now. The import used to be the only brand-filled
             thing on the screen — the loudest, widest object on a page whose job
             is finding one student among forty-five, for an administrative act
@@ -542,7 +540,7 @@ export function StudentsPage() {
             active={quick === 'visitors'}
             onPress={() => setQuick((current) => (current === 'visitors' ? 'none' : 'visitors'))}
           >
-            Visitors
+            {t('visitors')}
             <ChipCount active={quick === 'visitors'}>{visitorCount}</ChipCount>
           </FilterChip>
           </span>

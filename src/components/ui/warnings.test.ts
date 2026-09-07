@@ -95,7 +95,7 @@ describe('the red rule', () => {
     // be hurt, so it is red and it carries no ⚠.
     expect(warningTone('record-missing')).not.toBe('warn');
     expect(warningGlyph('record-missing')).toBeNull();
-    expect(en.Warnings[warningLabelKey('record-missing')]).toMatch(/check-in frozen/);
+    expect(en.Warnings[warningLabelKey('record-missing')]).toMatch(/check-in blocked/);
   });
 });
 

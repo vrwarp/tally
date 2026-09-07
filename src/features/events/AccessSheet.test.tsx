@@ -141,7 +141,7 @@ describe('which state looks like the current one', () => {
 describe('what the sheet says before it writes', () => {
   it('counts the team on the option that is currently true', () => {
     show();
-    expect(screen.getByText('5 people can take this register.')).toBeInTheDocument();
+    expect(screen.getByText('5 people can take attendance here.')).toBeInTheDocument();
   });
 
   it('names who a restriction would keep, and how many would lose it', async () => {

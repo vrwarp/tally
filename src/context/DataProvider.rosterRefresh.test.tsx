@@ -438,7 +438,7 @@ describe('a read that answered oddly', () => {
       const view = mount();
       await waitFor(() => expect(latest?.rosterError).toBeTruthy());
       expect(latest?.rosterError?.message).toBe(
-        'Could not reach the people backend for the roster.',
+        'Could not reach your church directory to load the roster. Check the wifi, then try again.',
       );
       view.unmount();
     }

@@ -258,7 +258,7 @@ describe('a gathering that is open', () => {
     await mount(DOORS_SHUT());
     // Said out loud, and then not acted on — the header advises, and the tap
     // still writes. Asserted before the tap because the tick covers the screen.
-    expect(screen.getByText(/window has closed/i)).toBeTruthy();
+    expect(screen.getByText(/the usual time has passed/i)).toBeTruthy();
 
     await checkInNoah();
 

@@ -192,9 +192,9 @@ describe('the counts and the rows they filter to', () => {
     );
 
     // Active is the default view, so one of the two failures is out of sight.
-    expect(screen.getByRole('button', { name: /Needs you/ })).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: /Stuck/ })).toHaveTextContent('1');
 
-    await user.click(screen.getByRole('button', { name: /Needs you/ }));
+    await user.click(screen.getByRole('button', { name: /Stuck/ }));
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 
@@ -212,7 +212,7 @@ describe('the counts and the rows they filter to', () => {
     // By role: the always-mounted editor modal has a Status field too, so a
     // label match finds two.
     await user.selectOptions(screen.getByRole('combobox', { name: 'Status' }), 'all');
-    expect(screen.getByRole('button', { name: /Needs you/ })).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /Stuck/ })).toHaveTextContent('2');
   });
 
   it('narrows the counts with the search box, like the list', async () => {
@@ -226,9 +226,9 @@ describe('the counts and the rows they filter to', () => {
       { upstreamEdits: [job({ state: 'queued' }), job({ id: 'edit-2', studentId: 's2', state: 'queued' })] },
     );
 
-    expect(screen.getByRole('button', { name: /In flight/ })).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /Still sending/ })).toHaveTextContent('2');
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Aiden');
-    expect(screen.getByRole('button', { name: /In flight/ })).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: /Still sending/ })).toHaveTextContent('1');
   });
 });
 
@@ -706,7 +706,7 @@ describe('StudentsPage header', () => {
     const actions = screen.getByRole('button', { name: 'Actions' });
     expect(actions).toHaveClass('lg:hidden');
 
-    const wide = screen.getByRole('button', { name: 'New visitor' }).parentElement!;
+    const wide = screen.getByRole('button', { name: 'Add by hand' }).parentElement!;
     expect(wide).toHaveClass('hidden', 'lg:flex');
   });
 
@@ -717,7 +717,7 @@ describe('StudentsPage header', () => {
     await user.click(screen.getByRole('button', { name: 'Actions' }));
 
     const sheet = await screen.findByRole('dialog');
-    expect(within(sheet).getByRole('button', { name: 'New visitor' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Add by hand' })).toBeInTheDocument();
     expect(
       within(sheet).getByRole('button', { name: /Add from Planning Center/ }),
     ).toBeInTheDocument();
@@ -730,7 +730,7 @@ describe('StudentsPage header', () => {
 
     await user.click(screen.getByRole('button', { name: 'Actions' }));
     await user.click(
-      within(await screen.findByRole('dialog')).getByRole('button', { name: 'New visitor' }),
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Add by hand' }),
     );
 
     // The student editor, and only it: the actions sheet stood down rather

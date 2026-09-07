@@ -179,6 +179,6 @@ describe('RecurrenceField', () => {
     render(<Harness initial={{ ...WEEKLY_ON_TUESDAY, count: 1 }} />);
 
     expect(screen.queryByText(/^Then /)).not.toBeInTheDocument();
-    expect(screen.getByText(/only gathering the repeat covers/)).toBeInTheDocument();
+    expect(screen.getByText(/No more dates after this one/)).toBeInTheDocument();
   });
 });

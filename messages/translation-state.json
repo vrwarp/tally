@@ -143,12 +143,6 @@
     "zh-Hant": "machine",
     "context": "Section heading on the events list, over gatherings further out than the next few. A time, not a \"do this later\" button."
   },
-  "Common.next": {
-    "source": "Next",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "DEAD KEY — nothing reads it; Register.next is the wizard button that renders. Slated for removal."
-  },
   "Common.grades": {
     "source": "Grades",
     "zh-Hans": "machine",
@@ -325,7 +319,7 @@
     "zh-Hant": "machine"
   },
   "Dashboard.tileMia": {
-    "source": "MIA",
+    "source": "Stopped coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -385,12 +379,12 @@
     "zh-Hant": "machine"
   },
   "Dashboard.releaseFailed": {
-    "source": "Could not save the release. Nothing changed.",
+    "source": "Could not save that. They are still expected — try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Dashboard.undoFailed": {
-    "source": "Could not undo the release.",
+    "source": "Could not undo that. Try again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -455,7 +449,7 @@
     "zh-Hant": "machine"
   },
   "Errors.provisionUnavailable": {
-    "source": "Could not reach the access service. If you are running Tally locally, the Firebase emulators are probably not running — start them with `npm run dev:emulated`.",
+    "source": "Could not reach the service that checks your access. Check the wifi and try again. If it keeps happening, ask an admin.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -475,17 +469,17 @@
     "zh-Hant": "machine"
   },
   "Errors.rosterRateLimited": {
-    "source": "The roster is being rate-limited upstream. It will refresh shortly.",
+    "source": "Your church directory asked Tally to slow down. The roster finishes loading on its own in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.noPeopleBackend": {
-    "source": "No people backend is configured.",
+    "source": "Tally has not been told where to read your people from. An admin can connect it in Settings.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.rosterUnreachable": {
-    "source": "Could not reach the people backend for the roster.",
+    "source": "Could not reach your church directory to load the roster. Check the wifi, then try again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -495,7 +489,7 @@
     "zh-Hant": "machine"
   },
   "Errors.theBackend": {
-    "source": "the backend",
+    "source": "your church directory",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -515,7 +509,7 @@
     "zh-Hant": "machine"
   },
   "Errors.incompleteUnreachable": {
-    "source": "Could not check which profiles are incomplete — the people system did not answer.",
+    "source": "Could not check which profiles are incomplete — your church directory did not answer.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -579,7 +573,7 @@
     "context": "Refusal: no student with that id. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
   },
   "Errors.notFound.studentUnlinked": {
-    "source": "That student is not linked to a people backend.",
+    "source": "That student is not matched to anybody in your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Refusal: the student exists in Tally but has no matching person in the church directory yet, so an action needing that person cannot run. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
@@ -619,7 +613,7 @@
     "zh-Hant": "machine"
   },
   "Errors.backend.rateLimited": {
-    "source": "{backend} is rate-limiting us. Try again in a moment.",
+    "source": "{backend} asked Tally to slow down. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -684,7 +678,7 @@
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.search": {
-    "source": "Could not reach {backend} to search {backend}.",
+    "source": "Could not reach {backend} to run that search. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -694,27 +688,27 @@
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.personCheck": {
-    "source": "Could not reach {backend} to check that person in {backend}.",
+    "source": "Could not reach {backend} to check that person. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.parentContact": {
-    "source": "Could not reach {backend} to add a parent contact in {backend}.",
+    "source": "Could not reach {backend} to add a parent contact. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.profileSave": {
-    "source": "Could not reach {backend} to save this profile to {backend}.",
+    "source": "Could not reach {backend} to save this profile. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.parentAdd": {
-    "source": "Could not reach {backend} to add a parent in {backend}.",
+    "source": "Could not reach {backend} to add a parent. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.recreate": {
-    "source": "Could not reach {backend} to re-create this student in {backend}.",
+    "source": "Could not reach {backend} to re-create this student. Try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -815,7 +809,7 @@
     "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
   },
   "Errors.field.gradeRange": {
-    "source": "grade must be a whole number from -1 (Pre-K) to 12, or null.",
+    "source": "Choose a grade from Pre-K to 12th grade, or “No grade”.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Validation message painted directly under the grade box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The -1 is Tally's internal encoding for Pre-K and appears on no screen; the picker offers a \"No grade\" option rather than a blank. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
@@ -861,7 +855,7 @@
     "zh-Hant": "machine"
   },
   "Export.failed": {
-    "source": "Could not save the file on this device.",
+    "source": "Could not save the file on this device. Try again, or open Tally on a computer.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -903,13 +897,13 @@
     "context": "The same badge where the row is too narrow for the full label. One or two characters is ideal."
   },
   "Warnings.recordMissingLabel": {
-    "source": "Planning Center record missing — check-in frozen",
+    "source": "Planning Center no longer has them — check-in blocked",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Full label: this student exists in Tally but no longer in Planning Center, so check-in refuses them."
   },
   "Warnings.recordMissingShort": {
-    "source": "Frozen",
+    "source": "Blocked",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "The same badge, abbreviated for a narrow row."
@@ -1429,12 +1423,12 @@
     "zh-Hant": "machine"
   },
   "Transitions.reasonDeparted": {
-    "source": "No longer with us",
+    "source": "Left the ministry",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Mia.title": {
-    "source": "Missing in action",
+    "source": "Stopped coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1444,7 +1438,7 @@
     "zh-Hant": "machine"
   },
   "Mia.description": {
-    "source": "Was a regular at one gathering, then missed {threshold} or more of it in a row.",
+    "source": "Was a regular at one gathering, then missed {threshold} or more in a row.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1544,7 +1538,7 @@
     "zh-Hant": "machine"
   },
   "Mia.resolve": {
-    "source": "Resolve…",
+    "source": "No longer expected…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1654,7 +1648,7 @@
     "zh-Hant": "machine"
   },
   "Release.confirm": {
-    "source": "Release",
+    "source": "Mark as no longer expected",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1669,7 +1663,7 @@
     "zh-Hant": "machine"
   },
   "Release.hintDeparted": {
-    "source": "Graduated, moved away, or stopped coming — this is the resolution.",
+    "source": "Graduated, moved away, or not coming back — Tally stops asking about them.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1689,12 +1683,12 @@
     "zh-Hant": "machine"
   },
   "Release.consequenceDeparted": {
-    "source": "Marking {name} “no longer with us” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
+    "source": "Marking {name} “left the ministry” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Release.consequenceDepartedUnseen": {
-    "source": "{name} has not been seen at any gathering since {date}. Marking {name} “no longer with us” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
+    "source": "{name} has not been seen at any gathering since {date}. Marking {name} “left the ministry” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1894,7 +1888,7 @@
     "zh-Hant": "machine"
   },
   "Ledger.backSince": {
-    "source": " · back since — no longer in effect",
+    "source": " · they have come back — this no longer applies",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1904,12 +1898,12 @@
     "zh-Hant": "machine"
   },
   "CheckIn.focusRecent": {
-    "source": "Recent",
+    "source": "Regulars",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "CheckIn.focusParticipated": {
-    "source": "Participated",
+    "source": "Been before",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2004,7 +1998,7 @@
     "zh-Hant": "machine"
   },
   "CheckIn.emptyRosterErrorBody": {
-    "source": "Check-in still works: quick-add anyone who walks in, and they will be counted.",
+    "source": "Check-in still works. Tap the + beside the search box to add anyone who walks in — they will be counted.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2014,7 +2008,7 @@
     "zh-Hant": "machine"
   },
   "CheckIn.emptyNoRosterBody": {
-    "source": "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in.",
+    "source": "Names appear here as soon as Tally has finished reading the roster. You can still add anyone who walks in — tap the + beside the search box.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2069,7 +2063,7 @@
     "zh-Hant": "machine"
   },
   "CheckIn.showAllParticipated": {
-    "source": "Show all {count} who have participated",
+    "source": "Show all {count} who have been before",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2079,7 +2073,7 @@
     "zh-Hant": "machine"
   },
   "CheckIn.frozen": {
-    "source": "{name} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.",
+    "source": "Tally cannot check {name} in — Planning Center no longer has an entry for them. Check everyone else in as normal, and ask the core team to put {name}'s entry back.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2329,7 +2323,7 @@
     "zh-Hant": "machine"
   },
   "StudentRow.wrongPerson": {
-    "source": "Wrong person",
+    "source": "Move check-in",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2339,7 +2333,7 @@
     "zh-Hant": "machine"
   },
   "QuickAdd.description": {
-    "source": "A contact is optional, and goes to the core team to add.",
+    "source": "Their name is all Tally needs. A parent’s details are optional and go to the core team to file.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2369,7 +2363,7 @@
     "zh-Hant": "machine"
   },
   "QuickAdd.contactFailed": {
-    "source": "{name} is checked in, but the contact did not save.",
+    "source": "{name} is checked in and counted. The adult’s details did not save — give the number to the core team instead.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2409,7 +2403,7 @@
     "zh-Hant": "machine"
   },
   "ChooseEvent.catchUpBody": {
-    "source": "Nobody took the register? Open one of these and add them now.",
+    "source": "Nobody checked anyone in? Open one of these and add them now.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2484,7 +2478,7 @@
     "zh-Hant": "machine"
   },
   "EventHeader.spokenInRoom": {
-    "source": "{inRoom} of {present} checked-in students still in the room, out of {eligible} eligible",
+    "source": "{inRoom} of {present} checked-in students still in the room, out of {eligible} expected",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2614,12 +2608,12 @@
     "zh-Hant": "machine"
   },
   "Settings.miaAfterMisses": {
-    "source": "MIA after misses",
+    "source": "Misses in a row",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Settings.newVisitorWindow": {
-    "source": "New visitor window (days)",
+    "source": "Days on the “New faces” list",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2829,7 +2823,7 @@
     "zh-Hant": "machine"
   },
   "Backends.headingWriteBack": {
-    "source": "Write-back",
+    "source": "What Tally may change",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2849,7 +2843,7 @@
     "zh-Hant": "machine"
   },
   "Backends.fromDeploy": {
-    "source": "These settings came with the deploy. Changing any of them here takes over from it.",
+    "source": "These settings came with Tally when it was installed. Changing any of them here overrides that.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2924,7 +2918,7 @@
     "zh-Hant": "machine"
   },
   "Backends.pcoUnresolved": {
-    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Planning Center — deleted or merged upstream.",
+    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Planning Center — deleted or merged there.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2969,7 +2963,7 @@
     "zh-Hant": "machine"
   },
   "Backends.a32Refreshed": {
-    "source": "Read the roster again from every connected backend",
+    "source": "Read the roster again from every connected directory",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3004,7 +2998,7 @@
     "zh-Hant": "machine"
   },
   "Backends.a32Unresolved": {
-    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Attendees — removed upstream.",
+    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Attendees — removed there.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3039,7 +3033,7 @@
     "zh-Hant": "machine"
   },
   "Backends.notMoved": {
-    "source": "Students already linked to a backend are not moved by this — it decides only where a brand-new student's record is created.",
+    "source": "Students already matched to a directory are not moved by this — it decides only where a brand-new student is created.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3094,7 +3088,7 @@
     "zh-Hant": "machine"
   },
   "Backends.writeBackFull": {
-    "source": "Create and update managed fields",
+    "source": "Create people and update their details",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3159,7 +3153,7 @@
     "zh-Hant": "machine"
   },
   "Backends.a32ConnectedHint": {
-    "source": "Attendees serves the roster alongside any other connected backend.",
+    "source": "Attendees serves the roster alongside any other connected directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3439,12 +3433,12 @@
     "zh-Hant": "machine"
   },
   "KioskPair.retireCore": {
-    "source": "To retire a kiosk, clear the browser's site data on the device — or deactivate and reactivate your account to cut every session loose.",
+    "source": "To retire a kiosk, clear the browser’s site data on the device. An admin can also switch your access off and on again, which stops every kiosk you paired.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "KioskPair.blocked": {
-    "source": "This deployment cannot sign a kiosk in. Approving a code still records it, but the lobby screen keeps waiting until the role below is granted.",
+    "source": "Tally cannot sign a kiosk in yet. Approving a code is still recorded, but the lobby screen keeps waiting until somebody runs the setup command below.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3609,7 +3603,7 @@
     "zh-Hant": "machine"
   },
   "KioskPair.rebuildFailed": {
-    "source": "Could not rebuild the kiosk phone index. Is a people backend reachable?",
+    "source": "Could not rebuild the kiosk phone index. Is your church directory reachable?",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3759,7 +3753,7 @@
     "zh-Hant": "machine"
   },
   "EventEditor.upcomingNote": {
-    "source": "The upcoming gathering. Instances already held keep the times they ran at.",
+    "source": "The next gathering. Nights that already happened keep the times they ran at.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3804,7 +3798,7 @@
     "zh-Hant": "machine"
   },
   "EventEditor.trackCheckOutHint": {
-    "source": "Volunteers record when each child is checked out, and the roster shows a live room count.",
+    "source": "Counselors record when each student is checked out, and the roster shows a live room count.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3969,7 +3963,7 @@
     "zh-Hant": "machine"
   },
   "LabelTemplate.unknownTokens": {
-    "source": "Tally does not know {tokens} — it will print as nothing.",
+    "source": "Tally does not know {tokens}, so that part of the line prints as nothing. Use one of the buttons below instead.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4359,7 +4353,7 @@
     "zh-Hant": "machine"
   },
   "Access.openDetail": {
-    "source": "{count, plural, one {# person} other {# people}} can take this register.",
+    "source": "{count, plural, one {# person} other {# people}} can take attendance here.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4369,7 +4363,7 @@
     "zh-Hant": "machine"
   },
   "Access.openToAnyone": {
-    "source": "Anybody with a Tally account can take this register.",
+    "source": "Anybody with a Tally account can take attendance here.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4379,7 +4373,7 @@
     "zh-Hant": "machine"
   },
   "Access.workingOut": {
-    "source": "Working out who has been taking this register…",
+    "source": "Working out who has been taking attendance here…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4419,7 +4413,7 @@
     "zh-Hant": "machine"
   },
   "Access.memberAdded": {
-    "source": "{name} can now take this register.",
+    "source": "{name} can now take attendance here.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4444,12 +4438,12 @@
     "zh-Hant": "machine"
   },
   "Access.hintRestricted": {
-    "source": "Only people added to this gathering can take its register.",
+    "source": "Only people added to this gathering can take attendance for it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Access.hintOpen": {
-    "source": "Everyone on the team can take this register.",
+    "source": "Everyone on the team can take attendance here.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4654,7 +4648,7 @@
     "zh-Hant": "machine"
   },
   "EventDetail.cancelledExplain": {
-    "source": "Nobody was checked in, so Tally reads this as a cancelled gathering: it is not counted as a miss for anybody, and it does not inform the predictive roster or the trend strip.",
+    "source": "Nobody was checked in, so Tally reads this as a cancelled gathering: it is not counted as a miss for anybody, and it does not change who counts as a regular or the attendance trend.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4679,17 +4673,17 @@
     "zh-Hant": "machine"
   },
   "EventDetail.whoOpen": {
-    "source": "Everyone on the team can take this register",
+    "source": "Everyone on the team can take attendance here",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "EventDetail.change": {
-    "source": "Change",
+    "source": "Change who is on it",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "EventDetail.limit": {
-    "source": "Limit",
+    "source": "Limit who is on it",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4909,7 +4903,7 @@
     "zh-Hant": "machine"
   },
   "Import.emptyMulti": {
-    "source": "No connected backend has an importable event. Archived ones are not offered.",
+    "source": "No connected directory has an importable event. Archived ones are not offered.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5009,7 +5003,7 @@
     "zh-Hant": "machine"
   },
   "KioskTheme.fieldHint": {
-    "source": "Worn by a lobby kiosk while it is bound to this gathering. Nobody’s phone changes.",
+    "source": "A lobby kiosk uses these colours while it is showing this gathering. Nobody’s phone changes.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5274,12 +5268,12 @@
     "zh-Hant": "machine"
   },
   "Events.lockedRestricted": {
-    "source": "Only people added to this gathering can take its register.",
+    "source": "Only people added to this gathering can take attendance for it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Events.lockedExplain": {
-    "source": "You are still signed in to Tally and everything else is unchanged — this one gathering has been narrowed to a set of people, and you are not on the list yet.",
+    "source": "You have not been added to this gathering yet — it has been narrowed to a set of people. Nothing else has changed, and you are still signed in to Tally.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -6141,7 +6135,7 @@
     "context": "Option in the \"Ends\" picker: the repeat stops after a number of occurrences. The field it reveals is labelled Recurrence.numberOfGatherings — keep the two consistent about what is being counted."
   },
   "Recurrence.onlyGathering": {
-    "source": "This is the only gathering the repeat covers.",
+    "source": "No more dates after this one.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Shown where the list of upcoming dates would be, when the rule produces exactly one."
@@ -6183,7 +6177,7 @@
     "context": "Hint under that field: the gathering being edited counts as number one."
   },
   "Recurrence.monthSkipped": {
-    "source": "A month with no {day}th is skipped rather than moved.",
+    "source": "A month too short for day {day} is skipped rather than moved.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Hint shown only when the monthly anchor is the 29th, 30th or 31st: months without that day are skipped, not moved to the nearest day. The English glues an ordinal suffix outside the argument and renders \"31th\"; Chinese takes 号/號 and is unaffected."
@@ -6544,7 +6538,7 @@
     "zh-Hant": "machine"
   },
   "Grid.stillReading": {
-    "source": "Still reading the registers.",
+    "source": "Still reading who came.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -6939,7 +6933,7 @@
     "context": "Chip form of \"sending\": in the air right now. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.sendingTitle": {
-    "source": "A server is talking to the people backend about this one right now.",
+    "source": "Tally is sending this change now.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the sending chip. Says only that it is moving, not stuck."
@@ -6957,7 +6951,7 @@
     "context": "Chip form of \"waiting\": throttled, resumes by itself. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.waitingTitle": {
-    "source": "The backend asked Tally to slow down. It resumes on its own — nothing is stuck.",
+    "source": "Your church directory asked Tally to slow down. It resumes on its own — nothing is stuck.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the waiting chip. \"Nothing is stuck\" is the reassurance that stops somebody re-sending."
@@ -6975,13 +6969,13 @@
     "context": "Chip form: done, the edit is in the directory. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.landedTitle": {
-    "source": "Saved upstream.",
+    "source": "Saved in your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the saved chip."
   },
   "JobChip.differsLong": {
-    "source": "Changed upstream",
+    "source": "Changed elsewhere",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A conflict: somebody changed the same field on the other side, so the value now stored is one nobody typed. Needs a person — it will not resolve itself. *Long* is the row form and may be a phrase."
@@ -6993,13 +6987,13 @@
     "context": "Chip form: a conflicting change on the other side. Needs a person. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.differsTitle": {
-    "source": "It landed on a value nobody typed — somebody changed the same field upstream. It will not resolve itself.",
+    "source": "It landed on a value nobody typed — somebody changed the same field in your church directory. It will not resolve itself.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the conflict chip. \"It will not resolve itself\" is what separates this from waiting and stalled."
   },
   "JobChip.mergedLong": {
-    "source": "Merged upstream",
+    "source": "Merged in the directory",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person being edited was merged into somebody else in the directory; the correction landed on the survivor under a different id. *Long* is the row form and may be a phrase."
@@ -7011,7 +7005,7 @@
     "context": "Chip form: the person was merged into another in the directory. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.mergedTitle": {
-    "source": "The person you edited was merged into somebody else upstream. Your correction landed on them, under a different id.",
+    "source": "The person you edited was merged into somebody else in your church directory. Your correction landed on them, under a different id.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the merged chip. The edit did land — on a different record than the one the reader picked."
@@ -7029,13 +7023,13 @@
     "context": "Chip form: refused. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.failedTitle": {
-    "source": "The backend refused this edit. Open the record to see why.",
+    "source": "Your church directory refused this edit. Open it to see why.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the failed chip."
   },
   "JobChip.orphanedLong": {
-    "source": "No upstream record",
+    "source": "Not in the directory",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person this edit names no longer exists in the directory — deleted there. Needs a person. *Long* is the row form and may be a phrase."
@@ -7047,7 +7041,7 @@
     "context": "Chip form: the person no longer exists in the directory. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.orphanedTitle": {
-    "source": "The person this edit names no longer exists upstream.",
+    "source": "The person this edit names no longer exists in your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Tooltip on the orphaned chip."
@@ -7065,7 +7059,7 @@
     "context": "Chip form: cancelled by a person. *Short* must fit inside a chip a few characters wide."
   },
   "JobChip.stalledLong": {
-    "source": "Still sending",
+    "source": "Taking longer",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Sent, and taking longer than it should. Nothing has failed and it may still land, so this must not read like an error. *Long* is the row form and may be a phrase."
@@ -7109,7 +7103,7 @@
     "zh-Hant": "machine"
   },
   "Students.newVisitor": {
-    "source": "New visitor",
+    "source": "Add by hand",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7120,11 +7114,6 @@
   },
   "Students.addFromPco": {
     "source": "Add from Planning Center",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Students.twoWaysShort": {
-    "source": "Two ways onto the roster, weekly first.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7164,17 +7153,23 @@
     "zh-Hant": "machine"
   },
   "Students.inFlight": {
-    "source": "In flight",
+    "source": "Still sending",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Students.needsYou": {
-    "source": "Needs you",
+    "source": "Stuck",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Students.incompleteProfiles": {
     "source": "Incomplete profiles",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Students.visitors": {
+    "source": "Visitors",
+    "context": "Quick-filter chip on the roster: show only students marked as first-time visitors. Sits beside \"Incomplete profiles\" and both are plural nouns naming sets of people. The person is a \"visitor\"; the dashboard list of them is called \"New faces\" — do not swap the two.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7189,7 +7184,7 @@
     "zh-Hant": "machine"
   },
   "Students.rosterErrorBody": {
-    "source": "Whoever is on it is still on it — Tally needs their backend to put names to them. The banner above has the details.",
+    "source": "Nobody has been lost — Tally cannot reach your church directory. The banner above has the details.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7284,7 +7279,7 @@
     "zh-Hant": "machine"
   },
   "Students.queuedPress": {
-    "source": "{name} is not in {backend} yet — push them now",
+    "source": "{name} is not in {backend} yet — send them now",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7369,12 +7364,12 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.releaseFailed": {
-    "source": "Could not save the release. Nothing changed.",
+    "source": "Could not save that. They are still expected — try again in a moment.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.undoFailed": {
-    "source": "Could not undo the release.",
+    "source": "Could not undo that. Try again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7459,7 +7454,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.pushRefused": {
-    "source": "{backend} did not accept the push.",
+    "source": "{backend} did not accept it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7494,7 +7489,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.createdWaitingPush": {
-    "source": "Created in Tally. Waiting to be pushed to {backend} — send them now, or the next push retry will.",
+    "source": "Created in Tally. Not in {backend} yet — send them now, or Tally will send them on its next try.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7504,12 +7499,12 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.pushTo": {
-    "source": "Push to {backend}",
+    "source": "Send to {backend}",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.worstOnMia": {
-    "source": "{scope} — on the MIA list at {threshold}",
+    "source": "{scope} — on the stopped-coming list at {threshold}",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7634,7 +7629,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.missedInARowMia": {
-    "source": "{count} missed in a row · MIA",
+    "source": "{count} missed in a row · stopped coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7979,7 +7974,7 @@
     "zh-Hant": "machine"
   },
   "RowBadge.flagNoNote": {
-    "source": "{backend} has the flag set but no note against it. Somebody upstream knows why.",
+    "source": "{backend} has the flag set but no note against it. Somebody there knows why.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8079,17 +8074,17 @@
     "zh-Hant": "machine"
   },
   "RowBadge.queuedExplain": {
-    "source": "{name} exists in Tally only. Attendance is being recorded either way — this is about the person record upstream, not about the counting.",
+    "source": "{name} exists in Tally only. Attendance is being recorded either way — this is about their entry in your church directory, not about the counting.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "RowBadge.queuedBadge": {
-    "source": "Queued",
+    "source": "Not sent yet",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "RowBadge.queuedClears": {
-    "source": " clears itself as soon as the push lands.",
+    "source": " goes away on its own once they have been sent.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8104,7 +8099,7 @@
     "zh-Hant": "machine"
   },
   "RowBadge.pushNow": {
-    "source": "Push now",
+    "source": "Send now",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8114,12 +8109,12 @@
     "zh-Hant": "machine"
   },
   "RowBadge.pushFailed": {
-    "source": "The push did not go through. Nothing was changed.",
+    "source": "That did not go through. Nothing changed — try again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "RowBadge.noMedicalYet": {
-    "source": "{name} was added here and has not reached {backend} yet, so there is no medical note to read — whatever somebody typed at the door is on their profile.",
+    "source": "{name} has not reached {backend} yet, so there is no allergy note to read from there. Check their profile for anything written down when they arrived.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8154,7 +8149,7 @@
     "zh-Hant": "machine"
   },
   "StudentEditor.descriptionAdd": {
-    "source": "Created in Tally, and pushed to your people system automatically when write-back allows it.",
+    "source": "Added to the roster now. Tally adds them to your church directory too, wherever it is allowed to write there.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8389,7 +8384,7 @@
     "zh-Hant": "machine"
   },
   "ParentContact.phoneInvalid": {
-    "source": "That is not a number anybody could ring.",
+    "source": "A phone number needs 10 digits.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8459,7 +8454,7 @@
     "zh-Hant": "machine"
   },
   "ParentContact.householdNote": {
-    "source": "Putting them in this household keeps one record. A second copy of the same adult has to be merged by hand later.",
+    "source": "Putting them in this household keeps one entry for this adult. Two entries for the same person have to be joined up by hand later.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8494,7 +8489,7 @@
     "zh-Hant": "machine"
   },
   "ParentContact.addedAsAdult": {
-    "source": "Added to {backend} as an adult in {name}’s household, and the household itself if there is not one yet. A phone number or email is optional now and can be added later.",
+    "source": "Save puts this adult in {name}’s household in {backend}, and makes the household if there is not one yet. A phone number or email can wait.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8534,7 +8529,7 @@
     "zh-Hant": "machine"
   },
   "PartialRoster.partialNote": {
-    "source": "If you go ahead, the filename will end in <code>-partial</code> and every row will carry the date its backend was last read.",
+    "source": "If you go ahead, the filename will end in <code>-partial</code> and every row will carry the date its directory was last read.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8805,7 +8800,7 @@
     "zh-Hant": "machine"
   },
   "Review.badgePushFailed": {
-    "source": "Push failed",
+    "source": "Could not be added",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8830,12 +8825,12 @@
     "zh-Hant": "machine"
   },
   "Review.expiringOne": {
-    "source": "When it clears, the phone number goes with it — and {name} stays on Tally’s roster with nobody attached to them.",
+    "source": "When those days run out, this card and the phone number are deleted — and {name} stays on Tally’s roster with nobody attached to them.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Review.expiringMany": {
-    "source": "When it clears, the phone number goes with it — and the children stay on Tally’s roster with nobody attached to them.",
+    "source": "When those days run out, this card and the phone number are deleted — and the children stay on Tally’s roster with nobody attached to them.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9055,7 +9050,7 @@
     "zh-Hant": "machine"
   },
   "Review.yesAddChildren": {
-    "source": "{count, plural, one {Yes — add {names}} other {Yes — add # children}}",
+    "source": "{count, plural, one {Yes — add {names}} other {Yes — add {names}}}",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9210,7 +9205,7 @@
     "zh-Hant": "machine"
   },
   "Review.linkedAutomatically": {
-    "source": "Linked automatically to {name} in the church’s database.",
+    "source": "Tally matched them to {name} in your church directory, by name and grade — no second person was added. If that is the wrong person, it can only be fixed there.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9245,7 +9240,7 @@
     "zh-Hant": "machine"
   },
   "Review.wouldLinkByDefault": {
-    "source": "The one we would link by default.",
+    "source": "Tally’s closest match.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9280,12 +9275,12 @@
     "zh-Hant": "machine"
   },
   "Door.notThisGathering": {
-    "source": "If that is not this gathering, please see a leader.",
+    "source": "If you are here for something else, please see a leader.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Door.tapToCarryOn": {
-    "source": "Tap anywhere to carry on",
+    "source": "Tap anywhere to continue",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9465,7 +9460,7 @@
     "zh-Hant": "machine"
   },
   "Staff.changeEventTitle": {
-    "source": "Change event?",
+    "source": "Change gathering?",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9480,7 +9475,7 @@
     "zh-Hant": "machine"
   },
   "Staff.changeEventKept": {
-    "source": "Children already checked in stay checked in, and the register is not changed.",
+    "source": "Children already checked in stay checked in, and attendance is not changed.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9535,7 +9530,7 @@
     "zh-Hant": "machine"
   },
   "Staff.changeEvent": {
-    "source": "Change event",
+    "source": "Change gathering",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9555,7 +9550,7 @@
     "zh-Hant": "machine"
   },
   "Staff.reprintInvitation": {
-    "source": "Tap a name to see what will print, then confirm. Nothing about the register changes.",
+    "source": "Tap a name to see what will print, then confirm. Nothing about attendance changes.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9645,7 +9640,7 @@
     "zh-Hant": "machine"
   },
   "Search.windowClosed": {
-    "source": "Check-in window has closed — you can still check in.",
+    "source": "You can still check in — the usual time has passed.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9711,7 +9706,7 @@
     "zh-Hant": "machine"
   },
   "Search.networkFailed": {
-    "source": "Couldn’t reach the network just now.",
+    "source": "No connection just now.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9751,7 +9746,7 @@
     "zh-Hant": "machine"
   },
   "Chooser.nothingToday": {
-    "source": "Nothing on today. Events are created in Tally itself.",
+    "source": "Nothing on today. Gatherings are set up in Tally.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9791,12 +9786,12 @@
     "zh-Hant": "machine"
   },
   "Register.couldNotSave": {
-    "source": "We could not save that just now — please see a leader.",
+    "source": "Tally could not finish that just now. Try again, or see a leader.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Register.saveTakingLonger": {
-    "source": "This is taking longer than expected. Your name tags have printed — please check with a leader before you go.",
+    "source": "Please check with a leader before you go. Your name tags have printed, but this is not finished.",
     "context": "The whole of the error body when the app gave up waiting rather than being refused — the family's name tags have already printed and nobody knows yet whether the registration was saved. It must not say the save failed, because half the time it did not. The instruction is the point: find a leader before leaving.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9818,7 +9813,7 @@
     "zh-Hant": "machine"
   },
   "Register.maxChildren": {
-    "source": "That is as many as one go takes — a leader can add the rest.",
+    "source": "That is the most this screen can add. A leader can add the rest.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9925,7 +9920,7 @@
     "zh-Hant": "machine"
   },
   "Register.subtitleAllergies": {
-    "source": "Any allergies we should know about?",
+    "source": "Any allergies the leaders should know about?",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

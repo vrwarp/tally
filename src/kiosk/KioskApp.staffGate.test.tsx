@@ -200,7 +200,7 @@ describe('the staff gate', () => {
     // never has to touch the one that shuts the kiosk.
     expect(screen.getByText('Staff')).toBeTruthy();
     expect(screen.getByText(/Label printer/i)).toBeTruthy();
-    expect(screen.getByText(/Change event/i)).toBeTruthy();
+    expect(screen.getByText(/Change gathering/i)).toBeTruthy();
     /*
      * This kiosk has no printer configured, so there is no reprint door — a
      * statement stands in its place. A disabled slab at the top of the stack
@@ -220,9 +220,9 @@ describe('the staff gate', () => {
   it('asks before it acts when Change event is chosen', async () => {
     await mount();
     await holdClear();
-    await tap(/Change event/i);
+    await tap(/Change gathering/i);
 
-    expect(screen.getByText(/Change event\?/i)).toBeTruthy();
+    expect(screen.getByText(/Change gathering\?/i)).toBeTruthy();
     // Named, because a volunteer holding a lobby tablet needs to know which
     // gathering they are about to walk away from.
     expect(screen.getByText('Sunday Nursery')).toBeTruthy();
@@ -255,7 +255,7 @@ describe('the staff gate', () => {
     });
     await settle();
 
-    expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.queryByText(/Change gathering\?/i)).toBeNull();
   });
 
   it('does not fire when the thumb slides off Clear', async () => {
@@ -278,15 +278,15 @@ describe('the staff gate', () => {
     });
     await settle();
 
-    expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.queryByText(/Change gathering\?/i)).toBeNull();
   });
 
   it('returns to the staff menu when the question is declined', async () => {
     await mount();
     await type('ada');
     await holdClear();
-    await tap(/Change event/i);
-    expect(screen.getByText(/Change event\?/i)).toBeTruthy();
+    await tap(/Change gathering/i);
+    expect(screen.getByText(/Change gathering\?/i)).toBeTruthy();
 
     /*
      * Declining lands back on the menu it was opened from, not out at the front
@@ -300,7 +300,7 @@ describe('the staff gate', () => {
      */
     await tap(/Keep checking in/i);
 
-    expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.queryByText(/Change gathering\?/i)).toBeNull();
     expect(screen.getByText('Staff')).toBeTruthy();
     expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
 
@@ -314,7 +314,7 @@ describe('the staff gate', () => {
     await mount();
     await type('ada');
     await holdClear();
-    await tap(/Change event/i);
+    await tap(/Change gathering/i);
 
     await tap(/Leave Sunday Nursery/i);
 
@@ -337,6 +337,6 @@ describe('the staff gate', () => {
      * asked whether they would like to take the kiosk off the gathering.
      */
     expect(screen.queryByText('Staff')).toBeNull();
-    expect(screen.queryByText(/Change event\?/i)).toBeNull();
+    expect(screen.queryByText(/Change gathering\?/i)).toBeNull();
   });
 });

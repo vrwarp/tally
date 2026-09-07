@@ -109,7 +109,7 @@ export const FIELD_MESSAGES: Record<FieldCode, string> = {
   'field.adultLast.tooLong': "The adult's last name is too long.",
   'field.adultLast.hasNumbers': "The adult's last name cannot contain numbers.",
   'field.adultLast.needsLetter': "The adult's last name needs at least one letter.",
-  'field.gradeRange': 'grade must be a whole number from -1 (Pre-K) to 12, or null.',
+  'field.gradeRange': 'Choose a grade from Pre-K to 12th grade, or “No grade”.',
   'field.phoneRequired': 'A phone number is required.',
   'field.phoneDigits': 'Enter a 10-digit phone number.',
   'field.phoneShape': 'That does not look like a phone number.',

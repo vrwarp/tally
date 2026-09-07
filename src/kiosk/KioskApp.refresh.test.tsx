@@ -261,7 +261,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
     await type('grace');
     await quiet();
 
-    expect(screen.getByText(/Couldn.t reach the network/)).toBeTruthy();
+    expect(screen.getByText(/No connection just now/)).toBeTruthy();
     // Emphatically not "still no match": nobody looked.
     expect(noMatchLine()).toBe('No match — first time here?');
   });

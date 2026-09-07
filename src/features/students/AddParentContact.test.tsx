@@ -181,7 +181,7 @@ describe('AddParentContact', () => {
       await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
       await userEvent.type(screen.getByLabelText('Adult’s phone'), '4102');
 
-      expect(screen.getByText(/not a number anybody could ring/)).toBeInTheDocument();
+      expect(screen.getByText(/needs 10 digits/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
       expect(setParentContact).not.toHaveBeenCalled();
     });
