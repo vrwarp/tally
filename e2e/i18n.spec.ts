@@ -28,7 +28,17 @@ import type { Page } from '@playwright/test';
 import { gotoReady } from './support/auth';
 import { openKiosk, pairKiosk } from './support/kiosk';
 import { expect, test } from './support/fixtures';
-import zhHantKiosk from '../messages/kiosk/zh-Hant.json';
+import { readFileSync } from 'node:fs';
+
+/*
+ * Read, not imported. Specs run under Playwright's own loader as plain Node
+ * ESM — no Vite, so `import … from './x.json'` needs an import attribute and
+ * dies without one, and it dies by finding no tests at all rather than by
+ * failing one, which exits 0 and looks like a pass.
+ */
+const zhHantKiosk = JSON.parse(
+  readFileSync(new URL('../messages/kiosk/zh-Hant.json', import.meta.url), 'utf8'),
+) as { Chooser: { question: string } };
 
 /**
  * A message key that reached the screen — `Account.signOut` rather than the
@@ -53,9 +63,17 @@ async function chooseLanguage(page: Page, name: string): Promise<void> {
   await picker(page).getByRole('button', { name }).click();
 }
 
-/** The switcher itself, by the one handle on it that is not translated. */
+/**
+ * The switcher itself, by the one handle on it that is not translated.
+ *
+ * `:visible` is not defensive padding. `AppShell` renders the account menu
+ * twice — the rail's copy and the bar's — and only one is on screen at a time,
+ * so the test id matches two nodes where the old role-based selector matched
+ * one: a role selector silently drops whatever is not in the accessibility
+ * tree, and a test id does not.
+ */
 function picker(page: Page) {
-  return page.getByTestId('language-picker');
+  return page.locator('[data-testid="language-picker"]:visible');
 }
 
 test.describe('the app speaks more than English', () => {

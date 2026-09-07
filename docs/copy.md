@@ -41,7 +41,7 @@ survives its own deletion. Aim at a 7th–8th grade reading level; this app is
 used by volunteers who signed up an hour ago.
 
 **3. Buttons name their action.** A button label completes "I want to…" — a
-verb and its object, in the reader's words. *Add student*, *Push now*, *Forget
+verb and its object, in the reader's words. *Add student*, *Send now*, *Forget
 the number*. Not *OK*, not *Submit*, not a noun where an action happened.
 
 **4. Errors say what happened, then what to do.** Every failure string owes the
