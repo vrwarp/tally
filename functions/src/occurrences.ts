@@ -184,7 +184,7 @@ function payloadFor(
     location: source.location,
     notes: source.notes,
     requiresRsvp: false,
-    // Inherited, unlike `requiresRsvp`: a room children are collected from is
+    // Inherited, unlike `requiresRsvp`: a room children are checked out from is
     // precisely the kind of gathering that repeats, and materialising one must
     // not quietly turn it into an ordinary roster. Mirrors `asEvent` in
     // src/lib/eventProjection.ts.

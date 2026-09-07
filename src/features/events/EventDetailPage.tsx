@@ -200,7 +200,7 @@ export function EventDetailPage() {
     .map((record) => ({ record, student: studentsById.get(record.studentId) ?? null }))
     .sort((a, b) => b.record.checkedInAt.getTime() - a.record.checkedInAt.getTime());
 
-  const collected = attendance.filter((record) => record.checkedOutAt !== null);
+  const checkedOut = attendance.filter((record) => record.checkedOutAt !== null);
 
   const registerExportRows = registerRows(event, attendance, exportRsvps, studentsById);
   const buildRegisterExport = () => ({
@@ -421,11 +421,11 @@ export function EventDetailPage() {
                 {event.requiresCheckOut ? (
                   <StatTile
                     label="Checked out"
-                    value={collected.length}
+                    value={checkedOut.length}
                     tone="neutral"
                     hint={
                       attendance.length > 0
-                        ? `${collected.length} of ${attendance.length} collected.`
+                        ? `${checkedOut.length} of ${attendance.length} checked out.`
                         : undefined
                     }
                   />

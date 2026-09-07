@@ -159,7 +159,7 @@ const CAST: Record<
     /*
      * Act 1's family, seeded. A different one per pass, because the two passes
      * share one emulator: the second would otherwise walk up to the child the
-     * first checked in *and collected*, whose row correctly offers neither.
+     * first checked in *and checked out*, whose row correctly offers neither.
      *
      * Both of them are regulars of the gathering the kiosk binds to, which is
      * now a requirement rather than a coincidence — the search is scoped to the
@@ -365,7 +365,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       /*
        * The other half of a nursery's day. The seeded Nursery tracks check-out,
-       * which is why the same row now offers a collection instead of a
+       * which is why the same row now offers a check-out instead of a
        * check-in: a child who is present can only be picked up.
        */
       await typeOnKiosk(kiosk, cast.doorFirst);
@@ -378,8 +378,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'The same row, hours later, offering the only thing left to do with a child who is already here. The button changes colour and verb and nothing else: a pickup is one press, exactly as the arrival was. It was a two-second hold for a while, on the argument that marking a child collected is a claim somebody took them out of the building and does not correct itself the way a stray check-in does — true, and still outweighed by how often it is asked. A gesture spent on the one control a parent presses every week makes the most-travelled path the slowest one. What guards it instead costs the ordinary case nothing: every name is on the glass above the finger, only the ticked ones go, and the press has to lift inside the button it landed on. Undoing one still needs a volunteer and the main app.',
       });
 
-      await kiosk.getByRole('button', { name: /^Collect$/ }).click();
-      await expect(kiosk.getByText(/collected|picked up|welcome/i).first()).toBeVisible({
+      await kiosk.getByRole('button', { name: /^Check out$/ }).click();
+      await expect(kiosk.getByText(/checked out|picked up|welcome/i).first()).toBeVisible({
         timeout: 30_000,
       });
       await shoot(kiosk, 'kiosk', {
@@ -651,7 +651,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        * The sibling Act 1's prediction left unticked, arriving on her own.
        *
        * She has to be somebody *not yet checked in*: the offer is
-       * deliberately absent on a collection — the seeded Nursery tracks
+       * deliberately absent on a check-out — the seeded Nursery tracks
        * check-out, so a child who is already present gets a pickup screen,
        * and a pickup is not the moment to add somebody to the roster. A
        * family arriving is.
@@ -765,7 +765,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await typeOnKiosk(kiosk, cast.phone.slice(-4));
       await kiosk.getByRole('button', { name: /Chidi/i }).first().click();
-      await expect(kiosk.getByText(/Collecting anyone else/i)).toBeVisible({ timeout: 30_000 });
+      await expect(kiosk.getByText(/Checking out anyone else/i)).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
@@ -775,7 +775,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await kiosk.getByRole('button', { name: /Zuri/i }).first().click();
-      await expect(kiosk.getByRole('button', { name: /Collect all 3/i })).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Check out all 3/i })).toBeVisible();
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
@@ -784,9 +784,9 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Arriving apart and leaving together is the ordinary case, not the exception — so the sibling the register cannot vouch for is still on the screen, in the list, one tap from ticked. Dropping her name would have been worse than leaving it unticked: a parent taking their family home should never have to go round the flow twice. The arrival decides what is *ticked*; the phone guess decides what is *shown*, and the two are different jobs.',
       });
 
-      await kiosk.getByRole('button', { name: /Collect all 3/i }).click();
-      // The words the success screen actually uses for a pickup — it says
-      // "checked out", never "collected", which is what the button said.
+      await kiosk.getByRole('button', { name: /Check out all 3/i }).click();
+      // The success screen and the button now say the same thing: the kiosk's
+      // pickup vocabulary is "check out" from the row through to the farewell.
       await expect(kiosk.getByText(/checked out\. See you next time/i)).toBeVisible({
         timeout: 30_000,
       });
@@ -1055,8 +1055,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       /*
        * Tried in order rather than named outright: by this point in the tour
-       * several of these children have been checked in *and collected*, and a
-       * collected child's confirm screen is a different frame than the one
+       * several of these children have been checked in *and checked out*, and a
+       * checked-out child's confirm screen is a different frame than the one
        * this caption claims.
        */
       for (const candidate of [cast.guestChild, cast.familyChild, cast.door]) {

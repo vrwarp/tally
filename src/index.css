@@ -293,7 +293,7 @@
  * luck — where the clip lands inside a row is an accident of how the row height
  * divides into the track, and on a landscape kiosk it landed just under the
  * baseline, leaving two whole rows legible at half strength. Half-strength and
- * legible is what this list already means by *collected*, so the rows that
+ * legible is what this list already means by *checked out*, so the rows that
  * continue below read as rows already dealt with.
  *
  * So the ramp is a row deep rather than a few pixels, and it is most of the way

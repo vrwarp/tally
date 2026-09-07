@@ -351,7 +351,7 @@ describe('the label queue', () => {
       await queue.idle();
 
       // Ada's went out late but was already on the wire; Noah's was never
-      // attempted, because a sticker for a child collected two minutes ago is
+      // attempted, because a sticker for a child checked out two minutes ago is
       // litter rather than a label.
       expect(onDropped).toHaveBeenCalledTimes(1);
       expect(onDropped.mock.calls[0]?.[0]).toBe('stale');

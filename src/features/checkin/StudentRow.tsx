@@ -178,7 +178,7 @@ export const StudentRow = memo(function StudentRow({
         ? `${name}${gradeClause} — already checked in`
         : `Move the check-in to ${name}${gradeClause}`
     : gone
-      ? `More actions for ${name}${gradeClause}, collected at ${formatClock(attendance!.checkedOutAt!)}`
+      ? `More actions for ${name}${gradeClause}, checked out at ${formatClock(attendance!.checkedOutAt!)}`
       : here
         ? `More actions for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
         : `Check in ${name}${gradeClause}`;
@@ -238,7 +238,7 @@ export const StudentRow = memo(function StudentRow({
               : swapping
                 ? 'bg-ink-900 ring-brand-500/30'
                 : 'bg-ink-900 ring-ink-800',
-          // Neutral and spent rather than an error colour. A collected child is
+          // Neutral and spent rather than an error colour. A checked-out child is
           // the happy ending, and a student with no pickup recorded has done
           // nothing wrong either — see the badge below.
           gone && 'opacity-60',
@@ -381,7 +381,7 @@ export const StudentRow = memo(function StudentRow({
 
             On a gathering that tracks check-out the slot goes to `Out`
             instead, and undo moves into the action strip one tap deeper. That
-            is the right way round for a nursery: collecting children is the
+            is the right way round for a nursery: checking children out is the
             gesture repeated forty times a morning while undo stays the rare
             correction. Nothing is lost — the strip carries it for both states.
           */}
@@ -419,7 +419,7 @@ export const StudentRow = memo(function StudentRow({
                 aria-busy={busy || undefined}
                 aria-label={
                   gone
-                    ? `Put ${name}${gradeClause} back in the room — collected at ${formatClock(attendance.checkedOutAt!)}`
+                    ? `Put ${name}${gradeClause} back in the room — checked out at ${formatClock(attendance.checkedOutAt!)}`
                     : tracksCheckOut
                       ? `Check out ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
                       : `Undo check-in for ${name}${gradeClause}, checked in at ${formatClock(attendance.checkedInAt)}`
@@ -466,7 +466,7 @@ export const StudentRow = memo(function StudentRow({
             )}
           >
             {/*
-              Undo the *check-in*, in both states. On a collected row that
+              Undo the *check-in*, in both states. On a checked-out row that
               deletes the record and takes the pickup with it, which is right:
               a pickup recorded against somebody who was never here is not
               worth keeping either.

@@ -4,7 +4,7 @@
  * A tablet on a stand in a lobby is the one Tally surface nobody is holding.
  * The screen is a metre from a parent's face, angled away, and often being
  * looked past rather than at — so the vibrator carries feedback the eyes may
- * never collect: the key took, the child is checked in.
+ * never check out: the key took, the child is checked in.
  *
  * These pin the deliberate asymmetry between the three. Keys buzz on contact,
  * every one of them, including the presses the buffer refuses — a key reports

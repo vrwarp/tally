@@ -158,7 +158,7 @@ export async function swapCheckIn(args: {
       checkedInAt: from.checkedInAt,
       // A check-out deliberately does not travel. The arrival moment is copied
       // because only *who* was wrong about it — but a pickup recorded against
-      // the wrong child is a statement about a parent who collected somebody
+      // the wrong child is a statement about a parent who checked out somebody
       // else's kid, and there is nothing in it worth preserving. The corrected
       // record starts present; if the right child has already gone home,
       // somebody checks them out again.
@@ -184,7 +184,7 @@ export async function undoCheckIn(eventId: string, studentId: string): Promise<v
 }
 
 /**
- * Records that somebody collected a student, on an event that tracks check-out.
+ * Records that somebody checked a student out, on an event that tracks check-out.
  *
  * `updateDoc` rather than `setDoc`, for two reasons that both matter. A pickup
  * for a child nobody checked in is a bug, and this fails rather than inventing
@@ -291,7 +291,7 @@ const ATTENDANCE_READ_CONCURRENCY = 12;
  * reads it as a sequence.
  *
  * `present` is everyone with a record — the head count, unchanged by check-out.
- * `checkedOut` is the subset that was collected, always a subset, and read from
+ * `checkedOut` is the subset that was checked out, always a subset, and read from
  * the same documents at the same cost.
  */
 export interface EventAttendanceIds {

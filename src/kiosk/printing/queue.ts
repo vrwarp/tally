@@ -15,7 +15,7 @@
  * **It is not durable.** Deliberately, and unlike the check-in retry queue in
  * `services.ts`, which persists to localStorage and replays for as long as it
  * takes. A check-in is a fact about the evening and is worth landing late. A
- * label is worth nothing late: a sticker for a child who was collected twenty
+ * label is worth nothing late: a sticker for a child who was checked out twenty
  * minutes ago is litter on the floor, and one queued before a reboot is a
  * mystery in a stack of unclaimed badges. So the queue lives in memory, is
  * bounded, and drops anything that has gone stale on the way to the head.

@@ -829,7 +829,7 @@ export function applyRegistration(result: {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Who is already checked in, and who has been collected — one explicit read,
+ * Who is already checked in, and who has been checked out — one explicit read,
  * no listener.
  *
  * The register used to be reduced to its ids on the way past. A pickup screen
@@ -979,7 +979,7 @@ export async function performCheckIn(args: {
  * for a child nobody checked in fails rather than inventing a record.
  *
  * No undo counterpart, deliberately. The kiosk has never offered one for
- * check-in either — a bystander clearing a collection somebody witnessed is
+ * check-in either — a bystander clearing a check-out somebody witnessed is
  * not a self-serve action — and the rules enforce that rather than trusting
  * this file to keep the promise.
  */

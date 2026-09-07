@@ -58,7 +58,7 @@ function asEvent(
     notes: source.notes,
     requiresRsvp: false,
     // Inherited, unlike `requiresRsvp` above, and for the mirror-image reason:
-    // a room children are collected from is exactly the kind of gathering that
+    // a room children are checked out from is exactly the kind of gathering that
     // repeats every Sunday, and these projections are the Sundays a volunteer
     // actually opens.
     requiresCheckOut: source.requiresCheckOut,

@@ -136,7 +136,7 @@ would make un-cancelling the only way to stop a cancelled night counting as ever
 ### 4. Check-out is a ternary state, and it never touches attendance
 
 `events/{eventId}.requiresCheckOut` turns the roster ternary: absent (no document), present
-(a document with no `checkedOutAt`), collected (a document with one). It is for a room children are
+(a document with no `checkedOutAt`), checked out (a document with one). It is for a room children are
 handed back from rather than a register of who came — a nursery, where the number a volunteer needs
 mid-service is not how many arrived but how many are still here.
 
@@ -163,7 +163,7 @@ otherwise either fail or overwrite the provenance of the arrival. It touches `ch
 `checkedOutBy` and nothing else, so the rest of the record survives being handed on.
 
 **The kiosk may record a first pickup, and only that.** It may not move one already standing and may
-not undo — correcting a recorded collection is a staff decision made on the roster, not something an
+not undo — correcting a recorded check-out is a staff decision made on the roster, not something an
 unattended lobby screen does. The rules enforce that rather than trusting the client to.
 
 ### 5. Tally does not track money or paperwork
@@ -287,7 +287,7 @@ One dated gathering.
 | `location` | string \| null | |
 | `notes` | string \| null | For the core team. Shown on the event page only — see `description` above. |
 | `requiresRsvp` | boolean | Closes a one-off's roster to the students who RSVP'd. A one-off with no explicit flag still defaults to one. |
-| `requiresCheckOut` | boolean | Turns the roster ternary: children are checked in and then collected. Off by default and unconditionally — unlike `requiresRsvp`, nothing about a gathering's shape implies it. Inherited by projected occurrences, because a nursery is exactly the kind of gathering that repeats. |
+| `requiresCheckOut` | boolean | Turns the roster ternary: children are checked in and then checked out. Off by default and unconditionally — unlike `requiresRsvp`, nothing about a gathering's shape implies it. Inherited by projected occurrences, because a nursery is exactly the kind of gathering that repeats. |
 | `labelTemplate` | object \| null | What the kiosk prints when a child is checked in here — `{ lines: [{ text, size, bold, align }], copies }`, where `text` may contain `{{firstName}}`-style tokens. Null means this gathering prints nothing, which is the default: a printer plugged in for the nursery must not start producing stickers at youth group. Content and layout only — no label size, no printer model, because which roll is loaded is a fact about the kiosk in the lobby and lives in *its* localStorage. Inherited by projected occurrences alongside `requiresCheckOut`, and carried onto the kiosk's chooser row because the kiosk never reads an event document. Shape pinned by the rules for the same reason `recurrence` is: a screen on a shelf expands it and nobody is standing there. See [`src/lib/labelTemplate.ts`](../src/lib/labelTemplate.ts). |
 | `kioskTheme` | object \| null | What a lobby kiosk looks like while it is bound to this gathering — `{ ground, accent, confirm, backdrop }`, where the ground is `dark` or `light` and the other three are hue *names* from the wheel in [`src/lib/kioskTheme.ts`](../src/lib/kioskTheme.ts). Null is the ordinary answer and means the kiosk that shipped. The three slots are named for the job each does — what you touch, what just happened, the wash on the page — because the kiosk's palette is already semantic and has no second or third *tier* to rank. `warn` is deliberately not among them: it is what an allergy line is painted in, on screen and on the label, and no gathering may recolour it. Stored by name, like `icon`, so a colour can be corrected without rewriting anybody's events; an unknown name reads as that slot's default. Inherited by projected occurrences alongside `labelTemplate`. Never read by the kiosk in this form — `functions/src/kiosk/events.ts` turns the names into finished hex while building the chooser row, because OKLCH and a gamut search are not work for a screen on a shelf. |
 | `kioskBackdropId` | string \| null | The photograph a lobby kiosk stands behind its idle screen while bound here, as the id of a [`kioskBackdrops/{backdropId}`](#kioskbackdropsbackdropid) document. The pointer and never the pixels, because this collection is read wholesale by the kiosk chooser and subscribed by the calendar — a photo riding those reads would bill every screen for one gathering's decoration. Content-addressed (`b` + a prefix of the image's SHA-256), so the id is also the revision and replacing the photo means a new id. Null is the ordinary answer. Inherited by projected occurrences alongside `kioskTheme`, and carried onto the chooser row as `backdropId`. See [`src/lib/kioskBackdrop.ts`](../src/lib/kioskBackdrop.ts). |
@@ -320,7 +320,7 @@ chain's own instances — so removing the last one empties the calendar ahead. I
 | `checkedInBy` | string | Must equal the caller's uid — enforced by rules for client writes. Rows imported from Planning Center Check-Ins carry the sentinel `'planning-center'` instead (written by the Admin SDK, which rules do not govern). |
 | `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual' \| 'import' \| 'kiosk'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. `import` marks a row that came from Check-Ins history rather than from anybody's thumb; `kiosk` marks a self-serve tap in the lobby. |
 | `isFirstEver` | boolean | True when this was the student's first ever check-in. |
-| `checkedOutAt` | Timestamp, or **absent** | When somebody collected them, on an event with `requiresCheckOut`. The key being absent is the whole "still in the room" state, so it is never written as null — see below. |
+| `checkedOutAt` | Timestamp, or **absent** | When somebody checked them out, on an event with `requiresCheckOut`. The key being absent is the whole "still in the room" state, so it is never written as null — see below. |
 | `checkedOutBy` | string, or absent | Who recorded the pickup. Deliberately not required to equal `checkedInBy`: the volunteer who takes a child in is rarely the one who hands them back. |
 | `arrivalId` | string, or **absent** | Who came through the door together — the same opaque value on every child one press of the kiosk's confirm button put on the register. Written only by the kiosk; the main app checks students in one at a time and makes no claim. Rules pin it to a non-empty string of at most 64 characters. |
 
@@ -582,7 +582,7 @@ the parents arrive — the screen unbound itself, mid-queue, exactly when it was
 together; fixing only one leaves a kiosk that survives until somebody reloads it. `max` rather than
 `checkInClosesAt` alone because the rules only require that field to be a timestamp, so a seed or a
 migration can produce a window that closes before its event ends, and taking the later of the two
-cannot shorten any binding. A gathering that has ended but is still collecting appears in the
+cannot shorten any binding. A gathering that has ended but is still checking children out appears in the
 chooser labelled `Ended — pickup only`.
 
 **And the kiosk hands itself back on its own.** A minute-by-minute clock in `KioskApp.tsx` puts the
@@ -653,7 +653,7 @@ any student. Readable by any active member — the kiosk session is one.
 
 **Read backwards, it is also the kiosk's family.** Inverting the map gives each student the set of
 digits their family answers to, which is what lets the confirm screen offer to check the other
-children on that number in — or collect them — in the same tap
+children on that number in — or check them out — in the same tap
 ([`src/kiosk/family.ts`](../src/kiosk/family.ts)). Two students count as family only when one's set
 of digits contains the other's, never on a bare overlap: because each collector aggregates over
 household or family-folk co-membership, real siblings always land on the same set (or a superset,

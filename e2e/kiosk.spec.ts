@@ -36,13 +36,13 @@ async function eventNamed(title: string): Promise<{ id: string; title: string }>
 }
 
 /**
- * A gathering that finished half an hour ago and is still collecting.
+ * A gathering that finished half an hour ago and is still checking children out.
  *
  * `endAt` in the past, `checkInClosesAt` an hour out — the exact window a
  * nursery kiosk lives in while parents arrive.
  */
-async function seedCollectingGathering(): Promise<string> {
-  const id = 'nursery-collecting';
+async function seedCheckingOutGathering(): Promise<string> {
+  const id = 'nursery-checking-out';
   const now = Date.now();
   const minutes = (offset: number) => new Date(now + offset * 60_000);
 
@@ -76,7 +76,7 @@ async function seedCollectingGathering(): Promise<string> {
  * A child per test, searched by name.
  *
  * The suite runs one worker against one dataset and `checkout.spec.ts` sorts
- * ahead of this file, so anyone it collected is already past the point these
+ * ahead of this file, so anyone it checked out is already past the point these
  * tests want to start from. Distinct names keep each flow starting from
  * "absent".
  *
@@ -89,7 +89,7 @@ async function seedCollectingGathering(): Promise<string> {
  */
 const CHECKED_IN = 'Josiah Mensah';
 const COLLECTED = 'Caleb Okafor';
-/** Checked in on the Nursery, which prints, and then collected. */
+/** Checked in on the Nursery, which prints, and then checked out. */
 const LABELLED = 'Nia Washington';
 /** Checked in on Friday Fellowship, which does not print. */
 const UNLABELLED = 'Micah Sullivan';
@@ -171,7 +171,7 @@ test.describe('the kiosk', () => {
     }
   });
 
-  test('renders a present child as collectable, and records the pickup', async ({
+  test('renders a present child as checkable out, and records the pickup', async ({
     browser,
     page,
     signedInAs,
@@ -185,7 +185,7 @@ test.describe('the kiosk', () => {
       const nursery = await eventNamed('Nursery');
       await bindTo(kiosk, /nursery/i);
 
-      // Check in, land back on a cleared home screen, search again, collect.
+      // Check in, land back on a cleared home screen, search again, check out.
       const row = await findOnKiosk(kiosk, COLLECTED);
       await row.click();
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
@@ -196,15 +196,15 @@ test.describe('the kiosk', () => {
       await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
-      const collectable = kiosk.getByText(/tap to collect/i).first();
-      await expect(collectable).toBeVisible({ timeout: 15_000 });
-      await collectable.click();
+      const checkOutRow = kiosk.getByText(/tap to check out/i).first();
+      await expect(checkOutRow).toBeVisible({ timeout: 15_000 });
+      await checkOutRow.click();
 
       // One press, the same as the arrival — the gesture the pickup used to
       // cost is gone; see the note at the top of ConfirmScreen for the trade.
       // A real press rather than a synthesised click, because the button
       // commits on the lift and only if the lift lands inside it.
-      const button = kiosk.getByRole('button', { name: /^Collect$/ });
+      const button = kiosk.getByRole('button', { name: /^Check out$/ });
       await expect(button).toBeVisible();
       const box = (await button.boundingBox())!;
       await kiosk.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -240,13 +240,13 @@ test.describe('the kiosk', () => {
    * about, and this one exists for exactly one assertion. Removed on the way
    * out, the way the Attendees specs sweep up after themselves.
    */
-  test('still offers a gathering that has ended but is still collecting', async ({
+  test('still offers a gathering that has ended but is still checking children out', async ({
     browser,
     page,
     signedInAs,
   }) => {
     await signedInAs('core');
-    const id = await seedCollectingGathering();
+    const id = await seedCheckingOutGathering();
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
@@ -283,13 +283,13 @@ test.describe('the kiosk', () => {
       // The confirm screen offers a check-in or says they are already done.
       // What it must never offer here is a pickup: the flag gates the flow,
       // and this gathering does not carry it.
-      await expect(kiosk.getByRole('button', { name: /^Collect/ })).toHaveCount(0);
+      await expect(kiosk.getByRole('button', { name: /^Check out/ })).toHaveCount(0);
       await expect(
         kiosk.getByRole('button', { name: /^Check in$/ }).or(kiosk.getByText(/already checked in/i)),
       ).toBeVisible();
 
       await kiosk.getByRole('button', { name: /back/i }).click();
-      await expect(kiosk.getByText(/tap to collect/i)).toHaveCount(0);
+      await expect(kiosk.getByText(/tap to check out/i)).toHaveCount(0);
     } finally {
       await context.close();
     }
@@ -473,7 +473,7 @@ test.describe('the kiosk', () => {
    * The seeded Nursery carries a template (see `scripts/seed.ts`); Friday
    * Fellowship deliberately does not.
    */
-  test('prints one label for a check-in, and none for a collection', async ({
+  test('prints one label for a check-in, and none for a check-out', async ({
     browser,
     browserName,
     page,
@@ -510,15 +510,15 @@ test.describe('the kiosk', () => {
       expect(label!.pageCount).toBe(1);
       expect(label!.bytes).toBeGreaterThan(10_000);
 
-      // Now collect the same child — searched for again, because the tick
+      // Now check the same child out — searched for again, because the tick
       // returns to an empty screen. Handing them back produces no sticker — the
       // label went on at the door — so the count must not move.
       await kiosk.getByText(/welcome/i).click();
       await findOnKiosk(kiosk, LABELLED);
-      const collectable = kiosk.getByText(/tap to collect/i).first();
-      await expect(collectable).toBeVisible({ timeout: 15_000 });
-      await collectable.click();
-      await kiosk.getByRole('button', { name: /^Collect$/ }).click();
+      const checkOutRow = kiosk.getByText(/tap to check out/i).first();
+      await expect(checkOutRow).toBeVisible({ timeout: 15_000 });
+      await checkOutRow.click();
+      await kiosk.getByRole('button', { name: /^Check out$/ }).click();
       await expect(kiosk.getByText(/checked out/i)).toBeVisible({ timeout: 15_000 });
 
       expect(await recordedLabels(kiosk)).toHaveLength(1);

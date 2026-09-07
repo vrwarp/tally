@@ -44,7 +44,7 @@ export function SuccessScreen({
     return () => clearTimeout(timer);
   }, []);
 
-  const collected = intent === 'check-out';
+  const checkedOut = intent === 'check-out';
   const many = students.length > 1;
   const names = joinNames(students.map((student) => student.firstName));
 
@@ -58,16 +58,16 @@ export function SuccessScreen({
     >
       <div
         className={`flex h-36 w-36 shrink-0 items-center justify-center rounded-full text-8xl text-white ${
-          collected ? 'bg-brand-600' : 'bg-present-600'
+          checkedOut ? 'bg-brand-600' : 'bg-present-600'
         }`}
       >
-        {collected ? '👋' : '✓'}
+        {checkedOut ? '👋' : '✓'}
       </div>
       <div>
         {/* Three names need to fit; one still gets the whole 5xl to itself. */}
         <div className={`font-bold text-ink-50 ${many ? 'text-4xl' : 'text-5xl'}`}>{names}</div>
         <div className="pt-3 text-2xl text-ink-300">
-          {collected
+          {checkedOut
             ? `${many ? 'are' : 'is'} checked out. See you next time!`
             : intent === 'done'
               ? `${many ? 'were' : 'was'} already checked in.`

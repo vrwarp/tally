@@ -873,7 +873,7 @@ describe('attendance', () => {
 });
 
 /**
- * Recording that somebody collected a child.
+ * Recording that somebody checked a child out.
  *
  * `ID.student` is seeded as already checked in, by `UID.counselor`. The claim
  * that matters most here is the first one: the volunteer who takes a child in
@@ -998,7 +998,7 @@ describe('the attendance freeze (upstreamRecordMissing)', () => {
    * system of record no longer holds is exactly as unreconcilable as an
    * arrival, and the volunteer at the door would never learn it had failed.
    */
-  it('refuses to collect a frozen student', async () => {
+  it('refuses to check out a frozen student', async () => {
     await seedFrozenStudent(ID.student);
     const db = asUser(env, UID.counselor);
     await assertFails(

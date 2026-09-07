@@ -347,7 +347,7 @@ is nothing to press. The reasoning, and the wider parent-facing reprint that was
 refused twice, are in [kiosk-reprint.md](kiosk-reprint.md).
 
 Labels are not queued across a reboot, deliberately and unlike check-ins. A
-sticker for a child collected twenty minutes ago is litter; one printed after a
+sticker for a child checked out twenty minutes ago is litter; one printed after a
 restart is a mystery in a stack of unclaimed badges. Anything more than two
 minutes stale is dropped.
 

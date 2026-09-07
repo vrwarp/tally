@@ -97,7 +97,7 @@ type Phase = 'booting' | 'pairing' | 'choosing' | 'printer' | 'ready';
  *
  * `intent` is what a confirm would do, decided once when the row is tapped so
  * the confirm and the success screen cannot disagree — a register refresh
- * landing mid-tap must not turn "Collect" into "already checked in" under a
+ * landing mid-tap must not turn "Check out" into "already checked in" under a
  * parent's thumb.
  */
 export type KioskIntent = 'check-in' | 'check-out' | 'done';
@@ -1055,7 +1055,7 @@ export function KioskApp() {
    *
    * On a gathering that does not track check-out this is the behaviour the
    * kiosk has always had: check them in, or tell them they already are. Where
-   * it does, a present child becomes collectable and a collected one is done.
+   * it does, a present child becomes a check-out and a checked-out one is done.
    */
   /**
    * Whether this gathering produces stickers at all.
@@ -1106,7 +1106,7 @@ export function KioskApp() {
    *   there is nothing to configure and nothing to turn off.
    * - anyone on tonight's register is always findable, whatever the aggregate
    *   said at 03:20. They are in the building — a parent must be able to
-   *   collect them — and it covers the family who registered at this kiosk
+   *   check them out — and it covers the family who registered at this kiosk
    *   twenty minutes ago.
    * - `widened`, the "Search everyone" row on the no-match panel.
    *
@@ -1291,7 +1291,7 @@ export function KioskApp() {
    * The brothers and sisters this tap could cover.
    *
    * Only the ones the confirm would do the *same* thing to. A screen that
-   * offered to collect a sibling under a "Check in" button would be two actions
+   * offered to check out a sibling under a "Check in" button would be two actions
    * wearing one, and the dangerous one is not the one being read.
    *
    * Nothing is offered alongside `done`: that screen has no button to put an
@@ -1404,7 +1404,7 @@ export function KioskApp() {
        * checked in and quietly not do it.
        *
        * Check-in only. A pickup is never premature — a child cannot be
-       * collected from an evening they were not checked into, so the presence
+       * checked out from an evening they were not checked into, so the presence
        * that makes `check-out` reachable already proves the window opened —
        * and `done` writes nothing at all.
        */
@@ -1436,7 +1436,7 @@ export function KioskApp() {
             .performCheckOut({ eventId: binding.eventId, studentId: student.id, uid })
             .catch((error: { code?: string }) => {
               // Refused outright — a pickup already stands, and only staff may
-              // move one. The row stays collected because it is.
+              // move one. The row stays checked out because it is.
               if (error.code?.includes('permission-denied')) return;
               services.enqueueCheckOut({ binding, student, uid });
             });
@@ -1453,7 +1453,7 @@ export function KioskApp() {
       /*
        * One id for this press, recorded locally at the same time as the tick.
        *
-       * Locally as well as upstream because a family can be collected before
+       * Locally as well as upstream because a family can be checked out before
        * the register has been re-read — a parent who drops a child and comes
        * straight back for a forgotten coat is inside the poll interval — and
        * the pickup screen would otherwise have to fall back to the guess for
@@ -2259,7 +2259,7 @@ export function KioskApp() {
            *
            * Only for a check-in, because only a check-in prints. On a gathering
            * that tracks check-out, most taps once the room has filled are
-           * collections, and rasterising for those is work thrown away.
+           * check-outs, and rasterising for those is work thrown away.
            *
            * Only the siblings arriving *ticked*, for the same reason: a child
            * the prediction does not expect is more likely than not to be

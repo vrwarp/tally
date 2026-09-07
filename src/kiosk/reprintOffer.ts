@@ -61,7 +61,7 @@ export const OFFER_WINDOW_MS = 10 * 60_000;
  *
  * `intent` and `family` are already decided there and for the same reason,
  * written at the top of `KioskApp.tsx`: a register refresh landing mid-tap must
- * not turn "Collect" into "already checked in" under a parent's thumb. This is
+ * not turn "Check out" into "already checked in" under a parent's thumb. This is
  * the same hazard one control further on. The offer used to be recomputed on
  * every render, and this screen re-renders on a five-minute register poll, on a
  * printer state change, and on the ten-minute boundary itself — so a parent two

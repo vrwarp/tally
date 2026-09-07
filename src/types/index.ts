@@ -726,7 +726,7 @@ export interface TallyEventDoc {
   /**
    * Turns the roster ternary: a student can be checked in, and then checked out.
    *
-   * For a room somebody is collected from rather than simply attends — a
+   * For a room somebody is checked out from rather than simply attends — a
    * nursery, where the number a volunteer needs mid-service is not how many
    * came but how many are still here. Off by default and unconditionally:
    * unlike `requiresRsvp`, which follows from `mode`, nothing about a
@@ -744,7 +744,7 @@ export interface TallyEventDoc {
    * loaded is a fact about the machine in the lobby, so it lives on the kiosk
    * itself; see `lib/labelTemplate.ts` for the whole argument. Carried onto
    * projected occurrences the way `requiresCheckOut` is, because a room children
-   * are collected from is exactly the kind of gathering that repeats.
+   * are checked out from is exactly the kind of gathering that repeats.
    */
   labelTemplate: LabelTemplate | null;
 
@@ -843,7 +843,7 @@ export interface AttendanceRecordDoc {
   /** First time this student has ever been marked present at anything. */
   isFirstEver: boolean;
   /**
-   * When somebody collected them, on an event that tracks check-out.
+   * When somebody checked them out, on an event that tracks check-out.
    *
    * The key is *absent* while they are still in the room — not null. A
    * `serverTimestamp()` sentinel reads back as null locally until the write
@@ -1770,7 +1770,7 @@ export interface EventAttendanceSnapshot {
    * not touch it — every metric built on attendance reads this and only this.
    */
   presentStudentIds: ReadonlySet<string>;
-  /** The subset who were collected. Always a subset of the above. */
+  /** The subset who were checked out. Always a subset of the above. */
   checkedOutStudentIds: ReadonlySet<string>;
   /** Whether anybody at all was checked in. Never inferred from the set above. */
   held: boolean;

@@ -1431,7 +1431,7 @@ describe('buildRoster: empty inputs', () => {
 /**
  * The room, as distinct from the register.
  *
- * `present` is attendance and does not move when somebody is collected — every
+ * `present` is attendance and does not move when somebody is checked out — every
  * dashboard metric reads it, and a missed pickup must never reduce a head
  * count. `inRoom` is the number a nursery volunteer is actually working from.
  */
@@ -1440,15 +1440,15 @@ describe('buildRoster: check-out', () => {
   const ada = makeStudent({ id: 'ada', lastName: 'Abara' });
   const bo = makeStudent({ id: 'bo', lastName: 'Brook' });
 
-  /** Both students checked in; `collected` have been handed back. */
-  const withPickups = (collected: readonly string[]) => ({
+  /** Both students checked in; `checkedOut` have been handed back. */
+  const withPickups = (checkedOut: readonly string[]) => ({
     event: nursery,
     students: [ada, bo],
     attendance: [ada, bo].map((student) =>
       makeAttendance({
         studentId: student.id,
         eventId: nursery.id,
-        checkedOutAt: collected.includes(student.id) ? new Date('2026-02-15T10:15:00') : null,
+        checkedOutAt: checkedOut.includes(student.id) ? new Date('2026-02-15T10:15:00') : null,
       }),
     ),
     rsvps: [],

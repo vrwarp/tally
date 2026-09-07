@@ -24,7 +24,7 @@ export interface EventHeaderProps {
   present: number;
   eligible: number;
   /**
-   * Checked in and not yet collected, on a gathering that tracks check-out.
+   * Checked in and not yet checked out, on a gathering that tracks check-out.
    *
    * When it does, this is the number the header leads with: it is the entire
    * reason the feature exists, and the attendance total moves beside it rather

@@ -793,11 +793,11 @@ export function EventEditorModal({
           ) : null}
 
           {/* Outside the one-off block, and deliberately not reset by a mode
-              change: a room children are collected from is most often the one
+              change: a room children are checked out from is most often the one
               that repeats every Sunday. */}
           <CheckboxField
             label="Track check-out"
-            hint="Volunteers record when each child is collected, and the roster shows a live room count."
+            hint="Volunteers record when each child is checked out, and the roster shows a live room count."
             checked={form.requiresCheckOut}
             onChange={(changed) => patch({ requiresCheckOut: changed.target.checked })}
           />

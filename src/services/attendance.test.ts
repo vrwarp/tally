@@ -282,7 +282,7 @@ describe('swapCheckIn', () => {
    * The arrival moment travels; the pickup does not.
    *
    * A check-out recorded against the wrong child is a statement about a parent
-   * who collected somebody else's kid — there is nothing in it worth keeping.
+   * who checked out somebody else's kid — there is nothing in it worth keeping.
    * The corrected record starts present, and if the right child has already
    * gone home somebody checks them out again.
    */
@@ -468,7 +468,7 @@ describe('fetchAttendanceByEvent', () => {
   it('tells who has gone home apart from who is present', async () => {
     /*
      * Two sets off one read, and they have to stay apart: `present` is everyone
-     * on the register, `checkedOut` only those a parent has collected. A screen
+     * on the register, `checkedOut` only those a parent has checked out. A screen
      * that conflated them would show an empty room at the end of the night, and
      * the check-out button is what a leader uses to know who is still in it.
      */
@@ -477,7 +477,7 @@ describe('fetchAttendanceByEvent', () => {
         { id: 'gone-home', get: (key: string) => (key === 'checkedOutAt' ? 'a-timestamp' : null) },
         { id: 'still-here', get: () => null },
         // A pending `serverTimestamp()` reads back null locally — the same
-        // state as never having been collected, which is the honest answer
+        // state as never having been checked out, which is the honest answer
         // until the write lands.
         { id: 'pending', get: (key: string) => (key === 'checkedOutAt' ? undefined : null) },
       ],

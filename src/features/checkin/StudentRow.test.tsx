@@ -60,8 +60,8 @@ function show(entry: RosterEntry, props: Partial<StudentRowProps> = {}) {
   return { ...view, onPress, onUndo, onSwap };
 }
 
-/** Checked in, then collected at a quarter past ten. */
-function collected(student: Student): RosterEntry {
+/** Checked in, then checked out at a quarter past ten. */
+function checkedOut(student: Student): RosterEntry {
   return entryFor(
     student,
     makeAttendance({
@@ -282,7 +282,7 @@ describe('StudentRow', () => {
  *
  * On a gathering that hands children back, `Out` takes the one-tap slot and
  * undo moves into the action strip one tap deeper — which is the right way
- * round when collecting is the gesture repeated forty times a morning and undo
+ * round when checking out is the gesture repeated forty times a morning and undo
  * is the rare correction. Nothing is lost: the strip carries undo in both
  * states.
  */
@@ -314,8 +314,8 @@ describe('StudentRow: check-out', () => {
     expect(onUndo).toHaveBeenCalledWith(entry);
   });
 
-  it('puts a collected student back from the same slot', async () => {
-    const entry = collected(JORDAN);
+  it('puts a checked-out student back from the same slot', async () => {
+    const entry = checkedOut(JORDAN);
     const { onUndoCheckOut } = withCheckOut(entry);
 
     await userEvent.click(
@@ -325,8 +325,8 @@ describe('StudentRow: check-out', () => {
   });
 
   /** Stated, not flagged: a missed check-out is not an error. */
-  it('says when they were collected, without a warning colour', () => {
-    withCheckOut(collected(JORDAN));
+  it('says when they were checked out, without a warning colour', () => {
+    withCheckOut(checkedOut(JORDAN));
 
     expect(screen.getByText(/^Out \d/)).toBeInTheDocument();
     expect(screen.queryByText(/missed|overdue/i)).not.toBeInTheDocument();
@@ -362,7 +362,7 @@ describe('StudentRow: check-out', () => {
     rerender(
       <MemoryRouter>
         <ul>
-          <StudentRow entry={collected(student)} onPress={vi.fn()} tracksCheckOut />
+          <StudentRow entry={checkedOut(student)} onPress={vi.fn()} tracksCheckOut />
         </ul>
       </MemoryRouter>,
     );

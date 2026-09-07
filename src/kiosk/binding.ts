@@ -199,7 +199,7 @@ export function windowHasClosed(binding: KioskBinding, nowMs: number): boolean {
  *
  * The counterpart `windowHasClosed` never had, and the asymmetry between them
  * is the point. A closed window is advisory — the kiosk says so and keeps
- * working, because a family collected at 21:10 from a gathering whose doors
+ * working, because a family checked out at 21:10 from a gathering whose doors
  * shut at 20:00 still walked out of the building. A window that has not opened
  * is a refusal: nobody can have arrived at an evening that has not happened,
  * and a kiosk bound to next Wednesday by a thumb one row off would otherwise
