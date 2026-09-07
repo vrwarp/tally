@@ -81,6 +81,7 @@ import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 import { NotOpenScreen } from './screens/NotOpenScreen';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
@@ -322,6 +323,7 @@ function isQuietHour(): boolean {
 
 export function KioskApp() {
   tallyRender('KioskApp');
+  const tDoor = useTranslations('Door');
   const grades = useGrades();
   const [phase, setPhase] = useState<Phase>('booting');
   const [services, setServices] = useState<KioskServices | null>(null);
@@ -1977,7 +1979,7 @@ export function KioskApp() {
         return (
           <>
             {backdrop}
-            <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
+            <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>
           </>
         );
       }
@@ -2200,7 +2202,7 @@ export function KioskApp() {
           {backdrop}
           <StaffSession onReturn={leaveStaff}>
             {overlay.kind === 'printer' && !printing ? (
-              <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>
+              <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>
             ) : (
               staffScreen
             )}
@@ -2419,5 +2421,5 @@ export function KioskApp() {
   }
 
   // Waiting on the services chunk for a screen that needs it.
-  return <div className="flex h-full items-center justify-center text-ink-500">Loading…</div>;
+  return <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>;
 }

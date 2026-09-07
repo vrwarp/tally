@@ -38,7 +38,7 @@ export const LOCALES = ['en', 'zh-Hans', 'zh-Hant'];
  * `src/kiosk/` naming something absent here would render its own key on a
  * screen a parent is standing at, so the test fails instead.
  */
-export const KIOSK_NAMESPACES = ['Grades'];
+export const KIOSK_NAMESPACES = ['Chooser', 'Confirm', 'Door', 'Grades', 'Search', 'Staff'];
 
 /**
  * The pure-string hooks, and the namespace each one wraps.

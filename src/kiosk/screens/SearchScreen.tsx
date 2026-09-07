@@ -50,6 +50,7 @@ import {
 } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 function gradeLabel(grades: GradeStrings, grade: number | null): string {
   return grade === null ? '' : gradeDescription(grades, grade);
@@ -83,13 +84,14 @@ function WidenButton({
   /** The standing row's weight, beside a keyboard somebody is aiming at. */
   quiet?: boolean;
 }) {
+  const t = useTranslations('Search');
   const tap = useTap();
 
   return (
     <button
       type="button"
       tabIndex={-1}
-      aria-label="Search everyone"
+      aria-label={t('searchEveryone')}
       aria-busy={widening}
       {...tap(() => {
         haptic(quiet ? 8 : undefined);
@@ -107,7 +109,7 @@ function WidenButton({
       style={{ touchAction: 'manipulation' }}
     >
       <span className="relative flex items-center justify-center">
-        <span className={widening ? 'invisible' : undefined}>Search everyone</span>
+        <span className={widening ? 'invisible' : undefined}>{t('searchEveryone')}</span>
         {widening && (
           <span
             className={`absolute block animate-spin rounded-full border-2 border-ink-600 border-t-ink-100 ${
@@ -154,6 +156,7 @@ const SearchHeader = memo(function SearchHeader({
    * exactly.
    */
   tallyRender('SearchHeader');
+  const t = useTranslations('Search');
   return (
     /* The staff gate used to be an invisible square over this corner; it is a
        hold on **Clear** now — see `onStaffGate`. */
@@ -172,7 +175,7 @@ const SearchHeader = memo(function SearchHeader({
         */}
       {printerNeedsAttention && (
         <span
-          aria-label="The label printer needs attention"
+          aria-label={t('printerNeedsAttention')}
           className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
         />
       )}
@@ -243,18 +246,27 @@ const SearchConsole = memo(function SearchConsole({
   offeredAbove,
   canWiden,
   widening,
-  offerPrompt,
+  hasResults,
   onWiden,
   onRegister,
 }: {
   offeredAbove: boolean;
   canWiden: boolean;
   widening: boolean;
-  offerPrompt: string;
+  /**
+   * Whether a search found anybody, which is what the offer's wording turns on.
+   *
+   * The boolean rather than the finished sentence, now the sentence comes out
+   * of the catalogue: a `t` call inside a memoized component is as stable as a
+   * string prop, and passing the words in would have the parent build them
+   * twice for the two widths below.
+   */
+  hasResults: boolean;
   onWiden: () => void;
   onRegister: () => void;
 }) {
   tallyRender('SearchConsole');
+  const t = useTranslations('Search');
   const tap = useTap();
 
   return (
@@ -337,11 +349,13 @@ const SearchConsole = memo(function SearchConsole({
             */}
           {canWiden ? (
             <>
-              <span className="sm:hidden">Not yours?&nbsp;Register</span>
-              <span className="hidden sm:inline">{offerPrompt}&nbsp;Register your child</span>
+              <span className="sm:hidden">{t('offerShort')}</span>
+              <span className="hidden sm:inline">
+                {hasResults ? t('offerNotYours') : t('offerFirstTime')}
+              </span>
             </>
           ) : (
-            <>{offerPrompt}&nbsp;Register your child</>
+            <>{hasResults ? t('offerNotYours') : t('offerFirstTime')}</>
           )}
         </button>
       )}
@@ -377,6 +391,7 @@ const ResultRow = memo(function ResultRow({
 }) {
   const grades = useGrades();
   tallyRender('ResultRow');
+  const t = useTranslations('Search');
   const inert = present && !tracksCheckOut;
   return (
     <button
@@ -411,11 +426,11 @@ const ResultRow = memo(function ResultRow({
       </span>
       <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
         {checkedOut ? (
-          <span className="font-semibold text-ink-400">Checked out</span>
+          <span className="font-semibold text-ink-400">{t('checkedOut')}</span>
         ) : present && tracksCheckOut ? (
-          <span className="font-semibold text-brand-300">Tap to check out</span>
+          <span className="font-semibold text-brand-300">{t('tapToCheckOut')}</span>
         ) : present ? (
-          <span className="font-semibold text-present-400">✓ Checked in</span>
+          <span className="font-semibold text-present-400">{t('checkedIn')}</span>
         ) : (
           gradeLabel(grades, student.grade)
         )}
@@ -483,6 +498,7 @@ export function SearchScreen({
   onStaffGate: () => void;
 }) {
   tallyRender('SearchScreen');
+  const t = useTranslations('Search');
   const now = Date.now();
   const closed = windowHasClosed(binding, now);
   /*
@@ -514,9 +530,9 @@ export function SearchScreen({
    * one of these strings actually changes — see SearchHeader.
    */
   const headerLine = notOpenYet
-    ? `Check-in opens ${opensAtLabel(binding, now)}`
+    ? t('opensWhen', { when: opensAtLabel(binding, now) })
     : closed
-      ? 'Check-in window has closed — you can still check in.'
+      ? t('windowClosed')
       : hours;
 
   /*
@@ -557,7 +573,7 @@ export function SearchScreen({
    * theirs. And it stays the quiet weight, because most matches are real and a
    * screen that doubted itself loudly would make a correct answer feel wrong.
    */
-  const offerPrompt = outcome.results.length > 0 ? 'Not your family?' : 'First time here?';
+  const hasResults = outcome.results.length > 0;
 
   /*
    * A row commits on lift, not on contact, because this list scrolls — see
@@ -874,8 +890,10 @@ export function SearchScreen({
                   one unit, set tight; what happens next is separated by air
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
-              <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">Type a name</div>
-              <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>or the last 4 digits of your phone</div>
+              <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">
+                {t('typeAName')}
+              </div>
+              <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>{t('orLastFour')}</div>
               {/*
                 * What happens next, said before it has to be guessed.
                 *
@@ -911,7 +929,7 @@ export function SearchScreen({
           )}
           {outcome.mode === 'phone-partial' && (
             <div className="pt-6 text-center text-lg text-ink-400">
-              Enter all 4 digits of a phone number in your family.
+              {t('enterAllFour')}
             </div>
           )}
           {(outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0 && (
@@ -976,11 +994,14 @@ export function SearchScreen({
                       * The word is what changed, so the word is what moves —
                       * animating the sentence would say the sentence is new.
                       */}
-                    <span className="animate-word-pulse text-ink-100">Still</span> no match — first
-                    time here?
+                    {t.rich('stillNoMatch', {
+                      pulse: (chunks) => (
+                        <span className="animate-word-pulse text-ink-100">{chunks}</span>
+                      ),
+                    })}
                   </>
                 ) : (
-                  'No match — first time here?'
+                  t('noMatch')
                 )}
               </div>
               {/*
@@ -1014,13 +1035,13 @@ export function SearchScreen({
                   })}
                   className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
                 >
-                  Register your child
+                  {t('registerYourChild')}
                 </button>
                 <WidenButton widening={widening} onWiden={onWiden} />
               </div>
               {refresh === 'failed' && (
                 <div className="text-base text-ink-500 kiosk:text-lg">
-                  Couldn&apos;t reach the network just now.
+                  {t('networkFailed')}
                 </div>
               )}
               {/*
@@ -1033,7 +1054,7 @@ export function SearchScreen({
                 * not mine" is a real state, and the answer to it — look again,
                 * the church may have added them since — is that control.
                 */}
-              <div className="text-base text-ink-400 kiosk:text-lg">or see a leader.</div>
+              <div className="text-base text-ink-400 kiosk:text-lg">{t('orSeeALeader')}</div>
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => (
@@ -1072,7 +1093,7 @@ export function SearchScreen({
           */}
         {truncated && (
           <div className="mx-auto w-full max-w-2xl pt-2 pb-16 text-center text-base text-ink-400 kiosk:text-lg tall:pb-20 lg:max-w-5xl">
-            More names than fit — keep typing.
+            {t('moreNames')}
           </div>
         )}
       </div>
@@ -1153,7 +1174,7 @@ export function SearchScreen({
         offeredAbove={offeredAbove}
         canWiden={canWiden}
         widening={widening}
-        offerPrompt={offerPrompt}
+        hasResults={hasResults}
         onWiden={steadyWiden}
         onRegister={steadyRegister}
       />

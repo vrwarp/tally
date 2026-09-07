@@ -7378,5 +7378,390 @@
     "source": "Different phone digits on file.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Door.loading": {
+    "source": "Loading…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.notOpenTitle": {
+    "source": "Not open yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.notOpenWhen": {
+    "source": "Check-in opens {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.notThisGathering": {
+    "source": "If that is not this gathering, please see a leader.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.tapToCarryOn": {
+    "source": "Tap anywhere to carry on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.capsLock": {
+    "source": "Caps lock on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.staffReprint": {
+    "source": "Staff · reprint a name tag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.installTitle": {
+    "source": "Install the kiosk app on this device",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.installBody": {
+    "source": "To keep this kiosk on the home screen: Share → Add to Home Screen, then pair the installed app.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.shiftOn": {
+    "source": "Shift on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Door.shift": {
+    "source": "Shift",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.back": {
+    "source": "← Back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkedIn": {
+    "source": "✓ Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkedOutTick": {
+    "source": "{count, plural, one {is} other {are}} checked out. See you next time!",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.alreadyTick": {
+    "source": "{count, plural, one {was} other {were}} already checked in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkedInTick": {
+    "source": "{count, plural, one {is} other {are}} checked in. Welcome!",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.whoElseWith": {
+    "source": "Who else is with {name}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.typeTheirName": {
+    "source": "Type their first or last name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.childsName": {
+    "source": "Child’s name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.noMatchNew": {
+    "source": "No match — are they new?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.addNewChild": {
+    "source": "Not on the list? Add a new child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkingOutAnyoneElse": {
+    "source": "Checking out anyone else?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.anyoneElse": {
+    "source": "Anyone else?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.moreBelow": {
+    "source": "{count, plural, one {1 more below} other {# more below}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.anotherChild": {
+    "source": "Another child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.liftThenHold": {
+    "source": "Lift, then hold again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.holdToPrint": {
+    "source": "Hold to print a name tag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.tagsFromDesk": {
+    "source": "Name tags come from the check-in desk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.tagSentFor": {
+    "source": "Name tag sent for {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.forAnotherAsk": {
+    "source": "For another, ask at the check-in desk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.alreadyCheckedIn": {
+    "source": "✓ Already checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkOutAll": {
+    "source": "Check out all {count}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkOut": {
+    "source": "Check out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkInAll": {
+    "source": "Check in all {count}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Confirm.checkIn": {
+    "source": "Check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.changeEventTitle": {
+    "source": "Change event?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.checkingInTo": {
+    "source": "This kiosk is checking in to <event></event>.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.changeEventWarning": {
+    "source": "Nobody can check in here until somebody picks an event again. If there is a queue at this kiosk, it stops.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.changeEventKept": {
+    "source": "Children already checked in stay checked in, and the register is not changed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.keepCheckingIn": {
+    "source": "Keep checking in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Staff.leaveEvent": {
+    "source": "Leave <event></event>",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.searchEveryone": {
+    "source": "Search everyone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.printerNeedsAttention": {
+    "source": "The label printer needs attention",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.checkedOut": {
+    "source": "Checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.tapToCheckOut": {
+    "source": "Tap to check out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.checkedIn": {
+    "source": "✓ Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.opensWhen": {
+    "source": "Check-in opens {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.windowClosed": {
+    "source": "Check-in window has closed — you can still check in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.notYourFamily": {
+    "source": "Not your family?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.firstTimeHere": {
+    "source": "First time here?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.typeAName": {
+    "source": "Type a name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.orLastFour": {
+    "source": "or the last 4 digits of your phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.enterAllFour": {
+    "source": "Enter all 4 digits of a phone number in your family.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.stillNoMatch": {
+    "source": "<pulse>Still</pulse> no match — first time here?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.noMatch": {
+    "source": "No match — first time here?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.registerYourChild": {
+    "source": "Register your child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.orSeeALeader": {
+    "source": "or see a leader.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.moreNames": {
+    "source": "More names than fit — keep typing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.offerNotYours": {
+    "source": "Not your family? Register your child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.offerFirstTime": {
+    "source": "First time here? Register your child",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.offerShort": {
+    "source": "Not yours? Register",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Search.networkFailed": {
+    "source": "Couldn’t reach the network just now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.question": {
+    "source": "Which gathering is this kiosk for?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.holdOne": {
+    "source": "Hold one to set the kiosk to it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.loading": {
+    "source": "Loading…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.loadFailed": {
+    "source": "Couldn’t load the calendar. Check the network, then reopen the kiosk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.checkInOpen": {
+    "source": "Check-in open",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.opensAt": {
+    "source": "Check-in opens {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.endedPickupOnly": {
+    "source": "Ended — pickup only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.nothingToday": {
+    "source": "Nothing on today. Events are created in Tally itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.setUpPrinter": {
+    "source": "Set up a label printer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.printerConnected": {
+    "source": "Label printer connected",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.lookingForPrinter": {
+    "source": "Looking for the label printer…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.printerNeedsAttention": {
+    "source": "Label printer needs attention",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.settingUp": {
+    "source": "Setting up…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.setKiosk": {
+    "source": "Set kiosk",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Chooser.pickAGathering": {
+    "source": "Pick a gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

@@ -20,6 +20,7 @@
  * quiet one, which is the way round this codebase puts every control whose cost
  * lands on somebody other than the person pressing it.
  */
+import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
 import { EventName } from '../components/EventName';
 import { useTap } from '../components/tapGuard';
@@ -42,22 +43,25 @@ export function ChangeEventScreen({
   onStay: () => void;
   onLeave: () => void;
 }) {
+  const t = useTranslations('Staff');
   const tap = useTap();
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
       <div className="flex flex-col gap-4">
-        <div className="text-4xl font-semibold text-ink-100">Change event?</div>
+        <div className="text-4xl font-semibold text-ink-100">{t('changeEventTitle')}</div>
         <p className="mx-auto max-w-xl text-xl text-ink-400">
-          This kiosk is checking in to{' '}
           {/* No `whitespace-nowrap` here, whatever the mark's presence
               suggests: this is a sentence, and the longest gathering name a
               church types has to be allowed to wrap inside it. Held on one
               line it took the whole screen sideways. */}
-          <span className="text-ink-200">
-            <EventName path={iconPath} title={title} />
-          </span>
-          .
+          {t.rich('checkingInTo', {
+            event: () => (
+              <span className="text-ink-200">
+                <EventName path={iconPath} title={title} />
+              </span>
+            ),
+          })}
         </p>
 
         {/*
@@ -72,15 +76,10 @@ export function ChangeEventScreen({
           <span aria-hidden className="text-2xl leading-none text-warn-400">
             ⚠
           </span>
-          <p className="text-lg text-warn-400">
-            Nobody can check in here until somebody picks an event again. If there is a queue at
-            this kiosk, it stops.
-          </p>
+          <p className="text-lg text-warn-400">{t('changeEventWarning')}</p>
         </div>
 
-        <p className="mx-auto max-w-xl text-base text-ink-500">
-          Children already checked in stay checked in, and the register is not changed.
-        </p>
+        <p className="mx-auto max-w-xl text-base text-ink-500">{t('changeEventKept')}</p>
       </div>
 
       <div className="flex w-full max-w-md flex-col gap-3">
@@ -93,7 +92,7 @@ export function ChangeEventScreen({
           })}
           className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500"
         >
-          Keep checking in
+          {t('keepCheckingIn')}
         </button>
         <button
           type="button"
@@ -125,7 +124,9 @@ export function ChangeEventScreen({
             * kiosk shooter asserts against, and which is how this was found.
             */}
           <span className="min-w-0 truncate">
-            Leave <EventName path={iconPath} title={title} />
+            {t.rich('leaveEvent', {
+              event: () => <EventName path={iconPath} title={title} />,
+            })}
           </span>
         </button>
       </div>

@@ -48,6 +48,7 @@ import { useTap } from '../components/tapGuard';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
 import type { KioskBinding } from '../binding';
 import type { PrinterState } from '../printing';
+import { useTranslations } from 'use-intl';
 
 function dayLabel(startAtMs: number, nowMs: number): string {
   const start = new Date(startAtMs);
@@ -91,6 +92,7 @@ export function EventChooser({
    * and this screen is reached that way, from the staff screen's `Change
    * event`.
    */
+  const t = useTranslations('Chooser');
   const tap = useTap();
   const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -175,18 +177,20 @@ export function EventChooser({
   return (
     <div className="flex h-full flex-col p-6">
       <div className="pb-4 text-center">
-        <div className="text-lg font-medium text-ink-400">Which gathering is this kiosk for?</div>
+        <div className="text-lg font-medium text-ink-400">{t('question')}</div>
         {/* The only place the rows' hold is written down. Kept to one line and
             below the question, because the person reading it is a volunteer
             setting a tablet up once, not somebody using this screen daily. */}
-        <div className="pt-1 text-sm text-ink-500">Hold one to set the kiosk to it.</div>
+        <div className="pt-1 text-sm text-ink-500">{t('holdOne')}</div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {entries === null && !failed && <div className="pt-12 text-center text-ink-400">Loading…</div>}
+        {entries === null && !failed && (
+          <div className="pt-12 text-center text-ink-400">{t('loading')}</div>
+        )}
         {failed && (
           <div className="pt-12 text-center text-ink-300">
-            Couldn&apos;t load the calendar. Check the network, then reopen the kiosk.
+            {t('loadFailed')}
           </div>
         )}
         <div className="mx-auto flex max-w-2xl flex-col gap-3">
@@ -336,12 +340,12 @@ export function EventChooser({
                     */}
                   {live && !ended && (
                     <span className="block font-medium text-present-400 sm:inline sm:pl-4">
-                      Check-in open
+                      {t('checkInOpen')}
                     </span>
                   )}
                   {notOpenYet && (
                     <span className="block font-medium text-ink-500 sm:inline sm:pl-4">
-                      Check-in opens {timeLabel(entry.checkInOpensAt)}
+                      {t('opensAt', { when: timeLabel(entry.checkInOpensAt) })}
                     </span>
                   )}
                   {/*
@@ -357,7 +361,7 @@ export function EventChooser({
                     */}
                   {ended && (
                     <span className="block font-medium text-warn-400 sm:inline sm:pl-4">
-                      Ended — pickup only
+                      {t('endedPickupOnly')}
                     </span>
                   )}
                 </div>
@@ -370,7 +374,7 @@ export function EventChooser({
                   list holds — and a volunteer reading this on a Tuesday should
                   go looking for tonight's gathering rather than concluding the
                   calendar is empty until Sunday. */}
-              Nothing on today. Events are created in Tally itself.
+              {t('nothingToday')}
             </div>
           )}
         </div>
@@ -402,12 +406,12 @@ export function EventChooser({
           className="mb-3 w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 active:bg-ink-800"
         >
           {printerState === null || printerState.kind === 'idle'
-            ? 'Set up a label printer'
+            ? t('setUpPrinter')
             : printerState.kind === 'ready'
-              ? 'Label printer connected'
+              ? t('printerConnected')
               : printerState.kind === 'unpaired' && printerState.searching
-                ? 'Looking for the label printer…'
-                : 'Label printer needs attention'}
+                ? t('lookingForPrinter')
+                : t('printerNeedsAttention')}
         </button>
 
         <button
@@ -475,7 +479,7 @@ export function EventChooser({
               <span className="shrink-0 text-white">· {timeLabel(selectedEntry.startAt)}</span>
             </span>
           )}
-          {binding ? 'Setting up…' : selected !== null ? 'Set kiosk' : 'Pick a gathering'}
+          {binding ? t('settingUp') : selected !== null ? t('setKiosk') : t('pickAGathering')}
         </button>
       </div>
     </div>

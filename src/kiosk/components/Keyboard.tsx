@@ -52,6 +52,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
 import { tallyRender } from '../renderTally';
 import { HOLD_DELAY_MS, HOLD_MS } from './HoldButton';
+import { useTranslations } from 'use-intl';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -145,6 +146,7 @@ export const Keyboard = memo(function Keyboard({
   onClearHeld?: () => void;
 }) {
   tallyRender('Keyboard');
+  const t = useTranslations('Door');
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);
@@ -252,7 +254,7 @@ export const Keyboard = memo(function Keyboard({
                 type="button"
                 tabIndex={-1}
                 data-key="shift"
-                aria-label={shift === 'lock' ? 'Caps lock on' : shift === 'on' ? 'Shift on' : 'Shift'}
+                aria-label={shift === 'lock' ? t('capsLock') : shift === 'on' ? t('shiftOn') : t('shift')}
                 aria-pressed={shift !== 'off'}
                 className={`${KEY_CLASS} col-span-3 text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
               >

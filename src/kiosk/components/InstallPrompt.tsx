@@ -12,10 +12,12 @@
  * afterwards comes up unpaired. Saying "then pair it" is the part that saves a
  * second trip to the lobby.
  */
+import { useTranslations } from 'use-intl';
 import { useTap } from './tapGuard';
 import { isInstalled, needsManualInstall, promptInstall, useCanInstall } from '../install';
 
 export function InstallPrompt({ className = '' }: { className?: string }) {
+  const t = useTranslations('Door');
   const canInstall = useCanInstall();
   /*
    * Guarded like every other control on the kiosk, and for the reason spelled
@@ -37,7 +39,7 @@ export function InstallPrompt({ className = '' }: { className?: string }) {
         {...tap(() => void promptInstall())}
         className={`w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 active:bg-ink-800 ${className}`}
       >
-        Install the kiosk app on this device
+        {t('installTitle')}
       </button>
     );
   }
@@ -45,8 +47,7 @@ export function InstallPrompt({ className = '' }: { className?: string }) {
   if (needsManualInstall()) {
     return (
       <p className={`text-center text-sm leading-relaxed text-ink-500 ${className}`}>
-        To keep this kiosk on the home screen: Share → Add to Home Screen, then pair the installed
-        app.
+        {t('installBody')}
       </p>
     );
   }
