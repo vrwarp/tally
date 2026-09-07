@@ -1727,6 +1727,8 @@ export function KioskApp() {
       checkedIn: boolean;
       /** The arrival the server recorded for them — the registration's own id. */
       registrationId: string;
+      /** The allergy answers as typed, index-aligned with `children`. */
+      notes: readonly string[];
     }) => {
       if (!services || !binding) return;
       const added = services.applyRegistration({
@@ -1786,8 +1788,20 @@ export function KioskApp() {
       }
 
       if (prints && result.checkedIn) {
-        for (const student of added) {
+        for (const [index, student] of added.entries()) {
           try {
+            /*
+             * The note first, because the sticker is drawn from it.
+             *
+             * This is the one child on the kiosk whose allergy cannot be looked
+             * up: registration mints a Tally-owned id, `fetchAllergyNote` has
+             * no upstream person to ask about and answers null, and a null
+             * under a set flag prints the bare word `Allergy`. The parent typed
+             * the real thing four screens ago, so it is handed over rather than
+             * asked for. A child whose answer was "none" seeds an empty string,
+             * which is what the lookup would have resolved to anyway.
+             */
+            printing?.rememberAllergyNote(student.id, result.notes[index] ?? '');
             printing?.printLabel(student, binding);
           } catch {
             // Deliberately swallowed, exactly as in `onConfirm`: a printer
@@ -1918,8 +1932,9 @@ export function KioskApp() {
               ...(carryNotes ? { allergies: notes } : {}),
             });
           }}
-          onRegistered={(result) =>
+          onRegistered={(result, notes) =>
             onRegistered({
+              notes,
               children: result.children.map((child) => ({
                 id: child.studentId,
                 firstName: child.firstName,

@@ -127,8 +127,18 @@ export interface RegistrationFlowProps {
     guardian: { firstName: string; lastName: string; phone: string } | null;
     anchorStudentIds: string[];
   }) => Promise<RegisterFamilyResult>;
-  /** Everybody registered and checked in — the caller greens their rows and prints. */
-  onRegistered: (result: RegisterFamilyResult) => void;
+  /**
+   * Everybody registered and checked in — the caller greens their rows and
+   * prints.
+   *
+   * `notes` is the allergy answer as the parent typed it, index-aligned with
+   * `result.children` — the server echoes the request's own order, so the two
+   * cannot drift. It rides beside the result rather than inside it because it
+   * never went upstream and came back: it is the one thing on a kiosk sticker
+   * the kiosk was *told* rather than having to ask, and the ask cannot succeed
+   * for a child this new. See `rememberAllergyNote`.
+   */
+  onRegistered: (result: RegisterFamilyResult, notes: readonly string[]) => void;
   /** Back to search: cancelled, timed out, or finished. */
   onClose: () => void;
 }
@@ -196,7 +206,10 @@ export function RegistrationFlow({
         // callable answer rather than create a second family.
         submittedRef.current = false;
         dispatch({ type: 'submitted', result });
-        onRegistered(result);
+        onRegistered(
+          result,
+          state.children.map((child) => child.allergies),
+        );
       })
       .catch(() => {
         submittedRef.current = false;

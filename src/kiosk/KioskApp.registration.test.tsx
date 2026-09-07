@@ -76,6 +76,9 @@ const printing = {
   // `services.ts` is the only module allowed to import Firebase, so the
   // printing chunk is given the reader rather than reaching for one.
   setAllergySource: vi.fn(),
+  // The other half of that: the one note the callable above cannot answer, so
+  // it is handed over instead of asked for. See printing/allergy.ts.
+  rememberAllergyNote: vi.fn(),
 } as unknown as KioskPrinting;
 
 /** What the callable answers. Reassigned per test. */
@@ -944,5 +947,40 @@ describe('the allergies question, where the backend can carry it', () => {
     // keeps every no-notes run working across a functions rollback to a
     // version that refuses the key.
     expect(sent[0]!).not.toHaveProperty('allergies');
+  });
+
+  it('hands the note to the sticker rather than asking a callable that cannot answer', async () => {
+    /*
+     * The only child on this kiosk whose allergy cannot be looked up.
+     *
+     * Registration mints a Tally-owned id, so `fetchAllergyNote` has no
+     * upstream person to put to the callable and answers null — and a null
+     * under a set flag prints the bare word `Allergy`. The parent typed the
+     * real thing four screens ago; it is handed over rather than asked for.
+     */
+    configurePrinter();
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await type('Peanuts');
+    await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    await tap('Check in Robin');
+
+    // Before the sticker, because the sticker is drawn from it — the rule the
+    // printing module's own tests pin from the other side.
+    expect(printing.rememberAllergyNote).toHaveBeenCalledWith('new-robin', 'Peanuts');
+  });
+
+  it('seeds an empty answer for the families who have none', async () => {
+    configurePrinter();
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await tap('No allergies');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    await tap('Check in Robin');
+
+    expect(printing.rememberAllergyNote).toHaveBeenCalledWith('new-robin', '');
   });
 });

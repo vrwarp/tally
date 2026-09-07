@@ -84,7 +84,12 @@ export { tokenValuesFor } from './tokens';
  * The allergy lookup's own surface, re-exported so `KioskApp` reaches it the way
  * it reaches everything else here — through the one dynamically imported handle.
  */
-export { ALLERGY_UNREAD, forgetAllergies, setAllergySource } from './allergy';
+export {
+  ALLERGY_UNREAD,
+  forgetAllergies,
+  rememberAllergyNote,
+  setAllergySource,
+} from './allergy';
 export type { PrintedLabel } from './queue';
 export type { AllergySource } from './allergy';
 

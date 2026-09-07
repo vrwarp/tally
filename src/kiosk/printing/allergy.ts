@@ -101,19 +101,45 @@ export function usesAllergyToken(template: LabelTemplate): boolean {
  * path is both — the first when the confirm screen opens, the second when a
  * thumb lands a second or two later.
  */
+/** Room for one more, oldest out first. See `MAX_HELD`. */
+function makeRoom(): void {
+  if (held.size < MAX_HELD) return;
+  // Oldest first. Map iteration is insertion-ordered, which is the order
+  // wanted and is why this is not a sort — as in `queue.ts`.
+  const oldest = held.keys().next();
+  // Stryker disable next-line ConditionalExpression: the map is at its limit
+  // to have got here, so the iterator always has a key and `done` is always
+  // false. It is here because the type says it might not be.
+  if (!oldest.done) held.delete(oldest.value);
+}
+
+/**
+ * The note a parent typed a minute ago, which no lookup can answer.
+ *
+ * The registration wizard is the one place the kiosk is *told* an allergy
+ * rather than having to ask about one, and until this existed it threw the
+ * answer away and asked anyway. The ask cannot succeed: a child registered at a
+ * kiosk gets a Tally-owned id, `fetchAllergyNote` has no upstream person to put
+ * to the callable and answers null, and a null under a set flag is read below
+ * as *flagged but unreadable* — so the sticker for a child whose parent typed
+ * "Peanuts — EpiPen in the bag" said the single word `Allergy`.
+ *
+ * Seeded into the same map a lookup resolves into, so everything downstream is
+ * unchanged: `startAllergyLookup` finds the id already held and does not ask,
+ * and `allergyFor` reads it the way it reads any other answer. It is held on
+ * exactly the terms a fetched note is — in memory, bounded, never written down
+ * — which is the whole reason to put it here rather than on the roster row.
+ */
+export function rememberAllergyNote(studentId: string, note: string): void {
+  makeRoom();
+  held.set(studentId, Promise.resolve(note.trim()));
+}
+
 export function startAllergyLookup(student: KioskStudent, template: LabelTemplate): void {
   if (!usesAllergyToken(template)) return;
   if (held.has(student.id)) return;
 
-  if (held.size >= MAX_HELD) {
-    // Oldest first. Map iteration is insertion-ordered, which is the order
-    // wanted and is why this is not a sort — as in `queue.ts`.
-    const oldest = held.keys().next();
-    // Stryker disable next-line ConditionalExpression: the map is at its limit
-    // to have got here, so the iterator always has a key and `done` is always
-    // false. It is here because the type says it might not be.
-    if (!oldest.done) held.delete(oldest.value);
-  }
+  makeRoom();
 
   // No flag, no request. The empty string resolves the token to nothing, which
   // makes `resolveLines` drop the line — so a child with no allergy gets a tidy
