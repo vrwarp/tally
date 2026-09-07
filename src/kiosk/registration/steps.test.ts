@@ -739,6 +739,109 @@ describe('the list of questions', () => {
  * Back un-banks its way there so fixing one letter meant walking the whole run
  * forwards again.
  */
+/**
+ * What each row of the list actually says.
+ *
+ * The states above pin which rows exist and in what order; these pin the
+ * answers printed on them, which is the half a parent reads. An answer taken
+ * from the wrong field, or a blank where a record holds something, is a bug
+ * this list is uniquely placed to hide: every row looks right.
+ */
+describe('the answers the list prints', () => {
+  function answered(): RegistrationState {
+    let held = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+    held = advance(typeText(advance(typeText(held, 'Chidi')), 'Okonkwo'));
+    held = advance(chooseGrade(held, 4 as Grade));
+    held = advance(typeText(held, 'Peanuts'));
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Ada'));
+    held = advance(held); // the surname, carried
+    held = advance(chooseGrade(held, 2 as Grade));
+    return answerNoAllergies(held);
+  }
+
+  const rowsOf = (state: RegistrationState, title: string) =>
+    questionList(state).find((section) => section.title === title)!.rows;
+
+  it('prints each child’s own answers under their own heading', () => {
+    const held = answered();
+
+    expect(rowsOf(held, 'Your child').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Chidi'],
+      ['Last name', 'Okonkwo'],
+      ['Grade', '4th'],
+      ['Allergies', 'Peanuts'],
+    ]);
+    expect(rowsOf(held, 'Child 2').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Ada'],
+      ['Last name', 'Okonkwo'],
+      ['Grade', '2nd'],
+      // A blank note is an answer, and the row says so rather than reading as
+      // a question somebody failed to fill in.
+      ['Allergies', 'None'],
+    ]);
+  });
+
+  it('prints the adult’s three, with the number grouped', () => {
+    // Each from its own field: a case falling through to the default here
+    // would print the phone number under "First name".
+    expect(rowsOf(answered(), 'And you').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Ngozi'],
+      ['Last name', 'Adeyemi'],
+      ['Phone', '555-010-3344'],
+    ]);
+  });
+
+  it('leaves an unanswered row blank rather than showing what is on the record', () => {
+    /*
+     * The prefills mean the record holds an answer before the question is
+     * asked: the second child's surname is on the draft from the moment the
+     * first child was banked. A row that printed it would tell a parent they
+     * had answered a question they have not reached.
+     */
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = advance(typeText(held, 'Ngozi'));
+
+    const adult = rowsOf(held, 'And you');
+    expect(adult.map((row) => [row.state, row.answer])).toEqual([
+      ['done', 'Ngozi'],
+      ['now', ''],
+      ['todo', ''],
+    ]);
+    // And an unreached question is not a place to jump to.
+    expect(adult.map((row) => row.canReopen)).toEqual([true, false, false]);
+  });
+
+  it('marks a whole section still to come as ahead of the run', () => {
+    // The adult's section before any child is finished: three rows, none of
+    // them current, none of them offering a jump.
+    const opening = rowsOf(start(), 'And you');
+
+    expect(opening.every((row) => row.state === 'todo')).toBe(true);
+    expect(opening.every((row) => row.answer === '')).toBe(true);
+    expect(opening.some((row) => row.canReopen)).toBe(false);
+  });
+
+  it('lights the current child’s question and leaves the finished ones filled', () => {
+    // Two children on the glass at once: the banked one is done throughout,
+    // the one being typed carries the accent on exactly one row.
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Ada'));
+
+    expect(rowsOf(held, 'Your child').map((row) => row.state)).toEqual([
+      'done',
+      'done',
+      'done',
+    ]);
+    expect(rowsOf(held, 'Child 2').map((row) => row.state)).toEqual(['done', 'now', 'todo']);
+  });
+});
+
 describe('reopening a question', () => {
   /** One child and an adult, stopped on the phone question. */
   function atThePhone(): RegistrationState {
@@ -869,6 +972,150 @@ describe('reopening a question', () => {
 
     expect(second.rows.map((row) => row.state)).toEqual(['done', 'todo', 'todo']);
     expect(second.rows[1]!.resumeHere).toBe(true);
+  });
+});
+
+/**
+ * Which record each question reads from and writes to.
+ *
+ * A wizard is a switch statement over six questions, and the failure mode of a
+ * switch statement is a case that quietly falls through to the default: the
+ * step opens on the wrong answer, or commits into the wrong field, and every
+ * test that only walks the run forwards still passes because forwards is the
+ * one path where the fields happen to line up. Reopening is what takes them
+ * out of order, so it is what these pin.
+ */
+describe('each question against its own field', () => {
+  function wholeFamily(): RegistrationState {
+    const held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    return addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+  }
+
+  it('opens every question on the answer it holds, and no other', () => {
+    const held = wholeFamily();
+
+    expect(reopen(held, 'child-first', 0).buffer).toBe('Chidi');
+    expect(reopen(held, 'child-last', 0).buffer).toBe('Okonkwo');
+    expect(reopen(held, 'guardian-first', null).buffer).toBe('Ngozi');
+    expect(reopen(held, 'guardian-last', null).buffer).toBe('Adeyemi');
+    expect(reopen(held, 'guardian-phone', null).buffer).toBe('5550103344');
+    // The grade is chosen off a grid and has no buffer to open on.
+    expect(reopen(held, 'child-grade', 0).buffer).toBe('');
+  });
+
+  it('opens the allergy note on its own child’s note', () => {
+    let held = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+    held = advance(typeText(advance(typeText(held, 'Chidi')), 'Okonkwo'));
+    held = advance(chooseGrade(held, 4 as Grade));
+    held = advance(typeText(held, 'Peanuts'));
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+
+    expect(reopen(held, 'child-allergies', 0).buffer).toBe('Peanuts');
+  });
+
+  it('commits into the field the open question names, and leaves the rest', () => {
+    // Each fix goes to one place. A case falling through to the default would
+    // land a guardian's surname on a child, or lose the answer entirely.
+    const held = wholeFamily();
+    const fixed = (step: Parameters<typeof reopen>[1], child: number | null, value: string) =>
+      advance(typeText(applyKey(reopen(held, step, child), { kind: 'clear' }), value));
+
+    expect(fixed('child-first', 0, 'Chidinma').children[0]).toMatchObject({
+      firstName: 'Chidinma',
+      lastName: 'Okonkwo',
+    });
+    expect(fixed('child-last', 0, 'Okonkwa').children[0]).toMatchObject({
+      firstName: 'Chidi',
+      lastName: 'Okonkwa',
+    });
+    expect(fixed('guardian-first', null, 'Ngozika').guardian).toEqual({
+      firstName: 'Ngozika',
+      lastName: 'Adeyemi',
+      phone: '5550103344',
+    });
+    expect(fixed('guardian-last', null, 'Adeyemiwa').guardian).toEqual({
+      firstName: 'Ngozi',
+      lastName: 'Adeyemiwa',
+      phone: '5550103344',
+    });
+    expect(fixed('guardian-phone', null, '5550149911').guardian).toEqual({
+      firstName: 'Ngozi',
+      lastName: 'Adeyemi',
+      phone: '5550149911',
+    });
+  });
+
+  it('gives the number pad no capitals, and every other question its own', () => {
+    // A dialer has no shift key to honour, so the phone question opens 'off'
+    // whatever it is holding; a name opens where its own letters leave off.
+    const held = wholeFamily();
+
+    expect(reopen(held, 'guardian-phone', null).shift).toBe('off');
+    expect(reopen(held, 'child-first', 0).shift).toBe('off');
+    // And an empty box is the start of a word, so it opens capitalised.
+    expect(reopen(held, 'child-grade', 0).shift).toBe('on');
+  });
+
+  it('marks a reopened grade as picked, so Next is not dead on arrival', () => {
+    expect(reopen(wholeFamily(), 'child-grade', 0).gradePicked).toBe(true);
+    expect(reopen(wholeFamily(), 'child-first', 0).gradePicked).toBe(false);
+  });
+
+  it('reads the phone back grouped, and every other answer verbatim', () => {
+    const held = wholeFamily();
+
+    expect(readoutFor(reopen(held, 'guardian-phone', null))).toBe('555-010-3344');
+    expect(readoutFor(reopen(held, 'guardian-first', null))).toBe('Ngozi');
+  });
+});
+
+describe('which child a reopened question belongs to', () => {
+  function twoChildren(): RegistrationState {
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    return advance(typeText(addAnotherChild(held), 'Ada'));
+  }
+
+  it('targets a banked child by index, and the draft by none', () => {
+    const held = twoChildren();
+
+    expect(reopen(held, 'child-first', 0).editing).toBe(0);
+    expect(reopen(held, 'child-first', null).editing).toBeNull();
+  });
+
+  it('treats the child being typed in as the draft, not as a banked row', () => {
+    /*
+     * The second child's own rows carry their index — 1 — while they are still
+     * the draft, and there is no `children[1]` to edit. Reopening one has to
+     * fall back to the draft, or the fix would be written to a record that
+     * does not exist and lost.
+     */
+    const held = twoChildren();
+    expect(held.children).toHaveLength(1);
+
+    const open = reopen(held, 'child-first', 1);
+    expect(open.editing).toBeNull();
+
+    const fixed = advance(typeText(applyKey(open, { kind: 'clear' }), 'Adaeze'));
+    expect(fixed.draft.firstName).toBe('Adaeze');
+    expect(fixed.children[0]!.firstName).toBe('Chidi');
+  });
+
+  it('is a no-op only for the question already open on the same child', () => {
+    const held = twoChildren();
+    const open = reopen(held, 'child-first', 0);
+
+    // The same row again: nothing moved, so nothing changes — and `resume`
+    // must not be overwritten with the reopened question itself.
+    expect(reopen(open, 'child-first', 0)).toBe(open);
+    // The same question on a different child is a different row.
+    expect(reopen(open, 'child-first', null)).not.toBe(open);
+    // And a different question on the same child.
+    expect(reopen(open, 'child-last', 0)).not.toBe(open);
   });
 });
 
