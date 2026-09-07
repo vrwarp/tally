@@ -966,7 +966,7 @@ describe('the jobs this module hands the queue', () => {
   it('warms a label as the confirm screen opens', async () => {
     const printing = await load();
 
-    printing.warmLabel(grades, ADA, binding());
+    printing.warmLabel(grades, 'en', ADA, binding());
 
     expect(queue.warm).toHaveBeenCalledTimes(1);
     expect((queue.warm.mock.calls[0]?.[0] as LabelJob).studentId).toBe('pco_1');
@@ -978,7 +978,7 @@ describe('the jobs this module hands the queue', () => {
   it('keeps the sticker name as the roster spells it, without a trailing space', async () => {
     const printing = await load();
 
-    printing.warmLabel(grades, { ...ADA, lastName: '' }, binding());
+    printing.warmLabel(grades, 'en', { ...ADA, lastName: '' }, binding());
 
     // A child with no surname on file. `Ada ` on the printer screen's log
     // reads as a name that lost something.
@@ -988,7 +988,7 @@ describe('the jobs this module hands the queue', () => {
   it('starts the allergy lookup before the raster that waits on it', async () => {
     const printing = await load();
 
-    printing.warmLabel(grades, ADA, binding());
+    printing.warmLabel(grades, 'en', ADA, binding());
 
     expect(allergy.started).toEqual(['pco_1']);
   });
@@ -996,7 +996,7 @@ describe('the jobs this module hands the queue', () => {
   it('warms nothing for a gathering with no template', async () => {
     const printing = await load();
 
-    printing.warmLabel(grades, ADA, binding(null as never));
+    printing.warmLabel(grades, 'en', ADA, binding(null as never));
 
     expect(queue.warm).not.toHaveBeenCalled();
     expect(allergy.started).toEqual([]);
@@ -1005,7 +1005,7 @@ describe('the jobs this module hands the queue', () => {
   it('prints, and starts the lookup again because the printer screen gets here too', async () => {
     const printing = await load();
 
-    printing.printLabel(grades, ADA, binding());
+    printing.printLabel(grades, 'en', ADA, binding());
 
     expect(queue.print).toHaveBeenCalledTimes(1);
     expect(allergy.started).toEqual(['pco_1']);
@@ -1014,7 +1014,7 @@ describe('the jobs this module hands the queue', () => {
   it('prints nothing for a gathering with no template', async () => {
     const printing = await load();
 
-    printing.printLabel(grades, ADA, binding(null as never));
+    printing.printLabel(grades, 'en', ADA, binding(null as never));
 
     expect(queue.print).not.toHaveBeenCalled();
   });
@@ -1025,7 +1025,7 @@ describe('the jobs this module hands the queue', () => {
     // should say *now*.
     const printing = await load();
 
-    printing.reprintLabel(grades, ADA, binding());
+    printing.reprintLabel(grades, 'en', ADA, binding());
 
     expect(queue.print).toHaveBeenCalledTimes(1);
   });
@@ -1067,7 +1067,7 @@ describe('the jobs this module hands the queue', () => {
     const printing = await load();
     await printing.ready();
 
-    printing.testPrint();
+    printing.testPrint('en');
 
     const job = queue.print.mock.calls.at(-1)?.[0] as LabelJob;
     expect(job.values.eventTitle).toBe('QL-800 · 62');
@@ -1093,7 +1093,7 @@ describe('the jobs this module hands the queue', () => {
   it('test-prints nothing on a kiosk with no printer configured', async () => {
     const printing = await load();
 
-    printing.testPrint();
+    printing.testPrint('en');
 
     expect(queue.print).not.toHaveBeenCalled();
   });
@@ -1412,14 +1412,14 @@ describe('labelPreview', () => {
   it('shows the words the sticker will carry', async () => {
     const printing = await load();
 
-    expect(printing.labelPreview(grades, ADA, binding())).toEqual(['Ada']);
+    expect(printing.labelPreview(grades, 'en', ADA, binding())).toEqual(['Ada']);
   });
 
   it('drops the lines that come to nothing, exactly as the renderer does', async () => {
     // The preview cannot promise a line the label will not have.
     const printing = await load();
 
-    const lines = printing.labelPreview(grades, { ...ADA, hasAllergies: false }, binding());
+    const lines = printing.labelPreview(grades, 'en', { ...ADA, hasAllergies: false }, binding());
 
     expect(lines).not.toContain('');
   });
@@ -1427,7 +1427,7 @@ describe('labelPreview', () => {
   it('has nothing to show for a gathering with no template', async () => {
     const printing = await load();
 
-    expect(printing.labelPreview(grades, ADA, binding(null as never))).toEqual([]);
+    expect(printing.labelPreview(grades, 'en', ADA, binding(null as never))).toEqual([]);
   });
 });
 

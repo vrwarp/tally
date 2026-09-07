@@ -39,7 +39,7 @@ import { DEFAULT_KIOSK_THEME, type KioskTheme } from '@/lib/kioskTheme';
 import { fetchKioskBackdrop, type StoredKioskBackdrop } from '@/services/kioskBackdrops';
 import { cn } from '@/lib/utils';
 import { painted } from './kioskPreview';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 /**
  * What the form holds: nothing, the photograph the event already points at,
@@ -115,12 +115,14 @@ function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSP
 }
 
 /** "12 Oct", for the conscience line. */
-function uploadedOn(date: Date): string {
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+function uploadedOn(locale: string, date: Date): string {
+  // The reader's language, not the browser's.
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
 export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFieldProps) {
   const t = useTranslations('KioskBackdrop');
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,7 +180,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
       : value.kind === 'new'
         ? t('newPhoto', { detail: describePrepared(value.prepared) })
         : stored?.id === value.id && stored.image?.updatedAt
-          ? t('storedPhoto', { when: uploadedOn(stored.image.updatedAt) })
+          ? t('storedPhoto', { when: uploadedOn(locale, stored.image.updatedAt) })
           : t('summaryPhoto');
 
   const pick = async (file: File | null) => {

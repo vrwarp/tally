@@ -1895,6 +1895,7 @@
     "registerYourChild": "Register your child",
     "orSeeALeader": "or see a leader.",
     "moreNames": "More names than fit — keep typing.",
+    "matchCount": "{count, plural, one {# name} other {# names}}",
     "offerNotYours": "Not your family? Register your child",
     "offerFirstTime": "First time here? Register your child",
     "offerShort": "Not yours? Register",

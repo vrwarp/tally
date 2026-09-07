@@ -81,7 +81,7 @@ import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 import { NotOpenScreen } from './screens/NotOpenScreen';
 import { useGrades } from '@/hooks/usePureStrings';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
@@ -324,6 +324,9 @@ function isQuietHour(): boolean {
 export function KioskApp() {
   tallyRender('KioskApp');
   const tDoor = useTranslations('Door');
+  // The kiosk's own language, not the browser's — the dates and times below
+  // are formatted against it. See `eventWindow` in binding.ts.
+  const locale = useLocale();
   // The connector `opensAtLabel` needs; see there for why it is handed in.
   const dayAtTime = useCallback(
     (values: { day: string; time: string }) => tDoor('dayAtTime', values),
@@ -1419,7 +1422,7 @@ export function KioskApp() {
        * and `done` writes nothing at all.
        */
       if (intent === 'check-in' && !windowHasOpened(binding, Date.now())) {
-        setOverlay({ kind: 'not-open', opensAt: opensAtLabel(dayAtTime, binding, Date.now()) });
+        setOverlay({ kind: 'not-open', opensAt: opensAtLabel(locale, dayAtTime, binding, Date.now()) });
         return;
       }
 
@@ -1524,7 +1527,7 @@ export function KioskApp() {
          */
         if (prints) {
           try {
-            printing?.printLabel(grades, student, binding);
+            printing?.printLabel(grades, locale, student, binding);
             // The printer screen lists what has been attempted tonight, and the
             // log is the queue's rather than React's — this is what tells a
             // screen that is open to read it again.
@@ -1535,7 +1538,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, printing, prints, binding, uid, grades, dayAtTime],
+    [services, printing, prints, binding, uid, grades, dayAtTime, locale],
   );
 
   /**
@@ -1554,7 +1557,7 @@ export function KioskApp() {
     (student: KioskStudent) => {
       if (!binding || !printing) return;
       try {
-        printing.reprintLabel(grades, student, binding);
+        printing.reprintLabel(grades, locale, student, binding);
       } catch {
         // Same reasoning as the check-in path: a sticker may never reach back
         // into the screen that asked for it.
@@ -1563,7 +1566,7 @@ export function KioskApp() {
       setSentId(student.id);
       setPrintTick((tick) => tick + 1);
     },
-    [binding, printing, grades],
+    [binding, printing, grades, locale],
   );
 
   /**
@@ -1610,16 +1613,16 @@ export function KioskApp() {
     (studentId: string): string | null => {
       const entry = printedTonight.find((row) => row.studentId === studentId && !row.failed);
       return entry
-        ? new Date(entry.atMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+        ? new Date(entry.atMs).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
         : null;
     },
-    [printedTonight],
+    [printedTonight, locale],
   );
 
   const labelLinesFor = useCallback(
     (student: KioskStudent): string[] =>
-      binding && printing ? printing.labelPreview(grades, student, binding) : [],
-    [binding, printing, grades],
+      binding && printing ? printing.labelPreview(grades, locale, student, binding) : [],
+    [binding, printing, grades, locale],
   );
 
   /**
@@ -1685,9 +1688,9 @@ export function KioskApp() {
 
   const refuseAsNotOpen = useCallback(() => {
     if (!binding) return;
-    setOverlay({ kind: 'not-open', opensAt: opensAtLabel(dayAtTime, binding, Date.now()) });
+    setOverlay({ kind: 'not-open', opensAt: opensAtLabel(locale, dayAtTime, binding, Date.now()) });
     setBuffer('');
-  }, [binding, dayAtTime]);
+  }, [binding, dayAtTime, locale]);
 
   const startWizard = useCallback(() => {
     if (!arrivalsOpen()) {
@@ -1892,7 +1895,7 @@ export function KioskApp() {
              * which is what the lookup would have resolved to anyway.
              */
             printing?.rememberAllergyNote(student.id, result.notes[index] ?? '');
-            printing?.printLabel(grades, student, binding);
+            printing?.printLabel(grades, locale, student, binding);
           } catch {
             // Deliberately swallowed, exactly as in `onConfirm`: a printer
             // cannot be allowed to contradict a screen that has told a family
@@ -1901,7 +1904,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, binding, printing, prints, grades],
+    [services, binding, printing, prints, grades, locale],
   );
 
   /* ---- Render ------------------------------------------------------------- */
@@ -2097,7 +2100,7 @@ export function KioskApp() {
           <StaffScreen
             title={binding.title}
             iconPath={binding.iconPath}
-            window={eventWindow(binding)}
+            window={eventWindow(locale, binding)}
             /*
              * `none` means *there is nothing here to print*, and nothing else.
              *
@@ -2146,7 +2149,7 @@ export function KioskApp() {
               // Warmed on the tap, the same trick the confirm screen plays: the
               // rasterising is a few hundred thousand pixels in a worker and
               // this is the slack while the confirm is on its way up.
-              printing?.warmLabel(grades, student, binding);
+              printing?.warmLabel(grades, locale, student, binding);
               setOverlay({ kind: 'reprint-confirm', student, from: 'reprint' });
             }}
             onDone={leaveStaff}
@@ -2186,7 +2189,7 @@ export function KioskApp() {
                */
               const student = students.find((row) => row.id === label.studentId);
               if (student) {
-                printing?.warmLabel(grades, student, binding);
+                printing?.warmLabel(grades, locale, student, binding);
                 setOverlay({ kind: 'reprint-confirm', student, from: 'printer' });
               }
             }}
@@ -2271,7 +2274,7 @@ export function KioskApp() {
              * group, and the button at the end says how many it covers.
              */
             services?.warmStudentDates(found.id);
-            printing?.warmLabel(grades, found, binding);
+            printing?.warmLabel(grades, locale, found, binding);
             setBuffer('');
             setOverlay({ ...from, family: [...from.family, found] });
           }}
@@ -2320,7 +2323,7 @@ export function KioskApp() {
               const member = overlay.family.find((row) => row.id === studentId);
               if (member) {
                 services?.warmStudentDates(member.id);
-                if (prints) printing?.warmLabel(grades, member, binding);
+                if (prints) printing?.warmLabel(grades, locale, member, binding);
               }
             }
             setOverlay({ ...overlay, skipped: next });
@@ -2394,8 +2397,8 @@ export function KioskApp() {
            */
           for (const member of taking) services?.warmStudentDates(member.id);
           if (prints && intent === 'check-in') {
-            printing?.warmLabel(grades, student, binding);
-            for (const member of taking) printing?.warmLabel(grades, member, binding);
+            printing?.warmLabel(grades, locale, student, binding);
+            for (const member of taking) printing?.warmLabel(grades, locale, member, binding);
           }
           setOverlay({
             kind: 'confirm',

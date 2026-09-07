@@ -204,7 +204,7 @@ describe('printing from the kiosk flow', () => {
     await tap('Check in');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[1].id).toBe(ADA.id);
+    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[2].id).toBe(ADA.id);
   });
 
   it('warms the label when the confirm screen opens, before anything is tapped', async () => {
@@ -337,13 +337,13 @@ describe('a family checked in together', () => {
     await pickAda();
 
     // The sibling arrives ticked, so their label is worth the same head start.
-    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[1].id).sort()).toEqual(
+    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
 
     await tap(/check in all 2/i);
 
-    expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[1].id).sort()).toEqual(
+    expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
   });
@@ -358,7 +358,7 @@ describe('a family checked in together', () => {
 
     expect(printing.forgetLabel).toHaveBeenCalledWith(BYRON.id);
     expect(printing.printLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[1].id).toBe(ADA.id);
+    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[2].id).toBe(ADA.id);
   });
 
   it('warms nothing for a family being checked out', async () => {

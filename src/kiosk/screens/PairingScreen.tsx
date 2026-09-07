@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 import { InstallPrompt } from '../components/InstallPrompt';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { useTranslations } from 'use-intl';
 
 /** Exported so tests can drive the poll loop rather than wait through it. */
@@ -184,6 +185,23 @@ export function PairingScreen({
       ) : (
         <div className="text-lg text-ink-400">{t('gettingCode')}</div>
       )}
+
+      {/*
+        * What this lobby speaks, chosen by the person setting the kiosk up.
+        *
+        * Here rather than in a setting somewhere, because this screen is the
+        * one moment a member of staff is standing at the device with a
+        * decision to make about it — and because the kiosk's language is a
+        * property of the room, not of whoever last touched the glass. The
+        * search screen carries the same control in its quiet weight for the
+        * family whose language is not the room's.
+        *
+        * Set before pairing, so the first screen a parent ever meets is
+        * already in the right language. It is kept under
+        * `KIOSK_LOCALE_STORAGE_KEY`, which survives pairing, unpairing and the
+        * ~4am reload alike.
+        */}
+      <LanguagePicker />
 
       {/*
         * The best moment to install, and the reason the offer is here rather

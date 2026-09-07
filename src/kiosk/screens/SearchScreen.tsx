@@ -39,6 +39,7 @@ import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { tallyRender } from '../renderTally';
 import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { useTap, useTapGuard, type TapHandlers } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import {
@@ -50,7 +51,7 @@ import {
 } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
 import { useGrades } from '@/hooks/usePureStrings';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 function gradeLabel(grades: GradeStrings, grade: number | null): string {
   return grade === null ? '' : gradeDescription(grades, grade);
@@ -500,6 +501,9 @@ export function SearchScreen({
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
   const tDoor = useTranslations('Door');
+  // The kiosk's language, which the hours and the opens-at line are formatted
+  // against — `Intl` would otherwise answer with the tablet's. See binding.ts.
+  const locale = useLocale();
   const dayAtTime = useCallback(
     (values: { day: string; time: string }) => tDoor('dayAtTime', values),
     [tDoor],
@@ -525,7 +529,7 @@ export function SearchScreen({
    * lobby screen; on a Raspberry Pi it was seven milliseconds of every letter.
    * See docs/kiosk-performance.md.
    */
-  const hours = useMemo(() => eventWindow(binding), [binding]);
+  const hours = useMemo(() => eventWindow(locale, binding), [locale, binding]);
 
   /*
    * The header's second line, finished here so the header can be memoized on
@@ -535,7 +539,7 @@ export function SearchScreen({
    * one of these strings actually changes — see SearchHeader.
    */
   const headerLine = notOpenYet
-    ? t('opensWhen', { when: opensAtLabel(dayAtTime, binding, now) })
+    ? t('opensWhen', { when: opensAtLabel(locale, dayAtTime, binding, now) })
     : closed
       ? t('windowClosed')
       : hours;
@@ -1213,7 +1217,30 @@ export function SearchScreen({
             the edge the rows are flush to rather than off this band's own
             padding — it is the list's caption, and it was missing the strongest
             vertical line in the frame by sixteen pixels. */}
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center text-center tall:h-20 lg:max-w-5xl">
+        {/* `px-24` is the clearance the two corner objects need. Both are
+            absolutely positioned, so neither can move a row or push the
+            letters off centre — but a long enough buffer is centred *through*
+            them, and "Bartholomew" under the language chips is the readout
+            failing at the one thing it does. Padding insets the flex content
+            only: an absolute child is placed against the padding box, so the
+            corners stay in the corners. */}
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-24 text-center tall:h-20 lg:max-w-5xl">
+          {/*
+            * The way out of a language a parent cannot read.
+            *
+            * Here rather than in the header because this band is the one place
+            * on the screen that is empty until somebody types, it is a hand's
+            * width from the keys the reader is already looking at, and it
+            * costs no geometry — the promise this file makes is that a
+            * keystroke never moves anything, and an absolute child of a
+            * fixed-height row cannot. The lobby's own language is set once, on
+            * the pairing screen; this is for the family the room's default is
+            * not for, and it changes the words without taking their place in
+            * the queue away from them.
+            */}
+          <span className="absolute left-0">
+            <LanguagePicker quiet />
+          </span>
           {buffer && (
             <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
               {buffer}
@@ -1248,7 +1275,7 @@ export function SearchScreen({
                 * registers a child the church already has. Past the cap the
                 * only useful thing to say is the thing that works.
                 */}
-              {matchCount} {matchCount === 1 ? 'name' : 'names'}
+              {t('matchCount', { count: matchCount })}
             </span>
           )}
         </div>

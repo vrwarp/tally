@@ -42,11 +42,13 @@ export interface ImportCheckInsModalProps {
 type SourcedEvent = CheckInsEventSummary & { backendId: BackendId };
 
 /** "Jan 2024" — the era a leader recognises an event's history by. */
-function formatSince(iso: string | null): string | null {
+function formatSince(locale: string, iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  // The reader's language, not the browser's — `Intl`'s default is the device's
+  // and this app's is a setting.
+  return date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
 }
 
 function EventRow({
@@ -64,7 +66,8 @@ function EventRow({
   onImport: (event: SourcedEvent) => void;
 }) {
   const t = useTranslations('Import');
-  const since = formatSince(event.firstGatheringAt);
+  const locale = useLocale();
+  const since = formatSince(locale, event.firstGatheringAt);
   const facts = [
     t('gatheringCount', { count: event.gatheringCount }),
     t('checkInCount', { count: event.checkInCount }),

@@ -1134,6 +1134,7 @@ const queue = createLabelQueue({
 
 function jobFor(
   grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
   template: LabelTemplate,
@@ -1146,7 +1147,7 @@ function jobFor(
     // looking for the child they can see.
     name: `${student.firstName} ${student.lastName}`.trim(),
     template,
-    values: tokenValuesFor(grades, student, binding),
+    values: tokenValuesFor(grades, locale, student, binding),
   };
 }
 
@@ -1159,6 +1160,7 @@ function jobFor(
  */
 export function warmLabel(
   grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
 ): void {
@@ -1167,7 +1169,7 @@ export function warmLabel(
   // Before the queue, not after: `warm` starts rasterising synchronously, and
   // the rasteriser is what waits for this.
   startAllergyLookup(student, template);
-  queue.warm(jobFor(grades, student, binding, template));
+  queue.warm(jobFor(grades, locale, student, binding, template));
 }
 
 /**
@@ -1179,6 +1181,7 @@ export function warmLabel(
  */
 export function printLabel(
   grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
 ): void {
@@ -1187,7 +1190,7 @@ export function printLabel(
   // A no-op when `warmLabel` already started it, and the reason this is not
   // simply left to the warm: the printer screen reaches `printLabel` too.
   startAllergyLookup(student, template);
-  queue.print(jobFor(grades, student, binding, template));
+  queue.print(jobFor(grades, locale, student, binding, template));
 }
 
 /**
@@ -1242,10 +1245,11 @@ export function forgetLabel(studentId: string): void {
  */
 export function reprintLabel(
   grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
 ): void {
-  printLabel(grades, student, binding);
+  printLabel(grades, locale, student, binding);
 }
 
 /**
@@ -1259,12 +1263,13 @@ export function reprintLabel(
  */
 export function labelPreview(
   grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
 ): string[] {
   const template = binding.labelTemplate;
   if (!template) return [];
-  const values = tokenValuesFor(grades, student, binding);
+  const values = tokenValuesFor(grades, locale, student, binding);
   return template.lines
     .map((line) => fillLabelTokens(line.text, values))
     .filter((text) => text.length > 0);
@@ -1293,7 +1298,7 @@ export function printedTonight(): readonly PrintedLabel[] {
  * Uses the real path — worker, raster, transport — so a successful test print
  * proves the whole chain rather than just that the device answers.
  */
-export function testPrint(): void {
+export function testPrint(locale: string): void {
   const active = config;
   if (!active) return;
   queue.print({
@@ -1308,7 +1313,7 @@ export function testPrint(): void {
     },
     values: {
       eventTitle: `${active.model} · ${active.label}`,
-      time: new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+      time: new Date().toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
     },
   });
 }

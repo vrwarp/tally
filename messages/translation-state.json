@@ -8774,6 +8774,12 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Search.matchCount": {
+    "source": "{count, plural, one {# name} other {# names}}",
+    "context": "How many children the search found, shown beside the letters a parent has typed. A bare count with its noun — not a sentence.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Search.offerNotYours": {
     "source": "Not your family? Register your child",
     "zh-Hans": "todo",

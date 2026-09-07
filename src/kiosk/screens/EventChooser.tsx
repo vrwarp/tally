@@ -48,9 +48,9 @@ import { useTap } from '../components/tapGuard';
 import type { KioskEventEntry, KioskServices } from '../KioskApp';
 import type { KioskBinding } from '../binding';
 import type { PrinterState } from '../printing';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
-function dayLabel(startAtMs: number, nowMs: number): string {
+function dayLabel(locale: string, startAtMs: number, nowMs: number): string {
   const start = new Date(startAtMs);
   const today = new Date(nowMs);
   const sameDay = start.toDateString() === today.toDateString();
@@ -66,11 +66,11 @@ function dayLabel(startAtMs: number, nowMs: number): string {
    * end of the first. "Wed" fits, says the same thing, and is the fix that
    * costs the row nothing.
    */
-  return start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return start.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function timeLabel(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+function timeLabel(locale: string, ms: number): string {
+  return new Date(ms).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
 export function EventChooser({
@@ -93,6 +93,9 @@ export function EventChooser({
    * event`.
    */
   const t = useTranslations('Chooser');
+  // The kiosk's language, not the tablet's: the dates on these rows are
+  // formatted against it. See `eventWindow` in ../binding.ts.
+  const locale = useLocale();
   const tap = useTap();
   const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -295,7 +298,7 @@ export function EventChooser({
                     * phone. A time range broken across two lines is unreadable,
                     * a date is not, so the range is the half that is held.
                     */}
-                  {dayLabel(entry.startAt, nowMs)}
+                  {dayLabel(locale, entry.startAt, nowMs)}
                   {' · '}
                   {/*
                     * The hours, a step louder than the line they are in.
@@ -312,7 +315,7 @@ export function EventChooser({
                     * come up.
                     */}
                   <span className="font-medium whitespace-nowrap text-ink-200">
-                    {timeLabel(entry.startAt)}–{timeLabel(entry.endAt)}
+                    {timeLabel(locale, entry.startAt)}–{timeLabel(locale, entry.endAt)}
                   </span>
                   {entry.location ? (
                     <>
@@ -345,7 +348,7 @@ export function EventChooser({
                   )}
                   {notOpenYet && (
                     <span className="block font-medium text-ink-500 sm:inline sm:pl-4">
-                      {t('opensAt', { when: timeLabel(entry.checkInOpensAt) })}
+                      {t('opensAt', { when: timeLabel(locale, entry.checkInOpensAt) })}
                     </span>
                   )}
                   {/*
@@ -476,7 +479,7 @@ export function EventChooser({
               <span className="min-w-0 truncate text-white/75">
                 <EventName path={selectedEntry.iconPath} title={selectedEntry.title} tone="inherit" />
               </span>
-              <span className="shrink-0 text-white">· {timeLabel(selectedEntry.startAt)}</span>
+              <span className="shrink-0 text-white">· {timeLabel(locale, selectedEntry.startAt)}</span>
             </span>
           )}
           {binding ? t('settingUp') : selected !== null ? t('setKiosk') : t('pickAGathering')}

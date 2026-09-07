@@ -17,7 +17,13 @@
  * three languages.
  *
  * A caller that needs a different locale passes one:
- * `render(<Thing />, { locale: 'zh-Hant' })`.
+ * `render(<Thing />, { locale: 'zh-Hant' })`, and gets that catalogue — all
+ * three are ordinary imports here, where there is no byte budget to answer to.
+ *
+ * The wrapper also supplies `LocaleContext`, and supplies it with real state:
+ * the language switcher is a component like any other, and a test that taps it
+ * must see the app it is inside change language rather than a stub swallow the
+ * call.
  */
 import type { ReactElement, ReactNode } from 'react';
 import {
@@ -28,9 +34,19 @@ import {
   type RenderOptions,
   type RenderResult,
 } from '@testing-library/react';
+import { useMemo, useState } from 'react';
 import { IntlProvider } from 'use-intl';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/locales';
+import { LocaleContext, type LocaleControl } from '@/i18n/localeContext';
 import en from '../../messages/en.json';
+import hans from '../../messages/zh-Hans.json';
+import hant from '../../messages/zh-Hant.json';
+
+const CATALOGS: Record<Locale, typeof en> = {
+  en,
+  'zh-Hans': hans,
+  'zh-Hant': hant,
+};
 
 export * from '@testing-library/react';
 
@@ -40,17 +56,24 @@ interface IntlOptions {
   timeZone?: string;
 }
 
-function wrapper(locale: Locale, timeZone: string | undefined) {
+function wrapper(initial: Locale, timeZone: string | undefined) {
   return function IntlWrapper({ children }: { children: ReactNode }) {
+    const [locale, setLocale] = useState<Locale>(initial);
+    const control = useMemo<LocaleControl>(
+      () => ({ locale, setLocale: (next: Locale) => setLocale(next) }),
+      [locale],
+    );
     /*
      * `onError` left at its default on purpose. A missing key or a broken ICU
      * argument logs loudly here, which is where somebody is looking — the
      * production provider swallows them because a leader mid-check-in is not.
      */
     return (
-      <IntlProvider locale={locale} messages={en} timeZone={timeZone}>
-        {children}
-      </IntlProvider>
+      <LocaleContext.Provider value={control}>
+        <IntlProvider locale={locale} messages={CATALOGS[locale]} timeZone={timeZone}>
+          {children}
+        </IntlProvider>
+      </LocaleContext.Provider>
     );
   };
 }

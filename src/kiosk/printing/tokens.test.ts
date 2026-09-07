@@ -44,14 +44,14 @@ const BINDING: KioskBinding = {
 
 describe('tokenValuesFor', () => {
   it('splits the stored composite into a first name and a nickname', () => {
-    const values = tokenValuesFor(grades, student({ firstName: 'Benson “蔡秉洲”' }), BINDING);
+    const values = tokenValuesFor(grades, 'en', student({ firstName: 'Benson “蔡秉洲”' }), BINDING);
 
     expect(values.firstName).toBe('Benson');
     expect(values.nickname).toBe('蔡秉洲');
   });
 
   it('leaves a plain first name alone and reports no nickname', () => {
-    const values = tokenValuesFor(grades, student({ firstName: 'Ada' }), BINDING);
+    const values = tokenValuesFor(grades, 'en', student({ firstName: 'Ada' }), BINDING);
 
     expect(values.firstName).toBe('Ada');
     // Empty rather than absent: the kiosk looked, and there is none.
@@ -62,14 +62,14 @@ describe('tokenValuesFor', () => {
     // The regression itself, stated in the terms the label cares about: whatever
     // the roster row holds, nothing typographic reaches the sticker.
     for (const name of ['Benson “蔡秉洲”', 'Jonathan “Jonny”', 'Ada']) {
-      const values = tokenValuesFor(grades, student({ firstName: name }), BINDING);
+      const values = tokenValuesFor(grades, 'en', student({ firstName: name }), BINDING);
       expect(values.firstName).not.toMatch(/[“”"]/);
       expect(values.nickname).not.toMatch(/[“”"]/);
     }
   });
 
   it('answers the rest of the row the way the label editor promises', () => {
-    const values = tokenValuesFor(grades, student(), BINDING);
+    const values = tokenValuesFor(grades, 'en', student(), BINDING);
 
     expect(values.lastName).toBe('Lovelace');
     // No full stop — a template that wants one says `{{lastInitial}}.`
@@ -79,7 +79,7 @@ describe('tokenValuesFor', () => {
   });
 
   it('gives a child with nothing on file empty strings rather than gaps', () => {
-    const values = tokenValuesFor(grades, student({ lastName: '', grade: null }), BINDING);
+    const values = tokenValuesFor(grades, 'en', student({ lastName: '', grade: null }), BINDING);
 
     expect(values.lastName).toBe('');
     expect(values.lastInitial).toBe('');
@@ -89,7 +89,7 @@ describe('tokenValuesFor', () => {
   it('leaves allergy for the rasteriser to fold in', () => {
     // It is the one value the roster row cannot answer; `allergyFor` adds it at
     // rasterise time, and absent reads as empty until it does.
-    expect(tokenValuesFor(grades, student({ hasAllergies: true }), BINDING).allergy).toBeUndefined();
+    expect(tokenValuesFor(grades, 'en', student({ hasAllergies: true }), BINDING).allergy).toBeUndefined();
   });
 
   describe('the two the clock answers', () => {
@@ -100,7 +100,7 @@ describe('tokenValuesFor', () => {
      * tape, most of it already spent on a child's name.
      */
     it('dates the label without the year', () => {
-      const date = tokenValuesFor(grades, student(), BINDING).date ?? '';
+      const date = tokenValuesFor(grades, 'en', student(), BINDING).date ?? '';
       const year = String(new Date().getFullYear());
 
       expect(date).not.toBe('');
@@ -109,7 +109,7 @@ describe('tokenValuesFor', () => {
     });
 
     it('times it to the minute, not the second', () => {
-      const time = tokenValuesFor(grades, student(), BINDING).time ?? '';
+      const time = tokenValuesFor(grades, 'en', student(), BINDING).time ?? '';
 
       // A sticker that says 7:04:31 PM is reporting on the printer, not on the
       // check-in.
@@ -118,7 +118,7 @@ describe('tokenValuesFor', () => {
     });
 
     it('says today, and this hour', () => {
-      const { date = '', time = '' } = tokenValuesFor(grades, student(), BINDING);
+      const { date = '', time = '' } = tokenValuesFor(grades, 'en', student(), BINDING);
       const now = new Date();
 
       // A sticker is handed over within a second of being asked for, so these

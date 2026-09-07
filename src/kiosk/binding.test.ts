@@ -81,18 +81,18 @@ describe('eventWindow', () => {
     // 62mm of tape and a lobby screen read from four feet away: "6:30 PM –
     // 8:30 PM" spends a third of the line saying PM twice.
     expect(
-      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(18, 30), endAtMs: at(20, 30) }),
+      eventWindow('en', { ...DOORS_CLOSE_EARLY, startAtMs: at(18, 30), endAtMs: at(20, 30) }),
     ).toBe('6:30 – 8:30 PM');
   });
 
   it('says it twice when the gathering crosses noon', () => {
     expect(
-      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(11, 30), endAtMs: at(13, 0) }),
+      eventWindow('en', { ...DOORS_CLOSE_EARLY, startAtMs: at(11, 30), endAtMs: at(13, 0) }),
     ).toBe('11:30 AM – 1:00 PM');
   });
 
   it('leaves no doubled space where the meridiem was', () => {
-    const window = eventWindow({
+    const window = eventWindow('en', {
       ...DOORS_CLOSE_EARLY,
       startAtMs: at(9, 0),
       endAtMs: at(10, 45),
@@ -104,7 +104,7 @@ describe('eventWindow', () => {
 
   it('crosses midnight without pretending the two ends agree', () => {
     expect(
-      eventWindow({ ...DOORS_CLOSE_EARLY, startAtMs: at(23, 0), endAtMs: at(0, 30) }),
+      eventWindow('en', { ...DOORS_CLOSE_EARLY, startAtMs: at(23, 0), endAtMs: at(0, 30) }),
     ).toBe('11:00 PM – 12:30 AM');
   });
 });
@@ -158,13 +158,13 @@ describe('opensAtLabel', () => {
   it('gives the clock alone when it opens today', () => {
     const later = NOON + 2 * 3_600_000;
     const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: later };
-    expect(opensAtLabel(dayAtTime, binding, NOON)).toBe(at(later));
+    expect(opensAtLabel('en', dayAtTime, binding, NOON)).toBe(at(later));
   });
 
   it('carries the day when it does not — the misbinding this is for', () => {
     const nextWeek = NOON + 7 * 24 * 3_600_000;
     const binding: KioskBinding = { ...WINDOW_TRAILS, checkInOpensAtMs: nextWeek };
-    const label = opensAtLabel(dayAtTime, binding, NOON);
+    const label = opensAtLabel('en', dayAtTime, binding, NOON);
     expect(label).toContain(at(nextWeek));
     expect(label).toMatch(/^\w+day, /);
   });
@@ -173,7 +173,7 @@ describe('opensAtLabel', () => {
     // Nothing else to say, and saying nothing would be worse: a legacy binding
     // never reaches this label anyway, so the fallback only has to be honest.
     expect(WINDOW_TRAILS.checkInOpensAtMs).toBeUndefined();
-    expect(opensAtLabel(dayAtTime, WINDOW_TRAILS, WINDOW_TRAILS.startAtMs)).toBe(at(WINDOW_TRAILS.startAtMs));
+    expect(opensAtLabel('en', dayAtTime, WINDOW_TRAILS, WINDOW_TRAILS.startAtMs)).toBe(at(WINDOW_TRAILS.startAtMs));
   });
 });
 

@@ -29,6 +29,15 @@ import type { KioskStudent } from '../search';
  */
 export function tokenValuesFor(
   grades: GradeStrings,
+  /**
+   * The kiosk's language, for the two tokens `Intl` writes.
+   *
+   * Passed rather than defaulted, on the same argument as `grades`: a lobby set
+   * to Chinese on a tablet sold in English would otherwise print `Sep 7` under
+   * a name in Chinese, and the language of the sticker is the language of the
+   * room. See `eventWindow` in `../binding.ts`.
+   */
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
 ): LabelTokenValues {
@@ -51,7 +60,7 @@ export function tokenValuesFor(
     lastInitial: student.lastName ? student.lastName.slice(0, 1).toUpperCase() : '',
     grade: student.grade === null ? '' : gradeDescription(grades, student.grade),
     eventTitle: binding.title,
-    date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    time: now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+    date: now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    time: now.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
   };
 }

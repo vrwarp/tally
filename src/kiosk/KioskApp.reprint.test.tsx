@@ -259,7 +259,7 @@ describe('the staff reprint flow', () => {
     await tap(/Print name tag/i);
 
     expect(printing.reprintLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.reprintLabel).mock.calls[0]?.[1]).toMatchObject({ id: ADA.id });
+    expect(vi.mocked(printing.reprintLabel).mock.calls[0]?.[2]).toMatchObject({ id: ADA.id });
 
     expect(services.performCheckIn).not.toHaveBeenCalled();
     expect(services.performCheckOut).not.toHaveBeenCalled();

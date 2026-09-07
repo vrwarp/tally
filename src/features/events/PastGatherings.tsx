@@ -27,11 +27,27 @@ import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
-/** "July 2026" — the ruler the rows hang off, so each row only needs a day. */
-const MONTH = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+/**
+ * "July 2026" — the ruler the rows hang off, so each row only needs a day.
+ *
+ * Built per locale rather than once, because the reader's language is a setting
+ * and `Intl`'s default is the browser's: a page switched to Chinese would
+ * otherwise hang Chinese rows off English month headings. `LOCALES` is three
+ * long, so the map is a cache with nothing to evict.
+ */
+const MONTHS = new Map<string, Intl.DateTimeFormat>();
+
+function monthLabel(locale: string, date: Date): string {
+  let format = MONTHS.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+    MONTHS.set(locale, format);
+  }
+  return format.format(date);
+}
 
 interface MonthGroup {
   key: string;
@@ -50,14 +66,14 @@ interface MonthGroup {
  * A ruler that scrolls off the top of the screen is not a ruler, which is why
  * the heading below is `sticky` — see the note on it.
  */
-function groupByMonth(events: readonly TallyEvent[]): MonthGroup[] {
+function groupByMonth(locale: string, events: readonly TallyEvent[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
 
   for (const event of events) {
     const key = `${event.startAt.getFullYear()}-${event.startAt.getMonth()}`;
     const last = groups.at(-1);
     if (last?.key === key) last.events.push(event);
-    else groups.push({ key, label: MONTH.format(event.startAt), events: [event] });
+    else groups.push({ key, label: monthLabel(locale, event.startAt), events: [event] });
   }
 
   return groups;
@@ -246,6 +262,7 @@ export interface PastGatheringsProps {
 export function PastGatherings({ before }: PastGatheringsProps) {
   const t = useTranslations('PastGatherings');
   const tErrors = useTranslations('Errors');
+  const locale = useLocale();
   const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
   const { canWork } = useData();
   /*
@@ -265,7 +282,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     () => new Map(snapshots.map((snapshot) => [snapshot.event.id, snapshot.presentStudentIds.size])),
     [snapshots],
   );
-  const groups = useMemo(() => groupByMonth(events), [events]);
+  const groups = useMemo(() => groupByMonth(locale, events), [locale, events]);
 
   /*
    * The scroll sentinel.

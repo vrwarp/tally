@@ -49,6 +49,16 @@ export const KIOSK_KEYS = {
    * unplugged?" — is asked the morning after.
    */
   printerLog: 'tally:kiosk:printerLog',
+  /**
+   * The Chinese slice of the message catalogue, if this kiosk speaks Chinese.
+   *
+   * One locale at a time — a lobby has one default language and the switcher on
+   * the search screen is for the family whose language is not it, not a second
+   * setting. Kept for the same reason the roster is: the words have to be on
+   * the glass before the network answers. Discarded when it no longer matches
+   * the build — see `src/kiosk/messages.ts`.
+   */
+  messages: 'tally:kiosk:messages',
 } as const;
 
 export function readJson<T>(key: string): T | null {

@@ -46,7 +46,7 @@ import type {
   PrinterNote,
   PrinterState,
 } from '../printing';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { usePrinterNote } from '../printerNote';
 
 /**
@@ -157,8 +157,8 @@ function detectionNotice(
 }
 
 /** "6:41 PM", the way every other time on this device is written. */
-function clockTime(atMs: number): string {
-  return new Date(atMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+function clockTime(locale: string, atMs: number): string {
+  return new Date(atMs).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
 export function PrinterScreen({
@@ -194,6 +194,8 @@ export function PrinterScreen({
   onDone: () => void;
 }) {
   const t = useTranslations('Printer');
+  // The kiosk's language, for the log's clock times and the test label.
+  const locale = useLocale();
   // The log's five ages, in the shape `describeAge` takes — see `AgeStrings`.
   const ages = t as unknown as AgeStrings;
   const printerNote = usePrinterNote();
@@ -421,7 +423,7 @@ export function PrinterScreen({
                         entry.failed ? 'font-semibold text-warn-400' : 'text-ink-500'
                       }`}
                     >
-                      {entry.failed ? t('didNotPrint') : clockTime(entry.atMs)}
+                      {entry.failed ? t('didNotPrint') : clockTime(locale, entry.atMs)}
                     </span>
                   </button>
                 ))}
@@ -663,7 +665,7 @@ export function PrinterScreen({
               type="button"
               tabIndex={-1}
               disabled={busy || state.kind !== 'ready'}
-              {...tap(() => printing.testPrint())}
+              {...tap(() => printing.testPrint(locale))}
               className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
               {t('testPrint')}
