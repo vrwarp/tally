@@ -29,7 +29,15 @@ export function LanguageChoice({ className }: { className?: string }) {
   const { locale, setLocale } = useLocaleControl();
 
   return (
-    <div role="group" aria-label={t('language')} className={cn('flex items-center gap-1', className)}>
+    <div
+      role="group"
+      // The one handle on this control that does not change with the language
+      // it is used to change. Reaching for it by its accessible name works
+      // exactly once — see `e2e/i18n.spec.ts`.
+      data-testid="language-picker"
+      aria-label={t('language')}
+      className={cn('flex items-center gap-1', className)}
+    >
       {LOCALES.map((candidate: Locale) => {
         const current = candidate === locale;
         return (

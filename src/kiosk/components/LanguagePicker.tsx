@@ -46,6 +46,9 @@ export function LanguagePicker({ quiet }: { quiet?: boolean }) {
   return (
     <div
       role="group"
+      // See `LanguageChoice`: the accessible name is itself translated, so it
+      // is not a handle a test can hold across a switch.
+      data-testid="language-picker"
       aria-label={t('language')}
       className={quiet ? 'flex items-center gap-1' : 'flex items-center gap-2'}
     >

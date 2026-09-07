@@ -8,18 +8,27 @@
  * because the control and the persistence are half of what there is to get
  * wrong.
  *
- * What it does *not* do is assert Chinese wording. The catalogues are drafted
- * by `npm run translate` and then read by a bilingual reviewer, and a spec that
- * pinned a sentence would either be asserting a machine draft or would go red
- * the first time somebody improved one. What it asserts instead is the
- * machinery around them, which is what actually breaks: the chunk resolves, the
- * choice sticks across a reload, the document says what language it is in, and
- * nothing anywhere renders a message key at somebody.
+ * What it does *not* do is *hard-code* Chinese wording. The catalogues are
+ * drafted and then read by a bilingual reviewer, and a spec that pinned a
+ * sentence would either be asserting a machine draft or would go red the first
+ * time somebody improved one. Where a Chinese string genuinely has to be
+ * expected — the chooser heading after a kiosk is paired in Chinese — it is
+ * read out of the catalogue, which stays true when the sentence changes. What
+ * it asserts otherwise is the machinery, which is what actually breaks: the
+ * chunk resolves, the choice sticks across a reload, the document says what
+ * language it is in, and nothing anywhere renders a message key at somebody.
+ *
+ * One trap this spec fell into itself, and the reason `language-picker` is a
+ * test id: a control used to *change* the language cannot be found by its own
+ * accessible name afterwards, because that name is translated too. The
+ * languages' own names are not (`LOCALE_LABELS`), so the buttons inside it
+ * still are.
  */
 import type { Page } from '@playwright/test';
 import { gotoReady } from './support/auth';
 import { openKiosk, pairKiosk } from './support/kiosk';
 import { expect, test } from './support/fixtures';
+import zhHantKiosk from '../messages/kiosk/zh-Hant.json';
 
 /**
  * A message key that reached the screen — `Account.signOut` rather than the
@@ -41,7 +50,12 @@ async function visibleText(page: Page): Promise<string> {
 }
 
 async function chooseLanguage(page: Page, name: string): Promise<void> {
-  await page.getByRole('group', { name: /language/i }).getByRole('button', { name }).click();
+  await picker(page).getByRole('button', { name }).click();
+}
+
+/** The switcher itself, by the one handle on it that is not translated. */
+function picker(page: Page) {
+  return page.getByTestId('language-picker');
 }
 
 test.describe('the app speaks more than English', () => {
@@ -62,7 +76,7 @@ test.describe('the app speaks more than English', () => {
     await chooseLanguage(page, '简体中文');
 
     await page.reload();
-    await expect(page.getByRole('group', { name: /language/i })).toBeVisible();
+    await expect(picker(page)).toBeVisible();
 
     // Not a flash of English on the way to Chinese: the locale is read from
     // localStorage synchronously, so the first render already knows.
@@ -82,7 +96,7 @@ test.describe('the app speaks more than English', () => {
 
     // The menu stays open: this changes the words under the reader rather than
     // taking them anywhere, and closing it would hide the only evidence.
-    await expect(page.getByRole('group', { name: /language/i })).toBeVisible();
+    await expect(picker(page)).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
     expect(await visibleText(page)).not.toMatch(MESSAGE_KEY);
   });
@@ -122,7 +136,9 @@ test.describe('the kiosk speaks the lobby it is in', () => {
 
       // And it survives the pairing it was chosen before, which is the point of
       // setting it on that screen.
-      await pairKiosk(kiosk, staff);
+      // The chooser it lands on is Chinese, so the wait has to be — and the
+      // catalogue is where that sentence lives, not this file.
+      await pairKiosk(kiosk, staff, zhHantKiosk.Chooser.question);
       await expect(kiosk.locator('html')).toHaveAttribute('lang', 'zh-Hant');
       expect(await visibleText(kiosk)).not.toMatch(MESSAGE_KEY);
     } finally {
