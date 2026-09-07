@@ -516,7 +516,7 @@ describe('while the call is in the air', () => {
       await vi.advanceTimersByTimeAsync(PROCESSING_MS);
     });
 
-    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
+    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[2].firstName))
       .toEqual(['Robin', 'Sam']);
     // And the second meter is up, saying so.
     expect(screen.getByText('Name tags printing')).toBeTruthy();
@@ -540,7 +540,7 @@ describe('while the call is in the air', () => {
     });
 
     const queued = (printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map(
-      (call) => call[0].id,
+      (call) => call[2].id,
     );
     await act(async () => {
       releaseRegister();

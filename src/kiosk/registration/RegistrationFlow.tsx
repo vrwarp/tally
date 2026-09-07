@@ -21,7 +21,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
-import { haptic, NO_GRADE } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
 import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { useGrades } from '@/hooks/usePureStrings';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
@@ -156,17 +156,20 @@ type FailureCause = 'refused' | 'gave-up';
  */
 const DEADLINE_EXCEEDED = 'deadline-exceeded';
 
-function messageFor(cause: FailureCause): string {
-  return cause === 'gave-up'
-    ? /*
-       * Deliberately not "we could not save that". We do not know that, and the
-       * one thing on this screen we *do* know is in the parent's hand — so the
-       * sentence starts from the tags and points at somebody who can look it up
-       * rather than sending a family away believing they are not registered.
-       */
-      'This is taking longer than expected. Your name tags have printed — please check with a leader before you go.'
-    : 'We could not save that just now — please see a leader.';
-}
+/**
+ * Which sentence a failure gets, as a key rather than as the sentence.
+ *
+ * The two are genuinely different instructions — one says nothing was written,
+ * the other says nobody knows and the family is holding name tags — and that
+ * distinction is a decision this module makes. What it may not do is *say* it:
+ * a reducer is a pure function shared with the tests and cannot reach a
+ * translator, so it names the sentence and the error step reads it out. Same
+ * split as the server's `ServerCode`; see `src/lib/serverCodes.ts`.
+ */
+const FAILURE_KEYS = {
+  'gave-up': 'saveTakingLonger',
+  refused: 'couldNotSave',
+} as const satisfies Record<FailureCause, string>;
 
 /*
  * A plain function, not a factory. It used to close over `requiresCheckOut` for
@@ -194,7 +197,12 @@ function reduce(state: RegistrationState, action: Action): RegistrationState {
     case 'submitted':
       return { ...state, step: 'success', last4: action.result.last4 };
     case 'failed':
-      return { ...state, step: 'error', message: messageFor(action.cause) };
+      return {
+        ...state,
+        step: 'error',
+        // The cause travels; the words are chosen where there is a translator.
+        message: '',
+      };
   }
 }
 
@@ -448,7 +456,7 @@ export function RegistrationFlow({
          */
         title={
           state.step === 'error' && failure === 'gave-up'
-            ? 'Taking a while'
+            ? t('takingAWhile')
             : titleFor(t, state, childNumber)
         }
         subtitle={subtitleFor(t, state, binding)}
@@ -577,7 +585,9 @@ export function RegistrationFlow({
 
           {state.step === 'error' && (
             <div className="flex flex-col gap-5 text-center">
-              <p className="text-xl text-ink-200">{state.message || t('couldNotSave')}</p>
+              <p className="text-xl text-ink-200">
+                {state.message || t(FAILURE_KEYS[failure ?? 'refused'])}
+              </p>
               <Big label={t('tryAgain')} tone="brand" onPick={runSubmit} />
             </div>
           )}
@@ -833,6 +843,8 @@ function SavingScreen({
   phase: SavePhase;
   tagsOut: boolean;
 }) {
+  const t = useTranslations('Register');
+  const grades = useGrades();
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
@@ -847,7 +859,7 @@ function SavingScreen({
             </span>
             {child.grade !== null && (
               <span className="shrink-0 text-base text-ink-500 kiosk:text-lg">
-                {gradeDescription(child.grade)}
+                {gradeDescription(grades, child.grade)}
               </span>
             )}
           </div>
@@ -856,14 +868,14 @@ function SavingScreen({
 
       <div className="flex flex-col gap-7">
         <Meter
-          label={tagsOut ? 'Name tags printing' : 'Checking them in…'}
+          label={tagsOut ? t('tagsPrinting') : t('checkingThemIn')}
           mode={phase === 'processing' ? 'running' : 'full'}
           slow={false}
         />
         {/* Only for the saves that earned it. Most evenings this is never
             drawn, and the screen is one meter that fills and is gone. */}
         {tagsOut && (
-          <Meter label="Saving…" mode={phase === 'finishing' ? 'full' : 'running'} slow />
+          <Meter label={t('saving')} mode={phase === 'finishing' ? 'full' : 'running'} slow />
         )}
       </div>
     </div>

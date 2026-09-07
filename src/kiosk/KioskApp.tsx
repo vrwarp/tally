@@ -1763,6 +1763,8 @@ export function KioskApp() {
           const id = printing.pendingLabelId(registrationId, index);
           printing.rememberAllergyNote(id, child.allergies);
           printing.printLabel(
+            grades,
+            locale,
             {
               id,
               firstName: child.firstName,
@@ -1783,7 +1785,7 @@ export function KioskApp() {
       }
       setPrintTick((tick) => tick + 1);
     },
-    [binding, printing, prints],
+    [binding, printing, prints, grades, locale],
   );
 
   /**

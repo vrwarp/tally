@@ -9582,6 +9582,18 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Register.saveTakingLonger": {
+    "source": "This is taking longer than expected. Your name tags have printed — please check with a leader before you go.",
+    "context": "The whole of the error body when the app gave up waiting rather than being refused — the family's name tags have already printed and nobody knows yet whether the registration was saved. It must not say the save failed, because half the time it did not. The instruction is the point: find a leader before leaving.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.takingAWhile": {
+    "source": "Taking a while",
+    "context": "The header over that same screen. Deliberately not 'Something went wrong': the body underneath says we do not know what happened, and a header that has already decided contradicts it in larger type. Three or four words.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Register.noAllergies": {
     "source": "No allergies",
     "zh-Hans": "todo",
@@ -9609,6 +9621,18 @@
   },
   "Register.saving": {
     "source": "Saving…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkingThemIn": {
+    "source": "Checking them in…",
+    "context": "Under the first progress bar on the saving screen a family watches while their registration is in the air. The bar itself carries the progress; this says what is being done. Addressed to a parent about their own children (您).",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.tagsPrinting": {
+    "source": "Name tags printing",
+    "context": "Replaces the line above the moment the name tags actually start coming out of the printer, so a parent looking at the machine sees the screen agree with it. A statement of what is happening now, not an instruction.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
