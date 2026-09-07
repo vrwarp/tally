@@ -247,19 +247,19 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'Your child',
         state: 'Registering — question 1 of 4',
         step: 'child-first',
-        title: "Child's first name",
+        title: 'The whole run, before any of it is answered',
         caption:
-          'One tap from the offer and the first question is up. One question per screen, in the frame the search already uses. The readout names the field rather than saying "type here", which matters most on the two steps where the answer could belong to either person in the room: "Child\'s last name" and "Your last name" are the same box until one of them says which.',
+          'One tap from the offer, and what a parent meets is not one question on an empty screen but the run: their child\'s questions, then their own, named and in order. This region used to be a 664px hole — half an upright tablet — between the question and the keys that answer it. The question is said again against the keys, and the two are doing different jobs: the row is the index, saying where you are and what you will be able to go back and fix; the line above the rule is the question, in the same glance as the thumb.',
       });
 
-      await type('Chidi');
+      await type('Chidii');
       await shoot({
         flow: 'Your child',
         state: 'Registering — question 1 of 4',
         step: 'child-first (typed)',
         title: 'Capitals, and a key to argue with them',
         caption:
-          'The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O\'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce.',
+          'The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O\'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce. The doubled letter here is deliberate: it is the typo the repair five frames from now goes back for.',
       });
 
       await next();
@@ -287,9 +287,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'Your child',
         state: 'Registering — question 3 of 4',
         step: 'child-grade',
-        title: 'Grade, or none',
+        title: 'Fifteen chips, four across',
         caption:
-          'Fourteen chips and "No grade", which is an answer rather than a blank somebody fills in later: a child too young for a grade has none. On a gathering that hands children back the question opens on "No grade" for the same reason — making a parent clear a field is the same mistake as making a volunteer reach for undo. Choosing is the whole step: a chip advances, so there is no state between picking and moving on.',
+          'Four across rather than three is what puts fifteen chips in four rows instead of five — and four rows land in the keyboard\'s footprint to the pixel, so this question has the same console as every other and the rule above it does not move when the question changes. That is what the grade step gains: a **Next** and a readout it never had. A chip now selects rather than advancing, which costs a tap per child and buys a parent the sight of the year they picked before it reaches a sticker. Next stays dead until one is pressed, because the draft always holds a grade and "No grade" is an answer here rather than a default nobody chose.',
       });
 
       await press('4th grade', true);
@@ -330,9 +330,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'And you',
         state: 'One child banked — adult, question 1 of 3',
         step: 'guardian-first',
-        title: 'Three quick questions about you',
+        title: 'The child is answered, and it shows',
         caption:
-          'The child\'s last question banks them and the wizard turns to the adult. There used to be a screen in this gap — "Anybody else?", with **That\'s everyone** under it — and it has gone: it asked every family a question most of them answer "no" to, about a list the confirm screen shows again four screens later. What is left in its place is one line, on the one step that changes the subject. It says the size of what remains, which is what a parent in a queue is actually asking; it does not restate the field named directly above it, and it does not pre-empt the reason the number is wanted, which arrives on cue two screens later.',
+          'The child\'s last question banks them and the wizard turns to the adult — and nothing about that arrives as a surprise, because the adult\'s three questions have been on the glass since the first keystroke. There used to be a screen in this gap ("Anybody else?", with **That\'s everyone** under it) and then a line standing in for it; a run named in full needs neither. What the list is doing now is the second job: the name typed forty seconds ago is right there to check, without pressing Back to reach it.',
       });
 
       await type('Ngozi');
@@ -340,9 +340,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'And you',
         state: 'Adult — question 1 of 3',
         step: 'guardian-first (typed)',
-        title: 'Typed, and the line has done its work',
+        title: 'The list holds still while a name is typed',
         caption:
-          'The count stays put while the name is typed — it is a fact about the section, not a prompt to be dismissed. It appears on this step alone: on the next question two remain, and a line still reading "three" would be worse than no line at all.',
+          'Nothing above the rule changes on a keystroke — the list is drawn from what has been committed, and a keystroke touches the buffer and the shift state and nothing else. It is memoised on exactly that, so the subtree does not re-render while somebody types. The same discipline the keyboard already keeps, and for the same reason.',
       });
 
       await next();
@@ -383,6 +383,34 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         title: 'Ten digits',
         caption:
           'A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.',
+      });
+
+      /* ---- Fixing something ------------------------------------------- */
+
+      /*
+       * The repair Back could not give them. The row a parent wants is a banked
+       * child's, three screens behind, and Back un-banks its way there — so
+       * fixing one letter used to mean answering the whole run again forwards.
+       */
+      await tap(kiosk.locator('[data-testid="question-child-0-child-first"]').click());
+      await shoot({
+        flow: 'Fixing something',
+        state: 'A question reopened, mid-answer',
+        step: 'child-first (reopened)',
+        title: 'One tap, five screens back',
+        caption:
+          'A parent standing on the phone question sees the doubled letter in their child\'s name. The row is a button: tapping it opens that question with its own answer already in the box and the keyboard lower-case, because the next press is a correction to a word that is there rather than the start of a new one. The child it belongs to is banked and five screens behind, and none of that is a parent\'s problem any more. Only answered questions are buttons — jumping forward to one nobody has reached would leave a hole in the run and a blank on the confirm. The phone row is marked "back to this" rather than lit: still unanswered, and where **Next** returns. The ten digits already typed travel with it, because a parent taps a row *while* answering something — that is when they notice — and coming back to an empty box would lose work they can see. Back here is "never mind", so a row tapped by accident costs nothing.',
+      });
+      await clear();
+      await type('Chidi');
+      await next();
+      await shoot({
+        flow: 'Fixing something',
+        state: 'Back where they were, with the digits intact',
+        step: 'guardian-phone (resumed)',
+        title: 'Put back, not walked back',
+        caption:
+          'Next commits the fix to the child it belongs to and returns straight to the question they were on, with their ten digits where they left them. The alternative — walking forward through everything between the typo and where they were — is five screens of re-confirming answers nobody changed, in front of a queue, to fix one letter.',
       });
 
       await next();

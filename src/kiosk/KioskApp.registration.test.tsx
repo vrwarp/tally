@@ -577,6 +577,12 @@ describe('the four things a parent touches', () => {
     // Three screens back, already committed, and one tap away.
     await tapRow('child-0-child-last');
     expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+
+    // And the header names the child whose question it is, not the one that
+    // would be next: they are fixing their first child, not starting a second.
+    expect(screen.getAllByText('Your child').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Child 2')).toBeNull();
+
     await tap('Clear');
     await type('Fields');
     await tap('Next');

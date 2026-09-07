@@ -222,7 +222,9 @@ export function RegistrationFlow({
 
   /* ---- Render ------------------------------------------------------------ */
 
-  const childNumber = state.children.length + 1;
+  /* Whose questions are on screen: the child being added, or — when a row has
+     been tapped to fix it — the child that row belongs to. */
+  const childNumber = (state.editing ?? state.children.length) + 1;
   /* Every step that asks a question: the list above, the console below. */
   const showsList = isTypingStep(state.step) || state.step === 'child-grade';
 

@@ -759,7 +759,7 @@ describe('reopening a question', () => {
       step: 'child-last',
       buffer: 'Okonkwoo',
       editing: 0,
-      resume: 'guardian-phone',
+      resume: { step: 'guardian-phone', buffer: '' },
     });
     // Lower case, because the next press is a correction to a word that is
     // already there rather than the start of a new one.
@@ -804,6 +804,32 @@ describe('reopening a question', () => {
 
     expect(held).toMatchObject({ step: 'guardian-phone', editing: null, resume: null });
     expect(held.children[0]!.firstName).toBe('Chidi');
+  });
+
+  it('carries a half-given answer back with them', () => {
+    /*
+     * A parent taps a row *while* answering something — ten digits typed and
+     * not yet committed — because that is when they notice the typo. Coming
+     * back to an empty box would lose work they can see on the screen, and
+     * their own half-answer is on no record to be read back off.
+     */
+    const typing = typeText(atThePhone(), '5550149911');
+    let held = reopen(typing, 'child-last', 0);
+    expect(held.buffer).toBe('Okonkwoo');
+
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Okonkwo'));
+
+    expect(held).toMatchObject({ step: 'guardian-phone', buffer: '5550149911', shift: 'off' });
+    expect(canAdvance(held)).toBe(true);
+  });
+
+  it('keeps it through a change of mind, too', () => {
+    const typing = typeText(atThePhone(), '5550149911');
+
+    expect(goBack(reopen(typing, 'child-last', 0))!).toMatchObject({
+      step: 'guardian-phone',
+      buffer: '5550149911',
+    });
   });
 
   it('marks the question it will put them back on', () => {
