@@ -224,6 +224,16 @@ async function type(text: string): Promise<void> {
 }
 
 /** One child, through the three questions and the fork. */
+/** A row of the question list, which is a button once it has an answer. */
+async function tapRow(id: string): Promise<void> {
+  const row = screen.getByTestId(`question-${id}`);
+  await act(async () => {
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
+  });
+  await settle();
+}
+
 async function enterChild(first: string, last: string, grade: string): Promise<void> {
   await type(first);
   await tap('Next');
@@ -549,6 +559,31 @@ describe('the four things a parent touches', () => {
     // And it is a real answer, not a blank: the wizard records the year.
     expect(screen.getByText('Robin Fields')).toBeTruthy();
     expect(screen.getByText('Pre-K')).toBeTruthy();
+  });
+
+  it('lets a parent tap a name three screens back and puts them where they were', async () => {
+    /*
+     * The repair Back could not give them. The row somebody wants is usually a
+     * banked child's, and Back un-banks its way there — so fixing one letter
+     * meant walking the whole run forwards again, in front of a queue.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Feilds', '4');
+    await type('Dana');
+    await tap('Next');
+    expect(screen.getAllByText('Your last name').length).toBeGreaterThan(0);
+
+    // Three screens back, already committed, and one tap away.
+    await tapRow('child-0-child-last');
+    expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    // Back on the adult's surname, which is where they were.
+    expect(screen.getAllByText('Your last name').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('question-child-0-child-last')).toHaveTextContent('Fields');
   });
 
   it('shows the children on the screen that offers another one', async () => {

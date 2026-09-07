@@ -19,6 +19,7 @@ import {
   formatPhone,
   questionList,
   readoutFor,
+  reopen,
   goBack,
   initialState,
   MAX_CHILDREN,
@@ -285,6 +286,8 @@ describe('the whole state, at each transition', () => {
     requiresCheckOut: false,
     backFromConfirm: 'guardian-phone',
     gradePicked: false,
+    editing: null,
+    resume: null,
     registrationId: 'r-1',
     allergiesSupported: false,
     noAllergies: false,
@@ -729,6 +732,122 @@ describe('the list of questions', () => {
       ['child-grade', 0],
     ]);
     expect(rows[3]).toMatchObject({ step: 'guardian-first', child: null });
+  });
+});
+
+
+/**
+ * Tapping a question in the list to fix it.
+ *
+ * The repair a parent actually needs, and the one Back could not give them: the
+ * row somebody wants is usually a banked child's, three screens behind, and
+ * Back un-banks its way there so fixing one letter meant walking the whole run
+ * forwards again.
+ */
+describe('reopening a question', () => {
+  /** One child and an adult, stopped on the phone question. */
+  function atThePhone(): RegistrationState {
+    let held = addChild(start(), 'Chidi', 'Okonkwoo', 4 as Grade);
+    held = advance(typeText(held, 'Ngozi'));
+    return advance(held);
+  }
+
+  it('opens the question with its own answer, on the child it belongs to', () => {
+    const held = reopen(atThePhone(), 'child-last', 0);
+
+    expect(held).toMatchObject({
+      step: 'child-last',
+      buffer: 'Okonkwoo',
+      editing: 0,
+      resume: 'guardian-phone',
+    });
+    // Lower case, because the next press is a correction to a word that is
+    // already there rather than the start of a new one.
+    expect(held.shift).toBe('off');
+  });
+
+  it('writes the fix back to that child and returns where the parent was', () => {
+    let held = reopen(atThePhone(), 'child-last', 0);
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Okonkwo'));
+
+    expect(held.children[0]!.lastName).toBe('Okonkwo');
+    // Not forward through everything they had already answered — five screens
+    // of re-confirming, in front of a queue, to fix one letter.
+    expect(held).toMatchObject({ step: 'guardian-phone', editing: null, resume: null });
+  });
+
+  it('leaves the other answers alone', () => {
+    let held = reopen(atThePhone(), 'child-first', 0);
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Chidiebere'));
+
+    expect(held.children[0]).toEqual({
+      firstName: 'Chidiebere',
+      lastName: 'Okonkwoo',
+      grade: 4,
+      allergies: '',
+    });
+    expect(held.guardian.firstName).toBe('Ngozi');
+  });
+
+  it('takes a grade off the grid, for the child being fixed', () => {
+    let held = reopen(atThePhone(), 'child-grade', 0);
+    expect(held.gradePicked).toBe(true);
+
+    held = advance(chooseGrade(held, 7 as Grade));
+
+    expect(held.children[0]!.grade).toBe(7);
+    expect(held.step).toBe('guardian-phone');
+  });
+
+  it('is "never mind" when the parent backs out of it', () => {
+    const held = goBack(reopen(atThePhone(), 'child-first', 0))!;
+
+    expect(held).toMatchObject({ step: 'guardian-phone', editing: null, resume: null });
+    expect(held.children[0]!.firstName).toBe('Chidi');
+  });
+
+  it('marks the question it will put them back on', () => {
+    const rows = questionList(reopen(atThePhone(), 'child-last', 0)).flatMap(
+      (section) => section.rows,
+    );
+
+    expect(rows.find((row) => row.resumeHere)).toMatchObject({
+      step: 'guardian-phone',
+      state: 'todo',
+    });
+    expect(rows.find((row) => row.state === 'now')).toMatchObject({ step: 'child-last' });
+  });
+
+  it('offers only the questions that have been answered', () => {
+    /*
+     * Jumping forward to a question nobody has reached would leave a hole in
+     * the run and a blank on the confirm, and there is nothing there to fix.
+     */
+    const rows = questionList(atThePhone()).flatMap((section) => section.rows);
+
+    expect(rows.filter((row) => row.canReopen).map((row) => row.step)).toEqual([
+      'child-first',
+      'child-last',
+      'child-grade',
+      'guardian-first',
+      'guardian-last',
+    ]);
+  });
+
+  it('keeps the run’s own place while a question is open', () => {
+    // The list is drawn from where the parent is in the run, not from the
+    // question they have jumped to — otherwise their half-answered child would
+    // read as finished.
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
+    expect(held.step).toBe('child-last');
+
+    const open = reopen(held, 'child-first', 0);
+    const second = questionList(open).find((section) => section.title === 'Child 2')!;
+
+    expect(second.rows.map((row) => row.state)).toEqual(['done', 'todo', 'todo']);
+    expect(second.rows[1]!.resumeHere).toBe(true);
   });
 });
 
