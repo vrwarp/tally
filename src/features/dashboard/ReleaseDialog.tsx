@@ -18,6 +18,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Modal, TextField } from '@/components/ui';
 import { formatShortDate } from '@/lib/time';
+import { useTranslations } from 'use-intl';
 import {
   TRANSITION_REASON_LABEL,
   studentFullName,
@@ -46,9 +47,9 @@ export interface ReleaseDialogProps {
   onConfirm: (target: ReleaseTarget, reason: TransitionReason, note: string) => void;
 }
 
-const REASON_HINT: Record<TransitionReason, string> = {
-  'moved-on': 'We still expect to see them at another gathering.',
-  departed: 'Graduated, moved away, or stopped coming — this is the resolution.',
+const REASON_HINT: Record<TransitionReason, 'hintMovedOn' | 'hintDeparted'> = {
+  'moved-on': 'hintMovedOn',
+  departed: 'hintDeparted',
 };
 
 /**
@@ -58,27 +59,35 @@ const REASON_HINT: Record<TransitionReason, string> = {
  * and a caption that only warned about the surfacing one would train the
  * reader that the sentence never matters.
  */
-function consequence(target: ReleaseTarget, reason: TransitionReason, threshold: number): string {
+/*
+ * Four whole sentences rather than two with a clause glued to the front.
+ * The "has not been seen anywhere since" opener is its own sentence in
+ * English, but which sentence it belongs *inside* differs by language, and a
+ * translator handed a prefix and a body cannot reorder them.
+ */
+function consequence(
+  t: ReturnType<typeof useTranslations<'Release'>>,
+  target: ReleaseTarget,
+  reason: TransitionReason,
+  threshold: number,
+): string {
   const name = target.student.firstName || studentFullName(target.student);
-  const unseen = target.notSeenAnywhereSince
-    ? `${name} has not been seen at any gathering since ${formatShortDate(target.notSeenAnywhereSince)}. `
-    : '';
+  const since = target.notSeenAnywhereSince;
 
   if (reason === 'departed') {
-    return (
-      `${unseen}Marking ${name} “no longer with us” means Tally stops asking about them: they ` +
-      `leave this list and will not appear on any other. Checking them in here again undoes it.`
-    );
+    return since
+      ? t('consequenceDepartedUnseen', { name, date: formatShortDate(since) })
+      : t('consequenceDeparted', { name });
   }
 
-  return (
-    `${unseen}${name} leaves this list now and stays on the ministry's radar: if no gathering ` +
-    `sees them, they will appear under “Not seen at any gathering” after about ${threshold} more ` +
-    `gatherings. Checking them in here again undoes the release by itself.`
-  );
+  return since
+    ? t('consequenceMovedOnUnseen', { name, date: formatShortDate(since), threshold })
+    : t('consequenceMovedOn', { name, threshold });
 }
 
 export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: ReleaseDialogProps) {
+  const t = useTranslations('Release');
+  const tReason = useTranslations('Transitions');
   const [reason, setReason] = useState<TransitionReason>('moved-on');
   const [note, setNote] = useState('');
 
@@ -97,16 +106,16 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
     <Modal
       open
       onClose={busy ? () => undefined : onClose}
-      title="No longer expected here"
-      description={`${name} · ${target.gatheringTitle}`}
+      title={t('title')}
+      description={t('subtitle', { name, gathering: target.gatheringTitle })}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button onClick={() => onConfirm(target, reason, note)} loading={busy}>
-            Release
+            {t('confirm')}
           </Button>
         </>
       }
@@ -116,7 +125,7 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
           below it ran together as a single wall. */}
       <div className="flex flex-col gap-4">
         <fieldset className="flex flex-col gap-2">
-          <legend className="sr-only">Why {name} is no longer expected</legend>
+          <legend className="sr-only">{t('legend', { name })}</legend>
           {(['moved-on', 'departed'] as const).map((value) => (
             <label
               key={value}
@@ -135,21 +144,21 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
               />
               <span className="flex min-w-0 flex-col">
                 <span className="text-sm font-semibold text-ink-50">
-                  {TRANSITION_REASON_LABEL[value]}
+                  {tReason(TRANSITION_REASON_LABEL[value])}
                 </span>
-                <span className="text-xs text-ink-400">{REASON_HINT[value]}</span>
+                <span className="text-xs text-ink-400">{t(REASON_HINT[value])}</span>
               </span>
             </label>
           ))}
         </fieldset>
 
         <TextField
-          label="Note (optional)"
+          label={t('noteLabel')}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={500}
-          placeholder="“graduated”, “moved to Austin”"
-          hint="Kept on the record under this list, for whoever reads it later."
+          placeholder={t('notePlaceholder')}
+          hint={t('noteHint')}
         />
 
         <p
@@ -160,7 +169,7 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
               : 'bg-ink-800/60 text-ink-300 ring-ink-700')
           }
         >
-          {consequence(target, reason, threshold)}
+          {consequence(t, target, reason, threshold)}
         </p>
       </div>
     </Modal>

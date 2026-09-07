@@ -27,6 +27,7 @@ import { formatRelative, formatShortDate } from '@/lib/time';
 import { gradeSentence, initials, sortByName } from '@/lib/utils';
 import { sessionReleaseKey, type SessionRelease } from '@/features/dashboard/sessionRelease';
 import { TRANSITION_REASON_LABEL, studentFullName, type MiaStudent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface MiaListProps {
   items: readonly MiaStudent[];
@@ -75,6 +76,7 @@ export function MiaList({
   onUndoSessionRelease,
   undoBusyKey = null,
 }: MiaListProps) {
+  const t = useTranslations('Mia');
   const students = items.map((item) => item.student);
 
   /*
@@ -102,12 +104,12 @@ export function MiaList({
   return (
     <Card>
       <CardHeader
-        title="Missing in action"
+        title={t('title')}
         count={loading ? undefined : items.length}
         description={
           gatheringTitle
-            ? `Came to ${gatheringTitle} regularly, then missed ${threshold} or more in a row.`
-            : `Was a regular at one gathering, then missed ${threshold} or more of it in a row.`
+            ? t('descriptionScoped', { gathering: gatheringTitle, threshold })
+            : t('description', { threshold })
         }
         action={
           /*
@@ -140,7 +142,7 @@ export function MiaList({
                 build={() => ({
                   filename: exportFilename({
                     kind: 'follow-up',
-                    scope: gatheringTitle ? `${gatheringTitle} mia` : 'mia',
+                    scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                     at: new Date(),
                   }),
                   contents: buildMiaCsv(items, exportContext),
@@ -159,11 +161,11 @@ export function MiaList({
         <CallListLoadingRows rows={4} lines={gatheringTitle === null ? 3 : 2} />
       ) : entries.length === 0 ? (
         <EmptyState
-          title={`Nobody has missed ${threshold} in a row — nice.`}
+          title={t('emptyTitle', { threshold })}
           description={
             gatheringTitle
-              ? `Every ${gatheringTitle} regular has been to one of the recent ones.`
-              : 'Every regular has turned up at one of the recent gatherings.'
+              ? t('emptyBodyScoped', { gathering: gatheringTitle })
+              : t('emptyBody')
           }
         />
       ) : (
@@ -215,6 +217,8 @@ function ReleasedRow({
   onUndo?: (release: SessionRelease) => void;
   busy: boolean;
 }) {
+  const t = useTranslations('Mia');
+  const tReason = useTranslations('Transitions');
   const { item, reason } = release;
   const name = studentFullName(item.student);
 
@@ -291,9 +295,12 @@ function ReleasedRow({
             rest of the list, and a clear step below the name above it.
           */}
           <span className="text-xs text-ink-500">
-            No longer expected
-            {showGathering && item.gatheringTitle ? ` at ${item.gatheringTitle}` : ' here'} —{' '}
-            {TRANSITION_REASON_LABEL[reason]}
+            {showGathering && item.gatheringTitle
+              ? t('noLongerExpectedAt', {
+                  gathering: item.gatheringTitle,
+                  reason: tReason(TRANSITION_REASON_LABEL[reason]),
+                })
+              : t('noLongerExpectedHere', { reason: tReason(TRANSITION_REASON_LABEL[reason]) })}
           </span>
         </div>
         {/*
@@ -354,6 +361,7 @@ function MiaRow({
   onContactAdded?: () => void;
   onResolve?: (item: MiaStudent) => void;
 }) {
+  const t = useTranslations('Mia');
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
   const name = studentFullName(student);
   const grade = gradeSentence(student);
@@ -378,10 +386,17 @@ function MiaRow({
    */
   const placedBelow = showGathering ? item.gatheringTitle !== null : true;
   const lastSeen = lastAttendedAt
-    ? `Last seen ${formatShortDate(lastAttendedAt)}, ${formatRelative(lastAttendedAt)}${
-        !placedBelow && lastAttendedEventTitle ? ` at ${lastAttendedEventTitle}` : ''
-      }`
-    : 'Never checked in';
+    ? !placedBelow && lastAttendedEventTitle
+      ? t('lastSeenAtEvent', {
+          date: formatShortDate(lastAttendedAt),
+          relative: formatRelative(lastAttendedAt),
+          event: lastAttendedEventTitle,
+        })
+      : t('lastSeen', {
+          date: formatShortDate(lastAttendedAt),
+          relative: formatRelative(lastAttendedAt),
+        })
+    : t('neverCheckedIn');
 
   return (
     /*
@@ -470,7 +485,7 @@ function MiaRow({
             <span className="text-xs text-ink-500">
               {showGathering
                 ? item.gatheringTitle
-                  ? `Missing from ${item.gatheringTitle}`
+                  ? t('missingFrom', { gathering: item.gatheringTitle })
                   : item.release
                     ? // The provenance a released row carries: who decided this
                       // student had moved on, has been contradicted by nobody —
@@ -484,21 +499,22 @@ function MiaRow({
                       // row in the list 18px taller than the rest. The date and
                       // the clause qualifying it are one fact, so they move to
                       // the next line together or not at all.
-                      [
-                        `Moved on${item.release.fromTitle ? ` from ${item.release.fromTitle}` : ''} `,
-                        <span key="since" className="whitespace-nowrap">
-                          {formatShortDate(item.release.at)} — not seen since
-                        </span>,
-                      ]
+                      t.rich(item.release.fromTitle ? 'movedOnFrom' : 'movedOn', {
+                        gathering: item.release.fromTitle ?? '',
+                        date: formatShortDate(item.release.at),
+                        nowrap: (chunks) => (
+                          <span key="since" className="whitespace-nowrap">
+                            {chunks}
+                          </span>
+                        ),
+                      })
                     : // No gathering can claim them: the window holds no sighting
                       // of them at any of them, which is the strongest version of
                       // this list's case rather than a weaker one.
-                      'Not seen at any gathering'
+                      t('notSeenAnyGathering')
                 : null}
               {showGathering && item.alsoMissingCount > 0
-                ? ` · and ${item.alsoMissingCount} other ${
-                    item.alsoMissingCount === 1 ? 'gathering' : 'gatherings'
-                  }`
+                ? t('alsoMissing', { count: item.alsoMissingCount })
                 : ''}
               {/*
                 The pre-marked exception, and it takes this line rather than the
@@ -527,9 +543,9 @@ function MiaRow({
                 */
                 <span className="whitespace-nowrap text-warn-400">
                   {showGathering ? (
-                    ' · and nowhere since'
+                    t('andNowhereSince')
                   ) : (
-                    <>Not seen anywhere since {formatShortDate(item.notSeenAnywhereSince)}</>
+                    t('notSeenAnywhereSince', { date: formatShortDate(item.notSeenAnywhereSince) })
                   )}
                 </span>
               ) : null}
@@ -541,8 +557,8 @@ function MiaRow({
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
           <span className="sr-only">
             {item.gatheringTitle
-              ? `Missed ${consecutiveMisses} ${item.gatheringTitle} gatherings in a row.`
-              : `Not seen at any of the last ${consecutiveMisses} gatherings.`}
+              ? t('missedInARow', { count: consecutiveMisses, gathering: item.gatheringTitle })
+              : t('notSeenAtLast', { count: consecutiveMisses })}
           </span>
           <span
             aria-hidden="true"
@@ -653,9 +669,9 @@ function MiaRow({
             // the two was the one that reverses a decision about a child.
             className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100 min-w-28"
             onClick={() => onResolve(item)}
-            aria-label={`No longer expected — ${name}`}
+            aria-label={t('resolveAria', { name })}
           >
-            Resolve…
+            {t('resolve')}
           </Button>
         ) : null}
       </div>

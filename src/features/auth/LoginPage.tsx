@@ -17,8 +17,10 @@ import { useAuth } from '@/context/authContext';
 import { Button, ErrorBanner, LoadingScreen } from '@/components/ui';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
 import { firebaseApp } from '@/lib/firebase';
+import { useTranslations } from 'use-intl';
 
 export function LoginPage() {
+  const t = useTranslations('Login');
   const { status, error, signInWithGoogle } = useAuth();
 
   /*
@@ -39,7 +41,7 @@ export function LoginPage() {
    */
   const googleUnavailable = strategy === 'unavailable';
 
-  if (status === 'loading') return <LoadingScreen message="Checking your session…" />;
+  if (status === 'loading') return <LoadingScreen message={t('checkingSession')} />;
   // `pending` redirects too: somebody who has just signed in but has no profile
   // yet gets the holding screen inside the app, not this form again.
   if (status === 'ready' || status === 'pending') return <Navigate to="/" replace />;
@@ -66,9 +68,7 @@ export function LoginPage() {
             ✓
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-ink-50">Tally</h1>
-          <p className="text-sm text-ink-400">
-            Attendance for youth and children&rsquo;s ministry.
-          </p>
+          <p className="text-sm text-ink-400">{t('tagline')}</p>
         </header>
 
         <div className="flex flex-col gap-5">
@@ -83,23 +83,17 @@ export function LoginPage() {
             onClick={() => void handleGoogle()}
             className={inAppBrowser && !googleUnavailable ? 'opacity-70 saturate-50' : undefined}
           >
-            {inAppBrowser && !googleUnavailable ? 'Try Google sign-in anyway' : 'Continue with Google'}
+            {inAppBrowser && !googleUnavailable ? t('tryGoogleAnyway') : t('continueWithGoogle')}
           </Button>
 
           {googleUnavailable || inAppBrowser ? (
             <p className="text-center text-xs leading-relaxed text-warn-400">
-              {googleUnavailable
-                ? 'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.'
-                : 'Google often refuses to sign people in inside an app’s built-in browser. If it ' +
-                  'does, tap the menu (⋯ or the share icon) and choose “Open in browser”, then try again.'}
+              {googleUnavailable ? t('googleUnavailable') : t('inAppBrowserWarning')}
             </p>
           ) : null}
         </div>
 
-        <p className="text-center text-xs leading-relaxed text-ink-500">
-          A leader adds you to Tally by your Google address. Sign in with the one they used, and
-          you are in — no password to remember at a door.
-        </p>
+        <p className="text-center text-xs leading-relaxed text-ink-500">{t('footer')}</p>
       </div>
     </div>
   );

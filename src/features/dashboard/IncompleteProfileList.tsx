@@ -28,6 +28,7 @@ import { exportFilename } from '@/lib/csv';
 import { formatShortDate } from '@/lib/time';
 import { gradeSentence, initials } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Past this many days an unfinished profile stops being a fresh to-do. */
 const STALE_DAYS = 7;
@@ -72,15 +73,16 @@ export function IncompleteProfileList({
   onContactAdded,
   exportContext = NO_EXPORT_CONTEXT,
 }: IncompleteProfileListProps) {
+  const t = useTranslations('Incomplete');
   return (
     <Card>
       <CardHeader
-        title="Incomplete profiles"
+        title={t('title')}
         count={loading ? undefined : students.length}
         description={
           gatheringTitle
-            ? `Seen at ${gatheringTitle}, with no phone or email on file for an adult.`
-            : 'Active students with no phone or email on file for an adult.'
+            ? t('descriptionScoped', { gathering: gatheringTitle })
+            : t('description')
         }
         action={
           // The real control, disabled at zero, so a loading header is the
@@ -91,7 +93,7 @@ export function IncompleteProfileList({
               build={() => ({
                 filename: exportFilename({
                   kind: 'follow-up',
-                  scope: gatheringTitle ? `${gatheringTitle} incomplete` : 'incomplete',
+                  scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                   at: now,
                 }),
                 contents: buildIncompleteProfileCsv(students, exportContext, now),
@@ -112,19 +114,19 @@ export function IncompleteProfileList({
       ) : students.length === 0 ? (
         checking ? (
           <p className="flex items-center gap-2 px-3 py-2 text-xs text-ink-500">
-            <Spinner /> Checking who has a contact…
+            <Spinner /> {t('checking')}
           </p>
         ) : error ? null : (
           <EmptyState
             title={
               gatheringTitle
-                ? `Everyone at ${gatheringTitle} has a contact.`
-                : 'Every profile has a contact.'
+                ? t('emptyTitleScoped', { gathering: gatheringTitle })
+                : t('emptyTitle')
             }
             description={
               gatheringTitle
-                ? 'Somebody the ministry cannot reach may still be on another tab — this one only counts the people at this gathering.'
-                : 'Quick-added visitors and students with nobody on file land here — right now nobody is waiting.'
+                ? t('emptyBodyScoped')
+                : t('emptyBody')
             }
           />
         )
@@ -166,16 +168,17 @@ function IncompleteRow({
   now: Date;
   onContactAdded?: () => void;
 }) {
+  const t = useTranslations('Incomplete');
   const days = waitingDays(student, now);
   const grade = gradeSentence(student);
   const tone =
     days === null ? 'warn' : days >= VERY_STALE_DAYS ? 'danger' : days >= STALE_DAYS ? 'warn' : 'neutral';
   const badge =
     days === null
-      ? 'Nobody on file'
+      ? t('badgeNobodyOnFile')
       : days === 0
-        ? 'Added today'
-        : `Waiting ${days} ${days === 1 ? 'day' : 'days'}`;
+        ? t('badgeAddedToday')
+        : t('badgeWaiting', { count: days });
 
   return (
     <li className="px-3 py-2">
@@ -211,10 +214,13 @@ function IncompleteRow({
               {/* Silent rather than "No grade" for a person Planning Center
                   holds no grade for — this line is about the wait, and a grade
                   Tally invented is not a fact worth the width. */}
-              {grade ? `${grade} · ` : ''}
-              {days === null
-                ? 'no contact in Planning Center'
-                : `added ${formatShortDate(student.createdAt)}`}
+              {(() => {
+                const detail =
+                  days === null
+                    ? t('metaNoContact')
+                    : t('metaAdded', { date: formatShortDate(student.createdAt) });
+                return grade ? t('metaWithGrade', { grade, detail }) : detail;
+              })()}
             </span>
             {/* Kept, because its tone is graduated — neutral at a day, warn at a
                 fortnight, danger past a year — which is the only ranking in the

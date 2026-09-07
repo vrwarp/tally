@@ -15,6 +15,7 @@ import { computeAttendanceTrend } from '@/features/dashboard/insights';
 import { formatShortDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { EventAttendanceSnapshot } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Tallest bar, in px. Fixed pixels rather than percentages so the bar heights
  *  do not depend on a flex container resolving its own height first. */
@@ -56,6 +57,7 @@ export function AttendanceTrend({
   loading = false,
   className,
 }: AttendanceTrendProps) {
+  const t = useTranslations('Trend');
   const points = useMemo(
     () => computeAttendanceTrend(snapshots, { gatheringKey, limit }),
     [snapshots, gatheringKey, limit],
@@ -70,11 +72,11 @@ export function AttendanceTrend({
   return (
     <Card className={className}>
       <CardHeader
-        title="Attendance trend"
+        title={t('title')}
         description={
           gatheringTitle
-            ? `${gatheringTitle} — head count per gathering, oldest to newest.`
-            : 'Head count per day, oldest to newest. Every gathering that met, added up.'
+            ? t('descriptionScoped', { gathering: gatheringTitle })
+            : t('description')
         }
       />
 
@@ -111,13 +113,13 @@ export function AttendanceTrend({
           </div>
 
           <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-transparent">
-            counting the recent gatherings
+            {t('loading')}
           </p>
         </div>
       ) : points.length === 0 ? (
         <EmptyState
-          title="No gatherings to chart yet."
-          description="Once a couple of gatherings have been checked in, the trend fills in here."
+          title={t('emptyTitle')}
+          description={t('emptyBody')}
         />
       ) : (
         <div className="px-3 pb-3 pt-3">
@@ -160,7 +162,7 @@ export function AttendanceTrend({
           </p>
 
           <table className="sr-only">
-            <caption>Head count per day, oldest first.</caption>
+            <caption>{t('tableCaption')}</caption>
             <thead>
               <tr>
                 <th scope="col">Gathering</th>

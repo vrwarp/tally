@@ -269,6 +269,26 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Errors.provisionUnauthenticated": {
+    "source": "Your session ended before we could check the roster. Sign out and sign in again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.provisionPermissionDenied": {
+    "source": "Planning Center refused this account.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.provisionUnavailable": {
+    "source": "Could not reach the access service. If you are running Tally locally, the Firebase emulators are probably not running — start them with `npm run dev:emulated`.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.provisionUnknown": {
+    "source": "Could not check your access. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Export.csv": {
     "source": "Export CSV",
     "zh-Hans": "todo",
@@ -506,6 +526,736 @@
   },
   "Account.roleAdmin": {
     "source": "admin",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.signingIn": {
+    "source": "Signing you in…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.slowTitle": {
+    "source": "This is taking longer than usual.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.slowBody": {
+    "source": "Tally is still trying to restore your session. Check the wifi, then reload — or sign in again to start fresh.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.reload": {
+    "source": "Reload",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.signInAgain": {
+    "source": "Sign in again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.coreOnlyTitle": {
+    "source": "Core team only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.coreOnlyBody": {
+    "source": "This part of Tally is for the core team. Checking students in is all yours.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.backToCheckIn": {
+    "source": "Back to check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.checkingTitle": {
+    "source": "Checking your access",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.checkingAria": {
+    "source": "Checking access",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.checkingBody": {
+    "source": "Looking for you on the team in Planning Center…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.errorTitle": {
+    "source": "Something went wrong",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.grantedTitle": {
+    "source": "You're on the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.grantedBody": {
+    "source": "Planning Center has you on the team. Your access is set up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.grantedBodyWithRole": {
+    "source": "Planning Center has you on the team as {role}. Your access is set up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.stuckBody": {
+    "source": "Tally is having trouble opening on this device. Your access is fine — reloading normally sorts it out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.openingAria": {
+    "source": "Opening Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.opening": {
+    "source": "Opening Tally…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.notFoundTitle": {
+    "source": "We couldn't find you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.notFoundBody": {
+    "source": "That email is not on the team in Planning Center, so Tally cannot let you in yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.signedInAs": {
+    "source": "Signed in as",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.notFoundHelp": {
+    "source": "Ask a core team leader to add this address to the team in Planning Center, then try again. If you normally use a different address, sign out and use that one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.inactiveTitle": {
+    "source": "Access turned off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.inactiveBody": {
+    "source": "Your Tally access has been turned off. Planning Center still lists you, but someone on the core team has marked you inactive.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.inactiveHelp": {
+    "source": "A core team leader can switch it back on from Settings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.checkingSession": {
+    "source": "Checking your session…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.tagline": {
+    "source": "Attendance for youth and children’s ministry.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.continueWithGoogle": {
+    "source": "Continue with Google",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.tryGoogleAnyway": {
+    "source": "Try Google sign-in anyway",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.googleUnavailable": {
+    "source": "Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.inAppBrowserWarning": {
+    "source": "Google often refuses to sign people in inside an app’s built-in browser. If it does, tap the menu (⋯ or the share icon) and choose “Open in browser”, then try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Login.footer": {
+    "source": "A leader adds you to Tally by your Google address. Sign in with the one they used, and you are in — no password to remember at a door.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.contactAdult": {
+    "source": "Contact adult",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.contactAdultAria": {
+    "source": "Contact the adult for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.contactFor": {
+    "source": "Contact for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.theContactOnFile": {
+    "source": "the contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.about": {
+    "source": "About {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copyNumber": {
+    "source": "Copy number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copyBlocked": {
+    "source": "Copying is blocked on this device.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copiedNamedNumber": {
+    "source": "Copied {contact}'s number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copiedNumber": {
+    "source": "Copied the number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copyNumberFailed": {
+    "source": "Could not copy the number.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.callAria": {
+    "source": "Call {contact} about {name} at {phone}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.textAria": {
+    "source": "Text {contact} about {name} at {phone}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.emailAria": {
+    "source": "Email {contact} about {name} at {email}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.lookingUp": {
+    "source": "Looking up contact…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copyList": {
+    "source": "Copy list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copiedNames": {
+    "source": "Copied {count, plural, one {# name} other {# names}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.copyListFailed": {
+    "source": "Could not copy to the clipboard.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.listContactFallback": {
+    "source": "contact in Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.listRowWithGrade": {
+    "source": "- {name} ({grade}) {contact}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.listRow": {
+    "source": "- {name} {contact}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.addContact": {
+    "source": "Add a contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.addContactAria": {
+    "source": "Add a contact for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Transitions.reasonMovedOn": {
+    "source": "Moved on within the ministry",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Transitions.reasonDeparted": {
+    "source": "No longer with us",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.title": {
+    "source": "Missing in action",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.descriptionScoped": {
+    "source": "Came to {gathering} regularly, then missed {threshold} or more in a row.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.description": {
+    "source": "Was a regular at one gathering, then missed {threshold} or more of it in a row.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.exportScopeScoped": {
+    "source": "{gathering} mia",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.exportScope": {
+    "source": "mia",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.emptyTitle": {
+    "source": "Nobody has missed {threshold} in a row — nice.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.emptyBodyScoped": {
+    "source": "Every {gathering} regular has been to one of the recent ones.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.emptyBody": {
+    "source": "Every regular has turned up at one of the recent gatherings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.noLongerExpectedAt": {
+    "source": "No longer expected at {gathering} — {reason}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.noLongerExpectedHere": {
+    "source": "No longer expected here — {reason}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.lastSeen": {
+    "source": "Last seen {date}, {relative}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.lastSeenAtEvent": {
+    "source": "Last seen {date}, {relative} at {event}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.neverCheckedIn": {
+    "source": "Never checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.missingFrom": {
+    "source": "Missing from {gathering}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.movedOnFrom": {
+    "source": "Moved on from {gathering} <nowrap>{date} — not seen since</nowrap>",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.movedOn": {
+    "source": "Moved on <nowrap>{date} — not seen since</nowrap>",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.notSeenAnyGathering": {
+    "source": "Not seen at any gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.alsoMissing": {
+    "source": " · and {count, plural, one {# other gathering} other {# other gatherings}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.andNowhereSince": {
+    "source": " · and nowhere since",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.notSeenAnywhereSince": {
+    "source": "Not seen anywhere since {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.missedInARow": {
+    "source": "Missed {count} {gathering} gatherings in a row.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.notSeenAtLast": {
+    "source": "Not seen at any of the last {count} gatherings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.resolve": {
+    "source": "Resolve…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Mia.resolveAria": {
+    "source": "No longer expected — {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.title": {
+    "source": "Incomplete profiles",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.descriptionScoped": {
+    "source": "Seen at {gathering}, with no phone or email on file for an adult.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.description": {
+    "source": "Active students with no phone or email on file for an adult.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.exportScopeScoped": {
+    "source": "{gathering} incomplete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.exportScope": {
+    "source": "incomplete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.checking": {
+    "source": "Checking who has a contact…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.emptyTitleScoped": {
+    "source": "Everyone at {gathering} has a contact.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.emptyTitle": {
+    "source": "Every profile has a contact.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.emptyBodyScoped": {
+    "source": "Somebody the ministry cannot reach may still be on another tab — this one only counts the people at this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.emptyBody": {
+    "source": "Quick-added visitors and students with nobody on file land here — right now nobody is waiting.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.badgeNobodyOnFile": {
+    "source": "Nobody on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.badgeAddedToday": {
+    "source": "Added today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.badgeWaiting": {
+    "source": "Waiting {count, plural, one {# day} other {# days}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.metaWithGrade": {
+    "source": "{grade} · {detail}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.metaNoContact": {
+    "source": "no contact in Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Incomplete.metaAdded": {
+    "source": "added {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.title": {
+    "source": "No longer expected here",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.subtitle": {
+    "source": "{name} · {gathering}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.cancel": {
+    "source": "Cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.confirm": {
+    "source": "Release",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.legend": {
+    "source": "Why {name} is no longer expected",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.hintMovedOn": {
+    "source": "We still expect to see them at another gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.hintDeparted": {
+    "source": "Graduated, moved away, or stopped coming — this is the resolution.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.noteLabel": {
+    "source": "Note (optional)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.notePlaceholder": {
+    "source": "“graduated”, “moved to Austin”",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.noteHint": {
+    "source": "Kept on the record under this list, for whoever reads it later.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.consequenceDeparted": {
+    "source": "Marking {name} “no longer with us” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.consequenceDepartedUnseen": {
+    "source": "{name} has not been seen at any gathering since {date}. Marking {name} “no longer with us” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.consequenceMovedOn": {
+    "source": "{name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes the release by itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Release.consequenceMovedOnUnseen": {
+    "source": "{name} has not been seen at any gathering since {date}. {name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes the release by itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.recapTitle": {
+    "source": "One-off events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.recapDescription": {
+    "source": "Retreats and trips. Head count on the day — there is nothing to compare it against.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.recapEmptyTitle": {
+    "source": "No one-off events recently.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.recapEmptyBody": {
+    "source": "A retreat or a trip shows up here once somebody has been checked into it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.checkedInSpoken": {
+    "source": "{count, plural, one {# student checked in.} other {# students checked in.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.checkedInUnit": {
+    "source": "checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.onlyTitle": {
+    "source": "Met once, never since",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.onlyDescription": {
+    "source": "Came to a one-off and has not been to a regular gathering since.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.onlyExportTitle": {
+    "source": "Invite — {count} we met once:",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.metaWithGrade": {
+    "source": "{grade} · {detail}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.gatheringsSinceUnit": {
+    "source": "{count, plural, one {gathering since} other {gatherings since}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.metAtWithGrade": {
+    "source": "{grade} · met at {event} · {date}, {relative}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "OneOff.metAt": {
+    "source": "met at {event} · {date}, {relative}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.title": {
+    "source": "New faces",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.descriptionScoped": {
+    "source": "First seen at {gathering} in the last {days} days.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.description": {
+    "source": "First time in the last {days} days.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.exportScopeScoped": {
+    "source": "{gathering} new",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.exportScope": {
+    "source": "new-faces",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.emptyTitleScoped": {
+    "source": "No first-timers at {gathering}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.emptyTitle": {
+    "source": "No first-timers this week.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.emptyBody": {
+    "source": "Anyone checked in for the first time shows up here while the visit is still fresh.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.badgeOneOffTitle": {
+    "source": "Met at a one-off event, not at a regular gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.badgeOneOff": {
+    "source": "One-off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.badgeIncompleteTitle": {
+    "source": "No contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.badgeIncomplete": {
+    "source": "Incomplete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "NewVisitors.unknownEvent": {
+    "source": "Unknown event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.title": {
+    "source": "Attendance trend",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.descriptionScoped": {
+    "source": "{gathering} — head count per gathering, oldest to newest.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.description": {
+    "source": "Head count per day, oldest to newest. Every gathering that met, added up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.loading": {
+    "source": "counting the recent gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.emptyTitle": {
+    "source": "No gatherings to chart yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.emptyBody": {
+    "source": "Once a couple of gatherings have been checked in, the trend fills in here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Trend.tableCaption": {
+    "source": "Head count per day, oldest first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Ledger.summaryHere": {
+    "source": "{count} no longer expected here · latest {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Ledger.summary": {
+    "source": "{count} no longer expected · latest {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Ledger.note": {
+    "source": " — “{note}”",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }
