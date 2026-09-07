@@ -341,7 +341,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
   await page.waitForTimeout(1200);
 
   await page
-    .getByRole('button', { name: /^(Limit|Change)$/ })
+    .getByRole('button', { name: /^(Limit who is on it|Change who is on it)$/ })
     .first()
     .click();
   await page.waitForTimeout(600);

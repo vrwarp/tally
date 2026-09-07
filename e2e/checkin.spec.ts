@@ -30,7 +30,7 @@ async function widenToWholeRoster(page: Page): Promise<void> {
   const whole = page.getByRole('region', { name: /^Roster,/ });
   for (let rung = 0; rung < 3; rung += 1) {
     if (await whole.isVisible()) return;
-    await page.getByRole('button', { name: /^Show all \d+ (students|who have participated)$/ }).click();
+    await page.getByRole('button', { name: /^Show all \d+ (students|who have been before)$/ }).click();
     await expect(rosterList(page)).toBeVisible();
   }
   await expect(whole).toBeVisible();
@@ -278,7 +278,7 @@ test.describe('check-in', () => {
     await expect(recent).toBeVisible();
     const recentCount = await recent.getByRole('button').count();
 
-    const widen = page.getByRole('button', { name: /^Show all \d+ who have participated$/ });
+    const widen = page.getByRole('button', { name: /^Show all \d+ who have been before$/ });
     await expect(widen).toBeVisible();
     await widen.click();
 
@@ -437,7 +437,7 @@ test.describe('check-in', () => {
     await expect(
       page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Move check-in/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Wrong person/ })).toBeVisible();
     // Counselors have no student pages to be sent to — see `RequireRole`.
     await expect(page.getByRole('link', { name: `Open the profile for ${name}` })).toHaveCount(0);
 
@@ -475,7 +475,7 @@ test.describe('check-in', () => {
     expect(arrivedAt, 'the check-in was written without a time on it').toBeTruthy();
 
     await page.getByRole('button', { name: new RegExp(`^More actions for ${wrong},`) }).click();
-    await page.getByRole('button', { name: /^Move check-in/ }).click();
+    await page.getByRole('button', { name: /^Wrong person/ }).click();
 
     // The screen says what a tap means now, and keeps saying it while the
     // counselor hunts.
@@ -523,7 +523,7 @@ test.describe('check-in', () => {
     const name = await tapFirstRoster(page);
 
     await page.getByRole('button', { name: new RegExp(`^More actions for ${name},`) }).click();
-    await page.getByRole('button', { name: /^Move check-in/ }).click();
+    await page.getByRole('button', { name: /^Wrong person/ }).click();
     await expect(page.getByText('Who should this be?')).toBeVisible();
 
     await page.getByRole('button', { name: 'Cancel' }).click();

@@ -986,7 +986,7 @@ test.describe('registering a family at the kiosk', () => {
 
       await enterChild(kiosk, 'Juniper', 'Aldercroft', '4th grade');
       // The fourth question, which the write-back capability just unlocked.
-      await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible();
+      await expect(kiosk.getByText(/Any allergies the leaders should know about/i)).toBeVisible();
       /*
        * Typed lowercase; stored capped. The step shares the name keyboard's
        * auto-shift, which capitalises at every word boundary — so what the
