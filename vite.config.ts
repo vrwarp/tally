@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { compileMessages } from './scripts/vite-compile-messages';
 
 export default defineConfig({
   /*
@@ -17,6 +18,7 @@ export default defineConfig({
     __E2E_HOOKS__: JSON.stringify(process.env.VITE_E2E_HOOKS === 'true'),
   },
   plugins: [
+    compileMessages(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -78,9 +80,26 @@ export default defineConfig({
     }),
   ],
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      /*
+       * The ICU parser, swapped for a formatter that reads compiled messages.
+       *
+       * `use-intl` reaches its formatter through this bare specifier, so the
+       * whole swap is this line plus the `compileMessages` plugin above — no
+       * application code knows which one it got. `format-only` imports nothing
+       * at all (1.9 kB minified); the module it replaces pulls in
+       * `intl-messageformat`, which is 15.2 kB gzipped of grammar the browser
+       * does not need to know. docs/i18n.md §4.2.
+       *
+       * Anchored, because a prefix match would rewrite the replacement's own
+       * specifier as well.
+       */
+      {
+        find: /^use-intl\/format-message$/,
+        replacement: 'use-intl/format-message/format-only',
+      },
+    ],
   },
   build: {
     // The Firebase SDK is a single ~585 kB vendor chunk and cannot be usefully

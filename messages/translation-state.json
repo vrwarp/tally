@@ -4000,7 +4000,7 @@
     "zh-Hant": "todo"
   },
   "LabelTemplate.bracketsHint": {
-    "source": "Put square brackets round a part that should disappear on its own: <example>{example}</example> prints the brackets only for a child who has a grade.",
+    "source": "Put square brackets round a part that should disappear on its own: <code>{example}</code> prints the brackets only for a child who has a grade.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
