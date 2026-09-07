@@ -39,12 +39,14 @@ import {
   MAX_CHILDREN,
   questionList,
   readoutFor,
+  reopen,
   type QuestionListState,
   type QuestionRow,
   toggleNoAllergies,
   type DraftChild,
   type RegistrationMode,
   type RegistrationState,
+  type StepKind,
 } from './steps';
 
 /**
@@ -69,6 +71,7 @@ type Action =
   | { type: 'back' }
   | { type: 'grade'; grade: Grade | null }
   | { type: 'add-child' }
+  | { type: 'reopen'; step: StepKind; child: number | null }
   | { type: 'no-allergies' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: RegisterFamilyResult }
@@ -91,6 +94,8 @@ function reduce(state: RegistrationState, action: Action): RegistrationState {
       return chooseGrade(state, action.grade);
     case 'add-child':
       return addAnotherChild(state);
+    case 'reopen':
+      return reopen(state, action.step, action.child);
     case 'no-allergies':
       return toggleNoAllergies(state);
     case 'submitting':
@@ -155,6 +160,11 @@ export function RegistrationFlow({
   const anchorIds = useMemo(() => (anchors ?? []).map((sibling) => sibling.id), [anchors]);
 
   const onKey = useCallback((key: KioskKey) => dispatch({ type: 'key', key }), []);
+  /* Stable, so the list's memo holds across a keystroke. */
+  const reopenRow = useCallback((step: StepKind, child: number | null) => {
+    haptic(8);
+    dispatch({ type: 'reopen', step, child });
+  }, []);
   const tap = useTap();
 
   /* ---- Walked away ------------------------------------------------------- */
@@ -279,6 +289,9 @@ export function RegistrationFlow({
                   guardian={state.guardian}
                   allergiesSupported={state.allergiesSupported}
                   mode={state.mode}
+                  editing={state.editing}
+                  resume={state.resume}
+                  onReopen={reopenRow}
                 />
               </div>
             </div>
@@ -659,7 +672,13 @@ const QuestionStack = memo(function QuestionStack({
   guardian,
   allergiesSupported,
   mode,
-}: Omit<QuestionListState, 'children'> & { roster: QuestionListState['children'] }) {
+  editing,
+  resume,
+  onReopen,
+}: Omit<QuestionListState, 'children'> & {
+  roster: QuestionListState['children'];
+  onReopen: (step: StepKind, child: number | null) => void;
+}) {
   const sections = questionList({
     step,
     children: roster,
@@ -667,6 +686,8 @@ const QuestionStack = memo(function QuestionStack({
     guardian,
     allergiesSupported,
     mode,
+    editing,
+    resume,
   });
 
   return (
@@ -677,7 +698,7 @@ const QuestionStack = memo(function QuestionStack({
             {section.title}
           </div>
           {section.rows.map((row) => (
-            <QuestionRowView key={row.id} row={row} />
+            <QuestionRowView key={row.id} row={row} onReopen={onReopen} />
           ))}
         </div>
       ))}
@@ -693,19 +714,25 @@ const QuestionStack = memo(function QuestionStack({
  * the parent is; and one still to come is an outline, because an empty filled
  * row reads as an answer somebody failed to give.
  */
-function QuestionRowView({ row }: { row: QuestionRow }) {
-  return (
-    <div
-      data-testid={`question-${row.id}`}
-      data-state={row.state}
-      className={`flex h-14 items-center justify-between gap-3 rounded-xl px-5 kiosk:h-16 ${
-        row.state === 'now'
-          ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
-          : row.state === 'done'
-            ? 'bg-ink-900'
-            : 'ring-1 ring-ink-800/70'
-      }`}
-    >
+function QuestionRowView({
+  row,
+  onReopen,
+}: {
+  row: QuestionRow;
+  onReopen: (step: StepKind, child: number | null) => void;
+}) {
+  const tap = useTap();
+  const shell = `flex h-14 w-full items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
+    row.state === 'now'
+      ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
+      : row.state === 'done'
+        ? 'bg-ink-900'
+        : row.resumeHere
+          ? 'ring-2 ring-ink-600'
+          : 'ring-1 ring-ink-800/70'
+  }`;
+  const body = (
+    <>
       <span
         className={`truncate text-base kiosk:text-lg ${
           row.state === 'now'
@@ -722,7 +749,40 @@ function QuestionRowView({ row }: { row: QuestionRow }) {
           {row.answer}
         </span>
       )}
-    </div>
+      {/* Where Next puts them back, said on the row itself rather than in a
+          sentence somewhere else on the screen. */}
+      {row.resumeHere && (
+        <span className="shrink-0 text-sm tracking-[0.08em] text-ink-500 uppercase kiosk:text-base">
+          back to this
+        </span>
+      )}
+    </>
+  );
+
+  /*
+   * A question already answered is a button; one nobody has reached is not.
+   * Jumping forward to an unanswered question would leave a hole in the run and
+   * a confirm screen with a blank on it, and there is nothing there to fix.
+   */
+  if (!row.canReopen) {
+    return (
+      <div data-testid={`question-${row.id}`} data-state={row.state} className={shell}>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      data-testid={`question-${row.id}`}
+      data-state={row.state}
+      aria-label={`${row.label}: ${row.answer}. Change it.`}
+      {...tap(() => onReopen(row.step, row.child))}
+      className={`${shell} active:bg-ink-700`}
+    >
+      {body}
+    </button>
   );
 }
 

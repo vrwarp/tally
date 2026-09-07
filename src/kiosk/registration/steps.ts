@@ -115,6 +115,28 @@ export interface RegistrationState {
    */
   gradePicked: boolean;
   /**
+   * Which banked child the buffer is filling, when a parent has tapped a row
+   * to fix it. Null in the ordinary forward run, where the buffer fills the
+   * draft.
+   *
+   * The row somebody most wants to fix is usually a banked one: they are on the
+   * phone question and they notice their child's surname is wrong, three
+   * screens back and already committed. So the record the buffer targets has to
+   * be addressable rather than always the draft.
+   */
+  editing: number | null;
+  /**
+   * Where **Next** goes after a question was reopened out of order, and null in
+   * the ordinary forward run.
+   *
+   * A parent who fixes question two from question six wants question six back,
+   * not five screens of re-confirming what they already answered. Stored rather
+   * than derived because the run's own position is exactly what reopening a row
+   * throws away — `step` is the reopened question now, and nothing else
+   * remembers where they were.
+   */
+  resume: StepKind | null;
+  /**
    * Whether "No allergies" is ticked on the allergies step.
    *
    * An empty buffer already means none, so this is not what *records* the
@@ -180,6 +202,8 @@ export function initialState(args: {
     allergiesSupported: args.allergiesSupported === true,
     noAllergies: false,
     gradePicked: false,
+    editing: null,
+    resume: null,
     children: [],
     draft: {
       firstName: '',
@@ -404,6 +428,119 @@ function stepAfterChildQuestions(state: RegistrationState): StepKind {
     : 'guardian-first';
 }
 
+/**
+ * The child the buffer is filling: the draft, or a banked one being fixed.
+ *
+ * Every child question reads and writes through this pair rather than touching
+ * `draft` directly, which is the whole of what makes a row tappable.
+ */
+function currentChild(state: RegistrationState): DraftChild {
+  // Stryker disable next-line OptionalChaining: `editing` is only ever set to
+  // an index `reopen` read off a row it built out of `children`.
+  return state.editing === null ? state.draft : state.children[state.editing]!;
+}
+
+function withChild(state: RegistrationState, child: DraftChild): RegistrationState {
+  if (state.editing === null) return { ...state, draft: child };
+  return {
+    ...state,
+    children: state.children.map((banked, index) => (index === state.editing ? child : banked)),
+  };
+}
+
+/** What a step opens with in the buffer — its own answer, ready to be edited. */
+function bufferFor(state: RegistrationState, step: StepKind): string {
+  const child = currentChild(state);
+  switch (step) {
+    case 'child-first':
+      return child.firstName;
+    case 'child-last':
+      return child.lastName;
+    case 'child-allergies':
+      return child.allergies;
+    case 'guardian-first':
+      return state.guardian.firstName;
+    case 'guardian-last':
+      return state.guardian.lastName;
+    case 'guardian-phone':
+      return state.guardian.phone;
+    // Stryker disable next-line StringLiteral: the grade has no buffer — it is
+    // chosen off a grid — and no other step is reachable here.
+    default:
+      return '';
+  }
+}
+
+/** The buffer written into whichever field the step on screen names. */
+function commitAnswer(state: RegistrationState, value: string): RegistrationState {
+  const child = currentChild(state);
+  switch (state.step) {
+    case 'child-first':
+      return withChild(state, { ...child, firstName: value });
+    case 'child-last':
+      return withChild(state, { ...child, lastName: value });
+    case 'child-allergies':
+      // The tick and an empty box record the same answer, and the tick wins
+      // where they could disagree: it is the one the parent can see.
+      return withChild(state, { ...child, allergies: state.noAllergies ? '' : value });
+    case 'guardian-first':
+      return { ...state, guardian: { ...state.guardian, firstName: value } };
+    case 'guardian-last':
+      return { ...state, guardian: { ...state.guardian, lastName: value } };
+    case 'guardian-phone':
+      return { ...state, guardian: { ...state.guardian, phone: value } };
+    // Stryker disable next-line StringLiteral: the grade is already on the
+    // record — a chip put it there — and no other step reaches this.
+    default:
+      return state;
+  }
+}
+
+/** Arriving at a question: its own answer in the buffer, ready to be changed. */
+function landOn(
+  state: RegistrationState,
+  step: StepKind,
+): Pick<RegistrationState, 'step' | 'buffer' | 'shift' | 'noAllergies' | 'gradePicked'> {
+  const buffer = bufferFor(state, step);
+  return {
+    step,
+    buffer,
+    // A number pad has no capitals to offer; everything else opens where the
+    // answer it is holding leaves off.
+    shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
+    // Reopened unticked whatever was answered: an empty box is the honest
+    // reopening of "none", and it is one tap from ticked again.
+    noAllergies: false,
+    // A grade being reopened was answered once already, so Next is not dead.
+    gradePicked: step === 'child-grade' ? true : state.gradePicked,
+  };
+}
+
+/**
+ * A question tapped in the list, reopened.
+ *
+ * The repair a parent actually needs. They are on the phone question and they
+ * notice the surname is wrong — three screens back, already committed to a
+ * banked child. Before this the only way there was Back four times, and Back
+ * un-banks its way backwards, so fixing one letter meant walking the whole run
+ * again forwards.
+ *
+ * Where they were is remembered rather than walked: `resume` brings **Next**
+ * straight back, and Back on a reopened question is "never mind" — it returns
+ * without committing. Only answered questions can be reopened; a question
+ * nobody has reached is not a place to jump to, it is a hole.
+ */
+export function reopen(
+  state: RegistrationState,
+  step: StepKind,
+  child: number | null,
+): RegistrationState {
+  const editing = child !== null && child < state.children.length ? child : null;
+  if (step === state.step && editing === state.editing) return state;
+  const moved = { ...state, editing, resume: state.resume ?? state.step };
+  return { ...moved, ...landOn(moved, step) };
+}
+
 /** A child nobody has typed into yet, opened on this gathering's default. */
 function blankDraft(state: RegistrationState): DraftChild {
   return {
@@ -451,6 +588,17 @@ function bankChild(state: RegistrationState, draft: DraftChild): RegistrationSta
 export function advance(state: RegistrationState): RegistrationState {
   if (!canAdvance(state)) return state;
   const value = state.buffer.trim();
+
+  /*
+   * A question reopened out of order goes back where the parent was, with the
+   * answer committed. Walking forward from here would make them re-confirm
+   * every screen between the typo and the question they were on — five of them,
+   * in front of a queue, to fix one letter.
+   */
+  if (state.resume !== null) {
+    const committed = { ...commitAnswer(state, value), editing: null, resume: null };
+    return { ...committed, ...landOn(committed, state.resume) };
+  }
 
   switch (state.step) {
     case 'child-first':
@@ -557,7 +705,7 @@ export function chooseGrade(
   grade: Grade | null,
 ): RegistrationState {
   if (state.step !== 'child-grade') return state;
-  return { ...state, draft: { ...state.draft, grade }, gradePicked: true };
+  return { ...withChild(state, { ...currentChild(state), grade }), gradePicked: true };
 }
 
 /**
@@ -648,6 +796,10 @@ export interface QuestionRow {
   /** The committed answer. Empty on any row not answered yet. */
   answer: string;
   state: 'done' | 'now' | 'todo';
+  /** Whether tapping it reopens the question. Only answered ones can be. */
+  canReopen: boolean;
+  /** The question the parent was on when they tapped away — where Next returns. */
+  resumeHere: boolean;
 }
 
 export interface QuestionSection {
@@ -722,7 +874,7 @@ function runState(at: SectionAt, position: number): QuestionRow['state'] {
  */
 export function readoutFor(state: RegistrationState): string {
   if (state.step === 'child-grade') {
-    return state.gradePicked ? gradeAnswer(state.draft.grade) : '';
+    return state.gradePicked ? gradeAnswer(currentChild(state).grade) : '';
   }
   if (state.step === 'guardian-phone') return formatPhone(state.buffer);
   return state.buffer;
@@ -757,19 +909,33 @@ export function readoutFor(state: RegistrationState): string {
 /** Everything the list reads. Deliberately not the buffer — see the component. */
 export type QuestionListState = Pick<
   RegistrationState,
-  'step' | 'children' | 'draft' | 'guardian' | 'allergiesSupported' | 'mode'
+  | 'step'
+  | 'children'
+  | 'draft'
+  | 'guardian'
+  | 'allergiesSupported'
+  | 'mode'
+  | 'editing'
+  | 'resume'
 >;
 
 export function questionList(state: QuestionListState): QuestionSection[] {
-  const onChild = isChildStep(state.step);
-  const onAdult = isAdultStep(state.step);
+  /*
+   * Where the run is, which is not where the screen is once a row has been
+   * tapped: `step` is then the question being fixed, and `resume` is the place
+   * the parent will be put back. The list is drawn from the run, and the
+   * reopened question is painted over it afterwards.
+   */
+  const at = state.resume ?? state.step;
+  const onChild = isChildStep(at);
+  const onAdult = isAdultStep(at);
   /* The draft is the last child of the run while its own questions are up. */
   const roster = onChild ? [...state.children, state.draft] : state.children;
   const current = onChild ? roster.length - 1 : -1;
   const childSteps: readonly StepKind[] = state.allergiesSupported
     ? CHILD_STEPS
     : CHILD_STEPS.slice(0, 3);
-  const childAt: SectionAt = onChild ? childSteps.indexOf(state.step) : 'behind';
+  const childAt: SectionAt = onChild ? childSteps.indexOf(at) : 'behind';
   /*
    * Off the adult's own steps the phone settles the section: it is the last of
    * the three, so having it means all three were answered — which is the case
@@ -777,7 +943,7 @@ export function questionList(state: QuestionListState): QuestionSection[] {
    * confirm screen.
    */
   const adultAt: SectionAt = onAdult
-    ? ADULT_STEPS.indexOf(state.step as (typeof ADULT_STEPS)[number])
+    ? ADULT_STEPS.indexOf(at as (typeof ADULT_STEPS)[number])
     : state.guardian.phone !== ''
       ? 'behind'
       : 'ahead';
@@ -795,6 +961,8 @@ export function questionList(state: QuestionListState): QuestionSection[] {
           label: CHILD_LABELS[position]!,
           answer: rowState === 'done' ? childAnswer(child, step) : '',
           state: rowState,
+          canReopen: rowState === 'done',
+          resumeHere: false,
         };
       }),
     });
@@ -812,12 +980,35 @@ export function questionList(state: QuestionListState): QuestionSection[] {
             label: ADULT_LABELS[position]!,
             answer: rowState === 'done' ? adultAnswer(state.guardian, step) : '',
             state: rowState,
+            canReopen: rowState === 'done',
+            resumeHere: false,
           };
         }),
       });
     }
   });
-  return sections;
+
+  if (state.resume === null) return sections;
+
+  /*
+   * A row has been tapped. The question being fixed wears the accent, and the
+   * one the parent was on is marked rather than lit — it is still unanswered,
+   * and it is where **Next** will put them back.
+   */
+  const openChild = isChildStep(state.step) ? (state.editing ?? current) : null;
+  const resumeChild = onChild ? current : null;
+  return sections.map((section) => ({
+    ...section,
+    rows: section.rows.map((row) => {
+      if (row.step === state.step && row.child === openChild) {
+        return { ...row, state: 'now' as const, canReopen: false };
+      }
+      if (row.step === at && row.child === resumeChild) {
+        return { ...row, state: 'todo' as const, canReopen: false, resumeHere: true };
+      }
+      return row;
+    }),
+  }));
 }
 
 /**
@@ -830,6 +1021,16 @@ export function questionList(state: QuestionListState): QuestionSection[] {
  * nobody can reason about at a door.
  */
 export function goBack(state: RegistrationState): RegistrationState | null {
+  /*
+   * "Never mind." Back out of a question that was reopened out of order and the
+   * answer that was already on the record stays on it — the parent goes back to
+   * where they were rather than into the run behind the question they tapped.
+   */
+  if (state.resume !== null) {
+    const cancelled = { ...state, editing: null, resume: null };
+    return { ...cancelled, ...landOn(cancelled, state.resume) };
+  }
+
   switch (state.step) {
     case 'child-first':
       /*
