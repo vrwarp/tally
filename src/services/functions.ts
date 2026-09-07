@@ -165,38 +165,259 @@ export const getStudentAttendance = httpsCallable<
   }
 >(functions, 'getStudentAttendance');
 
+/** What one student's details are asked for by. See `getPersonDetails`. */
+export interface PersonDetailsRequest {
+  /** The old request shape: a bare person id, which has always meant
+   *  Planning Center. Kept for exactly that meaning. */
+  pcoPersonId?: string;
+  /**
+   * The shape every screen should send: the student's own document id. The
+   * server reads the linkage and asks whichever backend holds the person —
+   * the caller does not have to know.
+   */
+  studentId?: string;
+  /**
+   * Skip the server's held answer.
+   *
+   * For after a *write*, and only then. The screens that add an adult or a
+   * number re-read the moment the write lands, which is well inside the few
+   * seconds a read may be reused for — and the answer they would get back is
+   * the one from before their own edit, on the one screen where that reads as
+   * "it did not work".
+   */
+  force?: boolean;
+}
+
+/** The one-at-a-time read, kept for a single student and for the fallback. */
+const callPersonDetails = httpsCallable<PersonDetailsRequest, PcoPersonDetails | null>(
+  functions,
+  'getPersonDetails',
+);
+
+interface PersonDetailsBatchResponse {
+  details: Record<string, PcoPersonDetails | null>;
+  errors: Record<string, { code: string; message: string }>;
+}
+
+const callPersonDetailsBatch = httpsCallable<
+  { students: ReadonlyArray<{ studentId: string; force?: boolean }> },
+  PersonDetailsBatchResponse
+>(functions, 'getPersonDetailsBatch');
+
+/* -------------------------------------------------------------------------- */
+/* Collecting person reads into one call                                       */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Parent contact and allergies for one student, for a screen that shows them.
+ * How long a read waits for company before it goes.
+ *
+ * The dashboard's three call lists mount their rows in more than one commit —
+ * the roster lands, then the contact statuses, and each pass adds rows — so a
+ * microtask would send two or three batches where one would do. A window this
+ * short is under a frame at 60Hz and merges the lot; nobody can perceive it,
+ * and the alternative is what this exists to stop.
+ */
+const BATCH_WINDOW_MS = 12;
+
+/** A backstop well under the server's own cap, which is 100. */
+const MAX_PER_BATCH = 50;
+
+interface Waiting {
+  force: boolean;
+  /**
+   * Kept for the fallback and nothing else. The batch dispatches on the student
+   * id alone, but the deployment the fallback exists for is an old one — and an
+   * old enough server reads only this field, and has always taken it to mean
+   * Planning Center. Dropping it would make the fallback fail exactly where it
+   * is needed.
+   */
+  pcoPersonId?: string;
+  promise: Promise<{ data: PcoPersonDetails | null }>;
+  settle: (value: { data: PcoPersonDetails | null }) => void;
+  fail: (error: unknown) => void;
+}
+
+/** Reads collected for the next flush, keyed by student id. */
+const queued = new Map<string, Waiting>();
+/** Reads already sent and not yet settled, so a late row joins rather than asks. */
+const inFlight = new Map<string, Promise<{ data: PcoPersonDetails | null }>>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Set once a batch call comes back `not-found`, which can only mean this
+ * deployment's functions predate `getPersonDetailsBatch` — the handler is
+ * written never to return that code for a student it could not resolve.
+ *
+ * A `firebase deploy` publishes hosting before the new function finishes being
+ * created, so there is a minute after every release in which a browser holding
+ * the new bundle is talking to the old backend. Without this the whole
+ * dashboard reads "could not reach Planning Center" for that minute. Latched
+ * rather than re-tested per batch, so an old backend costs one wasted call for
+ * the life of the tab instead of one per burst.
+ */
+let batchUnavailable = false;
+
+/** A rejection whose `code` the hooks can read, same as a callable's. */
+function failure(code: string, message: string): Error & { code: string } {
+  return Object.assign(new Error(message), { code });
+}
+
+function flush(): void {
+  flushTimer = null;
+  const batch = [...queued.entries()].slice(0, MAX_PER_BATCH);
+  for (const [studentId] of batch) queued.delete(studentId);
+  // Anything over the cap waits for the next window rather than being dropped.
+  if (queued.size > 0) schedule();
+  if (batch.length === 0) return;
+
+  for (const [studentId, entry] of batch) {
+    inFlight.set(studentId, entry.promise);
+    const done = (): void => {
+      if (inFlight.get(studentId) === entry.promise) inFlight.delete(studentId);
+    };
+    entry.promise.then(done, done);
+  }
+
+  const single = (studentId: string, entry: Waiting): void => {
+    callPersonDetails({
+      studentId,
+      ...(entry.pcoPersonId ? { pcoPersonId: entry.pcoPersonId } : {}),
+      ...(entry.force ? { force: true } : {}),
+    }).then(
+      (response) => entry.settle({ data: response.data }),
+      (cause: unknown) => entry.fail(cause),
+    );
+  };
+
+  if (batchUnavailable) {
+    for (const [studentId, entry] of batch) single(studentId, entry);
+    return;
+  }
+
+  callPersonDetailsBatch({
+    students: batch.map(([studentId, entry]) => ({
+      studentId,
+      ...(entry.force ? { force: true } : {}),
+    })),
+  }).then(
+    (response) => {
+      const { details, errors } = response.data;
+      for (const [studentId, entry] of batch) {
+        if (studentId in details) {
+          entry.settle({ data: details[studentId] ?? null });
+          continue;
+        }
+        const reported = errors[studentId];
+        entry.fail(
+          reported
+            ? failure(reported.code, reported.message)
+            : failure('internal', 'The read came back without an answer for this student.'),
+        );
+      }
+    },
+    (cause: unknown) => {
+      /*
+       * `not-found` from the batch itself is the deploy window described above,
+       * and the one failure worth paying a second round trip for. Everything
+       * else — a rate limit, a refused credential, an outage — is answered by
+       * asking again the same way, which is what the row's own "Try again" is
+       * for; re-issuing fifty individual calls would turn one refusal into
+       * fifty.
+       */
+      const code = (cause as { code?: string })?.code ?? '';
+      if (!code.includes('not-found')) {
+        for (const [, entry] of batch) entry.fail(cause);
+        return;
+      }
+      batchUnavailable = true;
+      for (const [studentId, entry] of batch) single(studentId, entry);
+    },
+  );
+}
+
+function schedule(): void {
+  if (flushTimer !== null) return;
+  flushTimer = setTimeout(flush, BATCH_WINDOW_MS);
+}
+
+/**
+ * Drops what is queued and in the air, so a scenario starts from nothing.
+ *
+ * A test seam and only that: nothing here holds anything personal — student
+ * ids, and answers on their way to a hook that keeps its own memo — so there is
+ * no production moment that needs it.
+ */
+export function resetPersonDetailsBatching(): void {
+  if (flushTimer !== null) clearTimeout(flushTimer);
+  flushTimer = null;
+  queued.clear();
+  inFlight.clear();
+  batchUnavailable = false;
+}
+
+/**
+ * Parent contact and allergies for one student — asked for one at a time, and
+ * sent for a screenful at a time.
  *
  * Split from the roster so a door volunteer's device never receives a minor's
  * parent's phone number: the screen they are on does not ask. The allergy line
  * it *does* ask for comes from `getAllergyNotes`, which carries that and
  * nothing else.
+ *
+ * The signature is a callable's, deliberately: every caller asks about the one
+ * student it is rendering, and none of them knows this exists. What changed is
+ * underneath. `FollowUpActions` sits on every row of the dashboard's three call
+ * lists, so a leader opening it on a Sunday evening fired one invocation per
+ * row — bursts of several hundred, each one re-reading the caller's `users`
+ * document, building its own backend registry, and asking Planning Center for a
+ * household the row above it had just fetched. Collecting the reads of one
+ * frame into a single `getPersonDetailsBatch` makes twenty rows one call.
+ *
+ * Two students are two entries; two *rows* for one student are one. That second
+ * case is not hypothetical — a new visitor who has since missed three
+ * gatherings is on two of the three lists at once, and the memo in
+ * `usePersonDetails` cannot collapse them because it is only written when an
+ * answer lands, which is after both rows have already asked.
+ *
+ * A `force` read never joins an unforced one already in the air: the whole
+ * point of `force` is that it follows a write, and the answer being waited on
+ * is the state from before it.
+ *
+ * A request with no `studentId` goes straight out on its own. That is the bare
+ * `pcoPersonId` shape, which the batch does not speak — the server dispatches a
+ * batch entry on the student id and the linkage behind it.
  */
-export const getPersonDetails = httpsCallable<
-  {
-    /** The old request shape: a bare person id, which has always meant
-     *  Planning Center. Kept for exactly that meaning. */
-    pcoPersonId?: string;
-    /**
-     * The shape every screen should send: the student's own document id. The
-     * server reads the linkage and asks whichever backend holds the person —
-     * the caller does not have to know.
-     */
-    studentId?: string;
-    /**
-     * Skip the server's held answer.
-     *
-     * For after a *write*, and only then. The screens that add an adult or a
-     * number re-read the moment the write lands, which is well inside the few
-     * seconds a read may be reused for — and the answer they would get back is
-     * the one from before their own edit, on the one screen where that reads as
-     * "it did not work".
-     */
-    force?: boolean;
-  },
-  PcoPersonDetails | null
->(functions, 'getPersonDetails');
+export function getPersonDetails(
+  request: PersonDetailsRequest,
+): Promise<{ data: PcoPersonDetails | null }> {
+  const studentId = request.studentId?.trim() ?? '';
+  if (!studentId) return callPersonDetails(request).then((response) => ({ data: response.data }));
+
+  const force = request.force === true;
+
+  const waiting = queued.get(studentId);
+  if (waiting) {
+    // A forced read arriving before the flush upgrades the one already queued
+    // rather than starting a second: what comes back is fresh enough for both.
+    if (force) waiting.force = true;
+    return waiting.promise;
+  }
+
+  if (!force) {
+    const held = inFlight.get(studentId);
+    if (held) return held;
+  }
+
+  let settle!: Waiting['settle'];
+  let fail!: Waiting['fail'];
+  const promise = new Promise<{ data: PcoPersonDetails | null }>((resolve, reject) => {
+    settle = resolve;
+    fail = reject;
+  });
+  queued.set(studentId, { force, pcoPersonId: request.pcoPersonId, promise, settle, fail });
+  schedule();
+  return promise;
+}
 
 export interface AllergyNotesResponse {
   /**

@@ -602,12 +602,13 @@ roster of minors.
 
 ## 7. What Tally reads, and when
 
-There is no scheduled anything. Five reads, and each one is somebody looking at a screen:
+There is no scheduled anything. Six reads, and each one is somebody looking at a screen:
 
 | Read | Triggered by | Cost |
 | --- | --- | --- |
 | The roster | Opening check-in, the students list, or a refresh | One sweep of `where[child]=true`, plus one request per roster member the sweep did not cover |
 | One person's details | Opening a student's page | One request, plus one per household |
+| A screenful of details | Opening the dashboard, whose call lists put a follow-up block on every row | The same, per student — but one household read per *family*, and one callable invocation for the lot |
 | The allergy notes | Check-in, for the rows the roster already flagged | One request per flagged student, once per session |
 | Who has a contact | Opening Insights | One sweep of `where[child]=false`, on top of the roster read it reuses |
 | A directory search | Typing in "Add from Planning Center" | One request per keystroke burst |
@@ -630,6 +631,34 @@ line of text each and nothing else — no parent, no number, no household — an
 It sits behind `requireMember` rather than the core-team gate for the same reason: `counselor` is the
 role that stands at the door, and it is the role that needs the answer. A student whose note cannot
 be read is simply absent from the reply, and their row keeps the plain badge.
+
+The details read comes in two shapes, and the second one is why the first is affordable on a list.
+`getPersonDetails` answers about one student, which is what a profile, a badge panel or a contact
+form asks for. `getPersonDetailsBatch` answers about the students a screen names, which is what the
+dashboard asks for — its three call lists put a follow-up block on every row, and every block wants
+a parent's number. One block per invocation is what that used to mean: a Sunday evening of leaders
+opening the dashboard was several hundred calls in bursts, each of them re-reading the caller's
+`users` document, building its own backend registry, and asking Planning Center for a household the
+row above it had just fetched.
+
+Batching changes none of the privacy posture, which is the point of batching rather than widening.
+It is the same read, under the same core-team gate, returning the same fields, for the students the
+caller names — a batch can only ever be the rows a screen is already showing, and nothing on the
+server decides for itself whom to look up. What it changes is the arithmetic: twenty rows are one
+invocation, one gate read, one registry, and one household request per family instead of per child.
+Attendees gets the same treatment through the same batch — the callable dispatches on the linkage
+and neither backend is special to it — with an adult read per family rather than per child, which is
+where that backend spends the request a sibling would otherwise repeat (`AttendeeMemo`).
+The browser does the collecting (`getPersonDetails` in `src/services/functions.ts` gathers a frame's
+worth of reads behind a callable's signature), so no screen had to learn that any of this exists.
+
+Two things are worth keeping true if this is ever touched. The batch **never** answers `not-found`
+at the top level — a student who resolves to nobody is reported against their own id — because the
+browser reads that code as "this deployment has no such function yet" and falls back to the
+one-at-a-time call, which is what keeps the dashboard working for the minute after a release in
+which hosting is new and the functions are not. And a read that carries `force` never shares an
+answer with one that does not: `force` follows a write, and the answer being waited on is the state
+from before it.
 
 The parent-contact read (`getParentContactStatus`) is the one that is deliberately *not* part of the
 roster. A roster row reports `profileComplete: null` — "we did not look" — because a parent's phone

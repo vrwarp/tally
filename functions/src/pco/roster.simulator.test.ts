@@ -25,6 +25,7 @@ import type { PcoConfig } from '../config.js';
 import { createTtlCache, type TtlCache } from './cache.js';
 import { createPcoClient, type PcoClient } from './client.js';
 import {
+  createHouseholdMemo,
   fetchAllergyNotes,
   fetchAdultContactStatus,
   fetchPersonDetails,
@@ -613,6 +614,75 @@ describe('fetchPersonDetails', () => {
 
     await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.amara, force: true });
     expect(world.requests.length).toBeGreaterThan(cached);
+  });
+
+  /**
+   * A family costs one household read, not one per child in it.
+   *
+   * `household_memberships` is not includable from `/people`, so naming the
+   * adult in a family is a request of its own — and Amara and Benji are in the
+   * same one. Read one student at a time, which is what a dashboard of
+   * follow-up rows did when every row was its own invocation, that request was
+   * paid again for every sibling on the list.
+   */
+  describe('the household memo', () => {
+    const householdReads = (world: Harness): number =>
+      world.requests.filter((url) => url.includes('household_memberships')).length;
+
+    it('reads a shared household once for two siblings', async () => {
+      const world = harness();
+      const config = baseConfig();
+      const households = createHouseholdMemo();
+
+      await fetchPersonDetails({ ...world, config, households, personId: FIXTURE_IDS.amara });
+      await fetchPersonDetails({
+        ...world,
+        config,
+        households,
+        personId: FIXTURE_IDS.benjiWithNickname,
+      });
+
+      expect(householdReads(world)).toBe(1);
+    });
+
+    it('reads it twice without one, which is what every caller but the batch does', async () => {
+      // The write paths pass no memo on purpose: they must not act on a
+      // household this request read a moment ago. See `loadPersonWithHousehold`.
+      const world = harness();
+      const config = baseConfig();
+
+      await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.amara });
+      await fetchPersonDetails({ ...world, config, personId: FIXTURE_IDS.benjiWithNickname });
+
+      expect(householdReads(world)).toBe(2);
+    });
+
+    it('still answers each sibling about their own family', async () => {
+      // The saving is the request, never the answer: a shared index that let one
+      // child's contact stand in for another's would be worse than the cost.
+      const world = harness();
+      const config = baseConfig();
+      const households = createHouseholdMemo();
+
+      const amara = await fetchPersonDetails({
+        ...world,
+        config,
+        households,
+        personId: FIXTURE_IDS.amara,
+      });
+      const sofia = await fetchPersonDetails({
+        ...world,
+        config,
+        households,
+        personId: FIXTURE_IDS.sofiaWithAllergy,
+      });
+
+      expect(amara?.contactName).toBeTruthy();
+      expect(sofia?.contactName).toBeTruthy();
+      expect(amara?.contactName).not.toBe(sofia?.contactName);
+      // Two households, so two reads — the memo collapses a family, not a list.
+      expect(householdReads(world)).toBe(2);
+    });
   });
 });
 

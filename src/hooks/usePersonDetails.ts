@@ -9,6 +9,12 @@
  * absorbed by a cache in front of Planning Center, so a screen whose whole job
  * is "who do I call, and how" can simply say so without asking first.
  *
+ * Twenty reads are no longer twenty *calls*, either. `getPersonDetails`
+ * collects the reads of one frame and sends them together — see the note on it
+ * in src/services/functions.ts — so this hook asks about its own student, once,
+ * and the transport underneath decides how many requests that costs. Nothing
+ * here needs to know, which is why none of it appears below.
+ *
  * Results are also memoised for the session, because a leader working down the
  * MIA list opens the same student more than once.
  */

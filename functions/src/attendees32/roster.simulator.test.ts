@@ -11,6 +11,7 @@ import {
   A32SimulatorStore,
   createSimulatorFetch,
   DEFAULT_TOKEN,
+  FAMILY_CATEGORY,
   seedDefaultOrganization,
   SIMULATOR_ORIGIN,
 } from '../../../tools/a32-simulator/src/index.js';
@@ -19,6 +20,7 @@ import { a32Config } from '../testing/a32Config.js';
 import { createTtlCache, type TtlCache } from '../pco/cache.js';
 import { createA32Client, type A32Client } from './client.js';
 import {
+  createAttendeeMemo,
   fetchAllergyNotes,
   fetchAdultContactStatus,
   fetchPersonDetails,
@@ -30,6 +32,8 @@ let store: A32SimulatorStore;
 let client: A32Client;
 let cache: TtlCache;
 let config: A32Config;
+/** Every URL the client asked for, so a test can count reads rather than infer. */
+let requests: string[];
 
 function idOf(firstName: string): string {
   const found = [...store.attendees.values()].find((attendee) => attendee.firstName === firstName);
@@ -40,10 +44,15 @@ function idOf(firstName: string): string {
 beforeEach(() => {
   store = new A32SimulatorStore();
   seedDefaultOrganization(store);
+  requests = [];
+  const simulator = createSimulatorFetch(store);
   client = createA32Client({
     token: DEFAULT_TOKEN,
     baseUrl: SIMULATOR_ORIGIN,
-    fetchImpl: createSimulatorFetch(store),
+    fetchImpl: (input, init) => {
+      requests.push(typeof input === 'string' ? input : String(input));
+      return simulator(input, init);
+    },
     sleep: async () => {},
   });
   cache = createTtlCache({ ttlMs: 30_000 });
@@ -185,6 +194,114 @@ describe('fetchPersonDetails', () => {
     const gone = idOf('Aroha');
     store.attendees.get(gone)!.isRemoved = true;
     expect(await fetchPersonDetails({ client, config, cache, personId: gone })).toBeNull();
+  });
+
+  /**
+   * A family costs one read of the adult, not one per child in it.
+   *
+   * Naming the adult behind a student is a request for that adult, and siblings
+   * share them — so twenty follow-up rows read one at a time, which is what the
+   * dashboard did when every row was its own invocation, paid that read again
+   * for every child of every family on the list. The Attendees counterpart of
+   * the Planning Center household memo, and it is tested the same way.
+   */
+  describe('the attendee memo', () => {
+    /** Two children of one adult, which the default seed deliberately has none of. */
+    function siblings(): { elder: string; younger: string; parent: string } {
+      const elder = store.seedStudent({
+        firstName: 'Ada',
+        lastName: 'Bello',
+        gender: 'FEMALE',
+        grade: 11,
+        parents: [{ firstName: 'Femi', gender: 'MALE', contacts: { phone1: '555-0377' } }],
+      });
+      const younger = store.createAttendee({
+        firstName: 'Chidi',
+        lastName: 'Bello',
+        gender: 'MALE',
+        infos: { fixed: { grade: 8 }, contacts: {} },
+      });
+      /*
+       * Into the family the elder already has, rather than one of their own:
+       * that shared edge is the whole subject of these tests. Found through the
+       * elder's own edges rather than by display name — `createAttendee` also
+       * makes a hidden non-family folk, so the category is what tells them
+       * apart.
+       */
+      const family = store.folkAttendees
+        .filter((edge) => edge.attendeeId === elder.id && !edge.isRemoved)
+        .map((edge) => store.folks.get(edge.folkId)!)
+        .find((folk) => folk.category === FAMILY_CATEGORY)!;
+      const childRole = store.relations.find((relation) => relation.title === 'child')!;
+      store.addFolkAttendee(family.id, younger.id, childRole.id);
+
+      const parent = [...store.attendees.values()].find(
+        (attendee) => attendee.firstName === 'Femi',
+      )!;
+      return { elder: elder.id, younger: younger.id, parent: parent.id };
+    }
+
+    const adultReads = (personId: string): number =>
+      requests.filter((url) => url.includes(personId)).length;
+
+    it('reads a shared adult once for two siblings', async () => {
+      const { elder, younger, parent } = siblings();
+      const attendees = createAttendeeMemo();
+
+      await fetchPersonDetails({ client, config, cache, attendees, personId: elder });
+      await fetchPersonDetails({ client, config, cache, attendees, personId: younger });
+
+      expect(adultReads(parent)).toBe(1);
+    });
+
+    it('reads them twice without one, which is what every caller but the batch does', async () => {
+      // The write paths pass no memo on purpose: they must not act on a family
+      // this request read a moment ago.
+      const { elder, younger, parent } = siblings();
+
+      await fetchPersonDetails({ client, config, cache, personId: elder });
+      await fetchPersonDetails({ client, config, cache, personId: younger });
+
+      expect(adultReads(parent)).toBe(2);
+    });
+
+    it('still answers each sibling with their own contact', async () => {
+      // The saving is the request, never the answer.
+      const { elder, younger } = siblings();
+      const attendees = createAttendeeMemo();
+
+      const first = await fetchPersonDetails({ client, config, cache, attendees, personId: elder });
+      const second = await fetchPersonDetails({
+        client,
+        config,
+        cache,
+        attendees,
+        personId: younger,
+      });
+
+      expect(first?.contactName).toBe('Femi Bello');
+      expect(second?.contactName).toBe('Femi Bello');
+      expect(second?.contactPhone).toBe('555-0377');
+    });
+
+    it('holds a deleted adult as an answer rather than re-asking per child', async () => {
+      const { elder, younger, parent } = siblings();
+      store.attendees.get(parent)!.isRemoved = true;
+      const attendees = createAttendeeMemo();
+
+      const first = await fetchPersonDetails({ client, config, cache, attendees, personId: elder });
+      const second = await fetchPersonDetails({
+        client,
+        config,
+        cache,
+        attendees,
+        personId: younger,
+      });
+
+      expect(first?.contactName).toBeNull();
+      expect(second?.contactName).toBeNull();
+      expect(adultReads(parent)).toBe(1);
+    });
   });
 });
 

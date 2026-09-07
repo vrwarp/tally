@@ -723,10 +723,17 @@ export interface LoadedPerson {
  * `PCO_CACHE_TTL_SECONDS` old. `fetchPersonDetails` puts its own cache in front
  * of this for the read path, where a few seconds of staleness is the whole
  * point.
+ *
+ * `households` is the read path's too, and only the read path passes one. It
+ * collapses the per-household request across the students of one batch, and
+ * lives no longer than the request — see `HouseholdMemo`. A write path that
+ * passed one would be acting on a household it read earlier in the same call,
+ * which is the staleness this function refuses.
  */
 export async function loadPersonWithHousehold(
   client: PcoClient,
   personId: string,
+  households?: HouseholdMemo,
 ): Promise<LoadedPerson | null> {
   const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
     include: [...ROSTER_INCLUDES, 'households.people'],
@@ -736,7 +743,7 @@ export async function loadPersonWithHousehold(
   if (!person) return null;
 
   const index = buildIncludedIndex(body.included);
-  await hydrateHouseholds(client, index, person);
+  await hydrateHouseholds(client, index, person, households);
   return { person, index };
 }
 
@@ -756,7 +763,7 @@ export function personDetailsCacheKey(baseUrl: string, personId: string): string
  * students every six hours is what this module exists to stop.
  */
 export async function fetchPersonDetails(
-  options: RosterOptions & { personId: string },
+  options: RosterOptions & { personId: string; households?: HouseholdMemo },
 ): Promise<PersonDetails | null> {
   const { client, config, cache, personId } = options;
   const now = options.now ?? new Date();
@@ -780,12 +787,12 @@ export async function fetchPersonDetails(
        */
       let loaded;
       try {
-        loaded = await loadPersonWithHousehold(client, personId);
+        loaded = await loadPersonWithHousehold(client, personId, options.households);
       } catch (error) {
         if (!isPersonGoneError(error)) throw error;
         const link = await followPersonLink(client, personId, error);
         if (link.outcome === 'gone') return null;
-        loaded = await loadPersonWithHousehold(client, link.personId);
+        loaded = await loadPersonWithHousehold(client, link.personId, options.households);
       }
       if (!loaded) return null;
       const { person, index } = loaded;
@@ -901,35 +908,87 @@ async function readAllergyNote(
 }
 
 /**
- * The household id is stamped onto each membership before indexing, because a
- * membership fetched this way carries a link to its household but no
- * relationship object the mapper could read.
+ * One household's memberships, flattened into resources an index can take.
+ *
+ * The household id is stamped onto each membership first, because a membership
+ * fetched this way carries a link to its household but no relationship object
+ * the mapper could read.
  */
+async function householdResources(
+  client: PcoClient,
+  householdId: string,
+): Promise<JsonApiResource[]> {
+  const collected: JsonApiResource[] = [];
+
+  for await (const page of client.paginate<PcoHouseholdMembership>(
+    `/households/${encodeURIComponent(householdId)}/household_memberships`,
+    { include: ['person', 'person.emails', 'person.phone_numbers'] },
+  )) {
+    for (const membership of page.data) {
+      collected.push({
+        ...membership,
+        relationships: {
+          ...membership.relationships,
+          household: { data: { type: PCO_TYPES.household, id: householdId } },
+        },
+      });
+    }
+    collected.push(...page.included);
+  }
+
+  return collected;
+}
+
+/**
+ * The households one request has already read, so a family costs one household
+ * read rather than one per child in it.
+ *
+ * Households are a request each — `household_memberships` is not includable
+ * from `/people` — and siblings share one. Reading twenty students one at a
+ * time, which is what a dashboard of follow-up rows used to do, paid that
+ * request again for every child of every family on the list.
+ *
+ * Scoped to a single invocation and nothing wider, which is the whole reason it
+ * is safe. The adapter is built per request (see `createRegistry`), so this map
+ * is born and discarded with the call, and the raw membership blob — every
+ * adult in the household, with their emails and phone numbers side-loaded — is
+ * never retained beyond the answer it was fetched to compute. A memo that
+ * outlived the request would be the mirror of the church's people that this
+ * module exists to avoid.
+ */
+export type HouseholdMemo = Map<string, Promise<JsonApiResource[]>>;
+
+export function createHouseholdMemo(): HouseholdMemo {
+  return new Map();
+}
+
 async function hydrateHouseholds(
   client: PcoClient,
   index: IncludedIndex,
   person: PcoPerson,
+  memo?: HouseholdMemo,
 ): Promise<void> {
   let fetched = 0;
   for (const householdId of householdIdsOf(person)) {
     if (fetched >= MAX_HOUSEHOLD_FETCHES) return;
     fetched += 1;
 
-    for await (const page of client.paginate<PcoHouseholdMembership>(
-      `/households/${encodeURIComponent(householdId)}/household_memberships`,
-      { include: ['person', 'person.emails', 'person.phone_numbers'] },
-    )) {
-      addToIncludedIndex(
-        index,
-        page.data.map((membership) => ({
-          ...membership,
-          relationships: {
-            ...membership.relationships,
-            household: { data: { type: PCO_TYPES.household, id: householdId } },
-          },
-        })),
-      );
-      addToIncludedIndex(index, page.included);
+    if (!memo) {
+      addToIncludedIndex(index, await householdResources(client, householdId));
+      continue;
     }
+
+    let pending = memo.get(householdId);
+    if (!pending) {
+      pending = householdResources(client, householdId);
+      memo.set(householdId, pending);
+      // Never remember a failure — the next student in this household deserves
+      // a real attempt — and the handler here is also what keeps a rejection
+      // nobody else got round to awaiting from surfacing as an unhandled one.
+      pending.catch(() => {
+        if (memo.get(householdId) === pending) memo.delete(householdId);
+      });
+    }
+    addToIncludedIndex(index, await pending);
   }
 }
