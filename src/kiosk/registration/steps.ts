@@ -30,7 +30,6 @@ export type StepKind =
   | 'child-last'
   | 'child-grade'
   | 'child-allergies'
-  | 'another'
   | 'guardian-first'
   | 'guardian-last'
   | 'guardian-phone'
@@ -42,15 +41,17 @@ export type StepKind =
 /**
  * Which of the two journeys this run is.
  *
- * `family` is a household nobody has met: three questions per child, three
- * about the adult, a confirm — six for one child.
+ * `family` is a household nobody has met: three questions per child — four
+ * where the church's database can hold an allergy note — three about the
+ * adult, and a confirm.
  *
  * `sibling` is the common case the first design treated as impossible. A parent
  * whose second child is finally old enough found themselves by phone a moment
  * ago, so the kiosk already knows which family this is and the server can
  * verify it. Asking for the adult again would be three questions to learn
- * nothing and one more chance to mistype a name onto a second household. Two
- * questions, then.
+ * nothing and one more chance to mistype a name onto a second household. So a
+ * sibling run is the child's own questions and nothing else: first name, last
+ * name, grade, and the allergy note where it is asked at all.
  */
 export type RegistrationMode = 'family' | 'sibling';
 
@@ -65,6 +66,26 @@ export interface DraftChild {
 export interface RegistrationState {
   mode: RegistrationMode;
   step: StepKind;
+  /**
+   * Whether this gathering hands children back, which decides what a fresh
+   * draft's grade opens on.
+   *
+   * On the state rather than closed over by the reducer because banking a child
+   * — which mints the next draft — now happens inside `advance`, where the only
+   * thing in scope is this object.
+   */
+  requiresCheckOut: boolean;
+  /**
+   * Which question the confirm screen was reached from, so Back reopens it.
+   *
+   * The confirm has two ways in and they cannot be told apart after the fact: a
+   * family arrives from the adult's number, and a parent who came back for
+   * another child arrives from that child's last question — with the adult's
+   * answers still on the state either way. Inferring it from `guardian.phone`
+   * would send a parent who has just typed their second child back to their own
+   * phone number, on the one screen where Back is the only repair.
+   */
+  backFromConfirm: StepKind;
   /**
    * Whether the allergies question exists in this run at all.
    *
@@ -135,6 +156,9 @@ export function initialState(args: {
   return {
     mode: args.mode ?? 'family',
     step: 'child-first',
+    requiresCheckOut: args.requiresCheckOut,
+    // Replaced the moment anything routes to the confirm; never read before.
+    backFromConfirm: 'guardian-phone',
     registrationId: args.registrationId,
     allergiesSupported: args.allergiesSupported === true,
     noAllergies: false,
@@ -244,7 +268,7 @@ export function applyKey(
    * by swallowing keystrokes silently. Untick to type.
    */
   // Stryker disable next-line ConditionalExpression: the step check is
-  // redundant with the flag — `advance`, `answerAnother` and `goBack` all clear
+  // redundant with the flag — `bankChild` and `goBack` both clear
   // `noAllergies` on the way out of this question, so it is never set on any
   // other step. It stays because that invariant lives in three other functions
   // and this one should not have to trust them.
@@ -316,6 +340,65 @@ export function formatPhone(digits: string): string {
 /* Moving between questions                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** The last question a child is asked, which the allergies gate decides. */
+function lastChildQuestion(state: RegistrationState): StepKind {
+  return state.allergiesSupported ? 'child-allergies' : 'child-grade';
+}
+
+/**
+ * Where a child's last question leads.
+ *
+ * Three situations, two destinations. A family run that has not met the adult
+ * yet goes to meet them; a sibling run never does, because the household
+ * upstream already holds their parent; and a family run whose parent came back
+ * from the confirm for another child has already answered those three
+ * questions and wants the confirm again.
+ *
+ * `guardian.phone` is only load-bearing inside `mode === 'family'`, and the
+ * mode check is what makes that safe: on a sibling run the phone is empty for
+ * the whole run and always will be, so alone it would read as "not asked yet"
+ * forever.
+ */
+function stepAfterChildQuestions(state: RegistrationState): StepKind {
+  return state.mode === 'sibling' || state.guardian.phone !== ''
+    ? 'confirm'
+    : 'guardian-first';
+}
+
+/** A child nobody has typed into yet, opened on this gathering's default. */
+function blankDraft(state: RegistrationState): DraftChild {
+  return {
+    firstName: '',
+    lastName: '',
+    grade: defaultGrade(state.requiresCheckOut),
+    allergies: '',
+  };
+}
+
+/**
+ * Commits the child on the draft and moves on.
+ *
+ * This used to be the "Anybody else?" screen's job. That screen asked every
+ * family a question most of them answer "no" to, on a list the confirm screen
+ * shows again four screens later — so it has gone, and the offer it carried now
+ * stands beside the commit, where a parent looking at their own family is best
+ * placed to notice somebody missing.
+ */
+function bankChild(state: RegistrationState, draft: DraftChild): RegistrationState {
+  const step = stepAfterChildQuestions(state);
+  return {
+    ...state,
+    children: [...state.children, draft],
+    draft: blankDraft(state),
+    step,
+    backFromConfirm: step === 'confirm' ? lastChildQuestion(state) : state.backFromConfirm,
+    buffer: '',
+    shift: 'on',
+    // Each child answers for themselves — see `noAllergies`.
+    noAllergies: false,
+  };
+}
+
 /**
  * Commits the buffer and moves to the next question.
  *
@@ -348,25 +431,23 @@ export function advance(state: RegistrationState): RegistrationState {
         shift: 'on',
       };
     case 'child-grade':
-      return {
-        ...state,
-        step: state.allergiesSupported ? 'child-allergies' : 'another',
-        buffer: '',
-        shift: 'on',
-        // Each child answers for themselves — see `noAllergies`.
-        noAllergies: false,
-      };
+      return state.allergiesSupported
+        ? {
+            ...state,
+            step: 'child-allergies',
+            buffer: '',
+            shift: 'on',
+            // Each child answers for themselves — see `noAllergies`.
+            noAllergies: false,
+          }
+        : bankChild(state, state.draft);
     case 'child-allergies':
-      return {
-        ...state,
-        // The tick and an empty box record the same answer, and the tick wins
-        // where they could disagree: it is the one the parent can see.
-        draft: { ...state.draft, allergies: state.noAllergies ? '' : value },
-        step: 'another',
-        buffer: '',
-        shift: 'on',
-        noAllergies: false,
-      };
+      // The tick and an empty box record the same answer, and the tick wins
+      // where they could disagree: it is the one the parent can see.
+      return bankChild(state, {
+        ...state.draft,
+        allergies: state.noAllergies ? '' : value,
+      });
     case 'guardian-first':
       return {
         ...state,
@@ -388,11 +469,12 @@ export function advance(state: RegistrationState): RegistrationState {
         ...state,
         guardian: { ...state.guardian, phone: value },
         step: 'confirm',
+        backFromConfirm: 'guardian-phone',
         buffer: '',
         shift: 'on',
       };
     // Stryker disable next-line ConditionalExpression: `canAdvance` is false for
-    // every step this would catch — the fork, the confirm screen, the error —
+    // every step this would catch — the confirm screen, the error —
     // so nothing reaches here. It is the same statement the guard at the top
     // makes, kept because the switch is over a union that will grow.
     default:
@@ -431,83 +513,64 @@ export function chooseGrade(
 }
 
 /**
- * 'Anybody else?' — the loop that makes this worth doing at a kiosk at all.
+ * 'Add another child' — the loop that makes this worth doing at a kiosk at all.
  *
- * The child on the draft is banked either way; what `more` decides is whether
- * the wizard goes back to the top of the child questions or on to the adult.
+ * A parent with three children walks it three times rather than queueing three
+ * times. It is offered from the confirm screen, which is where the family is
+ * written out and therefore where somebody missing is noticed; the run comes
+ * back to the confirm when the new child's last question is answered.
  */
-export function answerAnother(
-  state: RegistrationState,
-  more: boolean,
-  requiresCheckOut: boolean,
-): RegistrationState {
-  if (state.step !== 'another') return state;
-  const children = [...state.children, state.draft];
-
-  if (more && children.length < MAX_CHILDREN) {
-    return {
-      ...state,
-      children,
-      draft: {
-        firstName: '',
-        lastName: '',
-        grade: defaultGrade(requiresCheckOut),
-        allergies: '',
-      },
-      step: 'child-first',
-      buffer: '',
-      shift: 'on',
-    };
-  }
-
+export function addAnotherChild(state: RegistrationState): RegistrationState {
+  if (state.step !== 'confirm') return state;
+  // The kiosk's cap and the server's. A seventh child is a leader's job.
+  if (state.children.length >= MAX_CHILDREN) return state;
   return {
     ...state,
-    children,
-    draft: {
-      firstName: '',
-      lastName: '',
-      grade: defaultGrade(requiresCheckOut),
-      allergies: '',
-    },
-    // A sibling registration has no adult to ask about: the family is already
-    // identified, and the household upstream already holds their parent.
-    step: state.mode === 'sibling' ? 'confirm' : 'guardian-first',
+    draft: blankDraft(state),
+    step: 'child-first',
     buffer: '',
     shift: 'on',
   };
 }
 
 /**
- * Back onto the fork, which means un-banking the child that leaving it banked.
+ * Back into the last child's own questions, which means un-banking them.
  *
- * `answerAnother` commits the draft into `children` and resets the draft, so
- * the two steps that can be reached *through* the fork — the adult's first
- * question, and a sibling run's confirm — both stand on a state whose draft is
- * blank. Returning to the fork without undoing that put a nameless row in the
- * list `familyOf` builds, because on this step it renders `children` plus the
- * draft; pressing on then banked that blank child for real and the callable
- * refused the whole registration on `parseName`. A family who pressed Back once
- * met "We could not save that just now — please see a leader."
+ * `bankChild` commits the draft into `children` and mints a blank one, so every
+ * step reachable *through* it stands on a state whose draft is empty. Walking
+ * back without undoing that would reopen the allergy question of a child with
+ * no name, and pressing on would bank that blank for real — the callable
+ * refuses it on `parseName`, so a family who changed their mind once met "We
+ * could not save that just now — please see a leader."
  *
- * So the way back onto the fork is the exact inverse of the way off it: the
- * last banked child returns to the draft it was made from, which is also what
- * lets Back keep walking into that child's own questions to fix a name.
+ * So the way back is the exact inverse of the way forward: the last banked
+ * child returns to the draft it was made from, with its own answer in the
+ * buffer, and Back keeps walking from there into the name that was mistyped.
  */
-function reopenFork(state: RegistrationState): RegistrationState {
+function reopenLastChild(state: RegistrationState): RegistrationState {
   const banked = state.children[state.children.length - 1];
   // Stryker disable next-line ConditionalExpression,OptionalChaining: nothing
-  // reaches the fork from in front of it without having banked a child —
-  // `answerAnother` is the only door and it always commits one. The fallback is
-  // here so the function is total rather than resting on that argument.
+  // is reached from in front of the child questions without having banked a
+  // child — `bankChild` is the only door and it always commits one. The
+  // fallback is here so the function is total rather than resting on that.
   const undo = banked === undefined;
-  return {
-    ...state,
-    children: undo ? state.children : state.children.slice(0, -1),
-    draft: banked ?? state.draft,
-    step: 'another',
-    buffer: '',
-    shift: 'on',
-  };
+  const children = undo ? state.children : state.children.slice(0, -1);
+  const draft = banked ?? state.draft;
+  return state.allergiesSupported
+    ? {
+        ...state,
+        children,
+        draft,
+        step: 'child-allergies',
+        // The note as answered, reopened for editing — the same contract every
+        // other reopened question keeps. Unticked whatever was answered: an
+        // empty box is the honest reopening of "none", and it is one tap from
+        // ticked again.
+        buffer: draft.allergies,
+        shift: autoShiftAfter(draft.allergies),
+        noAllergies: false,
+      }
+    : { ...state, children, draft, step: 'child-grade', buffer: '', shift: 'on' };
 }
 
 /**
@@ -521,12 +584,15 @@ function reopenFork(state: RegistrationState): RegistrationState {
  */
 export function goBack(state: RegistrationState): RegistrationState | null {
   switch (state.step) {
-    // Stryker disable next-line StringLiteral: `default` answers null too, so
-    // no test can tell this case from falling through to it. It is here because
-    // "the first question has nowhere back" is the rule, and the default is the
-    // catch-all for the steps that have no keyboard at all.
     case 'child-first':
-      return null;
+      /*
+       * The first question of a run has nowhere back and closes the wizard;
+       * the first question of a child *added from the confirm* goes back to the
+       * confirm, abandoning the half-typed child rather than the registration.
+       */
+      return state.children.length > 0
+        ? { ...state, step: 'confirm', buffer: '', shift: 'on' }
+        : null;
     case 'child-last':
       return {
         ...state,
@@ -543,22 +609,8 @@ export function goBack(state: RegistrationState): RegistrationState | null {
       };
     case 'child-allergies':
       return { ...state, step: 'child-grade', buffer: '', shift: 'on' };
-    case 'another':
-      return state.allergiesSupported
-        ? {
-            ...state,
-            step: 'child-allergies',
-            // The note as answered, reopened for editing — the same contract
-            // every other reopened question keeps. Unticked whatever was
-            // answered: an empty box is the honest reopening of "none", and it
-            // is one tap from ticked again.
-            buffer: state.draft.allergies,
-            shift: autoShiftAfter(state.draft.allergies),
-            noAllergies: false,
-          }
-        : { ...state, step: 'child-grade', buffer: '', shift: 'on' };
     case 'guardian-first':
-      return reopenFork(state);
+      return reopenLastChild(state);
     case 'guardian-last':
       return {
         ...state,
@@ -574,14 +626,15 @@ export function goBack(state: RegistrationState): RegistrationState | null {
         shift: autoShiftAfter(state.guardian.lastName),
       };
     case 'confirm':
-      return state.mode === 'sibling'
-        ? reopenFork(state)
-        : {
+      // Whichever question was answered to get here — see `backFromConfirm`.
+      return state.backFromConfirm === 'guardian-phone'
+        ? {
             ...state,
             step: 'guardian-phone',
             buffer: state.guardian.phone,
             shift: 'off',
-          };
+          }
+        : reopenLastChild(state);
     case 'error':
       return {
         ...state,
@@ -595,9 +648,3 @@ export function goBack(state: RegistrationState): RegistrationState | null {
   }
 }
 
-/** Everybody this run will register — the banked children plus the draft. */
-export function familyOf(state: RegistrationState): DraftChild[] {
-  return state.step === 'another'
-    ? [...state.children, state.draft]
-    : state.children;
-}
