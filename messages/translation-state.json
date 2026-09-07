@@ -47,6 +47,12 @@
     "zh-Hant": "machine",
     "context": "Button that takes one row out of a list being edited, e.g. a child from a quick-add form. Not a delete."
   },
+  "Common.delete": {
+    "source": "Delete",
+    "context": "Button that destroys something permanently. Distinct from Common.remove, which takes a row out of a list being edited.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Common.grade": {
     "source": "Grade",
     "zh-Hans": "machine",
@@ -77,11 +83,35 @@
     "zh-Hant": "machine",
     "context": "Accessible name of the × that dismisses a modal."
   },
+  "Common.done": {
+    "source": "Done",
+    "context": "Button that closes a sheet the reader has finished with. Not a confirmation — nothing is saved by pressing it.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Common.reload": {
+    "source": "Reload",
+    "context": "Button offered after Tally updated while the page was open. Reloads the browser page.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Common.clear": {
+    "source": "Clear",
+    "context": "Key on the kiosk's drawn keyboard and phone pad: wipe what has been typed so far. A verb.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Common.dismiss": {
     "source": "Dismiss",
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Accessible name of the × on a toast — the small message that slides in after an action."
+  },
+  "Common.undo": {
+    "source": "Undo",
+    "context": "Button that takes back the action just performed — a check-in, a release. Always reversible; never a delete.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Common.status": {
     "source": "Status",
@@ -136,6 +166,24 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine",
     "context": "Card heading over the list of gatherings a student came to."
+  },
+  "Common.call": {
+    "source": "Call",
+    "context": "Button that dials a phone number. A verb.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Common.text": {
+    "source": "Text",
+    "context": "Button that opens a text message (SMS) to a phone number. A VERB, not the noun — some languages need \"send a message\".",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Common.email": {
+    "source": "Email",
+    "context": "Button that opens an email to an address. A verb.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Common.later": {
     "source": "Later",
@@ -2527,6 +2575,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventHeader.change": {
+    "source": "Change",
+    "context": "Link in the check-in header back to the gathering chooser: pick a different gathering to take attendance for.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "EventHeader.notTodayTitle": {
     "source": "This gathering is not today's",
     "zh-Hans": "machine",
@@ -3269,6 +3323,24 @@
   },
   "Team.columnLastSeen": {
     "source": "Last seen",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.statusInvited": {
+    "source": "Invited",
+    "context": "Status badge on somebody who has been invited to the team but has not signed in yet.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.invite": {
+    "source": "Invite",
+    "context": "Button that sends a team invitation.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.withdraw": {
+    "source": "Withdraw",
+    "context": "Button that cancels an invitation that has not been accepted. Not a removal from the team.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4082,6 +4154,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "LabelTemplate.allergyPrintWarning": {
+    "source": "These labels will print each child’s allergy note, so a volunteer holding them can read it. It is the one medical detail Tally puts on paper — anyone who can see the sticker can see it too.",
+    "context": "Warning shown when a label template includes the allergy field. The one place Tally prints a medical detail.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "LabelTemplate.media62x29": {
     "source": "62 × 29 mm die-cut",
     "zh-Hans": "machine",
@@ -4364,6 +4442,18 @@
   },
   "Access.openToAnyone": {
     "source": "Anybody with a Tally account can take attendance here.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Access.nowBadge": {
+    "source": "Now",
+    "context": "Badge marking which of the two access options is the one currently in force.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Access.always": {
+    "source": "Always",
+    "context": "Shown where a Remove button would be, against an admin: admins can always take attendance, so there is nothing to remove.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5129,6 +5219,24 @@
   },
   "Events.title": {
     "source": "Events",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Events.today": {
+    "source": "Today",
+    "context": "Section heading over the gatherings happening today.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Events.upcoming": {
+    "source": "Upcoming",
+    "context": "Section heading over gatherings still to come.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Events.notYoursDates": {
+    "source": "Their dates are below; their head counts are not, and nothing in them is yours to open or edit.",
+    "context": "Explains what a counselor can see of gatherings they have not been added to.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -6056,6 +6164,30 @@
   },
   "KioskBackdrop.noPhoto": {
     "source": "No photo — colours only",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.guidanceNoWords": {
+    "source": "Photographs, not posters: no words in the image — the kiosk’s own instructions must stay the loudest thing on the glass.",
+    "context": "Guidance for staff choosing a kiosk background photo.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.guidanceConsent": {
+    "source": "A child’s face on this screen needs their parent’s yes — it stands in a public lobby all morning. Rooms, decorations and seasons work better than people. Use a photo the church owns or took.",
+    "context": "Guidance about consent and copyright for a kiosk background photo.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.guidanceCrop": {
+    "source": "The kiosk’s own words hold the top of the glass — deepest on a screen stood on end, and never a promise of cover: the wide shelf shows more of the photo than the tall one. The previews show exactly how much of each crop stays clear.",
+    "context": "Explains how much of a background photo the kiosk’s own text will cover.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.fieldHint": {
+    "source": "Behind the kiosk’s idle screen while it is bound to this gathering, and gone the moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.",
+    "context": "Hint under the background-photo field: where the photo appears and when a change takes effect.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7228,6 +7360,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Students.badgeVisitor": {
+    "source": "Visitor",
+    "context": "Row badge marking a student as a first-time visitor. Pinned identical to StudentDetail.visitorBadge.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Students.allergyPress": {
     "source": "Read what {name} is allergic to",
     "zh-Hans": "machine",
@@ -7280,6 +7418,12 @@
   },
   "Students.queuedPress": {
     "source": "{name} is not in {backend} yet — send them now",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Students.badgeQueued": {
+    "source": "Not sent yet",
+    "context": "Row badge: this student exists in Tally but has not reached the church directory. Pinned identical to RowBadge.queuedBadge — same state, same words.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7748,6 +7892,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "StudentDetail.allergiesLabel": {
+    "source": "Allergies",
+    "context": "Heading on the amber panel holding what this student is allergic to.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "StudentDetail.recordGoneContact": {
     "source": "{backend} no longer has a record for {name} — deleted or merged there. Contact details live on that record, so there is nothing to show until it is sorted out below.",
     "zh-Hans": "machine",
@@ -7870,6 +8020,18 @@
   },
   "AddStudent.importListLink": {
     "source": "Adding a whole group? Import a Planning Center list →",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "AddStudent.importAction": {
+    "source": "Import",
+    "context": "Button that imports one Planning Center list onto the roster.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "AddStudent.importOnceNote": {
+    "source": "Import a list, once. Everyone on it today joins the roster; nothing stays linked, so a rule change upstream will not quietly add or drop a student later.",
+    "context": "Explains that a list import is a one-time copy, not a standing connection.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8535,6 +8697,12 @@
   },
   "EarlierAttendance.title": {
     "source": "Every gathering they came to",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EarlierAttendance.sourceNote": {
+    "source": "Read from this student’s own check-in records, so it reaches back as far as Tally has them — further than the year the screens above keep loaded. Only nights they were here; nothing is claimed about the ones in between.",
+    "context": "Explains where this longer history comes from and what it does not claim.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9499,6 +9667,18 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Staff.typeChildName": {
+    "source": "Type the child’s name",
+    "context": "Prompt above the keyboard on the reprint screen, where a volunteer finds a child whose label needs printing again.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.printerNeedsPrint": {
+    "source": "Printer needs attention — this may not print.",
+    "context": "Warning on the reprint confirmation screen when the label printer is not ready. Distinct from Staff.printerNeedsAttention, which is the status line on the staff menu.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Staff.troubleLine": {
     "source": "{trouble} — a name tag may not come out.",
     "zh-Hans": "machine",
@@ -10132,6 +10312,12 @@
   },
   "Printer.title": {
     "source": "Label printer",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.done": {
+    "source": "Done",
+    "context": "Button that closes the printer setup screen.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

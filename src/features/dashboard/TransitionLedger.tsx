@@ -49,6 +49,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
   const time = useTimeFormats();
   const t = useTranslations('Ledger');
   const tReason = useTranslations('Transitions');
+  const tCommon = useTranslations('Common');
   const [open, setOpen] = useState(false);
 
   if (rows.length === 0) return null;
@@ -141,7 +142,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                 onClick={() => onUndo(transition)}
                 loading={undoBusyId === transition.id}
               >
-                Undo
+                {tCommon('undo')}
               </Button>
             </li>
           ))}

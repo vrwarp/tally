@@ -92,6 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { error } = useData();
   const location = useLocation();
   const t = useTranslations();
+  const tCommon = useTranslations('Common');
   const [menuOpen, setMenuOpen] = useState(false);
 
   /*
@@ -363,7 +364,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               message={error}
               action={
                 <Button variant="secondary" onClick={() => window.location.reload()}>
-                  Reload
+                  {tCommon('reload')}
                 </Button>
               }
             />

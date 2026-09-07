@@ -143,6 +143,7 @@ export const StudentRow = memo(function StudentRow({
   const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('StudentRow');
+  const tCommon = useTranslations('Common');
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
   const name = studentFullName(student);
   const grade = gradeLabel(grades, student);
@@ -490,7 +491,7 @@ export const StudentRow = memo(function StudentRow({
               aria-label={t('ariaUndoShort', { name })}
               className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
             >
-              Undo
+              {tCommon('undo')}
             </button>
 
             {canOpenProfile ? (
@@ -499,7 +500,7 @@ export const StudentRow = memo(function StudentRow({
                 aria-label={t('ariaOpenProfile', { name })}
                 className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
               >
-                Profile
+                {tCommon('profile')}
               </Link>
             ) : null}
 

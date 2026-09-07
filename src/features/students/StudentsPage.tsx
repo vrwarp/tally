@@ -732,6 +732,7 @@ const StudentListRow = memo(function StudentListRow({
 }) {
   const grades = useGrades();
   const t = useTranslations('Students');
+  const tCommon = useTranslations('Common');
   const name = `${student.firstName} ${student.lastName}`;
   const birthday = birthdayState(student.birthday, now);
   const spokenGrade = gradeSentence(grades, student);
@@ -900,7 +901,7 @@ const StudentListRow = memo(function StudentListRow({
               onPress={() => onBadge(student, 'visitor')}
               pressLabel={t('visitorPress', { name })}
             >
-              Visitor
+              {t('badgeVisitor')}
             </Badge>
           ) : null}
 
@@ -971,7 +972,7 @@ const StudentListRow = memo(function StudentListRow({
               onPress={() => onBadge(student, 'inactive')}
               pressLabel={t('inactivePress', { name })}
             >
-              Inactive
+              {tCommon('inactive')}
             </Badge>
           ) : null}
           <QueuedBadge
@@ -1245,7 +1246,7 @@ function QueuedBadge({
       onPress={onPress}
       pressLabel={t('queuedPress', { name, backend: label })}
     >
-      Queued
+      {t('badgeQueued')}
     </Badge>
   );
 }

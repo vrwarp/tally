@@ -291,9 +291,7 @@ export function LabelTemplateField({
         <div className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
           {printsAllergies ? (
             <p className="rounded-lg bg-warn-500/10 p-2 text-xs leading-snug text-warn-400 ring-1 ring-warn-500/25">
-              These labels will print each child&rsquo;s allergy note, so a volunteer holding them can
-              read it. It is the one medical detail Tally puts on paper — anyone who can see the
-              sticker can see it too.
+              {t('allergyPrintWarning')}
             </p>
           ) : null}
 
@@ -464,7 +462,7 @@ export function LabelTemplateField({
                             onClick={() => removeLine(index)}
                             className="rounded-md px-2 py-1 text-xs font-semibold text-danger-400 hover:bg-ink-800"
                           >
-                            Remove
+                            {tCommon('remove')}
                           </button>
                         </div>
                       </div>

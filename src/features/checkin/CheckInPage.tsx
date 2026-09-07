@@ -154,6 +154,7 @@ const FOCUS_EMPTY = {
 export function CheckInPage() {
   const time = useTimeFormats();
   const t = useTranslations('CheckIn');
+  const tCommon = useTranslations('Common');
   const { eventId } = useParams();
   const { event, eventLoading, fromArchive, now, selectableEvents } = useActiveEvent(
     eventId ?? null,
@@ -969,7 +970,7 @@ export function CheckInPage() {
                 onClick={cancelSwap}
                 className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800"
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
             </div>
           ) : null}

@@ -732,7 +732,7 @@ export function PrinterScreen({
           {...tap(onDone)}
           className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
         >
-          Done
+          {t('done')}
         </button>
       </div>
     </div>

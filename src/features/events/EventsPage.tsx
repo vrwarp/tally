@@ -307,7 +307,7 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
         id="events-today"
         className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
       >
-        Today
+        {t('today')}
       </h2>
       {/*
         A card is the size of a decision, and there is no decision behind a wall.
@@ -632,7 +632,7 @@ export function EventsPage() {
               built the same way and the next person to add a band does not have
               to know about a hack. */}
           <h2 id="events-upcoming" className="pb-3 text-lg font-bold text-ink-50">
-            Upcoming
+            {t('upcoming')}
           </h2>
 
           <div className="flex flex-col gap-8">

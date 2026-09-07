@@ -220,6 +220,7 @@ function ReleasedRow({
 }) {
   const t = useTranslations('Mia');
   const tReason = useTranslations('Transitions');
+  const tCommon = useTranslations('Common');
   const { item, reason } = release;
   const name = studentFullName(item.student);
 
@@ -343,7 +344,7 @@ function ReleasedRow({
             onClick={() => onUndo(release)}
             loading={busy}
           >
-            Undo
+            {tCommon('undo')}
           </Button>
         ) : null}
       </div>

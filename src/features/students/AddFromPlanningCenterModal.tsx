@@ -58,6 +58,7 @@ export function AddFromPlanningCenterModal({
   onRoster,
 }: AddFromPlanningCenterModalProps) {
   const t = useTranslations('AddStudent');
+  const tCommon = useTranslations('Common');
   const locale = useLocale();
   const grades = useGrades();
   const { show } = useToast();
@@ -215,7 +216,7 @@ export function AddFromPlanningCenterModal({
       }
       footer={
         <Button variant="secondary" onClick={onClose}>
-          Done
+          {tCommon('done')}
         </Button>
       }
     >
@@ -333,8 +334,7 @@ export function AddFromPlanningCenterModal({
           ) : (
             <div className="flex flex-col gap-2">
               <p className="text-sm text-ink-300">
-                Import a list, once. Everyone on it today joins the roster; nothing stays linked, so
-                a rule change upstream will not quietly add or drop a student later.
+                {t('importOnceNote')}
               </p>
 
               {lists === null ? (
@@ -365,7 +365,7 @@ export function AddFromPlanningCenterModal({
                         loading={importingId === list.id}
                         onClick={() => void runImport(list)}
                       >
-                        Import
+                        {t('importAction')}
                       </Button>
                     </li>
                   ))}

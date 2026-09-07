@@ -777,14 +777,14 @@ export function StudentDetailPage() {
                           label={t('callAria', { contact: contactLabel, phone: formatPhone(phone) })}
                           icon="📞"
                         >
-                          Call
+                          {tCommon('call')}
                         </ContactLink>
                         <ContactLink
                           href={`sms:${dialable(phone)}`}
                           label={t('textAria', { contact: contactLabel, phone: formatPhone(phone) })}
                           icon="💬"
                         >
-                          Text
+                          {tCommon('text')}
                         </ContactLink>
                       </>
                     ) : null}
@@ -794,7 +794,7 @@ export function StudentDetailPage() {
                         label={t('emailAria', { contact: contactLabel, email })}
                         icon="✉"
                       >
-                        Email
+                        {tCommon('email')}
                       </ContactLink>
                     ) : null}
                   </div>
@@ -820,7 +820,7 @@ export function StudentDetailPage() {
             {student.hasAllergies ? (
               <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
                 <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">
-                  Allergies
+                  {t('allergiesLabel')}
                 </p>
                 <p className="mt-0.5 text-sm text-ink-100">
                   {details?.allergies ?? (detailsPending ? t('detailsLoading') : t('recordedIn', { backend: backendName }))}

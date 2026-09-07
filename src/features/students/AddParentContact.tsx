@@ -183,6 +183,7 @@ function ContactForm({
   onAdded: () => void;
 }) {
   const t = useTranslations('ParentContact');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -275,7 +276,7 @@ function ContactForm({
             setProblem(null);
           }}
         >
-          Cancel
+          {tCommon('cancel')}
         </Button>
       </div>
     </form>
@@ -296,6 +297,7 @@ function AdultForm({
   onAdded: () => void;
 }) {
   const t = useTranslations('ParentContact');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const [firstName, setFirstName] = useState('');
   // Right far more often than it is wrong, and wrong is one edit away. A blank
@@ -503,7 +505,7 @@ function AdultForm({
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
         </div>
 
@@ -584,7 +586,7 @@ function AdultForm({
             setProblem(null);
           }}
         >
-          Cancel
+          {tCommon('cancel')}
         </Button>
       </div>
     </form>

@@ -186,7 +186,7 @@ export function EventHeader({
           to="/"
           className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
-          Change
+          {t('change')}
         </Link>
 
         <select

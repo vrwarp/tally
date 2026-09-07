@@ -113,7 +113,7 @@ export function ReprintConfirmScreen({
             control that spends a label read for a beat as a bullet. */}
         {printerNeedsAttention && (
           <div className="pb-3 text-base font-semibold text-balance text-warn-400 kiosk:text-lg">
-            Printer needs attention&nbsp;— this may not print.
+            {t('printerNeedsPrint')}
           </div>
         )}
         <button

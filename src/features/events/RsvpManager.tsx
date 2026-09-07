@@ -82,6 +82,7 @@ function AddStudentsModal({
 }) {
   const grades = useGrades();
   const t = useTranslations('Rsvp');
+  const tCommon = useTranslations('Common');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [saving, setSaving] = useState(false);
@@ -123,7 +124,7 @@ function AddStudentsModal({
       footer={
         <>
           <Button variant="secondary" size="lg" onClick={close}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             size="lg"

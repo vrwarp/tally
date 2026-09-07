@@ -108,6 +108,7 @@ function DeleteGatheringModal({
 }: ConfirmProps) {
   const time = useTimeFormats();
   const t = useTranslations('DangerZone');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const chain = chainKey(event);
 
@@ -218,7 +219,7 @@ function DeleteGatheringModal({
             disabled={!ready || counting}
             loading={busy}
           >
-            Delete
+            {tCommon('delete')}
           </Button>
         </>
       }
@@ -281,6 +282,7 @@ export interface EventDangerZoneProps {
 
 export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZoneProps) {
   const t = useTranslations('DangerZone');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const [confirming, setConfirming] = useState<Scope | null>(null);
   const [confirmingEmpty, setConfirmingEmpty] = useState(false);
@@ -362,7 +364,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
                   loading={busy}
                   onClick={() => void deleteEmpty()}
                 >
-                  Delete
+                  {tCommon('delete')}
                 </Button>
               </div>
             </>

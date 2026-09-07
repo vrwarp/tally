@@ -217,7 +217,7 @@ export function ReprintScreen({
               {!rows && (
                 <div className="pt-6 text-center">
                   <div className="text-2xl font-semibold text-ink-200 kiosk:text-3xl">
-                    Type the child&apos;s name
+                    {t('typeChildName')}
                   </div>
                   {/*
                     * What actually happens, rather than what used to be promised.

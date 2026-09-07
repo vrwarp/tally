@@ -105,8 +105,7 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
               read once, on a viewport where the notice already costs half a
               fold. */}
           <span className="mt-0.5 hidden text-xs leading-relaxed text-ink-400 lg:block">
-            Their dates are below; their head counts are not, and nothing in them is yours to
-            open or edit.
+            {t('notYoursDates')}
           </span>
         </span>
       </span>

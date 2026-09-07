@@ -45,6 +45,7 @@ export const PhonePad = memo(function PhonePad({
   onKey: (key: KioskKey) => void;
 }) {
   const t = useTranslations('Register');
+  const tCommon = useTranslations('Common');
   const handlerRef = useRef(onKey);
   handlerRef.current = onKey;
 
@@ -92,7 +93,7 @@ export const PhonePad = memo(function PhonePad({
         data-key="clear"
         className={`${KEY_CLASS} text-base font-medium text-ink-300`}
       >
-        Clear
+        {tCommon('clear')}
       </button>
       <button
         key="0"

@@ -98,6 +98,7 @@ function AccessOption({
   busy: boolean;
   onPress: () => void;
 }) {
+  const t = useTranslations('Access');
   return (
     <button
       type="button"
@@ -131,7 +132,7 @@ function AccessOption({
           </span>
           {selected ? (
             <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-brand-200">
-              Now
+              {t('nowBadge')}
             </span>
           ) : null}
         </span>
@@ -159,6 +160,7 @@ type AccessTranslator = ReturnType<typeof useTranslations<'Access'>>;
 
 export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const t = useTranslations('Access');
+  const tCommon = useTranslations('Common');
   const { access, events } = useData();
   const { profile, can } = useAuth();
   const { show } = useToast();
@@ -506,11 +508,11 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                         /* Admins pass the gate whatever this list says, so a
                            Remove here would be a control that does nothing. */
                         <span className="text-xs uppercase tracking-wider text-ink-600">
-                          Always
+                          {t('always')}
                         </span>
                       ) : mayRemove && member.id !== uid ? (
                         <Button variant="ghost" onClick={() => void remove(member)} disabled={busy}>
-                          Remove
+                          {tCommon('remove')}
                         </Button>
                       ) : (
                         <span className="text-xs uppercase tracking-wider text-ink-600">

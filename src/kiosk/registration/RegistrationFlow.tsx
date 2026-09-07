@@ -969,6 +969,7 @@ function Header({
   onClose: () => void;
 }) {
   const t = useTranslations('Register');
+  const tCommon = useTranslations('Common');
   const tap = useTap();
 
   return (
@@ -1022,7 +1023,7 @@ function Header({
           canClose ? '' : 'invisible'
         }`}
       >
-        Cancel
+        {tCommon('cancel')}
       </button>
     </div>
   );

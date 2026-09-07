@@ -162,6 +162,7 @@ function Summary({ summary }: { summary: CheckInsImportSummary }) {
 
 export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps) {
   const t = useTranslations('Import');
+  const tCommon = useTranslations('Common');
   const locale = useLocale();
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
@@ -275,7 +276,7 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
       }
       footer={
         <Button variant="secondary" onClick={onClose} disabled={importingId !== null}>
-          Done
+          {tCommon('done')}
         </Button>
       }
     >

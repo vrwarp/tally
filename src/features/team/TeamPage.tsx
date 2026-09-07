@@ -113,6 +113,7 @@ function AccessToggle({
   label: string;
   onChange: (next: boolean) => void;
 }) {
+  const tCommon = useTranslations('Common');
   return (
     <label className="-mr-2 flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl px-2 text-sm text-ink-400 pointer-fine:min-h-9 @2xl:mr-0">
       <input
@@ -126,7 +127,7 @@ function AccessToggle({
         aria-label={label}
         onChange={(event) => onChange(event.target.checked)}
       />
-      Active
+      {tCommon('active')}
     </label>
   );
 }
@@ -577,7 +578,7 @@ export function TeamPage() {
                     >
                       ▸
                     </span>
-                    Invited
+                    {t('statusInvited')}
                     {/* No number at all when the read failed: a stale count is
                         the same false claim the empty state used to make. */}
                     {pending && !invitationsError ? (
@@ -603,7 +604,7 @@ export function TeamPage() {
                     <span aria-hidden="true">＋</span>{t('inviteSomeone')}
                   </span>
                   <span className="hidden min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-ink-400 group-open:inline-flex">
-                    Close
+                    {tCommon('close')}
                   </span>
                 </span>
               </summary>
@@ -636,7 +637,7 @@ export function TeamPage() {
                   ))}
                 </SelectField>
                 <Button type="submit" loading={inviting} disabled={!inviteEmail.trim()}>
-                  Invite
+                  {t('invite')}
                 </Button>
               </form>
 
@@ -727,7 +728,7 @@ export function TeamPage() {
                             disabled={busyId === invitation.id}
                             onClick={() => setConfirmingWithdrawal(invitation.id)}
                           >
-                            Withdraw
+                            {t('withdraw')}
                           </Button>
                         )}
                         {/* `basis-full` drops the consequence onto its own line

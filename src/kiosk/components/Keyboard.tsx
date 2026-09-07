@@ -147,6 +147,7 @@ export const Keyboard = memo(function Keyboard({
 }) {
   tallyRender('Keyboard');
   const t = useTranslations('Door');
+  const tCommon = useTranslations('Common');
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);
@@ -319,7 +320,7 @@ export const Keyboard = memo(function Keyboard({
               : undefined
           }
         >
-          Clear
+          {tCommon('clear')}
         </button>
         <button type="button" tabIndex={-1} data-key="space" aria-label={t('space')} className={`${KEY_CLASS} col-span-12`}>
           &nbsp;

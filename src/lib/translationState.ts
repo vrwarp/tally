@@ -120,6 +120,9 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
   ['EventDetail.badgeCheckInOpen', 'EventHero.checkInOpen', 'Chooser.checkInOpen'],
   ['Dashboard.noGatherings', 'Dashboard.emptyTitle', 'StudentDetail.noGatheringsTitle'],
   ['Incomplete.title', 'Students.incompleteProfiles'],
+  /* Row badge and detail badge for the same fact about the same student. */
+  ['StudentDetail.visitorBadge', 'Students.badgeVisitor'],
+  ['RowBadge.queuedBadge', 'Students.badgeQueued'],
   ['AddStudent.titleMulti', 'StudentEditor.titleAdd'],
   ['Students.addFromPco', 'AddStudent.titlePco'],
   ['FollowUp.addContact', 'ParentContact.modalTitle'],

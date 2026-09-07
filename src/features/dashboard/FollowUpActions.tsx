@@ -83,6 +83,7 @@ function ContactAdultButton({
   details: { contactName?: string | null; contactPhone?: string | null; contactEmail?: string | null };
 }) {
   const t = useTranslations('FollowUp');
+  const tCommon = useTranslations('Common');
   const [open, setOpen] = useState(false);
   const { show } = useToast();
 
@@ -163,7 +164,7 @@ function ContactAdultButton({
         */
         footer={
           <Button variant="ghost" onClick={() => setOpen(false)}>
-            Close
+            {tCommon('close')}
           </Button>
         }
       >
@@ -186,14 +187,14 @@ function ContactAdultButton({
                   label={t('callAria', { contact: inSentence, name, phone: formatPhone(phone) })}
                   icon="📞"
                 >
-                  Call
+                  {tCommon('call')}
                 </ActionLink>
                 <ActionLink
                   href={`sms:${dialable(phone)}`}
                   label={t('textAria', { contact: inSentence, name, phone: formatPhone(phone) })}
                   icon="💬"
                 >
-                  Text
+                  {tCommon('text')}
                 </ActionLink>
               </div>
             </div>
@@ -207,7 +208,7 @@ function ContactAdultButton({
                 label={t('emailAria', { contact: inSentence, name, email })}
                 icon="✉"
               >
-                Email
+                {tCommon('email')}
               </ActionLink>
             </div>
           ) : null}

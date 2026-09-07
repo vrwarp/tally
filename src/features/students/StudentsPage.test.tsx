@@ -467,7 +467,7 @@ describe('StudentsPage birthday badges', () => {
 
   it('does not say it about a student Planning Center has never heard of', () => {
     // A quick-added visitor has no birthday for the same reason they have no
-    // anything: their push has not landed. "Queued" already says that, and it
+    // anything: it has not been sent yet. "Not sent yet" already says that, and it
     // is the chip with the action on it.
     renderRoster([
       makeStudent({
@@ -480,7 +480,7 @@ describe('StudentsPage birthday badges', () => {
     ]);
 
     expect(within(row(/Kylie/)).queryByText('No birthday')).not.toBeInTheDocument();
-    expect(within(row(/Kylie/)).getAllByText('Queued').length).toBeGreaterThan(0);
+    expect(within(row(/Kylie/)).getAllByText('Not sent yet').length).toBeGreaterThan(0);
   });
 
   it('says nothing at all the rest of the year', () => {

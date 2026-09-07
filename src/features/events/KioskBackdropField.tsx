@@ -369,19 +369,13 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
            */}
           <div className="flex flex-col gap-1.5">
             <p className="text-xs leading-snug text-ink-500">
-              Photographs, not posters: no words in the image — the kiosk&rsquo;s own
-              instructions must stay the loudest thing on the glass.
+              {t('guidanceNoWords')}
             </p>
             <p className="text-xs leading-snug text-ink-500">
-              A child&rsquo;s face on this screen needs their parent&rsquo;s yes — it stands in a
-              public lobby all morning. Rooms, decorations and seasons work better than people.
-              Use a photo the church owns or took.
+              {t('guidanceConsent')}
             </p>
             <p className="text-xs leading-snug text-ink-500">
-              The kiosk&rsquo;s own words hold the top of the glass — deepest on a screen
-              stood on end, and never a promise of cover: the wide shelf shows more of the
-              photo than the tall one. The previews show exactly how much of each crop
-              stays clear.
+              {t('guidanceCrop')}
             </p>
           </div>
 
@@ -401,8 +395,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
       ) : null}
 
       <p className="text-xs leading-snug text-ink-500">
-        Behind the kiosk&rsquo;s idle screen while it is bound to this gathering, and gone the
-        moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.
+        {t('fieldHint')}
       </p>
     </div>
   );
