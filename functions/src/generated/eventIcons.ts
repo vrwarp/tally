@@ -183,26 +183,3 @@ export function findEventIcon(name: string | null | undefined): EventIconDef | n
   if (!name) return null;
   return BY_NAME.get(name) ?? null;
 }
-
-/**
- * The catalogue, filtered by what somebody has typed.
- *
- * Matches on the label, the Material name and the keyword list, so "fire",
- * "campfire" and "local_fire_department" all reach the same icon. An empty
- * query is the whole catalogue in its curated order — grouped by the kind of
- * gathering it belongs to, which is more use than alphabetical when you are
- * browsing rather than searching.
- */
-export function searchEventIcons(query: string): readonly EventIconDef[] {
-  const needle = query.trim().toLowerCase();
-  if (needle.length === 0) return EVENT_ICONS;
-
-  // Underscores are worth nothing to a search and everything to a paste: an
-  // icon's Material name is the one string somebody might arrive with from
-  // elsewhere, and `local_fire_department` has to find the icon it names.
-  const words = needle.replace(/_/g, ' ').split(/\s+/);
-  return EVENT_ICONS.filter((icon) => {
-    const haystack = `${icon.label} ${icon.name.replace(/_/g, ' ')} ${icon.keywords}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
-  });
-}

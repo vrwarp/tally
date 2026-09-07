@@ -5269,6 +5269,708 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Events.iconLabel": {
+    "source": "Icon",
+    "context": "The label above the icon picker in the gathering editor. The noun — the thing being chosen — not an instruction.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.iconDone": {
+    "source": "Done",
+    "context": "The button that closes the open icon grid. The picker is already showing a choice; this only puts the grid away.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.iconChange": {
+    "source": "Change",
+    "context": "The button that opens the icon grid, shown when it is closed. A verb: it invites picking a different icon.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.event": {
+    "source": "Event",
+    "context": "The icon picker's name for the Material Symbols glyph `event`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: calendar date schedule day. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.calendar_month": {
+    "source": "Calendar",
+    "context": "The icon picker's name for the Material Symbols glyph `calendar_month`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: month schedule date. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.today": {
+    "source": "Today",
+    "context": "The icon picker's name for the Material Symbols glyph `today`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: calendar day date. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.schedule": {
+    "source": "Clock",
+    "context": "The icon picker's name for the Material Symbols glyph `schedule`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: time hour schedule watch. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.groups": {
+    "source": "Groups",
+    "context": "The icon picker's name for the Material Symbols glyph `groups`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: people group community crowd team youth ministry congregation. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.group": {
+    "source": "Small group",
+    "context": "The icon picker's name for the Material Symbols glyph `group`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: people friends pair community fellowship. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.diversity_3": {
+    "source": "Community",
+    "context": "The icon picker's name for the Material Symbols glyph `diversity_3`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: people together fellowship diversity friends. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.diversity_1": {
+    "source": "Friends",
+    "context": "The icon picker's name for the Material Symbols glyph `diversity_1`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: friends together fellowship circle community people. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.handshake": {
+    "source": "Welcome",
+    "context": "The icon picker's name for the Material Symbols glyph `handshake`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: greeting partnership meet hands fellowship. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.waving_hand": {
+    "source": "Hello",
+    "context": "The icon picker's name for the Material Symbols glyph `waving_hand`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: welcome greeting wave hand visitor. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.child_care": {
+    "source": "Kids ministry",
+    "context": "The icon picker's name for the Material Symbols glyph `child_care`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: children kids child care nursery youth program sunday. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.kid_star": {
+    "source": "Kids",
+    "context": "The icon picker's name for the Material Symbols glyph `kid_star`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: children kids child youth star stars shining program. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.crib": {
+    "source": "Nursery",
+    "context": "The icon picker's name for the Material Symbols glyph `crib`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: baby infant crib cot nursery sleep children. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.stroller": {
+    "source": "Infants",
+    "context": "The icon picker's name for the Material Symbols glyph `stroller`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: baby infant stroller pram nursery childcare children parent. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.high_chair": {
+    "source": "Toddlers",
+    "context": "The icon picker's name for the Material Symbols glyph `high_chair`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: baby toddler high chair feeding nursery children. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.baby_changing_station": {
+    "source": "Changing station",
+    "context": "The icon picker's name for the Material Symbols glyph `baby_changing_station`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: baby diaper nappy nursery changing infant. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.family_restroom": {
+    "source": "Families",
+    "context": "The icon picker's name for the Material Symbols glyph `family_restroom`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: family parents children kids together. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.footprint": {
+    "source": "Footprints",
+    "context": "The icon picker's name for the Material Symbols glyph `footprint`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: footprints feet steps walking trail path journey children kids. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.barefoot": {
+    "source": "Little feet",
+    "context": "The icon picker's name for the Material Symbols glyph `barefoot`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: foot feet barefoot toes baby little nursery children footprints sand. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.celebration": {
+    "source": "Celebration",
+    "context": "The icon picker's name for the Material Symbols glyph `celebration`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: party confetti fun festive fellowship. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.festival": {
+    "source": "Festival",
+    "context": "The icon picker's name for the Material Symbols glyph `festival`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: tent fair carnival camp. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.emoji_events": {
+    "source": "Trophy",
+    "context": "The icon picker's name for the Material Symbols glyph `emoji_events`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: award win competition prize. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.workspace_premium": {
+    "source": "Award",
+    "context": "The icon picker's name for the Material Symbols glyph `workspace_premium`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: medal badge honour recognition. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.campaign": {
+    "source": "Announcement",
+    "context": "The icon picker's name for the Material Symbols glyph `campaign`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: megaphone shout news outreach. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.forum": {
+    "source": "Discussion",
+    "context": "The icon picker's name for the Material Symbols glyph `forum`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: talk chat conversation small group. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.chat_bubble": {
+    "source": "Chat",
+    "context": "The icon picker's name for the Material Symbols glyph `chat_bubble`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: talk message conversation. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.weekend": {
+    "source": "Living room",
+    "context": "The icon picker's name for the Material Symbols glyph `weekend`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: sofa couch home house lounge host small group. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.table_restaurant": {
+    "source": "Around the table",
+    "context": "The icon picker's name for the Material Symbols glyph `table_restaurant`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: table meal dinner host home fellowship small group. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.church": {
+    "source": "Church",
+    "context": "The icon picker's name for the Material Symbols glyph `church`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: worship chapel service sanctuary faith christian jesus sunday. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.folded_hands": {
+    "source": "Prayer",
+    "context": "The icon picker's name for the Material Symbols glyph `folded_hands`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: pray hands worship christian jesus faith. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.candle": {
+    "source": "Candlelight",
+    "context": "The icon picker's name for the Material Symbols glyph `candle`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: candle vigil christmas eve worship light service. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.self_improvement": {
+    "source": "Stillness",
+    "context": "The icon picker's name for the Material Symbols glyph `self_improvement`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: quiet meditate reflect stillness prayer worship reflection. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.menu_book": {
+    "source": "Bible study",
+    "context": "The icon picker's name for the Material Symbols glyph `menu_book`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: book read scripture study lesson bible christian. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.auto_stories": {
+    "source": "Devotional",
+    "context": "The icon picker's name for the Material Symbols glyph `auto_stories`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: book pages read story scripture bible devotion christian. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.book_ribbon": {
+    "source": "Bible",
+    "context": "The icon picker's name for the Material Symbols glyph `book_ribbon`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: bible scripture book study christian word. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.history_edu": {
+    "source": "Study",
+    "context": "The icon picker's name for the Material Symbols glyph `history_edu`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: study lesson learn book teaching class bible. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.volunteer_activism": {
+    "source": "Service",
+    "context": "The icon picker's name for the Material Symbols glyph `volunteer_activism`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: serve give heart hands charity. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.favorite": {
+    "source": "Heart",
+    "context": "The icon picker's name for the Material Symbols glyph `favorite`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: love care favourite jesus christian. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.star": {
+    "source": "Star",
+    "context": "The icon picker's name for the Material Symbols glyph `star`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: favourite highlight special stars shining shine twinkle. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.star_shine": {
+    "source": "Shining star",
+    "context": "The icon picker's name for the Material Symbols glyph `star_shine`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: star stars shining shine sparkle twinkle bright light kids. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.stars_2": {
+    "source": "Stars",
+    "context": "The icon picker's name for the Material Symbols glyph `stars_2`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: stars shining twinkle night sky kids. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.auto_awesome": {
+    "source": "Sparkle",
+    "context": "The icon picker's name for the Material Symbols glyph `auto_awesome`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: sparkle shine shining glitter twinkle stars special. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.spa": {
+    "source": "Retreat",
+    "context": "The icon picker's name for the Material Symbols glyph `spa`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: rest quiet calm renewal. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.light_mode": {
+    "source": "Sunrise service",
+    "context": "The icon picker's name for the Material Symbols glyph `light_mode`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: sun morning light bright shine shining. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.local_fire_department": {
+    "source": "Campfire",
+    "context": "The icon picker's name for the Material Symbols glyph `local_fire_department`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: fire bonfire camp flame camping retreat. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.camping": {
+    "source": "Camping",
+    "context": "The icon picker's name for the Material Symbols glyph `camping`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: camp tent outdoors retreat summer. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.holiday_village": {
+    "source": "Camp cabins",
+    "context": "The icon picker's name for the Material Symbols glyph `holiday_village`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: camp cabins village lodging retreat. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.chalet": {
+    "source": "Winter lodge",
+    "context": "The icon picker's name for the Material Symbols glyph `chalet`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: lodge cabin retreat mountain camp ski snow. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.cabin": {
+    "source": "Cabin",
+    "context": "The icon picker's name for the Material Symbols glyph `cabin`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: lodge retreat camp house camping. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.forest": {
+    "source": "Woods",
+    "context": "The icon picker's name for the Material Symbols glyph `forest`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: trees forest camp outdoors nature. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.park": {
+    "source": "Park",
+    "context": "The icon picker's name for the Material Symbols glyph `park`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: tree bench outdoors green. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.nature_people": {
+    "source": "Outdoors",
+    "context": "The icon picker's name for the Material Symbols glyph `nature_people`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: outdoors nature trees camp retreat walk people. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.hiking": {
+    "source": "Hike",
+    "context": "The icon picker's name for the Material Symbols glyph `hiking`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: walk trail backpack outdoors. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.directions_walk": {
+    "source": "Walk",
+    "context": "The icon picker's name for the Material Symbols glyph `directions_walk`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: walk walking prayer steps footsteps stroll journey path. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.landscape": {
+    "source": "Mountains",
+    "context": "The icon picker's name for the Material Symbols glyph `landscape`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: hills outdoors trail nature terrain. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.nights_stay": {
+    "source": "Overnight",
+    "context": "The icon picker's name for the Material Symbols glyph `nights_stay`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: night moon lock-in sleepover. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.bedtime": {
+    "source": "Lock-in",
+    "context": "The icon picker's name for the Material Symbols glyph `bedtime`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: moon night sleepover overnight. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.moon_stars": {
+    "source": "Starry night",
+    "context": "The icon picker's name for the Material Symbols glyph `moon_stars`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: stars night moon sky overnight lock-in sleepover camp. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.beach_access": {
+    "source": "Beach",
+    "context": "The icon picker's name for the Material Symbols glyph `beach_access`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: sun umbrella summer sand. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.pool": {
+    "source": "Swim",
+    "context": "The icon picker's name for the Material Symbols glyph `pool`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: pool water swimming summer. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sailing": {
+    "source": "Sailing",
+    "context": "The icon picker's name for the Material Symbols glyph `sailing`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: boat water lake sail. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.kayaking": {
+    "source": "Kayak",
+    "context": "The icon picker's name for the Material Symbols glyph `kayaking`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: canoe paddle water river. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.ac_unit": {
+    "source": "Winter",
+    "context": "The icon picker's name for the Material Symbols glyph `ac_unit`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: snow cold snowflake ski. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sports_basketball": {
+    "source": "Basketball",
+    "context": "The icon picker's name for the Material Symbols glyph `sports_basketball`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: ball sport game court. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sports_soccer": {
+    "source": "Soccer",
+    "context": "The icon picker's name for the Material Symbols glyph `sports_soccer`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: football ball sport game pitch. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sports_volleyball": {
+    "source": "Volleyball",
+    "context": "The icon picker's name for the Material Symbols glyph `sports_volleyball`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: ball sport game net. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sports_football": {
+    "source": "Football",
+    "context": "The icon picker's name for the Material Symbols glyph `sports_football`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: ball sport game. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.directions_run": {
+    "source": "Run",
+    "context": "The icon picker's name for the Material Symbols glyph `directions_run`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: race running sport activity. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.fitness_center": {
+    "source": "Workout",
+    "context": "The icon picker's name for the Material Symbols glyph `fitness_center`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: gym weights exercise fitness. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.skateboarding": {
+    "source": "Skate",
+    "context": "The icon picker's name for the Material Symbols glyph `skateboarding`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: skateboard park sport. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.sports_esports": {
+    "source": "Video games",
+    "context": "The icon picker's name for the Material Symbols glyph `sports_esports`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: video game controller esports games. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.casino": {
+    "source": "Game night",
+    "context": "The icon picker's name for the Material Symbols glyph `casino`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: dice board games play. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.toys_and_games": {
+    "source": "Games",
+    "context": "The icon picker's name for the Material Symbols glyph `toys_and_games`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: games play toys kids children activities fun. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.extension": {
+    "source": "Activity",
+    "context": "The icon picker's name for the Material Symbols glyph `extension`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: puzzle piece game craft games activities. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.restaurant": {
+    "source": "Meal",
+    "context": "The icon picker's name for the Material Symbols glyph `restaurant`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food dinner eat fork knife meal supper. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.dining": {
+    "source": "Potluck",
+    "context": "The icon picker's name for the Material Symbols glyph `dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food meal plate potluck dinner supper eat. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.local_pizza": {
+    "source": "Pizza",
+    "context": "The icon picker's name for the Material Symbols glyph `local_pizza`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food slice dinner. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.lunch_dining": {
+    "source": "Lunch",
+    "context": "The icon picker's name for the Material Symbols glyph `lunch_dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food burger lunch cookout. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.dinner_dining": {
+    "source": "Dinner",
+    "context": "The icon picker's name for the Material Symbols glyph `dinner_dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food dinner supper meal evening eat. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.breakfast_dining": {
+    "source": "Breakfast",
+    "context": "The icon picker's name for the Material Symbols glyph `breakfast_dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food breakfast eggs morning meal brunch. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.brunch_dining": {
+    "source": "Brunch",
+    "context": "The icon picker's name for the Material Symbols glyph `brunch_dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food brunch breakfast lunch meal. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.soup_kitchen": {
+    "source": "Meal service",
+    "context": "The icon picker's name for the Material Symbols glyph `soup_kitchen`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: food serve meal soup outreach charity volunteer. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.bakery_dining": {
+    "source": "Pastries",
+    "context": "The icon picker's name for the Material Symbols glyph `bakery_dining`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: pastry food morning breakfast croissant. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.cookie": {
+    "source": "Snacks",
+    "context": "The icon picker's name for the Material Symbols glyph `cookie`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: snack cookie biscuit treat food dessert. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.icecream": {
+    "source": "Ice cream",
+    "context": "The icon picker's name for the Material Symbols glyph `icecream`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: dessert cone treat summer. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.cake": {
+    "source": "Birthday",
+    "context": "The icon picker's name for the Material Symbols glyph `cake`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: cake dessert party celebrate. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.local_cafe": {
+    "source": "Coffee",
+    "context": "The icon picker's name for the Material Symbols glyph `local_cafe`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: cafe drink hot cup fellowship snack coffee. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.local_drink": {
+    "source": "Drinks",
+    "context": "The icon picker's name for the Material Symbols glyph `local_drink`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: drink water juice snack refreshment cup. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.outdoor_grill": {
+    "source": "Cookout",
+    "context": "The icon picker's name for the Material Symbols glyph `outdoor_grill`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: bbq grill barbecue food. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.directions_bus": {
+    "source": "Bus trip",
+    "context": "The icon picker's name for the Material Symbols glyph `directions_bus`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: bus coach transport travel. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.flight": {
+    "source": "Mission trip",
+    "context": "The icon picker's name for the Material Symbols glyph `flight`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: plane travel flight airport. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.luggage": {
+    "source": "Trip",
+    "context": "The icon picker's name for the Material Symbols glyph `luggage`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: suitcase travel packing. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.map": {
+    "source": "Map",
+    "context": "The icon picker's name for the Material Symbols glyph `map`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: directions location travel. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.explore": {
+    "source": "Explore",
+    "context": "The icon picker's name for the Material Symbols glyph `explore`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: compass adventure discover. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.local_activity": {
+    "source": "Outing",
+    "context": "The icon picker's name for the Material Symbols glyph `local_activity`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: ticket event activity activities. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.attractions": {
+    "source": "Fun",
+    "context": "The icon picker's name for the Material Symbols glyph `attractions`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: fair fun activities attraction outing. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.music_note": {
+    "source": "Worship music",
+    "context": "The icon picker's name for the Material Symbols glyph `music_note`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: song band music note worship praise singing. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.piano": {
+    "source": "Praise band",
+    "context": "The icon picker's name for the Material Symbols glyph `piano`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: piano keyboard music worship band song praise. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.library_music": {
+    "source": "Songs",
+    "context": "The icon picker's name for the Material Symbols glyph `library_music`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: music songs worship praise album singing. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.mic": {
+    "source": "Mic",
+    "context": "The icon picker's name for the Material Symbols glyph `mic`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: microphone speak sing sound worship preaching speaker. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.headphones": {
+    "source": "Audio",
+    "context": "The icon picker's name for the Material Symbols glyph `headphones`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: music listen sound. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.theater_comedy": {
+    "source": "Drama",
+    "context": "The icon picker's name for the Material Symbols glyph `theater_comedy`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: theatre play acting masks. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.palette": {
+    "source": "Craft",
+    "context": "The icon picker's name for the Material Symbols glyph `palette`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: art paint colour create. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.movie": {
+    "source": "Movie night",
+    "context": "The icon picker's name for the Material Symbols glyph `movie`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: film cinema watch. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.photo_camera": {
+    "source": "Photos",
+    "context": "The icon picker's name for the Material Symbols glyph `photo_camera`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: camera picture photography. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.school": {
+    "source": "Sunday school",
+    "context": "The icon picker's name for the Material Symbols glyph `school`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: class teach lesson graduate learn youth children. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.backpack": {
+    "source": "Back to school",
+    "context": "The icon picker's name for the Material Symbols glyph `backpack`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: bag school student youth children camp. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.science": {
+    "source": "Science",
+    "context": "The icon picker's name for the Material Symbols glyph `science`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: experiment lab flask. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.psychology": {
+    "source": "Mentoring",
+    "context": "The icon picker's name for the Material Symbols glyph `psychology`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: mind think counsel guidance. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.cleaning_services": {
+    "source": "Work day",
+    "context": "The icon picker's name for the Material Symbols glyph `cleaning_services`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: clean serve chores tidy. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.recycling": {
+    "source": "Serve project",
+    "context": "The icon picker's name for the Material Symbols glyph `recycling`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: recycle environment green. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.medical_services": {
+    "source": "First aid",
+    "context": "The icon picker's name for the Material Symbols glyph `medical_services`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: health medical kit. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.featured_seasonal_and_gifts": {
+    "source": "Gift exchange",
+    "context": "The icon picker's name for the Material Symbols glyph `featured_seasonal_and_gifts`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: present gift giving card. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventIcons.redeem": {
+    "source": "Christmas",
+    "context": "The icon picker's name for the Material Symbols glyph `redeem`, in this ministry's words rather than Google's. A church leader reads it while choosing what a gathering wears, so it names the occasion, not the drawing. What it depicts: gift present box. Keep it to one or two words — the picker shows it in a narrow row and as a tooltip on a 48px tile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "KioskBackdrop.fieldLabel": {
     "source": "Kiosk photo",
     "zh-Hans": "todo",

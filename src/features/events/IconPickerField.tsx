@@ -12,10 +12,11 @@
  * screens of thumb-sized tiles, and a picker that pushes the Save button off
  * the bottom of the form is a picker people close without choosing anything.
  */
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { EventIcon } from '@/components/ui/EventIcon';
 import { TextField } from '@/components/ui';
-import { findEventIcon, searchEventIcons } from '@/lib/eventIcons';
+import { findEventIcon, type EventIconDef } from '@/lib/eventIcons';
+import { searchEventIcons } from '@/lib/eventIconSearch';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'use-intl';
 
@@ -28,6 +29,17 @@ export interface IconPickerFieldProps {
 
 export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps) {
   const t = useTranslations('Events');
+  /*
+   * The catalogue's own namespace, keyed by the Material name. A dynamic
+   * lookup on purpose — there are a hundred and fourteen of them and the key is
+   * the id already stored on the event — which is why `tIcon` is passed around
+   * rather than called at each tile.
+   */
+  const tIcon = useTranslations('EventIcons');
+  const label = useCallback(
+    (icon: EventIconDef) => tIcon(icon.name as never),
+    [tIcon],
+  );
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -43,7 +55,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
   const valueId = useId();
 
   const selected = findEventIcon(value);
-  const results = useMemo(() => searchEventIcons(query), [query]);
+  const results = useMemo(() => searchEventIcons(query, label), [query, label]);
 
   const choose = (name: string | null) => {
     onChange(name);
@@ -56,7 +68,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
   return (
     <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
       <span id={labelId} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
-        Icon
+        {t('iconLabel')}
       </span>
 
       <button
@@ -72,10 +84,10 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
       >
         <EventIcon name={value} size="md" tone={selected ? 'brand' : 'neutral'} />
         <span id={valueId} className="min-w-0 flex-1 truncate text-sm text-ink-200">
-          {selected ? selected.label : t('noIcon')}
+          {selected ? label(selected) : t('noIcon')}
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs font-semibold text-brand-300">
-          {open ? 'Done' : 'Change'}
+          {open ? t('iconDone') : t('iconChange')}
         </span>
       </button>
 
@@ -106,7 +118,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
                       type="button"
                       onClick={() => choose(active ? null : icon.name)}
                       aria-pressed={active}
-                      title={icon.label}
+                      title={label(icon)}
                       className={cn(
                         // No focus ring here, and no `focus:outline-none`: a
                         // `ring` is a box-shadow painted outside the button, and
@@ -123,7 +135,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
                       <svg viewBox="0 -960 960 960" fill="currentColor" className="size-6">
                         <path d={icon.path} />
                       </svg>
-                      <span className="sr-only">{icon.label}</span>
+                      <span className="sr-only">{label(icon)}</span>
                     </button>
                   </li>
                 );
