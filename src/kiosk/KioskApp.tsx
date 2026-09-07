@@ -1765,6 +1765,24 @@ export function KioskApp() {
           for (const student of added) next.set(student.id, result.registrationId);
           return next;
         });
+        /*
+         * And when, which is what the parent's ten-minute reprint hold is
+         * measured against — see `reprintOffer.ts`.
+         *
+         * `onConfirm` has always written this and this path never did, so
+         * `reprintStanding` found no entry for a just-registered child and
+         * answered `ask`: the one hold built for *I checked in just now and no
+         * sticker came out* was unavailable to the only families whose label
+         * this kiosk had just printed for the first time. A registration is a
+         * check-in this kiosk performed, by the same definition `onConfirm`
+         * uses, so it is recorded the same way.
+         */
+        const checkedInAt = Date.now();
+        setCheckedInAtMs((held) => {
+          const next = new Map(held);
+          for (const student of added) next.set(student.id, checkedInAt);
+          return next;
+        });
       }
 
       if (prints && result.checkedIn) {

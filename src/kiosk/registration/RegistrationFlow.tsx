@@ -269,6 +269,17 @@ export function RegistrationFlow({
           if (goBack(state) === null) onClose();
           else dispatch({ type: 'back' });
         }}
+        /*
+         * Both controls go while the call is in the air, and Back is the one
+         * that mattered: `goBack` has no case for `submitting`, so it answered
+         * null and this handler read null as "there is nowhere back, close the
+         * wizard" — which dropped a parent on the search screen mid-flight. The
+         * registration still landed and the stickers still came out, because
+         * `onRegistered` belongs to `KioskApp` and outlives this unmount; what
+         * the parent lost was the screen with their four digits on it, which is
+         * the only thing this whole run is for.
+         */
+        canBack={state.step !== 'submitting'}
         canClose={state.step !== 'submitting'}
         onClose={onClose}
       />
@@ -608,12 +619,14 @@ function Header({
   title,
   subtitle,
   onBack,
+  canBack,
   canClose,
   onClose,
 }: {
   title: string;
   subtitle: string;
   onBack: () => void;
+  canBack: boolean;
   canClose: boolean;
   onClose: () => void;
 }) {
@@ -637,11 +650,18 @@ function Header({
      * name.
      */
     <div className="grid grid-cols-[auto_1fr_auto] items-start gap-1 px-2 pt-[max(0.75rem,var(--spacing-safe-top))] pb-2">
+      {/* Reserved rather than removed while the call is in flight, the same way
+          Cancel opposite is, and for the same reason: the title is centred on
+          what is left between the two slots, so dropping one would shift it. */}
       <button
         type="button"
         tabIndex={-1}
-        {...tap(onBack)}
-        className="h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800"
+        {...tap(() => {
+          if (canBack) onBack();
+        })}
+        className={`h-12 rounded-lg px-3 text-sm text-ink-400 active:bg-ink-800 ${
+          canBack ? '' : 'invisible'
+        }`}
       >
         ← Back
       </button>

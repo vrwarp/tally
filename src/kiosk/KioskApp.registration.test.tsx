@@ -103,6 +103,16 @@ let answer: RegisterFamilyResult = {
 let sent: RegisterFamilyRequest[] = [];
 let registerFails = false;
 /**
+ * Holds the callable open so a test can stand on the saving screen.
+ *
+ * Set before the commit; `releaseRegister()` answers it. Everything about the
+ * saving screen — the bar, the early sticker, the controls that go while the
+ * call is in the air — is a claim about the window between the press and the
+ * response, and that window is otherwise a microtask wide.
+ */
+let registerHangs = false;
+let releaseRegister: () => void = () => {};
+/**
  * The four-digit index the kiosk searches, seeded per test.
  *
  * It has to come through the loader rather than through localStorage: the
@@ -147,6 +157,11 @@ const services = {
   fetchAllergyNote: vi.fn(async () => null),
   registerFamily: vi.fn(async (request: RegisterFamilyRequest) => {
     sent.push(request);
+    if (registerHangs) {
+      await new Promise<void>((resolve) => {
+        releaseRegister = resolve;
+      });
+    }
     if (registerFails) throw new Error('offline');
     return answer;
   }),
@@ -280,6 +295,8 @@ beforeEach(() => {
   localStorage.clear();
   sent = [];
   registerFails = false;
+  registerHangs = false;
+  releaseRegister = () => {};
   phoneIndex = {};
   refreshedStudents = [];
   refreshedLast4 = {};
@@ -408,6 +425,61 @@ describe('registering a family', () => {
     await type('Robin');
 
     expect(screen.getByText('✓ Checked in')).toBeTruthy();
+  });
+
+  it('gives a just-registered child the same ten-minute hold a tap would', async () => {
+    /*
+     * `reprintStanding` asks whether *this kiosk* checked the child in and
+     * when, and the when was never written down here — only `onConfirm` kept
+     * that clock. So the one hold built for "I checked in just now and no
+     * sticker came out" was missing from the only door that had just printed a
+     * child's first ever label, which is the likeliest place for it to be
+     * wanted. See reprintOffer.ts.
+     */
+    configurePrinter();
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+    await tap('Done');
+
+    await type('Robin');
+    const row = screen.getByText('Robin Fields').closest('button')!;
+    await act(async () => {
+      fireEvent.pointerDown(row);
+      fireEvent.pointerUp(row);
+    });
+    await settle();
+
+    expect(screen.getByText(/Already checked in/i)).toBeTruthy();
+    expect(screen.getByText(/Hold to print a name tag/i)).toBeTruthy();
+  });
+});
+
+describe('while the call is in the air', () => {
+  it('takes Back away, so a parent cannot drop their own registration mid-flight', async () => {
+    /*
+     * `goBack` has no case for `submitting`, so it answered null — and null is
+     * this header's word for "there is nowhere back, close the wizard". One tap
+     * on a button sitting in plain sight put the parent on the search screen
+     * while the callable was still in the air. The family still landed and the
+     * stickers still came out, because `onRegistered` belongs to `KioskApp` and
+     * outlives the unmount; what went was the screen with their four digits on
+     * it, which is the entire point of the run.
+     */
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+
+    expect(screen.getByText('One moment')).toBeTruthy();
+    await tap(/← Back/);
+    expect(screen.getByText('One moment')).toBeTruthy();
+
+    await act(async () => {
+      releaseRegister();
+    });
+    await settle();
+    expect(screen.getByText('3344')).toBeTruthy();
   });
 });
 
