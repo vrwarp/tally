@@ -466,6 +466,17 @@ describe('the four things a parent touches', () => {
     expect(screen.getByText('Check in')).toBeTruthy();
   });
 
+  it('shows where the letters will land, before any have', async () => {
+    /*
+     * The readout is a div and never an input, and deliberately not a box
+     * either — so until somebody types it looks like nothing at all, on a step
+     * that has only just opened. The caret is the whole of what says otherwise.
+     */
+    await mount();
+    await tap(/Register your child/);
+    expect(screen.getByTestId('readout-caret')).toBeTruthy();
+  });
+
   it('offers a shift key, and types what the key is showing', async () => {
     await mount();
     await tap(/Register your child/);
@@ -648,6 +659,18 @@ describe('the allergies question, where the backend can carry it', () => {
     // answer somewhere to be *said*, so nobody types it into the box.
     await tap('Next');
     expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+  });
+
+  it('stills the caret with the box it belongs to', async () => {
+    // A caret blinking in a field the screen has just withdrawn is an
+    // invitation that has been taken back.
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    expect(screen.getByTestId('readout-caret').className).not.toContain('still');
+
+    await tap('No allergies');
+    expect(screen.getByTestId('readout-caret').className).toContain('still');
   });
 
   it('empties the box and stops the keys when the tick goes on', async () => {
