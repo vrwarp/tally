@@ -3,7 +3,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { compileMessages } from './scripts/vite-compile-messages';
+// @ts-expect-error — plain Node ESM, deliberately untyped: Vite's native config
+// loader needs the extension, and a `.ts` one would mean enabling
+// `allowImportingTsExtensions` project-wide. See the file's own note.
+import { compileMessages } from './scripts/vite-compile-messages.mjs';
 
 export default defineConfig({
   /*

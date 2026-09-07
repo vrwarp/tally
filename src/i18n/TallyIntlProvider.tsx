@@ -52,6 +52,19 @@ export function TallyIntlProvider({
     setLocaleState(next);
   }, []);
 
+  /*
+   * The document's own language, which is not decoration.
+   *
+   * `<html lang>` is what a screen reader picks a voice from, what a browser
+   * hyphenates and picks quotation marks by, and what "translate this page"
+   * offers to do — all of which are wrong when a Chinese screen still claims to
+   * be English. `index.html` ships `lang="en"` because something has to be
+   * there before React runs; this is what corrects it.
+   */
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const control = useMemo<LocaleControl>(() => ({ locale, setLocale }), [locale, setLocale]);
 
   return (

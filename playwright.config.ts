@@ -149,6 +149,20 @@ export default defineConfig({
 
   use: {
     baseURL: E2E.baseURL,
+    /*
+     * Every spec runs in English, and that is what keeps the suite meaningful.
+     *
+     * The app negotiates its language from `navigator.languages` when nobody has
+     * chosen one (`detectLocale`), so a runner whose image happens to be set to
+     * Chinese would put the whole suite in a catalogue nobody has reviewed and
+     * fail eight hundred assertions written against the English wording. Pinned
+     * here rather than in each spec, because the failure would arrive on the
+     * machine that has never run them.
+     *
+     * `e2e/i18n.spec.ts` is the one that switches language on purpose, and it
+     * does it through the control a reader would use rather than through this.
+     */
+    locale: 'en-US',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

@@ -28,9 +28,13 @@
  * parser over the ordinary catalogue. `tests/compiledMessages.test.ts` is what
  * covers the difference: it compiles and formats every message in every
  * catalogue through the production path.
+ *
+ * Plain Node ESM, deliberately untyped, like `sync-kiosk-messages.mjs`: Vite's
+ * native config loader needs a file extension on this import, and a `.ts` one
+ * would mean turning on `allowImportingTsExtensions` for the whole project to
+ * spare twenty lines their own module system.
  */
 import compile from 'icu-minify/compile';
-import type { Plugin } from 'vite';
 
 /**
  * The catalogues, and not the pipeline's bookkeeping.
@@ -43,17 +47,17 @@ import type { Plugin } from 'vite';
 const CATALOGUE = /[\\/]messages[\\/](kiosk[\\/])?(en|zh-Hans|zh-Hant)\.json(\?|$)/;
 
 /** Compile every leaf of a catalogue, leaving its namespace shape alone. */
-function compileTree(node: unknown, path: string): unknown {
+function compileTree(node, path) {
   if (typeof node === 'string') {
     try {
       return compile(node);
     } catch (error) {
-      throw new Error(`${path}: ${(error as Error).message}`, { cause: error });
+      throw new Error(`${path}: ${error.message}`, { cause: error });
     }
   }
   if (node && typeof node === 'object') {
     return Object.fromEntries(
-      Object.entries(node as Record<string, unknown>).map(([key, value]) => [
+      Object.entries(node).map(([key, value]) => [
         key,
         compileTree(value, path ? `${path}.${key}` : key),
       ]),
@@ -62,7 +66,7 @@ function compileTree(node: unknown, path: string): unknown {
   return node;
 }
 
-export function compileMessages(): Plugin {
+export function compileMessages() {
   return {
     name: 'tally:compile-messages',
     // Ahead of Vite's own JSON handling, and handing it JSON back: a compiled

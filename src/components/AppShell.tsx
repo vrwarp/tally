@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
+import { LanguageChoice } from '@/components/LanguageChoice';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
@@ -187,6 +188,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
         </>
       ) : null}
+      {/*
+        * The language, last and set apart from the rows above it.
+        *
+        * Those are destinations and this is a setting, so it is not a
+        * `menuitem`: a reader arrowing through the menu is looking for
+        * somewhere to go, and this changes the words under them and leaves them
+        * where they are. It stays open afterwards for the same reason —
+        * `setMenuOpen(false)` on every other row is because the row navigates,
+        * and closing the menu here would hide the only evidence that the tap
+        * did anything.
+        */}
+      <div className="mt-1 border-t border-ink-800 px-2 pb-1 pt-2 pointer-fine:px-1">
+        <LanguageChoice />
+      </div>
     </>
   );
 

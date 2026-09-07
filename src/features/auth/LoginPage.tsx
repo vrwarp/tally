@@ -18,6 +18,7 @@ import { Button, ErrorBanner, LoadingScreen } from '@/components/ui';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
 import { firebaseApp } from '@/lib/firebase';
 import { useTranslations } from 'use-intl';
+import { LanguageChoice } from '@/components/LanguageChoice';
 
 export function LoginPage() {
   const t = useTranslations('Login');
@@ -94,6 +95,18 @@ export function LoginPage() {
         </div>
 
         <p className="text-center text-xs leading-relaxed text-ink-500">{t('footer')}</p>
+
+        {/*
+          * The language, on the one screen where being unable to read is
+          * unrecoverable.
+          *
+          * Everywhere else the switcher is in the account menu, which is behind
+          * a sign-in — so a counselor who cannot read *this* page has no way to
+          * reach the control that would fix it. Below the fold of the decision
+          * rather than above it: the one thing to do here is press the button,
+          * and this must not compete with it.
+          */}
+        <LanguageChoice className="mx-auto max-w-xs" />
       </div>
     </div>
   );
