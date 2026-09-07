@@ -324,6 +324,66 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Errors.sessionExpired": {
+    "source": "Your session expired. Sign in again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.accessNotActive": {
+    "source": "Your access to Tally is not active.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.rosterRateLimited": {
+    "source": "The roster is being rate-limited upstream. It will refresh shortly.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.noPeopleBackend": {
+    "source": "No people backend is configured.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.rosterUnreachable": {
+    "source": "Could not reach the people backend for the roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.couldNotLoadStream": {
+    "source": "Could not load {stream}: {reason}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.theBackend": {
+    "source": "the backend",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.contactDetailsDenied": {
+    "source": "Only the core team can see contact details.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.contactDetailsUnreachable": {
+    "source": "Could not reach {backend} for these details.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.incompleteDenied": {
+    "source": "Only the core team can see which profiles are incomplete.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.incompleteUnreachable": {
+    "source": "Could not check which profiles are incomplete — the people system did not answer.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.olderGatherings": {
+    "source": "Could not load older gatherings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Export.csv": {
     "source": "Export CSV",
     "zh-Hans": "todo",
@@ -686,6 +746,46 @@
   },
   "Auth.inactiveHelp": {
     "source": "A core team leader can switch it back on from Settings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.inAppBrowserDeadEnd": {
+    "source": "This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome — tap the menu (⋯ or the share icon) and choose “Open in browser”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.installedAppDeadEnd": {
+    "source": "Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.signInCancelled": {
+    "source": "Sign-in was cancelled.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.noConnection": {
+    "source": "No connection. Check the wifi and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.popupBlocked": {
+    "source": "The sign-in window was blocked. Allow popups for this site, or try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.browserUnsupported": {
+    "source": "This browser cannot do Google sign-in. Open Tally in Safari or Chrome.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.redirectLostState": {
+    "source": "Sign-in could not be completed in this browser. Try again in Safari or Chrome.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.signInFailed": {
+    "source": "Sign-in failed. Try again.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3449,6 +3549,96 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "LabelTemplate.bracketsHint": {
+    "source": "Put square brackets round a part that should disappear on its own: <example>{example}</example> prints the brackets only for a child who has a grade.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.media62x29": {
+    "source": "62 × 29 mm die-cut",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.media62x100": {
+    "source": "62 × 100 mm die-cut",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.media29x90": {
+    "source": "29 × 90 mm die-cut",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.media62": {
+    "source": "62 mm continuous",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.media29": {
+    "source": "29 mm continuous",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sizeSm": {
+    "source": "Small",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sizeMd": {
+    "source": "Medium",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sizeLg": {
+    "source": "Large",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sizeXl": {
+    "source": "Biggest",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.alignLeft": {
+    "source": "Left",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.alignCenter": {
+    "source": "Centre",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.alignRight": {
+    "source": "Right",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sampleGrade": {
+    "source": "8th grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sampleAllergy": {
+    "source": "Peanuts — EpiPen in his bag",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sampleEvent": {
+    "source": "Sunday Nursery",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sampleDate": {
+    "source": "Aug 9",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sampleTime": {
+    "source": "9:04 AM",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Rsvp.title": {
     "source": "RSVPs",
     "zh-Hans": "todo",
@@ -4546,6 +4736,16 @@
   },
   "Events.labelDropped": {
     "source": "{count, plural, one {The last line does not fit on this label and will not be printed.} other {The last # lines do not fit on this label and will not be printed.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.chainDetail": {
+    "source": "{window} · {location}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.rowDateAndTime": {
+    "source": " · {time}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },

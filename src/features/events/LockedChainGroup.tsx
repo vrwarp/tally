@@ -37,6 +37,7 @@ import { format } from 'date-fns';
 import { LockedEventRow } from '@/features/events/LockedEventRow';
 import { sharedDetail, sharedWeekday, type LockedChain } from '@/features/events/lockedChains';
 import { useTranslations } from 'use-intl';
+import { useTimeStrings } from '@/hooks/useTimeFormats';
 
 export interface LockedChainGroupProps {
   chain: LockedChain;
@@ -103,7 +104,12 @@ function headDate(chain: LockedChain): string {
 
 export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedChainGroupProps) {
   const t = useTranslations('Events');
-  const detail = sharedDetail(chain.events);
+  const timeStrings = useTimeStrings();
+  const detail = sharedDetail(
+    timeStrings,
+    (values) => t('chainDetail', values),
+    chain.events,
+  );
   const weekday = sharedWeekday(chain.events);
   const listId = useId();
 

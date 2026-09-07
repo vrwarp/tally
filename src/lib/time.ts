@@ -201,9 +201,7 @@ function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.D
 export function formatEventDay(strings: TimeStrings, date: Date, now: Date = new Date()): string {
   if (isSameDay(date, now)) return strings.t('today');
   if (isSameDay(date, addDays(now, 1))) return strings.t('tomorrow');
-  return dateFormat(strings.locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(
-    date,
-  );
+  return formatWeekdayDate(strings, date);
 }
 
 /**
@@ -257,6 +255,19 @@ export function formatDateTime(strings: TimeStrings, date: Date): string {
     }).format(date),
     time: formatClock(strings, date),
   });
+}
+
+/**
+ * "Sun, Feb 15" — the day, always, with no "Today" for the one that is.
+ *
+ * `formatEventDay`'s answer minus its relative branch. A ladder of dates under
+ * one heading is read as a column, and one row saying "Today" among nine
+ * saying dates breaks the scan rather than helping it.
+ */
+export function formatWeekdayDate(strings: TimeStrings, date: Date): string {
+  return dateFormat(strings.locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(
+    date,
+  );
 }
 
 export function formatShortDate(strings: TimeStrings, date: Date): string {

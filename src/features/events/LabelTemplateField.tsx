@@ -44,7 +44,11 @@ import {
 import { cn } from '@/lib/utils';
 import { labelBoxFor } from '@/lib/labelRender';
 import { LabelPreview } from '@/features/events/LabelPreview';
-import { SAMPLE_VALUES, SPARSE_SAMPLE_VALUES } from '@/features/events/labelSamples';
+import {
+  sampleValues,
+  sparseSampleValues,
+  type SampleStrings,
+} from '@/features/events/labelSamples';
 import { useTranslations } from 'use-intl';
 
 /**
@@ -56,26 +60,32 @@ import { useTranslations } from 'use-intl';
  * for the job. The kiosk has the real list.
  */
 const PREVIEW_MEDIA = [
-  { id: '62x29', name: '62 × 29 mm die-cut', width: 696, height: 271 as number | null },
-  { id: '62x100', name: '62 × 100 mm die-cut', width: 696, height: 1109 as number | null },
-  { id: '29x90', name: '29 × 90 mm die-cut', width: 306, height: 991 as number | null },
-  { id: '62', name: '62 mm continuous', width: 696, height: null as number | null },
-  { id: '29', name: '29 mm continuous', width: 306, height: null as number | null },
-] as const;
+  { id: '62x29', name: 'media62x29', width: 696, height: 271 as number | null },
+  { id: '62x100', name: 'media62x100', width: 696, height: 1109 as number | null },
+  { id: '29x90', name: 'media29x90', width: 306, height: 991 as number | null },
+  { id: '62', name: 'media62', width: 696, height: null as number | null },
+  { id: '29', name: 'media29', width: 306, height: null as number | null },
+] as const satisfies readonly {
+  id: string;
+  /** A catalogue key: the roll's name is a sentence, not an identifier. */
+  name: 'media62x29' | 'media62x100' | 'media29x90' | 'media62' | 'media29';
+  width: number;
+  height: number | null;
+}[];
 
 /** Human wording for the size names, which are terse on purpose in the data. */
-const SIZE_LABELS: Record<(typeof LABEL_LINE_SIZES)[number], string> = {
-  sm: 'Small',
-  md: 'Medium',
-  lg: 'Large',
-  xl: 'Biggest',
-};
+const SIZE_LABELS = {
+  sm: 'sizeSm',
+  md: 'sizeMd',
+  lg: 'sizeLg',
+  xl: 'sizeXl',
+} as const satisfies Record<(typeof LABEL_LINE_SIZES)[number], string>;
 
-const ALIGN_LABELS: Record<(typeof LABEL_LINE_ALIGNS)[number], string> = {
-  left: 'Left',
-  center: 'Centre',
-  right: 'Right',
-};
+const ALIGN_LABELS = {
+  left: 'alignLeft',
+  center: 'alignCenter',
+  right: 'alignRight',
+} as const satisfies Record<(typeof LABEL_LINE_ALIGNS)[number], string>;
 
 function blankLine(): LabelLine {
   return { text: '', size: 'md', bold: false, align: 'center', requiresValue: false };
@@ -354,9 +364,10 @@ export function LabelTemplateField({
                         */}
                       {hasTokens ? (
                         <p className="text-xs leading-snug text-ink-500">
-                          Put square brackets round a part that should disappear on its own:{' '}
-                          <code className="text-ink-400">{'{{lastName}}[ ({{grade}})]'}</code> prints
-                          the brackets only for a child who has a grade.
+                          {t.rich('bracketsHint', {
+                            example: '{{lastName}}[ ({{grade}})]',
+                            code: (chunks) => <code className="text-ink-400">{chunks}</code>,
+                          })}
                         </p>
                       ) : null}
 
@@ -371,7 +382,7 @@ export function LabelTemplateField({
                         >
                           {LABEL_LINE_SIZES.map((size) => (
                             <option key={size} value={size}>
-                              {SIZE_LABELS[size]}
+                              {t(SIZE_LABELS[size])}
                             </option>
                           ))}
                         </SelectField>
@@ -385,7 +396,7 @@ export function LabelTemplateField({
                         >
                           {LABEL_LINE_ALIGNS.map((align) => (
                             <option key={align} value={align}>
-                              {ALIGN_LABELS[align]}
+                              {t(ALIGN_LABELS[align])}
                             </option>
                           ))}
                         </SelectField>
@@ -619,13 +630,17 @@ export function LabelTemplateField({
                 >
                   {PREVIEW_MEDIA.map((entry) => (
                     <option key={entry.id} value={entry.id}>
-                      {entry.name}
+                      {t(entry.name)}
                     </option>
                   ))}
                 </SelectField>
                 <LabelPreview
                   template={value}
-                  values={previewSparse ? SPARSE_SAMPLE_VALUES : SAMPLE_VALUES}
+                  values={
+                    previewSparse
+                      ? sparseSampleValues(t as unknown as SampleStrings)
+                      : sampleValues(t as unknown as SampleStrings)
+                  }
                   box={preview.box}
                   rotated={preview.rotated}
                 />

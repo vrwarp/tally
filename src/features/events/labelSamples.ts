@@ -15,30 +15,44 @@
 import type { LabelTokenValues } from '@/lib/labelTemplate';
 
 /**
+ * The five sample values that are sentences rather than names.
+ *
+ * The names stay literal — a proper noun is not translated, and a roster here
+ * genuinely holds `Bartholomew “蔡秉洲”` — but a grade, an allergy note, a
+ * gathering's name and a date all render differently per language, and a
+ * preview that showed English ones would be previewing the wrong widths.
+ */
+export type SampleStrings = (
+  key: 'sampleGrade' | 'sampleAllergy' | 'sampleEvent' | 'sampleDate' | 'sampleTime',
+) => string;
+
+/**
  * A child who exercises the layout rather than flattering it.
  *
  * Long enough to shrink at `xl` on a 62mm label, so a leader sees the machinery
  * work on the sample instead of discovering it on a Bartholomew.
  */
-export const SAMPLE_VALUES: LabelTokenValues = {
-  firstName: 'Bartholomew',
-  // A second name in another script, because that is the child this sample used
-  // to hide: the roster row holds `Bartholomew “蔡秉洲”` as one field, and until
-  // the kiosk split the halves apart it printed the composite on the name line.
-  // A leader who puts `{{nickname}}` on a template should see what it costs in
-  // width here rather than on the first family it happens to.
-  nickname: '蔡秉洲',
-  lastName: 'Fitzwilliam',
-  lastInitial: 'F',
-  grade: '8th grade',
-  // A real-shaped allergy line rather than the word "Peanuts": most of what is
-  // on file is a sentence, and a leader should find that out here rather than on
-  // the first child it wraps for.
-  allergy: 'Peanuts — EpiPen in his bag',
-  eventTitle: 'Sunday Nursery',
-  date: 'Aug 9',
-  time: '9:04 AM',
-};
+export function sampleValues(t: SampleStrings): LabelTokenValues {
+  return {
+    firstName: 'Bartholomew',
+    // A second name in another script, because that is the child this sample
+    // used to hide: the roster row holds `Bartholomew “蔡秉洲”` as one field, and
+    // until the kiosk split the halves apart it printed the composite on the
+    // name line. A leader who puts `{{nickname}}` on a template should see what
+    // it costs in width here rather than on the first family it happens to.
+    nickname: '蔡秉洲',
+    lastName: 'Fitzwilliam',
+    lastInitial: 'F',
+    grade: t('sampleGrade'),
+    // A real-shaped allergy line rather than the word "Peanuts": most of what
+    // is on file is a sentence, and a leader should find that out here rather
+    // than on the first child it wraps for.
+    allergy: t('sampleAllergy'),
+    eventTitle: t('sampleEvent'),
+    date: t('sampleDate'),
+    time: t('sampleTime'),
+  };
+}
 
 /**
  * The other child — the one the sample above flatters the template into
@@ -54,14 +68,16 @@ export const SAMPLE_VALUES: LabelTokenValues = {
  * that never looked sends; empty is what it sends for a child who genuinely has
  * nothing on file, and it is that second case a leader is previewing.
  */
-export const SPARSE_SAMPLE_VALUES: LabelTokenValues = {
-  firstName: 'Ada',
-  nickname: '',
-  lastName: '',
-  lastInitial: '',
-  grade: '',
-  allergy: '',
-  eventTitle: 'Sunday Nursery',
-  date: 'Aug 9',
-  time: '9:04 AM',
-};
+export function sparseSampleValues(t: SampleStrings): LabelTokenValues {
+  return {
+    firstName: 'Ada',
+    nickname: '',
+    lastName: '',
+    lastInitial: '',
+    grade: '',
+    allergy: '',
+    eventTitle: t('sampleEvent'),
+    date: t('sampleDate'),
+    time: t('sampleTime'),
+  };
+}

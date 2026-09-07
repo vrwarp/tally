@@ -25,7 +25,8 @@
  * destination they chose rather than a trap.
  */
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 import type { TallyEvent } from '@/types';
 
 export interface LockedEventRowProps {
@@ -44,6 +45,8 @@ export interface LockedEventRowProps {
 }
 
 export function LockedEventRow({ event, sharedWeekday = false, detail = null }: LockedEventRowProps) {
+  const t = useTranslations('Events');
+  const time = useTimeFormats();
   return (
     <li>
       {/*
@@ -70,13 +73,13 @@ export function LockedEventRow({ event, sharedWeekday = false, detail = null }: 
             column beside every row, and the nearest live target in that dead
             column was the control that collapses the group. */}
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-300 lg:flex-none">
-          {format(event.startAt, sharedWeekday ? 'MMM d' : 'EEE, MMM d')}
+          {sharedWeekday ? time.shortDate(event.startAt) : time.weekdayDate(event.startAt)}
           {/* Only when the chain's own head could not state a time — a series
               whose nights are not all at the same hour. Then the hour is a fact
               that varies, so it belongs on the row. */}
           {detail === null ? (
             <span className="text-xs font-normal text-ink-400">
-              {` · ${format(event.startAt, 'h:mm a')}`}
+              {t('rowDateAndTime', { time: time.clock(event.startAt) })}
             </span>
           ) : null}
         </span>

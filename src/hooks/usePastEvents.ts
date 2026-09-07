@@ -25,6 +25,7 @@ import {
   type PastEventsCursor,
 } from '@/services/events';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface PastEventsResult {
   events: TallyEvent[];
@@ -44,6 +45,7 @@ export interface PastEventsResult {
  *   Read once and then held; see the note on the boundary below.
  */
 export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): PastEventsResult {
+  const t = useTranslations('Errors');
   const [events, setEvents] = useState<TallyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -106,13 +108,13 @@ export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): P
       } catch {
         // The cursor is left where it was, so a retry asks for the same page
         // rather than skipping one.
-        setError('Could not load older gatherings.');
+        setError(t('olderGatherings'));
       } finally {
         inFlight.current = false;
         setLoading(false);
       }
     },
-    [pageSize],
+    [pageSize, t],
   );
 
   useEffect(() => {

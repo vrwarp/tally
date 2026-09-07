@@ -70,7 +70,19 @@
     "provisionUnauthenticated": "Your session ended before we could check the roster. Sign out and sign in again.",
     "provisionPermissionDenied": "Planning Center refused this account.",
     "provisionUnavailable": "Could not reach the access service. If you are running Tally locally, the Firebase emulators are probably not running — start them with `npm run dev:emulated`.",
-    "provisionUnknown": "Could not check your access. Try again."
+    "provisionUnknown": "Could not check your access. Try again.",
+    "sessionExpired": "Your session expired. Sign in again.",
+    "accessNotActive": "Your access to Tally is not active.",
+    "rosterRateLimited": "The roster is being rate-limited upstream. It will refresh shortly.",
+    "noPeopleBackend": "No people backend is configured.",
+    "rosterUnreachable": "Could not reach the people backend for the roster.",
+    "couldNotLoadStream": "Could not load {stream}: {reason}",
+    "theBackend": "the backend",
+    "contactDetailsDenied": "Only the core team can see contact details.",
+    "contactDetailsUnreachable": "Could not reach {backend} for these details.",
+    "incompleteDenied": "Only the core team can see which profiles are incomplete.",
+    "incompleteUnreachable": "Could not check which profiles are incomplete — the people system did not answer.",
+    "olderGatherings": "Could not load older gatherings."
   },
   "Export": {
     "csv": "Export CSV",
@@ -157,7 +169,15 @@
     "notFoundHelp": "Ask a core team leader to add this address to the team in Planning Center, then try again. If you normally use a different address, sign out and use that one.",
     "inactiveTitle": "Access turned off",
     "inactiveBody": "Your Tally access has been turned off. Planning Center still lists you, but someone on the core team has marked you inactive.",
-    "inactiveHelp": "A core team leader can switch it back on from Settings."
+    "inactiveHelp": "A core team leader can switch it back on from Settings.",
+    "inAppBrowserDeadEnd": "This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome — tap the menu (⋯ or the share icon) and choose “Open in browser”.",
+    "installedAppDeadEnd": "Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.",
+    "signInCancelled": "Sign-in was cancelled.",
+    "noConnection": "No connection. Check the wifi and try again.",
+    "popupBlocked": "The sign-in window was blocked. Allow popups for this site, or try again.",
+    "browserUnsupported": "This browser cannot do Google sign-in. Open Tally in Safari or Chrome.",
+    "redirectLostState": "Sign-in could not be completed in this browser. Try again in Safari or Chrome.",
+    "signInFailed": "Sign-in failed. Try again."
   },
   "Login": {
     "checkingSession": "Checking your session…",
@@ -753,7 +773,25 @@
     "previewOn": "Preview on",
     "previewOnHint": "Preview only — the kiosk knows which roll is loaded.",
     "sparseSample": "A child with nothing on file",
-    "sparseSampleHint": "No grade, no allergy, no surname — the label most children get."
+    "sparseSampleHint": "No grade, no allergy, no surname — the label most children get.",
+    "bracketsHint": "Put square brackets round a part that should disappear on its own: <example>{example}</example> prints the brackets only for a child who has a grade.",
+    "media62x29": "62 × 29 mm die-cut",
+    "media62x100": "62 × 100 mm die-cut",
+    "media29x90": "29 × 90 mm die-cut",
+    "media62": "62 mm continuous",
+    "media29": "29 mm continuous",
+    "sizeSm": "Small",
+    "sizeMd": "Medium",
+    "sizeLg": "Large",
+    "sizeXl": "Biggest",
+    "alignLeft": "Left",
+    "alignCenter": "Centre",
+    "alignRight": "Right",
+    "sampleGrade": "8th grade",
+    "sampleAllergy": "Peanuts — EpiPen in his bag",
+    "sampleEvent": "Sunday Nursery",
+    "sampleDate": "Aug 9",
+    "sampleTime": "9:04 AM"
   },
   "Rsvp": {
     "title": "RSVPs",
@@ -987,7 +1025,9 @@
     "askAnAdmin": "Ask an admin to add you to this gathering.",
     "labelPreviewAria": "Preview of the printed label",
     "labelScaledDown": "Everything has been scaled down to fit. Fewer or smaller lines would print larger.",
-    "labelDropped": "{count, plural, one {The last line does not fit on this label and will not be printed.} other {The last # lines do not fit on this label and will not be printed.}}"
+    "labelDropped": "{count, plural, one {The last line does not fit on this label and will not be printed.} other {The last # lines do not fit on this label and will not be printed.}}",
+    "chainDetail": "{window} · {location}",
+    "rowDateAndTime": " · {time}"
   },
   "KioskBackdrop": {
     "fieldLabel": "Kiosk photo",

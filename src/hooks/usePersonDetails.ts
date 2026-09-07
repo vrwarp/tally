@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPersonDetails } from '@/services/functions';
 import { backendLabelOf, personIdOfStudent, type PcoPersonDetails, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 const cache = new Map<string, PcoPersonDetails | null>();
 
@@ -64,6 +65,7 @@ export interface PersonDetailsResult {
 }
 
 export function usePersonDetails(student: Student | null): PersonDetailsResult {
+  const t = useTranslations('Errors');
   // Whichever backend holds them, not just Planning Center: the callable
   // dispatches on `studentId` and reads either, and gating on a Planning
   // Center person id told every Attendees student's screen there was nothing
@@ -77,7 +79,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
   // without re-running every time the roster hands down a new array.
   // Stryker disable next-line StringLiteral: only ever read into the failure
   // sentence, which needs a read, which needs a student.
-  const backendLabel = student ? backendLabelOf(student) : 'the backend';
+  const backendLabel = student ? backendLabelOf(student) : t('theBackend');
 
   // Stryker disable next-line ArrowFunction,LogicalOperator: what the caller
   // reads is `details ?? cache.get(key)`, so a session that already holds this
@@ -156,8 +158,8 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
         const code = (cause as { code?: string })?.code ?? '';
         setError(
           code.includes('permission-denied')
-            ? 'Only the core team can see contact details.'
-            : `Could not reach ${backendLabel} for these details.`,
+            ? t('contactDetailsDenied')
+            : t('contactDetailsUnreachable', { backend: backendLabel }),
         );
       })
       .finally(() => {
@@ -167,7 +169,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
     return () => {
       stale = true;
     };
-  }, [personId, key, attempt, backendLabel]);
+  }, [personId, key, attempt, backendLabel, t]);
 
   const retry = useCallback(() => {
     // Clearing the error here rather than in the effect is what lets the screen
