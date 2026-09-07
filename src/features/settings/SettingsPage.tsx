@@ -130,7 +130,7 @@ export function SettingsPage() {
   return (
     <PageFrame>
       <header>
-        <h1 className="text-xl font-bold text-ink-50">Settings</h1>
+        <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <p className="mt-0.5 text-sm text-ink-500">
           Thresholds and connections apply to every counselor's phone immediately. Appearance is
           yours alone. Who may sign in lives on{' '}

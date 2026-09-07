@@ -2144,6 +2144,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Settings.title": {
+    "source": "Settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Backends.refresh": {
     "source": "Refresh",
     "zh-Hans": "todo",
@@ -2581,6 +2586,396 @@
   },
   "Backends.a32ApiAddressHint": {
     "source": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.title": {
+    "source": "Team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.description": {
+    "source": "Who may sign in to Tally, and what they may do once they have. Changes apply to every phone immediately.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.howSummary": {
+    "source": "How Tally decides who may sign in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.howBody": {
+    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleCounselor": {
+    "source": "Counselor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleCore": {
+    "source": "Core team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleAdmin": {
+    "source": "Admin",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.membersTitle": {
+    "source": "Signed-in team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.membersDescriptionAdmin": {
+    "source": "People with a Tally profile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.membersDescription": {
+    "source": "Outstanding invitations are not listed here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.columnLastSeen": {
+    "source": "Last seen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.loadingTeam": {
+    "source": "Loading the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.membersEmptyTitle": {
+    "source": "Nobody has signed in yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.membersEmptyBody": {
+    "source": "Invite a Google address above, or sign in with one of the addresses named in TALLY_ADMIN_EMAILS.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.lastSeenPrefix": {
+    "source": "Last seen ",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.neverSignedIn": {
+    "source": "Never signed in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleFor": {
+    "source": "Role for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.maySignIn": {
+    "source": "{name} may sign in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.otherAdminOnly": {
+    "source": "Another admin has to change this.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitesNotLoaded": {
+    "source": "Not loaded",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitesDescription": {
+    "source": "Addresses that may sign in but have not yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.inviteSomeone": {
+    "source": "Invite someone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.googleAddress": {
+    "source": "Google address",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.googleAddressHint": {
+    "source": "It has to be the Google account they will actually sign in with — Tally matches on the address.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.loadingInvitations": {
+    "source": "Loading invitations",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitesEmptyTitle": {
+    "source": "No pending invitations.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitesEmptyBody": {
+    "source": "Everybody who has been invited has signed in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.keepIt": {
+    "source": "Keep it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.yesWithdraw": {
+    "source": "Yes, withdraw",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.withdrawWarning": {
+    "source": "This deletes the invitation for good.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.memberUpdated": {
+    "source": "{name} updated",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.canNowSignIn": {
+    "source": "{address} can now sign in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitedAgain": {
+    "source": "{email} invited again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.withdrawn": {
+    "source": "{email} withdrawn",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.saveChangeFailed": {
+    "source": "Could not save that change.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.saveInviteFailed": {
+    "source": "Could not save that invitation.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.restoreInviteFailed": {
+    "source": "Could not restore that invitation.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.withdrawInviteFailed": {
+    "source": "Could not withdraw that invitation.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.title": {
+    "source": "Pair a kiosk",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.intro": {
+    "source": "On the kiosk device, open <mono>/kiosk</mono>. It shows a six-character code — type it here to sign that kiosk in as you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.backToCheckIn": {
+    "source": "Check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.whatIsKiosk": {
+    "source": "<mono>/kiosk</mono> is a self-serve screen for a device in the lobby, served on this same site: families check themselves in by name, or by the last four digits of a household phone number.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.retire": {
+    "source": "To retire a kiosk, clear the browser's site data on the device.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.retireCore": {
+    "source": "To retire a kiosk, clear the browser's site data on the device — or deactivate and reactivate your account to cut every session loose.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.blocked": {
+    "source": "This deployment cannot sign a kiosk in. Approving a code still records it, but the lobby screen keeps waiting until the role below is granted.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.codeLabel": {
+    "source": "Pairing code",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.approving": {
+    "source": "Approving…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.approve": {
+    "source": "Approve this kiosk",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.codeHint": {
+    "source": "Codes last ten minutes. If this one is refused, read the code the kiosk is showing now and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.outcomeApproved": {
+    "source": "Approved — the kiosk signs itself in on its next poll, and every check-in it records will be under your name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.outcomeNotFound": {
+    "source": "No kiosk is showing that code. Codes last ten minutes; read the one on the kiosk screen now — the letters I, L, O and the digits 0 and 1 never appear.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.outcomeExpired": {
+    "source": "That code has expired. The kiosk is already showing a fresh one — read it off the screen and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.outcomeFailed": {
+    "source": "Could not reach the server. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.deploymentHeading": {
+    "source": "This deployment",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.readyToPair": {
+    "source": "Ready to pair",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.cannotSign": {
+    "source": "Cannot sign kiosk tokens",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.signingUnverified": {
+    "source": "Signing unverified",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.signingOk": {
+    "source": "Tally can hand a kiosk a session. It says nothing about the screen in the lobby.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.problemWithRemedy": {
+    "source": "{problem} {remedy}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.copyCommand": {
+    "source": "Copy command",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.checkAgain": {
+    "source": "Check again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.commandCopied": {
+    "source": "Command copied.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.copyFailed": {
+    "source": "Could not copy — select the command below instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.checking": {
+    "source": "Checking…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.checkedAt": {
+    "source": "Checked {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.justNow": {
+    "source": "just now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.project": {
+    "source": "Project",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.serviceAccount": {
+    "source": "Service account",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.unknown": {
+    "source": "unknown",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.stuckHeading": {
+    "source": "If the kiosk still waits",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.stuckPending": {
+    "source": "Once the role is granted, these are the remaining reasons a kiosk keeps waiting.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.stuckHomeScreen": {
+    "source": "A kiosk installed to the device's home screen keeps its own storage, so it asks to be paired a second time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.stuckDeactivated": {
+    "source": "A kiosk stops when its approver's access is deactivated. Pair it again from an active account.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.phoneSearchHeading": {
+    "source": "Phone search",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.phoneSearchNote": {
+    "source": "Only the last four digits of a household's numbers are ever stored in Tally. The index rebuilds nightly on its own; use this when a family's number changed today.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.rebuildIndex": {
+    "source": "Rebuild phone search index",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.rebuilt": {
+    "source": "Phone search rebuilt: {students} students, {entries} number endings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskPair.rebuildFailed": {
+    "source": "Could not rebuild the kiosk phone index. Is a people backend reachable?",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

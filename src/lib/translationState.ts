@@ -70,6 +70,8 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
    * Phase 2.
    */
   ['Dashboard.title', 'Nav.insights'],
+  ['Team.title', 'Nav.team'],
+  ['Settings.title', 'Nav.settings'],
 ];
 
 /**
