@@ -458,6 +458,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       });
 
       await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
+      // A chip selects; Next commits — the same shape every other question has.
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible({
         timeout: 15_000,
       });
@@ -467,15 +469,32 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'A family the church has never seen',
         title: 'A fourth question, only where it can land',
         caption:
-          'The wizard asks about allergies exactly when the church\'s own database can hold the answer — the same write-back gate the retired phone form kept, because collecting a family\'s medical note into a screen that silently drops it is worse than never asking. **No allergies** is a tick directly under the box, where the typing would otherwise start: a medical field with a keyboard under it and no visible way to say "nothing" collects "None", "N/A" and "no allergies" as free text — three spellings of a blank, bound for the church\'s database as though they were notes. Ticking it empties the box and puts it out of use. What is typed here goes to the person who reviews the family, then upstream; the kiosk itself keeps only a marker.',
+          'The wizard asks about allergies exactly when the church\'s own database can hold the answer — the same write-back gate the retired phone form kept, because collecting a family\'s medical note into a screen that silently drops it is worse than never asking. **No allergies** is a button of its own, beside **Next** rather than under forty keys: a medical field with a keyboard under it and no visible way to say "nothing" collects "None", "N/A" and "no allergies" as free text — three spellings of a blank, bound for the church\'s database as though they were notes. It answers and moves on in one press, and the colour says which of the two is being offered — here a letter has been typed, so Next has the brand and the blank has gone quiet. What is typed here goes to the person who reviews the family, then upstream; the kiosk itself keeps only a marker.',
       });
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+
+      /*
+       * The adult, then the confirm — where "anybody else?" is now asked, on
+       * the screen that writes the family out rather than on one of its own.
+       */
+      await typeOnKiosk(kiosk, 'Ngozi');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await shoot(kiosk, 'kiosk', {
+        act: 'Nobody has met us',
+        who: 'A family the church has never seen',
+        title: 'A number pad for a number',
+        caption:
+          'The letter keyboard would work and would be wrong: everybody already knows what a phone keypad looks like, and the letter groups under the digits are there because a parent reading their own number off muscle memory finds them. The line above says why it is being asked for *before* it is typed, while somebody is still deciding whether to give it.',
+      });
+      await typeOnKiosk(kiosk, cast.phone);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
         who: 'A family the church has never seen',
         title: 'Anybody else?',
         caption:
-          'The loop that makes this worth doing at a kiosk at all — and the children so far are named above the two buttons, because a parent cannot answer "anybody else?" against their own memory of what they typed forty seconds ago. Naming them also catches the mistake this screen is the last chance to catch: a child entered twice, or one whose name went in wrong.',
+          'The loop that makes this worth doing at a kiosk at all, asked where the family is written out rather than on a screen of its own. It used to be its own step, four screens before this one, and a parent cannot answer "anybody else?" against their memory of what they typed forty seconds ago — here they answer it by reading. The quiet button above the brand one is the same pair that screen carried, and it catches the mistake this list is the last chance to catch: a child entered twice, or one whose name went in wrong.',
       });
 
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
@@ -491,22 +510,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
 
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: 'Kindergarten', exact: true }).click();
-      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-      await typeOnKiosk(kiosk, 'Ngozi');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await shoot(kiosk, 'kiosk', {
-        act: 'Nobody has met us',
-        who: 'A family the church has never seen',
-        title: 'A number pad for a number',
-        caption:
-          'The letter keyboard would work and would be wrong: everybody already knows what a phone keypad looks like, and the letter groups under the digits are there because a parent reading their own number off muscle memory finds them. The line above says why it is being asked for *before* it is typed, while somebody is still deciding whether to give it.',
-      });
-
-      await typeOnKiosk(kiosk, cast.phone);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
         who: 'A family the church has never seen',
@@ -550,9 +555,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.doorLast);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '3rd grade', exact: true }).click();
-      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
       await typeOnKiosk(kiosk, 'Mira');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.locator('[data-key="clear"]').click();
@@ -714,9 +718,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.edgeChild.split(' ')[1]!);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
-      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
       await shoot(kiosk, 'kiosk', {
         act: 'The second child',
         who: 'A family the church already has, growing',
@@ -751,9 +754,8 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await typeOnKiosk(kiosk, cast.surname);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '1st grade', exact: true }).click();
-      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
       await typeOnKiosk(kiosk, 'Ngozi');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();

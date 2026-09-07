@@ -695,47 +695,53 @@ describe('the clock', () => {
 describe('the allergies question, where the backend can carry it', () => {
   const asking = () => binding({ allergiesSupported: true });
 
-  const tick = () => screen.getByRole('checkbox', { name: /No allergies/i });
+  const button = (label: string) =>
+    screen.getByText(label).closest('button') as HTMLButtonElement;
 
-  it('asks after the grade, and the tick answers "none"', async () => {
+  it('asks after the grade, and answers "none" in one press', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
     expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
-    expect(tick().getAttribute('aria-checked')).toBe('false');
 
+    // One press, not a tick and then a Next: the commonest answer costs what
+    // it is worth.
     await tap('No allergies');
-    expect(tick().getAttribute('aria-checked')).toBe('true');
-    await tap('Next');
     expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
   });
 
-  it('still takes an empty box as none, because the question is optional', async () => {
+  it('leaves Next dead until a note is typed', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
-    // Nothing typed and nothing ticked. Pressing on has always been an answer
-    // rather than a skip, and the tick did not change that — it only gave the
-    // answer somewhere to be *said*, so nobody types it into the box.
+    /*
+     * Two buttons that both committed an empty note could not say which one a
+     * parent was meant to press. So the rule every other question keeps holds
+     * here too: Next is lit when the box holds the answer it would send.
+     */
+    expect(button('Next').disabled).toBe(true);
     await tap('Next');
-    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
+
+    await type('Peanuts');
+    expect(button('Next').disabled).toBe(false);
   });
 
-  it('stills the caret with the box it belongs to', async () => {
-    // A caret blinking in a field the screen has just withdrawn is an
-    // invitation that has been taken back.
+  it('keeps the keyboard live and the caret blinking throughout', async () => {
+    // Nothing on this step is ever withdrawn now — there is no state to be in,
+    // only two answers to give.
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
+
     expect(screen.getByTestId('readout-caret').className).not.toContain('still');
-
-    await tap('No allergies');
-    expect(screen.getByTestId('readout-caret').className).toContain('still');
+    await type('Peanuts');
+    expect(screen.getByText('Peanuts')).toBeTruthy();
   });
 
-  it('empties the box and stops the keys when the tick goes on', async () => {
+  it('records none whatever had been typed before', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
@@ -743,27 +749,11 @@ describe('the allergies question, where the backend can carry it', () => {
     await type('Peanuts');
     expect(screen.getByText('Peanuts')).toBeTruthy();
 
-    // Ticking clears what was typed rather than hiding it behind a grey panel
-    // for the next press to commit.
+    // The press is the answer, not a label on the box: a parent who thought
+    // better of the note is saying there is nothing to report.
     await tap('No allergies');
-    expect(screen.queryByText('Peanuts')).toBeNull();
-
-    /*
-     * And the keyboard is out of use: keys pressed now must not refill the box
-     * the tick just emptied.
-     *
-     * Two letters rather than one, because every single letter is also the
-     * face of a key — `queryByText('X')` finds the keyboard whether or not
-     * anything was typed. A pair can only be the readout. Asserted through the
-     * state machine rather than through CSS, too: jsdom does not enforce
-     * `pointer-events-none`, so this proves `applyKey` refuses the keystroke
-     * rather than proving the class name is present.
-     */
-    await type('XY');
-    expect(screen.queryByText(/^XY$/i)).toBeNull();
-
-    await tap('Next');
-    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    expect(screen.queryByText(/Allergies:/)).toBeNull();
   });
 
   it('never asks where the binding is silent', async () => {
@@ -780,9 +770,6 @@ describe('the allergies question, where the backend can carry it', () => {
     await enterChild('Robin', 'Fields', '4');
 
     await type('Peanuts');
-    // The tick stays put and stays off while a note is being typed — it is a
-    // state to read, not a button that has been spent.
-    expect(tick().getAttribute('aria-checked')).toBe('false');
     await tap('Next');
     await enterGuardian('Dana', 'Fields', '5550103344');
 
@@ -801,7 +788,6 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap('Add another child');
     await enterChild('Sam', 'Fields', '2');
     await tap('No allergies');
-    await tap('Next');
     await tap(/Check in everyone/);
 
     expect(sent).toHaveLength(1);
@@ -818,7 +804,6 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
     await tap('No allergies');
-    await tap('Next');
     await enterGuardian('Dana', 'Fields', '5550103344');
     await tap(/^Check in$/);
 

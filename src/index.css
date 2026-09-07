@@ -1146,12 +1146,6 @@
   animation: tally-caret 1.06s steps(2, jump-none) infinite;
 }
 
-/* Ticked "No allergies" puts the box out of use, and a caret blinking in a
-   field nobody can type into is an invitation the screen has withdrawn. */
-.kiosk-caret--still {
-  animation: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .kiosk-caret {
     animation: none;

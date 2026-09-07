@@ -298,9 +298,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'Your child',
         state: 'Registering — question 4 of 4',
         step: 'child-allergies',
-        title: 'Allergies, only where they can land',
+        title: 'Allergies, and the answer most families give',
         caption:
-          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is the tick under the box rather than anything typed into it: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes.',
+          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is its own button rather than something typed into the box: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes. **No allergies** is lit and **Next** is dead, because there is nothing yet to press Next with — which is also the answer to what a parent is meant to do with two buttons.',
       });
 
       await type('Peanuts EpiPen in bag');
@@ -308,19 +308,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'Your child',
         state: 'Registering — question 4 of 4',
         step: 'child-allergies (typed)',
-        title: 'A real note, typed on a lobby keyboard',
+        title: 'A real note, and the buttons trade places',
         caption:
-          'The minority answer. The field takes digits as well as letters — "Type 1 diabetes", "EpiPen 0.3" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard\'s geometry on every screen including search. Note what auto-capitalisation does to a medical note: the rule that makes Anne-Marie right title-cases every word here, and flattens the capitals inside EpiPen while it is at it.',
-      });
-
-      await tap(kiosk.getByRole('checkbox', { name: /No allergies/i }).click());
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 4 of 4',
-        step: 'child-allergies (ticked)',
-        title: 'Ticked, and the box goes quiet',
-        caption:
-          'What the tick does, rather than only that it is there — and here it does it to a note that was actually typed. The box empties and dims and the keyboard goes with it, so the question is visibly answered and there is nothing left to type into. Anything already typed is cleared rather than hidden behind the grey: a note that survived out of sight would be a note nobody agreed to send. Unticking reopens an empty box, not the old text.',
+          'The minority answer. The field takes digits as well as letters — "Type 1 diabetes", "EpiPen 0.3" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard\'s geometry on every screen including search. Note what auto-capitalisation does to a medical note: the rule that makes Anne-Marie right title-cases every word here, and flattens the capitals inside EpiPen while it is at it. And note the band above: one letter was enough for **Next** to take the colour and for **No allergies** to go quiet. Colour says which answer is being offered; neither button moves.',
       });
 
       /* ---- And you --------------------------------------------------------- */
@@ -473,11 +463,10 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         step: 'child-allergies (child 2)',
         title: 'Allergies, asked again from scratch',
         caption:
-          'Each child answers for themselves: the tick is cleared on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine.',
+          'Each child answers for themselves: the box opens empty on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine. The next frame is one press away — **No allergies** answers and moves on rather than ticking something Next then has to collect.',
       });
 
-      await tap(kiosk.getByRole('checkbox', { name: /No allergies/i }).click());
-      await next();
+      await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
       await shoot({
         flow: 'Child 2',
         state: 'Two children, ready to check in',
@@ -652,8 +641,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
           'Asked here too, and on the same terms: the note goes to the reviewer and then upstream, and the kiosk keeps a marker rather than the text.',
       });
 
-      await tap(kiosk.getByRole('checkbox', { name: /No allergies/i }).click());
-      await next();
+      await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
       await shoot({
         flow: 'The second child',
         state: 'One child, no adult',
@@ -704,8 +692,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         await next();
         await press('No grade', true);
         await next();
-        await tap(kiosk.getByRole('checkbox', { name: /No allergies/i }).click());
-        await next();
+        await press(/^No allergies$/);
         if (index === 0) {
           // The adult, once, before the loop can return to the confirm.
           await type('Chinelo');

@@ -25,7 +25,7 @@ import {
   MAX_CHILDREN,
   NAME_MAX_LENGTH,
   PHONE_LENGTH,
-  toggleNoAllergies,
+  answerNoAllergies,
   type RegistrationState,
 } from './steps';
 
@@ -290,7 +290,6 @@ describe('the whole state, at each transition', () => {
     resume: null,
     registrationId: 'r-1',
     allergiesSupported: false,
-    noAllergies: false,
     children: [],
     draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
     guardian: { firstName: '', lastName: '', phone: '' },
@@ -371,11 +370,10 @@ describe('the whole state, at each transition', () => {
       step: 'guardian-first',
       buffer: '',
       shift: 'on',
-      noAllergies: false,
     });
   });
 
-  it('banks the note and unticks the box as the child is banked', () => {
+  it('banks the note as the child is banked', () => {
     const withAllergies = initialState({
       registrationId: 'r-1',
       requiresCheckOut: false,
@@ -398,7 +396,6 @@ describe('the whole state, at each transition', () => {
       step: 'guardian-first',
       buffer: '',
       shift: 'on',
-      noAllergies: false,
     });
   });
 
@@ -530,7 +527,6 @@ describe('the whole state, at each transition', () => {
       allergiesSupported: true,
       step: 'child-allergies',
       buffer: 'Peanuts',
-      noAllergies: true,
     };
 
     expect(goBack(atAllergies)).toEqual({
@@ -575,7 +571,7 @@ describe('the whole state, at each transition', () => {
     });
   });
 
-  it('reopens the allergy note unticked, from the step after it', () => {
+  it('reopens the allergy note, from the step after it', () => {
     const child = { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' };
     const banked: RegistrationState = {
       ...BASE,
@@ -591,7 +587,6 @@ describe('the whole state, at each transition', () => {
       step: 'child-allergies',
       buffer: 'Peanuts',
       shift: 'off',
-      noAllergies: false,
     });
   });
 
@@ -1202,14 +1197,6 @@ describe('the allergies question', () => {
     expect(throughGrade(start()).step).toBe('guardian-first');
   });
 
-  it('records nothing on one tap, which is the common answer', () => {
-    const asked = throughGrade(startAsking());
-    expect(canAdvance(asked)).toBe(true);
-    const answered = advance(asked);
-    expect(answered.step).toBe('guardian-first');
-    expect(answered.children[0]!.allergies).toBe('');
-  });
-
   it('accepts the digits a name refuses', () => {
     // "Type 1 diabetes" is medical text, not a name. The class is exactly what
     // the glass keyboard produces — no comma, no period, and that is a
@@ -1241,14 +1228,6 @@ describe('the allergies question', () => {
     expect(typeText(locked, 'EPIPEN').shift).toBe('lock');
   });
 
-  it('opens the keyboard in capitals when the tick comes off', () => {
-    // An emptied box is the start of a fresh answer, and the first letter of
-    // one is a capital — the same rule every other question opens on.
-    const typed = typeText(throughGrade(startAsking()), 'peanuts');
-    expect(toggleNoAllergies(typed).shift).toBe('on');
-    expect(toggleNoAllergies(toggleNoAllergies(typed)).shift).toBe('on');
-  });
-
   it('refuses a note longer than the callable would take', () => {
     const asked = typeText(throughGrade(startAsking()), 'a'.repeat(300));
     expect(asked.buffer.length).toBe(200);
@@ -1259,8 +1238,8 @@ describe('the allergies question', () => {
     held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
     held = advance(typeText(addAnotherChild(held), 'Byron'));
     held = advance(held); // prefilled surname
-    held = advance(chooseGrade(held, 1 as Grade));
-    held = advance(held); // no allergies for Byron
+    held = chooseGrade(held, 1 as Grade);
+    held = answerNoAllergies(advance(held));
 
     expect(held.step).toBe('confirm');
     expect(held.children.map((child) => child.allergies)).toEqual(['Peanuts', '']);
@@ -1275,53 +1254,63 @@ describe('the allergies question', () => {
     expect(goBack(reopened)!.step).toBe('child-grade');
   });
 
-  it('empties the box when the tick goes on, and leaves it empty coming off', () => {
-    const typed = typeText(throughGrade(startAsking()), 'Peanuts');
-    const ticked = toggleNoAllergies(typed);
-    expect(ticked.noAllergies).toBe(true);
-    expect(ticked.buffer).toBe('');
-
-    /*
-     * Unticking does not resurrect it. The box is the record of what will be
-     * sent, and text that reappeared after being hidden behind a grey panel is
-     * text nobody agreed to send.
-     */
-    const untutored = toggleNoAllergies(ticked);
-    expect(untutored.noAllergies).toBe(false);
-    expect(untutored.buffer).toBe('');
-  });
-
-  it('makes every key inert while it is ticked', () => {
-    const ticked = toggleNoAllergies(throughGrade(startAsking()));
-    // Not only the letters: clearing or backspacing an emptied, greyed box is
-    // a press that would do nothing, and it says so by being grey.
-    expect(typeText(ticked, 'Peanuts').buffer).toBe('');
-    expect(applyKey(ticked, { kind: 'clear' })).toBe(ticked);
-    expect(applyKey(ticked, { kind: 'backspace' })).toBe(ticked);
-    expect(applyKey(ticked, { kind: 'shift' })).toBe(ticked);
-  });
-
-  it('records none when ticked, whatever had been typed before', () => {
-    const answered = advance(toggleNoAllergies(typeText(throughGrade(startAsking()), 'Peanuts')));
+  it('answers and moves on in one press', () => {
+    // The whole point of the button: none is the commonest answer and it costs
+    // one tap, spelled the same way every time it is given.
+    const answered = answerNoAllergies(throughGrade(startAsking()));
     expect(answered.step).toBe('guardian-first');
     expect(answered.children[0]!.allergies).toBe('');
   });
 
-  it('starts each child unticked, so one answer cannot serve two', () => {
-    let held = advance(toggleNoAllergies(throughGrade(startAsking())));
+  it('records none whatever had been typed before', () => {
+    /*
+     * A parent who typed "peanuts", thought better of it and pressed the blank
+     * is saying there is nothing to report. The press is the answer, not a
+     * label on the box, so what was in the box does not travel with it.
+     */
+    const answered = answerNoAllergies(typeText(throughGrade(startAsking()), 'Peanuts'));
+    expect(answered.children[0]!.allergies).toBe('');
+  });
+
+  it('leaves Next dead until a note is typed', () => {
+    /*
+     * The universal rule, restored: a lit button on this screen means the
+     * answer it gives is ready. Two buttons that both committed the same empty
+     * record could not say which one a parent was meant to press.
+     */
+    const asked = throughGrade(startAsking());
+    expect(canAdvance(asked)).toBe(false);
+    expect(advance(asked)).toBe(asked);
+    expect(canAdvance(typeText(asked, 'Peanuts'))).toBe(true);
+  });
+
+  it('goes back where the parent was, when the question was reopened', () => {
+    // The same contract Next keeps — see `reopen`.
+    let held = advance(typeText(throughGrade(startAsking()), 'Peanuts'));
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = reopen(held, 'child-allergies', 0);
+    expect(held.step).toBe('child-allergies');
+
+    const answered = answerNoAllergies(held);
+    expect(answered.step).toBe('confirm');
+    expect(answered.children[0]!.allergies).toBe('');
+  });
+
+  it('asks the next child for themselves, with an empty box', () => {
+    let held = answerNoAllergies(throughGrade(startAsking()));
     held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
     held = advance(typeText(addAnotherChild(held), 'Byron'));
     held = advance(held); // prefilled surname
     held = advance(chooseGrade(held, 1 as Grade));
 
     expect(held.step).toBe('child-allergies');
-    expect(held.noAllergies).toBe(false);
+    expect(held.buffer).toBe('');
   });
 
   it('only applies on its own step', () => {
     const naming = throughGrade(startAsking());
     const elsewhere = goBack(naming)!; // child-grade
-    expect(toggleNoAllergies(elsewhere)).toBe(elsewhere);
+    expect(answerNoAllergies(elsewhere)).toBe(elsewhere);
   });
 
   it('is asked for a sibling too — the gate is the binding, not the mode', () => {

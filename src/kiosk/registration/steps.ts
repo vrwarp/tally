@@ -109,9 +109,9 @@ export interface RegistrationState {
    * file a grade they never chose, and "No grade" is an answer here rather than
    * a blank somebody fills in later.
    *
-   * One child's worth of lifetime, like `noAllergies`: a fresh draft starts
-   * unpicked, and a child un-banked back onto the step starts picked, because
-   * they answered it once already.
+   * One child's worth of lifetime: a fresh draft starts unpicked, and a child
+   * un-banked back onto the step starts picked, because they answered it once
+   * already.
    */
   gradePicked: boolean;
   /**
@@ -141,20 +141,6 @@ export interface RegistrationState {
    * typo. Their own half-answer is not on any record to be read back off.
    */
   resume: { step: StepKind; buffer: string } | null;
-  /**
-   * Whether "No allergies" is ticked on the allergies step.
-   *
-   * An empty buffer already means none, so this is not what *records* the
-   * answer — it is what stops the answer being typed. A medical field with a
-   * keyboard under it and no visible way to say "nothing" invites "None",
-   * "N/A" and "no allergies" as free text, three spellings of a blank that
-   * then travel to the church's database as though they were notes. The tick
-   * sits where the typing would have started and empties the box instead.
-   *
-   * One child's worth of lifetime: every entry to the step clears it, so the
-   * second child is never silently answered by the first.
-   */
-  noAllergies: boolean;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
   /** Children whose three questions are answered. */
@@ -205,7 +191,6 @@ export function initialState(args: {
     backFromConfirm: 'guardian-phone',
     registrationId: args.registrationId,
     allergiesSupported: args.allergiesSupported === true,
-    noAllergies: false,
     gradePicked: false,
     editing: null,
     resume: null,
@@ -327,18 +312,6 @@ export function applyKey(
   key: KioskKey,
 ): RegistrationState {
   if (!isTypingStep(state.step)) return state;
-  /*
-   * The box is inert while "No allergies" is ticked, and every key is — not
-   * only the letters. Clearing or backspacing an empty greyed-out box is a
-   * press that does nothing, and the screen says so by being grey rather than
-   * by swallowing keystrokes silently. Untick to type.
-   */
-  // Stryker disable next-line ConditionalExpression: the step check is
-  // redundant with the flag — `bankChild` and `goBack` both clear
-  // `noAllergies` on the way out of this question, so it is never set on any
-  // other step. It stays because that invariant lives in three other functions
-  // and this one should not have to trust them.
-  if (state.step === 'child-allergies' && state.noAllergies) return state;
   if (key.kind === 'shift') return { ...state, shift: cycleShift(state.shift) };
   if (key.kind === 'clear') return { ...state, buffer: '', shift: 'on' };
   if (key.kind === 'backspace') {
@@ -385,9 +358,6 @@ export function canAdvance(state: RegistrationState): boolean {
     return state.buffer.length === PHONE_LENGTH;
   // A chip has to have been pressed — see `gradePicked`.
   if (state.step === 'child-grade') return state.gradePicked;
-  // An empty allergies buffer is not an unanswered question — it is the
-  // answer most families give.
-  if (state.step === 'child-allergies') return true;
   // Stryker disable next-line MethodExpression: `typeInto` refuses a leading
   // space and collapses the rest, so the buffer never consists only of
   // whitespace and the trim can only ever remove a single trailing space from
@@ -485,9 +455,7 @@ function commitAnswer(state: RegistrationState, value: string): RegistrationStat
     case 'child-last':
       return withChild(state, { ...child, lastName: value });
     case 'child-allergies':
-      // The tick and an empty box record the same answer, and the tick wins
-      // where they could disagree: it is the one the parent can see.
-      return withChild(state, { ...child, allergies: state.noAllergies ? '' : value });
+      return withChild(state, { ...child, allergies: value });
     case 'guardian-first':
       return { ...state, guardian: { ...state.guardian, firstName: value } };
     case 'guardian-last':
@@ -505,7 +473,7 @@ function commitAnswer(state: RegistrationState, value: string): RegistrationStat
 function landOn(
   state: RegistrationState,
   step: StepKind,
-): Pick<RegistrationState, 'step' | 'buffer' | 'shift' | 'noAllergies' | 'gradePicked'> {
+): Pick<RegistrationState, 'step' | 'buffer' | 'shift' | 'gradePicked'> {
   const buffer = bufferFor(state, step);
   return {
     step,
@@ -513,9 +481,6 @@ function landOn(
     // A number pad has no capitals to offer; everything else opens where the
     // answer it is holding leaves off.
     shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
-    // Reopened unticked whatever was answered: an empty box is the honest
-    // reopening of "none", and it is one tap from ticked again.
-    noAllergies: false,
     // A grade being reopened was answered once already, so Next is not dead.
     gradePicked: step === 'child-grade' ? true : state.gradePicked,
   };
@@ -580,8 +545,7 @@ function bankChild(state: RegistrationState, draft: DraftChild): RegistrationSta
     backFromConfirm: step === 'confirm' ? lastChildQuestion(state) : state.backFromConfirm,
     buffer: '',
     shift: 'on',
-    // Each child answers for themselves — see `noAllergies` and `gradePicked`.
-    noAllergies: false,
+    // Each child answers for themselves — see `gradePicked`.
     gradePicked: false,
   };
 }
@@ -597,8 +561,17 @@ function bankChild(state: RegistrationState, draft: DraftChild): RegistrationSta
  */
 export function advance(state: RegistrationState): RegistrationState {
   if (!canAdvance(state)) return state;
-  const value = state.buffer.trim();
+  return commitAndMove(state, state.buffer.trim());
+}
 
+/**
+ * The move itself, for **Next** and for the answers a button gives directly.
+ *
+ * Split out because "No allergies" is an answer and a press of Next at once —
+ * it has nothing to put in the buffer first, and it must not be refused by the
+ * gate that asks whether the buffer holds an answer.
+ */
+function commitAndMove(state: RegistrationState, value: string): RegistrationState {
   /*
    * A question reopened out of order goes back where the parent was, with the
    * answer committed. Walking forward from here would make them re-confirm
@@ -641,17 +614,10 @@ export function advance(state: RegistrationState): RegistrationState {
             step: 'child-allergies',
             buffer: '',
             shift: 'on',
-            // Each child answers for themselves — see `noAllergies`.
-            noAllergies: false,
           }
         : bankChild(state, state.draft);
     case 'child-allergies':
-      // The tick and an empty box record the same answer, and the tick wins
-      // where they could disagree: it is the one the parent can see.
-      return bankChild(state, {
-        ...state.draft,
-        allergies: state.noAllergies ? '' : value,
-      });
+      return bankChild(state, { ...state.draft, allergies: value });
     case 'guardian-first':
       return {
         ...state,
@@ -693,18 +659,22 @@ function lastNameSoFar(state: RegistrationState): string {
 }
 
 /**
- * Ticks or unticks "No allergies", and empties the box when it goes on.
+ * "No allergies": the answer most families give, in one press.
  *
- * Emptying is the point rather than a side effect: a parent who typed
- * "peanuts", thought better of it and ticked the box must not leave "peanuts"
- * behind a grey panel to be committed by the next press. Unticking does not
- * put it back — the box is the record of what will be sent, and a control that
- * resurrected text nobody could see while it was hidden would be worse.
+ * A medical field with a keyboard under it and no visible way to say "nothing"
+ * invites "None", "N/A" and "no allergies" as free text — three spellings of a
+ * blank that travel to the church's database as though they were notes. So the
+ * blank is a button, sitting where the typing would have started.
+ *
+ * It commits and moves rather than ticking a box. A tick left the step with two
+ * controls that did the same thing from an empty box, and nothing on the screen
+ * said which one the parent was supposed to press. Answering outright also
+ * settles what happens to a note already typed: whatever is in the box, this
+ * says there is nothing to report, and it is Back that undoes it.
  */
-export function toggleNoAllergies(state: RegistrationState): RegistrationState {
+export function answerNoAllergies(state: RegistrationState): RegistrationState {
   if (state.step !== 'child-allergies') return state;
-  const noAllergies = !state.noAllergies;
-  return { ...state, noAllergies, buffer: noAllergies ? '' : state.buffer, shift: 'on' };
+  return commitAndMove(state, '');
 }
 
 /**
@@ -776,12 +746,9 @@ function reopenLastChild(state: RegistrationState): RegistrationState {
         draft,
         step: 'child-allergies',
         // The note as answered, reopened for editing — the same contract every
-        // other reopened question keeps. Unticked whatever was answered: an
-        // empty box is the honest reopening of "none", and it is one tap from
-        // ticked again.
+        // other reopened question keeps.
         buffer: draft.allergies,
         shift: autoShiftAfter(draft.allergies),
-        noAllergies: false,
       }
     : {
         ...state,

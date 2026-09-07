@@ -29,6 +29,7 @@ import { useTap } from '../components/tapGuard';
 import {
   addAnotherChild,
   advance,
+  answerNoAllergies,
   applyKey,
   canAdvance,
   chooseGrade,
@@ -42,7 +43,6 @@ import {
   reopen,
   type QuestionListState,
   type QuestionRow,
-  toggleNoAllergies,
   type DraftChild,
   type RegistrationMode,
   type RegistrationState,
@@ -97,7 +97,7 @@ function reduce(state: RegistrationState, action: Action): RegistrationState {
     case 'reopen':
       return reopen(state, action.step, action.child);
     case 'no-allergies':
-      return toggleNoAllergies(state);
+      return answerNoAllergies(state);
     case 'submitting':
       return { ...state, step: 'submitting', message: '' };
     case 'submitted':
@@ -165,7 +165,6 @@ export function RegistrationFlow({
     haptic(8);
     dispatch({ type: 'reopen', step, child });
   }, []);
-  const tap = useTap();
 
   /* ---- Walked away ------------------------------------------------------- */
 
@@ -297,54 +296,6 @@ export function RegistrationFlow({
                 />
               </div>
             </div>
-          {state.step === 'child-allergies' && (
-            /*
-              * The way to say "nothing", where the typing would have started.
-              *
-              * Directly above the readout on purpose — the body hangs from the
-              * bottom on typing steps so that it lands there. **Next** already
-              * offers the same answer, but a parent reading "any allergies we
-              * should know about?" is looking at the readout and the keys, not
-              * at a button above them — which is why the field was collecting
-              * "None", "N/A" and "no allergies" as though they were medical
-              * notes. Three spellings of a blank, bound for the church's
-              * database.
-              *
-              * A checkbox rather than a third button: it reports a state the
-              * parent can see they are in, and a button that had already been
-              * pressed would look exactly like one that had not.
-              */
-            <div className="mx-auto w-full max-w-2xl pt-2">
-              <button
-                type="button"
-                tabIndex={-1}
-                role="checkbox"
-                aria-checked={state.noAllergies}
-                {...tap(() => {
-                  haptic();
-                  dispatch({ type: 'no-allergies' });
-                })}
-                className={`flex h-16 w-full items-center gap-4 rounded-xl px-5 text-left text-xl font-semibold ${
-                  state.noAllergies
-                    ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/40'
-                    : 'bg-ink-900 text-ink-200 active:bg-ink-700'
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-lg ${
-                    state.noAllergies
-                      ? 'bg-brand-500 text-white'
-                      : 'ring-2 ring-ink-600'
-                  }`}
-                >
-                  {state.noAllergies ? '✓' : ''}
-                </span>
-                No allergies
-              </button>
-            </div>
-          )}
-
             {/*
               * The question, against the keys that answer it.
               *
@@ -443,28 +394,44 @@ export function RegistrationFlow({
           from moving between steps. */}
       {showsList ? (
         <div className="flex flex-col gap-1.5">
-          <div className="px-2 pt-2">
+          <div className="flex gap-2 px-2 pt-2">
             {/*
-              * Always "Next" on the allergies step, now that the tick above
-              * the keyboard says "No allergies".
+              * The allergies step answers in two ways, so it shows two ways —
+              * side by side, in the band **Next** already had, so the console
+              * keeps its height and the rule above it does not move.
               *
-              * This button used to carry that label itself while the box was
-              * empty, which made one answer into two controls a hand's width
-              * apart — and put the quieter of them under forty keys, where a
-              * parent reading the question is not looking. The tick took the
-              * job because it took the better place; leaving the label here as
-              * well would only ask which one is the real one.
+              * "None" is what most families have to say, and a medical field
+              * with forty keys under it and no visible way to say it collects
+              * "None", "N/A" and "no allergies" as free text: three spellings
+              * of a blank, bound for the church's database as though they were
+              * notes. This is that answer, in one press, spelled the same way
+              * every time.
               *
-              * An empty box still means none, ticked or not: this is an
-              * optional question and pressing Next past it has always been an
-              * answer rather than a skip.
+              * The colour says which one is being offered rather than the
+              * position: while the box is empty **No allergies** is the live
+              * answer and Next is dead, because there is nothing yet to press
+              * Next with. Type one letter and they trade — Next takes the
+              * brand and the blank goes quiet. Two lit buttons would only ask
+              * which is the real one, which is what a tick beside a keyboard
+              * was already asking.
               */}
-            <Big
-              label="Next"
-              tone="brand"
-              disabled={!canAdvance(state)}
-              onPick={() => dispatch({ type: 'next' })}
-            />
+            {state.step === 'child-allergies' && (
+              <div className="flex-1">
+                <Big
+                  label="No allergies"
+                  tone={state.buffer === '' ? 'brand' : undefined}
+                  onPick={() => dispatch({ type: 'no-allergies' })}
+                />
+              </div>
+            )}
+            <div className="flex-1">
+              <Big
+                label="Next"
+                tone="brand"
+                disabled={!canAdvance(state)}
+                onPick={() => dispatch({ type: 'next' })}
+              />
+            </div>
           </div>
           {/*
             * The readout, between the button that ends the step and the keys
@@ -489,15 +456,7 @@ export function RegistrationFlow({
             * reaching for '1' could commit the step by accident. An inert band
             * is a good thing to have there.
             */}
-          <div
-            className={`px-6 pb-1 ${
-              // Ticked "No allergies" empties the readout and puts it out of
-              // use. Dimming rather than hiding: the question was asked and
-              // answered in the negative, and a readout that vanished would
-              // read as a question that went away.
-              state.noAllergies ? 'opacity-40' : ''
-            }`}
-          >
+          <div className="px-6 pb-1">
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
               {/* The answer so far, however it is being given — typed, dialled
                   or tapped off a chip. Empty until there is one: the search
@@ -506,7 +465,10 @@ export function RegistrationFlow({
                   sitting in that slot read as something a previous family had
                   already put there. What the box is for is said above it. */}
               {readoutFor(state) && (
-                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
+                <span
+                  data-testid="readout"
+                  className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl"
+                >
                   {readoutFor(state)}
                 </span>
               )}
@@ -515,11 +477,7 @@ export function RegistrationFlow({
                   is chosen off a grid, and a caret blinking beside it would
                   promise a keyboard that is not there. See `.kiosk-caret`. */}
               {isTypingStep(state.step) && (
-                <span
-                  aria-hidden
-                  data-testid="readout-caret"
-                  className={`kiosk-caret${state.noAllergies ? ' kiosk-caret--still' : ''}`}
-                />
+                <span aria-hidden data-testid="readout-caret" className="kiosk-caret" />
               )}
             </div>
           </div>
@@ -536,18 +494,7 @@ export function RegistrationFlow({
               onPick={(grade) => dispatch({ type: 'grade', grade })}
             />
           ) : (
-            /*
-              * Greyed and inert while "No allergies" is ticked. The keys stay
-              * where they are rather than leaving: this file's geometry does
-              * not move under a thumb, and a keyboard that vanished mid-step
-              * would take the parent's place on the screen with it.
-              */
-            <div
-              className={state.noAllergies ? 'pointer-events-none opacity-40' : undefined}
-              aria-hidden={state.noAllergies || undefined}
-            >
-              <Keyboard onKey={onKey} shift={state.shift} />
-            </div>
+            <Keyboard onKey={onKey} shift={state.shift} />
           )}
         </div>
       ) : state.step === 'confirm' ? (

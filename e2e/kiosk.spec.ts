@@ -796,7 +796,7 @@ test.describe('registering a family at the kiosk', () => {
     .slice(0, 4)
     .join('')}`;
 
-  /** One child through the three questions and the fork. */
+  /** One child through the three questions, up to any allergy note. */
   async function enterChild(kiosk: Page, first: string, last: string, grade: string) {
     await typeOnKiosk(kiosk, first);
     await kiosk.getByRole('button', { name: /^Next$/ }).click();
@@ -804,6 +804,20 @@ test.describe('registering a family at the kiosk', () => {
     await typeOnKiosk(kiosk, last);
     await kiosk.getByRole('button', { name: /^Next$/ }).click();
     await kiosk.getByRole('button', { name: grade, exact: true }).click();
+    // The grade commits like every other answer; a chip selects, it does not
+    // advance.
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  }
+
+  /** The adult, who is asked once, after the first child. */
+  async function enterGuardian(kiosk: Page, first: string, last: string, phone: string) {
+    await typeOnKiosk(kiosk, first);
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
+    await kiosk.locator('[data-key="clear"]').click();
+    await typeOnKiosk(kiosk, last);
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
+    await typeOnKiosk(kiosk, phone);
+    await kiosk.getByRole('button', { name: /^Next$/ }).click();
   }
 
   test('adds two children and one adult, checks them in, and prints for each', async ({
@@ -830,22 +844,21 @@ test.describe('registering a family at the kiosk', () => {
 
       await kiosk.getByRole('button', { name: /Register your child/i }).click();
       await enterChild(kiosk, 'Wren', SURNAME, '4th grade');
+      await enterGuardian(kiosk, 'Dana', SURNAME, '5550147788');
+
+      // A second child is added from the confirm, where the family is written
+      // out — the screen that used to ask "anybody else?" before anyone could
+      // see who "else" already meant.
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       // The second child's surname arrives already filled in from the first —
       // typing it again is the tax this flow exists to remove.
       await typeOnKiosk(kiosk, 'Fox');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await expect(kiosk.getByText(SURNAME, { exact: true })).toBeVisible();
+      // The readout, not the list: the list is showing the same surname on the
+      // first child's row and on the adult's, which is the point of it.
+      await expect(kiosk.getByTestId('readout')).toHaveText(SURNAME);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-
-      await typeOnKiosk(kiosk, 'Dana');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, SURNAME);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await typeOnKiosk(kiosk, '5550147788');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
       // The confirm screen: the whole family, and one button.
@@ -923,14 +936,7 @@ test.describe('registering a family at the kiosk', () => {
       // Somebody the seed already put on the roster.
       const [first, last] = CHECKED_IN.split(' ') as [string, string];
       await enterChild(kiosk, first, last, '4th grade');
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-      await typeOnKiosk(kiosk, 'Dana');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, last);
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await typeOnKiosk(kiosk, '5550199001');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await enterGuardian(kiosk, 'Dana', last, '5550199001');
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
 
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
@@ -988,20 +994,13 @@ test.describe('registering a family at the kiosk', () => {
       await typeOnKiosk(kiosk, 'peanuts and bee stings');
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
+      await enterGuardian(kiosk, 'Dana', 'Aldercroft', '5550142299');
+
       await kiosk.getByRole('button', { name: /Add another child/i }).click();
       await enterChild(kiosk, 'Rowan', 'Aldercroft', '2nd grade');
-      // The common answer is the tick under the box, not typed into it.
-      await kiosk.getByRole('checkbox', { name: /No allergies/i }).click();
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-
-      await typeOnKiosk(kiosk, 'Dana');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.locator('[data-key="clear"]').click();
-      await typeOnKiosk(kiosk, 'Aldercroft');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await typeOnKiosk(kiosk, '5550142299');
-      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      // The common answer is its own button, beside Next rather than under
+      // forty keys — and it answers and moves on in the one press.
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
 
       // The family checking their own typing, before it becomes a record.
       await expect(kiosk.getByText('Allergies: Peanuts And Bee Stings')).toBeVisible();
