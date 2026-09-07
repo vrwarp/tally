@@ -1586,7 +1586,7 @@
     "zh-Hant": "machine"
   },
   "Mia.resolve": {
-    "source": "No longer expected…",
+    "source": "Stop expecting…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1696,7 +1696,7 @@
     "zh-Hant": "machine"
   },
   "Release.confirm": {
-    "source": "Mark as no longer expected",
+    "source": "Stop expecting them",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7563,7 +7563,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.noLongerExpected": {
-    "source": "No longer expected…",
+    "source": "Stop expecting…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

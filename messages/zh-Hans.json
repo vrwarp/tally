@@ -371,7 +371,7 @@
     "title": "不再列入这里",
     "subtitle": "{name} · {gathering}",
     "cancel": "取消",
-    "confirm": "标记为不再列入",
+    "confirm": "确认不再列入",
     "legend": "为什么不再列入 {name}",
     "hintMovedOn": "我们仍然预期会在别的聚会见到他。",
     "hintDeparted": "毕业、搬走，或者不会再回来了——Tally 不再过问他。",
