@@ -31,6 +31,7 @@ import { updateStudentProfile } from './profile.js';
 import { findStudentCandidates, pushPendingStudents, pushStudent } from './pushStudents.js';
 import { recreateStudent } from './recreate.js';
 import {
+  createHouseholdMemo,
   fetchAllergyNotes,
   fetchAdultContactStatus,
   fetchPersonDetails,
@@ -60,6 +61,12 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
     baseUrl: config.baseUrl,
   });
   const cache = sharedCache(config);
+  /*
+   * One per request, because the adapter is one per request — a batch of
+   * follow-up rows that shares a household reads it once. See `HouseholdMemo`
+   * for why it may not outlive the call, and why only the read path gets one.
+   */
+  const households = createHouseholdMemo();
 
   /**
    * Check-Ins lives beside People on the same host, so its root is derived
@@ -96,7 +103,7 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       fetchRoster({ client, config, cache, personIds, force }),
     searchPeople: ({ query, limit }) => searchPeople({ client, config, query, limit, cache }),
     fetchPersonDetails: ({ personId, force }) =>
-      fetchPersonDetails({ client, config, cache, personId, force }),
+      fetchPersonDetails({ client, config, cache, personId, force, households }),
     fetchAllergyNotes: ({ personIds, force }) =>
       fetchAllergyNotes({ client, config, cache, personIds, force }),
     fetchAdultContactStatus: ({ personIds, force }) =>

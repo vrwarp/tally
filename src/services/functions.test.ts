@@ -123,21 +123,27 @@ beforeEach(() => {
 });
 
 describe('the callable clients', () => {
-  it('wires every export to a name the backend deploys', async () => {
-    const module = await load();
-    const wired = wiring(module as unknown as Record<string, unknown>);
+  it('wires every callable it builds to a name the backend deploys', async () => {
+    await load();
     const deployed = deployedCallableNames();
+    const built = [...wiredOptions.keys()];
 
     // The scan itself has to be known-good, or an empty set would make every
     // assertion below vacuous and this file a rubber stamp.
     expect(deployed.size).toBeGreaterThan(30);
-    expect(wired.size).toBeGreaterThan(30);
+    expect(built.length).toBeGreaterThan(30);
 
-    for (const [exportName, callableName] of wired) {
-      expect(
-        deployed,
-        `${exportName} calls "${callableName}", which the backend does not export`,
-      ).toContain(callableName);
+    /*
+     * Every name the module builds, not only the ones it re-exports. Person
+     * details are held privately now — `getPersonDetails` is a function that
+     * collects a frame's worth of reads into one `getPersonDetailsBatch` call —
+     * so walking the exports alone would leave both of those names unchecked,
+     * which is exactly the 404-on-a-Sunday this file exists to catch.
+     */
+    for (const callableName of built) {
+      expect(deployed, `"${callableName}" is not a callable the backend exports`).toContain(
+        callableName,
+      );
     }
   });
 
@@ -148,8 +154,11 @@ describe('the callable clients', () => {
    */
   it('names each callable after the export that holds it', async () => {
     const module = await load();
+    const wired = wiring(module as unknown as Record<string, unknown>);
 
-    for (const [exportName, callableName] of wiring(module as unknown as Record<string, unknown>)) {
+    // A guard against the walk finding nothing and rubber-stamping the loop.
+    expect(wired.size).toBeGreaterThan(30);
+    for (const [exportName, callableName] of wired) {
       expect(callableName).toBe(exportName);
     }
   });

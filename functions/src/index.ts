@@ -29,6 +29,7 @@ import {
   type SweepResult,
 } from './upstreamEdits.js';
 import { isHeldForReview } from './backends/pendingReview.js';
+import { planDetailBatch, runDetailBatch } from './backends/detailBatch.js';
 import {
   a32AliasPairs,
   collapseAliasPair,
@@ -760,12 +761,70 @@ interface PersonDetailsResponse extends PersonDetails {
 }
 
 /**
+ * One student's details, resolved and decorated — the body both callables share.
+ *
+ * Throws `HttpsError` and nothing else: a resolution problem (an unlinked
+ * visitor, a backend switched off) comes back as the code that names it, and a
+ * backend that would not answer goes through `reportBackendFailure` so the
+ * sentence names whichever one failed and the debug payload rides along.
+ */
+async function readPersonDetails(
+  registry: BackendRegistry,
+  database: FirestoreLike,
+  data: { pcoPersonId?: string; studentId?: string; force?: boolean } | undefined,
+): Promise<PersonDetailsResponse | null> {
+  const { backend, personId } = await resolveDetailsTarget(registry, database, data);
+
+  try {
+    const details = await backend.fetchPersonDetails({
+      personId,
+      /*
+       * Asked for by a screen that has just written, and honoured because the
+       * alternative fails in the worst possible place. `addParent` drops this
+       * instance's cache when it succeeds, but the re-read that follows it is
+       * a *different* request and may land on a different instance, whose
+       * held answer still says this family has nobody in it — on the one
+       * screen whose entire subject is whether they do.
+       */
+      force: data?.force === true,
+    });
+    if (!details) return null;
+
+    /*
+     * Added here rather than inside the cached read, because the two halves
+     * of this answer expire on completely different schedules. Whether the
+     * household has an adult is a fact about the backend and is worth
+     * holding for the TTL; whether Tally is allowed to write is a setting a
+     * leader may have changed a second ago, and serving that from a cache
+     * would leave a form on screen that the write path then refuses.
+     */
+    const writeBackFull = backend.capabilities.writeBack === 'full';
+    return {
+      ...details,
+      backendId: backend.id,
+      contactWritable: details.householdAdult && writeBackFull,
+      profileWritable: writeBackFull,
+      adultCreatable:
+        writeBackFull && !details.householdAdult && backend.capabilities.adultCreatable,
+    };
+  } catch (error) {
+    return reportBackendFailure(backend.displayName, error, 'load this student');
+  }
+}
+
+/**
  * Parent contact and allergies for one student.
  *
  * Separate from the roster on purpose. This is the data minimisation the PRD
  * asks for made structural: a counselor checking people in at a door never
  * receives a minor's contact phone number, because the screen they are on
  * never asks for it.
+ *
+ * Still here, and still the shape a screen showing one student sends, but the
+ * screens that show *lists* of them now go through `getPersonDetailsBatch`.
+ * This one remains the single-student read, the compatibility surface for the
+ * bare `pcoPersonId` request, and the client's fallback while a deploy is
+ * mid-flight.
  */
 export const getPersonDetails = onCall<
   { pcoPersonId?: string; studentId?: string; force?: boolean },
@@ -774,46 +833,127 @@ export const getPersonDetails = onCall<
   { secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
   async (request): Promise<PersonDetailsResponse | null> => {
     await requireCoreTeam(request.auth?.uid);
+    return readPersonDetails(await createRegistry(db()), db(), request.data);
+  },
+);
+
+/**
+ * How many students one batch may ask about.
+ *
+ * A backstop rather than a working limit: the client chunks well below this,
+ * and a request larger than it has misunderstood the shape.
+ */
+const MAX_DETAIL_LOOKUPS = 100;
+
+/**
+ * How many of them are read at once.
+ *
+ * Eight Planning Center requests in the air at once, which is comfortably
+ * inside a rate limit and far gentler than what it replaces: twenty follow-up
+ * rows used to be twenty *invocations*, landing on up to `maxInstances`
+ * instances that share no cache and coordinate on nothing, so the burst that
+ * reached Planning Center was bounded by nothing at all.
+ *
+ * Higher than `ALLERGY_CONCURRENCY` because a details read is two round trips
+ * deep rather than one, so the same concurrency buys half the throughput, and
+ * because a leader is waiting on this list rather than glancing at a badge.
+ */
+const DETAIL_CONCURRENCY = 8;
+
+/** A student is in exactly one of these maps, or in neither. */
+export interface PersonDetailsBatchResponse {
+  /**
+   * Student id -> their details, or null for a person the backend no longer
+   * holds. A student with an error is absent from here; a student in neither
+   * map was never asked about.
+   */
+  details: Record<string, PersonDetailsResponse | null>;
+  /**
+   * Student id -> why that one could not be read. Per-student rather than
+   * per-batch because the failures are per-student: one unlinked visitor among
+   * twenty rows must not blank the other nineteen.
+   */
+  errors: Record<string, { code: string; message: string }>;
+}
+
+/**
+ * Parent contact for a screenful of students, in one call.
+ *
+ * The dashboard's three call lists put `FollowUpActions` on every row, and each
+ * row used to be its own invocation: a Sunday evening of leaders opening the
+ * dashboard was hundreds of calls in bursts, every one of them re-reading
+ * `users/{uid}` for the same person, building its own registry, and asking
+ * Planning Center for a household some other row in the same list had just
+ * fetched. Twenty rows are now one call, one gate read, one registry, and one
+ * household read per family rather than per child.
+ *
+ * The privacy posture is unchanged, which is the point of batching rather than
+ * widening: this is `getPersonDetails` for the students the caller names, under
+ * the same core-team gate, returning the same fields. Nothing here reads the
+ * roster or decides for itself whom to look up — a batch can only ever be the
+ * rows a screen is already showing.
+ *
+ * **Never throws `not-found`.** A student who resolves to nobody is reported in
+ * `errors` against their own id, because the client reads a `not-found` at
+ * *batch* level as "this deployment has no such function yet" and falls back to
+ * the one-at-a-time call. Keep that true.
+ */
+export const getPersonDetailsBatch = onCall<
+  { students?: ReadonlyArray<{ studentId?: string; force?: boolean }> },
+  Promise<PersonDetailsBatchResponse>
+>(
+  { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
+  async (request): Promise<PersonDetailsBatchResponse> => {
+    await requireCoreTeam(request.auth?.uid);
+
+    const asked = request.data?.students;
+    if (!Array.isArray(asked)) {
+      throw new HttpsError('invalid-argument', 'students is required.');
+    }
+
+    const plan = planDetailBatch(asked, MAX_DETAIL_LOOKUPS);
+
+    // Nothing to ask about is an ordinary answer — a dashboard whose lists are
+    // all empty — and must not cost a registry.
+    if (plan.wanted.size === 0) return { details: {}, errors: plan.errors };
 
     const registry = await createRegistry(db());
-    const resolved = await resolveDetailsTarget(registry, db(), request.data);
-    const { backend, personId } = resolved;
+    const database = db();
 
-    try {
-      const details = await backend.fetchPersonDetails({
-        personId,
-        /*
-         * Asked for by a screen that has just written, and honoured because the
-         * alternative fails in the worst possible place. `addParent` drops this
-         * instance's cache when it succeeds, but the re-read that follows it is
-         * a *different* request and may land on a different instance, whose
-         * held answer still says this family has nobody in it — on the one
-         * screen whose entire subject is whether they do.
-         */
-        force: request.data?.force === true,
-      });
-      if (!details) return null;
+    const { details, errors, failures } = await runDetailBatch(
+      plan.wanted,
+      (studentId, force) => readPersonDetails(registry, database, { studentId, force }),
+      {
+        concurrency: DETAIL_CONCURRENCY,
+        errors: plan.errors,
+        describe: (error) =>
+          error instanceof HttpsError
+            ? { code: error.code, message: error.message }
+            : { code: 'internal', message: 'Could not load this student.' },
+      },
+    );
 
-      /*
-       * Added here rather than inside the cached read, because the two halves
-       * of this answer expire on completely different schedules. Whether the
-       * household has an adult is a fact about the backend and is worth
-       * holding for the TTL; whether Tally is allowed to write is a setting a
-       * leader may have changed a second ago, and serving that from a cache
-       * would leave a form on screen that the write path then refuses.
-       */
-      const writeBackFull = backend.capabilities.writeBack === 'full';
-      return {
-        ...details,
-        backendId: backend.id,
-        contactWritable: details.householdAdult && writeBackFull,
-        profileWritable: writeBackFull,
-        adultCreatable:
-          writeBackFull && !details.householdAdult && backend.capabilities.adultCreatable,
-      };
-    } catch (error) {
-      return reportBackendFailure(backend.displayName, error, 'load this student');
+    /*
+     * Every single one failed, which is a backend having a minute rather than
+     * twenty separate problems. Rethrown as the failure it is — with the code
+     * and the debug payload `reportBackendFailure` built — so the screen says
+     * "Planning Center is rate-limiting us" once, with something to forward,
+     * instead of printing the same sentence on twenty rows with nothing.
+     *
+     * `not-found` is exempt: a batch of nothing but unlinked visitors is not an
+     * outage, and that code at batch level is what tells the client this
+     * deployment predates this function. See the note on the callable.
+     */
+    const [firstFailure] = failures;
+    if (
+      Object.keys(details).length === 0 &&
+      firstFailure instanceof HttpsError &&
+      firstFailure.code !== 'not-found'
+    ) {
+      throw firstFailure;
     }
+
+    return { details, errors };
   },
 );
 
