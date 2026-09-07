@@ -29,7 +29,7 @@
  * a label coming out proves the whole chain rather than just that the device
  * answers.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { haptic } from '@/lib/utils';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
@@ -48,18 +48,44 @@ import type {
 /** The models this was built against, offered first. */
 const PREFERRED_MODELS = ['QL-810W', 'QL-800', 'QL-820NWB'];
 
+/** How many of the printer's recent events the fold shows; the copy carries them all. */
+const MAX_EVENTS_SHOWN = 40;
+
+/** How long "Copied" stays up. */
+const COPY_FEEDBACK_MS = 2500;
+
+type CopyState = 'idle' | 'copied' | 'failed';
+
 function orderedModels(printing: KioskPrinting): string[] {
   const all = printing.modelIdentifiers();
   const preferred = PREFERRED_MODELS.filter((model) => all.includes(model));
   return [...preferred, ...all.filter((model) => !preferred.includes(model))];
 }
 
+/**
+ * What a kiosk set up with a printer it cannot find is told to do.
+ *
+ * The Android sentence is there because on Android it is the whole story: a
+ * printer that lost power or its cable, however briefly, is one the browser
+ * can no longer match to its grant, and only the chooser brings it back. See
+ * docs/label-printing.md.
+ */
+const UNPAIRED_ADVICE =
+  'Check its power and cable. A printer that lost power on an Android tablet has to be connected again from this screen.';
+
 function stateLine(state: PrinterState): { text: string; tone: string } {
   switch (state.kind) {
     case 'ready':
       return { text: 'Connected and ready.', tone: 'text-present-400' };
     case 'unpaired':
-      return { text: 'No printer connected yet.', tone: 'text-ink-400' };
+      // Set up with a printer, which is what makes this different from `idle`
+      // below: the browser is not listing the one this kiosk was given.
+      return state.searching
+        ? { text: 'Looking for the printer this kiosk was set up with…', tone: 'text-ink-400' }
+        : {
+            text: 'The printer this kiosk was set up with is not connected.',
+            tone: 'text-warn-400',
+          };
     case 'unsupported':
       return { text: state.message, tone: 'text-warn-400' };
     case 'trouble':
@@ -163,11 +189,45 @@ export function PrinterScreen({
   const [label, setLabel] = useState(config.label);
   const [detection, setDetection] = useState<PrinterDetection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [copied, setCopied] = useState<CopyState>('idle');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowTap = useTapGuard(onReprint);
   const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
   useEffect(() => printing.subscribe(setState), [printing]);
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
+
+  const flash = (next: CopyState) => {
+    setCopied(next);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied('idle'), COPY_FEEDBACK_MS);
+  };
+
+  /**
+   * The record, onto the clipboard.
+   *
+   * Absent on http origins and inside a few in-app browsers. Say so rather than
+   * doing nothing, and put the text on the screen where it can be selected by
+   * hand — the same shape as the debug details in the main app.
+   */
+  const copyEvents = async () => {
+    if (!navigator.clipboard) {
+      flash('failed');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(printing.printerLogText());
+      flash('copied');
+    } catch {
+      flash('failed');
+    }
+  };
 
   const available = printing.labelsForModel(model);
   // A model change can leave the stored media unprintable on the new head —
@@ -235,9 +295,31 @@ export function PrinterScreen({
     }
   };
 
+  /**
+   * Look for the printer again without the chooser.
+   *
+   * The module reopens by itself after a dropped transfer and on a connect
+   * event, so this is for the case neither covers: a volunteer who has just
+   * pushed a cable back in and wants to know now, not on the next label.
+   */
+  const lookAgain = async () => {
+    setBusy(true);
+    try {
+      await printing.ready();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const canLookAgain =
+    state.kind === 'trouble' || (state.kind === 'unpaired' && !state.searching);
+
   const nameOf = (entry: Label) => printing.labelName(entry);
   const notice = detection ? detectionNotice(detection, label, nameOf) : null;
   const line = stateLine(state);
+  // Newest first, and read on every render rather than held in state: the
+  // record moves whenever the state does, which is what re-renders this.
+  const events = printing.printerLog().slice(-MAX_EVENTS_SHOWN).reverse();
+  const now = Date.now();
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -246,6 +328,9 @@ export function PrinterScreen({
         <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>{line.text}</div>
         {state.kind === 'trouble' && state.advice && (
           <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{state.advice}</div>
+        )}
+        {state.kind === 'unpaired' && !state.searching && (
+          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{UNPAIRED_ADVICE}</div>
         )}
       </div>
 
@@ -440,6 +525,78 @@ export function PrinterScreen({
           </details>
 
           {/*
+            * What has happened to the printer lately.
+            *
+            * For whoever is standing here with a screen that says the printer
+            * was unplugged and a cable that is still in. The record is the
+            * module's — every state change, every device the browser listed or
+            * lost, the browser's own name for each failure, and what the
+            * transport saw on the wire — and this is the only place it is
+            * read. Folded, because on an ordinary evening nobody needs it, and
+            * copyable, because the person who can read it is usually not the
+            * person standing here.
+            */}
+          <details
+            className="shrink-0 rounded-xl bg-ink-900"
+            onToggle={(event) => setEventsOpen((event.target as HTMLDetailsElement).open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0 truncate">Recent printer events</span>
+              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
+                {eventsOpen ? 'Hide' : 'Show'}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              {events.length === 0 ? (
+                <div className="text-sm text-ink-500 kiosk:text-base">
+                  Nothing has been written down yet.
+                </div>
+              ) : (
+                <div
+                  className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain scroll-touch font-mono text-xs text-ink-400 kiosk:text-sm"
+                  style={{ touchAction: 'pan-y' }}
+                >
+                  {events.map((entry, index) => (
+                    <div key={`${entry.t}-${index}`} className="flex gap-3">
+                      <span className="w-16 shrink-0 text-ink-500">
+                        {printing.describeAge(entry.t, now)}
+                      </span>
+                      <span className="min-w-0 break-all">{printing.describeEntry(entry)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  {...tap(() => void copyEvents())}
+                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                >
+                  {copied === 'copied' ? 'Copied' : 'Copy'}
+                </button>
+                {copied === 'failed' && (
+                  <span className="text-xs text-ink-500 kiosk:text-sm">
+                    Copying is blocked on this device — select the text below instead.
+                  </span>
+                )}
+                <span aria-live="polite" className="sr-only">
+                  {copied === 'copied' ? 'Printer events copied to the clipboard' : ''}
+                </span>
+              </div>
+              {copied === 'failed' && (
+                <textarea
+                  readOnly
+                  aria-label="Printer events"
+                  rows={6}
+                  value={printing.printerLogText()}
+                  className="w-full rounded-lg bg-ink-950 p-3 font-mono text-xs text-ink-300"
+                />
+              )}
+            </div>
+          </details>
+
+          {/*
             * The saturated control on a screen about reprinting used to be
             * **Choose a different printer** — the one that unbinds the printer —
             * and a hurried volunteer aims at colour. It is the by-name reprint
@@ -511,15 +668,28 @@ export function PrinterScreen({
             * runs at. So opening the printer screen opened the browser's device
             * chooser, every time, on a printer that was already connected.
             */}
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={busy}
-            {...tap(() => void connect())}
-            className="shrink-0 rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-          >
-            {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
-          </button>
+          <div className={`grid shrink-0 gap-3 ${canLookAgain ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {canLookAgain && (
+              <button
+                type="button"
+                tabIndex={-1}
+                disabled={busy}
+                {...tap(() => void lookAgain())}
+                className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
+              >
+                Look again
+              </button>
+            )}
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={busy}
+              {...tap(() => void connect())}
+              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
+            >
+              {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
+            </button>
+          </div>
         </div>
       </div>
 

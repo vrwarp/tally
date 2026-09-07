@@ -68,6 +68,7 @@ const printing = {
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   reprintLabel: vi.fn(),
   printedTonight: vi.fn(() => []),
+  closePrinter: vi.fn(async () => {}),
   labelPreview: vi.fn(() => []),
   forgetGathering: vi.fn(),
   testPrint: vi.fn(),

@@ -9,9 +9,11 @@ claim no test here can make: the layout arithmetic is covered in
 `src/lib/labelRender.test.ts`, the queue's ordering and staleness in
 `src/kiosk/printing/queue.test.ts`, what a child's tokens come to in
 `src/kiosk/printing/tokens.test.ts`, which taps print in
-`src/kiosk/KioskApp.printing.test.tsx`, and a real worker producing a real raster
-job in `e2e/kiosk.spec.ts` — but nothing in CI has a printer, so a label actually
-coming out of one is something a person has to go and see.
+`src/kiosk/KioskApp.printing.test.tsx`, the road back from a printer going away in
+`src/kiosk/printing/index.test.ts`, the record it keeps of that road in
+`src/kiosk/printing/log.test.ts`, and a real worker producing a real raster job in
+`e2e/kiosk.spec.ts` — but nothing in CI has a printer, so a label actually coming
+out of one is something a person has to go and see.
 
 What follows is what that person has to do.
 
@@ -41,7 +43,9 @@ What follows is what that person has to do.
    the only step that needs a person: the browser opens its device chooser only
    in response to a real gesture. Everything afterwards — reconnecting at boot,
    printing, reading status — needs none, so the kiosk can run unattended for
-   weeks and reopen the printer by itself after the nightly reload.
+   weeks and reopen the printer by itself after the nightly reload, after the
+   tablet wakes, and after the odd rejected USB transfer — see
+   [When it stops working](#when-it-stops-working).
 5. **Read the line it comes back with.** Connecting asks the printer what it is
    and what is in it, and sets the kiosk to the answers — so in the ordinary
    case there is nothing left to fill in. The line says what was taken, and it
@@ -65,6 +69,13 @@ What follows is what that person has to do.
 6. Press **Print a test label**. It goes through the whole chain — worker,
    rasteriser, transport — so a label coming out means the feature works, not
    just that the device answered.
+7. **Turn the printer's Auto Power Off off.** The QL-800 series ships with it set
+   to 60 minutes, so a printer connected only by USB switches itself off an hour
+   after the last label, and the kiosk reports it unplugged until somebody
+   presses its power button — on an Android tablet, until somebody connects it
+   again (see [Platform notes](#platform-notes)). In Brother's Printer Setting
+   Tool: Device Settings → Basic → **Auto Power Off (AC/DC)** → *None*. A printer
+   with Wi-Fi turned on does not power itself off either.
 
 Changed the roll later? **Check the printer** does the same reading again and
 sets the kiosk to what it finds. It is deliberately not done at boot: a kiosk
@@ -269,6 +280,56 @@ screen, and it says what is actually wrong — cover open, out of media, unplugg
 or another program holding the device. The staff reprint screens say so in words,
 because a volunteer standing there *can* do something about it.
 
+### What the kiosk does on its own
+
+Most of what looks like a printer going away is not one. The library reports a
+"disconnect" whenever a USB transfer is rejected, and a printer that is still
+plugged in does that now and then — one failed transfer in the millions an
+evening sends, or a tablet that froze the page for a while. The kiosk used to
+take the library's word for it, say *The printer was unplugged*, and wait for a
+connect event that never came, because the printer had never left. Now:
+
+- A dead transport is given a moment (1.5 s) for the browser's own disconnect
+  event, which only a device that really left the bus produces.
+- If none comes, the kiosk asks the browser what is still listed. A printer that
+  is still there is closed and reopened — silently the first time, since that
+  almost always works. If it keeps failing the kiosk keeps trying, at 1 s, 5 s,
+  30 s and then every minute, and shows the real error from the second attempt
+  on.
+- A printer that is not listed is reported as unplugged, and the connect event
+  brings it back as it always did.
+- The same check runs when the tablet wakes — the screen unlocked, the app
+  switched back to. At boot, a printer the browser has not listed yet is looked
+  for for about ten seconds before the screen says it is missing, because one
+  that is still enumerating after the reload turns up inside that.
+- Before the nightly reload the printer is released on purpose rather than
+  dropped with the page.
+
+**Look again** on the printer screen runs the same search by hand, without the
+chooser — for a cable that has just been pushed back in.
+
+### Recent printer events
+
+Under the settings on the printer screen is a fold, **Recent printer events**:
+the last two hundred things that happened to the printer, newest first. Every
+state the screens were told and why, every device the browser listed or lost and
+whether it was this kiosk's, every failed open with the browser's own name for
+the failure, and what the transport saw on the wire. It survives the nightly
+reload, it holds no children's names, and **Copy** puts the whole of it on the
+clipboard for a bug report (where copying is blocked, the text appears to select
+by hand).
+
+The lines that decide what happened:
+
+| Lines | What happened |
+| --- | --- |
+| `transport disconnect during="read" error="NetworkError: A transfer error has occurred."`, then `usb devices … present=true`, then `transport open` | One rejected transfer on a printer still there. Recovered by itself; nothing to do. |
+| `transport disconnect … error="NotFoundError: The device was disconnected."` with `usb disconnect … ours=true`, and later `usb connect` | The printer left the bus and came back — power, a hub, a cable. Recovered by itself. If it keeps happening, check Auto Power Off and the hub. |
+| `usb disconnect … ours=true`, then `usb devices … count=0` and no `usb connect` after it | The printer left and the browser no longer lists it. On Android that is every re-attach (see below); elsewhere the printer is off, or the grant is gone. Connect it again from the printer screen. |
+| `usb devices cause="boot" count=0`, then `count=1` a few seconds later | Slow to enumerate after the reload. Found by the boot search; nothing to do. |
+| `kiosk open-failed … code="claim-failed"` | Something else holds the device: a second tab or window with the kiosk open, or on macOS a job in the print queue. |
+| `kiosk label-failed code="status-timeout"` and `state trouble … message="The printer went quiet after printing."` | The label came out and the printer said nothing more. Not a connection problem; the next label clears it. |
+
 ## Printing one again
 
 Hold **Clear** for two seconds and the staff screen offers **Reprint a name tag**:
@@ -297,7 +358,23 @@ printer, remove it — CUPS will hold the interface and the claim will fail.
 
 **Android.** Works in Chrome proper, not in a WebView. The tablet needs USB host
 mode, which in practice means a powered OTG hub so it can charge and talk to the
-printer at once.
+printer at once. And one thing to know before choosing it: **a printer that
+leaves the bus has to be connected again from the printer screen.** When a USB
+device is re-attached, Android revokes the browser's permission for it, and
+without that permission Chrome cannot read the printer's serial number — the
+thing it matches the grant against — so the printer vanishes from the kiosk's
+list and no connect event ever arrives. The kiosk notices and says so, but only
+a person can press **Connect a printer** (and then *Allow* on Android's own
+dialog). A brief power cut, a hub that browns out, a nudged cable: each is a
+visit. Keep the printer on mains with Auto Power Off set to *None*, on a hub the
+tablet does not switch off, and if the visits keep coming, ChromeOS keeps the
+grant across re-attaches and reconnects silently.
+
+**Grants and serial numbers, everywhere.** Chrome remembers a WebUSB grant across
+an unplug only for a device that reports a serial number. One that does not gets
+a grant that is revoked the moment it is unplugged, and the kiosk then needs
+**Connect a printer** again. `chrome://usb-internals` shows what the printer
+reports.
 
 **ChromeOS.** Nothing to configure, and the smoothest of the four.
 
@@ -322,8 +399,13 @@ goes out.
 
 For a locked-down kiosk, the Chrome policy
 [`WebUsbAllowDevicesForUrls`](https://chromeenterprise.google/policies/#WebUsbAllowDevicesForUrls)
-pre-grants the device to Tally's origin, so step 6 above disappears and a
-replacement printer needs no visit. Vendor id `0x04f9`.
+pre-grants the device to Tally's origin, so step 4 above disappears and a
+replacement printer needs no visit. Vendor id `0x04f9`. A policy grant is matched
+by vendor and product id rather than serial, so it also survives the Android
+re-attach described above — Chrome still asks Android's own permission on the
+first open afterwards, but the kiosk raises that by itself from the connect
+event, so the visit becomes a tap on *Allow*. Supported on ChromeOS, desktop
+Chrome and Android (75+); on Android it needs a managed device.
 
 ## If a label comes out wrong
 

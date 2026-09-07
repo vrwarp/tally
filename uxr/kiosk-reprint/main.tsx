@@ -140,6 +140,10 @@ const printing = {
   pairPrinter: async () => null,
   checkPrinter: async () => null,
   testPrint: () => {},
+  printerLog: () => [],
+  printerLogText: () => '',
+  describeAge: () => 'just now',
+  describeEntry: () => '',
 } as unknown as KioskPrinting;
 
 export function Prototype() {

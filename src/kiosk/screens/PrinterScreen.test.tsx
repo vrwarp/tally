@@ -14,10 +14,11 @@
  * to prevent.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import type { KioskPrinting } from '@/kiosk/KioskApp';
-import type { Label, PrinterDetection, PrinterStatus } from '@/kiosk/printing';
+import type { Label, PrinterDetection, PrinterLogEntry, PrinterStatus } from '@/kiosk/printing';
+import { describeAge, describeEntry } from '@/kiosk/printing/log';
 
 /**
  * A label, as far as this screen reads one: something to identify and a name to
@@ -61,7 +62,7 @@ function detection(overrides: Partial<PrinterDetection> = {}): PrinterDetection 
  * a list of models, a list of media, a state, and an answer from whichever
  * button was pressed.
  */
-function handleWith(found: PrinterDetection | null) {
+function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = []) {
   const printing = {
     modelIdentifiers: () => ['QL-810W', 'QL-800'],
     labelsForModel: () => [PLAIN_62, RED_62, BADGE],
@@ -72,6 +73,10 @@ function handleWith(found: PrinterDetection | null) {
     pairPrinter: vi.fn(async () => found),
     checkPrinter: vi.fn(async () => found),
     testPrint: vi.fn(),
+    printerLog: () => events,
+    printerLogText: () => 'the whole record',
+    describeAge,
+    describeEntry,
   };
   return printing as unknown as KioskPrinting & typeof printing;
 }
@@ -275,5 +280,63 @@ describe('a press this screen never received', () => {
     expect(printing.checkPrinter).not.toHaveBeenCalled();
     expect(printing.testPrint).not.toHaveBeenCalled();
     expect(printing.configure).not.toHaveBeenCalled();
+  });
+});
+
+describe('what has happened to the printer', () => {
+  /*
+   * The record is the module's; this screen is the one place it is read. What
+   * is pinned is that it reads newest first in words a volunteer can take in,
+   * and that the whole of it can leave the tablet — on the clipboard where
+   * there is one, and as selectable text where there is not.
+   */
+  const now = Date.now();
+  const events: PrinterLogEntry[] = [
+    { t: now - 120_000, category: 'usb', name: 'disconnect', data: { ours: true } },
+    {
+      t: now - 5_000,
+      category: 'transport',
+      name: 'open',
+      data: { interfaceNumber: 0 },
+    },
+  ];
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  it('lists recent events, newest first, with how long ago', () => {
+    mount(handleWith(detection(), events));
+
+    const rows = screen.getAllByText(/ago|just now/).map((node) => node.textContent);
+    expect(rows).toEqual(['just now', '2 min ago']);
+    expect(screen.getByText('transport open interfaceNumber=0')).toBeInTheDocument();
+    expect(screen.getByText('usb disconnect ours=true')).toBeInTheDocument();
+  });
+
+  it('says so when nothing has been written down yet', () => {
+    mount(handleWith(detection()));
+
+    expect(screen.getByText('Nothing has been written down yet.')).toBeInTheDocument();
+  });
+
+  it('puts the whole record on the clipboard with one press', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    mount(handleWith(detection(), events));
+
+    await press(/^Copy$/);
+
+    expect(writeText).toHaveBeenCalledWith('the whole record');
+    expect(screen.getByRole('button', { name: /^Copied$/ })).toBeInTheDocument();
+  });
+
+  it('shows the text to select by hand where copying is blocked', async () => {
+    mount(handleWith(detection(), events));
+
+    await press(/^Copy$/);
+
+    expect(screen.getByText(/Copying is blocked on this device/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Printer events')).toHaveValue('the whole record');
   });
 });

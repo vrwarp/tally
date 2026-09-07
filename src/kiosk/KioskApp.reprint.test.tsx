@@ -97,6 +97,7 @@ const printing = {
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   reprintLabel: vi.fn(),
   printedTonight: vi.fn(() => []),
+  closePrinter: vi.fn(async () => {}),
   labelPreview: vi.fn(() => ['Ada L', '8th grade']),
   testPrint: vi.fn(),
   labelsForModel: vi.fn(() => [{ identifier: '62x29' }]),
@@ -105,6 +106,10 @@ const printing = {
   configure: vi.fn(async () => {}),
   pairPrinter: vi.fn(async () => null),
   checkPrinter: vi.fn(async () => null),
+  printerLog: vi.fn(() => []),
+  printerLogText: vi.fn(() => ''),
+  describeAge: vi.fn(() => 'just now'),
+  describeEntry: vi.fn(() => ''),
 } as unknown as KioskPrinting;
 
 const services = {
@@ -286,7 +291,7 @@ describe('the staff reprint flow', () => {
    * kiosk that would have printed.
    */
   it('opens the reprint door on a printer that is configured but not claimed', async () => {
-    vi.mocked(printing.currentState).mockReturnValue({ kind: 'unpaired' });
+    vi.mocked(printing.currentState).mockReturnValue({ kind: 'unpaired', searching: false });
     await mount();
     await holdClear();
 
