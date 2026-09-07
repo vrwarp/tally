@@ -56,6 +56,8 @@ async function openNursery(page: Page, child?: string): Promise<string> {
     ? page.getByRole('button', { name: new RegExp(`^Check in ${child}`) })
     : page.getByRole('button', { name: /quick add a visitor/i });
 
+  const widen = page.getByRole('button', { name: /^Show all \d+ / }).first();
+
   /*
    * Out of the room and onto the whole roster.
    *
@@ -68,12 +70,24 @@ async function openNursery(page: Page, child?: string): Promise<string> {
    * which is about a named child who has not arrived yet.
    *
    * The way out is the rung under the list, which is the one a volunteer would
-   * take. Twice, because it is deliberately one rung at a time: the screen
-   * offers the gathering's own people before it offers all of Tally.
+   * take. Up to twice, because widening is deliberately one rung at a time: on
+   * a roster with a `participated` rung the screen offers the gathering's own
+   * people before it offers all of Tally. This gathering has no such rung —
+   * nobody has participated in a nursery seeded minutes ago, so `widenTo`
+   * resolves straight to `all` — and the second pass is the loop noticing that
+   * and stopping rather than a second click.
+   *
+   * Waiting on the *screen* rather than sampling it is the whole point. This
+   * used to re-read `target.count()` at the top of each pass, which is a
+   * zero-wait snapshot: taken in the frame a widen click resolves in, it reads
+   * zero off a list React has not re-rendered yet, and the loop would take a
+   * second pass and block thirty seconds on a rung the first click had already
+   * spent. So each pass waits for whichever lands first — the row, or the rung
+   * that reveals it.
    */
-  for (let rung = 0; rung < 2 && (await target.count()) === 0; rung += 1) {
-    const widen = page.getByRole('button', { name: /^Show all \d+ / }).first();
-    await widen.waitFor({ timeout: 30_000 });
+  for (let rung = 0; rung < 2; rung += 1) {
+    await expect(target.or(widen).first()).toBeVisible({ timeout: 30_000 });
+    if ((await target.count()) > 0) break;
     await widen.click();
   }
 
