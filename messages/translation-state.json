@@ -2978,5 +2978,740 @@
     "source": "Could not rebuild the kiosk phone index. Is a people backend reachable?",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "EventEditor.titleEdit": {
+    "source": "Edit event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.titleNew": {
+    "source": "New event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.descriptionRecurring": {
+    "source": "The dates ahead follow the schedule; this changes them from here on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.descriptionOneOff": {
+    "source": "Changes apply to this gathering only.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.hintRecurring": {
+    "source": "Recurring gatherings predict their roster from their own past gatherings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.hintOneOff": {
+    "source": "A trip borrows its predicted roster from a gathering that repeats.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.saveChanges": {
+    "source": "Save changes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.scheduleEvent": {
+    "source": "Schedule event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.sectionGathering": {
+    "source": "The gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.sectionRosterDetails": {
+    "source": "Roster & details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldTitle": {
+    "source": "Title",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldDescription": {
+    "source": "Description",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldType": {
+    "source": "Type",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldLocation": {
+    "source": "Location",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldNotes": {
+    "source": "Notes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.fieldRepeats": {
+    "source": "Repeats",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.iconHint": {
+    "source": "Shown wherever this gathering is listed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.descriptionPlaceholder": {
+    "source": "Games, a talk and pizza. Bring a friend.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.descriptionHint": {
+    "source": "A sentence for the people turning up. Shown on the check-in screen when this is today’s gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.typeHintRecurring": {
+    "source": "Everyone active is on the roster, and its own past gatherings mark the regulars “Recent”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.typeHintOneOff": {
+    "source": "Happens once. Can borrow another gathering’s regulars, and limit its roster to the students who RSVP’d.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.typeRecurring": {
+    "source": "Recurring",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.typeOneOff": {
+    "source": "One-off — retreat, outing",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelNextStart": {
+    "source": "Next start",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelStarts": {
+    "source": "Starts",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelNextEnd": {
+    "source": "Next end",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelEnds": {
+    "source": "Ends",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelCheckInOpens": {
+    "source": "Check-in opens",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.labelCheckInCloses": {
+    "source": "Check-in closes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.upcomingNote": {
+    "source": "The upcoming gathering. Instances already held keep the times they ran at.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.predictedRoster": {
+    "source": "Predicted roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.predictedHintRecurring": {
+    "source": "Its regulars are marked “Recent” here. Everybody else is still on the roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.predictedHintOneOff": {
+    "source": "A trip has no past of its own. Borrow a gathering’s regulars and “Recent” still means something.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.noPrediction": {
+    "source": "No prediction — the whole roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.chainAlreadyChosen": {
+    "source": "The gathering already chosen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.rsvpOnly": {
+    "source": "Limit the roster to students who RSVP’d",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.rsvpOnlyHint": {
+    "source": "Nobody else appears at check-in, so the trip list stays closed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.trackCheckOut": {
+    "source": "Track check-out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.trackCheckOutHint": {
+    "source": "Volunteers record when each child is checked out, and the roster shows a live room count.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.locationPlaceholder": {
+    "source": "Youth room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.notesPlaceholder": {
+    "source": "Meet at the church car park at 5:45…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.notesHint": {
+    "source": "For the core team. Only shown on the event page.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errTitle": {
+    "source": "Give this event a name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errStart": {
+    "source": "Pick a start date and time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errEnd": {
+    "source": "Pick an end date and time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errEndBeforeStart": {
+    "source": "The event has to end after it starts.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errPickTime": {
+    "source": "Pick a time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errOpensAfterStart": {
+    "source": "Check-in has to be open by the time the event starts.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errClosesBeforeEnd": {
+    "source": "Check-in has to stay open until the event ends.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errorLine": {
+    "source": "{field}: {message}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errorMore": {
+    "source": "{first} (+{count} more)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.saved": {
+    "source": "Event updated",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.scheduled": {
+    "source": "{title} scheduled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.saveFailed": {
+    "source": "Could not save this event. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errRecurrenceWeekdays": {
+    "source": "Pick at least one day of the week.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errRecurrenceUntilMissing": {
+    "source": "Pick a date for the repeat to end on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.errRecurrenceUntilBeforeStart": {
+    "source": "The repeat has to end on or after the first gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.enable": {
+    "source": "Print a label at check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.enableHint": {
+    "source": "For a room children are checked out from. Needs a Brother QL plugged into the kiosk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.lineLabel": {
+    "source": "Line {number}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.leftoverWarning": {
+    "source": "A child with none of these still prints “{leftover}”. Tick “{requiresValueLabel}” to drop the whole line instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.unknownTokens": {
+    "source": "Tally does not know {tokens} — it will print as nothing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.requiresValue": {
+    "source": "Only if filled in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.moveUp": {
+    "source": "Move line {number} up",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.moveDown": {
+    "source": "Move line {number} down",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.addLine": {
+    "source": "+ Add a line",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.maxLines": {
+    "source": "{max} lines is the most a label can hold",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.onTheRoll": {
+    "source": "On the roll",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.rotated": {
+    "source": "Print along the tape",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.rotatedHint": {
+    "source": "Turns the label a quarter turn, so a long name runs down the roll instead of being shrunk to fit across it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.textScale": {
+    "source": "Text size (×)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.textScaleHint": {
+    "source": "Scales every line together, so the sizes you chose keep their proportions. Worth turning up when the label has room to spare.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.spaceAbove": {
+    "source": "Space above (mm)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.spaceBelow": {
+    "source": "Space below (mm)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.marginsHint": {
+    "source": "Blank tape at each end of the sticker — the two ends the cutter makes, whichever way the text runs.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.fixedLength": {
+    "source": "Same length every time",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.fixedLengthHint": {
+    "source": "Otherwise the label is as long as the text needs, so a short name makes a short sticker.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.lengthMm": {
+    "source": "Length (mm)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.dieCutIgnores": {
+    "source": "{media} is die-cut, so the preview ignores these — its size is already decided. A kiosk with a continuous roll loaded will use them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.needsContinuous": {
+    "source": "The turn and the fixed length need a continuous roll. A die-cut label is already a fixed size, and a kiosk with one loaded ignores them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.previewOn": {
+    "source": "Preview on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.previewOnHint": {
+    "source": "Preview only — the kiosk knows which roll is loaded.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sparseSample": {
+    "source": "A child with nothing on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "LabelTemplate.sparseSampleHint": {
+    "source": "No grade, no allergy, no surname — the label most children get.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.title": {
+    "source": "RSVPs",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.descriptionLimited": {
+    "source": "Only these students appear at check-in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.descriptionOpen": {
+    "source": "This event is open to everyone — RSVPs are for planning.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.addStudents": {
+    "source": "Add students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.addTitle": {
+    "source": "Add students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.addDescription": {
+    "source": "Tick everyone going, then add them in one go.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.searchAria": {
+    "source": "Search students by name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.searchPlaceholder": {
+    "source": "Search students…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.allAddedTitle": {
+    "source": "Everyone is already on the list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.noMatchTitle": {
+    "source": "No match",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.allAddedBody": {
+    "source": "Students already on the RSVP list are not shown here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.formerStudent": {
+    "source": "Former student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.addFailed": {
+    "source": "Could not add those students. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.emptyTitle": {
+    "source": "Nobody has RSVP’d yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.emptyBodyLimited": {
+    "source": "The check-in roster for this event stays empty until students are added here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.emptyBodyOpen": {
+    "source": "Add the students you expect, so the head count has something to compare against.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.statusYes": {
+    "source": "Going",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.statusMaybe": {
+    "source": "Maybe",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.statusNo": {
+    "source": "No",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.tileGoing": {
+    "source": "Going",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.tileMaybe": {
+    "source": "Maybe",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.tileDeclined": {
+    "source": "Declined",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.notOnRoster": {
+    "source": "Not on the check-in roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.updateFailed": {
+    "source": "Could not update {name}'s RSVP.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.putBack": {
+    "source": "{name} put back on the RSVP list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.putBackFailed": {
+    "source": "Could not put {name} back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.removedAnnounce": {
+    "source": "{name} removed from the RSVP list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.removedToast": {
+    "source": "{name} removed from the list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.removeFailed": {
+    "source": "Could not remove {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.added": {
+    "source": "{count, plural, one {# student} other {# students}} added to the RSVP list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.removeAria": {
+    "source": "Remove {name} from the RSVP list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.rsvpForAria": {
+    "source": "RSVP for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.statusOptionAria": {
+    "source": "{option} — {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Rsvp.undo": {
+    "source": "Undo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.nobody": {
+    "source": "nobody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.nameListMore": {
+    "source": "{names} and {count} more",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.nameListLast": {
+    "source": "{names} and {last}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.openDetail": {
+    "source": "{count, plural, one {# person} other {# people}} can take this register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.counting": {
+    "source": "Counting the team…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.openToAnyone": {
+    "source": "Anybody with a Tally account can take this register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.restrictedDetail": {
+    "source": "{count, plural, one {# person} other {# people}} — everybody else sees it locked.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.workingOut": {
+    "source": "Working out who has been taking this register…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.justYou": {
+    "source": "just you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.wouldKeepOnly": {
+    "source": "Would keep {names} — nobody else works this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.wouldKeep": {
+    "source": "Would keep {names} — {count, plural, one {# other would lose} other {# others would lose}} it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.notAllowed": {
+    "source": "You are not allowed to change who is on this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.saveFailed": {
+    "source": "Could not save that. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.nowLimited": {
+    "source": "{title} is now limited to {count, plural, one {# person} other {# people}}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.nowOpen": {
+    "source": "{title} is open to the whole team again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.memberAdded": {
+    "source": "{name} can now take this register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.scopeOneOff": {
+    "source": "This gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.scopeSeries": {
+    "source": "Every gathering in this repeat",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.everyoneOnTeam": {
+    "source": "Everyone on the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.onlyPeopleIAdd": {
+    "source": "Only people I add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.hintRestricted": {
+    "source": "Only people added to this gathering can take its register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.hintOpen": {
+    "source": "Everyone on the team can take this register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.addSomebody": {
+    "source": "Add somebody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.searchTeam": {
+    "source": "Search the team…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.onThisGathering": {
+    "source": "On this gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.loadingTeam": {
+    "source": "Loading the team…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.appliesToThis": {
+    "source": "This applies to this gathering only.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.appliesToSeries": {
+    "source": "Changing this affects every {title}, past and future.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.alreadyOn": {
+    "source": "{count, plural, one {{names} is already on this gathering.} other {{names} are already on this gathering.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

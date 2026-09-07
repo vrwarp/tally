@@ -44,11 +44,12 @@ import { useRsvps } from '@/hooks/useAttendance';
 import { cn, createSearchMatcher, gradeLabel, NO_GRADE, sortByName } from '@/lib/utils';
 import { addRsvps, removeRsvp, setRsvpStatus } from '@/services/rsvps';
 import { studentFullName, type Rsvp, type RsvpStatus, type Student, type TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
-const STATUS_OPTIONS: { value: RsvpStatus; label: string; active: string }[] = [
-  { value: 'yes', label: 'Going', active: 'bg-present-500/20 text-present-400 ring-present-500/40' },
-  { value: 'maybe', label: 'Maybe', active: 'bg-warn-500/20 text-warn-400 ring-warn-500/40' },
-  { value: 'no', label: 'No', active: 'bg-ink-700 text-ink-100 ring-ink-600' },
+const STATUS_OPTIONS: { value: RsvpStatus; label: 'statusYes' | 'statusMaybe' | 'statusNo'; active: string }[] = [
+  { value: 'yes', label: 'statusYes', active: 'bg-present-500/20 text-present-400 ring-present-500/40' },
+  { value: 'maybe', label: 'statusMaybe', active: 'bg-warn-500/20 text-warn-400 ring-warn-500/40' },
+  { value: 'no', label: 'statusNo', active: 'bg-ink-700 text-ink-100 ring-ink-600' },
 ];
 
 /**
@@ -77,6 +78,7 @@ function AddStudentsModal({
   candidates: readonly Student[];
   onAdd: (studentIds: string[]) => Promise<void>;
 }) {
+  const t = useTranslations('Rsvp');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [saving, setSaving] = useState(false);
@@ -113,8 +115,8 @@ function AddStudentsModal({
     <Modal
       open={open}
       onClose={close}
-      title="Add students"
-      description="Tick everyone going, then add them in one go."
+      title={t('addTitle')}
+      description={t('addDescription')}
       footer={
         <>
           <Button variant="secondary" size="lg" onClick={close}>
@@ -140,8 +142,8 @@ function AddStudentsModal({
           autoCorrect="off"
           autoComplete="off"
           spellCheck={false}
-          aria-label="Search students by name"
-          placeholder="Search students…"
+          aria-label={t('searchAria')}
+          placeholder={t('searchPlaceholder')}
           value={query}
           onChange={(changed) => setQuery(changed.target.value)}
           className="min-h-12 w-full rounded-xl bg-ink-950 px-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
@@ -149,11 +151,11 @@ function AddStudentsModal({
 
         {visible.length === 0 ? (
           <EmptyState
-            title={candidates.length === 0 ? 'Everyone is already on the list' : 'No match'}
+            title={candidates.length === 0 ? t('allAddedTitle') : t('noMatchTitle')}
             description={
               candidates.length === 0
                 ? undefined
-                : 'Students already on the RSVP list are not shown here.'
+                : t('allAddedBody')
             }
           />
         ) : (
@@ -207,6 +209,7 @@ export interface RsvpManagerProps {
 }
 
 export function RsvpManager({ event }: RsvpManagerProps) {
+  const t = useTranslations('Rsvp');
   const { students } = useData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -230,7 +233,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
         return {
           rsvp,
           student,
-          name: student ? studentFullName(student) : 'Former student',
+          name: student ? studentFullName(student) : t('formerStudent'),
         };
       })
       .sort((a, b) =>
@@ -277,7 +280,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
     void run(
       `${row.rsvp.studentId}:status`,
       () => setRsvpStatus(event.id, row.rsvp.studentId, status, user.uid),
-      `Could not update ${row.name}'s RSVP.`,
+      t('updateFailed', { name: row.name }),
     );
   };
 
@@ -285,9 +288,9 @@ export function RsvpManager({ event }: RsvpManagerProps) {
   const restore = async (row: RsvpRow, status: RsvpStatus, uid: string) => {
     try {
       await addRsvps(event.id, [row.rsvp.studentId], uid, status);
-      setAnnouncement(`${row.name} put back on the RSVP list`);
+      setAnnouncement(t('putBack', { name: row.name }));
     } catch {
-      show(`Could not put ${row.name} back.`, { tone: 'error' });
+      show(t('putBackFailed', { name: row.name }), { tone: 'error' });
     }
   };
 
@@ -301,14 +304,14 @@ export function RsvpManager({ event }: RsvpManagerProps) {
       `${row.rsvp.studentId}:remove`,
       async () => {
         await removeRsvp(event.id, row.rsvp.studentId);
-        setAnnouncement(`${row.name} removed from the RSVP list`);
-        show(`${row.name} removed from the list`, {
+        setAnnouncement(t('removedAnnounce', { name: row.name }));
+        show(t('removedToast', { name: row.name }), {
           tone: 'info',
           durationMs: UNDO_MS,
-          action: { label: 'Undo', onPress: () => void restore(row, previous, actor.uid) },
+          action: { label: t('undo'), onPress: () => void restore(row, previous, actor.uid) },
         });
       },
-      `Could not remove ${row.name}.`,
+      t('removeFailed', { name: row.name }),
     );
   };
 
@@ -317,33 +320,33 @@ export function RsvpManager({ event }: RsvpManagerProps) {
     try {
       await addRsvps(event.id, studentIds, user.uid);
       setAnnouncement(
-        `${studentIds.length} ${studentIds.length === 1 ? 'student' : 'students'} added to the RSVP list`,
+        t('added', { count: studentIds.length }),
       );
     } catch {
-      show('Could not add those students. Try again.', { tone: 'error' });
+      show(t('addFailed'), { tone: 'error' });
     }
   };
 
   return (
     <Card>
       <CardHeader
-        title="RSVPs"
+        title={t('title')}
         count={rows.length}
         description={
           event.requiresRsvp
-            ? 'Only these students appear at check-in.'
-            : 'This event is open to everyone — RSVPs are for planning.'
+            ? t('descriptionLimited')
+            : t('descriptionOpen')
         }
-        action={<Button onClick={() => setAddOpen(true)}>Add students</Button>}
+        action={<Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>}
       />
 
       <div className="flex flex-col gap-3 p-3">
         {error ? <ErrorBanner message={error} /> : null}
 
         <div className="grid grid-cols-3 gap-2">
-          <StatTile label="Going" value={summary.going} tone="success" />
-          <StatTile label="Maybe" value={summary.maybe} />
-          <StatTile label="Declined" value={summary.declined} />
+          <StatTile label={t('tileGoing')} value={summary.going} tone="success" />
+          <StatTile label={t('tileMaybe')} value={summary.maybe} />
+          <StatTile label={t('tileDeclined')} value={summary.declined} />
         </div>
 
         {loading && rows.length === 0 ? (
@@ -351,13 +354,13 @@ export function RsvpManager({ event }: RsvpManagerProps) {
         ) : rows.length === 0 ? (
           <EmptyState
             icon="🚌"
-            title="Nobody has RSVP’d yet"
+            title={t('emptyTitle')}
             description={
               event.requiresRsvp
-                ? 'The check-in roster for this event stays empty until students are added here.'
-                : 'Add the students you expect, so the head count has something to compare against.'
+                ? t('emptyBodyLimited')
+                : t('emptyBodyOpen')
             }
-            action={<Button onClick={() => setAddOpen(true)}>Add students</Button>}
+            action={<Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>}
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -390,7 +393,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                         a declined student is not merely marked — they are off
                         the check-in roster and search will not find them. */}
                     {event.requiresRsvp && rsvp.status === 'no' ? (
-                      <p className="mt-0.5 text-xs text-ink-500">Not on the check-in roster.</p>
+                      <p className="mt-0.5 text-xs text-ink-500">{t('notOnRoster')}</p>
                     ) : null}
                   </div>
 
@@ -398,7 +401,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                     type="button"
                     onClick={() => handleRemove(row)}
                     disabled={pending.has(`${rsvp.studentId}:remove`)}
-                    aria-label={`Remove ${row.name} from the RSVP list`}
+                    aria-label={t('removeAria', { name: row.name })}
                     className="order-2 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 hover:bg-ink-800 active:bg-ink-800 disabled:opacity-50 lg:order-3"
                   >
                     <span aria-hidden="true">×</span>
@@ -412,7 +415,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                   */}
                   <div
                     role="group"
-                    aria-label={`RSVP for ${row.name}`}
+                    aria-label={t('rsvpForAria', { name: row.name })}
                     className="order-3 grid w-full max-w-xs grid-cols-3 gap-2 lg:order-2 lg:w-64 lg:shrink-0"
                   >
                     {STATUS_OPTIONS.map((option) => {
@@ -422,7 +425,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                           key={option.value}
                           type="button"
                           aria-pressed={active}
-                          aria-label={`${option.label} — ${row.name}`}
+                          aria-label={t('statusOptionAria', { option: t(option.label), name: row.name })}
                           disabled={pending.has(`${rsvp.studentId}:status`)}
                           onClick={() => handleStatus(row, option.value)}
                           className={cn(
@@ -433,7 +436,7 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                               : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 hover:text-ink-200 active:bg-ink-800',
                           )}
                         >
-                          {option.label}
+                          {t(option.label)}
                         </button>
                       );
                     })}

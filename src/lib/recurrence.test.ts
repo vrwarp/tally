@@ -25,9 +25,11 @@ import {
   suggestedRecurrenceEnd,
   toDateOnlyValue,
   validateRecurrence,
+  type RecurrenceProblem,
   weekdayOrdinalInMonth,
 } from '@/lib/recurrence';
 import type { RecurrenceRule } from '@/types';
+import { testTranslator } from '@/test/translator';
 
 /** Fri 24 Jul 2026, 19:00 local — the fourth Friday of the month. */
 const FRIDAY = new Date(2026, 6, 24, 19, 0);
@@ -510,6 +512,10 @@ describe('retimeRecurrence', () => {
   });
 });
 
+/** A recurrence problem as the sentence a leader actually reads. */
+const t = testTranslator('EventEditor');
+const message = (key: RecurrenceProblem | null) => (key === null ? null : t(key));
+
 describe('validateRecurrence', () => {
   it('accepts what the form can produce', () => {
     expect(validateRecurrence(null, FRIDAY)).toBeNull();
@@ -517,8 +523,12 @@ describe('validateRecurrence', () => {
     expect(validateRecurrence(rule({ until: '2026-07-24' }), FRIDAY)).toBeNull();
   });
 
+  /*
+   * Through the catalogue, because that is where the sentences live now.
+   * `validateRecurrence` names a key; en.json says what a leader reads.
+   */
   it('rejects a weekly rule with every day unticked', () => {
-    expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toMatch(/at least one day/);
+    expect(message(validateRecurrence(rule({ weekdays: [] }), FRIDAY))).toMatch(/at least one day/);
   });
 
   it('accepts a gathering in the last instant of the day the repeat ends on', () => {
@@ -534,8 +544,8 @@ describe('validateRecurrence', () => {
   });
 
   it('rejects an end date before the gathering it repeats', () => {
-    expect(validateRecurrence(rule({ until: '2026-07-01' }), FRIDAY)).toMatch(/has to end on/);
-    expect(validateRecurrence(rule({ until: '' }), FRIDAY)).toMatch(/Pick a date/);
+    expect(message(validateRecurrence(rule({ until: '2026-07-01' }), FRIDAY))).toMatch(/has to end on/);
+    expect(message(validateRecurrence(rule({ until: '' }), FRIDAY))).toMatch(/Pick a date/);
   });
 });
 
@@ -601,7 +611,7 @@ describe('defaultRuleForFrequency', () => {
     // monthly one has no weekdays by construction, and telling somebody to
     // pick a day on a form with no day picker on it is a dead end.
     expect(validateRecurrence(rule({ frequency: 'monthly', weekdays: [] }), FRIDAY)).toBeNull();
-    expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toBe(
+    expect(message(validateRecurrence(rule({ weekdays: [] }), FRIDAY))).toBe(
       'Pick at least one day of the week.',
     );
   });

@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { labelBoxFor } from '@/lib/labelRender';
 import { LabelPreview } from '@/features/events/LabelPreview';
 import { SAMPLE_VALUES, SPARSE_SAMPLE_VALUES } from '@/features/events/labelSamples';
+import { useTranslations } from 'use-intl';
 
 /**
  * The media offered for the preview, in printable dots at 300 dpi.
@@ -87,7 +88,7 @@ function numberOrUndefined(raw: string): number | undefined {
 }
 
 /** What the checkbox that drops a line is called, quoted in the hint below. */
-const REQUIRES_VALUE_LABEL = 'Only if filled in';
+const REQUIRES_VALUE_LABEL = 'requiresValue';
 
 /**
  * What this line would print for a child none of its tokens has a value for.
@@ -126,11 +127,12 @@ function FixedLengthField({
   value: number;
   onChange: (next: number) => void;
 }) {
+  const t = useTranslations('LabelTemplate');
   const [draft, setDraft] = useState<string | null>(null);
 
   return (
     <TextField
-      label="Length (mm)"
+      label={t('lengthMm')}
       type="number"
       inputMode="decimal"
       min={MIN_LABEL_FIXED_LENGTH_MM}
@@ -163,6 +165,7 @@ export function LabelTemplateField({
   value: LabelTemplate | null;
   onChange: (next: LabelTemplate | null) => void;
 }) {
+  const t = useTranslations('LabelTemplate');
   const [media, setMedia] = useState<string>(PREVIEW_MEDIA[0].id);
   const chosen = PREVIEW_MEDIA.find((entry) => entry.id === media) ?? PREVIEW_MEDIA[0];
   /*
@@ -265,8 +268,8 @@ export function LabelTemplateField({
   return (
     <div className="flex flex-col gap-3">
       <CheckboxField
-        label="Print a label at check-in"
-        hint="For a room children are checked out from. Needs a Brother QL plugged into the kiosk."
+        label={t('enable')}
+        hint={t('enableHint')}
         checked={value !== null}
         onChange={(changed) =>
           onChange(changed.target.checked ? structuredClone(DEFAULT_LABEL_TEMPLATE) : null)
@@ -299,7 +302,7 @@ export function LabelTemplateField({
                   return (
                     <div key={index} className="flex flex-col gap-2 rounded-lg bg-ink-900/60 p-2">
                       <TextField
-                        label={`Line ${index + 1}`}
+                        label={t('lineLabel', { number: index + 1 })}
                         value={line.text}
                         maxLength={MAX_LABEL_LINE_LENGTH}
                         placeholder="{{firstName}}"
@@ -316,12 +319,17 @@ export function LabelTemplateField({
                         hint={
                           leftover === ''
                             ? undefined
-                            : `A child with none of these still prints “${leftover}”. Tick “${REQUIRES_VALUE_LABEL}” to drop the whole line instead.`
+                            : t('leftoverWarning', {
+                                leftover,
+                                requiresValueLabel: t(REQUIRES_VALUE_LABEL),
+                              })
                         }
                         onChange={(changed) => patchLine(index, { text: changed.target.value })}
                         error={
                           unknown.length > 0
-                            ? `Tally does not know ${unknown.map((name) => `{{${name}}}`).join(', ')} — it will print as nothing.`
+                            ? t('unknownTokens', {
+                                tokens: unknown.map((name) => `{{${name}}}`).join(', '),
+                              })
                             : null
                         }
                       />
@@ -397,7 +405,7 @@ export function LabelTemplateField({
                         {hasTokens ? (
                           <div className="pb-1">
                             <CheckboxField
-                              label={REQUIRES_VALUE_LABEL}
+                              label={t(REQUIRES_VALUE_LABEL)}
                               checked={line.requiresValue}
                               onChange={(changed) =>
                                 patchLine(index, { requiresValue: changed.target.checked })
@@ -415,7 +423,7 @@ export function LabelTemplateField({
                         <div className="ml-auto flex items-center gap-1">
                           <button
                             type="button"
-                            aria-label={`Move line ${index + 1} up`}
+                            aria-label={t('moveUp', { number: index + 1 })}
                             disabled={index === 0}
                             onClick={() => moveLine(index, -1)}
                             className={cn(
@@ -427,7 +435,7 @@ export function LabelTemplateField({
                           </button>
                           <button
                             type="button"
-                            aria-label={`Move line ${index + 1} down`}
+                            aria-label={t('moveDown', { number: index + 1 })}
                             disabled={index === value.lines.length - 1}
                             onClick={() => moveLine(index, 1)}
                             className={cn(
@@ -465,8 +473,8 @@ export function LabelTemplateField({
                     )}
                   >
                     {value.lines.length >= MAX_LABEL_LINES
-                      ? `${MAX_LABEL_LINES} lines is the most a label can hold`
-                      : '+ Add a line'}
+                      ? t('maxLines', { max: MAX_LABEL_LINES })
+                      : t('addLine')}
                   </button>
 
                   <SelectField
@@ -497,12 +505,12 @@ export function LabelTemplateField({
                   */}
                 <fieldset className="flex flex-col gap-3 rounded-lg bg-ink-900/60 p-3">
                   <legend className="px-1 text-xs font-semibold tracking-wide text-ink-400 uppercase">
-                    On the roll
+                    {t('onTheRoll')}
                   </legend>
 
                   <CheckboxField
-                    label="Print along the tape"
-                    hint="Turns the label a quarter turn, so a long name runs down the roll instead of being shrunk to fit across it."
+                    label={t('rotated')}
+                    hint={t('rotatedHint')}
                     checked={value.rotated === true}
                     onChange={(changed) =>
                       patchShape({ rotated: changed.target.checked ? true : undefined })
@@ -510,8 +518,8 @@ export function LabelTemplateField({
                   />
 
                   <TextField
-                    label="Text size (×)"
-                    hint="Scales every line together, so the sizes you chose keep their proportions. Worth turning up when the label has room to spare."
+                    label={t('textScale')}
+                    hint={t('textScaleHint')}
                     type="number"
                     inputMode="decimal"
                     min={MIN_LABEL_FONT_SCALE}
@@ -533,7 +541,7 @@ export function LabelTemplateField({
                     */}
                   <div className="flex flex-wrap items-start gap-3">
                     <TextField
-                      label="Space above (mm)"
+                      label={t('spaceAbove')}
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -547,7 +555,7 @@ export function LabelTemplateField({
                       }
                     />
                     <TextField
-                      label="Space below (mm)"
+                      label={t('spaceBelow')}
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -562,14 +570,14 @@ export function LabelTemplateField({
                     />
                   </div>
                   <p className="-mt-1 text-xs leading-snug text-ink-500">
-                    Blank tape at each end of the sticker — the two ends the cutter makes, whichever
+                    {t('marginsHint')}
                     way the text runs.
                   </p>
 
                   <div className="flex flex-wrap items-start gap-3">
                     <CheckboxField
-                      label="Same length every time"
-                      hint="Otherwise the label is as long as the text needs, so a short name makes a short sticker."
+                      label={t('fixedLength')}
+                      hint={t('fixedLengthHint')}
                       checked={value.fixedLengthMm !== undefined}
                       onChange={(changed) =>
                         patchShape({
@@ -593,13 +601,11 @@ export function LabelTemplateField({
                     */}
                   {chosen.height !== null && (value.rotated === true || value.fixedLengthMm !== undefined) ? (
                     <p className="text-xs leading-snug text-warn-400">
-                      {chosen.name} is die-cut, so the preview ignores these — its size is already
-                      decided. A kiosk with a continuous roll loaded will use them.
+                      {t('dieCutIgnores', { media: chosen.name })}
                     </p>
                   ) : (
                     <p className="text-xs leading-snug text-ink-500">
-                      The turn and the fixed length need a continuous roll. A die-cut label is already
-                      a fixed size, and a kiosk with one loaded ignores them.
+                      {t('needsContinuous')}
                     </p>
                   )}
                 </fieldset>
@@ -607,8 +613,8 @@ export function LabelTemplateField({
 
               <div className="flex flex-col gap-2">
                 <SelectField
-                  label="Preview on"
-                  hint="Preview only — the kiosk knows which roll is loaded."
+                  label={t('previewOn')}
+                  hint={t('previewOnHint')}
                   value={media}
                   onChange={(changed) => setMedia(changed.target.value)}
                 >
@@ -625,8 +631,8 @@ export function LabelTemplateField({
                   rotated={preview.rotated}
                 />
                 <CheckboxField
-                  label="A child with nothing on file"
-                  hint="No grade, no allergy, no surname — the label most children get."
+                  label={t('sparseSample')}
+                  hint={t('sparseSampleHint')}
                   checked={previewSparse}
                   onChange={(changed) => setPreviewSparse(changed.target.checked)}
                 />

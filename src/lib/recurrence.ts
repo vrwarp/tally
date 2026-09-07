@@ -226,17 +226,25 @@ export function matchRecurrencePreset(
  * repairs everything else, and repairing a *typed* end date silently would move
  * the last gathering without saying so.
  */
-export function validateRecurrence(rule: RecurrenceRule | null, anchor: Date): string | null {
+export type RecurrenceProblem =
+  | 'errRecurrenceWeekdays'
+  | 'errRecurrenceUntilMissing'
+  | 'errRecurrenceUntilBeforeStart';
+
+export function validateRecurrence(
+  rule: RecurrenceRule | null,
+  anchor: Date,
+): RecurrenceProblem | null {
   if (!rule) return null;
 
   if (rule.frequency === 'weekly' && rule.weekdays.length === 0) {
-    return 'Pick at least one day of the week.';
+    return 'errRecurrenceWeekdays';
   }
 
   if (rule.until !== null) {
     const end = untilInstant(rule);
-    if (!end) return 'Pick a date for the repeat to end on.';
-    if (end < anchor) return 'The repeat has to end on or after the first gathering.';
+    if (!end) return 'errRecurrenceUntilMissing';
+    if (end < anchor) return 'errRecurrenceUntilBeforeStart';
   }
 
   return null;
