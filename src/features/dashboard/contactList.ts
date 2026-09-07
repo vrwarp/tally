@@ -22,7 +22,7 @@ export function buildContactList(
   const lines = students.map((student) => {
     const details = contacts.get(student.id);
     const contact =
-      details?.parentPhone?.trim() || details?.parentEmail?.trim() || 'contact in Planning Center';
+      details?.contactPhone?.trim() || details?.contactEmail?.trim() || 'contact in Planning Center';
     // The bracket goes rather than filling with a grade nobody holds: this
     // paste lands in a group chat, where "(6th)" beside an adult's name is a
     // claim about them that whoever reads it has no way to check.

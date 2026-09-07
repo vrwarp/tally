@@ -5,7 +5,7 @@ import {
   compareIds,
   displayFirstName,
   emailKey,
-  extractParentContact,
+  extractAdultContact,
   fullBirthdayOf,
   hasContactDetails,
   isYouth,
@@ -375,14 +375,14 @@ describe('pcoGrade', () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* extractParentContact                                                        */
+/* extractAdultContact                                                        */
 /* -------------------------------------------------------------------------- */
 
-describe('extractParentContact', () => {
+describe('extractAdultContact', () => {
   const student = person('100', { first_name: 'Jamie', last_name: 'Rivera', child: true }, ['H1']);
 
   it('prefers the parent_guardian over another adult in the same household', () => {
-    const contact = extractParentContact(
+    const contact = extractAdultContact(
       student,
       index(
         [household('H1', ['100', '301', '302'])],
@@ -401,9 +401,9 @@ describe('extractParentContact', () => {
     );
 
     expect(contact).toEqual({
-      parentName: 'Alex Rivera',
-      parentPhone: '555-0100',
-      parentEmail: 'alex.rivera@example.org',
+      contactName: 'Alex Rivera',
+      contactPhone: '555-0100',
+      contactEmail: 'alex.rivera@example.org',
     });
   });
 
@@ -418,16 +418,16 @@ describe('extractParentContact', () => {
       [phone('p1', '301', '555-0199', true), phone('p2', '302', '555-0100', true)],
     );
 
-    const first = extractParentContact(student, resources);
-    const second = extractParentContact(student, resources);
+    const first = extractAdultContact(student, resources);
+    const second = extractAdultContact(student, resources);
 
-    expect(first.parentName).toBe('Chris Rivera');
-    expect(first.parentPhone).toBe('555-0199');
+    expect(first.contactName).toBe('Chris Rivera');
+    expect(first.contactPhone).toBe('555-0199');
     expect(second).toEqual(first);
   });
 
   it('returns nothing when the household holds no adults', () => {
-    const contact = extractParentContact(
+    const contact = extractAdultContact(
       student,
       index(
         [household('H1', ['100', '101'])],
@@ -440,19 +440,19 @@ describe('extractParentContact', () => {
       ),
     );
 
-    expect(contact).toEqual({ parentName: null, parentPhone: null, parentEmail: null });
+    expect(contact).toEqual({ contactName: null, contactPhone: null, contactEmail: null });
   });
 
   it('returns nothing when the student has no household at all', () => {
-    expect(extractParentContact(person('100', { first_name: 'Jamie' }), index())).toEqual({
-      parentName: null,
-      parentPhone: null,
-      parentEmail: null,
+    expect(extractAdultContact(person('100', { first_name: 'Jamie' }), index())).toEqual({
+      contactName: null,
+      contactPhone: null,
+      contactEmail: null,
     });
   });
 
   it('prefers a primary contact method and otherwise takes the lowest id', () => {
-    const contact = extractParentContact(
+    const contact = extractAdultContact(
       student,
       index(
         [household('H1', ['100', '301'])],
@@ -463,13 +463,13 @@ describe('extractParentContact', () => {
       ),
     );
 
-    expect(contact.parentPhone).toBe('555-0100');
+    expect(contact.contactPhone).toBe('555-0100');
     // No primary email, so the lowest id wins rather than array order.
-    expect(contact.parentEmail).toBe('home@example.org');
+    expect(contact.contactEmail).toBe('home@example.org');
   });
 
   it('falls back to the child flag when no membership records were fetched', () => {
-    const contact = extractParentContact(
+    const contact = extractAdultContact(
       student,
       index(
         [household('H1', ['100', '301'])],
@@ -478,8 +478,8 @@ describe('extractParentContact', () => {
       ),
     );
 
-    expect(contact.parentName).toBe('Chris Rivera');
-    expect(contact.parentPhone).toBe('555-0123');
+    expect(contact.contactName).toBe('Chris Rivera');
+    expect(contact.contactPhone).toBe('555-0123');
   });
 });
 

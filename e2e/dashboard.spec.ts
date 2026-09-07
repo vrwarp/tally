@@ -66,7 +66,7 @@ test.describe('dashboard', () => {
      * The PRD asks for actionable insights rather than a data table: a row that
      * cannot be acted on is a row somebody has to copy into their phone by hand.
      *
-     * Parent contact lives in Planning Center and is read one person at a time,
+     * Contact details live in Planning Center and are read one person at a time,
      * which used to be spent as a tap: the row offered to fetch it. The reads
      * are cached now, so the row just fetches, and "actionable" means every one
      * of them settles on something a leader can act on.
@@ -75,7 +75,7 @@ test.describe('dashboard', () => {
      * only pretend: it poked the first row and demanded a phone number. Which
      * student sorts first moves with the clock — `computeMia` orders by
      * consecutive misses, and the seed's `edge` band drifts across that
-     * threshold as gatherings come and go. Two of those students have no parent
+     * threshold as gatherings come and go. Two of those students have no adult
      * in Planning Center *on purpose* (Trevor Boyd's note says the office has
      * never reached one), so the old assertion passed or failed depending on
      * the hour the suite happened to run.
@@ -83,18 +83,18 @@ test.describe('dashboard', () => {
     // Each block names its student, so a list that reveals everything at once
     // does not read as a run of loose phone numbers. That label is also the
     // only thing here that is stable while the contents are still loading.
-    const blocks = page.getByRole('group', { name: /^Parent contact for / });
+    const blocks = page.getByRole('group', { name: /^Contact for / });
     await expect(blocks.first()).toBeVisible();
 
     const names = (
       await blocks.evaluateAll((groups) =>
         groups.map((group) => group.getAttribute('aria-label') ?? ''),
       )
-    ).map((label) => label.replace(/^Parent contact for /, ''));
+    ).map((label) => label.replace(/^Contact for /, ''));
 
     const reachable: string[] = [];
     for (const name of names) {
-      const block = page.getByRole('group', { name: `Parent contact for ${name}` }).first();
+      const block = page.getByRole('group', { name: `Contact for ${name}` }).first();
 
       /*
        * Three honest outcomes: a way to reach them, the form that adds one —
@@ -111,9 +111,9 @@ test.describe('dashboard', () => {
        * none. So the row's claim is the button, and the claim that the button
        * leads somewhere is made once, below, by opening it.
        */
-      const reachOut = block.getByRole('button', { name: `Contact parent for ${name}` });
+      const reachOut = block.getByRole('button', { name: `Contact the adult for ${name}` });
       const addOne = block.getByRole('button', {
-        name: new RegExp(`^Add parent contact for ${escapeForRegExp(name)}`),
+        name: new RegExp(`^Add a contact for ${escapeForRegExp(name)}`),
       });
       const nobodyToCall = block.getByText(
         /no longer has a record for|Not in Planning Center yet/,
@@ -125,7 +125,7 @@ test.describe('dashboard', () => {
 
     // And at least one row really produced a number or an address, so this is
     // exercising the Planning Center read rather than tallying excuses. The
-    // seed's `drifted` band — the five absent 4+ weeks — all have a parent.
+    // seed's `drifted` band — the five absent 4+ weeks — all have an adult.
     expect(reachable.length, 'not one follow-up row yielded any contact details').toBeGreaterThan(
       0,
     );
@@ -138,9 +138,9 @@ test.describe('dashboard', () => {
      */
     const first = reachable[0]!;
     await page
-      .getByRole('group', { name: `Parent contact for ${first}` })
+      .getByRole('group', { name: `Contact for ${first}` })
       .first()
-      .getByRole('button', { name: `Contact parent for ${first}` })
+      .getByRole('button', { name: `Contact the adult for ${first}` })
       .click();
 
     await expect(
@@ -182,8 +182,8 @@ test.describe('dashboard', () => {
      * land finds nothing — which is a pass-shaped failure. Wait for the first.
      */
     const stuck = page
-      .getByRole('group', { name: /^Parent contact for / })
-      .filter({ has: page.getByRole('button', { name: /^Add parent contact for / }) });
+      .getByRole('group', { name: /^Contact for / })
+      .filter({ has: page.getByRole('button', { name: /^Add a contact for / }) });
     await expect(stuck.first()).toBeVisible({ timeout: 20_000 });
 
     /*
@@ -199,7 +199,7 @@ test.describe('dashboard', () => {
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: /new faces/i }) })
       .first();
-    const prompt = newFaces.getByRole('button', { name: /^Add parent contact for / }).first();
+    const prompt = newFaces.getByRole('button', { name: /^Add a contact for / }).first();
     await expect(prompt).toBeVisible({ timeout: 20_000 });
 
     // And it opens here rather than somewhere else. The dialog is the whole
@@ -207,7 +207,7 @@ test.describe('dashboard', () => {
     await prompt.click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(
-      page.getByRole('dialog').getByText(/Planning Center|parent/i).first(),
+      page.getByRole('dialog').getByText(/Planning Center|adult/i).first(),
     ).toBeVisible({ timeout: 20_000 });
   });
 
@@ -264,12 +264,12 @@ test.describe('dashboard', () => {
     const incomplete = page.getByRole('heading', { name: /incomplete profiles/i }).first();
     const count = async () => Number(/(\d+)/.exec(await incomplete.innerText())?.[1] ?? 0);
 
-    await expect(page.getByText(/seen at friday fellowship, with no parent phone or email/i))
+    await expect(page.getByText(/seen at friday fellowship, with no phone or email/i))
       .toBeVisible();
     const scoped = await count();
 
     await tabs.getByRole('button', { name: 'All' }).click();
-    await expect(page.getByText(/active students with no parent phone or email/i)).toBeVisible();
+    await expect(page.getByText(/active students with no phone or email/i)).toBeVisible();
     // The seed keeps students with no parent contact at both gatherings and at
     // neither, so narrowing has to drop somebody.
     await expect.poll(count).toBeGreaterThan(scoped);

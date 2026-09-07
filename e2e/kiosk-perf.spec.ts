@@ -434,8 +434,8 @@ async function growRoster(): Promise<number> {
       // search being measured is a search that matched everybody.
       lastName: `${last}${index}`,
       grade: 6 + (index % 7),
-      parentName: `${first}'s parent`,
-      parentPhone: `(555) 556-${tail}`,
+      contactName: `${first}'s parent`,
+      contactPhone: `(555) 556-${tail}`,
     };
   });
 

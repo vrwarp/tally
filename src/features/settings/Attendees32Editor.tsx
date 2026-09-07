@@ -30,7 +30,7 @@ const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
   off: 'Tally never writes to Attendees. Visitors added at the door stay queued until this is turned on.',
   create:
     'Tally creates attendees it has not seen before, after searching for a match. It never edits an existing one.',
-  full: 'Tally creates attendees, and Edit profile becomes editable for students Attendees already has — name, grade, allergies and birthday are saved there. A leader can also add a parent to the family, and fill in a parent’s phone or email when Attendees has none.',
+  full: 'Tally creates attendees, and Edit profile becomes editable for students Attendees already has — name, grade, allergies and birthday are saved there. A leader can also add an adult to the family, and fill in their phone or email when Attendees has none.',
 };
 
 /** Same ceiling as the Planning Center editor, for the same reason. */

@@ -187,7 +187,7 @@ export const getPersonDetails = httpsCallable<
     /**
      * Skip the server's held answer.
      *
-     * For after a *write*, and only then. The screens that add a parent or a
+     * For after a *write*, and only then. The screens that add an adult or a
      * number re-read the moment the write lands, which is well inside the few
      * seconds a read may be reused for — and the answer they would get back is
      * the one from before their own edit, on the one screen where that reads as
@@ -461,7 +461,7 @@ export interface SetParentContactResult {
     | 'no-household-adult'
     | 'nothing-to-write';
   /** The adult it landed on, when there was one. */
-  parentName: string | null;
+  contactName: string | null;
   wrote: ('phone' | 'email')[];
   /** Left alone because Planning Center already had one. */
   skipped: ('phone' | 'email')[];
@@ -505,7 +505,7 @@ export interface AddParentResult {
     | 'already-has-adult'
     | 'not-an-adult'
     | 'nothing-to-write';
-  parentName: string | null;
+  contactName: string | null;
   parentPersonId: string | null;
   createdPerson: boolean;
   createdHousehold: boolean;
@@ -528,7 +528,7 @@ export interface AddParentResult {
  *
  * Off unless `PCO_WRITE_BACK=full`, and refused outright once the household has
  * an adult — that is `setParentContact`'s job. Check
- * `PcoPersonDetails.parentCreatable` before offering the form.
+ * `PcoPersonDetails.adultCreatable` before offering the form.
  */
 export const addParent = httpsCallable<
   {

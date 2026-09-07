@@ -2,7 +2,7 @@
  * The full roster, for the core team.
  *
  * Two audiences share this screen: someone looking up one student ("what is
- * Marcus's mum's number?") and someone working a list ("who still has no parent
+ * Marcus's mum's number?") and someone working a list ("who still has no contact
  * contact?"). Search serves the first; the two quick-filter chips serve the
  * second, because those are the only two lists the core team actually works.
  *
@@ -14,7 +14,7 @@
  * somebody typed, the allergy flag, the birthday. Nothing on this list waits on
  * a fetch, which is what lets eighty-five rows appear at once and stay honest
  * while somebody types. The reads that *are* expensive — a medical note, a
- * parent's phone number — happen for one student, when a badge is pressed. See
+ * an adult's phone number — happen for one student, when a badge is pressed. See
  * `RowBadgeModal`.
  */
 import { memo, useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -35,7 +35,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
-import { useParentContact } from '@/hooks/useParentContact';
+import { useAdultContact } from '@/hooks/useAdultContact';
 import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
@@ -132,7 +132,7 @@ export function StudentsPage() {
    * Tally's own quick-adds and disagreed with the dashboard tile beside it in
    * the sidebar: seven there, five here, same three words.
    */
-  const { reachable } = useParentContact();
+  const { reachable } = useAdultContact();
 
   /*
    * The queue, keyed by student, so a row does not scan a list to draw a mark.
@@ -611,7 +611,7 @@ export function StudentsPage() {
             At 1440 a row is about 999px wide and roughly half of it is carrying
             nothing: the note lane is blank on almost every row and the badge
             lane's spacer is blank on every row without a flag. The brief rules
-            out spending that width on more *about* a minor, and parent contact
+            out spending that width on more *about* a minor, and contact details
             is fetched per student on purpose — so the width goes back into
             rows, which is the thing this screen is short of: twelve of fifty
             above the fold becomes about twenty-four.
@@ -960,7 +960,7 @@ const StudentListRow = memo(function StudentListRow({
             <WarningBadge
               warning="incomplete-profile"
               onPress={() => onBadge(student, 'contact')}
-              pressLabel={`Add a parent contact for ${name}`}
+              pressLabel={`Add a contact for ${name}`}
             />
           ) : (
             <WarningBadge

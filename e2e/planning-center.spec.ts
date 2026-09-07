@@ -68,12 +68,12 @@ test.describe('Planning Center', () => {
     const documents = await firestore.collection('students');
     expect(documents.length).toBeGreaterThan(0);
     for (const student of documents) {
-      expect(Object.keys(student.data)).not.toContain('parentPhone');
+      expect(Object.keys(student.data)).not.toContain('contactPhone');
       expect(Object.keys(student.data)).not.toContain('allergies');
     }
   });
 
-  test('a minor’s parent contact is never written to Firestore', async ({
+  test('a minor’s contact details are never written to Firestore', async ({
     signedInAs,
     firestore,
   }) => {
@@ -83,9 +83,9 @@ test.describe('Planning Center', () => {
     await signedInAs('core');
 
     for (const student of await firestore.collection('students')) {
-      expect(student.data.parentName ?? null).toBeNull();
-      expect(student.data.parentPhone ?? null).toBeNull();
-      expect(student.data.parentEmail ?? null).toBeNull();
+      expect(student.data.contactName ?? null).toBeNull();
+      expect(student.data.contactPhone ?? null).toBeNull();
+      expect(student.data.contactEmail ?? null).toBeNull();
       expect(student.data.allergies ?? null).toBeNull();
     }
   });
@@ -108,8 +108,8 @@ test.describe('Planning Center', () => {
       firstName: 'Wendell',
       lastName: 'Ashgrove',
       grade: 10,
-      parentName: 'Marta Ashgrove',
-      parentPhone: '555-0177',
+      contactName: 'Marta Ashgrove',
+      contactPhone: '555-0177',
     });
 
     await signedInAs('core');
@@ -155,7 +155,7 @@ test.describe('Planning Center', () => {
     await expect(page.getByRole('link', { name: /Wendell/ })).toBeVisible({ timeout: 30_000 });
   });
 
-  test('parent contact is fetched for one student, on the screen that shows it', async ({
+  test('contact details are fetched for one student, on the screen that shows it', async ({
     page,
     signedInAs,
   }) => {
@@ -166,7 +166,9 @@ test.describe('Planning Center', () => {
     await page.getByRole('link', { name: new RegExp(ROSTER_STUDENT) }).first().click();
 
     // The detail screen exists to answer "who do I call", so it asks eagerly.
-    await expect(page.getByText(/parent contact/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Contact', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
 
     /*
      * A real number, on screen. Firestore holds none — the sibling test asserts

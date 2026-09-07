@@ -86,19 +86,19 @@ export interface MappedStudent {
   pcoUpdatedAt: Date | null;
 }
 
-export interface ParentContact {
-  parentName: string | null;
-  parentPhone: string | null;
-  parentEmail: string | null;
+export interface AdultContact {
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
 }
 
-/** The household adult `extractParentContact` reports on, identified. */
-export interface ParentCandidate {
+/** The household adult `extractAdultContact` reports on, identified. */
+export interface ContactCandidate {
   /** Planning Center person id of the adult. */
   id: string;
   /** Their person resource, when it was side-loaded. */
   member: PcoPerson | null;
-  /** Their display name, composed the same way `parentName` is. */
+  /** Their display name, composed the same way `contactName` is. */
   name: string | null;
 }
 
@@ -197,7 +197,7 @@ function ownedBy(resource: JsonApiResource, personId: string): boolean {
 /**
  * Every phone number Planning Center holds for this person, raw as entered.
  *
- * All of them, unlike `extractParentContact`'s one: the kiosk's last-4 index
+ * All of them, unlike `extractAdultContact`'s one: the kiosk's last-4 index
  * answers "does any number in this family end in these digits", and a parent
  * types whichever of their numbers they think of first.
  */
@@ -462,7 +462,7 @@ export interface ContactFieldsOnFile {
 }
 
 /**
- * Exactly the two fields `extractParentContact` would hand back, as yes/no.
+ * Exactly the two fields `extractAdultContact` would hand back, as yes/no.
  *
  * Answered per field rather than as one boolean because the write path needs to
  * know *which* half is missing: it may add the one that is absent and must not
@@ -473,7 +473,7 @@ export function contactFieldsOnFile(person: PcoPerson, index: IncludedIndex): Co
     listIncluded<PcoEmail>(index, PCO_TYPES.email).some(
       (candidate) => ownedBy(candidate, person.id) && trimmed(candidate.attributes?.address) !== null,
     ) ||
-    // The same last resort `extractParentContact` falls back to, for a person
+    // The same last resort `extractAdultContact` falls back to, for a person
     // whose Email records were not side-loaded.
     trimmed(person.attributes?.primary_email_address) !== null;
 
@@ -509,16 +509,16 @@ export function hasContactDetails(person: PcoPerson, index: IncludedIndex): bool
  * so two syncs over an unchanged household never flap between mum and dad and
  * churn every counselor's listener.
  *
- * Split out from `extractParentContact` because the write path needs the same
+ * Split out from `extractAdultContact` because the write path needs the same
  * answer with the id still attached. "Who does Tally say to ring" and "whose
  * record does Tally add a number to" must be the same person — a row that says
  * nobody can be reached, and a write that lands on a different adult in the
  * household, would leave the row saying it still.
  */
-export function findParentCandidate(
+export function findContactCandidate(
   person: PcoPerson,
   householdIndex: IncludedIndex,
-): ParentCandidate | null {
+): ContactCandidate | null {
   const householdIds = new Set(householdIdsFor(person, householdIndex));
   if (householdIds.size === 0) return null;
 
@@ -570,9 +570,9 @@ export function findParentCandidate(
 }
 
 /** Parent name, phone and email for a student, or nulls when there is nobody. */
-export function extractParentContact(person: PcoPerson, householdIndex: IncludedIndex): ParentContact {
-  const chosen = findParentCandidate(person, householdIndex);
-  if (!chosen) return { parentName: null, parentPhone: null, parentEmail: null };
+export function extractAdultContact(person: PcoPerson, householdIndex: IncludedIndex): AdultContact {
+  const chosen = findContactCandidate(person, householdIndex);
+  if (!chosen) return { contactName: null, contactPhone: null, contactEmail: null };
 
   const attributes: PcoPersonAttributes = chosen.member?.attributes ?? {};
   const emails = listIncluded<PcoEmail>(householdIndex, PCO_TYPES.email).filter((email) =>
@@ -583,11 +583,11 @@ export function extractParentContact(person: PcoPerson, householdIndex: Included
   );
 
   return {
-    parentName: chosen.name,
-    parentPhone: pickContactValue(phones, (phone) =>
+    contactName: chosen.name,
+    contactPhone: pickContactValue(phones, (phone) =>
       firstNonEmpty(phone.attributes?.number, phone.attributes?.national, phone.attributes?.e164),
     ),
-    parentEmail:
+    contactEmail:
       pickContactValue(emails, (email) => trimmed(email.attributes?.address)?.toLowerCase() ?? null) ??
       trimmed(attributes.primary_email_address)?.toLowerCase() ??
       null,

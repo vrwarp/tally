@@ -37,7 +37,7 @@ import type {
   UpdateStudentProfileResult,
 } from '../pco/profile.js';
 import type {
-  ParentContactStatus,
+  AdultContactStatus,
   PersonDetails,
   PersonSearchResult,
   RosterPerson,
@@ -59,7 +59,7 @@ export type {
   CreateFamilyResult,
   HouseholdChoice,
   HouseholdSummary,
-  ParentContactStatus,
+  AdultContactStatus,
   PcoListSummary,
   PersonDetails,
   PersonSearchResult,
@@ -86,7 +86,7 @@ export interface BackendCapabilities {
   /** The effective write-back mode from this backend's own configuration. */
   writeBack: PcoWriteBackMode;
   /** Whether `addParent` can build a family here. */
-  parentCreatable: boolean;
+  adultCreatable: boolean;
   /**
    * Whether a dead person id may carry a forwarding address (Planning Center
    * merges, via the mirror's `410` + `merged_into`). A backend without merges
@@ -145,10 +145,10 @@ export interface PeopleBackend {
     personIds: readonly string[];
     force?: boolean;
   }): Promise<Record<string, string>>;
-  fetchParentContactStatus(args: {
+  fetchAdultContactStatus(args: {
     personIds: readonly string[];
     force?: boolean;
-  }): Promise<ParentContactStatus>;
+  }): Promise<AdultContactStatus>;
   /** `addRosterMember`'s existence check, merge-following included. */
   checkPerson(args: { personId: string }): Promise<PersonCheck>;
 
@@ -243,7 +243,7 @@ export interface PeopleBackend {
    * nobody was asked — a sweep, a retry, a family who registered again a month
    * later — not the only way this decision is ever made.
    *
-   * Present iff `capabilities.parentCreatable`.
+   * Present iff `capabilities.adultCreatable`.
    */
   createFamily?(args: {
     /** Every child of this family, as Tally student ids. */
@@ -305,7 +305,7 @@ export interface PeopleBackend {
    * Never writes. A backend that cannot be reached is no candidates, which
    * leaves the screen offering exactly the decision it offered before.
    *
-   * Present iff `capabilities.parentCreatable`.
+   * Present iff `capabilities.adultCreatable`.
    */
   findAdultCandidates?(args: {
     firstName: string;

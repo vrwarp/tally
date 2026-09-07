@@ -198,7 +198,7 @@ export function useEventSnapshots(events: readonly { id: string }[]) {
  * "looking up parent contact" state, which is a picture of a spinner rather
  * than of a call list.
  */
-export function useParentContact() {
+export function useAdultContact() {
   return {
     reachable: new Map(
       STUDENTS.map((student) => [
@@ -227,9 +227,9 @@ export function useParentContact() {
 export function usePersonDetails(student: { firstName?: string } | null) {
   return {
     details: {
-      parentName: `${student?.firstName ?? 'A'}'s parent`,
-      parentPhone: '5550100100',
-      parentEmail: null,
+      contactName: `${student?.firstName ?? 'A'}'s parent`,
+      contactPhone: '5550100100',
+      contactEmail: null,
     },
     loading: false,
     error: null,

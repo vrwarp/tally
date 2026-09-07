@@ -17,7 +17,7 @@ import { a32RootEventId, importMeetHistory, listImportableMeets } from './histor
 import { collectPhoneLast4 } from './phoneIndex.js';
 import {
   fetchAllergyNotes,
-  fetchParentContactStatus,
+  fetchAdultContactStatus,
   fetchPersonDetails,
   fetchRoster,
   orgSweepCacheKey,
@@ -54,7 +54,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
     displayName: A32_DISPLAY_NAME,
     capabilities: {
       writeBack: config.writeBack,
-      parentCreatable: true,
+      adultCreatable: true,
       /*
        * True since attendees32 grew merges of its own: a merged-away attendee
        * answers `410` with `merged_into`, which is the same question Planning
@@ -72,8 +72,8 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
       fetchPersonDetails({ client, config, cache, personId, force }),
     fetchAllergyNotes: ({ personIds, force }) =>
       fetchAllergyNotes({ client, config, cache, personIds, force }),
-    fetchParentContactStatus: ({ personIds, force }) =>
-      fetchParentContactStatus({ client, config, cache, personIds, force }),
+    fetchAdultContactStatus: ({ personIds, force }) =>
+      fetchAdultContactStatus({ client, config, cache, personIds, force }),
     collectPhoneLast4: ({ personIds, force }) =>
       collectPhoneLast4({ client, config, cache, personIds, force }),
     checkPerson: ({ personId }) => checkPerson(client, personId),

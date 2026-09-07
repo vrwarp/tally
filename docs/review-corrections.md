@@ -250,7 +250,7 @@ document nobody will read.
 The adult is *not* the same test, and the obvious version of it is wrong. "Are
 the children still held?" gets two real cards backwards:
 
-- a **counselor's parent contact** — a leader quick-added a visitor at a door
+- a **counselor's contact** — a leader quick-added a visitor at a door
   and took a number down afterwards — is settled from the moment it is created,
   because that child was never held. The adult is the entire point of it.
 - a **kiosk family whose guardian was refused** is settled too, and is kept

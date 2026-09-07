@@ -193,7 +193,7 @@ describe('setParentContact against the simulator', () => {
         firstName: 'Della',
         lastName: 'Okafor',
         grade: 9,
-        parentName: 'Ada Okafor',
+        contactName: 'Ada Okafor',
       });
       const id = `pco_${student.id}`;
       h.db.seed(`students/${id}`, rosterStudent(student.id));
@@ -202,7 +202,7 @@ describe('setParentContact against the simulator', () => {
 
       expect(result.status).toBe('updated');
       expect(result.wrote).toEqual(['phone', 'email']);
-      expect(result.parentName).toBe('Ada Okafor');
+      expect(result.contactName).toBe('Ada Okafor');
 
       const parent = parentOf(student.id)!;
       expect(h.store.phonesFor(parent).map((phone) => phone.number)).toEqual(['510-555-0199']);

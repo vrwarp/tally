@@ -9,7 +9,7 @@
  * own profile all along.
  *
  * So the row opens that form. Which of the two it turns out to be — a number on
- * an adult already on file, or a parent and a household to put them in — is
+ * an adult already on file, or an adult and a household to put them in — is
  * decided inside, by the server, on the read the modal makes when it opens; and
  * on an install with write-back turned down the same modal is where the link to
  * Planning Center now lives. One press either way, and the list is still
@@ -50,7 +50,7 @@ export function AddParentContactButton({
   const name = studentFullName(student);
 
   /*
-   * A student who exists only in Tally has no upstream record to hang a parent
+   * A student who exists only in Tally has no upstream record to hang an adult
    * off, so there is nothing for the form to write to and no point opening it.
    * Their profile is where the push lives, and it says so — the same place this
    * row has always sent them.
@@ -59,11 +59,11 @@ export function AddParentContactButton({
     return (
       <Link
         to={`/students/${student.id}`}
-        aria-label={`Add parent contact for ${name}`}
+        aria-label={`Add a contact for ${name}`}
         className={cn(PILL, className)}
       >
         <span aria-hidden="true">＋</span>
-        Add parent contact
+        Add a contact
       </Link>
     );
   }
@@ -72,11 +72,11 @@ export function AddParentContactButton({
     <button
       type="button"
       onClick={() => host.open(student, onAdded)}
-      aria-label={`Add parent contact for ${name}`}
+      aria-label={`Add a contact for ${name}`}
       className={cn(PILL, className)}
     >
       <span aria-hidden="true">＋</span>
-      Add parent contact
+      Add a contact
     </button>
   );
 }

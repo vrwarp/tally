@@ -128,15 +128,15 @@ const show = vi.fn();
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '4200003',
-    parentName: 'Ana Delgado',
-    parentPhone: '5550100100',
-    parentEmail: null,
+    contactName: 'Ana Delgado',
+    contactPhone: '5550100100',
+    contactEmail: null,
     allergies: null,
     birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
-    parentCreatable: false,
+    adultCreatable: false,
     ...overrides,
   };
 }

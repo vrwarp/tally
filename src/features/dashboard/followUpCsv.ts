@@ -26,7 +26,7 @@
  *
  * Even here, where the whole point is phoning families. `CopyContactsButton`
  * already refuses to bulk-fetch them for a clipboard; a file that gets emailed
- * around is the stronger case, not the weaker one. `parent_contact_on_file` is
+ * around is the stronger case, not the weaker one. `contact_on_file` is
  * the honest substitute and it is already a badge on the row.
  */
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
@@ -46,7 +46,7 @@ export interface FollowUpCsvContext {
  * Knowing nothing, stated as such.
  *
  * The default for a list rendered without the screen's session-held answers —
- * a test, or a card mounted before the parent-contact read lands. Every column
+ * a test, or a card mounted before the contact read lands. Every column
  * it feeds is one whose blank already means "nobody looked", so an export taken
  * in this state is honest rather than wrong.
  */
@@ -72,7 +72,7 @@ function studentColumns<T>(
     { header: 'grade', value: (row) => of(row).grade },
     { header: 'grade_label', value: (row) => gradeLabel(of(row)) },
     {
-      header: 'parent_contact_on_file',
+      header: 'contact_on_file',
       value: (row) => {
         const student = of(row);
         if (isUnreachable(student, context.reachable)) return 'no';

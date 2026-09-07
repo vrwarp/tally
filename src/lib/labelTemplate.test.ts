@@ -135,9 +135,9 @@ describe('the default template', () => {
     // Parent contact and photographs do not reach a lobby screen — see the
     // docblock in labelTemplate.ts. This is a tripwire on the token list, not on
     // the text.
-    expect(LABEL_TOKENS).not.toContain('parentPhone');
-    expect(LABEL_TOKENS).not.toContain('parentName');
-    expect(LABEL_TOKENS).not.toContain('parentEmail');
+    expect(LABEL_TOKENS).not.toContain('contactPhone');
+    expect(LABEL_TOKENS).not.toContain('contactName');
+    expect(LABEL_TOKENS).not.toContain('contactEmail');
     expect(LABEL_TOKENS).not.toContain('notes');
   });
 

@@ -806,7 +806,7 @@ test.describe('registering a family at the kiosk', () => {
     await kiosk.getByRole('button', { name: grade, exact: true }).click();
   }
 
-  test('adds two children and one parent, checks them in, and prints for each', async ({
+  test('adds two children and one adult, checks them in, and prints for each', async ({
     browser,
     browserName,
     page,

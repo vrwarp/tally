@@ -20,7 +20,7 @@
  */
 import type { PcoConfig } from '../config.js';
 import type { PcoClient } from './client.js';
-import { contactFieldsOnFile, findParentCandidate } from './mapping.js';
+import { contactFieldsOnFile, findContactCandidate } from './mapping.js';
 import { loadPersonWithHousehold } from './roster.js';
 import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import { SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
@@ -48,7 +48,7 @@ export type SetParentContactStatus =
 export interface SetParentContactResult {
   status: SetParentContactStatus;
   /** The adult the contact landed on, when there was one. */
-  parentName: string | null;
+  contactName: string | null;
   /** Fields this call created upstream. */
   wrote: ContactField[];
   /** Fields left alone because Planning Center already had one. */
@@ -112,7 +112,7 @@ function result(
   message: string,
   extra: Partial<SetParentContactResult> = {},
 ): SetParentContactResult {
-  return { status, parentName: null, wrote: [], skipped: [], message, ...extra };
+  return { status, contactName: null, wrote: [], skipped: [], message, ...extra };
 }
 
 /**
@@ -175,7 +175,7 @@ export async function writeContactOnto(
  * Adds a parent contact to the adult Planning Center already has in this
  * student's household.
  *
- * The adult is chosen by `findParentCandidate` — the same ranking the *read*
+ * The adult is chosen by `findContactCandidate` — the same ranking the *read*
  * path uses to decide whose number to show. That is not a tidiness point: if the
  * two disagreed, a leader could add a number and watch the row go on saying
  * nobody can be reached, because the number landed on an adult the row does not
@@ -190,7 +190,7 @@ export async function setParentContact(
   if (config.writeBack !== 'full') {
     return result(
       'disabled',
-      'Adding a parent contact from Tally is switched off. A leader can turn on full write-back in Settings, or add the number in Planning Center.',
+      'Adding a contact from Tally is switched off. A leader can turn on full write-back in Settings, or add the number in Planning Center.',
     );
   }
 
@@ -225,11 +225,11 @@ export async function setParentContact(
   }
   const loaded = read.value;
 
-  const parent = findParentCandidate(loaded.person, loaded.index);
+  const parent = findContactCandidate(loaded.person, loaded.index);
   if (!parent) {
     return result(
       'no-household-adult',
-      'Planning Center has no adult in this household. Somebody has to add the parent there before a number can go on them.',
+      'Planning Center has no adult in this household. Somebody has to add the adult there before a number can go on them.',
     );
   }
 
@@ -252,14 +252,14 @@ export async function setParentContact(
   if (wrote.length === 0) {
     return result(
       'already-set',
-      `Planning Center already has contact details for ${parent.name ?? 'this parent'}. Nothing was changed.`,
-      { parentName: parent.name, skipped },
+      `Planning Center already has contact details for ${parent.name ?? 'this adult'}. Nothing was changed.`,
+      { contactName: parent.name, skipped },
     );
   }
 
   // The person id, never the number: this line ends up in a log a church admin
   // may read, and the contact detail itself has no business being in one.
-  logger.info('Added a parent contact in Planning Center', {
+  logger.info('Added a contact in Planning Center', {
     studentId,
     parentPersonId: parent.id,
     wrote,
@@ -268,7 +268,7 @@ export async function setParentContact(
 
   return result(
     'updated',
-    `Added ${wrote.join(' and ')} for ${parent.name ?? 'the parent'} in Planning Center.`,
-    { parentName: parent.name, wrote, skipped },
+    `Added ${wrote.join(' and ')} for ${parent.name ?? 'the adult'} in Planning Center.`,
+    { contactName: parent.name, wrote, skipped },
   );
 }

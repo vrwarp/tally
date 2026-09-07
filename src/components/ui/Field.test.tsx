@@ -14,12 +14,12 @@ import { MaskedField, PhoneField, TextField } from '@/components/ui/Field';
 
 function Harness({ initial = '' }: { initial?: string }) {
   const [value, setValue] = useState(initial);
-  return <PhoneField label="Parent phone" value={value} onValueChange={setValue} />;
+  return <PhoneField label="Adult’s phone" value={value} onValueChange={setValue} />;
 }
 
 function mount(initial = '') {
   render(<Harness initial={initial} />);
-  return screen.getByLabelText('Parent phone') as HTMLInputElement;
+  return screen.getByLabelText('Adult’s phone') as HTMLInputElement;
 }
 
 describe('PhoneField', () => {

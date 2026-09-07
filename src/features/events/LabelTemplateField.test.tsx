@@ -131,7 +131,7 @@ describe('LabelTemplateField', () => {
     render(<Harness initial={DEFAULT_LABEL_TEMPLATE} />);
     // Parent contact never reaches a lobby screen, and this row is the one place
     // a leader would look for it.
-    expect(screen.queryByRole('button', { name: 'parentPhone' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'contactPhone' })).toBeNull();
     expect(screen.getAllByRole('button', { name: 'firstName' }).length).toBeGreaterThan(0);
   });
 

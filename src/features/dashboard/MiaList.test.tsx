@@ -108,7 +108,7 @@ describe('MiaList', () => {
 
     const row = container.querySelector('li');
     expect(row).toHaveClass('xl:flex');
-    expect(screen.getByRole('group', { name: /Parent contact for Bree Sandoval/ })).toHaveClass(
+    expect(screen.getByRole('group', { name: /Contact for Bree Sandoval/ })).toHaveClass(
       'xl:w-40',
     );
     /*
@@ -117,7 +117,7 @@ describe('MiaList', () => {
      * stack is what lifted the button 10px off the line the avatar, the badge
      * and Resolve all sit on — on every row of the list.
      */
-    expect(screen.getByRole('group', { name: /Parent contact for Bree Sandoval/ })).not.toHaveClass(
+    expect(screen.getByRole('group', { name: /Contact for Bree Sandoval/ })).not.toHaveClass(
       'xl:min-h-14',
     );
     // The row's own floor is what keeps a released row exactly as tall as the

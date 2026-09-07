@@ -150,7 +150,7 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
         const code = (cause as { code?: string })?.code ?? '';
         setError(
           code.includes('permission-denied')
-            ? 'Only the core team can see parent contact details.'
+            ? 'Only the core team can see contact details.'
             : `Could not reach ${backendLabel} for these details.`,
         );
       })

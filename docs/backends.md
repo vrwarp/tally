@@ -21,7 +21,7 @@ Everything upstream-facing runs server-side in the Cloud Functions, and the inte
 the registry, with methods that mirror the flows the callables need —
 
 - reads: `fetchRoster`, `searchPeople`, `fetchPersonDetails`, `fetchAllergyNotes`,
-  `fetchParentContactStatus`, `checkPerson`
+  `fetchAdultContactStatus`, `checkPerson`
 - writes: `pushStudent`, `pushPendingStudents`, `updateStudentProfile`, `setParentContact`,
   `addParent`, `createFamily`, `findAdultCandidates`, `recreateStudent`
 - history: `listImportableEvents`, `importHistory` (optional — capability-gated)
@@ -37,7 +37,7 @@ Each backend declares `capabilities`:
 | Capability | pco | a32 | Meaning |
 | --- | --- | --- | --- |
 | `writeBack` | per config | per config | `off` / `create` / `full`, same ladder both sides |
-| `parentCreatable` | yes | yes | `addParent` and `createFamily` can create a person and a household/family |
+| `adultCreatable` | yes | yes | `addParent` and `createFamily` can create a person and a household/family |
 | `mergeAware` | yes | yes | Upstream merges leave a forwarding address Tally can follow |
 | `listsSupported` | yes | no | Saved lists exist upstream and can seed the roster |
 | `historyImportSupported` | yes | yes | A whole event's attendance history can be imported |
@@ -48,7 +48,7 @@ it is absent.
 
 ### `addParent` and `createFamily` are not the same write
 
-Both put an adult in a household with a child, and both are gated on `parentCreatable`. What differs
+Both put an adult in a household with a child, and both are gated on `adultCreatable`. What differs
 is who is standing there when a name turns out to be ambiguous.
 
 `addParent` serves a leader at a desk. It builds a household around **one** student, and when it

@@ -8,7 +8,7 @@
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { invalidateParentContact, useParentContact } from '@/hooks/useParentContact';
+import { invalidateAdultContact, useAdultContact } from '@/hooks/useAdultContact';
 
 const getParentContactStatus = vi.hoisted(() => vi.fn());
 
@@ -18,16 +18,16 @@ function answer(reachable: Record<string, boolean>, unresolved: string[] = []) {
   return { data: { reachable, unresolved, cached: false, fetchedAt: '2026-02-13T19:30:00.000Z' } };
 }
 
-describe('useParentContact', () => {
+describe('useAdultContact', () => {
   beforeEach(() => {
-    invalidateParentContact();
+    invalidateAdultContact();
     getParentContactStatus.mockReset();
   });
 
   it('reports who can and cannot be reached', async () => {
     getParentContactStatus.mockResolvedValue(answer({ pco_1: false, pco_2: true }));
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.reachable.get('pco_1')).toBe(false);
@@ -39,11 +39,11 @@ describe('useParentContact', () => {
   it('holds the answer for the session rather than re-sweeping', async () => {
     getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
 
-    const first = renderHook(() => useParentContact());
+    const first = renderHook(() => useAdultContact());
     await waitFor(() => expect(first.result.current.loaded).toBe(true));
     first.unmount();
 
-    const second = renderHook(() => useParentContact());
+    const second = renderHook(() => useAdultContact());
     expect(second.result.current.reachable.get('pco_1')).toBe(true);
     expect(getParentContactStatus).toHaveBeenCalledTimes(1);
   });
@@ -51,7 +51,7 @@ describe('useParentContact', () => {
   it('says it could not check instead of answering "nobody"', async () => {
     getParentContactStatus.mockRejectedValue(new Error('Planning Center is having a minute'));
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.error).toBeTruthy());
     expect(result.current.reachable.size).toBe(0);
@@ -66,7 +66,7 @@ describe('useParentContact', () => {
     const seen: { loading: boolean; loaded: boolean }[] = [];
 
     const { result } = renderHook(() => {
-      const state = useParentContact();
+      const state = useAdultContact();
       seen.push({ loading: state.loading, loaded: state.loaded });
       return state;
     });
@@ -81,11 +81,11 @@ describe('useParentContact', () => {
     // Coming back to the insights screen should not blank the list it is
     // showing while a sweep it does not need runs again.
     getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
-    const first = renderHook(() => useParentContact());
+    const first = renderHook(() => useAdultContact());
     await waitFor(() => expect(first.result.current.loaded).toBe(true));
     first.unmount();
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     expect(result.current.loaded).toBe(true);
     expect(result.current.reachable.get('pco_1')).toBe(true);
@@ -95,7 +95,7 @@ describe('useParentContact', () => {
   it('lets the server answer from what it holds on the first read', async () => {
     getParentContactStatus.mockResolvedValue(answer({}));
 
-    renderHook(() => useParentContact());
+    renderHook(() => useAdultContact());
 
     await waitFor(() => expect(getParentContactStatus).toHaveBeenCalledWith({ force: false }));
   });
@@ -104,7 +104,7 @@ describe('useParentContact', () => {
     // The one moment the held answer is certainly wrong: somebody has just
     // gone and filled a number in.
     getParentContactStatus.mockResolvedValue(answer({ pco_1: false }));
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
     await waitFor(() => expect(result.current.loaded).toBe(true));
 
     getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
@@ -116,7 +116,7 @@ describe('useParentContact', () => {
 
   it('refreshes again on a second press', async () => {
     getParentContactStatus.mockResolvedValue(answer({}));
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
     await waitFor(() => expect(result.current.loaded).toBe(true));
 
     act(() => result.current.refresh());
@@ -128,7 +128,7 @@ describe('useParentContact', () => {
 
   it('clears a failure the moment refresh is pressed', async () => {
     getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
     await waitFor(() => expect(result.current.error).not.toBeNull());
 
     let release: (value: unknown) => void = () => {};
@@ -152,7 +152,7 @@ describe('useParentContact', () => {
     getParentContactStatus.mockRejectedValueOnce(
       Object.assign(new Error('nope'), { code: 'functions/permission-denied' }),
     );
-    const refused = renderHook(() => useParentContact());
+    const refused = renderHook(() => useAdultContact());
     await waitFor(() =>
       expect(refused.result.current.error).toBe(
         'Only the core team can see which profiles are incomplete.',
@@ -160,9 +160,9 @@ describe('useParentContact', () => {
     );
     refused.unmount();
 
-    invalidateParentContact();
+    invalidateAdultContact();
     getParentContactStatus.mockRejectedValueOnce(new Error('socket hang up'));
-    const offline = renderHook(() => useParentContact());
+    const offline = renderHook(() => useAdultContact());
     await waitFor(() =>
       expect(offline.result.current.error).toBe(
         'Could not check which profiles are incomplete — the people system did not answer.',
@@ -173,7 +173,7 @@ describe('useParentContact', () => {
   it('survives a rejection that is not an object at all', async () => {
     getParentContactStatus.mockRejectedValueOnce(null);
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.error).toContain('did not answer'));
   });
@@ -183,7 +183,7 @@ describe('useParentContact', () => {
     // not resolve. Neither is a student with no parent contact.
     getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
     await waitFor(() => expect(result.current.loaded).toBe(true));
 
     expect(result.current.reachable.has('tally_visitor')).toBe(false);
@@ -192,7 +192,7 @@ describe('useParentContact', () => {
   it('treats a server that reported nothing as an empty answer', async () => {
     getParentContactStatus.mockResolvedValue({ data: {} });
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.reachable.size).toBe(0);
@@ -208,7 +208,7 @@ describe('useParentContact', () => {
     );
     const noisy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { unmount } = renderHook(() => useParentContact());
+    const { unmount } = renderHook(() => useAdultContact());
     unmount();
     await act(async () => {
       release(answer({ pco_1: true }));
@@ -228,13 +228,13 @@ describe('useParentContact', () => {
           release = resolve;
         }),
     );
-    const { unmount } = renderHook(() => useParentContact());
+    const { unmount } = renderHook(() => useAdultContact());
     unmount();
     await act(async () => {
       release(answer({ pco_1: true }));
     });
 
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     expect(result.current.reachable.get('pco_1')).toBe(true);
   });
@@ -258,7 +258,7 @@ describe('useParentContact', () => {
 
     it('does not let the stale answer overwrite the fresh one', async () => {
       const gates = twoSweeps();
-      const { result } = renderHook(() => useParentContact());
+      const { result } = renderHook(() => useAdultContact());
       await waitFor(() => expect(gates).toHaveLength(1));
 
       act(() => result.current.refresh());
@@ -275,7 +275,7 @@ describe('useParentContact', () => {
 
     it('stays loading while the fresh sweep is still out', async () => {
       const gates = twoSweeps();
-      const { result } = renderHook(() => useParentContact());
+      const { result } = renderHook(() => useAdultContact());
       await waitFor(() => expect(gates).toHaveLength(1));
 
       act(() => result.current.refresh());
@@ -308,7 +308,7 @@ describe('useParentContact', () => {
           }),
       );
 
-      const { result } = renderHook(() => useParentContact());
+      const { result } = renderHook(() => useAdultContact());
       await waitFor(() => expect(gates).toHaveLength(1));
 
       act(() => result.current.refresh());
@@ -324,7 +324,7 @@ describe('useParentContact', () => {
 
     it('counts as settled once any sweep has answered', async () => {
       const gates = twoSweeps();
-      const { result } = renderHook(() => useParentContact());
+      const { result } = renderHook(() => useAdultContact());
       await waitFor(() => expect(gates).toHaveLength(1));
 
       act(() => result.current.refresh());
@@ -347,7 +347,7 @@ describe('useParentContact', () => {
 
   it('takes the failure down when a later sweep succeeds', async () => {
     getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
     await waitFor(() => expect(result.current.error).not.toBeNull());
 
     getParentContactStatus.mockResolvedValueOnce(answer({ pco_1: true }));
@@ -362,7 +362,7 @@ describe('useParentContact', () => {
     const seen: boolean[] = [];
 
     renderHook(() => {
-      seen.push(useParentContact().loaded);
+      seen.push(useAdultContact().loaded);
       return null;
     });
 
@@ -372,14 +372,14 @@ describe('useParentContact', () => {
     expect(seen[0]).toBe(false);
   });
 
-  it('does not remember an outage as "nobody has a parent"', async () => {
+  it('does not remember an outage as "nobody has a contact"', async () => {
     getParentContactStatus.mockRejectedValueOnce(new Error('offline'));
-    const first = renderHook(() => useParentContact());
+    const first = renderHook(() => useAdultContact());
     await waitFor(() => expect(first.result.current.error).not.toBeNull());
     first.unmount();
 
     getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
-    const { result } = renderHook(() => useParentContact());
+    const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.reachable.get('pco_1')).toBe(true));
   });

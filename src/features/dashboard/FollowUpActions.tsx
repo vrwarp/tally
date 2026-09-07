@@ -45,7 +45,7 @@ function ActionLink({
 }
 
 /**
- * "Contact parent", and the dialog behind it.
+ * "Contact adult", and the dialog behind it.
  *
  * The button is the row's; everything about *how* to reach the family is the
  * dialog's. That split is what lets a call list stay a list: the row carries a
@@ -73,20 +73,32 @@ function ActionLink({
  * families' numbers without opening anything, which is not a thing a call list
  * is for — a leader rings one family, then the next.
  */
-function ContactParentButton({
+function ContactAdultButton({
   student,
   details,
 }: {
   student: Student;
-  details: { parentName?: string | null; parentPhone?: string | null; parentEmail?: string | null };
+  details: { contactName?: string | null; contactPhone?: string | null; contactEmail?: string | null };
 }) {
   const [open, setOpen] = useState(false);
   const { show } = useToast();
 
   const name = studentFullName(student);
-  const phone = details.parentPhone?.trim() ?? '';
-  const email = details.parentEmail?.trim() ?? '';
-  const parent = details.parentName?.trim() || `${name}'s parent`;
+  const phone = details.contactPhone?.trim() ?? '';
+  const email = details.contactEmail?.trim() ?? '';
+  const contactName = details.contactName?.trim() ?? '';
+  /*
+   * Two forms of the same person, because one string cannot be both: `heading`
+   * stands alone at the top of a dialog, `inSentence` goes inside one.
+   *
+   * Both fall back rather than asserting. The old fallback was
+   * `${name}'s parent`, which invented a relationship Tally has never known —
+   * the adult on a child's record is as often a grandmother, an aunt or the
+   * neighbour who drives on Fridays, and the upstream read that finds them
+   * accepts any family relation flagged as an emergency contact.
+   */
+  const heading = contactName || `Contact for ${name}`;
+  const inSentence = contactName || 'the contact on file';
 
   /** The same guard `CopyContactsButton` uses: absent on http and in some
       in-app browsers, and saying so beats silently doing nothing. */
@@ -97,7 +109,7 @@ function ContactParentButton({
     }
     try {
       await navigator.clipboard.writeText(formatPhone(phone));
-      show(`Copied ${parent}'s number`);
+      show(contactName ? `Copied ${contactName}'s number` : 'Copied the number');
     } catch {
       show('Could not copy the number.', { tone: 'error' });
     }
@@ -124,17 +136,17 @@ function ContactParentButton({
          * chooser. The label is two clear words.
          */
         onClick={() => setOpen(true)}
-        /* The row says whose parent it is; the button's own label must too, or
+        /* The row says which child this is; the button's own label must too, or
            a screen reader on a call list hears a run of identical controls. */
-        aria-label={`Contact parent for ${name}`}
+        aria-label={`Contact the adult for ${name}`}
       >
-        Contact parent
+        Contact adult
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={parent}
+        title={heading}
         description={`About ${name}`}
         size="sm"
         /*
@@ -168,17 +180,17 @@ function ContactParentButton({
               <div className="flex gap-2 [&>*]:flex-1">
                 <ActionLink
                   href={`tel:${dialable(phone)}`}
-                  label={`Call ${parent} about ${name} at ${formatPhone(phone)}`}
+                  label={`Call ${inSentence} about ${name} at ${formatPhone(phone)}`}
                   icon="📞"
                 >
-                  Call parent
+                  Call
                 </ActionLink>
                 <ActionLink
                   href={`sms:${dialable(phone)}`}
-                  label={`Text ${parent} about ${name} at ${formatPhone(phone)}`}
+                  label={`Text ${inSentence} about ${name} at ${formatPhone(phone)}`}
                   icon="💬"
                 >
-                  Text parent
+                  Text
                 </ActionLink>
               </div>
             </div>
@@ -189,10 +201,10 @@ function ContactParentButton({
               <p className="break-all text-center text-sm text-ink-200">{email}</p>
               <ActionLink
                 href={`mailto:${email}`}
-                label={`Email ${parent} about ${name} at ${email}`}
+                label={`Email ${inSentence} about ${name} at ${email}`}
                 icon="✉"
               >
-                Email parent
+                Email
               </ActionLink>
             </div>
           ) : null}
@@ -206,7 +218,7 @@ export interface FollowUpActionsProps {
   student: Student;
   className?: string;
   /**
-   * Called when this row has just put a parent contact into Planning Center, so
+   * Called when this row has just put a contact into Planning Center, so
    * a list holding its own "who can we reach" answer can ask again. The row
    * itself re-reads without being told.
    */
@@ -216,10 +228,10 @@ export interface FollowUpActionsProps {
 /**
  * Contact affordances for one student.
  *
- * Tally does not hold parent contact details; Planning Center does, and they are
+ * Tally does not hold contact details; Planning Center does, and they are
  * read one person at a time. That used to be spent as a feature: the row named
  * who to chase and offered to look up *how*, so a list of twenty students never
- * put twenty parents' phone numbers on a leader's phone at once. The reads are
+ * put twenty adults' phone numbers on a leader's phone at once. The reads are
  * cheap now — a cache in front of Planning Center absorbs them — and what is
  * left of the old design is a tap between a leader and the only thing the row
  * is for. So the row fetches on sight.
@@ -232,23 +244,36 @@ export interface FollowUpActionsProps {
  * A leader chasing a 9th grader on a Tuesday morning usually texts first and
  * calls if that goes nowhere, so a phone number gets both.
  *
- * ## Every label says "parent"
+ * ## The row's label says who is on the other end
  *
  * None of these numbers belong to the student. Tally holds no contact details
  * for a 12-year-old and never will; what Planning Center hands back is an adult
  * in their household. A row that reads "Aaron Sun … Call" invites exactly the
  * wrong reading of that, and the row above it on the same card is a 6th grader.
- * So the buttons name who is on the other end. On the buttons rather than
- * beside them: this component sits in a row that folds onto one line on a
+ * So the row's button names who is on the other end. On the button rather than
+ * beside it: this component sits in a row that folds onto one line on a
  * laptop, and every pixel spent there is taken from the student's name.
+ *
+ * "Adult" and not "parent", which is what it said until the terminology pass.
+ * The word had to carry two jobs — rule out the student, and name the person —
+ * and it was only ever right about the first. The adult on a child's record is
+ * as often a grandmother, an aunt or a family friend; the Attendees read that
+ * finds them accepts any family relation flagged as an emergency contact, so a
+ * grandparent qualifies and was then called a parent all the way down. "Adult"
+ * rules out the 12-year-old just as flatly and claims nothing else.
+ *
+ * Inside the dialog the verbs stand alone — Call, Text, Email — because the
+ * heading above them is already the person's name and the description under it
+ * is already the child's. Repeating either there would be the same words twice
+ * in a sheet four lines tall.
  */
 export function FollowUpActions({ student, className, onContactAdded }: FollowUpActionsProps) {
   const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
 
   const name = studentFullName(student);
   const label = backendLabelOf(student);
-  const phone = details?.parentPhone?.trim() ?? '';
-  const email = details?.parentEmail?.trim() ?? '';
+  const phone = details?.contactPhone?.trim() ?? '';
+  const email = details?.contactEmail?.trim() ?? '';
 
   let body: ReactNode;
 
@@ -273,7 +298,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // on its way to the spinner.
     /*
      * Short, because this transient line is what the row's action column has to
-     * be wide enough for. "Looking up parent contact…" measured ~198px, so the
+     * be wide enough for. The old "Looking up parent contact…" measured ~198px, so the
      * column reserved 13rem to hold a 152px button — 56px of unpaintable width
      * in every row, taken from the student's name, to caption a state that
      * lasts a few hundred milliseconds. Three words fit inside the button's own
@@ -281,7 +306,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      */
     body = (
       <p className="flex items-center gap-2 text-xs text-ink-500">
-        <Spinner /> Looking up parent…
+        <Spinner /> Looking up contact…
       </p>
     );
   } else if (!details) {
@@ -301,7 +326,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      * true, and a new tab away from a call list — but the read this row already
      * made is the same read the form needs, so the row can simply offer the
      * form. What opens is decided inside `ParentContactModal`: a number on the
-     * adult on file, a parent and a household where there is neither, or the
+     * adult on file, an adult and a household where there is neither, or the
      * pointer at Planning Center on an install that will not let Tally write.
      *
      * The pill alone, on the one line every other answer here fits on.
@@ -312,7 +337,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      * beside the pill was not enough either: at the width this column has on a
      * laptop the two together wrap, which is the same extra line by another
      * route. The pill is not a poorer statement than the sentence was — it is
-     * amber, it says "Add parent contact", and its label names the student —
+     * amber, it says "Add a contact", and its label names the student —
      * and the incomplete-profiles card on the same screen has always offered
      * exactly this and nothing else.
      */
@@ -328,7 +353,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     );
   } else {
     /*
-     * One button, and the ways to reach the parent behind it.
+     * One button, and the ways to reach the adult behind it.
      *
      * This used to be the affordances themselves — Call and Text side by side,
      * with the number printed beside them on a wide screen. Three things went
@@ -348,7 +373,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      * where the old layout charged every row on the screen for the two people
      * a leader eventually rang.
      */
-    body = <ContactParentButton student={student} details={details} />;
+    body = <ContactAdultButton student={student} details={details} />;
   }
 
   /*
@@ -377,7 +402,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   return (
     <div
       role="group"
-      aria-label={`Parent contact for ${name}`}
+      aria-label={`Contact for ${name}`}
       className={cn('flex min-h-12 min-w-0 items-center', className)}
     >
       {body}
@@ -405,7 +430,7 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
     try {
       // Names and grades only. Pulling contact details for everybody would mean
       // one Planning Center read per student to build a list that mostly gets
-      // skimmed — and would put a screenful of parents' numbers on a clipboard.
+      // skimmed — and would put a screenful of adults' numbers on a clipboard.
       await navigator.clipboard.writeText(buildContactList(title, students));
       show(`Copied ${students.length} ${students.length === 1 ? 'name' : 'names'}`, {
         tone: 'success',

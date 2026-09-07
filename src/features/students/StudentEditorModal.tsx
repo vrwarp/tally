@@ -719,7 +719,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         its own button the moment it is submitted — it is not part of Save
         changes, and a form cannot be nested inside another one.
       */}
-      <ParentContactSection
+      <ContactSection
         student={student ?? null}
         details={details}
         loading={detailsLoading}
@@ -733,14 +733,14 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
 }
 
 /**
- * Parent contact, as this form can honestly offer it.
+ * Contact details, as this form can honestly offer it.
  *
  * Three different situations that used to share one sentence — "kept in
  * Planning Center, edit them there" — which was true and useless in the case a
  * leader is usually in: there is no number, write-back is on, and Tally could
  * simply have taken one.
  */
-function ParentContactSection({
+function ContactSection({
   student,
   details,
   loading,
@@ -751,17 +751,17 @@ function ParentContactSection({
   loading: boolean;
   onAdded: () => void;
 }) {
-  const onFile = details?.parentPhone || details?.parentEmail ? details : null;
+  const onFile = details?.contactPhone || details?.contactEmail ? details : null;
   const backend = student ? backendOfStudent(student) : null;
   const label = student ? backendLabelOf(student) : 'Planning Center';
 
   return (
     <div className="mt-4 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Parent contact</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Contact</p>
 
       {!student || backend === null ? (
         <p className="mt-1 text-sm text-ink-300">
-          Once this student reaches {label}, their parent contact is added there.
+          Once this student reaches {label}, their contact details are added there.
         </p>
       ) : loading && !details ? (
         <p className="mt-1 text-sm text-ink-500">Reading what {label} has…</p>
@@ -770,12 +770,12 @@ function ParentContactSection({
         // path only ever fills a gap, and never overwrites what is on file.
         <>
           <p className="mt-1 text-sm text-ink-100">
-            {onFile.parentName ? `${onFile.parentName} · ` : ''}
-            {onFile.parentPhone ? (
-              <span className="tabular-nums">{formatPhone(onFile.parentPhone)}</span>
+            {onFile.contactName ? `${onFile.contactName} · ` : ''}
+            {onFile.contactPhone ? (
+              <span className="tabular-nums">{formatPhone(onFile.contactPhone)}</span>
             ) : null}
-            {onFile.parentPhone && onFile.parentEmail ? ' · ' : ''}
-            {onFile.parentEmail ? <span className="break-all">{onFile.parentEmail}</span> : null}
+            {onFile.contactPhone && onFile.contactEmail ? ' · ' : ''}
+            {onFile.contactEmail ? <span className="break-all">{onFile.contactEmail}</span> : null}
           </p>
           <p className="mt-1 text-xs text-ink-500">
             Kept in {label}.

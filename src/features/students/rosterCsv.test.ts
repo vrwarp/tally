@@ -63,7 +63,7 @@ describe('buildRosterCsv — grade', () => {
 
 describe('buildRosterCsv — the three-state contact column', () => {
   function contact(student: Student, reachable = new Map<string, boolean>()): string {
-    return cell(buildRosterCsv([student], { ...NO_CONTEXT, reachable }), 0, 'parent_contact_on_file');
+    return cell(buildRosterCsv([student], { ...NO_CONTEXT, reachable }), 0, 'contact_on_file');
   }
 
   it('is blank when nobody has looked', () => {

@@ -141,16 +141,16 @@ describe('buildIncompleteProfileCsv', () => {
   });
 });
 
-describe('parent_contact_on_file', () => {
+describe('contact_on_file', () => {
   it('is blank when nobody has looked, in every one of the three', () => {
     const student = makeStudent({ id: 'pco_1', profileComplete: null });
     const csv = buildIncompleteProfileCsv([student], NO_EXPORT_CONTEXT, new Date());
-    expect(cells(csv).parent_contact_on_file).toBe('');
+    expect(cells(csv).contact_on_file).toBe('');
   });
 
   it('is no once the backend has been asked and holds nobody', () => {
     const student = makeStudent({ id: 'pco_1', profileComplete: false });
     const csv = buildIncompleteProfileCsv([student], NO_EXPORT_CONTEXT, new Date());
-    expect(cells(csv).parent_contact_on_file).toBe('no');
+    expect(cells(csv).contact_on_file).toBe('no');
   });
 });

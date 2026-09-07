@@ -18,7 +18,7 @@ import {
   computeUnseen,
   gatheringsOnCalendar,
   groupByGathering,
-  hasNoParentContact,
+  hasNoAdultContact,
   isUnreachable,
   orderSnapshotsNewestFirst,
   recurringSnapshots,
@@ -1378,7 +1378,7 @@ describe('computeIncompleteProfiles', () => {
     const reachable = new Map([['pco_1', false]]);
 
     for (const student of [rosterUnreachable, visitor]) {
-      expect(hasNoParentContact(student.profileComplete, reachable.get(student.id))).toBe(
+      expect(hasNoAdultContact(student.profileComplete, reachable.get(student.id))).toBe(
         isUnreachable(student, reachable),
       );
     }

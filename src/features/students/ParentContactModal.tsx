@@ -1,5 +1,5 @@
 /**
- * "Add a parent contact", wherever somebody is standing when they notice one is
+ * "Add a contact", wherever somebody is standing when they notice one is
  * missing.
  *
  * The write itself lives in `AddParentContact`, which already carries every
@@ -16,7 +16,7 @@
  */
 import { Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { invalidateParentContact } from '@/hooks/useParentContact';
+import { invalidateAdultContact } from '@/hooks/useAdultContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { backendLabelOf, studentFullName, type Student } from '@/types';
@@ -67,7 +67,7 @@ export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPa
       student={student}
       details={details}
       // Opening this *is* the request. Everything hosting it got here from a
-      // control that said "add parent contact", so the collapsed state would be
+      // control that said "add a contact", so the collapsed state would be
       // that same offer made a second time.
       defaultOpen
       onCancel={onDone}
@@ -76,7 +76,7 @@ export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPa
         // student's details, the session-wide "who can we reach" map the chip
         // count reads, and the roster row itself.
         invalidatePersonDetails(student.id);
-        invalidateParentContact();
+        invalidateAdultContact();
         refresh();
         void refreshRoster(true);
         onAdded?.();
@@ -106,7 +106,7 @@ export function ParentContactModal({ student, onClose, onAdded }: ParentContactM
     <Modal
       open
       onClose={onClose}
-      title="Add parent contact"
+      title="Add a contact"
       description={studentFullName(student)}
       size="sm"
     >

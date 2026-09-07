@@ -352,10 +352,31 @@ describe('students', () => {
     const db = asUser(env, UID.counselor);
 
     await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { contactPhone: '555-0100' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { contactEmail: 'parent@example.org' }),
+    );
+    await assertFails(
+      updateDoc(doc(db, paths.student(ID.student)), { contactName: 'Alex Rivera' }),
+    );
+  });
+
+  /*
+   * The names those three fields carried before the terminology change. The
+   * rule denies both spellings, and it has to: a deny-list that tracked only
+   * the current name would let the next rename quietly reopen the hole. Nothing
+   * in the app writes these any more, which is exactly why the rule is the only
+   * thing left holding the line.
+   */
+  it('refuses the pre-rename spellings of the same three fields', async () => {
+    const db = asUser(env, UID.counselor);
+
+    await assertFails(
       updateDoc(doc(db, paths.student(ID.student)), { parentPhone: '555-0100' }),
     );
     await assertFails(
-      updateDoc(doc(db, paths.student(ID.student)), { parentEmail: 'parent@example.org' }),
+      updateDoc(doc(db, paths.student(ID.student)), { parentEmail: 'adult@example.org' }),
     );
     await assertFails(
       updateDoc(doc(db, paths.student(ID.student)), { parentName: 'Alex Rivera' }),
@@ -372,7 +393,7 @@ describe('students', () => {
     await assertFails(
       setDoc(doc(db, paths.student('student-contact')), {
         ...studentDoc(),
-        parentPhone: '555-0100',
+        contactPhone: '555-0100',
       }),
     );
   });

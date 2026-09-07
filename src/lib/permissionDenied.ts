@@ -10,7 +10,7 @@
  * has to travel with each read rather than being a property of the session.
  *
  * The `includes` rather than an equality check is deliberate and matches what
- * the codebase already does in `usePersonDetails`, `useParentContact` and the
+ * the codebase already does in `usePersonDetails`, `useAdultContact` and the
  * kiosk's replay queue: Firestore raises `permission-denied` while the
  * callables raise `functions/permission-denied`, and both mean the same thing
  * to a caller deciding whether to try again.

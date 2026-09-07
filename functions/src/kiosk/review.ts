@@ -1085,13 +1085,13 @@ export async function approveRegistration(options: {
   let guardianMessage = '';
 
   /*
-   * `parentCreatable` says the *adapter* knows how, not that the deployment
+   * `adultCreatable` says the *adapter* knows how, not that the deployment
    * allows it — both backends hardcode it true, and the write-back mode is only
    * discovered inside the call, which answers `disabled`. So the capability is
    * what decides whether to ask, and the answer is what decides whether asking
    * again could ever help. See the note below.
    */
-  const buildFamily = backend.capabilities.parentCreatable ? backend.createFamily : undefined;
+  const buildFamily = backend.capabilities.adultCreatable ? backend.createFamily : undefined;
 
   if (record.guardian && withoutGuardian) {
     /*
@@ -1307,7 +1307,7 @@ export async function discardRegistration(options: {
         ? // Nobody was held, so nobody comes off — the record was carrying an
           // adult and nothing else, which is what a counselor's is, and what a
           // kiosk family's becomes once their children have been approved.
-          'The parent’s details are gone. Nothing changed on the roster.'
+          'The adult’s details are gone. Nothing changed on the roster.'
         : deactivated === 1
           ? 'Taken off the roster. Their check-in history is kept.'
           : `${deactivated} students taken off the roster. Their check-in history is kept.`,

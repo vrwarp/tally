@@ -8,17 +8,17 @@
  *
  *   - `contactWritable`: Planning Center has an adult in the household and
  *     nobody has put a number on them. One form, two fields, done.
- *   - `parentCreatable`: there is no adult at all. That is not a missing field,
+ *   - `adultCreatable`: there is no adult at all. That is not a missing field,
  *     it is a missing person, so the form asks for a name as well — and Tally
- *     creates the parent, and the household if there is none.
+ *     creates the adult, and the household if there is none.
  *
  * Both arrive on the person details, and exactly one of them is ever true under
  * `PCO_WRITE_BACK=full`. Neither is true under any other mode, which is when
  * this goes back to being a pointer at Planning Center.
  *
- * ## Why adding a parent asks twice
+ * ## Why adding an adult asks twice
  *
- * A church's parents are already in People — they attend — they are simply not
+ * A church's adults are already in People — they attend — they are simply not
  * linked to their child's household. So the first Save is a question: the
  * server searches for adults of that name and hands back whoever it finds, and
  * only a person looking at that list decides whether this is the same David Kim
@@ -35,7 +35,6 @@ import { addParent, setParentContact, type ExistingPerson } from '@/services/fun
 import {
   backendLabelOf,
   backendOfStudent,
-  studentFullName,
   type PcoPersonDetails,
   type Student,
 } from '@/types';
@@ -47,10 +46,10 @@ export interface AddParentContactProps {
   /** Called after a write lands, so the screen re-reads what it now says. */
   onAdded: () => void;
   /**
-   * Skip the "＋ Add a parent" step and open the form straight away.
+   * Skip the "＋ Add an adult" step and open the form straight away.
    *
    * For the surfaces that are already the answer to that question: a dialog a
-   * leader opened by pressing "Add parent contact" has asked once, and asking
+   * leader opened by pressing "Add a contact" has asked once, and asking
    * again on the other side of it is a tap that says nothing.
    */
   defaultOpen?: boolean;
@@ -58,8 +57,8 @@ export interface AddParentContactProps {
    * Called when the form is dismissed, for a host that opened straight into it.
    *
    * Without this, Cancel on a `defaultOpen` surface drops back to a state
-   * nobody navigated through — a dialog titled "Add parent contact" offering a
-   * button to add a parent contact.
+   * nobody navigated through — a dialog titled "Add a contact" offering a
+   * button to add a contact.
    */
   onCancel?: () => void;
 }
@@ -100,7 +99,7 @@ export function AddParentContact({
       <>
         <Missing label={label} />
         <p className="mt-1 text-xs text-ink-500">
-          Tally holds no parent contact of its own. Once this student reaches {label}, their
+          Tally holds no contact details of its own. Once this student reaches {label}, their
           contact details are added there.
         </p>
       </>
@@ -108,7 +107,7 @@ export function AddParentContact({
   }
 
   const writable = details?.contactWritable === true;
-  const creatable = details?.parentCreatable === true;
+  const creatable = details?.adultCreatable === true;
 
   /* ---- Tally may not write at all ---------------------------------------- */
   if (!writable && !creatable) {
@@ -120,7 +119,7 @@ export function AddParentContact({
             ? // Write-back is turned down: the family still has to be built,
               // and the backend is the only place that can do it.
               `${label} has no adult in this household yet, so there is nobody to put a number on.`
-            : `Parent contact is kept in ${label}.`}{' '}
+            : `Contact details are kept in ${label}.`}{' '}
           {backend === 'pco' && student.pcoPersonId ? (
             // Only Planning Center has a product page to link to.
             <>
@@ -152,7 +151,7 @@ export function AddParentContact({
           </p>
         ) : null}
         <Button variant="secondary" size="sm" className="mt-2" onClick={() => setOpen(true)}>
-          {creatable ? '＋ Add a parent' : '＋ Add parent contact'}
+          {creatable ? '＋ Add an adult' : '＋ Add a contact'}
         </Button>
       </>
     );
@@ -164,7 +163,7 @@ export function AddParentContact({
   };
 
   return creatable ? (
-    <ParentForm student={student} onClose={close} onAdded={onAdded} />
+    <AdultForm student={student} onClose={close} onAdded={onAdded} />
   ) : (
     <ContactForm student={student} details={details} onClose={close} onAdded={onAdded} />
   );
@@ -191,7 +190,6 @@ function ContactForm({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const name = studentFullName(student);
   const phoneOk = phone.trim() === '' || usablePhone(phone);
   const emailOk = email.trim() === '' || usableEmail(email);
   /*
@@ -241,19 +239,19 @@ function ContactForm({
   return (
     <form onSubmit={(event) => void submit(event)} className="mt-2 flex flex-col gap-3">
       <p className="text-xs text-ink-500">
-        Saved onto {details?.parentName ?? `${name}'s parent`} in {backendLabelOf(student)}. Either
+        Saved onto {details?.contactName ?? 'the adult on file'} in {backendLabelOf(student)}. Either
         field is enough.
       </p>
 
       <PhoneField
-        label="Parent phone"
+        label="Adult’s phone"
         autoComplete="tel"
         value={phone}
         onValueChange={setPhone}
         error={phoneOk ? null : 'That is not a number anybody could ring.'}
       />
       <TextField
-        label="Parent email"
+        label="Adult’s email"
         type="email"
         inputMode="email"
         autoComplete="email"
@@ -284,10 +282,10 @@ function ContactForm({
 }
 
 /* -------------------------------------------------------------------------- */
-/* A parent, and a household to put them in                                    */
+/* An adult, and a household to put them in                                   */
 /* -------------------------------------------------------------------------- */
 
-function ParentForm({
+function AdultForm({
   student,
   onClose,
   onAdded,
@@ -381,8 +379,8 @@ function ParentForm({
         */}
         <p className="text-sm font-semibold text-ink-100">
           {candidates.length === 1
-            ? `Is this ${student.firstName}'s parent?`
-            : `Which of these is ${student.firstName}'s parent?`}
+            ? `Is this the adult to call for ${student.firstName}?`
+            : `Which of these is the adult to call for ${student.firstName}?`}
         </p>
 
         {/*
@@ -403,7 +401,7 @@ function ParentForm({
                   onClick={() => void send({ personId: candidate.pcoPersonId })}
                   disabled={busy}
                   aria-busy={choosing || undefined}
-                  aria-label={`${candidate.name} is ${student.firstName}'s parent`}
+                  aria-label={`${candidate.name} is the adult to call for ${student.firstName}`}
                   className={cn(
                     'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1',
                     'bg-ink-900 ring-ink-800 transition-colors active:bg-ink-800 disabled:opacity-60',
@@ -512,7 +510,7 @@ function ParentForm({
           two buttons they came here for.
         */}
         <p className="text-xs text-ink-500">
-          Putting them in this household keeps one record. A second copy of the same parent has to be
+          Putting them in this household keeps one record. A second copy of the same adult has to be
           merged by hand later.
         </p>
       </div>
@@ -535,7 +533,7 @@ function ParentForm({
 
       <div className="grid grid-cols-2 gap-3">
         <TextField
-          label="Parent first name"
+          label="Adult’s first name"
           value={firstName}
           onChange={(changed) => setFirstName(changed.target.value)}
           autoCapitalize="words"
@@ -543,7 +541,7 @@ function ParentForm({
           required
         />
         <TextField
-          label="Parent last name"
+          label="Adult’s last name"
           value={lastName}
           onChange={(changed) => setLastName(changed.target.value)}
           autoCapitalize="words"
@@ -552,14 +550,14 @@ function ParentForm({
       </div>
 
       <PhoneField
-        label="Parent phone"
+        label="Adult’s phone"
         autoComplete="tel"
         value={phone}
         onValueChange={setPhone}
         error={phoneOk ? null : 'That is not a number anybody could ring.'}
       />
       <TextField
-        label="Parent email"
+        label="Adult’s email"
         type="email"
         inputMode="email"
         autoComplete="email"

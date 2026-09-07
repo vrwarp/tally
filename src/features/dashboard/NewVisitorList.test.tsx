@@ -95,12 +95,12 @@ describe('NewVisitorList', () => {
     // The quick-add has no upstream record to write onto, so their profile —
     // where the push lives — is still the destination. The roster student's
     // contact can be typed in from here.
-    expect(screen.getByRole('link', { name: 'Add parent contact for Kylie Novak' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Add a contact for Kylie Novak' })).toHaveAttribute(
       'href',
       '/students/tally-1',
     );
     expect(
-      screen.getByRole('button', { name: 'Add parent contact for Janet Lee' }),
+      screen.getByRole('button', { name: 'Add a contact for Janet Lee' }),
     ).toBeInTheDocument();
 
     // And the sentence it replaced is gone.
@@ -114,22 +114,22 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: null,
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: null,
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: true,
         profileWritable: true,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 
     show([fromRoster()], new Map([['pco_4200014', false]]));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add parent contact for Janet Lee' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a contact for Janet Lee' }));
 
-    expect(await screen.findByLabelText('Parent phone')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Adult’s phone')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
   });
 
@@ -140,13 +140,13 @@ describe('NewVisitorList', () => {
     expect(within(row).getByText('Incomplete')).toBeInTheDocument();
   });
 
-  it('leaves a reachable student their way of contacting the parent', async () => {
+  it('leaves a reachable student their way of contacting the adult', async () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: '(510) 706-7079',
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: '(510) 706-7079',
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: false,
@@ -155,7 +155,7 @@ describe('NewVisitorList', () => {
 
     show([fromRoster()], new Map([['pco_4200014', true]]));
 
-    expect(await screen.findByRole('button', { name: /Contact parent/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Contact the adult/ })).toBeInTheDocument();
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe('NewVisitorList', () => {
 
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Add parent contact for Janet Lee' }),
+      screen.queryByRole('button', { name: 'Add a contact for Janet Lee' }),
     ).not.toBeInTheDocument();
     // It falls through to the lookup instead, which speaks for itself.
     expect(await screen.findByText(/Planning Center no longer has a record/)).toBeInTheDocument();
@@ -188,14 +188,14 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200099',
-        parentName: 'Wen Lee',
-        parentPhone: '(510) 706-7079',
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: '(510) 706-7079',
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: false,
         profileWritable: false,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 
@@ -204,7 +204,7 @@ describe('NewVisitorList', () => {
       new Map([['pco_4200099', true]]),
     );
 
-    expect(await screen.findByRole('button', { name: /Contact parent/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Contact the adult/ })).toBeInTheDocument();
     expect(screen.queryByText('Incomplete')).not.toBeInTheDocument();
   });
 
@@ -218,7 +218,7 @@ describe('NewVisitorList', () => {
 
     expect(screen.getByText('Incomplete')).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Add parent contact for Kylie Novak' }),
+      screen.getByRole('link', { name: 'Add a contact for Kylie Novak' }),
     ).toBeInTheDocument();
   });
 
@@ -238,14 +238,14 @@ describe('NewVisitorList', () => {
     getPersonDetails.mockResolvedValue({
       data: {
         pcoPersonId: '4200014',
-        parentName: 'Wen Lee',
-        parentPhone: null,
-        parentEmail: null,
+        contactName: 'Wen Lee',
+        contactPhone: null,
+        contactEmail: null,
         allergies: null,
         householdAdult: true,
         contactWritable: true,
         profileWritable: true,
-        parentCreatable: false,
+        adultCreatable: false,
       },
     });
 
@@ -253,16 +253,16 @@ describe('NewVisitorList', () => {
     const answer = show([fromRoster()]);
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Add parent contact for Janet Lee' }),
+      await screen.findByRole('button', { name: 'Add a contact for Janet Lee' }),
     );
-    await userEvent.type(await screen.findByLabelText('Parent email'), 'wen@example.com');
+    await userEvent.type(await screen.findByLabelText('Adult’s email'), 'wen@example.com');
 
     // Planning Center answers what the screen already suspected, and the row
     // swaps branches.
     answer(new Map([['pco_4200014', false]]));
 
     expect(screen.getByText('Incomplete')).toBeInTheDocument();
-    expect(screen.getByLabelText('Parent email')).toHaveValue('wen@example.com');
+    expect(screen.getByLabelText('Adult’s email')).toHaveValue('wen@example.com');
     expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
   });
 });

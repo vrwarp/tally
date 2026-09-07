@@ -119,7 +119,7 @@ test.describe('the parent contact walkthrough', () => {
       await expect(dialog).toBeVisible();
       await dialog.getByLabel(/^first name/i).fill(child.first);
       await dialog.getByLabel(/^last name/i).fill(child.last);
-      await dialog.getByRole('button', { name: /add parent contact/i }).click();
+      await dialog.getByRole('button', { name: /add a contact/i }).click();
       await capture(page, size, 3, {
         journey: 'J2 — the offer declined',
         title: 'Opened, and answering nothing',
@@ -132,8 +132,8 @@ test.describe('the parent contact walkthrough', () => {
 
       /* ---- J3: the offer taken --------------------------------------------- */
 
-      await dialog.getByLabel(/parent first name/i).fill(PARENT.first);
-      await dialog.getByLabel(/parent phone/i).fill(PARENT.phone);
+      await dialog.getByLabel(/adult’s first name/i).fill(PARENT.first);
+      await dialog.getByLabel(/adult’s phone/i).fill(PARENT.phone);
       await capture(page, size, 4, {
         journey: 'J3 — the offer taken',
         title: 'A name and a number',

@@ -22,11 +22,11 @@ const NOTHING: ReadonlyMap<string, boolean> = new Map();
 let held: ReadonlyMap<string, boolean> | null = null;
 
 /** Drops the session's answer — call after a push links a visitor upstream. */
-export function invalidateParentContact(): void {
+export function invalidateAdultContact(): void {
   held = null;
 }
 
-export interface ParentContactResult {
+export interface AdultContactResult {
   /**
    * Student id -> whether somebody can be reached about them.
    *
@@ -45,7 +45,7 @@ export interface ParentContactResult {
   refresh: () => void;
 }
 
-export function useParentContact(): ParentContactResult {
+export function useAdultContact(): AdultContactResult {
   const [reachable, setReachable] = useState<ReadonlyMap<string, boolean>>(() => held ?? NOTHING);
   // Stryker disable next-line ArrowFunction,ConditionalExpression: the
   // `loaded` the caller sees is `loaded || held !== null`, so a session that

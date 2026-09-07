@@ -130,7 +130,7 @@ export interface WarningBadgeProps {
   detail?: string | null;
   /** See `BadgeProps.onPress`. Without it this is a plain, unpressable chip. */
   onPress?: () => void;
-  /** The verb, for a screen reader: "Add a parent contact for Aaron Mensah". */
+  /** The verb, for a screen reader: "Add a contact for Aaron Mensah". */
   pressLabel?: string;
   className?: string;
 }

@@ -160,8 +160,8 @@ test.describe('Two backends at once', () => {
       firstName: 'Tomás',
       lastName: 'Beltrán',
       grade: 7,
-      parentName: 'Rodrigo Beltrán',
-      parentPhone: '555-0333',
+      contactName: 'Rodrigo Beltrán',
+      contactPhone: '555-0333',
       attendeesUuid: tomasUuid,
     });
 

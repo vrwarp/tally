@@ -1,6 +1,6 @@
-# A parent contact at the door
+# A contact at the door
 
-UXR guidance for the optional parent contact on the counselor's quick-add, Aug 2026.
+UXR guidance for the optional contact on the counselor's quick-add, Aug 2026.
 The screens it governs are `src/features/checkin/QuickAddVisitorModal.tsx` and the
 counselor card on `src/features/review/ReviewPage.tsx`.
 
@@ -45,7 +45,7 @@ Sam taps **Quick add a visitor**, types `Maya`, `Chen`, leaves the grade on 9th,
 taps **Save & check in**. The modal closes on the tap, the row is green before
 the write leaves the phone, the queue moves.
 
-Sam never reads the words "parent contact". They are on screen — one small
+Sam never reads the words "contact". They are on screen — one small
 secondary button below the grade — and they are below the three fields, below
 the tab order that matters, and outside the path from the last field to Save.
 
@@ -55,7 +55,7 @@ regardless of what J3 buys.
 
 ### J2 — The offer declined (the trap this design has to avoid)
 
-*Same night, 19:20. Sam taps ＋ Add parent contact. The mum turns to talk to
+*Same night, 19:20. Sam taps ＋ Add contact. The mum turns to talk to
 somebody and drifts off.*
 
 Sam taps **Save & check in** with the section open and empty. Maya is added and
@@ -72,7 +72,7 @@ and empties it — so what is on screen is always exactly what will be sent.
 
 *19:22. "I'm Rosa, her mum — 555-0134."*
 
-Sam taps ＋ Add parent contact. The parent's surname is already filled in with
+Sam taps ＋ Add contact. The parent's surname is already filled in with
 the child's — right far more often than it is wrong, one edit away when it is
 not. Sam types `Rosa`, taps into the phone field, types ten digits (grouped as
 `555-010-3344` as they land), taps **Save & check in**. Same closing tap, same
@@ -134,7 +134,7 @@ must never see one, and the memory buys nothing: opening it is one tap.
 
 ### 3. Disclosure, not a checkbox, not an accordion with a chevron
 
-`＋ Add parent contact` is a *verb the counselor is choosing to do*. A checkbox
+`＋ Add contact` is a *verb the counselor is choosing to do*. A checkbox
 labelled "I have parent details" asks them to describe the world before acting
 in it, and a chevron on a titled section makes an empty panel look like
 something they skipped. The ＋ matches how the same offer is already worded on
@@ -165,8 +165,8 @@ takes an email later, sitting down, from somebody who can read it back.
 ### 7. Never let the optional half fail the required half
 
 The child and the check-in are written first, by the counselor's own device, and
-reported first. The parent contact is a second call whose failure gets its own
-sentence — *"Maya is checked in, but the parent contact did not save"* — because
+reported first. The contact is a second call whose failure gets its own
+sentence — *"Maya is checked in, but the contact did not save"* — because
 the obvious wording, *"could not save Maya"*, sends a counselor back to add a
 student who is already on the roster. One toast per fact, and each names what is
 actually true.
@@ -224,7 +224,7 @@ maybe one in four. "Optional" printed next to a field does not make a field
 weightless — it still has to be read and skipped past, and the label is read
 most carefully by exactly the person with the least time.
 
-**A second modal after the check-in ("Add a parent contact?").** Rejected: an
+**A second modal after the check-in ("Add a contact?").** Rejected: an
 interruption after the job is finished is a dialog people learn to dismiss, and
 by the time it appears the counselor has already looked up at the next student.
 
@@ -239,7 +239,7 @@ printer makes stays the only one.
 ## What to measure
 
 - **Time-to-close of the modal for J1**, before and after. Must not move.
-- **Share of quick-adds that carry a parent contact.** If it is near zero, the
+- **Share of quick-adds that carry a contact.** If it is near zero, the
   disclosure is too quiet or the counselor never believed it mattered; if it is
   near one, ask whether the section should be pre-opened for gatherings that
   hand children back.

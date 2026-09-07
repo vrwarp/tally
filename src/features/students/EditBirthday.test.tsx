@@ -109,15 +109,15 @@ const NOW = new Date(2026, 2, 14, 10, 0);
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '4200003',
-    parentName: null,
-    parentPhone: null,
-    parentEmail: null,
+    contactName: null,
+    contactPhone: null,
+    contactEmail: null,
     allergies: null,
     birthdate: null,
     householdAdult: true,
     contactWritable: true,
     profileWritable: true,
-    parentCreatable: false,
+    adultCreatable: false,
     ...overrides,
   };
 }

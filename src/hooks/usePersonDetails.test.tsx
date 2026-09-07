@@ -33,9 +33,9 @@ vi.mock('@/services/functions', () => ({ getPersonDetails }));
 function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   return {
     pcoPersonId: '101',
-    parentName: 'Dana Rivera',
-    parentPhone: '+15125550143',
-    parentEmail: 'dana@example.org',
+    contactName: 'Dana Rivera',
+    contactPhone: '+15125550143',
+    contactEmail: 'dana@example.org',
     allergies: 'Peanuts',
     birthdate: '2011-03-14',
     householdAdult: true,
@@ -64,7 +64,7 @@ describe('reading a linked student', () => {
     expect(result.current.loading).toBe(true);
     await waitFor(() => expect(result.current.loaded).toBe(true));
 
-    expect(result.current.details?.parentPhone).toBe('+15125550143');
+    expect(result.current.details?.contactPhone).toBe('+15125550143');
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.unavailable).toBe(false);
@@ -191,7 +191,7 @@ describe('when the read fails', () => {
     const { result } = renderHook(() => usePersonDetails(linked()));
 
     await waitFor(() => expect(result.current.error).toBeTruthy());
-    expect(result.current.error).toBe('Only the core team can see parent contact details.');
+    expect(result.current.error).toBe('Only the core team can see contact details.');
   });
 
   it('does not memoise a failure', async () => {
@@ -205,7 +205,7 @@ describe('when the read fails', () => {
     // An outage must not become a permanent "no contact for this child".
     const second = renderHook(() => usePersonDetails(linked()));
     await waitFor(() => expect(second.result.current.loaded).toBe(true));
-    expect(second.result.current.details?.parentPhone).toBe('+15125550143');
+    expect(second.result.current.details?.contactPhone).toBe('+15125550143');
     expect(getPersonDetails).toHaveBeenCalledTimes(2);
   });
 });
@@ -221,7 +221,7 @@ describe('retry', () => {
 
     await waitFor(() => expect(result.current.loaded).toBe(true));
     expect(result.current.error).toBeNull();
-    expect(result.current.details?.parentName).toBe('Dana Rivera');
+    expect(result.current.details?.contactName).toBe('Dana Rivera');
   });
 
   it('clears the failure straight away, so the retry shows a spinner', async () => {
@@ -303,7 +303,7 @@ describe('the memo', () => {
     // A leader working down the MIA list opens the same student twice.
     const second = renderHook(() => usePersonDetails(linked()));
     expect(second.result.current.loaded).toBe(true);
-    expect(second.result.current.details?.parentName).toBe('Dana Rivera');
+    expect(second.result.current.details?.contactName).toBe('Dana Rivera');
     expect(second.result.current.loading).toBe(false);
     expect(getPersonDetails).toHaveBeenCalledTimes(1);
   });
@@ -326,10 +326,10 @@ describe('the memo', () => {
     });
     await waitFor(() => expect(result.current.loaded).toBe(true));
 
-    getPersonDetails.mockResolvedValue({ data: details({ pcoPersonId: '202', parentName: 'Sam' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ pcoPersonId: '202', contactName: 'Sam' }) });
     rerender({ student: makeStudent({ id: 'pco_202' }) });
 
-    await waitFor(() => expect(result.current.details?.parentName).toBe('Sam'));
+    await waitFor(() => expect(result.current.details?.contactName).toBe('Sam'));
     expect(getPersonDetails).toHaveBeenCalledTimes(2);
   });
 
@@ -337,7 +337,7 @@ describe('the memo', () => {
     const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
       initialProps: { student: linked() },
     });
-    await waitFor(() => expect(result.current.details?.parentName).toBe('Dana Rivera'));
+    await waitFor(() => expect(result.current.details?.contactName).toBe('Dana Rivera'));
 
     // Anything held belongs to the previous child. Showing it under the new
     // name is the one failure worse than showing nothing.
@@ -353,7 +353,7 @@ describe('the memo', () => {
     await waitFor(() => expect(first.result.current.loaded).toBe(true));
     first.unmount();
 
-    getPersonDetails.mockResolvedValue({ data: details({ parentName: 'Sam' }) });
+    getPersonDetails.mockResolvedValue({ data: details({ contactName: 'Sam' }) });
     const other = renderHook(() => usePersonDetails(makeStudent({ id: 'pco_202' })));
     await waitFor(() => expect(other.result.current.loaded).toBe(true));
     other.unmount();
@@ -393,7 +393,7 @@ describe('the memo', () => {
 describe('what a refresh shows while it is happening', () => {
   it('keeps the details on screen rather than blanking the panel', async () => {
     const { result } = renderHook(() => usePersonDetails(linked()));
-    await waitFor(() => expect(result.current.details?.parentName).toBe('Dana Rivera'));
+    await waitFor(() => expect(result.current.details?.contactName).toBe('Dana Rivera'));
 
     // `refresh` drops the memo on the way in. What is on the panel is the
     // answer from a second ago, and a leader who pressed it to see one field
@@ -401,7 +401,7 @@ describe('what a refresh shows while it is happening', () => {
     getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
     act(() => result.current.refresh());
 
-    expect(result.current.details?.parentName).toBe('Dana Rivera');
+    expect(result.current.details?.contactName).toBe('Dana Rivera');
     expect(result.current.loaded).toBe(true);
     expect(result.current.loading).toBe(true);
   });
@@ -479,21 +479,21 @@ describe('a late answer', () => {
         answerFirst = resolve;
       }),
     );
-    getPersonDetails.mockResolvedValueOnce({ data: details({ parentName: 'Sam' }) });
+    getPersonDetails.mockResolvedValueOnce({ data: details({ contactName: 'Sam' }) });
 
     const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
       initialProps: { student: linked() },
     });
     rerender({ student: makeStudent({ id: 'pco_202' }) });
-    await waitFor(() => expect(result.current.details?.parentName).toBe('Sam'));
+    await waitFor(() => expect(result.current.details?.contactName).toBe('Sam'));
 
     await act(async () => {
-      answerFirst({ data: details({ parentName: 'Dana Rivera' }) });
+      answerFirst({ data: details({ contactName: 'Dana Rivera' }) });
     });
 
     // The first read resolving after the second must not repaint the screen
     // with the previous child's parent.
-    expect(result.current.details?.parentName).toBe('Sam');
+    expect(result.current.details?.contactName).toBe('Sam');
   });
 
   it('does not put the previous student’s failure on this student’s screen', async () => {
@@ -503,13 +503,13 @@ describe('a late answer', () => {
         failFirst = reject;
       }),
     );
-    getPersonDetails.mockResolvedValueOnce({ data: details({ parentName: 'Sam' }) });
+    getPersonDetails.mockResolvedValueOnce({ data: details({ contactName: 'Sam' }) });
 
     const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
       initialProps: { student: linked() },
     });
     rerender({ student: makeStudent({ id: 'pco_202' }) });
-    await waitFor(() => expect(result.current.details?.parentName).toBe('Sam'));
+    await waitFor(() => expect(result.current.details?.contactName).toBe('Sam'));
 
     await act(async () => {
       failFirst(new Error('unavailable'));

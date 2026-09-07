@@ -22,7 +22,7 @@ import { pushStudent } from '../../functions/lib/pco/pushStudents.js';
 import { updateStudentProfile } from '../../functions/lib/pco/profile.js';
 import { addParent } from '../../functions/lib/pco/household.js';
 import { setParentContact } from '../../functions/lib/pco/parentContact.js';
-import { fetchPersonDetails, fetchRoster, fetchParentContactStatus, searchPeople }
+import { fetchPersonDetails, fetchRoster, fetchAdultContactStatus, searchPeople }
   from '../../functions/lib/pco/roster.js';
 
 const db = makeDb();
@@ -175,10 +175,10 @@ async function parentCreate() {
     client: clients.mirror, config, cache, personId: pid, force: true });
   check('tally sees a household adult', details?.householdAdult === true, JSON.stringify(details));
   check('tally sees the parent name',
-    String(details?.parentName ?? '').startsWith(PARENT_FIRST), String(details?.parentName));
-  check('tally sees the phone', details?.parentPhone === PHONE, String(details?.parentPhone));
+    String(details?.contactName ?? '').startsWith(PARENT_FIRST), String(details?.contactName));
+  check('tally sees the phone', details?.contactPhone === PHONE, String(details?.contactPhone));
 
-  const status = await fetchParentContactStatus({
+  const status = await fetchAdultContactStatus({
     client: clients.mirror, config, cache, personIds: [pid], force: true });
   check('dashboard says reachable', status.reachable[`pco_${pid}`] === true,
     JSON.stringify(status.reachable));
@@ -202,7 +202,7 @@ async function parentUpdate() {
 
   const details = await fetchPersonDetails({
     client: clients.mirror, config, cache, personId: pid, force: true });
-  check('tally shows the email', details?.parentEmail === EMAIL, String(details?.parentEmail));
+  check('tally shows the email', details?.contactEmail === EMAIL, String(details?.contactEmail));
 }
 
 async function duplicateCheck() {

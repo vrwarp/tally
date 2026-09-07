@@ -38,7 +38,7 @@ export interface WarningMeta {
  *   gets either. A counselor in a dim hallway with a queue either stops to read
  *   the 11px word on every amber row, or learns that amber is usually
  *   paperwork and stops reading amber — and the one they stop reading is the
- *   allergy. That is the whole reason "Missing parent contact" is a neutral
+ *   allergy. That is the whole reason "No contact on file" is a neutral
  *   chip here, and why it says what it means rather than "Info", which named
  *   nothing without a tooltip a thumb cannot produce.
  * - **Red means the app itself will refuse.** Not "this looks serious" —
@@ -73,7 +73,7 @@ export const WARNING_META: Record<RosterWarning, WarningMeta> = {
     glyph: null,
   },
   'incomplete-profile': {
-    label: 'Missing parent contact',
+    label: 'No contact on file',
     short: 'No contact',
     tone: 'neutral',
     glyph: null,

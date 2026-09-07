@@ -38,7 +38,7 @@ by grade, on the same one list.
 
 **Journey 3 — a visitor nobody has met.** Quick-add takes a first name, a last name and a grade,
 creates the student and checks them in as a single atomic write. They are flagged as an incomplete
-profile so the core team can chase a parent contact later, and queued for a push into Planning
+profile so the core team can chase a contact later, and queued for a push into Planning
 Center. **No grade** is one of the answers, not a blank to be filled in later — a child too young for
 one has none, and on a gathering that tracks check-out the field opens there. The push carries them
 upstream either way; the grade is simply omitted rather than sent as a zero.
@@ -46,12 +46,12 @@ upstream either way; the grade is simply omitted rather than sent as a zero.
 **Journey 3b — and the parent is standing right there.** The commonest thing a counselor learns at a
 door is a phone number, and until now Tally had nowhere to put it: the profile went into the
 incomplete list and somebody rang round on Tuesday, if they got to it. Quick-add therefore carries a
-fourth, optional thing — **＋ Add parent contact**, closed until it is asked for, three fields when
+fourth, optional thing — **＋ Add contact**, closed until it is asked for, three fields when
 it opens (parent first name, surname carried across from the child, phone). Skipping it is the
 default and costs nothing; opening it and typing nothing is also fine, because a parent who walks off
 mid-sentence must not strand a counselor at a required field.
 
-What it is not is a write into the church's database. Tally holds no parent contact on a student —
+What it is not is a write into the church's database. Tally holds no contact details on a student —
 `firestore.rules` refuses one, deliberately — and the question behind "add this parent" is *which*
 David Kim this is, which the core team's own screen asks out loud with the directory in front of it.
 So the number goes to the same review queue a lobby family goes to, as a card about an adult rather
@@ -227,7 +227,7 @@ student document to the eight keys a check-in's date patch touches, which is why
 callable that decides every field itself.
 
 **Journey 5 — the follow-up list.** The dashboard is a call list, not a report: students who have
-missed three gatherings in a row, first-timers from the last week, profiles with no parent contact,
+missed three gatherings in a row, first-timers from the last week, profiles with no contact,
 and a head-count trend. It is split by gathering, for the same reason prediction is — a student who
 comes every Sunday and has never been to a Friday has missed nothing, and the pooled version phoned
 their family about it. Each tab answers for one repeat chain.
@@ -330,7 +330,7 @@ still deactivating them on the Team screen.
 
 ## Where the people come from
 
-Planning Center People is the system of record for *people*: names, grades, parent contact and
+Planning Center People is the system of record for *people*: names, grades, contact and
 medical notes originate there, are read on demand, and are stored nowhere in Tally.
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,

@@ -17,7 +17,7 @@ import {
   trimmed,
 } from '../backends/mappingShared.js';
 import { studentIdFor } from '../generated/backendIds.js';
-import type { ParentContact } from '../pco/mapping.js';
+import type { AdultContact } from '../pco/mapping.js';
 import type { RosterPerson } from '../pco/roster.js';
 import {
   A32_FAMILY_CATEGORY,
@@ -189,7 +189,7 @@ export function birthdayPatch(
 /* Families                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export interface A32ParentCandidate {
+export interface A32ContactCandidate {
   /** The parent's attendee id. */
   id: string;
   /** The family folk the relationship lives in. */
@@ -207,11 +207,11 @@ export interface A32ParentCandidate {
  * the student-side `child`. Ordered by role title then id so repeated reads
  * pick the same parent every time.
  */
-export function findParentCandidates(
+export function findContactCandidates(
   studentId: string,
   edges: readonly A32FolkAttendee[],
   relationsById: ReadonlyMap<number, A32Relation>,
-): A32ParentCandidate[] {
+): A32ContactCandidate[] {
   const familyFolkIds = new Set(
     edges
       .filter(
@@ -224,7 +224,7 @@ export function findParentCandidates(
   );
   if (familyFolkIds.size === 0) return [];
 
-  const candidates: A32ParentCandidate[] = [];
+  const candidates: A32ContactCandidate[] = [];
   for (const edge of edges) {
     if (edge.is_removed === true) continue;
     if (edge.attendee === studentId) continue;
@@ -276,7 +276,7 @@ export function allPhonesOf(attendee: A32Attendee): string[] {
 }
 
 /** Parent name/phone/email for a student, from an already-fetched parent. */
-export function parentContactOf(parent: A32Attendee): ParentContact {
+export function adultContactOf(parent: A32Attendee): AdultContact {
   const { phone, email } = contactsOf(parent);
   const name = [
     composeFirstName(parent.first_name, cjkNameOf(parent)),
@@ -285,8 +285,8 @@ export function parentContactOf(parent: A32Attendee): ParentContact {
     .join(' ')
     .trim();
   return {
-    parentName: name.length > 0 ? name : null,
-    parentPhone: phone,
-    parentEmail: email ? email.toLowerCase() : null,
+    contactName: name.length > 0 ? name : null,
+    contactPhone: phone,
+    contactEmail: email ? email.toLowerCase() : null,
   };
 }

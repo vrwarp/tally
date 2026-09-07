@@ -3,7 +3,7 @@
  *
  * The kiosk's search screen answers one question — "which of these is your
  * child" — and for a family arriving for the first time the answer was "none of
- * them, please see a leader". This is the other door: a parent types their
+ * them, please see a leader". This is the other door: an adult types their
  * children in, one adult and one phone number, and walks away with everybody
  * checked in and stickers printed.
  *
@@ -34,7 +34,7 @@
  * ## What the door does not decide
  *
  * Nothing that cannot be taken back. This used to create people, an adult and a
- * household in the church's database while the parent stood there, and to
+ * household in the church's database while the adult stood there, and to
  * *refuse* a registration whose child's name already matched the roster. Both
  * were the same mistake: asking a lobby screen with a queue behind it to settle
  * identity, on evidence a stranger typed, against a system with no undo —
@@ -340,8 +340,8 @@ export function parseRegisterFamilyRequest(data: unknown): ParsedRegistration {
     rawGuardian === null && anchorStudentIds.length > 0
       ? null
       : {
-          firstName: parseName(rawGuardian?.firstName, "The parent's first name"),
-          lastName: parseName(rawGuardian?.lastName, "The parent's last name"),
+          firstName: parseName(rawGuardian?.firstName, "The adult's first name"),
+          lastName: parseName(rawGuardian?.lastName, "The adult's last name"),
           phone: parseRegistrationPhone(rawGuardian?.phone),
         };
 
