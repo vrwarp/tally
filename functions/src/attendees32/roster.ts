@@ -221,8 +221,64 @@ export async function loadFamilyEdges(
   return edges;
 }
 
+/**
+ * The adults one request has already fetched, so a family costs one read of
+ * each rather than one per child in it.
+ *
+ * The Attendees counterpart of Planning Center's `HouseholdMemo`, and it exists
+ * for the same reason: naming the adult behind a student is a request for that
+ * adult, and siblings share them. Twenty follow-up rows read one at a time —
+ * which is what a dashboard did when every row was its own invocation — paid
+ * that read again for every child of every family on the list.
+ *
+ * Scoped to a single invocation and nothing wider, which is what makes it safe.
+ * The adapter is built per request (see `createRegistry`), so this map is born
+ * and discarded with the call, and an adult's raw row — their phone number and
+ * email among it — is never retained beyond the answer it was fetched to
+ * compute.
+ *
+ * `null` is a real entry: an adult who has been deleted upstream is a settled
+ * answer, and re-asking about them once per sibling is the thing being avoided.
+ */
+export type AttendeeMemo = Map<string, Promise<A32Attendee | null>>;
+
+export function createAttendeeMemo(): AttendeeMemo {
+  return new Map();
+}
+
+/** One adult, through the memo when there is one. Null means gone upstream. */
+async function loadAttendee(
+  client: A32Client,
+  personId: string,
+  memo: AttendeeMemo | undefined,
+): Promise<A32Attendee | null> {
+  const read = async (): Promise<A32Attendee | null> => {
+    try {
+      return await client.get<A32Attendee>(API.attendeeById(personId));
+    } catch (error) {
+      if (isA32GoneError(error)) return null;
+      throw error;
+    }
+  };
+
+  if (!memo) return read();
+
+  let pending = memo.get(personId);
+  if (!pending) {
+    pending = read();
+    memo.set(personId, pending);
+    // Never remember a failure — the next child in this family deserves a real
+    // attempt — and the handler is also what keeps a rejection nobody got round
+    // to awaiting from surfacing as an unhandled one.
+    pending.catch(() => {
+      if (memo.get(personId) === pending) memo.delete(personId);
+    });
+  }
+  return pending;
+}
+
 export async function fetchPersonDetails(
-  options: A32FlowOptions & { personId: string },
+  options: A32FlowOptions & { personId: string; attendees?: AttendeeMemo },
 ): Promise<PersonDetails | null> {
   const { client, config, cache, personId } = options;
 
@@ -245,13 +301,8 @@ export async function fetchPersonDetails(
 
       let contact = { contactName: null as string | null, contactPhone: null as string | null, contactEmail: null as string | null };
       for (const candidate of candidates) {
-        let parent: A32Attendee;
-        try {
-          parent = await client.get<A32Attendee>(API.attendeeById(candidate.id));
-        } catch (error) {
-          if (isA32GoneError(error)) continue;
-          throw error;
-        }
+        const parent = await loadAttendee(client, candidate.id, options.attendees);
+        if (!parent) continue;
         const extracted = adultContactOf(parent);
         // The first candidate names the parent; the first with a way to reach
         // them supplies the contact. Usually the same person.

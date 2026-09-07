@@ -16,6 +16,7 @@ import { createA32Client } from './client.js';
 import { a32RootEventId, importMeetHistory, listImportableMeets } from './history.js';
 import { collectPhoneLast4 } from './phoneIndex.js';
 import {
+  createAttendeeMemo,
   fetchAllergyNotes,
   fetchAdultContactStatus,
   fetchPersonDetails,
@@ -47,6 +48,12 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
   const { db, config } = args;
   const client = createA32Client({ token: config.token, baseUrl: config.baseUrl });
   const cache = sharedCache(config);
+  /*
+   * One per request, because the adapter is one per request — a batch of
+   * follow-up rows that shares an adult reads them once. See `AttendeeMemo`
+   * for why it may not outlive the call, and why only the read path gets one.
+   */
+  const attendees = createAttendeeMemo();
 
   return {
     id: 'a32',
@@ -69,7 +76,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
     fetchRoster: ({ personIds, force }) => fetchRoster({ client, config, cache, personIds, force }),
     searchPeople: ({ query, limit }) => searchPeople({ client, config, query, limit }),
     fetchPersonDetails: ({ personId, force }) =>
-      fetchPersonDetails({ client, config, cache, personId, force }),
+      fetchPersonDetails({ client, config, cache, personId, force, attendees }),
     fetchAllergyNotes: ({ personIds, force }) =>
       fetchAllergyNotes({ client, config, cache, personIds, force }),
     fetchAdultContactStatus: ({ personIds, force }) =>

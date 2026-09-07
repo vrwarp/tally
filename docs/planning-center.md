@@ -646,6 +646,9 @@ It is the same read, under the same core-team gate, returning the same fields, f
 caller names — a batch can only ever be the rows a screen is already showing, and nothing on the
 server decides for itself whom to look up. What it changes is the arithmetic: twenty rows are one
 invocation, one gate read, one registry, and one household request per family instead of per child.
+Attendees gets the same treatment through the same batch — the callable dispatches on the linkage
+and neither backend is special to it — with an adult read per family rather than per child, which is
+where that backend spends the request a sibling would otherwise repeat (`AttendeeMemo`).
 The browser does the collecting (`getPersonDetails` in `src/services/functions.ts` gathers a frame's
 worth of reads behind a callable's signature), so no screen had to learn that any of this exists.
 
