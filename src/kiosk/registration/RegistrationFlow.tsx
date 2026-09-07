@@ -505,6 +505,14 @@ export function RegistrationFlow({
                   {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
                 </span>
               )}
+              {/* Where the next letter lands, so the band reads as a live field
+                  rather than as a gap. Always rendered — on an empty step it is
+                  the only thing here, which is the point. See `.kiosk-caret`. */}
+              <span
+                aria-hidden
+                data-testid="readout-caret"
+                className={`kiosk-caret${state.noAllergies ? ' kiosk-caret--still' : ''}`}
+              />
             </div>
           </div>
           {/* The one question on this screen that is a number gets the shape

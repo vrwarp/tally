@@ -1110,6 +1110,55 @@
 }
 
 /*
+ * The caret in the kiosk's readout.
+ *
+ * The readout is a div and never an input — the native keyboard must not rise,
+ * and a box on a touchscreen is a text field a parent taps before typing into.
+ * That leaves it looking like nothing at all until somebody types: on arrival,
+ * and every step arrives empty, the band is sixty-four pixels of bare ground
+ * between a disabled **Next** and the top row of keys. The caret says "the
+ * letters land here" without promising a press.
+ *
+ * Fixed width and a fixed height in rem — never `1em`, which would differ
+ * between `text-3xl` and `kiosk:text-4xl` — and `flex: none`, so it cannot
+ * shrink, cannot grow the row, and cannot take a character off the truncating
+ * name beside it. The band's own height is fixed, so nothing below it moves.
+ *
+ * Opacity, in steps, on a compositor-only animation: no style recalc, no
+ * layout, and no main-thread work per frame. It is deliberately not driven
+ * from React — a `setInterval` toggling state would re-render this subtree
+ * twice a second for the life of the screen and run the keyboard's memo
+ * comparison on every tick.
+ */
+@keyframes tally-caret {
+  to {
+    opacity: 0;
+  }
+}
+
+.kiosk-caret {
+  flex: none;
+  width: 3px;
+  height: 2.25rem;
+  margin-left: 0.125rem;
+  border-radius: 2px;
+  background: var(--color-ink-500);
+  animation: tally-caret 1.06s steps(2, jump-none) infinite;
+}
+
+/* Ticked "No allergies" puts the box out of use, and a caret blinking in a
+   field nobody can type into is an invitation the screen has withdrawn. */
+.kiosk-caret--still {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-caret {
+    animation: none;
+  }
+}
+
+/*
  * Dialog entrances. `<dialog>` is `display: none` while closed, so both of
  * these run on open without any mount/unmount bookkeeping in React.
  */
