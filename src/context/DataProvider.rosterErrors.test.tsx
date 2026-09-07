@@ -15,7 +15,7 @@
  * The developer-facing message is never lost either way: `pcoErrorReport` keeps
  * it under `debug`, and the details panel shows it as "Underlying error".
  */
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';

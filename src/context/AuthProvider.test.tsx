@@ -20,7 +20,7 @@
  * anything Google does.
  */
 import type { ReactNode } from 'react';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '@/context/AuthProvider';
 import { useAuth, type AuthContextValue } from '@/context/authContext';

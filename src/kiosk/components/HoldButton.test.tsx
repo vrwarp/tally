@@ -20,7 +20,7 @@
  * kiosks are, a cancelled hold and a broken button were the same event: an empty
  * bar under a thumb that kept pressing.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HOLD_DELAY_MS, HOLD_MS, HoldButton, STRAY_HINT_MS } from './HoldButton';

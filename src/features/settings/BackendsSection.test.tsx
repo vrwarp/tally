@@ -5,7 +5,7 @@
  * can hear, and facts laid out in columns when the card has width for columns
  * rather than as full-measure lines because the page frame is wide.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BackendsSection } from '@/features/settings/BackendsSection';

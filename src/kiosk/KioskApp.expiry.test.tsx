@@ -19,7 +19,7 @@
  *    forget the register while keeping the allergy notes and the list of who
  *    had a name tag printed — on a device that then sat in a lobby all week.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';

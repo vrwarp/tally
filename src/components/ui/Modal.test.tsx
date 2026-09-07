@@ -8,7 +8,7 @@
  * dismisses a modal nobody has touched, and never dismisses one somebody has.
  */
 import { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Modal } from '@/components/ui/Modal';

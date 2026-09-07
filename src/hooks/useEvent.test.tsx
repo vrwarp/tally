@@ -8,7 +8,7 @@
  * of Check-Ins history turned that from unreachable into the common case.
  */
 import type { ReactNode } from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { describe, expect, it, vi } from 'vitest';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';

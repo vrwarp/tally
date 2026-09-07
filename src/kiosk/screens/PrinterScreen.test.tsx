@@ -13,7 +13,7 @@
  * silently chosen is exactly the wrong-roll Sunday the detection was supposed
  * to prevent.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import type { KioskPrinting } from '@/kiosk/KioskApp';

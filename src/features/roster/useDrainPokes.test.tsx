@@ -8,7 +8,7 @@
  * harmful: that it fires at the due time rather than immediately, and that it
  * stops when the screen goes away.
  */
-import { renderHook } from '@testing-library/react';
+import { renderHook } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDrainPokes } from '@/features/roster/useDrainPokes';
 import type { UpstreamEdit, UpstreamEditState } from '@/types';

@@ -13,7 +13,7 @@
  * disappears after a dismissal rather than sitting there doing nothing when
  * tapped again.
  */
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isInstalled, needsManualInstall, promptInstall, useCanInstall } from '@/kiosk/install';
 

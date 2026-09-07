@@ -6,7 +6,7 @@
  * consumer rather than at the missing provider. Saying so at the boundary is
  * the difference between a five-second fix and a hunt.
  */
-import { render } from '@testing-library/react';
+import { render } from '@/test/rtl';
 import { describe, expect, it, vi } from 'vitest';
 import { DataContext, useData, type DataContextValue } from '@/context/dataContext';
 import { makeSettings } from '../../tests/factories';

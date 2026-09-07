@@ -9,7 +9,7 @@
  * The cards themselves are covered by their own suites; what is asserted here
  * is only the arrangement, which is the thing no card can see for itself.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from '@/features/settings/SettingsPage';

@@ -9,7 +9,7 @@
  * atomic inline and Chrome will break the line after one, which left the mark
  * at the end of a line and the name opening the next.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import { describe, expect, it } from 'vitest';
 import { EventName } from './EventName';
 

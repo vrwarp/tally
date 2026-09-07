@@ -10,7 +10,7 @@
  * and the button would go back to inheriting its label colour. That is the same
  * failure the missing ramp steps had: nothing throws, the colour is just gone.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import { describe, expect, it } from 'vitest';
 import { Button } from '@/components/ui/Button';
 

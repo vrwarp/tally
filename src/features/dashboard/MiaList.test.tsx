@@ -7,7 +7,7 @@
  * "Copied 1 name". Two strings about the same press, disagreeing, one of them
  * in front of the whole team.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

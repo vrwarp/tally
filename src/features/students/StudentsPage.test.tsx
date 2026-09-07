@@ -20,7 +20,7 @@
  * The tone assertions are deliberately about *tone*, not about text, because
  * the text is not the part that was wrong.
  */
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';

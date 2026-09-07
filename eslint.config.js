@@ -86,10 +86,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', 'tests/**/*.ts', 'firestore-tests/**/*.ts'],
+    // `src/test/` is the suite's own helpers — Testing Library re-exported with
+    // the app's IntlProvider wrapped around `render`. Never hot-reloaded, so the
+    // react-refresh rule has nothing to say about it.
+    files: ['**/*.test.{ts,tsx}', 'tests/**/*.ts', 'src/test/**/*.{ts,tsx}', 'firestore-tests/**/*.ts'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      'react-refresh/only-export-components': 'off',
     },
   },
 );

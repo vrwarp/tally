@@ -5,7 +5,7 @@
  * nothing until asked for, that pressing again reaches further back, and that
  * it never implies an absence it has not established.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { EarlierAttendance } from '@/features/students/EarlierAttendance';

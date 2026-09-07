@@ -12,7 +12,7 @@
  * contact like the rest of the kiosk (see `components/tapGuard.ts`): a list
  * that scrolls cannot also re-point the kiosk from the touch that scrolled it.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
 import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';

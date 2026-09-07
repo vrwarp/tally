@@ -10,7 +10,7 @@
  * constraint and a counselor is the person most likely to change this.
  */
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ThemeCard } from '@/features/settings/ThemeCard';

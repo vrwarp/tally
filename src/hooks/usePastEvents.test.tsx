@@ -10,7 +10,7 @@
  * `fetchPastEvents` is mocked at the service boundary — this is a hook about
  * paging, and the query it builds has its own tests.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { makeEvent } from '../../tests/factories';

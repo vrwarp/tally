@@ -10,7 +10,7 @@
  * it will do, that a name unticked is a child left alone, and that one confirm
  * produces one write per child and no more.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';

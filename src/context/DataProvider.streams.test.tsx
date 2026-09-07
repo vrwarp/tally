@@ -14,7 +14,7 @@
  * its fault teaches people to ignore the next one.
  */
 import type { ReactNode } from 'react';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';

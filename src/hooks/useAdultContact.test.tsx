@@ -6,7 +6,7 @@
  * came back as `false` for everybody would put the entire ministry on a Tuesday
  * morning call list — and a leader would work it before doubting it.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateAdultContact, useAdultContact } from '@/hooks/useAdultContact';
 

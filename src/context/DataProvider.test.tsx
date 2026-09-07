@@ -11,7 +11,7 @@
  * read moments ago, not announcing an unchanged one as new, and not un-settling
  * a screen that has already landed.
  */
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, EVENT_WINDOW_DAYS } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';

@@ -11,7 +11,7 @@
  * `outcomeOf` is deliberately not mocked. It is the rule under test; only the
  * reads and writes around it are stubbed.
  */
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProfileHistory } from '@/features/students/useProfileHistory';
 import type * as SkippedNights from '@/services/skippedNights';

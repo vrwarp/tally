@@ -8,7 +8,7 @@
  * a list, with no way to tell a slow Planning Center read from an empty result.
  * `ErrorBanner` named the fault and offered nothing to do about it.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import { describe, expect, it } from 'vitest';
 import { ErrorBanner, SkeletonRows } from '@/components/ui/Feedback';
 

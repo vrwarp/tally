@@ -11,7 +11,7 @@
  * `useRsvps` is the same hook with one extra switch — a gathering that does not
  * take RSVPs opens no listener at all — so the two are tested side by side.
  */
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { makeAttendance, makeRsvp } from '../../tests/factories';

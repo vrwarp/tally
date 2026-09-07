@@ -15,7 +15,7 @@
  * Time is driven rather than waited through, so the poll interval can grow
  * without these getting slower.
  */
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PairingScreen, POLL_MS, TROUBLE_AFTER_FAILURES } from '@/kiosk/screens/PairingScreen';
 import type { KioskServices } from '@/kiosk/KioskApp';

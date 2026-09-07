@@ -10,7 +10,7 @@
  * So these assert the route out of a counselor's account menu, and that the two
  * genuinely core-team destinations are still not in it.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

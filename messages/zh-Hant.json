@@ -1,0 +1,53 @@
+{
+  "Common": {
+    "language": "Language",
+    "loadingRoster": "Loading the roster",
+    "loadingHistory": "Loading attendance history"
+  },
+  "Nav": {
+    "checkIn": "Check in",
+    "insights": "Insights",
+    "events": "Events",
+    "students": "Students",
+    "review": "Review",
+    "kiosk": "Kiosk",
+    "team": "Team",
+    "settings": "Settings"
+  },
+  "Dashboard": {
+    "title": "Insights",
+    "loading": "Loading insights…",
+    "readingAttendance": "Reading the recent attendance…",
+    "through": "Through {gathering}, {date} · last {count} {scope}",
+    "scopeOfGathering": "of {gathering}",
+    "scopeAcrossAll": "{count, plural, one {gathering} other {gatherings}}, across every one",
+    "nobodyCheckedIn": "Nobody has been checked into any of the recent gatherings.",
+    "noGatherings": "No gatherings on record yet.",
+    "skippedGatherings": "{count, plural, one {One scheduled gathering had nobody checked in, so it counts as cancelled here.} other {{count} scheduled gatherings had nobody checked in, so they count as cancelled here.}}",
+    "tabsLabel": "Show insights for",
+    "tabAll": "All",
+    "excludedOne": "{name} is not shown — you're not on it.",
+    "excludedMany": "{names} and {last} are not shown — you're not on them.",
+    "historyError": "Could not load attendance history. {error}",
+    "emptyTitle": "No gatherings on record yet.",
+    "emptyBody": "Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach.",
+    "tileLastGathering": "Last gathering",
+    "tileMia": "MIA",
+    "tileMiaHint": "{threshold}+ missed in a row",
+    "tileNewFaces": "New faces",
+    "tileNewFacesHint": "last {days} days",
+    "tileIncomplete": "Incomplete",
+    "tileIncompleteHint": "no contact on file",
+    "tileCheckedOut": "Checked out",
+    "tileCheckedOutHint": "of check-ins on check-out gatherings",
+    "changeFirst": "first one in this window",
+    "changeSame": "same as the {count} before",
+    "changeDelta": "{delta} vs {previous} before",
+    "deltaWithGathering": "{gathering} · {change}",
+    "releaseFailed": "Could not save the release. Nothing changed.",
+    "undoFailed": "Could not undo the release.",
+    "thisGathering": "this gathering",
+    "someoneUnknown": "Someone no longer on the roster",
+    "somebody": "Somebody"
+  }
+}

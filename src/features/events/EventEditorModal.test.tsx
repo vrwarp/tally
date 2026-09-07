@@ -11,7 +11,7 @@
  * the draft the form builds, which is the only thing the writes see.
  */
 import type { ReactNode } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';

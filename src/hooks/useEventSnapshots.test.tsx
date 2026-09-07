@@ -8,7 +8,7 @@
  * whole roster repaints — republishing an equal answer repainted two hundred
  * rows a minute for as long as a counselor had the screen open.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import type { TallyEvent } from '@/types';
