@@ -7,7 +7,7 @@
  * honour is worse than no offer: it costs a leader a filled-in form and a
  * refusal, on the screen they opened because somebody could not be reached.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AddParentContact } from '@/features/students/AddParentContact';

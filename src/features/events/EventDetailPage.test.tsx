@@ -13,7 +13,7 @@
  * the page's own branching.
  */
 import type { ReactNode } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';

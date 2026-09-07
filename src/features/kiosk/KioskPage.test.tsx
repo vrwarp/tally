@@ -16,7 +16,7 @@
  *
  * These assert on the words a leader reads, not on the component's shape.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';

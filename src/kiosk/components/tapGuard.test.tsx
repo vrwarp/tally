@@ -14,7 +14,7 @@
  * zero rect.
  */
 import { useState } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TAP_SLOP_PX, useOrphanClickGuard, useTap, useTapGuard } from './tapGuard';

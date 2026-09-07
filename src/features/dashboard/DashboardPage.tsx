@@ -26,6 +26,7 @@
  * leader reads this.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslations } from 'use-intl';
 import {
   Card,
   EmptyState,
@@ -94,6 +95,7 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
+  const t = useTranslations();
   const {
     students,
     events,
@@ -308,14 +310,14 @@ export function DashboardPage() {
       target: {
         student: item.student,
         chainKey: chain,
-        gatheringTitle: item.gatheringTitle ?? item.release?.fromTitle ?? 'this gathering',
+        gatheringTitle: item.gatheringTitle ?? item.release?.fromTitle ?? t('Dashboard.thisGathering'),
         // An unseen row is by definition unseen since its last visit; a
         // gathering row carries the pre-computed mark or nothing.
         notSeenAnywhereSince:
           item.notSeenAnywhereSince ?? (item.gatheringKey === null ? item.lastAttendedAt : null),
       },
     });
-  }, []);
+  }, [t]);
 
   const confirmRelease = useCallback(
     async (target: ReleaseTarget, reason: TransitionReason, note: string) => {
@@ -328,7 +330,7 @@ export function DashboardPage() {
           reason,
           note,
           uid: user.uid,
-          authorName: profile?.displayName ?? user.email ?? 'Somebody',
+          authorName: profile?.displayName ?? user.email ?? t('Dashboard.somebody'),
         });
         const key = sessionReleaseKey(pendingRelease.item.gatheringKey, target.student.id);
         setSessionReleases((current) =>
@@ -336,12 +338,12 @@ export function DashboardPage() {
         );
         setPendingRelease(null);
       } catch {
-        show('Could not save the release. Nothing changed.', { tone: 'error' });
+        show(t('Dashboard.releaseFailed'), { tone: 'error' });
       } finally {
         setReleaseBusy(false);
       }
     },
-    [pendingRelease, user, profile, show],
+    [pendingRelease, user, profile, show, t],
   );
 
   const handleUndoSessionRelease = useCallback(
@@ -358,12 +360,12 @@ export function DashboardPage() {
           return next;
         });
       } catch {
-        show('Could not undo the release.', { tone: 'error' });
+        show(t('Dashboard.undoFailed'), { tone: 'error' });
       } finally {
         setUndoBusyKey(null);
       }
     },
-    [show],
+    [show, t],
   );
 
   /*
@@ -391,7 +393,7 @@ export function DashboardPage() {
       );
       return {
         transition,
-        studentName: student ? studentFullName(student) : 'Someone no longer on the roster',
+        studentName: student ? studentFullName(student) : t('Dashboard.someoneUnknown'),
         gatheringTitle: titles.get(transition.chainKey) ?? null,
         inert: isInertRelease(
           transition,
@@ -400,7 +402,7 @@ export function DashboardPage() {
         ),
       };
     });
-  }, [transitions, activeGathering, planned, gatherings, students]);
+  }, [transitions, activeGathering, planned, gatherings, students, t]);
 
   const handleLedgerUndo = useCallback(
     async (transition: Transition) => {
@@ -408,12 +410,12 @@ export function DashboardPage() {
       try {
         await undoRelease(transition.chainKey, transition.studentId);
       } catch {
-        show('Could not undo the release.', { tone: 'error' });
+        show(t('Dashboard.undoFailed'), { tone: 'error' });
       } finally {
         setLedgerUndoBusyId(null);
       }
     },
-    [show],
+    [show, t],
   );
 
   /*
@@ -497,7 +499,7 @@ export function DashboardPage() {
   );
   const oneOffOnly = useMemo(() => computeOneOffOnly(students, snapshots), [students, snapshots]);
 
-  if (loading) return <LoadingScreen message="Loading insights…" />;
+  if (loading) return <LoadingScreen message={t('Dashboard.loading')} />;
 
   /*
    * The roster arrives separately from the streams — it is read from Planning
@@ -543,10 +545,10 @@ export function DashboardPage() {
   const delta = summary.lastEventCount - previous;
   const change =
     previous === 0
-      ? 'first one in this window'
+      ? t('Dashboard.changeFirst')
       : delta === 0
-        ? `same as the ${previous} before`
-        : `${delta > 0 ? '+' : ''}${delta} vs ${previous} before`;
+        ? t('Dashboard.changeSame', { count: previous })
+        : t('Dashboard.changeDelta', { delta: `${delta > 0 ? '+' : ''}${delta}`, previous });
   /*
    * Named under "All", where the tile would otherwise be a number about a
    * gathering the reader has not been told about — and said at all only when
@@ -558,7 +560,7 @@ export function DashboardPage() {
     ? undefined
     : activeGathering
       ? change
-      : `${headCount.title} · ${change}`;
+      : t('Dashboard.deltaWithGathering', { gathering: headCount.title, change });
 
   /*
    * The tiles, as the row that is actually going to be rendered.
@@ -571,12 +573,17 @@ export function DashboardPage() {
    * exactly the ministries the feature exists for.
    */
   const tiles = [
-    <StatTile key="last" label="Last gathering" value={summary.lastEventCount} hint={deltaHint} />,
+    <StatTile
+      key="last"
+      label={t('Dashboard.tileLastGathering')}
+      value={summary.lastEventCount}
+      hint={deltaHint}
+    />,
     <StatTile
       key="mia"
-      label="MIA"
+      label={t('Dashboard.tileMia')}
       value={pending(summary.miaCount)}
-      hint={`${settings.miaConsecutiveMisses}+ missed in a row`}
+      hint={t('Dashboard.tileMiaHint', { threshold: settings.miaConsecutiveMisses })}
       tone={!awaitingRoster && summary.miaCount > 0 ? 'danger' : 'neutral'}
       // The one tile in the row that is a call to action, and so the one
       // that gets the tinted field.
@@ -584,16 +591,16 @@ export function DashboardPage() {
     />,
     <StatTile
       key="new"
-      label="New faces"
+      label={t('Dashboard.tileNewFaces')}
       value={pending(summary.newVisitorCount)}
-      hint={`last ${settings.newVisitorWindowDays} days`}
+      hint={t('Dashboard.tileNewFacesHint', { days: settings.newVisitorWindowDays })}
       tone={!awaitingRoster && summary.newVisitorCount > 0 ? 'success' : 'neutral'}
     />,
     <StatTile
       key="incomplete"
-      label="Incomplete"
+      label={t('Dashboard.tileIncomplete')}
       value={awaitingContacts ? '—' : pending(summary.incompleteCount)}
-      hint="no contact on file"
+      hint={t('Dashboard.tileIncompleteHint')}
       tone={
         !awaitingRoster && !awaitingContacts && summary.incompleteCount > 0 ? 'warn' : 'neutral'
       }
@@ -605,9 +612,9 @@ export function DashboardPage() {
       ? [
           <StatTile
             key="checkout"
-            label="Checked out"
+            label={t('Dashboard.tileCheckedOut')}
             value={`${summary.checkOutRate}%`}
-            hint="of check-ins on check-out gatherings"
+            hint={t('Dashboard.tileCheckedOutHint')}
             tone="neutral"
           />,
         ]
@@ -631,16 +638,16 @@ export function DashboardPage() {
       : 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_28rem] xl:grid-cols-[repeat(3,minmax(0,1fr))_24rem]';
 
   const scopeLabel = activeGathering
-    ? `of ${activeGathering.title}`
+    ? t('Dashboard.scopeOfGathering', { gathering: activeGathering.title })
     // The noun lives here rather than before it: scoped, the gathering's own
     // name is the noun ("last 8 of Sunday School"), and repeating it would read
     // as "last 8 gatherings of Sunday School".
-    : `${held.length === 1 ? 'gathering' : 'gatherings'}, across every one`;
+    : t('Dashboard.scopeAcrossAll', { count: held.length });
 
   return (
     <PageFrame width="lg">
       <header>
-        <h1 className="text-xl font-bold text-ink-50">Insights</h1>
+        <h1 className="text-xl font-bold text-ink-50">{t('Dashboard.title')}</h1>
         {/*
           Two lines' room on a phone, one where the sentence fits on one.
 
@@ -654,18 +661,21 @@ export function DashboardPage() {
         */}
         <p className="mt-0.5 min-h-10 text-sm text-ink-500 sm:min-h-5">
           {awaitingHistory
-            ? 'Reading the recent attendance…'
+            ? t('Dashboard.readingAttendance')
             : lastGathering
-              ? `Through ${lastGathering.title}, ${formatShortDate(lastGathering.startAt)} · last ${held.length} ${scopeLabel}`
+              ? t('Dashboard.through', {
+                  gathering: lastGathering.title,
+                  date: formatShortDate(lastGathering.startAt),
+                  count: held.length,
+                  scope: scopeLabel,
+                })
               : recentEvents.length > 0
-                ? 'Nobody has been checked into any of the recent gatherings.'
-                : 'No gatherings on record yet.'}
+                ? t('Dashboard.nobodyCheckedIn')
+                : t('Dashboard.noGatherings')}
         </p>
         {skipped > 0 ? (
           <p className="mt-1 text-xs text-ink-600">
-            {skipped === 1
-              ? 'One scheduled gathering had nobody checked in, so it counts as cancelled here.'
-              : `${skipped} scheduled gatherings had nobody checked in, so they count as cancelled here.`}
+            {t('Dashboard.skippedGatherings', { count: skipped })}
           </p>
         ) : null}
       </header>
@@ -674,9 +684,9 @@ export function DashboardPage() {
           apart. A ministry with a single Friday sees the screen it always saw. */}
       {tabs.length > 1 ? (
         <TabBar
-          label="Show insights for"
+          label={t('Dashboard.tabsLabel')}
           options={[
-            { id: ALL, label: 'All' },
+            { id: ALL, label: t('Dashboard.tabAll') },
             ...tabs.map((gathering) => ({ id: gathering.key, label: gathering.title })),
           ]}
           selected={active}
@@ -687,12 +697,15 @@ export function DashboardPage() {
       {excluded.length > 0 ? (
         <p className="text-xs text-ink-500">
           {excluded.length === 1
-            ? `${excluded[0]} is not shown — you're not on it.`
-            : `${excluded.slice(0, -1).join(', ')} and ${excluded[excluded.length - 1]} are not shown — you're not on them.`}
+            ? t('Dashboard.excludedOne', { name: excluded[0]! })
+            : t('Dashboard.excludedMany', {
+                names: excluded.slice(0, -1).join(', '),
+                last: excluded[excluded.length - 1]!,
+              })}
         </p>
       ) : null}
 
-      {error ? <ErrorBanner message={`Could not load attendance history. ${error}`} /> : null}
+      {error ? <ErrorBanner message={t('Dashboard.historyError', { error })} /> : null}
 
       {/*
         No tiles at all until something has been recorded.
@@ -742,7 +755,7 @@ export function DashboardPage() {
       */}
       {awaiting ? (
         <span role="status" className="sr-only">
-          {awaitingRoster ? 'Loading the roster' : 'Loading attendance history'}
+          {awaitingRoster ? t('Common.loadingRoster') : t('Common.loadingHistory')}
         </span>
       ) : null}
 
@@ -773,8 +786,8 @@ export function DashboardPage() {
           {recentEvents.length === 0 ? (
             <Card>
               <EmptyState
-                title="No gatherings on record yet."
-                description="Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach."
+                title={t('Dashboard.emptyTitle')}
+                description={t('Dashboard.emptyBody')}
               />
             </Card>
           ) : (

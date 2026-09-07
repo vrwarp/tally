@@ -11,7 +11,7 @@
  * separately: it is what corrects the document when that script was blocked, or
  * when another tab changed the stored value while this one was closed.
  */
-import { act, render } from '@testing-library/react';
+import { act, render } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/context/ThemeProvider';
 import { useTheme, type ThemeContextValue } from '@/context/themeContext';

@@ -10,7 +10,7 @@
  * types `local_fire_department`.
  */
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { IconPickerField } from '@/features/events/IconPickerField';

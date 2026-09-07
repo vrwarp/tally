@@ -7,7 +7,7 @@
  * the Cloud Function's job and is tested in functions/src/pco.
  */
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DataContext, type DataContextValue } from '@/context/dataContext';

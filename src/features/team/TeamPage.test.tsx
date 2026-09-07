@@ -22,7 +22,7 @@
  * asserted on directly: every fix above adds something to the admin's view and
  * none of them may leak into theirs.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';

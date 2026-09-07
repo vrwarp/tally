@@ -7,7 +7,7 @@
  * asserted below is something somebody would otherwise get wrong at speed on a
  * Tuesday.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';

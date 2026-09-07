@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
@@ -33,17 +34,24 @@ const MENU_ITEM =
 
 interface NavItem {
   to: string;
-  label: string;
+  /**
+   * A key into `Nav.*`, not a word.
+   *
+   * This list is module-level — it is the same on every render and must not be
+   * rebuilt per paint — so it cannot call a hook. The label is looked up where
+   * it is drawn instead.
+   */
+  labelKey: 'checkIn' | 'insights' | 'events' | 'students' | 'review';
   icon: string;
   /** Core-team only. */
   core?: boolean;
 }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Check in', icon: '✓' },
-  { to: '/dashboard', label: 'Insights', icon: '◎', core: true },
-  { to: '/events', label: 'Events', icon: '▤', core: true },
-  { to: '/students', label: 'Students', icon: '☰', core: true },
+  { to: '/', labelKey: 'checkIn', icon: '✓' },
+  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true },
+  { to: '/events', labelKey: 'events', icon: '▤', core: true },
+  { to: '/students', labelKey: 'students', icon: '☰', core: true },
   /*
    * Review used to live only inside the account menu, on the argument that the
    * thumb bar is for the four things somebody does at a door. That argument
@@ -53,7 +61,7 @@ const NAV: NavItem[] = [
    * since a registration nobody looks at loses the family's phone number after
    * thirty days whether or not anyone knew it was waiting.
    */
-  { to: '/review', label: 'Review', icon: '▣', core: true },
+  { to: '/review', labelKey: 'review', icon: '▣', core: true },
 ];
 
 /**
@@ -71,6 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { profile, signOut, can } = useAuth();
   const { error } = useData();
   const location = useLocation();
+  const t = useTranslations();
   const [menuOpen, setMenuOpen] = useState(false);
 
   /*
@@ -142,7 +151,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           existed there was no link to that screen for one. The kiosk's own
           screen sent them to Settings, which a counselor cannot open. */}
       <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-        Kiosk
+        {t('Nav.kiosk')}
       </NavLink>
       {can('core') ? (
         <>
@@ -152,7 +161,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               to be the last card on that page, which put "who can see a roster
               of minors" below a colour picker and an API connection. */}
           <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-            Team
+            {t('Nav.team')}
           </NavLink>
           <NavLink
             to="/settings"
@@ -160,7 +169,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMenuOpen(false)}
             className={MENU_ITEM}
           >
-            Settings
+            {t('Nav.settings')}
           </NavLink>
         </>
       ) : null}
@@ -267,7 +276,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span aria-hidden="true" className="text-base leading-none">
                   {item.icon}
                 </span>
-                {item.label}
+                {t(`Nav.${item.labelKey}`)}
               </NavLink>
             ))}
           </nav>
@@ -356,7 +365,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <span aria-hidden="true" className="text-base leading-none">
                       {item.icon}
                     </span>
-                    {item.label}
+                    {t(`Nav.${item.labelKey}`)}
                   </NavLink>
                 </li>
               ))}

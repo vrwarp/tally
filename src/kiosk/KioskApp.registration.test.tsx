@@ -12,7 +12,7 @@
  *   - a kiosk mid-wizard not counting as idle, so the binding cannot expire
  *     under a parent halfway through typing their children in.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';

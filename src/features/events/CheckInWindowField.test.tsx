@@ -7,7 +7,7 @@
  * case where staying shut would be indefensible, which is an error inside.
  */
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { CheckInWindowField } from '@/features/events/CheckInWindowField';

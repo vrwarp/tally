@@ -5,7 +5,7 @@
  * it worked comes from this component: the count in the toast, the disable at
  * zero, and the named refusal when the roster underneath is not trustworthy.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportCsvButton } from '@/components/ExportCsvButton';

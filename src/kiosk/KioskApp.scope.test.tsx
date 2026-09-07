@@ -14,7 +14,7 @@
  * the children in the building tonight, the sibling search behind the door, and
  * the gathering that has no history to scope by at all.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';

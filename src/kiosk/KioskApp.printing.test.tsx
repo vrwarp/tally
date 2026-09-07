@@ -16,7 +16,7 @@
  * check-in. The tick is painted before the write and before the label, and a
  * printer that throws must leave that untouched.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';

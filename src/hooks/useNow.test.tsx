@@ -7,7 +7,7 @@
  * throttle timers in a background tab, so the two resync events are what
  * actually make coming back to the app correct rather than merely eventual.
  */
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useNow } from '@/hooks/useNow';
 

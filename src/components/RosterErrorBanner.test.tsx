@@ -6,7 +6,7 @@
  * said "No students on the roster yet" while `getRoster` returned 503 on every
  * call. Any change that puts Tally back to saying nothing should fail here.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';

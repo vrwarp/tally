@@ -14,7 +14,7 @@
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';

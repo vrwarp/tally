@@ -5,7 +5,7 @@
  * a rule is only choosable if the dropdown says which Tuesday it means.
  */
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { RecurrenceField } from '@/features/events/RecurrenceField';

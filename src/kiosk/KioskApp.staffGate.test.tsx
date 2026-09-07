@@ -19,7 +19,7 @@
  * and leaving is one of its doors, so the prompt below is two taps away rather
  * than one, and everything that was true of it is still true when it arrives.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';

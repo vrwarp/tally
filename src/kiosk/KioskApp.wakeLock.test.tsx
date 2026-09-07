@@ -11,7 +11,7 @@
  * The API is faked wholesale. jsdom has no `navigator.wakeLock` at all, which is
  * also the case this has to cover for a real older iPad.
  */
-import { act, render } from '@testing-library/react';
+import { act, render } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';

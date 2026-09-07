@@ -11,7 +11,7 @@
  *
  * None of that had a test. The whole in-flight branch was never executed.
  */
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';

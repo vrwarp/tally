@@ -12,7 +12,7 @@
  * unless the hook says which it is. It used to render a Show contact button
  * that did nothing at all when tapped, for the rest of the session.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

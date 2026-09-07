@@ -15,7 +15,7 @@
  * a door pays nothing for it; a listener that outlived its screen would undo
  * that.
  */
-import { act, render } from '@testing-library/react';
+import { act, render } from '@/test/rtl';
 import { describe, expect, it, vi } from 'vitest';
 import { useTransitions } from '@/hooks/useTransitions';
 import type { Transition } from '@/types';

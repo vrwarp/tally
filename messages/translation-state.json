@@ -1,0 +1,227 @@
+{
+  "Common.language": {
+    "source": "Language",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.loadingRoster": {
+    "source": "Loading the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.loadingHistory": {
+    "source": "Loading attendance history",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.checkIn": {
+    "source": "Check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.insights": {
+    "source": "Insights",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.events": {
+    "source": "Events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.students": {
+    "source": "Students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.review": {
+    "source": "Review",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.kiosk": {
+    "source": "Kiosk",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.team": {
+    "source": "Team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Nav.settings": {
+    "source": "Settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.title": {
+    "source": "Insights",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.loading": {
+    "source": "Loading insights…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.readingAttendance": {
+    "source": "Reading the recent attendance…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.through": {
+    "source": "Through {gathering}, {date} · last {count} {scope}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.scopeOfGathering": {
+    "source": "of {gathering}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.scopeAcrossAll": {
+    "source": "{count, plural, one {gathering} other {gatherings}}, across every one",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.nobodyCheckedIn": {
+    "source": "Nobody has been checked into any of the recent gatherings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.noGatherings": {
+    "source": "No gatherings on record yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.skippedGatherings": {
+    "source": "{count, plural, one {One scheduled gathering had nobody checked in, so it counts as cancelled here.} other {{count} scheduled gatherings had nobody checked in, so they count as cancelled here.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tabsLabel": {
+    "source": "Show insights for",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tabAll": {
+    "source": "All",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.excludedOne": {
+    "source": "{name} is not shown — you're not on it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.excludedMany": {
+    "source": "{names} and {last} are not shown — you're not on them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.historyError": {
+    "source": "Could not load attendance history. {error}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.emptyTitle": {
+    "source": "No gatherings on record yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.emptyBody": {
+    "source": "Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileLastGathering": {
+    "source": "Last gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileMia": {
+    "source": "MIA",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileMiaHint": {
+    "source": "{threshold}+ missed in a row",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileNewFaces": {
+    "source": "New faces",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileNewFacesHint": {
+    "source": "last {days} days",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileIncomplete": {
+    "source": "Incomplete",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileIncompleteHint": {
+    "source": "no contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileCheckedOut": {
+    "source": "Checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.tileCheckedOutHint": {
+    "source": "of check-ins on check-out gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.changeFirst": {
+    "source": "first one in this window",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.changeSame": {
+    "source": "same as the {count} before",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.changeDelta": {
+    "source": "{delta} vs {previous} before",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.deltaWithGathering": {
+    "source": "{gathering} · {change}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.releaseFailed": {
+    "source": "Could not save the release. Nothing changed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.undoFailed": {
+    "source": "Could not undo the release.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.thisGathering": {
+    "source": "this gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.someoneUnknown": {
+    "source": "Someone no longer on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Dashboard.somebody": {
+    "source": "Somebody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  }
+}

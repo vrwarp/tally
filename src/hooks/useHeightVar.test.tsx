@@ -8,7 +8,7 @@
  * taken away on unmount rather than left behind to strand whatever sticks under
  * it.
  */
-import { render, renderHook } from '@testing-library/react';
+import { render, renderHook } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHeightVar } from '@/hooks/useHeightVar';
 

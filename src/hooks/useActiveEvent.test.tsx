@@ -14,7 +14,7 @@
  * screen for the entire time it was open.
  */
 import type { ReactNode } from 'react';
-import { renderHook } from '@testing-library/react';
+import { renderHook } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
