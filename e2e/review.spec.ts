@@ -41,6 +41,8 @@ async function enterChild(kiosk: Page, first: string, last: string, grade: strin
   await typeOnKiosk(kiosk, last);
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
   await kiosk.getByRole('button', { name: grade, exact: true }).click();
+  // A chip selects; Next commits, the same shape every other question has.
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
 }
 
 /** Registers one child through the on-kiosk wizard, start to sticker. */
@@ -48,8 +50,8 @@ async function registerAtKiosk(kiosk: Page, first: string, surname: string): Pro
   // One tap: the wizard is the front door now that the QR screen is retired.
   await kiosk.getByRole('button', { name: /Register your child/i }).click();
   await enterChild(kiosk, first, surname, '4th grade');
-  await kiosk.getByRole('button', { name: /That's everyone/i }).click();
-
+  // The adult follows the child directly — the "anybody else?" fork moved onto
+  // the confirm, where the family is written out.
   await typeOnKiosk(kiosk, 'Renata');
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
   await kiosk.locator('[data-key="clear"]').click();
@@ -57,7 +59,8 @@ async function registerAtKiosk(kiosk: Page, first: string, surname: string): Pro
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
   await typeOnKiosk(kiosk, PHONE);
   await kiosk.getByRole('button', { name: /^Next$/ }).click();
-  await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+  // The commit names who it checks in, which is never the guardian.
+  await kiosk.getByRole('button', { name: `Check in ${first}` }).click();
 
   await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
 }

@@ -225,29 +225,53 @@ async function type(text: string): Promise<void> {
 }
 
 /** One child, through the three questions and the fork. */
+/** A row of the question list, which is a button once it has an answer. */
+async function tapRow(id: string): Promise<void> {
+  const row = screen.getByTestId(`question-${id}`);
+  await act(async () => {
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
+  });
+  await settle();
+}
+
 async function enterChild(first: string, last: string, grade: string): Promise<void> {
   await type(first);
   await tap('Next');
   await tap('Clear');
   await type(last);
   await tap('Next');
+  // A chip selects rather than advancing now; Next leaves the question, as on
+  // every other step.
   await tap(grade);
+  await tap('Next');
 }
 
-/** The whole wizard, up to but not including the final button. */
+/** The adult's three questions, from their first name to the confirm. */
+async function enterGuardian(first: string, last: string, phone: string): Promise<void> {
+  await type(first);
+  await tap('Next');
+  await tap('Clear');
+  await type(last);
+  await tap('Next');
+  await type(phone);
+  await tap('Next');
+}
+
+/**
+ * The whole wizard, up to but not including the final button.
+ *
+ * The second child is added from the confirm screen, which is the only place
+ * that offers it now: the "Anybody else?" screen that used to stand between the
+ * children and the adult asked every family a question most of them answer
+ * "no" to, about a list the confirm shows again four screens later.
+ */
 async function fillInTheFamily(): Promise<void> {
   await tap(/Register your child/);
   await enterChild('Robin', 'Fields', '4');
+  await enterGuardian('Dana', 'Fields', '5550103344');
   await tap('Add another child');
   await enterChild('Sam', 'Fields', '2');
-  await tap("That's everyone");
-  await type('Dana');
-  await tap('Next');
-  await tap('Clear');
-  await type('Fields');
-  await tap('Next');
-  await type('5550103344');
-  await tap('Next');
 }
 
 beforeEach(() => {
@@ -323,7 +347,7 @@ describe('registering a family', () => {
   it('sends one call for the whole family, checked in against this gathering', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.eventId).toBe('friday-today');
@@ -342,7 +366,7 @@ describe('registering a family', () => {
   it('teaches the family their four digits before it lets them go', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
 
     expect(screen.getByText('Robin and Sam are checked in. Welcome!')).toBeTruthy();
     expect(screen.getByText('3344')).toBeTruthy();
@@ -352,7 +376,7 @@ describe('registering a family', () => {
     configurePrinter();
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(2);
     expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
@@ -362,7 +386,7 @@ describe('registering a family', () => {
   it('leaves the family searchable by name and by their digits, at once', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
     await tap('Done');
 
     // Nothing was refetched: the server patched the index, and the answer that
@@ -379,7 +403,7 @@ describe('registering a family', () => {
   it('shows them as checked in, so a second family cannot re-tap them', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
     await tap('Done');
     await type('Robin');
 
@@ -403,8 +427,10 @@ describe('the four things a parent touches', () => {
     await tap('Clear');
     await type('Fields');
     await tap('Next');
+    expect(screen.getAllByText('What grade are they in?').length).toBeGreaterThan(0);
+
     await tap('4');
-    await tap("That's everyone");
+    await tap('Next');
     expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
     /*
      * And the header is not the same words again. It carries the gathering,
@@ -413,6 +439,73 @@ describe('the four things a parent touches', () => {
      * the smallest text on the screen and once as the loudest object on it.
      */
     expect(screen.getAllByText('Friday Fellowship').length).toBeGreaterThan(0);
+  });
+
+  it('shows the whole run, so the adult’s half is not a surprise', async () => {
+    /*
+     * The "Anybody else?" screen used to stand between the children and the
+     * adult, and however badly its **That's everyone** read, it was a visible
+     * seam. Without one, three questions about the adult would arrive in a
+     * frame identical to the four before them — so the run is on the glass
+     * from the first question, named rather than counted.
+     */
+    await mount();
+    await tap(/Register your child/);
+
+    expect(screen.getByTestId('question-child-0-child-first')).toHaveAttribute(
+      'data-state',
+      'now',
+    );
+    for (const id of ['adult-guardian-first', 'adult-guardian-last', 'adult-guardian-phone']) {
+      expect(screen.getByTestId(`question-${id}`)).toHaveAttribute('data-state', 'todo');
+    }
+
+    // And the answers fill in behind, so a name typed forty seconds ago can be
+    // checked without pressing Back four times to reach it.
+    await enterChild('Robin', 'Fields', '4');
+    expect(screen.getByTestId('question-child-0-child-first')).toHaveTextContent('Robin');
+    expect(screen.getByTestId('question-child-0-child-grade')).toHaveTextContent('4th');
+    expect(screen.getByTestId('question-adult-guardian-first')).toHaveAttribute(
+      'data-state',
+      'now',
+    );
+  });
+
+  it('reopens the child a parent backs out of, rather than a nameless one', async () => {
+    /*
+     * Banking the child mints a blank draft behind them, so a parent who
+     * answered the last child question and then pressed Back used to reopen a
+     * child with no name — and pressing on banked that blank for real, which
+     * the callable refused. Changing your mind once cost the registration.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
+
+    await tap(/Back/);
+
+    // Back on the grade chips, for the child whose grade they are.
+    expect(screen.getAllByText('What grade are they in?').length).toBeGreaterThan(0);
+    await tap('4');
+    await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+
+    // One child on the confirm, not one and a blank — and the commit names
+    // them, so a phantom second child would show in the button itself.
+    expect(screen.getByText('Check in Robin')).toBeTruthy();
+    expect(screen.getAllByText('Robin').length).toBeGreaterThan(0);
+  });
+
+  it('shows where the letters will land, before any have', async () => {
+    /*
+     * The readout is a div and never an input, and deliberately not a box
+     * either — so until somebody types it looks like nothing at all, on a step
+     * that has only just opened. The caret is the whole of what says otherwise.
+     */
+    await mount();
+    await tap(/Register your child/);
+    expect(screen.getByTestId('readout-caret')).toBeTruthy();
   });
 
   it('offers a shift key, and types what the key is showing', async () => {
@@ -436,7 +529,6 @@ describe('the four things a parent touches', () => {
     await mount();
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
-    await tap("That's everyone");
     await type('Dana');
     await tap('Next');
     await tap('Clear');
@@ -463,28 +555,125 @@ describe('the four things a parent touches', () => {
 
     expect(screen.queryByText('-1')).toBeNull();
     await tap('Pre-K');
+    await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
 
     // And it is a real answer, not a blank: the wizard records the year.
-    expect(screen.getByText('Robin Fields')).toBeTruthy();
+    expect(screen.getByText('Check in Robin')).toBeTruthy();
     expect(screen.getByText('Pre-K')).toBeTruthy();
   });
 
-  it('shows the children so far when it asks whether there are more', async () => {
-    // The question is "anybody else?", and the parent of four cannot answer it
-    // against their memory of what they typed forty seconds ago.
+  it('lets a parent tap a name three screens back and puts them where they were', async () => {
+    /*
+     * The repair Back could not give them. The row somebody wants is usually a
+     * banked child's, and Back un-banks its way there — so fixing one letter
+     * meant walking the whole run forwards again, in front of a queue.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Feilds', '4');
+    await type('Dana');
+    await tap('Next');
+    expect(screen.getAllByText('Your last name').length).toBeGreaterThan(0);
+
+    // Three screens back, already committed, and one tap away.
+    await tapRow('child-0-child-last');
+    expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+
+    // And the header names the child whose question it is, not the one that
+    // would be next: they are fixing their first child, not starting a second.
+    expect(screen.getAllByText('Your child').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Child 2')).toBeNull();
+
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    // Back on the adult's surname, which is where they were.
+    expect(screen.getAllByText('Your last name').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('question-child-0-child-last')).toHaveTextContent('Fields');
+  });
+
+  it('repairs a wrong answer from the confirm itself, and comes back to it', async () => {
+    /*
+     * The whole argument for keeping the list on the confirm. The screen that
+     * asks a parent to check their typing used to be the one screen where the
+     * rows stopped being buttons — so repair got harder at the exact moment it
+     * was asked for, and the only ways back were Back and Cancel.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Feilds', '4');
+    await enterGuardian('Dana', 'Feilds', '5550103344');
+    expect(screen.getByText('Check in Robin')).toBeTruthy();
+
+    await tapRow('child-0-child-last');
+    expect(screen.getAllByText("Child's last name").length).toBeGreaterThan(0);
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+
+    // Straight back to the confirm, corrected — not five screens of walking.
+    expect(screen.getByText('Check in Robin')).toBeTruthy();
+    expect(screen.getByTestId('question-child-0-child-last')).toHaveTextContent('Fields');
+  });
+
+  it('names on the commit what it is about to check in, and only that', async () => {
+    /*
+     * "Check in everyone" named a set the kiosk does not act on: the guardian
+     * is the last row on this screen and is never checked in — one attendance
+     * row is written per child and only per child. The button says what it
+     * does instead, which leaves the ambiguity nowhere to live.
+     */
     await mount();
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    expect(screen.getByText('Check in Robin')).toBeTruthy();
+    expect(screen.queryByText(/everyone/i)).toBeNull();
 
-    expect(screen.getByText('Robin Fields')).toBeTruthy();
-    expect(screen.getByText('4th grade')).toBeTruthy();
+    await tap('Add another child');
+    await enterChild('Sam', 'Fields', '2');
+    expect(screen.getByText('Check in Robin and Sam')).toBeTruthy();
+
+    // Past two it counts rather than lists — six names would not fit a button.
+    await tap('Add another child');
+    await enterChild('Wren', 'Fields', '1');
+    expect(screen.getByText('Check in 3 children')).toBeTruthy();
+
+    // And the adult is on the glass throughout, under their own heading rather
+    // than as an unlabelled third row of a check-in list.
+    expect(screen.getAllByText('And you').length).toBeGreaterThan(0);
+  });
+
+  it('shows the children on the screen that offers another one', async () => {
+    /*
+     * "Anybody else?" cannot be answered against a parent's memory of what they
+     * typed forty seconds ago — least of all the parent of four, who is exactly
+     * who the loop exists for. So the offer stands against the list, on the
+     * screen where the family is written out and a missing child is noticed by
+     * reading rather than by remembering.
+     */
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+
+    // The run itself, still on the glass — the confirm keeps the list rather
+    // than replacing it with a receipt of the same facts.
+    expect(screen.getByText('Robin')).toBeTruthy();
+    expect(screen.getAllByText('Fields').length).toBeGreaterThan(0);
+    expect(screen.getByText('4th')).toBeTruthy();
+    expect(screen.getByText('Anyone else to add?')).toBeTruthy();
+    expect(screen.getByText('Add another child')).toBeTruthy();
 
     await tap('Add another child');
     await enterChild('Sam', 'Fields', '2');
 
     // Both of them, including the one just added.
-    expect(screen.getByText('Robin Fields')).toBeTruthy();
-    expect(screen.getByText('Sam Fields')).toBeTruthy();
+    expect(screen.getByText('Robin')).toBeTruthy();
+    expect(screen.getByText('Sam')).toBeTruthy();
+    expect(screen.getByText('Check in Robin and Sam')).toBeTruthy();
   });
 });
 
@@ -504,7 +693,7 @@ describe('when it does not work', () => {
     registerFails = true;
     await mount();
     await fillInTheFamily();
-    await tap('Check in everyone');
+    await tap('Check in Robin and Sam');
 
     expect(screen.getByText(/please see a leader/)).toBeTruthy();
 
@@ -564,35 +753,53 @@ describe('the clock', () => {
 describe('the allergies question, where the backend can carry it', () => {
   const asking = () => binding({ allergiesSupported: true });
 
-  const tick = () => screen.getByRole('checkbox', { name: /No allergies/i });
+  const button = (label: string) =>
+    screen.getByText(label).closest('button') as HTMLButtonElement;
 
-  it('asks after the grade, and the tick answers "none"', async () => {
+  it('asks after the grade, and answers "none" in one press', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
     expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
-    expect(tick().getAttribute('aria-checked')).toBe('false');
 
+    // One press, not a tick and then a Next: the commonest answer costs what
+    // it is worth.
     await tap('No allergies');
-    expect(tick().getAttribute('aria-checked')).toBe('true');
-    await tap('Next');
-    expect(screen.getByText('Anybody else?')).toBeTruthy();
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
   });
 
-  it('still takes an empty box as none, because the question is optional', async () => {
+  it('leaves Next dead until a note is typed', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
-    // Nothing typed and nothing ticked. Pressing on has always been an answer
-    // rather than a skip, and the tick did not change that — it only gave the
-    // answer somewhere to be *said*, so nobody types it into the box.
+    /*
+     * Two buttons that both committed an empty note could not say which one a
+     * parent was meant to press. So the rule every other question keeps holds
+     * here too: Next is lit when the box holds the answer it would send.
+     */
+    expect(button('Next').disabled).toBe(true);
     await tap('Next');
-    expect(screen.getByText('Anybody else?')).toBeTruthy();
+    expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
+
+    await type('Peanuts');
+    expect(button('Next').disabled).toBe(false);
   });
 
-  it('empties the box and stops the keys when the tick goes on', async () => {
+  it('keeps the keyboard live and the caret blinking throughout', async () => {
+    // Nothing on this step is ever withdrawn now — there is no state to be in,
+    // only two answers to give.
+    await mount(asking());
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+
+    expect(screen.getByTestId('readout-caret').className).not.toContain('still');
+    await type('Peanuts');
+    expect(screen.getByText('Peanuts')).toBeTruthy();
+  });
+
+  it('records none whatever had been typed before', async () => {
     await mount(asking());
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
@@ -600,27 +807,11 @@ describe('the allergies question, where the backend can carry it', () => {
     await type('Peanuts');
     expect(screen.getByText('Peanuts')).toBeTruthy();
 
-    // Ticking clears what was typed rather than hiding it behind a grey panel
-    // for the next press to commit.
+    // The press is the answer, not a label on the box: a parent who thought
+    // better of the note is saying there is nothing to report.
     await tap('No allergies');
-    expect(screen.queryByText('Peanuts')).toBeNull();
-
-    /*
-     * And the keyboard is out of use: keys pressed now must not refill the box
-     * the tick just emptied.
-     *
-     * Two letters rather than one, because every single letter is also the
-     * face of a key — `queryByText('X')` finds the keyboard whether or not
-     * anything was typed. A pair can only be the readout. Asserted through the
-     * state machine rather than through CSS, too: jsdom does not enforce
-     * `pointer-events-none`, so this proves `applyKey` refuses the keystroke
-     * rather than proving the class name is present.
-     */
-    await type('XY');
-    expect(screen.queryByText(/^XY$/i)).toBeNull();
-
-    await tap('Next');
-    expect(screen.getByText('Anybody else?')).toBeTruthy();
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    expect(screen.queryByText(/Allergies:/)).toBeNull();
   });
 
   it('never asks where the binding is silent', async () => {
@@ -628,7 +819,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
     expect(screen.queryByText(/Any allergies/i)).toBeNull();
-    expect(screen.getByText('Anybody else?')).toBeTruthy();
+    expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
   });
 
   it('carries a typed note through to the confirm', async () => {
@@ -637,22 +828,14 @@ describe('the allergies question, where the backend can carry it', () => {
     await enterChild('Robin', 'Fields', '4');
 
     await type('Peanuts');
-    // The tick stays put and stays off while a note is being typed — it is a
-    // state to read, not a button that has been spent.
-    expect(tick().getAttribute('aria-checked')).toBe('false');
     await tap('Next');
-    await tap("That's everyone");
-    await type('Dana');
-    await tap('Next');
-    await tap('Clear');
-    await type('Fields');
-    await tap('Next');
-    await type('5550103344');
-    await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
 
     // The family checking their own typing — the one moment the reader is the
-    // writer, before this becomes a record a reviewer acts on.
-    expect(screen.getByText('Allergies: Peanuts')).toBeTruthy();
+    // writer, before this becomes a record a reviewer acts on. Under its own
+    // label now, on the row that asked for it.
+    expect(screen.getByText('Peanuts')).toBeTruthy();
+    expect(screen.getAllByText('Allergies').length).toBeGreaterThan(0);
   });
 
   it('sends the notes beside the children, and only when one was typed', async () => {
@@ -661,19 +844,11 @@ describe('the allergies question, where the backend can carry it', () => {
     await enterChild('Robin', 'Fields', '4');
     await type('Peanuts');
     await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
     await tap('Add another child');
     await enterChild('Sam', 'Fields', '2');
     await tap('No allergies');
-    await tap('Next');
-    await tap("That's everyone");
-    await type('Dana');
-    await tap('Next');
-    await tap('Clear');
-    await type('Fields');
-    await tap('Next');
-    await type('5550103344');
-    await tap('Next');
-    await tap(/Check in everyone/);
+    await tap('Check in Robin and Sam');
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.allergies).toEqual(['Peanuts', null]);
@@ -689,16 +864,8 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
     await tap('No allergies');
-    await tap('Next');
-    await tap("That's everyone");
-    await type('Dana');
-    await tap('Next');
-    await tap('Clear');
-    await type('Fields');
-    await tap('Next');
-    await type('5550103344');
-    await tap('Next');
-    await tap(/^Check in$/);
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    await tap('Check in Robin');
 
     expect(sent).toHaveLength(1);
     // Not [null] — absent. An all-null array says nothing, and omitting it

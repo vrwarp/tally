@@ -247,7 +247,8 @@ const SCENES: {
       'F', 'O', 'X', 'Next',
       '7th grade',
       'Next',
-      "That's everyone",
+      // The adult follows the child directly now; "anybody else?" is asked on
+      // the confirm this scene ends on.
       'A', 'M', 'Next',
       'F', 'O', 'X', 'Next',
       '5', '5', '5', '0', '1', '2', '3', '4', '5', '6', 'Next',

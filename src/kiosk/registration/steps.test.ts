@@ -7,23 +7,25 @@
  * from, and that the loop banks a child before it asks about the next one.
  */
 import { describe, expect, it } from 'vitest';
-import type { Grade } from '@/types';
+import { PRE_K, type Grade } from '@/types';
 import type { ShiftState } from '../components/Keyboard';
 import {
+  addAnotherChild,
   advance,
-  answerAnother,
   applyKey,
   canAdvance,
   chooseGrade,
   defaultGrade,
-  familyOf,
   formatPhone,
+  questionList,
+  readoutFor,
+  reopen,
   goBack,
   initialState,
   MAX_CHILDREN,
   NAME_MAX_LENGTH,
   PHONE_LENGTH,
-  toggleNoAllergies,
+  answerNoAllergies,
   type RegistrationState,
 } from './steps';
 
@@ -38,7 +40,13 @@ function typeText(state: RegistrationState, text: string): RegistrationState {
   );
 }
 
-/** One child, through their three questions, to the "anybody else" fork. */
+/**
+ * One child, through their questions and banked.
+ *
+ * Where that lands depends on the run: the first child of a family run goes on
+ * to the adult, and every child after the adult has been answered goes to the
+ * confirm. See `stepAfterChildQuestions`.
+ */
 function addChild(
   state: RegistrationState,
   firstName: string,
@@ -48,7 +56,20 @@ function addChild(
   let held = advance(typeText(state, firstName));
   // The last-name step opens prefilled; clear it before typing this child's.
   held = advance(typeText(applyKey(held, { kind: 'clear' }), lastName));
-  return chooseGrade(held, grade);
+  // A chip selects; Next is what leaves the question, as on every other step.
+  return advance(chooseGrade(held, grade));
+}
+
+/** The adult's three questions, from their first name to the confirm. */
+function addGuardian(
+  state: RegistrationState,
+  firstName: string,
+  lastName: string,
+  phone: string,
+): RegistrationState {
+  let held = advance(typeText(state, firstName));
+  held = advance(typeText(applyKey(held, { kind: 'clear' }), lastName));
+  return advance(typeText(held, phone));
 }
 
 describe('typing a name', () => {
@@ -133,7 +154,8 @@ describe('the shift key', () => {
     // The surname carried forward from the last child is already written; the
     // next keystroke belongs mid-word, not at the start of one.
     let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, true, false);
+    held = addGuardian(held, 'Anne', 'Lovelace', '5550103344');
+    held = addAnotherChild(held);
     expect(held.shift).toBe('on');
     held = advance(typeText(held, 'Byron'));
     expect(held.buffer).toBe('Lovelace');
@@ -143,9 +165,7 @@ describe('the shift key', () => {
 
 describe('typing a phone number', () => {
   function atPhone(): RegistrationState {
-    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, false, false);
-    held = advance(typeText(held, 'Anne'));
+    const held = advance(typeText(addChild(start(), 'Ada', 'Lovelace', 4 as Grade), 'Anne'));
     return advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
   }
 
@@ -169,17 +189,15 @@ describe('typing a phone number', () => {
 describe('the surnames', () => {
   it("opens the second child's last name on the first child's", () => {
     let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, true, false);
-    held = advance(typeText(held, 'Byron'));
+    held = addGuardian(held, 'Anne', 'Lovelace', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
 
     expect(held.step).toBe('child-last');
     expect(held.buffer).toBe('Lovelace');
   });
 
   it("opens the parent's last name on the family's", () => {
-    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, false, false);
-    held = advance(typeText(held, 'Anne'));
+    const held = advance(typeText(addChild(start(), 'Ada', 'Lovelace', 4 as Grade), 'Anne'));
 
     expect(held.step).toBe('guardian-last');
     expect(held.buffer).toBe('Lovelace');
@@ -194,7 +212,7 @@ describe('the surnames', () => {
 });
 
 describe('the loop', () => {
-  it('answers the fork only while the fork is on screen', () => {
+  it('adds another child only from the screen that offers it', () => {
     /*
      * Every one of these is a button on some other screen, and the wizard is
      * one shared state machine — a stray press mid-typing must be a press that
@@ -202,11 +220,11 @@ describe('the loop', () => {
      */
     const typing = typeText(start(), 'Ada');
 
-    expect(answerAnother(typing, true, false)).toBe(typing);
+    expect(addAnotherChild(typing)).toBe(typing);
     expect(chooseGrade(typing, 4 as Grade)).toBe(typing);
-    // And the draft is not part of the family until the fork is reached: a
-    // confirm list drawn mid-question would show a child nobody finished.
-    expect(familyOf(typing)).toEqual([]);
+    // And the draft is nobody's child until their last question is answered: a
+    // list drawn mid-question would show a child nobody finished.
+    expect(typing.children).toEqual([]);
   });
 
   it('advances nothing while the answer is not one', () => {
@@ -218,21 +236,20 @@ describe('the loop', () => {
     expect(advance(empty)).toBe(empty);
   });
 
-  it('banks the child on the fork, whichever way it is answered', () => {
-    const forked = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    expect(forked.step).toBe('another');
-    // Not banked yet — but shown, because the confirm list a parent is about to
-    // see has to include the child they just typed.
-    expect(forked.children).toHaveLength(0);
-    expect(familyOf(forked)).toHaveLength(1);
+  it('banks the child as their last question is answered', () => {
+    const banked = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
 
-    expect(answerAnother(forked, true, false).children).toHaveLength(1);
-    expect(answerAnother(forked, false, false).children).toHaveLength(1);
+    expect(banked.children).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+    // And the draft is clean behind them, ready for whoever comes next.
+    expect(banked.draft.firstName).toBe('');
   });
 
   it('starts the next child clean, on the same gathering default', () => {
     let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, true, false);
+    held = addGuardian(held, 'Anne', 'Lovelace', '5550103344');
+    held = addAnotherChild(held);
 
     expect(held.step).toBe('child-first');
     expect(held.buffer).toBe('');
@@ -242,10 +259,10 @@ describe('the loop', () => {
 
   it('collects a whole family in one run', () => {
     let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, true, false);
-    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
-    held = answerAnother(held, false, false);
+    held = addGuardian(held, 'Anne', 'Lovelace', '5550103344');
+    held = addChild(addAnotherChild(held), 'Byron', 'Lovelace', 1 as Grade);
 
+    expect(held.step).toBe('confirm');
     expect(held.children).toEqual([
       { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
       { firstName: 'Byron', lastName: 'Lovelace', grade: 1, allergies: '' },
@@ -266,9 +283,13 @@ describe('the whole state, at each transition', () => {
   const BASE: RegistrationState = {
     mode: 'family',
     step: 'child-first',
+    requiresCheckOut: false,
+    backFromConfirm: 'guardian-phone',
+    gradePicked: false,
+    editing: null,
+    resume: null,
     registrationId: 'r-1',
     allergiesSupported: false,
-    noAllergies: false,
     children: [],
     draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
     guardian: { firstName: '', lastName: '', phone: '' },
@@ -285,6 +306,7 @@ describe('the whole state, at each transition', () => {
   it('opens a gathering that hands children back on no grade', () => {
     expect(initialState({ registrationId: 'r-1', requiresCheckOut: true })).toEqual({
       ...BASE,
+      requiresCheckOut: true,
       draft: { ...BASE.draft, grade: null },
     });
   });
@@ -335,42 +357,45 @@ describe('the whole state, at each transition', () => {
     });
   });
 
-  it('goes from the grade straight to the fork when allergies are not asked', () => {
-    const graded = chooseGrade(
-      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
-      11 as Grade,
+  it('banks the child off the grade question when allergies are not asked', () => {
+    const graded = advance(
+      chooseGrade(advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')), 11 as Grade),
     );
 
     expect(graded).toEqual({
       ...BASE,
-      draft: { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' },
-      step: 'another',
+      children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
+      // The draft behind them is `BASE.draft` again — clean, on the gathering's
+      // own default, ready for whoever the parent adds next.
+      step: 'guardian-first',
       buffer: '',
       shift: 'on',
-      noAllergies: false,
     });
   });
 
-  it('banks the note and unticks the box on the way to the fork', () => {
+  it('banks the note as the child is banked', () => {
     const withAllergies = initialState({
       registrationId: 'r-1',
       requiresCheckOut: false,
       allergiesSupported: true,
     });
-    const asked = chooseGrade(
-      advance(typeText(advance(typeText(withAllergies, 'Ada')), 'Lovelace')),
-      11 as Grade,
+    const asked = advance(
+      chooseGrade(
+        advance(typeText(advance(typeText(withAllergies, 'Ada')), 'Lovelace')),
+        11 as Grade,
+      ),
     );
     expect(asked.step).toBe('child-allergies');
 
     expect(advance(typeText(asked, 'Peanuts'))).toEqual({
       ...BASE,
       allergiesSupported: true,
-      draft: { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' },
-      step: 'another',
+      children: [
+        { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' },
+      ],
+      step: 'guardian-first',
       buffer: '',
       shift: 'on',
-      noAllergies: false,
     });
   });
 
@@ -428,14 +453,15 @@ describe('the whole state, at each transition', () => {
   });
 
   it('starts the next child on a clean draft', () => {
-    const banked = chooseGrade(
-      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
-      11 as Grade,
-    );
-
-    expect(answerAnother(banked, true, false)).toEqual({
+    const atConfirm: RegistrationState = {
       ...BASE,
+      step: 'confirm',
       children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '5550103344' },
+    };
+
+    expect(addAnotherChild(atConfirm)).toEqual({
+      ...atConfirm,
       draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
       step: 'child-first',
       buffer: '',
@@ -443,42 +469,46 @@ describe('the whole state, at each transition', () => {
     });
   });
 
-  it('goes on to the adult when the family is done', () => {
-    const banked = chooseGrade(
-      advance(typeText(advance(typeText(start(), 'Ada')), 'Lovelace')),
-      11 as Grade,
-    );
+  it('goes to the adult the first time and back to the confirm after that', () => {
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    expect(held.step).toBe('guardian-first');
 
-    expect(answerAnother(banked, false, false)).toEqual({
-      ...BASE,
-      children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
-      draft: { firstName: '', lastName: '', grade: 9 as Grade, allergies: '' },
-      step: 'guardian-first',
-      buffer: '',
-      shift: 'on',
-    });
+    /*
+     * A parent who came back from the confirm for another child has already
+     * answered the adult's three questions. Asking again would be three
+     * questions to learn nothing, and one more chance to mistype a name.
+     */
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = addChild(addAnotherChild(held), 'Byron', 'Lovelace', 1 as Grade);
+
+    expect(held.step).toBe('confirm');
+    // And Back from there reopens that child, not the parent's number.
+    expect(goBack(held)).toMatchObject({ step: 'child-grade' });
   });
 
   it('carries the gathering default onto the next child too', () => {
-    const banked = chooseGrade(
-      advance(typeText(advance(typeText(start(true), 'Ada')), 'Lovelace')),
-      11 as Grade,
-    );
+    let held = addChild(start(true), 'Ada', 'Lovelace', 11 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
 
-    expect(answerAnother(banked, true, true).draft.grade).toBeNull();
+    expect(addAnotherChild(held).draft.grade).toBeNull();
   });
 
-  it('stops looping once the family is as large as the kiosk will take', () => {
-    let held = start();
-    for (let index = 0; index < MAX_CHILDREN - 1; index += 1) {
-      held = answerAnother(addChild(held, `Child${index}`, 'Osei', 9 as Grade), true, false);
-      expect(held.step).toBe('child-first');
+  it('stops offering another child once the family is as large as the kiosk will take', () => {
+    let held = addGuardian(
+      addChild(start(), 'Child0', 'Osei', 9 as Grade),
+      'Dana',
+      'Osei',
+      '5550103344',
+    );
+    for (let index = 1; index < MAX_CHILDREN; index += 1) {
+      held = addChild(addAnotherChild(held), `Child${index}`, 'Osei', 9 as Grade);
+      expect(held.step).toBe('confirm');
     }
+    expect(held.children).toHaveLength(MAX_CHILDREN);
 
-    // The sixth is banked and the loop closes rather than offering a seventh.
-    const full = answerAnother(addChild(held, 'Child5', 'Osei', 9 as Grade), true, false);
-    expect(full.children).toHaveLength(MAX_CHILDREN);
-    expect(full.step).toBe('guardian-first');
+    // The seventh is a leader's job. The offer does nothing rather than opening
+    // a question whose answer could not be banked.
+    expect(addAnotherChild(held)).toBe(held);
   });
 
   it('clears the error message on the way back to confirm', () => {
@@ -497,10 +527,16 @@ describe('the whole state, at each transition', () => {
       allergiesSupported: true,
       step: 'child-allergies',
       buffer: 'Peanuts',
-      noAllergies: true,
     };
 
-    expect(goBack(atAllergies)).toEqual({ ...atAllergies, step: 'child-grade', buffer: '', shift: 'on' });
+    expect(goBack(atAllergies)).toEqual({
+      ...atAllergies,
+      step: 'child-grade',
+      buffer: '',
+      shift: 'on',
+      // Answered once already, so Next is not dead on the way back.
+      gradePicked: true,
+    });
   });
 
   it('reopens each earlier question with its own answer', () => {
@@ -518,11 +554,11 @@ describe('the whole state, at each transition', () => {
       buffer: 'Lovelace',
       shift: 'off',
     });
-    expect(goBack({ ...held, step: 'guardian-first' })).toMatchObject({
-      step: 'another',
-      buffer: '',
-      shift: 'on',
-    });
+    // The adult's first question steps back into the last child's own, which
+    // means un-banking them — see `reopenLastChild`.
+    expect(
+      goBack({ ...held, step: 'guardian-first', children: [draft], draft: BASE.draft }),
+    ).toMatchObject({ step: 'child-grade', buffer: '', shift: 'on' });
     expect(goBack({ ...held, step: 'guardian-last' })).toMatchObject({
       step: 'guardian-first',
       buffer: 'Dana',
@@ -535,29 +571,551 @@ describe('the whole state, at each transition', () => {
     });
   });
 
-  it('reopens the allergy note unticked, from the fork', () => {
-    const draft = { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' };
-    const atFork: RegistrationState = {
+  it('reopens the allergy note, from the step after it', () => {
+    const child = { firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: 'Peanuts' };
+    const banked: RegistrationState = {
       ...BASE,
       allergiesSupported: true,
-      step: 'another',
-      draft,
-      noAllergies: true,
+      step: 'guardian-first',
+      children: [child],
     };
 
-    expect(goBack(atFork)).toEqual({
-      ...atFork,
+    expect(goBack(banked)).toEqual({
+      ...banked,
+      children: [],
+      draft: child,
       step: 'child-allergies',
       buffer: 'Peanuts',
       shift: 'off',
-      noAllergies: false,
     });
+  });
+
+  it('goes back to the confirm from a child added out of it', () => {
+    /*
+     * The first question of a run has nowhere back and closes the wizard. The
+     * first question of a child added from the confirm has somewhere: back to
+     * the confirm, abandoning the half-typed child rather than the whole
+     * registration a parent has already answered six questions for.
+     */
+    const adding: RegistrationState = {
+      ...BASE,
+      step: 'child-first',
+      children: [{ firstName: 'Ada', lastName: 'Lovelace', grade: 11 as Grade, allergies: '' }],
+      guardian: { firstName: 'Dana', lastName: 'Rivera', phone: '5550103344' },
+      buffer: 'By',
+    };
+
+    expect(goBack(adding)).toMatchObject({ step: 'confirm', buffer: '' });
+    expect(goBack({ ...adding, children: [] })).toBeNull();
   });
 
   it('has nowhere to go back to from a step with no question behind it', () => {
     for (const step of ['submitting', 'success'] as const) {
       expect(goBack({ ...BASE, step })).toBeNull();
     }
+  });
+});
+
+
+/**
+ * The list the wizard draws beside the question.
+ *
+ * A pure derivation, which is the whole reason it lives here: what a parent
+ * sees of their own run — what is answered, what is being answered, and what is
+ * still to come — is decided by rules, and the rules are worth pinning without
+ * rendering anything.
+ */
+describe('the list of questions', () => {
+  const labels = (state: RegistrationState) =>
+    questionList(state).map((section) => [
+      section.title,
+      ...section.rows.map((row) => `${row.state} ${row.label} ${row.answer}`.trim()),
+    ]);
+
+  it('names every question in the run before any of them is answered', () => {
+    // The forewarning the deleted fork used to carry, and then some: a parent
+    // on the first question can see that the adult's three are coming.
+    expect(labels(start())).toEqual([
+      ['Your child', 'now First name', 'todo Last name', 'todo Grade'],
+      ['And you', 'todo First name', 'todo Last name', 'todo Phone'],
+    ]);
+  });
+
+  it('asks about allergies only where the binding says the answer can land', () => {
+    const asking = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+
+    expect(questionList(asking)[0]!.rows.map((row) => row.label)).toEqual([
+      'First name',
+      'Last name',
+      'Grade',
+      'Allergies',
+    ]);
+  });
+
+  it('shows no answer on a question nobody has reached', () => {
+    /*
+     * The draft opens on this gathering's default grade, and it is a real value
+     * on the record from the first keystroke. Printing it beside "Grade" would
+     * tell a family they had answered a question nobody asked them.
+     */
+    const typing = typeText(start(), 'Ada');
+    const grade = questionList(typing)[0]!.rows[2]!;
+
+    expect(grade.state).toBe('todo');
+    expect(grade.answer).toBe('');
+    expect(typing.draft.grade).toBe(9);
+  });
+
+  it('fills the answers in behind the parent', () => {
+    const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+
+    expect(labels(held)[0]).toEqual([
+      'Your child',
+      'done First name Ada',
+      'done Last name Lovelace',
+      'done Grade 4th',
+    ]);
+  });
+
+  it('names the two years that have no number of their own', () => {
+    const preK = addChild(start(true), 'Robin', 'Fields', PRE_K as Grade);
+    const none = addChild(start(true), 'Robin', 'Fields', null);
+
+    expect(questionList(preK)[0]!.rows[2]!.answer).toBe('Pre-K');
+    expect(questionList(none)[0]!.rows[2]!.answer).toBe('No grade');
+  });
+
+  it('puts a second child after the adult, because that is when they are added', () => {
+    /*
+     * Chronological, not grouped by person. A second child is added from the
+     * confirm screen — after the adult's three — and a list that regrouped
+     * itself mid-run would be a list that moves under a thumb.
+     */
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
+
+    expect(questionList(held).map((section) => section.title)).toEqual([
+      'Your child',
+      'And you',
+      'Child 2',
+    ]);
+    // And the adult reads as answered from the second child's questions, since
+    // they were answered before this child existed.
+    expect(questionList(held)[1]!.rows.every((row) => row.state === 'done')).toBe(true);
+  });
+
+  it('has no adult at all on a sibling run', () => {
+    const held = initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
+
+    expect(questionList(held).map((section) => section.title)).toEqual(['Your child']);
+  });
+
+  it('addresses each row to the step it would reopen', () => {
+    // What makes a row tappable later: it carries the step and the child it is
+    // about, so nothing has to be inferred from where it sits on the screen.
+    const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    const rows = questionList(held).flatMap((section) => section.rows);
+
+    expect(rows.slice(0, 3).map((row) => [row.step, row.child])).toEqual([
+      ['child-first', 0],
+      ['child-last', 0],
+      ['child-grade', 0],
+    ]);
+    expect(rows[3]).toMatchObject({ step: 'guardian-first', child: null });
+  });
+});
+
+
+/**
+ * Tapping a question in the list to fix it.
+ *
+ * The repair a parent actually needs, and the one Back could not give them: the
+ * row somebody wants is usually a banked child's, three screens behind, and
+ * Back un-banks its way there so fixing one letter meant walking the whole run
+ * forwards again.
+ */
+/**
+ * What each row of the list actually says.
+ *
+ * The states above pin which rows exist and in what order; these pin the
+ * answers printed on them, which is the half a parent reads. An answer taken
+ * from the wrong field, or a blank where a record holds something, is a bug
+ * this list is uniquely placed to hide: every row looks right.
+ */
+describe('the answers the list prints', () => {
+  function answered(): RegistrationState {
+    let held = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+    held = advance(typeText(advance(typeText(held, 'Chidi')), 'Okonkwo'));
+    held = advance(chooseGrade(held, 4 as Grade));
+    held = advance(typeText(held, 'Peanuts'));
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Ada'));
+    held = advance(held); // the surname, carried
+    held = advance(chooseGrade(held, 2 as Grade));
+    return answerNoAllergies(held);
+  }
+
+  const rowsOf = (state: RegistrationState, title: string) =>
+    questionList(state).find((section) => section.title === title)!.rows;
+
+  it('prints each child’s own answers under their own heading', () => {
+    const held = answered();
+
+    expect(rowsOf(held, 'Your child').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Chidi'],
+      ['Last name', 'Okonkwo'],
+      ['Grade', '4th'],
+      ['Allergies', 'Peanuts'],
+    ]);
+    expect(rowsOf(held, 'Child 2').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Ada'],
+      ['Last name', 'Okonkwo'],
+      ['Grade', '2nd'],
+      // A blank note is an answer, and the row says so rather than reading as
+      // a question somebody failed to fill in.
+      ['Allergies', 'None'],
+    ]);
+  });
+
+  it('prints the adult’s three, with the number grouped', () => {
+    // Each from its own field: a case falling through to the default here
+    // would print the phone number under "First name".
+    expect(rowsOf(answered(), 'And you').map((row) => [row.label, row.answer])).toEqual([
+      ['First name', 'Ngozi'],
+      ['Last name', 'Adeyemi'],
+      ['Phone', '555-010-3344'],
+    ]);
+  });
+
+  it('leaves an unanswered row blank rather than showing what is on the record', () => {
+    /*
+     * The prefills mean the record holds an answer before the question is
+     * asked: the second child's surname is on the draft from the moment the
+     * first child was banked. A row that printed it would tell a parent they
+     * had answered a question they have not reached.
+     */
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = advance(typeText(held, 'Ngozi'));
+
+    const adult = rowsOf(held, 'And you');
+    expect(adult.map((row) => [row.state, row.answer])).toEqual([
+      ['done', 'Ngozi'],
+      ['now', ''],
+      ['todo', ''],
+    ]);
+    // And an unreached question is not a place to jump to.
+    expect(adult.map((row) => row.canReopen)).toEqual([true, false, false]);
+  });
+
+  it('marks a whole section still to come as ahead of the run', () => {
+    // The adult's section before any child is finished: three rows, none of
+    // them current, none of them offering a jump.
+    const opening = rowsOf(start(), 'And you');
+
+    expect(opening.every((row) => row.state === 'todo')).toBe(true);
+    expect(opening.every((row) => row.answer === '')).toBe(true);
+    expect(opening.some((row) => row.canReopen)).toBe(false);
+  });
+
+  it('lights the current child’s question and leaves the finished ones filled', () => {
+    // Two children on the glass at once: the banked one is done throughout,
+    // the one being typed carries the accent on exactly one row.
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Ada'));
+
+    expect(rowsOf(held, 'Your child').map((row) => row.state)).toEqual([
+      'done',
+      'done',
+      'done',
+    ]);
+    expect(rowsOf(held, 'Child 2').map((row) => row.state)).toEqual(['done', 'now', 'todo']);
+  });
+});
+
+describe('reopening a question', () => {
+  /** One child and an adult, stopped on the phone question. */
+  function atThePhone(): RegistrationState {
+    let held = addChild(start(), 'Chidi', 'Okonkwoo', 4 as Grade);
+    held = advance(typeText(held, 'Ngozi'));
+    return advance(held);
+  }
+
+  it('opens the question with its own answer, on the child it belongs to', () => {
+    const held = reopen(atThePhone(), 'child-last', 0);
+
+    expect(held).toMatchObject({
+      step: 'child-last',
+      buffer: 'Okonkwoo',
+      editing: 0,
+      resume: { step: 'guardian-phone', buffer: '' },
+    });
+    // Lower case, because the next press is a correction to a word that is
+    // already there rather than the start of a new one.
+    expect(held.shift).toBe('off');
+  });
+
+  it('writes the fix back to that child and returns where the parent was', () => {
+    let held = reopen(atThePhone(), 'child-last', 0);
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Okonkwo'));
+
+    expect(held.children[0]!.lastName).toBe('Okonkwo');
+    // Not forward through everything they had already answered — five screens
+    // of re-confirming, in front of a queue, to fix one letter.
+    expect(held).toMatchObject({ step: 'guardian-phone', editing: null, resume: null });
+  });
+
+  it('leaves the other answers alone', () => {
+    let held = reopen(atThePhone(), 'child-first', 0);
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Chidiebere'));
+
+    expect(held.children[0]).toEqual({
+      firstName: 'Chidiebere',
+      lastName: 'Okonkwoo',
+      grade: 4,
+      allergies: '',
+    });
+    expect(held.guardian.firstName).toBe('Ngozi');
+  });
+
+  it('takes a grade off the grid, for the child being fixed', () => {
+    let held = reopen(atThePhone(), 'child-grade', 0);
+    expect(held.gradePicked).toBe(true);
+
+    held = advance(chooseGrade(held, 7 as Grade));
+
+    expect(held.children[0]!.grade).toBe(7);
+    expect(held.step).toBe('guardian-phone');
+  });
+
+  it('is "never mind" when the parent backs out of it', () => {
+    const held = goBack(reopen(atThePhone(), 'child-first', 0))!;
+
+    expect(held).toMatchObject({ step: 'guardian-phone', editing: null, resume: null });
+    expect(held.children[0]!.firstName).toBe('Chidi');
+  });
+
+  it('carries a half-given answer back with them', () => {
+    /*
+     * A parent taps a row *while* answering something — ten digits typed and
+     * not yet committed — because that is when they notice the typo. Coming
+     * back to an empty box would lose work they can see on the screen, and
+     * their own half-answer is on no record to be read back off.
+     */
+    const typing = typeText(atThePhone(), '5550149911');
+    let held = reopen(typing, 'child-last', 0);
+    expect(held.buffer).toBe('Okonkwoo');
+
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Okonkwo'));
+
+    expect(held).toMatchObject({ step: 'guardian-phone', buffer: '5550149911', shift: 'off' });
+    expect(canAdvance(held)).toBe(true);
+  });
+
+  it('keeps it through a change of mind, too', () => {
+    const typing = typeText(atThePhone(), '5550149911');
+
+    expect(goBack(reopen(typing, 'child-last', 0))!).toMatchObject({
+      step: 'guardian-phone',
+      buffer: '5550149911',
+    });
+  });
+
+  it('marks the question it will put them back on', () => {
+    const rows = questionList(reopen(atThePhone(), 'child-last', 0)).flatMap(
+      (section) => section.rows,
+    );
+
+    expect(rows.find((row) => row.resumeHere)).toMatchObject({
+      step: 'guardian-phone',
+      state: 'todo',
+    });
+    expect(rows.find((row) => row.state === 'now')).toMatchObject({ step: 'child-last' });
+  });
+
+  it('offers only the questions that have been answered', () => {
+    /*
+     * Jumping forward to a question nobody has reached would leave a hole in
+     * the run and a blank on the confirm, and there is nothing there to fix.
+     */
+    const rows = questionList(atThePhone()).flatMap((section) => section.rows);
+
+    expect(rows.filter((row) => row.canReopen).map((row) => row.step)).toEqual([
+      'child-first',
+      'child-last',
+      'child-grade',
+      'guardian-first',
+      'guardian-last',
+    ]);
+  });
+
+  it('keeps the run’s own place while a question is open', () => {
+    // The list is drawn from where the parent is in the run, not from the
+    // question they have jumped to — otherwise their half-answered child would
+    // read as finished.
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
+    expect(held.step).toBe('child-last');
+
+    const open = reopen(held, 'child-first', 0);
+    const second = questionList(open).find((section) => section.title === 'Child 2')!;
+
+    expect(second.rows.map((row) => row.state)).toEqual(['done', 'todo', 'todo']);
+    expect(second.rows[1]!.resumeHere).toBe(true);
+  });
+});
+
+/**
+ * Which record each question reads from and writes to.
+ *
+ * A wizard is a switch statement over six questions, and the failure mode of a
+ * switch statement is a case that quietly falls through to the default: the
+ * step opens on the wrong answer, or commits into the wrong field, and every
+ * test that only walks the run forwards still passes because forwards is the
+ * one path where the fields happen to line up. Reopening is what takes them
+ * out of order, so it is what these pin.
+ */
+describe('each question against its own field', () => {
+  function wholeFamily(): RegistrationState {
+    const held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    return addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+  }
+
+  it('opens every question on the answer it holds, and no other', () => {
+    const held = wholeFamily();
+
+    expect(reopen(held, 'child-first', 0).buffer).toBe('Chidi');
+    expect(reopen(held, 'child-last', 0).buffer).toBe('Okonkwo');
+    expect(reopen(held, 'guardian-first', null).buffer).toBe('Ngozi');
+    expect(reopen(held, 'guardian-last', null).buffer).toBe('Adeyemi');
+    expect(reopen(held, 'guardian-phone', null).buffer).toBe('5550103344');
+    // The grade is chosen off a grid and has no buffer to open on.
+    expect(reopen(held, 'child-grade', 0).buffer).toBe('');
+  });
+
+  it('opens the allergy note on its own child’s note', () => {
+    let held = initialState({
+      registrationId: 'r-1',
+      requiresCheckOut: false,
+      allergiesSupported: true,
+    });
+    held = advance(typeText(advance(typeText(held, 'Chidi')), 'Okonkwo'));
+    held = advance(chooseGrade(held, 4 as Grade));
+    held = advance(typeText(held, 'Peanuts'));
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+
+    expect(reopen(held, 'child-allergies', 0).buffer).toBe('Peanuts');
+  });
+
+  it('commits into the field the open question names, and leaves the rest', () => {
+    // Each fix goes to one place. A case falling through to the default would
+    // land a guardian's surname on a child, or lose the answer entirely.
+    const held = wholeFamily();
+    const fixed = (step: Parameters<typeof reopen>[1], child: number | null, value: string) =>
+      advance(typeText(applyKey(reopen(held, step, child), { kind: 'clear' }), value));
+
+    expect(fixed('child-first', 0, 'Chidinma').children[0]).toMatchObject({
+      firstName: 'Chidinma',
+      lastName: 'Okonkwo',
+    });
+    expect(fixed('child-last', 0, 'Okonkwa').children[0]).toMatchObject({
+      firstName: 'Chidi',
+      lastName: 'Okonkwa',
+    });
+    expect(fixed('guardian-first', null, 'Ngozika').guardian).toEqual({
+      firstName: 'Ngozika',
+      lastName: 'Adeyemi',
+      phone: '5550103344',
+    });
+    expect(fixed('guardian-last', null, 'Adeyemiwa').guardian).toEqual({
+      firstName: 'Ngozi',
+      lastName: 'Adeyemiwa',
+      phone: '5550103344',
+    });
+    expect(fixed('guardian-phone', null, '5550149911').guardian).toEqual({
+      firstName: 'Ngozi',
+      lastName: 'Adeyemi',
+      phone: '5550149911',
+    });
+  });
+
+  it('gives the number pad no capitals, and every other question its own', () => {
+    // A dialer has no shift key to honour, so the phone question opens 'off'
+    // whatever it is holding; a name opens where its own letters leave off.
+    const held = wholeFamily();
+
+    expect(reopen(held, 'guardian-phone', null).shift).toBe('off');
+    expect(reopen(held, 'child-first', 0).shift).toBe('off');
+    // And an empty box is the start of a word, so it opens capitalised.
+    expect(reopen(held, 'child-grade', 0).shift).toBe('on');
+  });
+
+  it('marks a reopened grade as picked, so Next is not dead on arrival', () => {
+    expect(reopen(wholeFamily(), 'child-grade', 0).gradePicked).toBe(true);
+    expect(reopen(wholeFamily(), 'child-first', 0).gradePicked).toBe(false);
+  });
+
+  it('reads the phone back grouped, and every other answer verbatim', () => {
+    const held = wholeFamily();
+
+    expect(readoutFor(reopen(held, 'guardian-phone', null))).toBe('555-010-3344');
+    expect(readoutFor(reopen(held, 'guardian-first', null))).toBe('Ngozi');
+  });
+});
+
+describe('which child a reopened question belongs to', () => {
+  function twoChildren(): RegistrationState {
+    let held = addChild(start(), 'Chidi', 'Okonkwo', 4 as Grade);
+    held = addGuardian(held, 'Ngozi', 'Adeyemi', '5550103344');
+    return advance(typeText(addAnotherChild(held), 'Ada'));
+  }
+
+  it('targets a banked child by index, and the draft by none', () => {
+    const held = twoChildren();
+
+    expect(reopen(held, 'child-first', 0).editing).toBe(0);
+    expect(reopen(held, 'child-first', null).editing).toBeNull();
+  });
+
+  it('treats the child being typed in as the draft, not as a banked row', () => {
+    /*
+     * The second child's own rows carry their index — 1 — while they are still
+     * the draft, and there is no `children[1]` to edit. Reopening one has to
+     * fall back to the draft, or the fix would be written to a record that
+     * does not exist and lost.
+     */
+    const held = twoChildren();
+    expect(held.children).toHaveLength(1);
+
+    const open = reopen(held, 'child-first', 1);
+    expect(open.editing).toBeNull();
+
+    const fixed = advance(typeText(applyKey(open, { kind: 'clear' }), 'Adaeze'));
+    expect(fixed.draft.firstName).toBe('Adaeze');
+    expect(fixed.children[0]!.firstName).toBe('Chidi');
+  });
+
+  it('is a no-op only for the question already open on the same child', () => {
+    const held = twoChildren();
+    const open = reopen(held, 'child-first', 0);
+
+    // The same row again: nothing moved, so nothing changes — and `resume`
+    // must not be overwritten with the reopened question itself.
+    expect(reopen(open, 'child-first', 0)).toBe(open);
+    // The same question on a different child is a different row.
+    expect(reopen(open, 'child-first', null)).not.toBe(open);
+    // And a different question on the same child.
+    expect(reopen(open, 'child-last', 0)).not.toBe(open);
   });
 });
 
@@ -654,19 +1212,47 @@ describe('the grade question', () => {
     expect(defaultGrade(true)).toBeNull();
   });
 
+  it('will not leave the question until a chip has been pressed', () => {
+    /*
+     * The draft opens on a grade, so the record cannot say whether anybody
+     * picked it. While a chip was the only way off the step that did not
+     * matter; now the step carries a Next like every other, and without this a
+     * parent could press past the question and file a year they never chose.
+     */
+    let held = advance(typeText(start(), 'Robin'));
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Fields'));
+    expect(held.step).toBe('child-grade');
+    expect(held.draft.grade).toBe(9);
+
+    expect(canAdvance(held)).toBe(false);
+    expect(advance(held)).toBe(held);
+
+    expect(canAdvance(chooseGrade(held, 4 as Grade))).toBe(true);
+  });
+
+  it('reads the chosen year back, and nothing before one is chosen', () => {
+    let held = advance(typeText(start(), 'Robin'));
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Fields'));
+
+    expect(readoutFor(held)).toBe('');
+    expect(readoutFor(chooseGrade(held, 4 as Grade))).toBe('4th');
+    expect(readoutFor(chooseGrade(held, 0 as Grade))).toBe('Kindergarten');
+    expect(readoutFor(chooseGrade(held, null))).toBe('No grade');
+  });
+
   it('takes "no grade" as an answer and moves on', () => {
     const held = addChild(start(true), 'Robin', 'Fields', null);
-    expect(held.step).toBe('another');
-    expect(familyOf(held)[0]!.grade).toBeNull();
+    expect(held.step).toBe('guardian-first');
+    expect(held.children[0]!.grade).toBeNull();
   });
 });
 
-describe('going back from the fork', () => {
+describe('going back into the last child', () => {
   it('reopens the allergies question where the gathering asks one', () => {
     let held = initialState({ registrationId: 'r-1', requiresCheckOut: false, allergiesSupported: true });
     held = advance(typeText(held, 'Ada'));
     held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
-    held = chooseGrade(held, 4 as Grade);
+    held = advance(chooseGrade(held, 4 as Grade));
     held = advance(typeText(held, 'Peanuts'));
 
     expect(goBack(held)).toMatchObject({ step: 'child-allergies', buffer: 'Peanuts' });
@@ -681,19 +1267,102 @@ describe('going back from the fork', () => {
     expect(goBack(held)).toMatchObject({ step: 'child-grade', buffer: '', shift: 'on' });
   });
 
-  it('sends a sibling run back to the fork rather than to the parent’s number', () => {
+  it('sends a sibling run back to the child rather than to a parent nobody asked about', () => {
     /*
      * A sibling run has no adult half — the family is already registered, and
      * the parent's details came off the existing record. Backing out of the
-     * confirm screen has to land on "anybody else", which is the only question
-     * that run asked.
+     * confirm has to land on the only question that run asked.
      */
-    let held = initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
-    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
-    held = answerAnother(held, false, false);
+    const held = addChild(
+      initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' }),
+      'Byron',
+      'Lovelace',
+      1 as Grade,
+    );
     expect(held.step).toBe('confirm');
 
-    expect(goBack(held)).toMatchObject({ step: 'another', buffer: '', shift: 'on' });
+    expect(goBack(held)).toMatchObject({ step: 'child-grade', buffer: '', shift: 'on' });
+  });
+
+  it('un-banks the child on the way, rather than reopening a nameless one', () => {
+    /*
+     * `bankChild` commits the draft and mints a blank one, so a parent who
+     * answered their child's last question and then pressed Back used to
+     * reopen a child with no name — and pressing on banked that blank for
+     * real. The callable refuses it on `parseName`, so what a family met for
+     * changing their mind once was "We could not save that just now — please
+     * see a leader."
+     */
+    const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    expect(held.step).toBe('guardian-first');
+
+    const back = goBack(held)!;
+
+    expect(back.step).toBe('child-grade');
+    expect(back.children).toEqual([]);
+    expect(back.draft).toEqual({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      grade: 4,
+      allergies: '',
+    });
+    // And pressing on again banks the family that was always there — once, not
+    // twice, and not one and a half times.
+    expect(advance(chooseGrade(back, 4 as Grade)).children).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+  });
+
+  it('un-banks on the sibling path too, where the confirm is what follows', () => {
+    const held = addChild(
+      initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' }),
+      'Byron',
+      'Lovelace',
+      1 as Grade,
+    );
+
+    const back = goBack(held)!;
+
+    expect(back.children).toEqual([]);
+    expect(back.draft).toEqual({
+      firstName: 'Byron',
+      lastName: 'Lovelace',
+      grade: 1,
+      allergies: '',
+    });
+  });
+
+  it('leaves the earlier children alone, and only the last one on the draft', () => {
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = addChild(addAnotherChild(held), 'Byron', 'Lovelace', 1 as Grade);
+
+    const back = goBack(held)!;
+
+    expect(back.children).toEqual([
+      { firstName: 'Ada', lastName: 'Lovelace', grade: 4, allergies: '' },
+    ]);
+    expect(back.draft).toEqual({
+      firstName: 'Byron',
+      lastName: 'Lovelace',
+      grade: 1,
+      allergies: '',
+    });
+  });
+
+  it('keeps walking back into that child’s own questions, so a wrong name is reachable', () => {
+    /*
+     * The other half of un-banking, and the reason it is worth more than a
+     * missing blank row. A parent who spots a mistyped name two screens later
+     * has Back and nothing else; it has to reach the box that holds the name,
+     * with the name in it, rather than stopping somewhere that has forgotten
+     * which child it is talking about.
+     */
+    const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+
+    const back = goBack(goBack(held)!)!;
+
+    expect(back).toMatchObject({ step: 'child-last', buffer: 'Lovelace' });
   });
 });
 
@@ -716,11 +1385,9 @@ describe('adding a sibling', () => {
   const sibling = () =>
     initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
 
-  it('skips the adult entirely — two questions, not six', () => {
-    let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
-    expect(held.step).toBe('another');
+  it('skips the adult entirely — the child’s questions, and nothing else', () => {
+    const held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
 
-    held = answerAnother(held, false, false);
     // Straight to the confirm. The family is already identified by the digits
     // they searched with, and the household upstream already holds their
     // parent — asking again is three questions to learn nothing.
@@ -730,19 +1397,16 @@ describe('adding a sibling', () => {
 
   it('still loops, for the parent adding two at once', () => {
     let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, true, false);
-    held = addChild(held, 'Byron', 'Lovelace', 1 as Grade);
-    held = answerAnother(held, false, false);
+    held = addChild(addAnotherChild(held), 'Byron', 'Lovelace', 1 as Grade);
 
     expect(held.step).toBe('confirm');
     expect(held.children.map((child) => child.firstName)).toEqual(['Ada', 'Byron']);
   });
 
-  it('goes back to the list rather than to an adult who was never asked about', () => {
-    let held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
-    held = answerAnother(held, false, false);
+  it('goes back to the child rather than to an adult who was never asked about', () => {
+    const held = addChild(sibling(), 'Ada', 'Lovelace', 4 as Grade);
 
-    expect(goBack(held)!.step).toBe('another');
+    expect(goBack(held)!.step).toBe('child-grade');
   });
 });
 
@@ -769,7 +1433,7 @@ describe('the allergies question', () => {
   function throughGrade(state: RegistrationState): RegistrationState {
     let held = advance(typeText(state, 'Ada'));
     held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
-    return chooseGrade(held, 4 as Grade);
+    return advance(chooseGrade(held, 4 as Grade));
   }
 
   it('is only asked when the binding says the answer can land', () => {
@@ -777,15 +1441,7 @@ describe('the allergies question', () => {
     // The default is silence: a binding written before the flag existed, or a
     // backend that cannot carry the note, and the wizard is exactly as short
     // as it was.
-    expect(throughGrade(start()).step).toBe('another');
-  });
-
-  it('records nothing on one tap, which is the common answer', () => {
-    const asked = throughGrade(startAsking());
-    expect(canAdvance(asked)).toBe(true);
-    const answered = advance(asked);
-    expect(answered.step).toBe('another');
-    expect(answered.draft.allergies).toBe('');
+    expect(throughGrade(start()).step).toBe('guardian-first');
   });
 
   it('accepts the digits a name refuses', () => {
@@ -819,14 +1475,6 @@ describe('the allergies question', () => {
     expect(typeText(locked, 'EPIPEN').shift).toBe('lock');
   });
 
-  it('opens the keyboard in capitals when the tick comes off', () => {
-    // An emptied box is the start of a fresh answer, and the first letter of
-    // one is a capital — the same rule every other question opens on.
-    const typed = typeText(throughGrade(startAsking()), 'peanuts');
-    expect(toggleNoAllergies(typed).shift).toBe('on');
-    expect(toggleNoAllergies(toggleNoAllergies(typed)).shift).toBe('on');
-  });
-
   it('refuses a note longer than the callable would take', () => {
     const asked = typeText(throughGrade(startAsking()), 'a'.repeat(300));
     expect(asked.buffer.length).toBe(200);
@@ -834,13 +1482,13 @@ describe('the allergies question', () => {
 
   it('keeps the note on the child it was typed for', () => {
     let held = advance(typeText(throughGrade(startAsking()), 'Peanuts'));
-    held = answerAnother(held, true, false);
-    held = advance(typeText(held, 'Byron'));
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
     held = advance(held); // prefilled surname
     held = chooseGrade(held, 1 as Grade);
-    held = advance(held); // no allergies for Byron
-    held = answerAnother(held, false, false);
+    held = answerNoAllergies(advance(held));
 
+    expect(held.step).toBe('confirm');
     expect(held.children.map((child) => child.allergies)).toEqual(['Peanuts', '']);
   });
 
@@ -853,53 +1501,63 @@ describe('the allergies question', () => {
     expect(goBack(reopened)!.step).toBe('child-grade');
   });
 
-  it('empties the box when the tick goes on, and leaves it empty coming off', () => {
-    const typed = typeText(throughGrade(startAsking()), 'Peanuts');
-    const ticked = toggleNoAllergies(typed);
-    expect(ticked.noAllergies).toBe(true);
-    expect(ticked.buffer).toBe('');
+  it('answers and moves on in one press', () => {
+    // The whole point of the button: none is the commonest answer and it costs
+    // one tap, spelled the same way every time it is given.
+    const answered = answerNoAllergies(throughGrade(startAsking()));
+    expect(answered.step).toBe('guardian-first');
+    expect(answered.children[0]!.allergies).toBe('');
+  });
 
+  it('records none whatever had been typed before', () => {
     /*
-     * Unticking does not resurrect it. The box is the record of what will be
-     * sent, and text that reappeared after being hidden behind a grey panel is
-     * text nobody agreed to send.
+     * A parent who typed "peanuts", thought better of it and pressed the blank
+     * is saying there is nothing to report. The press is the answer, not a
+     * label on the box, so what was in the box does not travel with it.
      */
-    const untutored = toggleNoAllergies(ticked);
-    expect(untutored.noAllergies).toBe(false);
-    expect(untutored.buffer).toBe('');
+    const answered = answerNoAllergies(typeText(throughGrade(startAsking()), 'Peanuts'));
+    expect(answered.children[0]!.allergies).toBe('');
   });
 
-  it('makes every key inert while it is ticked', () => {
-    const ticked = toggleNoAllergies(throughGrade(startAsking()));
-    // Not only the letters: clearing or backspacing an emptied, greyed box is
-    // a press that would do nothing, and it says so by being grey.
-    expect(typeText(ticked, 'Peanuts').buffer).toBe('');
-    expect(applyKey(ticked, { kind: 'clear' })).toBe(ticked);
-    expect(applyKey(ticked, { kind: 'backspace' })).toBe(ticked);
-    expect(applyKey(ticked, { kind: 'shift' })).toBe(ticked);
+  it('leaves Next dead until a note is typed', () => {
+    /*
+     * The universal rule, restored: a lit button on this screen means the
+     * answer it gives is ready. Two buttons that both committed the same empty
+     * record could not say which one a parent was meant to press.
+     */
+    const asked = throughGrade(startAsking());
+    expect(canAdvance(asked)).toBe(false);
+    expect(advance(asked)).toBe(asked);
+    expect(canAdvance(typeText(asked, 'Peanuts'))).toBe(true);
   });
 
-  it('records none when ticked, whatever had been typed before', () => {
-    const answered = advance(toggleNoAllergies(typeText(throughGrade(startAsking()), 'Peanuts')));
-    expect(answered.step).toBe('another');
-    expect(answered.draft.allergies).toBe('');
+  it('goes back where the parent was, when the question was reopened', () => {
+    // The same contract Next keeps — see `reopen`.
+    let held = advance(typeText(throughGrade(startAsking()), 'Peanuts'));
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = reopen(held, 'child-allergies', 0);
+    expect(held.step).toBe('child-allergies');
+
+    const answered = answerNoAllergies(held);
+    expect(answered.step).toBe('confirm');
+    expect(answered.children[0]!.allergies).toBe('');
   });
 
-  it('starts each child unticked, so one answer cannot serve two', () => {
-    let held = advance(toggleNoAllergies(throughGrade(startAsking())));
-    held = answerAnother(held, true, false);
-    held = advance(typeText(held, 'Byron'));
+  it('asks the next child for themselves, with an empty box', () => {
+    let held = answerNoAllergies(throughGrade(startAsking()));
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
     held = advance(held); // prefilled surname
-    held = chooseGrade(held, 1 as Grade);
+    held = advance(chooseGrade(held, 1 as Grade));
 
     expect(held.step).toBe('child-allergies');
-    expect(held.noAllergies).toBe(false);
+    expect(held.buffer).toBe('');
   });
 
   it('only applies on its own step', () => {
     const naming = throughGrade(startAsking());
     const elsewhere = goBack(naming)!; // child-grade
-    expect(toggleNoAllergies(elsewhere)).toBe(elsewhere);
+    expect(answerNoAllergies(elsewhere)).toBe(elsewhere);
   });
 
   it('is asked for a sibling too — the gate is the binding, not the mode', () => {

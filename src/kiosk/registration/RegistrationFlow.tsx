@@ -19,7 +19,7 @@
  * collect it is retired; it is gated on the binding's `allergiesSupported`,
  * which is the same write-back check that form made before showing its field.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -27,21 +27,25 @@ import type { KioskBinding } from '../binding';
 import { PhonePad } from './PhonePad';
 import { useTap } from '../components/tapGuard';
 import {
+  addAnotherChild,
   advance,
-  answerAnother,
+  answerNoAllergies,
   applyKey,
   canAdvance,
   chooseGrade,
-  familyOf,
-  formatPhone,
   goBack,
   initialState,
   isTypingStep,
   MAX_CHILDREN,
-  toggleNoAllergies,
+  questionList,
+  readoutFor,
+  reopen,
+  type QuestionListState,
+  type QuestionRow,
   type DraftChild,
   type RegistrationMode,
   type RegistrationState,
+  type StepKind,
 } from './steps';
 
 /**
@@ -65,39 +69,45 @@ type Action =
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'grade'; grade: Grade | null }
-  | { type: 'another'; more: boolean }
+  | { type: 'add-child' }
+  | { type: 'reopen'; step: StepKind; child: number | null }
   | { type: 'no-allergies' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: RegisterFamilyResult }
   | { type: 'failed' };
 
-function makeReducer(requiresCheckOut: boolean) {
-  return function reduce(state: RegistrationState, action: Action): RegistrationState {
-    switch (action.type) {
-      case 'key':
-        return applyKey(state, action.key);
-      case 'next':
-        return advance(state);
-      case 'back':
-        return goBack(state) ?? state;
-      case 'grade':
-        return chooseGrade(state, action.grade);
-      case 'another':
-        return answerAnother(state, action.more, requiresCheckOut);
-      case 'no-allergies':
-        return toggleNoAllergies(state);
-      case 'submitting':
-        return { ...state, step: 'submitting', message: '' };
-      case 'submitted':
-        return { ...state, step: 'success', last4: action.result.last4 };
-      case 'failed':
-        return {
-          ...state,
-          step: 'error',
-          message: 'We could not save that just now — please see a leader.',
-        };
-    }
-  };
+/*
+ * A plain function, not a factory. It used to close over `requiresCheckOut` for
+ * the fork's sake; the gathering's grade default now lives on the state, where
+ * banking a child can reach it.
+ */
+function reduce(state: RegistrationState, action: Action): RegistrationState {
+  switch (action.type) {
+    case 'key':
+      return applyKey(state, action.key);
+    case 'next':
+      return advance(state);
+    case 'back':
+      return goBack(state) ?? state;
+    case 'grade':
+      return chooseGrade(state, action.grade);
+    case 'add-child':
+      return addAnotherChild(state);
+    case 'reopen':
+      return reopen(state, action.step, action.child);
+    case 'no-allergies':
+      return answerNoAllergies(state);
+    case 'submitting':
+      return { ...state, step: 'submitting', message: '' };
+    case 'submitted':
+      return { ...state, step: 'success', last4: action.result.last4 };
+    case 'failed':
+      return {
+        ...state,
+        step: 'error',
+        message: 'We could not save that just now — please see a leader.',
+      };
+  }
 }
 
 export interface RegistrationFlowProps {
@@ -134,7 +144,6 @@ export function RegistrationFlow({
 }: RegistrationFlowProps) {
   // Absent on a binding written before the flag existed, and absent means no.
   const tracksCheckOut = binding.requiresCheckOut ?? false;
-  const reduce = useMemo(() => makeReducer(tracksCheckOut), [tracksCheckOut]);
   const [state, dispatch] = useReducer(
     reduce,
     {
@@ -150,7 +159,11 @@ export function RegistrationFlow({
   const anchorIds = useMemo(() => (anchors ?? []).map((sibling) => sibling.id), [anchors]);
 
   const onKey = useCallback((key: KioskKey) => dispatch({ type: 'key', key }), []);
-  const tap = useTap();
+  /* Stable, so the list's memo holds across a keystroke. */
+  const reopenRow = useCallback((step: StepKind, child: number | null) => {
+    haptic(8);
+    dispatch({ type: 'reopen', step, child });
+  }, []);
 
   /* ---- Walked away ------------------------------------------------------- */
 
@@ -207,8 +220,39 @@ export function RegistrationFlow({
 
   /* ---- Render ------------------------------------------------------------ */
 
-  const family = familyOf(state);
-  const childNumber = state.children.length + 1;
+  /* Whose questions are on screen: the child being added, or — when a row has
+     been tapped to fix it — the child that row belongs to. */
+  const childNumber = (state.editing ?? state.children.length) + 1;
+  /*
+   * Every step that draws the run above the console — which now includes the
+   * confirm.
+   *
+   * The confirm used to replace the body with a receipt of the same facts in a
+   * different shape, at the one moment a parent is asked to check them. So the
+   * screen they had been reading for ninety seconds vanished exactly when it
+   * was needed, and its rows — buttons on every other step — stopped being
+   * buttons here, which made repair hardest at the moment it is asked for.
+   *
+   * Keeping the list means the body does not move at all between the last
+   * question and the confirm: only the console changes, and it changes
+   * completely. It also puts the confirm inside the scroll region, which the
+   * receipt never had — six children on one confirm is more than the glass
+   * holds.
+   */
+  const showsList =
+    isTypingStep(state.step) || state.step === 'child-grade' || state.step === 'confirm';
+
+  /*
+   * A long family scrolls, and the end of the list is what a parent wants —
+   * the child they are entering now, against the question they are answering.
+   * Per step rather than per keystroke: nothing in the list changes while a
+   * name is being typed.
+   */
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [state.step, state.children.length]);
 
   return (
     /* The column is the glass, never its widest item. A name typed to
@@ -229,180 +273,80 @@ export function RegistrationFlow({
         onClose={onClose}
       />
 
-      <div className="flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6">
-        {/*
-          * On a typing step the body hangs from the bottom of its region
-          * rather than the top, so that what a step puts here — today, the
-          * "No allergies" tick — stays against the readout it belongs to.
-          * The readout moved down to the keyboard (see below) and this is the
-          * half of that move that keeps the step whole: a question, its answer
-          * and the keys in one block under the hand, instead of one control
-          * marooned under the header.
-          *
-          * `mt-auto` rather than `justify-end`, because this region scrolls:
-          * an auto margin collapses to nothing once the content is taller than
-          * the box, where end-justified content would push its own top out of
-          * reach.
-          */}
-        <div
-          className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
-            'min-h-full'
-          }`}
-        >
-          {/*
-            * The step's question, in the region where its answer gets built.
-            *
-            * It has been in three places across this loop. In the header it was
-            * fourteen pixels of `ink-500` — 4.24:1, under the AA floor — at the
-            * far end of the screen from the hand, and the only thing telling
-            * step two of this wizard from step five. Hard against the readout it
-            * was legible and adjacent but it left this region empty: a third of
-            * the screen with nothing in it, and the first object below the title
-            * a disabled **Next**, which is what made the register step read as a
-            * screen that had not finished loading beside the search screen it
-            * came from.
-            *
-            * Here, and quieter than search's "Type a name", because that one is
-            * the whole screen and this one shares its step with a header that
-            * already says whose turn it is.
-            */}
-          {isTypingStep(state.step) && (
-            <div className="text-center text-xl text-ink-300 kiosk:text-2xl">
-              {placeholderFor(state)}
-            </div>
-          )}
-          {state.step === 'child-grade' && (
-            <div className="mt-auto grid grid-cols-3 gap-2 pt-2">
-              {GRADES.map((grade) => (
-                <GradeChip
-                  key={grade}
-                  label={gradeChipLabel(grade)}
-                  hint={gradeDescription(grade)}
-                  onPick={() => dispatch({ type: 'grade', grade })}
+      {/*
+        * The body is the run, written out.
+        *
+        * One question on the glass and nothing else left a 664px hole on an
+        * upright tablet — half the screen — between the question and the keys
+        * that answer it. What fills it is the list: what has been answered,
+        * what is being answered now, and what is still to come. It replaced the
+        * "Anybody else?" screen's job of forewarning and the line that stood in
+        * for it, and it gives a parent somewhere to look that is not a void.
+        *
+        * The list scrolls and the question does not: `questionFor` is a sibling
+        * of the scroll box, not a child of it, so it stays against the console
+        * however long a family gets.
+        */}
+      <div className="flex min-h-0 flex-col px-6">
+        {showsList ? (
+          <>
+            <div
+              ref={listRef}
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch"
+            >
+              {/* `mt-auto` rather than `justify-end`: an auto margin collapses
+                  to nothing once the content is taller than the box, where
+                  end-justified content would push its own top out of reach. */}
+              <div className="mx-auto mt-auto flex w-full max-w-2xl flex-col gap-2 pt-2 pb-1">
+                <QuestionStack
+                  step={state.step}
+                  roster={state.children}
+                  draft={state.draft}
+                  guardian={state.guardian}
+                  allergiesSupported={state.allergiesSupported}
+                  mode={state.mode}
+                  editing={state.editing}
+                  resume={state.resume}
+                  onReopen={reopenRow}
                 />
-              ))}
-              {/* Last, because it is the one chip here that is not an answer.
-                  In reading position one, styled like the fourteen real values,
-                  it reads as the default — and what it produces is a
-                  grade-less record for the core team to adjudicate. */}
-              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
-            </div>
-          )}
-
-          {state.step === 'child-allergies' && (
-            /*
-              * The way to say "nothing", where the typing would have started.
-              *
-              * Directly above the readout on purpose — the body hangs from the
-              * bottom on typing steps so that it lands there. **Next** already
-              * offers the same answer, but a parent reading "any allergies we
-              * should know about?" is looking at the readout and the keys, not
-              * at a button above them — which is why the field was collecting
-              * "None", "N/A" and "no allergies" as though they were medical
-              * notes. Three spellings of a blank, bound for the church's
-              * database.
-              *
-              * A checkbox rather than a third button: it reports a state the
-              * parent can see they are in, and a button that had already been
-              * pressed would look exactly like one that had not.
-              */
-            <div className="mt-auto pt-2">
-              <button
-                type="button"
-                tabIndex={-1}
-                role="checkbox"
-                aria-checked={state.noAllergies}
-                {...tap(() => {
-                  haptic();
-                  dispatch({ type: 'no-allergies' });
-                })}
-                className={`flex h-16 w-full items-center gap-4 rounded-xl px-5 text-left text-xl font-semibold ${
-                  state.noAllergies
-                    ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/40'
-                    : 'bg-ink-900 text-ink-200 active:bg-ink-700'
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-lg ${
-                    state.noAllergies
-                      ? 'bg-brand-500 text-white'
-                      : 'ring-2 ring-ink-600'
-                  }`}
-                >
-                  {state.noAllergies ? '✓' : ''}
-                </span>
-                No allergies
-              </button>
-            </div>
-          )}
-
-          {state.step === 'another' && (
-            <div className="mt-auto flex flex-col gap-3 pt-2">
-              {/*
-                * Who is on the list so far, above the two buttons.
-                *
-                * The question is "anybody else?", and a parent cannot answer it
-                * against their own memory of what they typed forty seconds ago
-                * — least of all the parent of four, which is exactly the parent
-                * this loop exists for. Naming them also catches the mistake
-                * this screen is otherwise the last chance to catch: a child
-                * entered twice, or the one whose name went in wrong.
-                */}
-              <div className="flex flex-col gap-2">
-                {family.map((child, index) => (
-                  <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
-                ))}
+                {state.step === 'confirm' && state.mode === 'sibling' && (
+                  /*
+                    Who this child is being added to. The kiosk guessed the
+                    family from four digits (see family.ts for how much of a
+                    guess that is), so the guess goes on the glass rather than
+                    staying in the request — a parent looking at a stranger's
+                    children in their own confirmation cannot miss it.
+                  */
+                  <p className="px-1 pt-1 text-base text-ink-400">
+                    {anchors && anchors.length > 0
+                      ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
+                      : 'Joining your family.'}
+                  </p>
+                )}
               </div>
-              <Big
-                label="Add another child"
-                disabled={family.length >= MAX_CHILDREN}
-                onPick={() => dispatch({ type: 'another', more: true })}
-              />
-              <Big label="That's everyone" tone="brand" onPick={() => dispatch({ type: 'another', more: false })} />
-              {family.length >= MAX_CHILDREN && (
-                <p className="text-center text-base text-ink-500">
-                  That is as many as one go takes — a leader can add the rest.
-                </p>
-              )}
             </div>
-          )}
-
-          {state.step === 'confirm' && (
-            /* Against the commit, not stranded a screen above it. This is the
-               last thing a parent reads before a record goes upstream, and on a
-               portrait tablet the list of their own children sat a thousand
-               pixels from the button that files it. */
-            <div className="mt-auto flex flex-col gap-2 pt-2">
-              {state.children.map((child, index) => (
-                <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
-              ))}
-              {state.mode === 'sibling' ? (
-                /*
-                  Who this child is being added to. The kiosk guessed the family
-                  from four digits (see family.ts for how much of a guess that
-                  is), so the guess goes on the glass above the button rather
-                  than staying in the request — a parent looking at a stranger's
-                  children in their own confirmation cannot miss it.
-                */
-                <p className="px-1 pt-1 text-base text-ink-400">
-                  {anchors && anchors.length > 0
-                    ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
-                    : 'Joining your family.'}
-                </p>
-              ) : (
-                <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
-                  <span className="truncate text-lg text-ink-300">
-                    {state.guardian.firstName} {state.guardian.lastName}
-                  </span>
-                  <span className="pl-3 text-base whitespace-nowrap text-ink-500">
-                    {formatPhone(state.guardian.phone)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
+            {/*
+              * The question, against the keys that answer it.
+              *
+              * It was at the top of this region, which on a portrait tablet put
+              * it six hundred pixels above the thing a parent presses to answer
+              * it. Said here as well as in the list above — deliberately: the
+              * row in the list is the index, saying where somebody is in the
+              * run and what they can go back and fix; this is the question, in
+              * the same glance as the thumb.
+              *
+              * Not on the confirm: there the header carries the question and
+              * the console carries the fork, and a third line saying the same
+              * thing a third time would only ask which one to answer.
+              */}
+            {state.step !== 'confirm' && (
+              <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
+                {questionFor(state)}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
           {state.step === 'submitting' && (
             <p className="pt-10 text-center text-xl text-ink-400">Saving…</p>
           )}
@@ -429,7 +373,8 @@ export function RegistrationFlow({
               <Big label="Try again" tone="brand" onPick={runSubmit} />
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/*
@@ -443,32 +388,72 @@ export function RegistrationFlow({
         */}
       <div className="border-t border-ink-800/70" />
 
-      {/* The bottom row: the readout and the keyboard where something is being
-          typed, the one action that ends the step where it is not. */}
-      {isTypingStep(state.step) ? (
+      {/* The bottom row: the readout and whatever fills it — letters, digits or
+          the grade chips — with the action that ends the step above them. The
+          same object on every question, which is what keeps the rule above it
+          from moving between steps.
+
+          The confirm is tested first because it draws the same body as a
+          question and a different console: it is the one step where the run
+          stays still and this whole region changes. */}
+      {state.step === 'confirm' ? (
+        <ConfirmConsole
+          roster={state.children}
+          onAdd={() => dispatch({ type: 'add-child' })}
+          onCommit={runSubmit}
+        />
+      ) : showsList ? (
         <div className="flex flex-col gap-1.5">
-          <div className="px-2 pt-2">
-            {/*
-              * Always "Next" on the allergies step, now that the tick above
-              * the keyboard says "No allergies".
-              *
-              * This button used to carry that label itself while the box was
-              * empty, which made one answer into two controls a hand's width
-              * apart — and put the quieter of them under forty keys, where a
-              * parent reading the question is not looking. The tick took the
-              * job because it took the better place; leaving the label here as
-              * well would only ask which one is the real one.
-              *
-              * An empty box still means none, ticked or not: this is an
-              * optional question and pressing Next past it has always been an
-              * answer rather than a skip.
-              */}
-            <Big
-              label="Next"
-              tone="brand"
-              disabled={!canAdvance(state)}
-              onPick={() => dispatch({ type: 'next' })}
-            />
+          {/*
+            * The band is drawn on the body's own measure — `max-w-2xl` inside
+            * `px-6`, the pair the question list is laid out on — rather than
+            * on the width of the glass. A button wider than the boxes it
+            * commits reads as belonging to something else, and on a 1280-wide
+            * kiosk it ran three hundred pixels past them on either side.
+            *
+            * The keyboard below it is the exception and stays full-bleed: it
+            * is not part of the run, it is the thing under the thumbs.
+            */}
+          <div className="px-6 pt-2">
+            <div className="mx-auto flex w-full max-w-2xl gap-2">
+              {/*
+                * The allergies step answers in two ways, so it shows two ways —
+                * side by side, in the band **Next** already had, so the console
+                * keeps its height and the rule above it does not move.
+                *
+                * "None" is what most families have to say, and a medical field
+                * with forty keys under it and no visible way to say it collects
+                * "None", "N/A" and "no allergies" as free text: three spellings
+                * of a blank, bound for the church's database as though they
+                * were notes. This is that answer, in one press, spelled the
+                * same way every time.
+                *
+                * The colour says which one is being offered rather than the
+                * position: while the box is empty **No allergies** is the live
+                * answer and Next is dead, because there is nothing yet to press
+                * Next with. Type one letter and they trade — Next takes the
+                * brand and the blank goes quiet. Two lit buttons would only ask
+                * which is the real one, which is what a tick beside a keyboard
+                * was already asking.
+                */}
+              {state.step === 'child-allergies' && (
+                <div className="flex-1">
+                  <Big
+                    label="No allergies"
+                    tone={state.buffer === '' ? 'brand' : undefined}
+                    onPick={() => dispatch({ type: 'no-allergies' })}
+                  />
+                </div>
+              )}
+              <div className="flex-1">
+                <Big
+                  label="Next"
+                  tone="brand"
+                  disabled={!canAdvance(state)}
+                  onPick={() => dispatch({ type: 'next' })}
+                />
+              </div>
+            </div>
           </div>
           {/*
             * The readout, between the button that ends the step and the keys
@@ -493,62 +478,124 @@ export function RegistrationFlow({
             * reaching for '1' could commit the step by accident. An inert band
             * is a good thing to have there.
             */}
-          <div
-            className={`px-6 pb-1 ${
-              // Ticked "No allergies" empties the readout and puts it out of
-              // use. Dimming rather than hiding: the question was asked and
-              // answered in the negative, and a readout that vanished would
-              // read as a question that went away.
-              state.noAllergies ? 'opacity-40' : ''
-            }`}
-          >
+          <div className="px-6 pb-1">
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
-              {/* Letters only, and empty until there are some. The search screen
-                  teaches a parent two taps earlier that the bold word above the
-                  keys is what *they* typed; a placeholder sitting in that slot
-                  read as something a previous family had already entered. What
-                  the box is for is said above it, at size. */}
-              {state.buffer && (
-                <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
-                  {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
+              {/* The answer so far, however it is being given — typed, dialled
+                  or tapped off a chip. Empty until there is one: the search
+                  screen teaches a parent two taps earlier that the bold word
+                  above the keys is what *they* entered, and a placeholder
+                  sitting in that slot read as something a previous family had
+                  already put there. What the box is for is said above it. */}
+              {readoutFor(state) && (
+                <span
+                  data-testid="readout"
+                  className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl"
+                >
+                  {readoutFor(state)}
                 </span>
+              )}
+              {/* Where the next letter lands, so the band reads as a live field
+                  rather than as a gap. Only where something is typed — a grade
+                  is chosen off a grid, and a caret blinking beside it would
+                  promise a keyboard that is not there. See `.kiosk-caret`. */}
+              {isTypingStep(state.step) && (
+                <span aria-hidden data-testid="readout-caret" className="kiosk-caret" />
               )}
             </div>
           </div>
-          {/* The one question on this screen that is a number gets the shape
-              everybody already knows for one. See PhonePad. */}
+          {/* The one question that is a number gets the shape everybody already
+              knows for one; the one that is a year gets a grid of years. Both
+              stand where the keyboard stands, in the keyboard's own footprint,
+              because they are that question's keys. */}
           {state.step === 'guardian-phone' ? (
             <PhonePad onKey={onKey} />
+          ) : state.step === 'child-grade' ? (
+            <GradeChips
+              grade={state.draft.grade}
+              picked={state.gradePicked}
+              onPick={(grade) => dispatch({ type: 'grade', grade })}
+            />
           ) : (
-            /*
-              * Greyed and inert while "No allergies" is ticked. The keys stay
-              * where they are rather than leaving: this file's geometry does
-              * not move under a thumb, and a keyboard that vanished mid-step
-              * would take the parent's place on the screen with it.
-              */
-            <div
-              className={state.noAllergies ? 'pointer-events-none opacity-40' : undefined}
-              aria-hidden={state.noAllergies || undefined}
-            >
-              <Keyboard onKey={onKey} shift={state.shift} />
-            </div>
+            <Keyboard onKey={onKey} shift={state.shift} />
           )}
         </div>
-      ) : state.step === 'confirm' ? (
-        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
-          <Big
-            label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
-            tone="brand"
-            onPick={runSubmit}
-          />
-        </div>
       ) : state.step === 'success' ? (
-        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
-          <Big label="Done" onPick={onClose} />
+        <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          <div className="mx-auto w-full max-w-2xl">
+            <Big label="Done" onPick={onClose} />
+          </div>
         </div>
       ) : (
         <div className="h-4" />
       )}
+    </div>
+  );
+}
+
+/**
+ * The confirm's console: the fork, and the commit.
+ *
+ * Its own component because it is the one console that is not a question's —
+ * the body above it is the same list the last question drew, and everything
+ * that changes when a parent arrives here changes in this box.
+ */
+function ConfirmConsole({
+  roster,
+  onAdd,
+  onCommit,
+}: {
+  roster: readonly DraftChild[];
+  onAdd: () => void;
+  onCommit: () => void;
+}) {
+  return (
+    <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+      {/* The family's own measure, as above — these buttons commit the rows
+          they sit under. */}
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+        {/*
+          * The fork, asked where it is answered.
+          *
+          * The header asks whether the typing is right; these two buttons
+          * answer whether anybody is missing, which is a different question,
+          * and for a while the screen only asked the first one. Both belong,
+          * and they belong in different places: the header keeps the question
+          * whose failure is expensive and silent — a misspelt name becomes a
+          * roster row, a sticker and a record upstream, and nobody catches it
+          * until a weekday, next to the duplicate it caused — while this one
+          * sits on top of the buttons that answer it. The same move the typing
+          * steps make with `questionFor`.
+          *
+          * Not phrased as a yes and a no. A yes/no pair reads as two answers
+          * of equal weight and these are not: a second child is rare, the
+          * quiet/brand contrast already says which one a parent is here for,
+          * and "No, check them in" would put back exactly the ambiguity
+          * `commitLabel` exists to remove.
+          *
+          * A fixed band above a fixed pair, present from first paint, so
+          * nothing here moves when a child is added.
+          */}
+        <p className="pt-1 pb-2 text-center text-xl text-ink-400">Anyone else to add?</p>
+        {/*
+          * The offer the fork screen used to carry, in the shape it carried it
+          * — the quiet button above the brand one, so a parent who learned
+          * that pair on the old screen meets the same pair here. It belongs on
+          * this screen rather than on one of its own: a parent notices a
+          * missing child by reading the list, not by being asked about it four
+          * screens earlier.
+          */}
+        <Big
+          label="Add another child"
+          disabled={roster.length >= MAX_CHILDREN}
+          onPick={onAdd}
+        />
+        <Big label={commitLabel(roster)} tone="brand" onPick={onCommit} />
+        {roster.length >= MAX_CHILDREN && (
+          <p className="text-center text-base text-ink-500">
+            That is as many as one go takes — a leader can add the rest.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -622,27 +669,170 @@ function Header({
   );
 }
 
-/** One child as the wizard has them: the name, the grade, and any note. */
-function ChildRow({ child }: { child: DraftChild }) {
+/**
+ * The run, written out beside the question being answered.
+ *
+ * Memoised on what it draws and nothing else — see `QuestionListState`. A
+ * keystroke changes the buffer and the shift state, and neither is here, so
+ * this subtree does not re-render while a name is being typed. That is the
+ * discipline the keyboard already keeps, for the same reason: the work in a
+ * keystroke is the thing this file guards hardest.
+ */
+const QuestionStack = memo(function QuestionStack({
+  step,
+  roster,
+  draft,
+  guardian,
+  allergiesSupported,
+  mode,
+  editing,
+  resume,
+  onReopen,
+}: Omit<QuestionListState, 'children'> & {
+  roster: QuestionListState['children'];
+  onReopen: (step: StepKind, child: number | null) => void;
+}) {
+  const sections = questionList({
+    step,
+    children: roster,
+    draft,
+    guardian,
+    allergiesSupported,
+    mode,
+    editing,
+    resume,
+  });
+
   return (
-    <div className="flex min-h-16 flex-col justify-center rounded-xl bg-ink-900 px-5 py-2.5">
-      <div className="flex items-center justify-between">
-        <span className="truncate text-xl font-semibold text-ink-100">
-          {child.firstName} {child.lastName}
+    <>
+      {sections.map((section) => (
+        <div key={section.title} className="flex flex-col gap-1.5">
+          <div className="px-1 pt-1 text-sm tracking-[0.14em] text-ink-500 uppercase kiosk:text-base">
+            {section.title}
+          </div>
+          {section.rows.map((row) => (
+            <QuestionRowView key={row.id} row={row} onReopen={onReopen} />
+          ))}
+        </div>
+      ))}
+    </>
+  );
+});
+
+/**
+ * One question in the list.
+ *
+ * Three states and each is a different claim. Answered is filled, because it
+ * holds something; the one being answered wears the accent, because it is where
+ * the parent is; and one still to come is an outline, because an empty filled
+ * row reads as an answer somebody failed to give.
+ */
+function QuestionRowView({
+  row,
+  onReopen,
+}: {
+  row: QuestionRow;
+  onReopen: (step: StepKind, child: number | null) => void;
+}) {
+  const tap = useTap();
+  const shell = `flex h-14 w-full items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
+    row.state === 'now'
+      ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
+      : row.state === 'done'
+        ? 'bg-ink-900'
+        : row.resumeHere
+          ? 'ring-2 ring-ink-600'
+          : 'ring-1 ring-ink-800/70'
+  }`;
+  const body = (
+    <>
+      <span
+        className={`truncate text-base kiosk:text-lg ${
+          row.state === 'now'
+            ? 'font-semibold text-brand-300'
+            : row.state === 'done'
+              ? 'text-ink-500'
+              : 'text-ink-600'
+        }`}
+      >
+        {row.label}
+      </span>
+      {row.answer !== '' && (
+        <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+          {row.answer}
         </span>
-        <span className="pl-3 text-base whitespace-nowrap text-ink-400">
-          {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
-        </span>
-      </div>
-      {/*
-        * On the roster rows a warn-tone dot is all the kiosk shows; here the
-        * note itself is printed, because this list is the family checking
-        * their own typing — the one moment the person reading it is the
-        * person who wrote it, before it becomes a record a reviewer acts on.
-        */}
-      {child.allergies !== '' && (
-        <div className="truncate text-base text-warn-400">Allergies: {child.allergies}</div>
       )}
+      {/* Where Next puts them back, said on the row itself rather than in a
+          sentence somewhere else on the screen. */}
+      {row.resumeHere && (
+        <span className="shrink-0 text-sm tracking-[0.08em] text-ink-500 uppercase kiosk:text-base">
+          back to this
+        </span>
+      )}
+    </>
+  );
+
+  /*
+   * A question already answered is a button; one nobody has reached is not.
+   * Jumping forward to an unanswered question would leave a hole in the run and
+   * a confirm screen with a blank on it, and there is nothing there to fix.
+   */
+  if (!row.canReopen) {
+    return (
+      <div data-testid={`question-${row.id}`} data-state={row.state} className={shell}>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      data-testid={`question-${row.id}`}
+      data-state={row.state}
+      aria-label={`${row.label}: ${row.answer}. Change it.`}
+      {...tap(() => onReopen(row.step, row.child))}
+      className={`${shell} active:bg-ink-700`}
+    >
+      {body}
+    </button>
+  );
+}
+
+/**
+ * The grade grid, standing where the keyboard stands.
+ *
+ * Four across rather than three, which is what lets fifteen chips land in four
+ * rows instead of five — and four rows of `h-[4.375rem]` are the keyboard's
+ * five rows to the pixel, at both of the key heights `Keyboard` uses. So the
+ * console is the same height on this question as on every other, and the rule
+ * above it does not move when the question changes.
+ */
+function GradeChips({
+  grade,
+  picked,
+  onPick,
+}: {
+  grade: Grade | null;
+  picked: boolean;
+  onPick: (grade: Grade | null) => void;
+}) {
+  return (
+    <div className="mx-auto grid w-full grid-cols-4 gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0">
+      {GRADES.map((year) => (
+        <GradeChip
+          key={year}
+          label={gradeChipLabel(year)}
+          hint={gradeDescription(year)}
+          selected={picked && grade === year}
+          onPick={() => onPick(year)}
+        />
+      ))}
+      {/* Last, because it is the one chip here that is not an answer. In
+          reading position one, styled like the fourteen real values, it reads
+          as the default — and what it produces is a grade-less record for the
+          core team to adjudicate. */}
+      <GradeChip label={NO_GRADE} selected={picked && grade === null} onPick={() => onPick(null)} />
     </div>
   );
 }
@@ -678,12 +868,25 @@ function Big({
             : 'bg-ink-800 text-ink-100 active:bg-ink-600'
       }`}
     >
-      {label}
+      {/* Truncating, because one of these labels is written from a family's own
+          names now — two long ones would otherwise push the button's minimum
+          past the glass, the same way the readout used to widen the header. */}
+      <span className="min-w-0 truncate px-4">{label}</span>
     </button>
   );
 }
 
-function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPick: () => void }) {
+function GradeChip({
+  label,
+  hint,
+  selected,
+  onPick,
+}: {
+  label: string;
+  hint?: string;
+  selected: boolean;
+  onPick: () => void;
+}) {
   const tap = useTap();
 
   return (
@@ -691,11 +894,16 @@ function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPi
       type="button"
       tabIndex={-1}
       aria-label={hint ?? label}
+      aria-pressed={selected}
       {...tap(() => {
         haptic();
         onPick();
       })}
-      className="flex h-16 items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600"
+      className={`flex h-[4.375rem] items-center justify-center rounded-xl text-xl font-semibold tall:h-20 ${
+        selected
+          ? 'bg-brand-600/25 text-brand-200 ring-2 ring-brand-500'
+          : 'bg-ink-800 text-ink-100 active:bg-ink-600'
+      }`}
     >
       {label}
     </button>
@@ -740,8 +948,6 @@ function titleFor(state: RegistrationState, childNumber: number): string {
         : childNumber === 1
           ? 'Your child'
           : `Child ${childNumber}`;
-    case 'another':
-      return 'Anybody else?';
     case 'guardian-first':
     case 'guardian-last':
     case 'guardian-phone':
@@ -768,15 +974,15 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
     case 'child-first':
     case 'child-last':
       return binding.title;
+    /*
+     * The question moved down to the console, where the answer is given. These
+     * two go back to identity with the rest: a parent glancing up wants to know
+     * they are still at the right gathering, not to read the same sentence
+     * twice at opposite ends of the type ramp.
+     */
     case 'child-grade':
-      return 'What grade are they in?';
     case 'child-allergies':
-      // "we should know about" and not "do they have": a parent whose child's
-      // hay fever is nobody's business at a check-in desk is being invited to
-      // skip, not interrogated.
-      return 'Any allergies we should know about?';
-    case 'another':
-      return 'You can add the whole family in one go.';
+      return binding.title;
     /*
      * The adult's two steps share one line, and it is context rather than a
      * label: the readout under it already says "Your first name". A subtitle
@@ -798,22 +1004,31 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
 }
 
 /**
- * What the empty readout says.
+ * The question, said against the thing that answers it.
  *
- * The field's own name, not "Type here" — which repeated the shape of the
- * screen back at somebody and named nothing. It matters most on the two steps
- * where the question above and the answer below could belong to either person
- * in the room: "Child's last name" and "Your last name" are the same box until
- * one of them says which.
+ * The field's own name where a field is what it is, not "Type here" — which
+ * repeated the shape of the screen back at somebody and named nothing. It
+ * matters most on the two steps where the question and the answer could belong
+ * to either person in the room: "Child's last name" and "Your last name" are
+ * the same box until one of them says which.
+ *
+ * The grade and the allergy note ask a sentence rather than name a field,
+ * because neither has a field to name — a year comes off a grid, and "any
+ * allergies we should know about?" is deliberately an invitation to skip rather
+ * than an interrogation. Both used to be said by the header instead; the header
+ * carries the gathering on those steps now, which is what a parent glancing up
+ * is checking.
  */
-function placeholderFor(state: RegistrationState): string {
+function questionFor(state: RegistrationState): string {
   switch (state.step) {
     case 'child-first':
       return "Child's first name";
     case 'child-last':
       return "Child's last name";
+    case 'child-grade':
+      return 'What grade are they in?';
     case 'child-allergies':
-      return 'Allergies';
+      return 'Any allergies we should know about?';
     case 'guardian-first':
       return 'Your first name';
     case 'guardian-last':
@@ -832,6 +1047,28 @@ function placeholderFor(state: RegistrationState): string {
  * text node — a family reads it as a sentence, and so does anything testing
  * that it says what it should.
  */
+/**
+ * What the commit button says, which is what it does.
+ *
+ * It used to say "Check in everyone" over a list whose last row is the adult —
+ * and the adult is never checked in. The callable writes one attendance row per
+ * child and only per child; a guardian's name and number live on the review
+ * record, TTL'd, and travel upstream as a household contact. So "everyone"
+ * named a set the kiosk does not act on, in front of the family it named.
+ *
+ * Naming the subject removes the ambiguity and has nowhere to put it back.
+ * Names up to two, because two is the whole of the multi-child case in
+ * practice and six of them would not fit the button; a count beyond that. The
+ * one- and two-child forms are the sentence the success screen already speaks,
+ * so the button promises exactly what the next screen confirms.
+ */
+function commitLabel(children: readonly DraftChild[]): string {
+  const names = children.map((child) => child.firstName);
+  if (names.length === 1) return `Check in ${names[0]}`;
+  if (names.length === 2) return `Check in ${names[0]} and ${names[1]}`;
+  return `Check in ${names.length} children`;
+}
+
 function welcomeLine(children: readonly DraftChild[]): string {
   const names = children.map((child) => child.firstName);
   const list =
