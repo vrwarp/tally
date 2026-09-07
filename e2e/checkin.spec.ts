@@ -15,7 +15,7 @@ const countsLine = (page: Page) => page.getByText(/^\d+ of \d+ students checked 
 
 /** The one roster list, whichever filter it is currently showing. */
 const rosterList = (page: Page) =>
-  page.getByRole('region', { name: /^(Recent|Participated|Roster|Checked in|Results),/ });
+  page.getByRole('region', { name: /^(Regulars|Been before|Roster|Checked in|Results),/ });
 
 /**
  * Presses the widen button until the list is the whole ministry.
@@ -102,7 +102,7 @@ async function rosterRows(page: Page): Promise<{ name: string; here: boolean }[]
  */
 async function settledOnRecent(page: Page): Promise<void> {
   await page
-    .getByRole('region', { name: /^Recent,/ })
+    .getByRole('region', { name: /^Regulars,/ })
     .waitFor({ timeout: 30_000 })
     .catch(() => {});
   await rosterSettled(page);
@@ -150,7 +150,7 @@ test.describe('the first paint', () => {
       const record = () => {
         for (const section of document.querySelectorAll('section[aria-label]')) {
           const label = section.getAttribute('aria-label') ?? '';
-          if (!/^(Recent|Roster|Checked in|Results), \d+$/.test(label)) continue;
+          if (!/^(Regulars|Roster|Checked in|Results), \d+$/.test(label)) continue;
           if (seen[seen.length - 1] !== label) seen.push(label);
         }
       };
@@ -191,7 +191,7 @@ test.describe('the first paint', () => {
     // otherwise "pass" this test forever.
     expect(headings.length).toBeGreaterThan(0);
     test.skip(
-      !headings.some((heading) => heading.startsWith('Recent,')),
+      !headings.some((heading) => heading.startsWith('Regulars,')),
       'this seed has no regulars to narrow to',
     );
 
@@ -204,7 +204,7 @@ test.describe('the first paint', () => {
     const narrowed = headings.some(
       (heading, index) =>
         heading.startsWith('Roster,') &&
-        headings[index + 1]?.startsWith('Recent,') &&
+        headings[index + 1]?.startsWith('Regulars,') &&
         size(headings[index + 1]!) < size(heading),
     );
 
@@ -246,7 +246,7 @@ test.describe('check-in', () => {
   test('opens on the regulars, with the whole roster one tap away', async ({ page }) => {
     await rosterSettled(page);
 
-    const recent = page.getByRole('region', { name: /^Recent,/ });
+    const recent = page.getByRole('region', { name: /^Regulars,/ });
     await expect(recent).toBeVisible();
     const recentCount = await recent.getByRole('button').count();
     expect(recentCount).toBeGreaterThan(0);
@@ -274,7 +274,7 @@ test.describe('check-in', () => {
     page,
   }) => {
     await settledOnRecent(page);
-    const recent = page.getByRole('region', { name: /^Recent,/ });
+    const recent = page.getByRole('region', { name: /^Regulars,/ });
     await expect(recent).toBeVisible();
     const recentCount = await recent.getByRole('button').count();
 
@@ -284,7 +284,7 @@ test.describe('check-in', () => {
 
     // Says what it is measuring, because "participated" is only ever true of
     // the window the app loaded.
-    const participated = page.getByRole('region', { name: /^Participated,/ });
+    const participated = page.getByRole('region', { name: /^Been before,/ });
     await expect(participated).toBeVisible();
     await expect(page.getByText(/been here in the last \d+ gatherings?/)).toBeVisible();
 
@@ -351,7 +351,7 @@ test.describe('check-in', () => {
     await expect(page.getByRole('button', { name: /^filter by grade, 8th, 9th$/i })).toBeVisible();
 
     const labels = await page
-      .getByRole('region', { name: /^(Recent|Roster),/ })
+      .getByRole('region', { name: /^(Regulars|Roster),/ })
       .getByRole('button')
       .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') ?? ''));
 
@@ -437,7 +437,7 @@ test.describe('check-in', () => {
     await expect(
       page.getByRole('button', { name: new RegExp(`^Undo check-in for ${name}`) }),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Wrong person/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Move check-in/ })).toBeVisible();
     // Counselors have no student pages to be sent to — see `RequireRole`.
     await expect(page.getByRole('link', { name: `Open the profile for ${name}` })).toHaveCount(0);
 
@@ -475,7 +475,7 @@ test.describe('check-in', () => {
     expect(arrivedAt, 'the check-in was written without a time on it').toBeTruthy();
 
     await page.getByRole('button', { name: new RegExp(`^More actions for ${wrong},`) }).click();
-    await page.getByRole('button', { name: /^Wrong person/ }).click();
+    await page.getByRole('button', { name: /^Move check-in/ }).click();
 
     // The screen says what a tap means now, and keeps saying it while the
     // counselor hunts.
@@ -523,7 +523,7 @@ test.describe('check-in', () => {
     const name = await tapFirstRoster(page);
 
     await page.getByRole('button', { name: new RegExp(`^More actions for ${name},`) }).click();
-    await page.getByRole('button', { name: /^Wrong person/ }).click();
+    await page.getByRole('button', { name: /^Move check-in/ }).click();
     await expect(page.getByText('Who should this be?')).toBeVisible();
 
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -546,7 +546,7 @@ test.describe('check-in', () => {
    */
   test('an unpredicted student stays on Recent after an undo, until a reload', async ({ page }) => {
     await settledOnRecent(page);
-    const recent = page.getByRole('region', { name: /^Recent,/ });
+    const recent = page.getByRole('region', { name: /^Regulars,/ });
     await expect(recent).toBeVisible();
     const regulars = new Set((await rosterRows(page)).map((row) => row.name));
 
@@ -578,7 +578,7 @@ test.describe('check-in', () => {
     await settledOnRecent(page);
     await expect(
       page
-        .getByRole('region', { name: /^Recent,/ })
+        .getByRole('region', { name: /^Regulars,/ })
         .getByRole('button', { name: new RegExp(`^Check in ${outsider},`) }),
     ).toHaveCount(0);
   });

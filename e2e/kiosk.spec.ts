@@ -739,8 +739,8 @@ test.describe('the kiosk', () => {
 
       // The warning belongs to the choice rather than to the act of looking, so
       // it is on the far side of Change event.
-      await kiosk.getByRole('button', { name: /Change event/i }).click();
-      await expect(kiosk.getByText(/Change event\?/i)).toBeVisible();
+      await kiosk.getByRole('button', { name: /Change gathering/i }).click();
+      await expect(kiosk.getByText(/Change gathering\?/i)).toBeVisible();
       await expect(kiosk.getByText(/Nobody can check in here/i)).toBeVisible();
 
       /*
@@ -752,7 +752,7 @@ test.describe('the kiosk', () => {
        * the queue loses the seconds and nothing else.
        */
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
-      await expect(kiosk.getByText(/Change event\?/i)).toHaveCount(0);
+      await expect(kiosk.getByText(/Change gathering\?/i)).toHaveCount(0);
       await expect(kiosk.getByText('Staff')).toBeVisible();
 
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();

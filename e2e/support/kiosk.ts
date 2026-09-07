@@ -102,7 +102,7 @@ export async function hold(
  */
 export async function leaveGathering(kiosk: Page): Promise<void> {
   await hold(kiosk, '[data-key="clear"]');
-  await kiosk.getByRole('button', { name: /Change event/i }).click();
+  await kiosk.getByRole('button', { name: /Change gathering/i }).click();
   await kiosk.getByRole('button', { name: /^Leave /i }).click();
 }
 

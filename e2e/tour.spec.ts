@@ -460,7 +460,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: '4th grade', exact: true }).click();
       // A chip selects; Next commits — the same shape every other question has.
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await expect(kiosk.getByText(/Any allergies we should know about/i)).toBeVisible({
+      await expect(kiosk.getByText(/Any allergies the leaders should know about/i)).toBeVisible({
         timeout: 15_000,
       });
       await typeOnKiosk(kiosk, 'peanuts')
@@ -1134,7 +1134,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
        */
       await leaveGathering(kiosk);
       await bindTo(kiosk, /doors closed/i);
-      await expect(kiosk.getByText(/Check-in window has closed/i)).toBeVisible({ timeout: 60_000 });
+      await expect(kiosk.getByText(/You can still check in/i)).toBeVisible({ timeout: 60_000 });
       await shoot(kiosk, 'kiosk', {
         act: "When it doesn't go that way",
         who: 'A family arriving late',
