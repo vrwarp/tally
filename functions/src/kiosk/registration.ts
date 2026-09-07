@@ -59,6 +59,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { buildSearchName, nameKey } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -798,7 +799,7 @@ export async function registerFamily(
           firstName: child.firstName,
           lastName: child.lastName,
           grade: child.grade,
-          searchName: buildSearchName(child.firstName, child.lastName),
+          searchName: withPinyin(buildSearchName(child.firstName, child.lastName)),
           // From the record, not the request: the replay answers with what
           // was actually kept, and both were parsed from the same body.
           hasAllergies: (held.allergies[index] ?? null) !== null,
@@ -816,7 +817,7 @@ export async function registerFamily(
     firstName: child.firstName,
     lastName: child.lastName,
     grade: child.grade,
-    searchName: buildSearchName(child.firstName, child.lastName),
+    searchName: withPinyin(buildSearchName(child.firstName, child.lastName)),
     hasAllergies: (request.allergies[index] ?? null) !== null,
   }));
 

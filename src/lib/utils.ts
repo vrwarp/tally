@@ -532,9 +532,43 @@ const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
  * of the two lists. `StudentRow` sets the surname a step back so the scan has
  * something to land on.
  */
-export function sortByName<T extends { lastName: string; firstName: string }>(a: T, b: T): number {
+/** Han characters, the ones `Intl.Collator` cannot file under a letter. */
+const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+
+/**
+ * What to file a person under, when their name is not written in letters.
+ *
+ * `Intl.Collator` orders Hanzi by stroke or by pinyin depending on the locale,
+ * and in either case it puts *all* of them together — before the Latin names in
+ * a `zh` collation, after them in an `en` one. Neither is a list a counselor can
+ * scan: 蔡秉洲 belongs between Bergman and Chen, which is where a person looking
+ * for them would go.
+ *
+ * Doing that means romanizing the name, and romanizing means a dictionary close
+ * to a megabyte — which is exactly what `functions/src/names/pinyin.ts` refuses
+ * to put in a bundle. So the server has already done it: `searchName` carries
+ * the romanization, and by contract the canonical one is the token immediately
+ * after the Chinese. This reads it back. A name with no Chinese in it costs one
+ * failed regexp, which is nearly every name.
+ *
+ * Falls back to the name itself — a student written before the backfill ran, or
+ * one whose `searchName` the client rebuilt a moment ago and the trigger has
+ * not yet widened. They file under Han for a second, which is where they were.
+ */
+export function nameSortKey(person: { firstName: string; searchName?: string }): string {
+  if (!HAN.test(person.firstName)) return person.firstName;
+  const tokens = person.searchName?.split(' ') ?? [];
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (HAN.test(tokens[index]!)) return tokens[index + 1] ?? person.firstName;
+  }
+  return person.firstName;
+}
+
+export function sortByName<
+  T extends { lastName: string; firstName: string; searchName?: string },
+>(a: T, b: T): number {
   return (
-    NAME_COLLATOR.compare(a.firstName, b.firstName) ||
+    NAME_COLLATOR.compare(nameSortKey(a), nameSortKey(b)) ||
     NAME_COLLATOR.compare(a.lastName, b.lastName)
   );
 }

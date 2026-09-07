@@ -21,6 +21,7 @@ import {
   trimmed,
   type GradeRange,
 } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import {
   HOUSEHOLD_ADULT_ROLES,
   PCO_TYPES,
@@ -374,7 +375,7 @@ export function mapPersonToStudent(person: PcoPerson, ctx: StudentMappingContext
     allergies: trimmed(attributes.medical_notes),
     birthday: birthdayOf(person),
     status: normaliseStatus(person),
-    searchName: buildSearchName(firstName, lastName),
+    searchName: withPinyin(buildSearchName(firstName, lastName)),
     pcoPersonId: person.id,
     pcoUpdatedAt: parseDate(attributes.updated_at),
   };

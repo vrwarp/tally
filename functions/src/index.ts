@@ -16,7 +16,8 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger, setGlobalOptions } from 'firebase-functions/v2';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { withPinyin } from './names/pinyin.js';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { backendFailureStatus, describeBackendFailure } from './backends/errors.js';
@@ -2279,6 +2280,46 @@ export const pushPendingVisitors = onCall<void, Promise<PushPendingResult>>(
     const result = await target.backend.pushPendingStudents({ logger });
     if (result.pushed > 0) target.backend.resetCache();
     return result;
+  },
+);
+
+/**
+ * The pinyin on a name the client wrote for itself.
+ *
+ * Every server-side write path already widens `searchName` — `withPinyin` sits
+ * beside `buildSearchName` in the mappers, the kiosk registration and the
+ * amend flow. The client cannot: the dictionary that turns 蔡秉洲 into
+ * `caibingzhou cbz` is close to a megabyte, and `src/services/students.ts`
+ * writes a bare `buildSearchName` from a phone. This puts the tokens back on.
+ *
+ * It cannot loop, and that is by construction rather than by a guard: this
+ * writes `withPinyin(searchName)`, the trigger fires again on its own write,
+ * and `withPinyin` is idempotent — the second pass finds every token already
+ * present and returns before touching anything. A name with no Chinese in it
+ * costs one failed regexp and no write at all, which is nearly every student.
+ *
+ * `set(..., { merge: true })` rather than `update`, and only `searchName`:
+ * nothing about the student has been edited, so `updatedAt`/`updatedBy` stay
+ * where the person who last edited them left them. A row that quietly claimed
+ * to have been edited by the server today would be wrong in every screen that
+ * sorts by it.
+ */
+export const onStudentNamed = onDocumentWritten(
+  { document: 'students/{studentId}', timeoutSeconds: 60, memory: '256MiB', retry: false },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+
+    const searchName = after.data()?.searchName;
+    if (typeof searchName !== 'string' || searchName === '') return;
+
+    const widened = withPinyin(searchName);
+    if (widened === searchName) return;
+
+    await after.ref.set({ searchName: widened }, { merge: true });
+    logger.info('Widened a name so its Chinese can be typed', {
+      studentId: event.params.studentId,
+    });
   },
 );
 

@@ -6,7 +6,7 @@
  * every keystroke.
  */
 import { describe, expect, it } from 'vitest';
-import { createSearchMatcher, formatPhone, formatPhoneInput, initials, matchesQuery, normalizeForSearch, partition, sortByName } from '@/lib/utils';
+import { createSearchMatcher, formatPhone, formatPhoneInput, initials, matchesQuery, nameSortKey, normalizeForSearch, partition, sortByName } from '@/lib/utils';
 
 describe('matchesQuery', () => {
   it('is case-insensitive in both directions', () => {
@@ -339,6 +339,52 @@ describe('sortByName', () => {
   it('compares without case sensitivity', () => {
     expect(sortByName(name('a', 'alvarez'), name('A', 'ALVAREZ'))).toBe(0);
     expect(sortByName(name('Ana', 'alvarez'), name('Ana', 'Bell'))).toBeLessThan(0);
+  });
+
+  /*
+   * A Chinese name files under the letter a reader would look for it under,
+   * and it can only do that because the server has already romanized it —
+   * see `nameSortKey` and `functions/src/names/pinyin.ts`. Left to
+   * `Intl.Collator`, every one of these ends up in a clump at one end of the
+   * list, which is not a list anybody can scan.
+   */
+  it('files a Chinese name under its pinyin, between the Latin ones', () => {
+    const people = [
+      { firstName: 'Bergman', lastName: 'Ruiz' },
+      { firstName: '秉洲', lastName: '蔡', searchName: '秉洲 蔡 caixiu bx cx' },
+      { firstName: 'Dana', lastName: 'Okafor' },
+    ];
+    expect([...people].sort(sortByName).map((p) => p.firstName)).toEqual([
+      'Bergman',
+      '秉洲',
+      'Dana',
+    ]);
+  });
+});
+
+describe('nameSortKey', () => {
+  it('is the name itself when the name is written in letters', () => {
+    expect(nameSortKey({ firstName: 'Ada', searchName: 'ada lovelace' })).toBe('Ada');
+  });
+
+  /*
+   * The contract with `withPinyin`: the canonical romanization is the token
+   * immediately after the Chinese, and everything after that is an alternative
+   * spelling.
+   */
+  it('is the romanization the server wrote after the Chinese', () => {
+    expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲 caibingzhou cbz tsaibingzhou' }))
+      .toBe('caibingzhou');
+  });
+
+  /*
+   * A student created a moment ago, whose `searchName` the client rebuilt and
+   * the trigger has not caught up with yet. They file under Han for a second,
+   * which is where they already were — never at an undefined.
+   */
+  it('falls back to the name when nothing has romanized it yet', () => {
+    expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲' })).toBe('蔡秉洲');
+    expect(nameSortKey({ firstName: '蔡秉洲' })).toBe('蔡秉洲');
   });
 });
 

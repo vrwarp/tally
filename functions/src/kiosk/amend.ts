@@ -65,6 +65,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { buildSearchName, nameKey } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -285,7 +286,7 @@ async function amendChild(context: {
     lastName: corrected.lastName,
     // The kiosk searches on this, so it has to move with the name or a family
     // corrected on Tuesday stops being findable on Friday.
-    searchName: buildSearchName(corrected.firstName, corrected.lastName),
+    searchName: withPinyin(buildSearchName(corrected.firstName, corrected.lastName)),
     updatedAt: at,
     updatedBy: uid,
   };
