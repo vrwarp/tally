@@ -6723,5 +6723,660 @@
     "source": "No grade",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Review.title": {
+    "source": "Families to review",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.intro": {
+    "source": "Two doors, one queue: families who put themselves on the roster at the lobby kiosk, and contacts a counselor was given beside a visitor they quick-added. Everybody named here is on the roster and was checked in — no adult has gone into the church’s database yet. Soonest to be cleared first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.loadFailed": {
+    "source": "Could not read the registrations waiting for review.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.emptyTitle": {
+    "source": "Nothing waiting.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.emptyBody": {
+    "source": "A family who registers at the lobby kiosk, or an adult’s details a counselor takes at a door, waits here until somebody approves them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.thatIsAll": {
+    "source": "That is all {count}. Nothing else is waiting to be reviewed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.actionFailed": {
+    "source": "Could not reach the server. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.amendFailed": {
+    "source": "Could not save that correction. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.unknownStudent": {
+    "source": "A student on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noGradeOnFile": {
+    "source": "no grade on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.summaryLabel": {
+    "source": "{name} · {grade}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.edit": {
+    "source": "Edit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.editAria": {
+    "source": "Edit {name}’s details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.editingChild": {
+    "source": "Editing {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.editingGuardian": {
+    "source": "Editing the adult",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.firstName": {
+    "source": "First name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.lastName": {
+    "source": "Last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.grade": {
+    "source": "Grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noGrade": {
+    "source": "No grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.allergies": {
+    "source": "Allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.allergiesHint": {
+    "source": "Goes into the church’s database with them when this family is approved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.phone": {
+    "source": "Phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.phoneHint": {
+    "source": "The last four are what this family types at the kiosk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.cancel": {
+    "source": "Cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.save": {
+    "source": "Save the correction",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.editorCancelCaption": {
+    "source": "Leaves this family exactly as the kiosk recorded them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.childRenameCaption": {
+    "source": "Renames this row on Tally’s roster and asks the roster again whether anybody already has that name. Nothing is sent to the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.childEditCaption": {
+    "source": "Corrects this child on Tally’s roster. Nothing is sent to the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.guardianDigitsCaption": {
+    "source": "Changes the digits this family types at the kiosk from {from} to {to} — the old four stop finding them. Nothing is sent to the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.guardianEditCaption": {
+    "source": "Corrects the adult recorded on this registration. Nothing is sent to the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.theseChildren": {
+    "source": "these children",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.aFamily": {
+    "source": "A family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.namedFamily": {
+    "source": "{surname} family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.takenAtDoorWhen": {
+    "source": "Taken at the door {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.takenAtDoor": {
+    "source": "Taken at the door",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.registeredWhen": {
+    "source": "Registered {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.atGathering": {
+    "source": "at {title}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.fromTheirPhone": {
+    "source": "from their own phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgeConfirm": {
+    "source": "Confirm to add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgePushFailed": {
+    "source": "Push failed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgeDaysLeft": {
+    "source": "{count, plural, one {# day left} other {# days left}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgeDuplicate": {
+    "source": "Possible duplicate",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgeAlsoRegistered": {
+    "source": "Also registered separately",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.badgeJoinsFamily": {
+    "source": "Joins a family on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.expiringOne": {
+    "source": "When it clears, the phone number goes with it — and {name} stays on Tally’s roster with nobody attached to them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.expiringMany": {
+    "source": "When it clears, the phone number goes with it — and the children stay on Tally’s roster with nobody attached to them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.counselorQueued": {
+    "source": "A counselor added {names} at the door and was given an adult’s details. {names} is already on the roster and already queued for the church’s database — the adult below is the only thing waiting on you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.counselorOnRoster": {
+    "source": "A counselor added {names} at the door and was given an adult’s details. {names} is on the roster — the adult below is the only thing waiting on you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.unsettledStrip": {
+    "source": "Nothing here can be added until {names}’s row is settled below: a second {first} in the church’s database could not be removed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.lastAttempt": {
+    "source": "Last attempt did not finish: {reason}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.anchorsStrip": {
+    "source": "Another child, added alongside somebody the church already has: {names}. Approving joins that household rather than making a second one, and asks for no new adult.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.didNotFinish": {
+    "source": "Nobody was recorded as bringing them, and no family was named — this registration did not finish.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.typedAsGuardian": {
+    "source": "Typed at the kiosk as {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.numberCorrected": {
+    "source": "The number was corrected here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.thisNumber": {
+    "source": "this number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.kinIntro": {
+    "source": "{count, plural, one {Another registration} other {# other registrations}} in this queue typed {number}. Approving together adds every child to one family and asks the church’s database for one adult.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.settleTheirCard": {
+    "source": "Settle their own card first — {count, plural, one {# child} other {# children}} there already share a name with somebody on the roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.approvingTogether": {
+    "source": "Approving together",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.sameFamily": {
+    "source": "Same family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.churchHasName": {
+    "source": "The church already has {count, plural, one {somebody} other {# people}} called {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.numberMatches": {
+    "source": "their number matches",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.differentNumber": {
+    "source": "a different number on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noNumber": {
+    "source": "no number on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.thisIsThem": {
+    "source": "This is them",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.samePerson": {
+    "source": "Same person",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.nobodyOnList": {
+    "source": "Nobody on this list",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.addingAsNew": {
+    "source": "Adding as new",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.addAsNew": {
+    "source": "Add as new",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.householdIntro": {
+    "source": "{adult} is in {count} families in the church’s database. {names} {heldCount, plural, one {joins} other {join}} this one:",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.withMembers": {
+    "source": "with {names}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.nobodyElse": {
+    "source": "nobody else on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.theOneWeWouldPick": {
+    "source": ", the one we would pick",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.thisOne": {
+    "source": "This one",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.thisFamily": {
+    "source": "This family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.neitherNewFamily": {
+    "source": "Neither — start a new family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.startingNewOne": {
+    "source": "Starting a new one",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.newFamily": {
+    "source": "New family",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.childLinkOverride": {
+    "source": "If the child already belongs to a family in the church’s database, that family stands and {name} is not added to it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.clauseJoinsMatching": {
+    "source": "joins {adult}, whose number matches",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.clauseJoinsKnown": {
+    "source": "joins {adult}, who the church already has",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.clauseNewPerson": {
+    "source": "is added as a new person",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.adultSentenceWithClause": {
+    "source": "{name} {clause}, attached to {children}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.adultSentencePlain": {
+    "source": "Adds {name} to the church’s database, attached to {children}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.approveCancelCaption": {
+    "source": "Leaves this family in the queue. Nothing is sent to the church’s database and nothing is lost.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.confirmAdultCaption": {
+    "source": "{sentence} Nothing added to the church’s database can be deleted or taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.confirmChildrenCaption": {
+    "source": "{names} {count, plural, one {goes} other {go}} into the church’s database now{withFamily}{withAdult}. Nothing added there can be deleted or taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.withFamilyClause": {
+    "source": "{count, plural, one {, with the other registration as one family} other {, with the # other registrations as one family}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.withAdultClause": {
+    "source": ", and {name} {clause}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.yesAddAdult": {
+    "source": "Yes — add {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.yesAddChildren": {
+    "source": "{count, plural, one {Yes — add {names}} other {Yes — add # children}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.theAdult": {
+    "source": "the adult",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.waitingCaption": {
+    "source": "Waiting on {unsettled}’s row. Choose who they already are, or say they are new — then this adds {names} for good.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.retryCaption": {
+    "source": "Tries {name} again. The last attempt was refused, and nothing about the refusal has changed on its own.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.adultOnlyCaption": {
+    "source": "{sentence} Nothing added to the church’s database can be taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.approveCaption": {
+    "source": "Adds {names} to the church’s database{withAdult}. Nothing added there can be taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.approveCaptionWithFamily": {
+    "source": "Adds {names} and the family they were registered with to the church’s database{withAdult}. Nothing added there can be taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.tryAdultAgain": {
+    "source": "Try {name} again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.addAdult": {
+    "source": "Add {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.finishAdding": {
+    "source": "Finish adding them",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.approveAndAdd": {
+    "source": "Approve and add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardAdultConfirm": {
+    "source": "Forgets {number} for good — it is the only copy. {names} stays on the roster exactly as they are, and nobody is added to the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardChildrenConfirm": {
+    "source": "Takes {names} off the roster for good. Their check-in history is kept, and only a new registration at the kiosk brings them back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardChildrenConfirmWithPhone": {
+    "source": "Takes {names} off the roster and forgets {number} for good. Their check-in history is kept, and only a new registration at the kiosk brings them back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.yesForgetNumber": {
+    "source": "Yes, forget the number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.yesTakeThemOff": {
+    "source": "Yes, take them off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardAdultCaption": {
+    "source": "Forgets {number} for good. {names} stays on the roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardWithPhoneCaption": {
+    "source": "Takes {names} off the roster and forgets {number} for good.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.discardNoPhoneCaption": {
+    "source": "Takes {names} off the roster. No number was given, so nothing else is lost.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.forgetTheNumber": {
+    "source": "Forget the number",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.notOurs": {
+    "source": "Not ours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.withoutAdultCaption": {
+    "source": "Adds {names} with no adult attached, and forgets {number}. Somebody has to join them to a household in the church’s database afterwards.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.addWithoutAdult": {
+    "source": "Add the children without {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noGradeGiven": {
+    "source": "No grade given",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noGradeLower": {
+    "source": "no grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.typedAsChild": {
+    "source": "Typed at the kiosk as {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.typedAsChildWithGrade": {
+    "source": "Typed at the kiosk as {name}, {grade}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.added": {
+    "source": "Added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.mergedIntoNamed": {
+    "source": "Merged into <keeper>{name}</keeper>. Their check-ins are kept together.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.mergedIntoUnknown": {
+    "source": "Merged into another row on the roster. Their check-ins are kept together.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.undo": {
+    "source": "Undo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.linkedAutomatically": {
+    "source": "Linked automatically to {name} in the church’s database.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.whoIs": {
+    "source": "Who is {name}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.bothUndoNote": {
+    "source": "Merging a roster row can be undone. Adding to the church’s database cannot.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.rosterUndoNote": {
+    "source": "Merging can be undone. A duplicate in the church’s database cannot.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.upstreamNote": {
+    "source": "Nothing added to the church’s database can be taken back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.rosterShareName": {
+    "source": "{count, plural, one {One student on the roster shares this name.} other {# students on the roster share this name.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.upstreamShareName": {
+    "source": "{count, plural, one {One person in the church’s database has this name and grade.} other {# people in the church’s database have this name and grade.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.wouldLinkByDefault": {
+    "source": "The one we would link by default.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.noneOfThem": {
+    "source": "None of them — {name} is new",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.samePhoneDigits": {
+    "source": "Same phone digits on file.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Review.differentPhoneDigits": {
+    "source": "Different phone digits on file.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }
