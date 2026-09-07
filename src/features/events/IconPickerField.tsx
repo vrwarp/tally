@@ -94,8 +94,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
 
           {results.length === 0 ? (
             <p className="px-1 py-6 text-center text-sm text-ink-500">
-              Nothing matches “{query.trim()}”. Try what the thing is rather than what it is
-              called — “fire”, “food”, “trip”.
+              {t('iconNoMatch', { query: query.trim() })}
             </p>
           ) : (
             <ul className="scroll-touch grid max-h-56 grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-1 overflow-y-auto">

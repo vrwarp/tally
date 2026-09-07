@@ -654,10 +654,12 @@ export function StudentDetailPage() {
             {grade ?? t('noGradeIn', { backend: backendName })}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
-            {recordGone ? <Badge tone="danger">{backendName} record missing</Badge> : null}
+            {student.isVisitor ? <Badge tone="brand">{t('visitorBadge')}</Badge> : null}
+            {recordGone ? (
+              <Badge tone="danger">{t('recordMissingBadge', { backend: backendName })}</Badge>
+            ) : null}
             {unreachable && !recordGone ? <Badge tone="warn">{t('noContactOnFile')}</Badge> : null}
-            {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
+            {student.status === 'inactive' ? <Badge tone="neutral">{t('inactiveBadge')}</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>
         </div>
@@ -723,13 +725,11 @@ export function StudentDetailPage() {
           <div className="flex flex-col gap-4 px-4 py-3">
             <div>
               <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                Contact
+                {t('contactHeading')}
               </h3>
               {recordGone ? (
                 <p className="mt-1 text-sm text-warn-400">
-                  {backendName} no longer has a record for {name} — deleted or merged there.
-                  Contact details live on that record, so there is nothing to show until it is
-                  sorted out below.
+                  {t('recordGoneContact', { backend: backendName, name })}
                 </p>
               ) : detailsError ? (
                 // A backend outage must not read as "this family has no phone
@@ -883,9 +883,7 @@ export function StudentDetailPage() {
               {recordGone ? (
                 <div className="mt-1 flex flex-col gap-2 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
                   <p className="text-sm text-warn-300">
-                    {backendName} no longer has a record for {name} — deleted or merged there.
-                    Check-ins are frozen, past nights included, until this is sorted out: take
-                    them off the roster, or put a record back.
+                    {t('recordGoneFrozen', { backend: backendName, name })}
                   </p>
                   {recreateForm.open ? (
                     <div className="flex flex-col gap-2">
@@ -933,7 +931,7 @@ export function StudentDetailPage() {
                 <p className="mt-1 text-sm text-ink-300">
                   {/* Not "synced": nothing was copied. This screen read the
                       backend a moment ago and is showing what it said. */}
-                  Read from {backendName}.
+                  {t('readFrom', { backend: backendName })}
                   {backend === 'pco' && student.pcoPersonId ? (
                     // Only Planning Center has a product page to link out to.
                     <>
@@ -1419,8 +1417,7 @@ function BirthdaySection({
 
           {recordGone ? null : upstream === null ? (
             <p className="mt-1 text-xs text-ink-500">
-              Tally keeps no birthday of its own. Once {student.firstName} reaches Planning Center,
-              theirs can be filled in there.
+              {t('birthdayUpstreamFirst', { name: student.firstName })}
             </p>
           ) : writable ? (
             <p className="mt-1 text-xs text-ink-500">
@@ -1440,7 +1437,7 @@ function BirthdaySection({
             <p className="mt-1 text-xs text-ink-500">{t('readingPermissions')}</p>
           ) : (
             <p className="mt-1 text-xs text-ink-500">
-              Kept in Planning Center.{' '}
+              {t('birthdayKeptIn')}{' '}
               <a
                 href={upstream}
                 target="_blank"

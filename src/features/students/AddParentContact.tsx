@@ -76,11 +76,8 @@ function usableEmail(raw: string): boolean {
 }
 
 function Missing({ label }: { label: string }) {
-  return (
-    <p className="mt-1 text-sm text-warn-400">
-      Nothing in {label} — nobody can reach this family in an emergency.
-    </p>
-  );
+  const t = useTranslations('ParentContact');
+  return <p className="mt-1 text-sm text-warn-400">{t('nothingIn', { backend: label })}</p>;
 }
 
 export function AddParentContact({
@@ -101,8 +98,7 @@ export function AddParentContact({
       <>
         <Missing label={label} />
         <p className="mt-1 text-xs text-ink-500">
-          Tally holds no contact details of its own. Once this student reaches {label}, their
-          contact details are added there.
+          {t('noneOfOurOwn', { backend: label })}
         </p>
       </>
     );
@@ -269,7 +265,7 @@ function ContactForm({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
         <Button
           type="button"
@@ -533,9 +529,10 @@ function AdultForm({
       className="mt-2 flex flex-col gap-3"
     >
       <p className="text-xs text-ink-500">
-        Added to {backendLabelOf(student)} as an adult in {student.firstName}&rsquo;s household, and
-        the household itself if there is not one yet. A phone number or email is optional now and
-        can be added later.
+        {t('addedAsAdult', {
+          backend: backendLabelOf(student),
+          name: student.firstName,
+        })}
       </p>
 
       <div className="grid grid-cols-2 gap-3">
@@ -577,7 +574,7 @@ function AdultForm({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
         <Button
           type="button"

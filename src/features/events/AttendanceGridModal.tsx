@@ -147,7 +147,7 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
       <div className="flex flex-col gap-3">
         {gatherings.length === 0 ? (
           <p className="text-sm text-ink-400">
-            There are no recurring gatherings you are on to build a grid from.
+            {t('noRecurring')}
           </p>
         ) : (
           <>

@@ -534,8 +534,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
             {writable ? (
               <>
-                Name, grade, birthday and allergies are {label}'s, and Save writes them there —
-                Tally keeps no copy.
+                {t('writableNote', { backend: label })}
                 {backend === 'pco' && student.pcoPersonId ? (
                   // Only Planning Center has a product page to link out to.
                   <>
@@ -546,17 +545,16 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
                       rel="noreferrer"
                       className="font-semibold underline"
                     >
-                      Open in {label}
+                      {t('openIn', { backend: label })}
                     </a>
-                    .
+                    {t('fullStop')}
                   </>
                 ) : null}{' '}
-                Notes live in Tally.
+                {t('notesLiveHere')}
               </>
             ) : (
               <>
-                Name, grade, birthday, allergies and status come from {label} and would be
-                overwritten by the next sync.
+                {t('readOnlyNote', { backend: label })}
                 {backend === 'pco' && student.pcoPersonId ? (
                   <>
                     {' '}
@@ -566,14 +564,14 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
                       rel="noreferrer"
                       className="font-semibold underline"
                     >
-                      Edit them in {label}
+                      {t('editThemIn', { backend: label })}
                     </a>
-                    .
+                    {t('fullStop')}
                   </>
                 ) : (
-                  <> Edit them in {label} itself, or turn write-back on.</>
+                  <> {t('editThemInHere', { backend: label })}</>
                 )}{' '}
-                Notes live in Tally.
+                {t('notesLiveHere')}
               </>
             )}
           </p>
@@ -766,14 +764,14 @@ function ContactSection({
 
   return (
     <div className="mt-4 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Contact</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{t('contactHeading')}</p>
 
       {!student || backend === null ? (
         <p className="mt-1 text-sm text-ink-300">
-          Once this student reaches {label}, their contact details are added there.
+          {t('contactLater', { backend: label })}
         </p>
       ) : loading && !details ? (
-        <p className="mt-1 text-sm text-ink-500">Reading what {label} has…</p>
+        <p className="mt-1 text-sm text-ink-500">{t('contactReading', { backend: label })}</p>
       ) : onFile ? (
         // Already reachable, so there is nothing for Tally to add: the write
         // path only ever fills a gap, and never overwrites what is on file.
@@ -787,7 +785,7 @@ function ContactSection({
             {onFile.contactEmail ? <span className="break-all">{onFile.contactEmail}</span> : null}
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Kept in {label}.
+            {t('contactKeptIn', { backend: label })}
             {backend === 'pco' && student.pcoPersonId ? (
               // Only Planning Center has a product page to link out to.
               <>
@@ -800,7 +798,7 @@ function ContactSection({
                 >
                   {t('changeItThere')}
                 </a>
-                .
+                {t('fullStop')}
               </>
             ) : null}
           </p>

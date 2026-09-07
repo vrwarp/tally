@@ -249,7 +249,9 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
                   : undefined
               }
             >
-              <option value="dayOfMonth">Monthly on day {anchor.getDate()}</option>
+              <option value="dayOfMonth">
+                {t('monthlyOnDayOption', { day: anchor.getDate() })}
+              </option>
               <option value="dayOfWeek">
                 {t('monthlyOnWeekdayOption', {
                   which: describeMonthlyWeekday(recurrenceStrings, anchor),

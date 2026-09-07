@@ -187,8 +187,7 @@ export function OneOffOnlyList({
 
                 <span className="shrink-0 rounded-xl bg-warn-500/10 px-2.5 py-1 text-center ring-1 ring-warn-500/25">
                   <span className="sr-only">
-                    {item.missedSince} regular {item.missedSince === 1 ? 'gathering' : 'gatherings'}{' '}
-                    since, none of them with this student in it.
+                    {t('missedSinceAria', { count: item.missedSince })}
                   </span>
                   <span
                     aria-hidden="true"

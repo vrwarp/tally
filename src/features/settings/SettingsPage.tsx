@@ -133,22 +133,24 @@ export function SettingsPage() {
       <header>
         <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <p className="mt-0.5 text-sm text-ink-500">
-          Thresholds and connections apply to every counselor's phone immediately. Appearance is
-          yours alone. Who may sign in lives on{' '}
-          <Link
-            to="/team"
-            className="font-semibold text-brand-300 underline-offset-2 hover:underline"
-          >
-            Team
-          </Link>
-          , and the lobby screen on{' '}
-          <Link
-            to="/pair-kiosk"
-            className="font-semibold text-brand-300 underline-offset-2 hover:underline"
-          >
-            Kiosk
-          </Link>
-          .
+          {t.rich('intro', {
+            team: (chunks) => (
+              <Link
+                to="/team"
+                className="font-semibold text-brand-300 underline-offset-2 hover:underline"
+              >
+                {chunks}
+              </Link>
+            ),
+            kiosk: (chunks) => (
+              <Link
+                to="/pair-kiosk"
+                className="font-semibold text-brand-300 underline-offset-2 hover:underline"
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       </header>
 

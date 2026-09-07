@@ -183,7 +183,7 @@ function EventRow({
           aria-label={t('unCancelAria', { title: event.title })}
           className="min-h-16 shrink-0 rounded-xl bg-ink-800 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 active:bg-ink-700 disabled:opacity-50"
         >
-          Un-cancel
+          {t('unCancel')}
         </button>
       ) : null}
     </li>
@@ -400,7 +400,7 @@ function QuickAction({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold text-ink-300">
-              {series.title} is scheduled
+              {t('isScheduled', { title: series.title })}
             </span>
             <span className="block truncate text-xs text-ink-500">{when}</span>
           </span>
@@ -421,7 +421,7 @@ function QuickAction({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-brand-200">
-            Schedule next {series.title}
+            {t('scheduleNext', { title: series.title })}
           </span>
           <span className="block truncate text-xs text-ink-400">{when}</span>
         </span>

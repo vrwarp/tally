@@ -579,6 +579,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Pco.sentTimes": {
+    "source": "Sent {count} times — Tally retried before giving up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Fields.clearSearch": {
     "source": "Clear search",
     "zh-Hans": "todo",
@@ -934,6 +939,16 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "FollowUp.notInBackend": {
+    "source": "Not in {backend} yet, so there is nobody to call. Add them there to follow up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "FollowUp.recordGone": {
+    "source": "{backend} no longer has a record for {name} — deleted or merged there. Nobody can follow up until that is sorted out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Transitions.reasonMovedOn": {
     "source": "Moved on within the ministry",
     "zh-Hans": "todo",
@@ -1279,6 +1294,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "OneOff.missedSinceAria": {
+    "source": "{count, plural, one {# regular gathering since, none of them with this student in it.} other {# regular gatherings since, none of them with this student in it.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "NewVisitors.title": {
     "source": "New faces",
     "zh-Hans": "todo",
@@ -1391,6 +1411,11 @@
   },
   "Ledger.note": {
     "source": " — “{note}”",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Ledger.backSince": {
+    "source": " · back since — no longer in effect",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -1731,6 +1756,11 @@
   },
   "CheckIn.formerStudent": {
     "source": "Former student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.swapBody": {
+    "source": "Tap the right student. {name}’s check-in moves across, still {time}.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -2246,6 +2276,11 @@
   },
   "Settings.title": {
     "source": "Settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.intro": {
+    "source": "Thresholds and connections apply to every counselor's phone immediately. Appearance is yours alone. Who may sign in lives on <team>Team</team>, and the lobby screen on <kiosk>Kiosk</kiosk>.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3954,6 +3989,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Access.noTeamMatch": {
+    "source": "Nobody on the team matches “{query}”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "EventDetail.notFoundTitle": {
     "source": "That event is not here",
     "zh-Hans": "todo",
@@ -4284,6 +4324,26 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "DangerZone.datesAheadGo": {
+    "source": "The dates ahead go too. They are not saved anywhere — the calendar works them out from the ones it has already held — so once the last one is gone, nothing puts a {title} back on the calendar.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.cannotBeUndone": {
+    "source": "This cannot be undone.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteEmptyAsk": {
+    "source": "Delete “{title}” permanently? Cancelling keeps it on the calendar and can be undone.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.repeatsNote": {
+    "source": "This gathering repeats. Ending it removes every {title} — the nights already recorded, their check-ins, and the dates the schedule has not reached yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Import.titleMulti": {
     "source": "Import history",
     "zh-Hans": "todo",
@@ -4431,6 +4491,11 @@
   },
   "Import.keptRows": {
     "source": "{count, plural, one {# row kept as Tally recorded them} other {# rows kept as Tally recorded them}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.listDown": {
+    "source": "{backends} could not be asked for its events just now — this list is from the rest.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4746,6 +4811,41 @@
   },
   "Events.rowDateAndTime": {
     "source": " · {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.unCancel": {
+    "source": "Un-cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.isScheduled": {
+    "source": "{title} is scheduled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.scheduleNext": {
+    "source": "Schedule next {title}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.iconNoMatch": {
+    "source": "Nothing matches “{query}”. Try what the thing is rather than what it is called — “fire”, “food”, “trip”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.notYoursCount": {
+    "source": "{count, plural, one {Not yours · # today} other {Not yours · # today}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.notYoursCountMore": {
+    "source": "{count, plural, one {Not yours · # more today} other {Not yours · # more today}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.notOnGatherings": {
+    "source": "You are not on {titles}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5084,6 +5184,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Recurrence.monthlyOnDayOption": {
+    "source": "Monthly on day {day}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "EventStatus.cancelled": {
     "source": "Cancelled",
     "zh-Hans": "todo",
@@ -5144,6 +5249,16 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "EventHero.cancelled": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.checkOut": {
+    "source": "Check-out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Grid.title": {
     "source": "Attendance grid",
     "zh-Hans": "todo",
@@ -5191,6 +5306,11 @@
   },
   "Grid.denied": {
     "source": "{count, plural, one {# gathering is not yours to read, so it has no column here — rather than a column of zeros saying nobody came.} other {# gatherings are not yours to read, so they have no column here — rather than a column of zeros saying nobody came.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.noRecurring": {
+    "source": "There are no recurring gatherings you are on to build a grid from.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5506,6 +5626,16 @@
   },
   "SyncStrip.gotIt": {
     "source": "Got it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.recreateIn": {
+    "source": "Re-create them in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.opensThemIn": {
+    "source": "Opens them in {backend}.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -6284,6 +6414,51 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "StudentDetail.contactHeading": {
+    "source": "Contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recordGoneContact": {
+    "source": "{backend} no longer has a record for {name} — deleted or merged there. Contact details live on that record, so there is nothing to show until it is sorted out below.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recordGoneFrozen": {
+    "source": "{backend} no longer has a record for {name} — deleted or merged there. Check-ins are frozen, past nights included, until this is sorted out: take them off the roster, or put a record back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.readFrom": {
+    "source": "Read from {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdayUpstreamFirst": {
+    "source": "Tally keeps no birthday of its own. Once {name} reaches Planning Center, theirs can be filled in there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdayKeptIn": {
+    "source": "Kept in Planning Center.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recordMissingBadge": {
+    "source": "{backend} record missing",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.visitorBadge": {
+    "source": "Visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.inactiveBadge": {
+    "source": "Inactive",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "AddStudent.titleMulti": {
     "source": "Add a student",
     "zh-Hans": "todo",
@@ -6421,6 +6596,11 @@
   },
   "AddStudent.importedCount": {
     "source": "{added} of {total} from “{list}” added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.searchDown": {
+    "source": "{backends} could not be searched just now — these results are from the rest.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -6599,6 +6779,31 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "RowBadge.noMedicalYet": {
+    "source": "{name} was added here and has not reached {backend} yet, so there is no medical note to read — whatever somebody typed at the door is on their profile.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.tryAgain": {
+    "source": "Try again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.noBirthdateHeld": {
+    "source": "{backend} holds no birthdate for {name}, so Tally cannot tell you when to say something.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.dayOnly": {
+    "source": "The day only — {backend} holds no year for {name}, so it shows no age.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.noRecordYet": {
+    "source": "{name} does not exist in {backend} yet, so there is nowhere to put one until their push lands.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "StudentEditor.titleEdit": {
     "source": "Edit {name}",
     "zh-Hans": "todo",
@@ -6739,6 +6944,61 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "StudentEditor.writableNote": {
+    "source": "Name, grade, birthday and allergies are {backend}'s, and Save writes them there — Tally keeps no copy.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.readOnlyNote": {
+    "source": "Name, grade, birthday, allergies and status come from {backend} and would be overwritten by the next sync.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.openIn": {
+    "source": "Open in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.editThemIn": {
+    "source": "Edit them in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.editThemInHere": {
+    "source": "Edit them in {backend} itself, or turn write-back on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.notesLiveHere": {
+    "source": "Notes live in Tally.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.fullStop": {
+    "source": ".",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.contactLater": {
+    "source": "Once this student reaches {backend}, their contact details are added there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.contactReading": {
+    "source": "Reading what {backend} has…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.contactKeptIn": {
+    "source": "Kept in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.contactHeading": {
+    "source": "Contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "ParentContact.noAdultInHousehold": {
     "source": "{backend} has no adult in this household yet, so there is nobody to put a number on.",
     "zh-Hans": "todo",
@@ -6876,6 +7136,31 @@
   },
   "ParentContact.savingBirthday": {
     "source": "Saving {name}’s birthday to {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.nothingIn": {
+    "source": "Nothing in {backend} — nobody can reach this family in an emergency.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.noneOfOurOwn": {
+    "source": "Tally holds no contact details of its own. Once this student reaches {backend}, their contact details are added there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.saveTo": {
+    "source": "Save to {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addedAsAdult": {
+    "source": "Added to {backend} as an adult in {name}’s household, and the household itself if there is not one yet. A phone number or email is optional now and can be added later.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.cancel": {
+    "source": "Cancel",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },

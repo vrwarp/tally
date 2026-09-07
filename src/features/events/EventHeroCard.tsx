@@ -132,10 +132,10 @@ export function EventHeroCard({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
+        {cancelled ? <Badge tone="danger">{t('cancelled')}</Badge> : null}
         {open ? <Badge tone="success">{t('checkInOpen')}</Badge> : null}
         {event.requiresRsvp ? <Badge tone="warn">{t('rsvpOnly')}</Badge> : null}
-        {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
+        {event.requiresCheckOut ? <Badge tone="neutral">{t('checkOut')}</Badge> : null}
         {/*
           Said once.
 

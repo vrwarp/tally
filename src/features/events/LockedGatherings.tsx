@@ -55,7 +55,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
           {/* "Today" rather than "tonight": this list is the calendar day, and
               a nursery team's gathering is at half past nine in the morning. */}
           <span id="not-yours">
-            Not yours · {events.length} {hasOwn ? 'more ' : ''}today
+            {t(hasOwn ? 'notYoursCountMore' : 'notYoursCount', { count: events.length })}
           </span>
           {/* Turned about the arrowhead's ink, not its em box. `⌄` hangs low in
               its square, so a plain 180° flip throws the mark to cap height and

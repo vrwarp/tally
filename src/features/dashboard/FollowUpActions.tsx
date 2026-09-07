@@ -285,7 +285,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   if (unavailable) {
     body = (
       <p className="text-xs text-warn-400">
-        Not in {label} yet, so there is nobody to call. Add them there to follow up.
+        {t('notInBackend', { backend: label })}
       </p>
     );
   } else if (error) {
@@ -320,8 +320,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // fixed in a different place.
     body = (
       <p className="text-xs text-warn-400">
-        {label} no longer has a record for {name} — deleted or merged there. Nobody can follow up
-        until that is sorted out.
+        {t('recordGone', { backend: label, name })}
       </p>
     );
   } else if (!phone && !email) {

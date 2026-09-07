@@ -958,8 +958,10 @@ export function CheckInPage() {
                   {t("swapPrompt")}
                 </span>
                 <span className="block text-xs leading-snug text-ink-300">
-                  Tap the right student. {studentFullName(swapSource.student)}’s check-in moves
-                  across, still {time.clock(swapSource.record.checkedInAt)}.
+                  {t('swapBody', {
+                    name: studentFullName(swapSource.student),
+                    time: time.clock(swapSource.record.checkedInAt),
+                  })}
                 </span>
               </span>
               <button

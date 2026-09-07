@@ -477,7 +477,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                   </p>
                 ) : (
                   <p className="px-2 pt-2 text-sm text-ink-400">
-                    Nobody on the team matches “{query.trim()}”.
+                    {t('noTeamMatch', { query: query.trim() })}
                   </p>
                 )}
               </section>

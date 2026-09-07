@@ -34,7 +34,7 @@ import {
   type PcoList,
   type PcoPersonSearchResult,
 } from '@/types';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
 
 /** Which backend a search row came from; every row can say. */
@@ -58,6 +58,7 @@ export function AddFromPlanningCenterModal({
   onRoster,
 }: AddFromPlanningCenterModalProps) {
   const t = useTranslations('AddStudent');
+  const locale = useLocale();
   const grades = useGrades();
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
@@ -239,8 +240,9 @@ export function AddFromPlanningCenterModal({
 
         {searchDown.length > 0 && query.trim() ? (
           <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-            {searchDown.join(' and ')} could not be searched just now — these results are from the
-            rest.
+            {t('searchDown', {
+              backends: new Intl.ListFormat(locale, { type: 'conjunction' }).format(searchDown),
+            })}
           </p>
         ) : null}
 

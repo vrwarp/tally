@@ -232,9 +232,7 @@ function DeleteGatheringModal({
               <Consequences summary={summary} scope="chain" />
             ) : null}
             <p className="text-sm leading-relaxed text-ink-300">
-              The dates ahead go too. They are not saved anywhere — the calendar works them out
-              from the ones it has already held — so once the last one is gone, nothing puts a{' '}
-              {event.title} back on the calendar.
+              {t('datesAheadGo', { title: event.title })}
             </p>
           </>
         ) : (
@@ -245,7 +243,7 @@ function DeleteGatheringModal({
         )}
 
         <p className="text-sm leading-relaxed text-ink-300">
-          This cannot be undone.{' '}
+          {t('cannotBeUndone')}{' '}
           {scope === 'chain'
             ? t('compareChain')
             : t('compareEvent')}
@@ -348,8 +346,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           ) : confirmingEmpty ? (
             <>
               <p className="text-sm text-ink-300">
-                Delete “{event.title}” permanently? Cancelling keeps it on the calendar and can be
-                undone.
+                {t('deleteEmptyAsk', { title: event.title })}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -391,8 +388,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           {event.mode === 'recurring' ? (
             <div className="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-4">
               <p className="text-sm text-ink-400">
-                This gathering repeats. Ending it removes every {event.title} — the nights already
-                recorded, their check-ins, and the dates the schedule has not reached yet.
+                {t('repeatsNote', { title: event.title })}
               </p>
               <Button variant="secondary" onClick={() => setConfirming('chain')}>
                 {t('deleteChain')}

@@ -208,7 +208,7 @@ export function StudentSyncStrip({
           {edit.state === 'orphaned' ? (
             <>
               <Button variant="primary" className="w-full lg:w-auto" onClick={onRecreate}>
-                Re-create them in {backend}
+                {syncStrings.t('recreateIn', { backend })}
               </Button>
               <span className="text-xs text-ink-500">{syncStrings.t(ONE_NEW_PERSON)}</span>
             </>
@@ -224,7 +224,9 @@ export function StudentSyncStrip({
                   name: edit.survivorName ?? syncStrings.t('theSurvivor'),
                 })}
               </Button>
-              <span className="text-xs text-ink-500">Opens them in {backend}.</span>
+              <span className="text-xs text-ink-500">
+                {syncStrings.t('opensThemIn', { backend })}
+              </span>
             </>
           ) : null}
           {/*

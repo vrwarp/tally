@@ -129,7 +129,8 @@
     "response": "Response",
     "code": "Code",
     "when": "When",
-    "error": "Error"
+    "error": "Error",
+    "sentTimes": "Sent {count} times — Tally retried before giving up."
   },
   "Fields": {
     "clearSearch": "Clear search",
@@ -210,7 +211,9 @@
     "listRowWithGrade": "- {name} ({grade}) {contact}",
     "listRow": "- {name} {contact}",
     "addContact": "Add a contact",
-    "addContactAria": "Add a contact for {name}"
+    "addContactAria": "Add a contact for {name}",
+    "notInBackend": "Not in {backend} yet, so there is nobody to call. Add them there to follow up.",
+    "recordGone": "{backend} no longer has a record for {name} — deleted or merged there. Nobody can follow up until that is sorted out."
   },
   "Transitions": {
     "reasonMovedOn": "Moved on within the ministry",
@@ -289,7 +292,8 @@
     "metaWithGrade": "{grade} · {detail}",
     "gatheringsSinceUnit": "{count, plural, one {gathering since} other {gatherings since}}",
     "metAtWithGrade": "{grade} · met at {event} · {date}, {relative}",
-    "metAt": "met at {event} · {date}, {relative}"
+    "metAt": "met at {event} · {date}, {relative}",
+    "missedSinceAria": "{count, plural, one {# regular gathering since, none of them with this student in it.} other {# regular gatherings since, none of them with this student in it.}}"
   },
   "NewVisitors": {
     "title": "New faces",
@@ -318,7 +322,8 @@
   "Ledger": {
     "summaryHere": "{count} no longer expected here · latest {date}",
     "summary": "{count} no longer expected · latest {date}",
-    "note": " — “{note}”"
+    "note": " — “{note}”",
+    "backSince": " · back since — no longer in effect"
   },
   "CheckIn": {
     "focusAll": "Roster",
@@ -388,7 +393,8 @@
     "archivedNote": "This night is older than the few months Tally keeps loaded, so it opens as a record of what happened rather than a roster.",
     "archivedEmptyTitle": "Nobody was checked in",
     "archivedEmptyBody": "Tally reads a finished gathering with no attendance as one that did not happen — it is not a miss for anybody.",
-    "formerStudent": "Former student"
+    "formerStudent": "Former student",
+    "swapBody": "Tap the right student. {name}’s check-in moves across, still {time}."
   },
   "StudentRow": {
     "whoWithGrade": "{name}, {grade}",
@@ -503,7 +509,8 @@
     "previewMiaLabel": "Flagged as missing in action",
     "previewWas": " · was {count}",
     "previewStudents": " {count, plural, one {student} other {students}}",
-    "title": "Settings"
+    "title": "Settings",
+    "intro": "Thresholds and connections apply to every counselor's phone immediately. Appearance is yours alone. Who may sign in lives on <team>Team</team>, and the lobby screen on <kiosk>Kiosk</kiosk>."
   },
   "Backends": {
     "refresh": "Refresh",
@@ -858,7 +865,8 @@
     "loadingTeam": "Loading the team…",
     "appliesToThis": "This applies to this gathering only.",
     "appliesToSeries": "Changing this affects every {title}, past and future.",
-    "alreadyOn": "{count, plural, one {{names} is already on this gathering.} other {{names} are already on this gathering.}}"
+    "alreadyOn": "{count, plural, one {{names} is already on this gathering.} other {{names} are already on this gathering.}}",
+    "noTeamMatch": "Nobody on the team matches “{query}”."
   },
   "EventDetail": {
     "notFoundTitle": "That event is not here",
@@ -928,7 +936,11 @@
     "deleteWithCheckIns": "Delete this gathering and its check-ins",
     "emptyNote": "Nobody has been checked in, so this event can still be removed entirely.",
     "deleteEvent": "Delete event",
-    "deleteChain": "Delete every gathering in this repeat"
+    "deleteChain": "Delete every gathering in this repeat",
+    "datesAheadGo": "The dates ahead go too. They are not saved anywhere — the calendar works them out from the ones it has already held — so once the last one is gone, nothing puts a {title} back on the calendar.",
+    "cannotBeUndone": "This cannot be undone.",
+    "deleteEmptyAsk": "Delete “{title}” permanently? Cancelling keeps it on the calendar and can be undone.",
+    "repeatsNote": "This gathering repeats. Ending it removes every {title} — the nights already recorded, their check-ins, and the dates the schedule has not reached yet."
   },
   "Import": {
     "titleMulti": "Import history",
@@ -960,7 +972,8 @@
     "skippedVolunteers": "{count} volunteer check-ins skipped (leaders, not students)",
     "skippedGuests": "{count, plural, one {# one-time guest skipped (no Planning Center person behind the name)} other {# one-time guests skipped (no Planning Center person behind the name)}}",
     "duplicatesCollapsed": "{count, plural, one {# duplicate check-in collapsed} other {# duplicate check-ins collapsed}}",
-    "keptRows": "{count, plural, one {# row kept as Tally recorded them} other {# rows kept as Tally recorded them}}"
+    "keptRows": "{count, plural, one {# row kept as Tally recorded them} other {# rows kept as Tally recorded them}}",
+    "listDown": "{backends} could not be asked for its events just now — this list is from the rest."
   },
   "KioskTheme": {
     "fieldLabel": "Kiosk colours",
@@ -1027,7 +1040,14 @@
     "labelScaledDown": "Everything has been scaled down to fit. Fewer or smaller lines would print larger.",
     "labelDropped": "{count, plural, one {The last line does not fit on this label and will not be printed.} other {The last # lines do not fit on this label and will not be printed.}}",
     "chainDetail": "{window} · {location}",
-    "rowDateAndTime": " · {time}"
+    "rowDateAndTime": " · {time}",
+    "unCancel": "Un-cancel",
+    "isScheduled": "{title} is scheduled",
+    "scheduleNext": "Schedule next {title}",
+    "iconNoMatch": "Nothing matches “{query}”. Try what the thing is rather than what it is called — “fire”, “food”, “trip”.",
+    "notYoursCount": "{count, plural, one {Not yours · # today} other {Not yours · # today}}",
+    "notYoursCountMore": "{count, plural, one {Not yours · # more today} other {Not yours · # more today}}",
+    "notOnGatherings": "You are not on {titles}"
   },
   "KioskBackdrop": {
     "fieldLabel": "Kiosk photo",
@@ -1098,7 +1118,8 @@
     "weekdayInitialWed": "W",
     "weekdayInitialThu": "T",
     "weekdayInitialFri": "F",
-    "weekdayInitialSat": "S"
+    "weekdayInitialSat": "S",
+    "monthlyOnDayOption": "Monthly on day {day}"
   },
   "EventStatus": {
     "cancelled": "Cancelled",
@@ -1114,7 +1135,9 @@
     "whenWindowLocation": "{window} · {location}",
     "whenWindow": "{window}",
     "checkInOpen": "Check-in open",
-    "rsvpOnly": "RSVP only"
+    "rsvpOnly": "RSVP only",
+    "cancelled": "Cancelled",
+    "checkOut": "Check-out"
   },
   "Grid": {
     "title": "Attendance grid",
@@ -1126,7 +1149,8 @@
     "rangeLast3Months": "Last 3 months",
     "rangeLast12Months": "Last 12 months",
     "presumedCancelled": "{count, plural, one {# gathering had nobody checked in and is left out, the way every other screen treats them.} other {# gatherings had nobody checked in and are left out, the way every other screen treats them.}}",
-    "denied": "{count, plural, one {# gathering is not yours to read, so it has no column here — rather than a column of zeros saying nobody came.} other {# gatherings are not yours to read, so they have no column here — rather than a column of zeros saying nobody came.}}"
+    "denied": "{count, plural, one {# gathering is not yours to read, so it has no column here — rather than a column of zeros saying nobody came.} other {# gatherings are not yours to read, so they have no column here — rather than a column of zeros saying nobody came.}}",
+    "noRecurring": "There are no recurring gatherings you are on to build a grid from."
   },
   "PastGatherings": {
     "title": "Past gatherings",
@@ -1193,7 +1217,9 @@
     "keepTheirs": "Keep theirs",
     "sendMineAgain": "Send mine again",
     "discardTheEdit": "Discard the edit",
-    "gotIt": "Got it"
+    "gotIt": "Got it",
+    "recreateIn": "Re-create them in {backend}",
+    "opensThemIn": "Opens them in {backend}."
   },
   "JobChip": {
     "queuedLong": "Queued",
@@ -1354,7 +1380,16 @@
     "birthdaySaved": "Saved in Planning Center.",
     "changeItThere": "Change it there",
     "addOneThere": "Add one there",
-    "recreateIn": "Re-create in {backend}"
+    "recreateIn": "Re-create in {backend}",
+    "contactHeading": "Contact",
+    "recordGoneContact": "{backend} no longer has a record for {name} — deleted or merged there. Contact details live on that record, so there is nothing to show until it is sorted out below.",
+    "recordGoneFrozen": "{backend} no longer has a record for {name} — deleted or merged there. Check-ins are frozen, past nights included, until this is sorted out: take them off the roster, or put a record back.",
+    "readFrom": "Read from {backend}.",
+    "birthdayUpstreamFirst": "Tally keeps no birthday of its own. Once {name} reaches Planning Center, theirs can be filled in there.",
+    "birthdayKeptIn": "Kept in Planning Center.",
+    "recordMissingBadge": "{backend} record missing",
+    "visitorBadge": "Visitor",
+    "inactiveBadge": "Inactive"
   },
   "AddStudent": {
     "titleMulti": "Add a student",
@@ -1384,7 +1419,8 @@
     "backOnRoster": "{name} is back on the roster",
     "added": "{name} added",
     "allAlreadyOn": "Everyone on “{list}” was already on the roster",
-    "importedCount": "{added} of {total} from “{list}” added"
+    "importedCount": "{added} of {total} from “{list}” added",
+    "searchDown": "{backends} could not be searched just now — these results are from the rest."
   },
   "RowBadge": {
     "titleAllergy": "Allergies",
@@ -1421,7 +1457,12 @@
     "pushing": "Pushing…",
     "pushNow": "Push now",
     "pushed": "{name} is in {backend}.",
-    "pushFailed": "The push did not go through. Nothing was changed."
+    "pushFailed": "The push did not go through. Nothing was changed.",
+    "noMedicalYet": "{name} was added here and has not reached {backend} yet, so there is no medical note to read — whatever somebody typed at the door is on their profile.",
+    "tryAgain": "Try again",
+    "noBirthdateHeld": "{backend} holds no birthdate for {name}, so Tally cannot tell you when to say something.",
+    "dayOnly": "The day only — {backend} holds no year for {name}, so it shows no age.",
+    "noRecordYet": "{name} does not exist in {backend} yet, so there is nowhere to put one until their push lands."
   },
   "StudentEditor": {
     "titleEdit": "Edit {name}",
@@ -1451,7 +1492,18 @@
     "savingTo": "{name} — saving to {backend}",
     "saved": "{name} saved",
     "addedToast": "{name} added",
-    "contactPrefix": "{name} · "
+    "contactPrefix": "{name} · ",
+    "writableNote": "Name, grade, birthday and allergies are {backend}'s, and Save writes them there — Tally keeps no copy.",
+    "readOnlyNote": "Name, grade, birthday, allergies and status come from {backend} and would be overwritten by the next sync.",
+    "openIn": "Open in {backend}",
+    "editThemIn": "Edit them in {backend}",
+    "editThemInHere": "Edit them in {backend} itself, or turn write-back on.",
+    "notesLiveHere": "Notes live in Tally.",
+    "fullStop": ".",
+    "contactLater": "Once this student reaches {backend}, their contact details are added there.",
+    "contactReading": "Reading what {backend} has…",
+    "contactKeptIn": "Kept in {backend}.",
+    "contactHeading": "Contact"
   },
   "ParentContact": {
     "noAdultInHousehold": "{backend} has no adult in this household yet, so there is nobody to put a number on.",
@@ -1481,7 +1533,12 @@
     "householdNote": "Putting them in this household keeps one record. A second copy of the same adult has to be merged by hand later.",
     "modalTitle": "Add a contact",
     "backendUnreachable": "{backend} could not be reached. Nothing was changed.",
-    "savingBirthday": "Saving {name}’s birthday to {backend}."
+    "savingBirthday": "Saving {name}’s birthday to {backend}.",
+    "nothingIn": "Nothing in {backend} — nobody can reach this family in an emergency.",
+    "noneOfOurOwn": "Tally holds no contact details of its own. Once this student reaches {backend}, their contact details are added there.",
+    "saveTo": "Save to {backend}",
+    "addedAsAdult": "Added to {backend} as an adult in {name}’s household, and the household itself if there is not one yet. A phone number or email is optional now and can be added later.",
+    "cancel": "Cancel"
   },
   "PartialRoster": {
     "title": "Some of this roster is out of date",

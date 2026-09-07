@@ -31,7 +31,7 @@ import {
   type CheckInsImportSummary,
   type PcoErrorReport,
 } from '@/types';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 export interface ImportCheckInsModalProps {
   open: boolean;
@@ -159,6 +159,7 @@ function Summary({ summary }: { summary: CheckInsImportSummary }) {
 
 export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps) {
   const t = useTranslations('Import');
+  const locale = useLocale();
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
 
@@ -285,8 +286,9 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
 
         {listDown.length > 0 ? (
           <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-            {listDown.join(' and ')} could not be asked for its events just now — this list is from
-            the rest.
+            {t('listDown', {
+              backends: new Intl.ListFormat(locale, { type: 'conjunction' }).format(listDown),
+            })}
           </p>
         ) : null}
 

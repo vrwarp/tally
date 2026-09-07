@@ -201,10 +201,10 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
       />
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone} disabled={busy}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button onClick={() => void save()} loading={busy}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
       </div>
     </div>

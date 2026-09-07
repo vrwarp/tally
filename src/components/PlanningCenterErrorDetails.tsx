@@ -69,7 +69,7 @@ function RequestSection({ request }: { request: PcoDebugRequest }) {
       </Block>
       {request.attempts > 1 ? (
         <p className="text-xs text-ink-500">
-          Sent {request.attempts} times — Tally retried before giving up.
+          {t('sentTimes', { count: request.attempts })}
         </p>
       ) : null}
     </Section>

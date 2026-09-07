@@ -124,8 +124,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                     // Their own attendance outranks the record, and the strip
                     // says so rather than quietly dropping the row.
                     <span className="whitespace-nowrap text-present-400">
-                      {' '}
-                      · back since — no longer in effect
+                      {t('backSince')}
                     </span>
                   ) : null}
                 </p>

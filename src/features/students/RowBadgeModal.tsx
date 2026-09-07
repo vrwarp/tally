@@ -117,8 +117,7 @@ function AllergyPanel({ student }: { student: Student }) {
   if (unavailable) {
     return (
       <p className="text-sm text-ink-300">
-        {student.firstName} was added here and has not reached {label} yet, so there is no medical
-        note to read — whatever somebody typed at the door is on their profile.
+        {t('noMedicalYet', { name: student.firstName, backend: label })}
       </p>
     );
   }
@@ -129,7 +128,7 @@ function AllergyPanel({ student }: { student: Student }) {
         <ErrorBanner message={error} />
         <div className="flex justify-end">
           <Button variant="secondary" onClick={retry}>
-            Try again
+            {t('tryAgain')}
           </Button>
         </div>
       </div>
@@ -288,8 +287,7 @@ function BirthdayPanel({
     <div className="flex flex-col gap-3">
       {state === 'missing' ? (
         <p className="text-sm text-ink-300">
-          {label} holds no birthdate for {student.firstName}, so Tally cannot tell you when to say
-          something.
+          {t('noBirthdateHeld', { backend: label, name: student.firstName })}
         </p>
       ) : (
         <div className="flex flex-col gap-1">
@@ -303,7 +301,7 @@ function BirthdayPanel({
           */}
           {details && birthdayYear(onFile) === null ? (
             <p className="text-sm text-ink-500">
-              The day only — {label} holds no year for {student.firstName}, so it shows no age.
+              {t('dayOnly', { backend: label, name: student.firstName })}
             </p>
           ) : null}
         </div>
@@ -328,8 +326,7 @@ function BirthdayPanel({
         </p>
       ) : (
         <p className="text-sm text-ink-400">
-          {student.firstName} does not exist in {label} yet, so there is nowhere to put one until
-          their push lands.
+          {t('noRecordYet', { name: student.firstName, backend: label })}
         </p>
       )}
     </div>
