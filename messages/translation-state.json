@@ -9809,6 +9809,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Search.thenTapName": {
+    "source": "Then tap your child’s name.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine",
+    "context": "On the lobby kiosk, under \"Type a name\". The one sentence telling a parent that the name rows below are pressable. \"Tap\" is the same gesture as in Search.tapToCheckOut and should use the same verb. Addresses the parent as 您."
+  },
   "Search.checkedIn": {
     "source": "✓ Checked in",
     "zh-Hans": "machine",

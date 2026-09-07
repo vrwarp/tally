@@ -229,6 +229,7 @@
     "printerNeedsAttention": "The label printer needs attention",
     "checkedOut": "Checked out",
     "tapToCheckOut": "Tap to check out",
+    "thenTapName": "Then tap your child’s name.",
     "checkedIn": "✓ Checked in",
     "opensWhen": "Check-in opens {when}",
     "windowClosed": "You can still check in — the usual time has passed.",

@@ -932,7 +932,11 @@ export function SearchScreen({
                 * sends somebody hunting for a button and finding the register
                 * offer.
                 */}
-              <div className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>Then tap your child&rsquo;s name.</div>
+              <div
+                className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}
+              >
+                {t('thenTapName')}
+              </div>
               </div>
             </div>
           )}

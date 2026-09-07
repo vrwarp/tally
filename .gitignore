@@ -60,6 +60,13 @@ docs/walkthrough/parents/index.html
 docs/walkthrough/*.artifact.html
 docs/walkthrough/*/*.artifact.html
 
+# The i18n walkthrough splits the same way as the first one: `i18n/web/*.jpg` IS
+# committed — it is what the Markdown shows — while the archival PNGs and the
+# standalone page (the same frames again, inlined as base64) are not. Both
+# regenerate with `npm run walkthrough:i18n`.
+docs/walkthrough/i18n/shots/
+docs/walkthrough/i18n/i18n.html
+
 # The theme walkthrough follows the same split, and its `web/*.png` are PNG
 # rather than JPEG on purpose — a page arguing about which hue a gathering chose
 # should not ship through a codec that stores colour at half resolution. See the

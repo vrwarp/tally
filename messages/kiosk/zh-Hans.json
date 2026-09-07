@@ -229,6 +229,7 @@
     "printerNeedsAttention": "名牌打印机需要处理",
     "checkedOut": "已签出",
     "tapToCheckOut": "点一下签出",
+    "thenTapName": "然后点一下您孩子的名字。",
     "checkedIn": "✓ 已签到",
     "opensWhen": "{when} 开始签到",
     "windowClosed": "您仍然可以签到——只是已经过了平常的时间。",
