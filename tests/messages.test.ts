@@ -20,6 +20,7 @@ import { LOCALES } from '@/lib/locales';
 // standalone as `--check` with no toolchain around it.
 import { KIOSK_NAMESPACES, stale as staleKioskSlices, usedNamespaces } from '../scripts/sync-kiosk-messages.mjs';
 import {
+  DELIBERATELY_UNPINNED,
   QUOTED_IN,
   REQUIRED_WORDING,
   SAME_VALUE_GROUPS,
@@ -104,6 +105,39 @@ describe('message catalogues', () => {
       }
       for (const { key } of REQUIRED_WORDING) {
         expect(enFlat.has(key), `unknown key in REQUIRED_WORDING: ${key}`).toBe(true);
+      }
+    });
+
+    /*
+     * The list of pairs that are identical in English and must NOT be pinned.
+     *
+     * It is a comment with a test attached: the claim it makes is that these
+     * keys really do collide today, which is what makes them tempting, and the
+     * assertion is what stops the list rotting into a note about keys that
+     * drifted apart years ago. If one of these stops matching, the entry is
+     * simply no longer needed and should be deleted.
+     */
+    it('documents pairs that collide in English but must stay free', () => {
+      for (const group of DELIBERATELY_UNPINNED) {
+        for (const key of group) {
+          expect(enFlat.has(key), `unknown key in DELIBERATELY_UNPINNED: ${key}`).toBe(true);
+        }
+        const [first, ...rest] = group;
+        for (const other of rest) {
+          expect(
+            enFlat.get(other),
+            `${other} no longer matches ${first} in English — drop the DELIBERATELY_UNPINNED entry`,
+          ).toBe(enFlat.get(first!));
+        }
+      }
+    });
+
+    it('never pins a pair it also declares free', () => {
+      const pinned = new Set(SAME_VALUE_GROUPS.flat());
+      for (const group of DELIBERATELY_UNPINNED) {
+        for (const key of group) {
+          expect(pinned.has(key), `${key} is both pinned and declared free`).toBe(false);
+        }
       }
     });
 

@@ -66,13 +66,90 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
   /*
    * A nav label and the heading of the screen it opens are the same words about
    * the same thing, and a reader who taps 概覽 must land on a screen that says
-   * 概覽. Grows a row per screen as extraction reaches it — see docs/i18n.md
-   * Phase 2.
+   * 概覽. See docs/i18n.md Phase 2.
    */
   ['Dashboard.title', 'Nav.insights'],
   ['Team.title', 'Nav.team'],
   ['Settings.title', 'Nav.settings'],
+
+  /*
+   * The same thing said to the same reader from two places.
+   *
+   * Every group below already renders identically in all three catalogues —
+   * pinning them costs no translation, it only stops them drifting apart. That
+   * is worth doing because drift here is invisible: a reviewer editing a toast
+   * on the dashboard has no way to know the student page raises the same toast,
+   * and nothing goes red when only one of them moves. A copy audit found
+   * fifty-two English strings living under two or three keys with nothing
+   * holding them in step; these are the ones where that is a defect rather
+   * than a coincidence.
+   *
+   * A control and the dialog it opens count as one thing for this purpose — a
+   * button reading "Add a contact" must not open a sheet titled anything else.
+   */
+  ['Dashboard.releaseFailed', 'StudentDetail.releaseFailed'],
+  ['Dashboard.undoFailed', 'StudentDetail.undoFailed'],
+  ['Dashboard.historyError', 'StudentDetail.historyError'],
+  ['ChooseEvent.ctaTakeAttendance', 'EventDetail.takeAttendance'],
+  ['Errors.accessNotActive', 'Errors.auth.notActive'],
+  ['Auth.installedAppDeadEnd', 'Login.googleUnavailable'],
+  ['Access.hintRestricted', 'Events.lockedRestricted'],
+  ['EventDetail.backOn', 'Events.backOn'],
+  ['StudentDetail.backOnRoster', 'AddStudent.backOnRoster'],
+  ['StudentDetail.noGradeIn', 'AddStudent.noGradeIn'],
+  ['StudentDetail.changeItThere', 'StudentEditor.changeItThere'],
+  ['QuickAdd.adultFirst', 'ParentContact.adultFirstName'],
+  ['QuickAdd.addContact', 'ParentContact.addAContact'],
+  ['CheckIn.searchPlaceholder', 'Rsvp.searchPlaceholder'],
+  ['CheckIn.searchAria', 'Rsvp.searchAria'],
+  ['CheckIn.emptyNoRsvp', 'Rsvp.emptyTitle'],
+  ['CheckIn.announceAdded', 'QuickAdd.added'],
+  ['Settings.saveFailed', 'Backends.editorSaveFailed'],
+  ['Staff.reprint', 'Printer.reprint'],
+  ['Staff.labelPrinter', 'Printer.title'],
+  ['Search.opensWhen', 'Chooser.opensAt'],
+  ['FollowUp.theContactOnFile', 'StudentDetail.theContactOnFile'],
+  ['Mia.noLongerExpectedHere', 'StudentDetail.noLongerExpectedHere'],
+  ['Warnings.incompleteLabel', 'NewVisitors.badgeIncompleteTitle', 'StudentDetail.noContactOnFile'],
+  ['CheckIn.formerStudent', 'Rsvp.formerStudent', 'EventDetail.formerStudent'],
+  ['EventDetail.badgeCheckInOpen', 'EventHero.checkInOpen', 'Chooser.checkInOpen'],
+  ['Dashboard.noGatherings', 'Dashboard.emptyTitle', 'StudentDetail.noGatheringsTitle'],
+  ['Incomplete.title', 'Students.incompleteProfiles'],
+  ['AddStudent.titleMulti', 'StudentEditor.titleAdd'],
+  ['Students.addFromPco', 'AddStudent.titlePco'],
+  ['FollowUp.addContact', 'ParentContact.modalTitle'],
 ];
+
+/**
+ * Identical in English on purpose, and deliberately NOT pinned.
+ *
+ * Written down because the list above invites a tidying instinct, and these are
+ * exactly the pairs that instinct would ruin. Two kinds:
+ *
+ * **Different readers.** `Auth.errorTitle` is read by a counselor and
+ * `Register.titleError` by a family at the lobby kiosk, and both are "Something
+ * went wrong" today — but the kiosk addresses a parent as 您 and the staff app
+ * says 你, so pinning them would force one register on both audiences. Same for
+ * `Confirm.anotherChild` / `Register.titleAnotherChild`.
+ *
+ * **Coincidence.** `Recurrence.monthlyOn` is a summary sentence and
+ * `monthlyOnWeekdayOption` is a `<select>` option; Chinese may reasonably want
+ * a shorter form inside a dropdown. Likewise `Incomplete.metaWithGrade` /
+ * `OneOff.metaWithGrade`, `DangerZone.consequenceCheckIns` /
+ * `Import.checkInCount`, `Staff.nameCount` / `Search.matchCount`,
+ * `LabelTemplate.sampleEvent` / `KioskTheme.previewTitle` (both sample data),
+ * and the bare format strings `Events.when` / `EventHero.whenDayWindow` /
+ * `PastGatherings.when`.
+ */
+export const DELIBERATELY_UNPINNED = [
+  ['Auth.errorTitle', 'Register.titleError'],
+  ['Confirm.anotherChild', 'Register.titleAnotherChild'],
+  ['Recurrence.monthlyOn', 'Recurrence.monthlyOnWeekdayOption'],
+  ['Incomplete.metaWithGrade', 'OneOff.metaWithGrade'],
+  ['DangerZone.consequenceCheckIns', 'Import.checkInCount'],
+  ['Staff.nameCount', 'Search.matchCount'],
+  ['LabelTemplate.sampleEvent', 'KioskTheme.previewTitle'],
+] as const;
 
 /**
  * Messages that quote another UI element's wording inside a sentence.

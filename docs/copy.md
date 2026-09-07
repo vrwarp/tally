@@ -41,19 +41,31 @@ survives its own deletion. Aim at a 7th–8th grade reading level; this app is
 used by volunteers who signed up an hour ago.
 
 **3. Buttons name their action.** A button label completes "I want to…" — a
-verb and its object, in the reader's words. *Add student*, *Send now*, *Forget
-the number*. Not *OK*, not *Submit*, not a noun where an action happened.
+verb and its object, in the reader's words. *Add a student*, *Send now*,
+*Forget the number* — this catalogue keeps the article, and being consistent
+about it matters more than which way it went. Not *OK*, not *Submit*, not a noun where an action happened.
 
 **4. Errors say what happened, then what to do.** Every failure string owes the
 reader both halves. Missing the second half is the most common defect in this
 catalogue. And it is never the reader's fault: the system failed to reach
 something, the system did not accept it — not "you entered an invalid…".
 
-**5. No system vocabulary.** *Backend*, *upstream*, *record*, *sync*, *push*,
-*queued*, *write-back*, *linked*, *provision*, *rate-limited* are the words of
-the people who built this. A children's ministry volunteer holding a tablet has
-never heard them. Where the concept genuinely must surface, name it by what the
-reader can see happen, not by its implementation.
+**5. No system vocabulary.** *Backend*, *upstream*, *sync*, *push*, *queued*,
+*write-back*, *linked*, *provision*, *rate-limited* are the words of the people
+who built this. A children's ministry volunteer holding a tablet has never heard
+them. Where the concept genuinely must surface, name it by what the reader can
+see happen, not by its implementation.
+
+*Record* is banned only as a countable noun for a stored row — *their Planning
+Center record was deleted*. The verb and the idiom are ordinary English this app
+cannot do without, and twenty-odd keys use them correctly: *you can still record
+attendance*, *no gatherings on record yet*. Do not "fix" those.
+
+One exception, and it is the audiences section below cashing out: a word on this
+list is allowed where **the screen teaches it in place at the point of use** — a
+badge with an explainer under it, a hint beneath the control it names. A word
+that only ever appears in a toast or an error can never be taught, so it never
+qualifies.
 
 **6. One term per thing, forever.** *Gathering* is not sometimes *event*.
 *Counselor* is not sometimes *leader* and sometimes *volunteer*. *Roster* is not
@@ -70,7 +82,10 @@ instruction.
 capitals; nothing else earns one.
 
 **9. Second person, and the system acts.** The reader is *you*. Tally is *Tally*
-or is invisible; it is never *we*, and the reader is never *the user*.
+or is invisible; it is never *we*, and the reader is never *the user*. The
+*church* may be *we* — "Any allergies we should know about?" at the kiosk is a
+congregation asking a family, not software apologising — but only where the
+sentence is plainly the church's and could not be read as the software's.
 
 **10. Explain only where somebody decides.** A caption under a destructive
 button is earning its place. A paragraph explaining the data model above a
@@ -81,7 +96,9 @@ not matter.
 pun, no joke that dies in Chinese. Never split a sentence into two catalogue
 keys concatenated at runtime — a language that reorders the halves cannot put
 them back together. An ICU argument is a *value* (a name, a count, a date),
-never a clause.
+never a clause — except in a string only a screen reader will hear, where the
+point is to compose one utterance out of an action and its object and no sighted
+reader ever meets the seam.
 
 ## The two audiences, and how they differ
 

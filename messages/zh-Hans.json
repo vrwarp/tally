@@ -57,7 +57,7 @@
     "tabAll": "全部",
     "excludedOne": "{name} 未显示——你不在其中。",
     "excludedMany": "{names} 和 {last} 未显示——你不在其中。",
-    "historyError": "无法加载出席记录。{error}",
+    "historyError": "无法加载签到记录。{error}",
     "emptyTitle": "还没有聚会记录。",
     "emptyBody": "签到几个学生之后，这个画面就会自己长出来：谁开始不来了、谁是新面孔、谁联系不上。",
     "tileLastGathering": "最近一次聚会",
@@ -73,8 +73,8 @@
     "changeSame": "与之前 {count} 次持平",
     "changeDelta": "{delta}，之前为 {previous}",
     "deltaWithGathering": "{gathering} · {change}",
-    "releaseFailed": "无法保存结束跟进。没有任何改动。",
-    "undoFailed": "无法撤销结束跟进。",
+    "releaseFailed": "没能保存这次「不再列入」。什么都没有改动。",
+    "undoFailed": "没能撤销这次「不再列入」。",
     "thisGathering": "这次聚会",
     "someoneUnknown": "已不在名单上的人",
     "somebody": "某人"
@@ -523,11 +523,11 @@
     "saveFailed": "无法保存 {name}。请再新增一次。",
     "contactFailed": "{name} 已签到，但联系方式没有保存。",
     "contactLegend": "联系方式",
-    "adultFirst": "家长的名字",
+    "adultFirst": "家长名字",
     "adultLast": "家长的姓氏",
     "adultPhone": "家长的电话",
     "contactHint": "先留着交给核心同工去补。Tally 不会把联系方式存在学生身上。",
-    "addContact": "＋ 加上联系方式"
+    "addContact": "＋ 新增联系方式"
   },
   "ChooseEvent": {
     "catchUpTitle": "补记录",
@@ -1579,7 +1579,7 @@
     "lastSeenNotInYear": "最近一年内任何聚会都没有出现",
     "lastSeenNoCheckIns": "还没有签到记录",
     "withheld": "{count, plural, other {{titles} 没有算进来——那不是你带的聚会。上面的一切都不计那些晚上，所以这段历史比带那些聚会的人看到的要短。}}",
-    "noGatheringsTitle": "还没有任何聚会记录。",
+    "noGatheringsTitle": "还没有聚会记录。",
     "noGatheringsBody": "只要这名学生签到过一次，出席就会出现在这里。",
     "oneOffNoStreak": "出游和退修会——不计连续缺席",
     "noneHappened": "这些聚会一场都没有办成",
