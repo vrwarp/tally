@@ -1248,26 +1248,26 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
   const counts = held && (theirs || present);
 
   const label = present
-    ? 'Present'
+    ? t('attendancePresent')
     : !counts
       ? !held
         ? outcome === 'cancelled'
-          ? 'Cancelled'
+          ? t('attendanceCancelled')
           : t('attendanceNoOne')
         : '—'
       : event.mode === 'oneoff'
         ? t('attendanceNotOnIt')
-        : 'Missed';
+        : t('attendanceMissed');
 
   const spoken = present
-    ? 'present'
+    ? t('spokenPresent')
     : !held
       ? t('didNotHappen')
       : !theirs
         ? t('notAGatheringTheyComeTo')
         : event.mode === 'oneoff'
           ? t('notOnThisTrip')
-          : 'missed';
+          : t('spokenMissed');
 
   return (
     <li

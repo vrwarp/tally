@@ -141,6 +141,62 @@ describe('messageArguments', () => {
   it('does not count a closing tag as a second one', () => {
     expect(messageArguments('<b>bold</b>')).toEqual(['<b>']);
   });
+
+  /*
+   * The distinction this function exists to draw, and the one a regexp cannot.
+   * A plural branch whose body happens to be a bare word looks exactly like an
+   * argument — and reading it as one made every message shaped this way
+   * untranslatable, because no correct Chinese carries a literal
+   * `{gatherings}`.
+   */
+  it('does not mistake a plural branch body for an argument', () => {
+    expect(messageArguments('{count, plural, one {gathering} other {gatherings}}')).toEqual([
+      '{count}',
+    ]);
+    expect(messageArguments('{n, select, male {he} female {she} other {they}}')).toEqual(['{n}']);
+    expect(messageArguments('{grade, selectordinal, one {st} other {th}}')).toEqual(['{grade}']);
+  });
+
+  /*
+   * A branch body is still a message, so an argument genuinely inside one has
+   * to be found — dropping it in translation would render the placeholder.
+   */
+  it('finds a real argument inside a branch body', () => {
+    expect(messageArguments('{count, plural, one {# of {total}} other {# of {total}}}')).toEqual([
+      '{count}',
+      '{total}',
+    ]);
+  });
+
+  it('reads a nested plural inside a branch', () => {
+    expect(
+      messageArguments('{a, plural, other {{b, plural, other {{c} things}}}}'),
+    ).toEqual(['{a}', '{b}', '{c}']);
+  });
+
+  it('keeps the argument of a formatted value', () => {
+    expect(messageArguments('{when, date, short} at {when, time, short}')).toEqual(['{when}']);
+    expect(messageArguments('{total, number}')).toEqual(['{total}']);
+  });
+
+  it('is not thrown by a stray brace', () => {
+    expect(messageArguments('a { b')).toEqual([]);
+  });
+
+  /*
+   * A branch body that opens with an argument — `other {{count} things}` — is
+   * the shape three real messages in this catalogue have, and the one most
+   * likely to be read as a brace and given up on.
+   */
+  it('finds an argument that opens a branch body', () => {
+    expect(
+      messageArguments('{count, plural, one {One thing} other {{count} things}}'),
+    ).toEqual(['{count}']);
+  });
+
+  it('ignores the plural hash, which is not an argument', () => {
+    expect(messageArguments('{count, plural, other {# names}}')).toEqual(['{count}']);
+  });
 });
 
 /*

@@ -160,10 +160,71 @@ export function unflatten(flat: Map<string, string>, order: readonly string[]): 
  * intact — a dropped argument renders the raw placeholder on a screen, and a
  * dropped tag throws. Sorted so two messages can be compared by deep equality
  * regardless of the order the translator happened to write them in.
+ *
+ * A plural or select *branch body* is not an argument, and telling the two
+ * apart is why this walks the string rather than matching it. `{count, plural,
+ * one {gathering} other {gatherings}}` reads to a regexp as three arguments,
+ * two of which are English words — which made every message shaped like that
+ * untranslatable, because no correct Chinese carries a literal `{gatherings}`.
+ * A branch body is still a message, though, so a real argument inside one is
+ * found: `one {# of {total}}` carries `{total}`.
  */
+const IDENTIFIER = /^[a-zA-Z0-9_]+$/;
+const SUBMESSAGE = /(?:plural|selectordinal|select)\s*,/y;
+
+/** The index just past the `}` matching the `{` at `open`, or -1. */
+function closingBrace(text: string, open: number): number {
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    else if (text[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The branches of a `plural`/`select`, each of which is a message in its own
+ * right — `one {…} other {…}` — read for the arguments inside them.
+ */
+function collectBranches(text: string, into: Set<string>): void {
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== '{') continue;
+    const end = closingBrace(text, index);
+    if (end === -1) return;
+    collectArguments(text.slice(index + 1, end), into);
+    index = end;
+  }
+}
+
+function collectArguments(text: string, into: Set<string>): void {
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== '{') continue;
+    const end = closingBrace(text, index);
+    if (end === -1) return;
+
+    const inner = text.slice(index + 1, end);
+    const comma = inner.indexOf(',');
+    const name = (comma === -1 ? inner : inner.slice(0, comma)).trim();
+    if (IDENTIFIER.test(name)) {
+      into.add(`{${name}}`);
+      if (comma !== -1) {
+        const rest = inner.slice(comma + 1);
+        const offset = rest.length - rest.trimStart().length;
+        SUBMESSAGE.lastIndex = offset;
+        const kind = SUBMESSAGE.exec(rest);
+        if (kind) collectBranches(rest.slice(SUBMESSAGE.lastIndex), into);
+      }
+    }
+    index = end;
+  }
+}
+
 export function messageArguments(message: string): string[] {
   const args = new Set<string>();
-  for (const m of message.matchAll(/\{\s*([a-zA-Z0-9_]+)\s*[,}]/g)) args.add(`{${m[1]}}`);
+  collectArguments(message, args);
   for (const m of message.matchAll(/<([a-z][a-zA-Z0-9]*)>/g)) args.add(`<${m[1]}>`);
   return [...args].sort();
 }
