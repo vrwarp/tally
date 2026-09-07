@@ -20,18 +20,19 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
-import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials } from '@/lib/utils';
 import { gradeSentence } from '@/lib/grades';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface OneOffRecapListProps {
   items: readonly OneOffRecap[];
 }
 
 export function OneOffRecapList({ items, className }: OneOffRecapListProps & { className?: string }) {
+  const time = useTimeFormats();
   const t = useTranslations('OneOff');
   return (
     <Card className={className}>
@@ -61,7 +62,7 @@ export function OneOffRecapList({ items, className }: OneOffRecapListProps & { c
                   {item.event.title}
                 </span>
                 <span className="truncate text-xs text-ink-500">
-                  {formatShortDate(item.event.startAt)}, {formatRelative(item.event.startAt)}
+                  {time.shortDate(item.event.startAt)}, {time.relative(item.event.startAt)}
                 </span>
               </Link>
               <span className="shrink-0 text-right">
@@ -110,6 +111,7 @@ export function OneOffOnlyList({
   className,
   exportContext = NO_EXPORT_CONTEXT,
 }: OneOffOnlyListProps & { className?: string; exportContext?: FollowUpCsvContext }) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('OneOff');
   if (items.length === 0) return null;
@@ -172,13 +174,13 @@ export function OneOffOnlyList({
                       ? t('metAtWithGrade', {
                           grade,
                           event: item.events[0]?.title ?? '',
-                          date: formatShortDate(item.metAt),
-                          relative: formatRelative(item.metAt),
+                          date: time.shortDate(item.metAt),
+                          relative: time.relative(item.metAt),
                         })
                       : t('metAt', {
                           event: item.events[0]?.title ?? '',
-                          date: formatShortDate(item.metAt),
-                          relative: formatRelative(item.metAt),
+                          date: time.shortDate(item.metAt),
+                          relative: time.relative(item.metAt),
                         })}
                   </span>
                 </Link>

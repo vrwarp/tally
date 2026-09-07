@@ -31,11 +31,11 @@ import {
   toDateOnlyValue,
   type RecurrencePresetId,
 } from '@/lib/recurrence';
-import { formatShortDate } from '@/lib/time';
 import { cn, haptic } from '@/lib/utils';
 import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useRecurrenceStrings } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * No "days". Every day is every weekday of a weekly rule, chosen in the picker
@@ -120,6 +120,7 @@ export interface RecurrenceFieldProps {
 }
 
 export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFieldProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Recurrence');
   const recurrenceStrings = useRecurrenceStrings();
   // Choosing "Custom…" has to open the panel even when the rule currently in
@@ -294,7 +295,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
       {preview.length > 0 ? (
         <p className="text-xs text-ink-500">
-          Then {preview.map((date) => formatShortDate(date)).join(', ')}
+          Then {preview.map((date) => time.shortDate(date)).join(', ')}
           {preview.length === 3 ? '…' : ''}
         </p>
       ) : (

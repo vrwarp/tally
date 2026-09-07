@@ -19,11 +19,11 @@
  */
 import { Link } from 'react-router-dom';
 import { EmptyState } from '@/components/ui';
-import { formatClock, formatEventDay, formatEventWindow } from '@/lib/time';
 import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type AttendanceRecord, type Student, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface ArchivedNightProps {
   event: TallyEvent;
@@ -34,6 +34,7 @@ export interface ArchivedNightProps {
 }
 
 export function ArchivedNight({ event, attendance, students, now }: ArchivedNightProps) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('CheckIn');
   const byId = new Map(students.map((student) => [student.id, student]));
@@ -51,7 +52,7 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-bold text-ink-50">{event.title}</h1>
         <p className="text-sm text-ink-400">
-          {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+          {time.eventDay(event.startAt, now)} · {time.eventWindow(event)}
         </p>
         {/* Said plainly, because the absence of the usual roster is the first
             thing somebody will notice and the last thing they should have to
@@ -94,7 +95,7 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
                   </span>
                 ) : null}
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {formatClock(record.checkedInAt)}
+                  {time.clock(record.checkedInAt)}
                 </span>
               </li>
             ))}

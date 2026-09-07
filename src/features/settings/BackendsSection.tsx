@@ -16,7 +16,6 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { Attendees32Editor } from '@/features/settings/Attendees32Editor';
-import { formatRelative } from '@/lib/time';
 import { refreshPlanningCenter } from '@/services/functions';
 import {
   fetchBackendStatuses,
@@ -33,6 +32,7 @@ import {
   type PcoWriteBackMode,
 } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 const WRITE_BACK_LABEL = {
   off: 'a32WriteOff',
@@ -41,6 +41,7 @@ const WRITE_BACK_LABEL = {
 } as const satisfies Record<PcoWriteBackMode, string>;
 
 export function BackendsSection() {
+  const time = useTimeFormats();
   const t = useTranslations('Backends');
   const { show } = useToast();
   const { profile, user } = useAuth();
@@ -222,7 +223,7 @@ export function BackendsSection() {
 
               <p className="text-xs text-ink-500">
                 {settings.managedInApp && stored?.updatedAt
-                  ? t('changedHere', { when: formatRelative(stored.updatedAt) })
+                  ? t('changedHere', { when: time.relative(stored.updatedAt) })
                   : t('fromDeploy')}
                 {profile?.role === 'admin'
                   ? t('tokenNote')

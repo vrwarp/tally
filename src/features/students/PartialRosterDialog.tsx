@@ -27,9 +27,9 @@
  * nothing to annotate — only a count to say out loud.
  */
 import { Button, Modal } from '@/components/ui';
-import { formatDateTime } from '@/lib/time';
 import type { RosterBackendStatus } from '@/services/functions';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface PartialRosterDialogProps {
   open: boolean;
@@ -52,6 +52,7 @@ export function PartialRosterDialog({
   onRetry,
   retrying = false,
 }: PartialRosterDialogProps) {
+  const time = useTimeFormats();
   const t = useTranslations('PartialRoster');
   const tErrors = useTranslations('Errors');
   const names = down.map((backend) => backend.displayName).join(' and ');
@@ -83,7 +84,7 @@ export function PartialRosterDialog({
                 {backend.fetchedAt
                   ? t('savedCopyWithDate', {
                       count: backend.people,
-                      when: formatDateTime(new Date(backend.fetchedAt)),
+                      when: time.dateTime(new Date(backend.fetchedAt)),
                     })
                   : t('savedCopy', { count: backend.people })}
               </p>

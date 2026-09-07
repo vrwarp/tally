@@ -28,7 +28,6 @@
 import { Button } from '@/components/ui';
 import { syncStripCopy } from '@/features/students/syncStripCopy';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import {
   backendLabelOf,
@@ -39,6 +38,7 @@ import {
   type UpstreamEditPatch,
 } from '@/types';
 import { useSyncStripStrings } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** The short guard, shared so the two frames that show it cannot drift apart. */
 /** The key for the promise the re-create button makes. */
@@ -77,6 +77,7 @@ export function StudentSyncStrip({
   onFix,
   onRecreate,
 }: StudentSyncStripProps) {
+  const time = useTimeFormats();
   const syncStrings = useSyncStripStrings();
   const backend = backendLabelOf(student);
   const mine = edit.createdBy === uid;
@@ -86,7 +87,7 @@ export function StudentSyncStrip({
     backend,
     mine,
     authorFirstName: edit.createdByName.split(/\s+/)[0] ?? syncStrings.t('somebody'),
-    ago: formatRelative(edit.createdAt),
+    ago: time.relative(edit.createdAt),
   });
 
   const loud = needsAHuman(edit);
@@ -123,7 +124,7 @@ export function StudentSyncStrip({
              */
             meta: [
               personIdFromStudentId(student.id) ? `#${personIdFromStudentId(student.id)}` : null,
-              syncStrings.t('mergedAt', { when: formatRelative(edit.settledAt ?? edit.updatedAt) }),
+              syncStrings.t('mergedAt', { when: time.relative(edit.settledAt ?? edit.updatedAt) }),
             ]
               .filter(Boolean)
               .join(' · '),

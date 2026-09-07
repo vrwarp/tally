@@ -18,9 +18,9 @@ import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { shortName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
-import { formatEventDay, formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LockedGatheringProps {
   event: TallyEvent;
@@ -36,6 +36,7 @@ export function LockedGathering({
   backTo = '/',
   backLabel = 'Check-in',
 }: LockedGatheringProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Events');
   const { access } = useData();
   const { byUid } = useTeam(true);
@@ -61,8 +62,8 @@ export function LockedGathering({
           <h1 className="text-xl font-bold text-ink-100">{event.title}</h1>
           <p className="text-sm text-ink-500">
             {t('when', {
-              day: formatEventDay(event.startAt, now),
-              window: formatEventWindow(event),
+              day: time.eventDay(event.startAt, now),
+              window: time.eventWindow(event),
             })}
           </p>
         </div>

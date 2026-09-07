@@ -66,12 +66,12 @@ import {
 import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import { subscribeUsers, upsertUser } from '@/services/users';
 import type { Invitation, Role, UserProfile } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 const ROLE_LABEL = {
   counselor: 'roleCounselor',
@@ -156,6 +156,7 @@ function Identity({
 }
 
 export function TeamPage() {
+  const time = useTimeFormats();
   const t = useTranslations('Team');
   const { profile, can } = useAuth();
   const { show } = useToast();
@@ -444,7 +445,7 @@ export function TeamPage() {
                 const recency = member.lastSeenAt ? (
                   <p className="min-h-5 truncate text-xs text-ink-300">
                     <span className="@2xl:hidden">{t('lastSeenPrefix')}</span>
-                    {formatRelative(member.lastSeenAt)}
+                    {time.relative(member.lastSeenAt)}
                   </p>
                 ) : (
                   <p className="min-h-5 text-xs">
@@ -678,7 +679,7 @@ export function TeamPage() {
                               </Badge>
                             )}
                             {invitation.invitedAt ? (
-                              <span>· invited {formatRelative(invitation.invitedAt)}</span>
+                              <span>· invited {time.relative(invitation.invitedAt)}</span>
                             ) : null}
                           </p>
                         }

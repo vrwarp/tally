@@ -26,10 +26,10 @@ import { partitionBand } from '@/features/events/lockedChains';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
-import { formatEventWindow } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** "July 2026" — the ruler the rows hang off, so each row only needs a day. */
 const MONTH = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
@@ -209,6 +209,7 @@ export function PastEventRow({
    */
   destination?: PastEventDestination;
 }) {
+  const time = useTimeFormats();
   const t = useTranslations('PastGatherings');
   return (
     <li>
@@ -223,7 +224,7 @@ export function PastEventRow({
           {/* A step closer than it was: with two series alternating down this
               list, the date is the only thing telling one row from another. */}
           <span className="mt-0.5 block truncate text-xs text-ink-400">
-            {t('when', { day: format(event.startAt, 'EEE d'), window: formatEventWindow(event) })}
+            {t('when', { day: format(event.startAt, 'EEE d'), window: time.eventWindow(event) })}
           </span>
         </span>
 

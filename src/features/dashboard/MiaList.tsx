@@ -23,13 +23,13 @@ import {
   type FollowUpCsvContext,
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
-import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials, sortByName } from '@/lib/utils';
 import { gradeSentence } from '@/lib/grades';
 import { sessionReleaseKey, type SessionRelease } from '@/features/dashboard/sessionRelease';
 import { TRANSITION_REASON_LABEL, studentFullName, type MiaStudent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface MiaListProps {
   items: readonly MiaStudent[];
@@ -364,6 +364,7 @@ function MiaRow({
   onContactAdded?: () => void;
   onResolve?: (item: MiaStudent) => void;
 }) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('Mia');
   const { student, consecutiveMisses, lastAttendedAt, lastAttendedEventTitle } = item;
@@ -392,13 +393,13 @@ function MiaRow({
   const lastSeen = lastAttendedAt
     ? !placedBelow && lastAttendedEventTitle
       ? t('lastSeenAtEvent', {
-          date: formatShortDate(lastAttendedAt),
-          relative: formatRelative(lastAttendedAt),
+          date: time.shortDate(lastAttendedAt),
+          relative: time.relative(lastAttendedAt),
           event: lastAttendedEventTitle,
         })
       : t('lastSeen', {
-          date: formatShortDate(lastAttendedAt),
-          relative: formatRelative(lastAttendedAt),
+          date: time.shortDate(lastAttendedAt),
+          relative: time.relative(lastAttendedAt),
         })
     : t('neverCheckedIn');
 
@@ -505,7 +506,7 @@ function MiaRow({
                       // the next line together or not at all.
                       t.rich(item.release.fromTitle ? 'movedOnFrom' : 'movedOn', {
                         gathering: item.release.fromTitle ?? '',
-                        date: formatShortDate(item.release.at),
+                        date: time.shortDate(item.release.at),
                         nowrap: (chunks) => (
                           <span key="since" className="whitespace-nowrap">
                             {chunks}
@@ -549,7 +550,7 @@ function MiaRow({
                   {showGathering ? (
                     t('andNowhereSince')
                   ) : (
-                    t('notSeenAnywhereSince', { date: formatShortDate(item.notSeenAnywhereSince) })
+                    t('notSeenAnywhereSince', { date: time.shortDate(item.notSeenAnywhereSince) })
                   )}
                 </span>
               ) : null}

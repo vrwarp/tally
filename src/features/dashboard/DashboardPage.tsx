@@ -66,10 +66,10 @@ import {
 } from '@/features/dashboard/insights';
 import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
-import { formatShortDate } from '@/lib/time';
 import { cn, sameItems } from '@/lib/utils';
 import { releaseStudent, undoRelease } from '@/services/transitions';
 import { studentFullName, type MiaStudent, type TallyEvent, type Transition, type TransitionReason } from '@/types';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * How many past nights of *each* gathering the dashboard reasons over.
@@ -95,6 +95,7 @@ const MAX_EVENTS = 24;
 const ALL = 'all';
 
 export function DashboardPage() {
+  const time = useTimeFormats();
   const t = useTranslations();
   const {
     students,
@@ -665,7 +666,7 @@ export function DashboardPage() {
             : lastGathering
               ? t('Dashboard.through', {
                   gathering: lastGathering.title,
-                  date: formatShortDate(lastGathering.startAt),
+                  date: time.shortDate(lastGathering.startAt),
                   count: held.length,
                   scope: scopeLabel,
                 })

@@ -13,10 +13,15 @@ import { Badge, EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { AccessSheet } from '@/features/events/AccessSheet';
 import { chainKey } from '@/lib/materialize';
-import { formatEventDay, formatEventWindow, formatShortDate, isCheckInOpen } from '@/lib/time';
-import { startOfDay } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
+import {
+  startOfDay,
+} from '@/lib/time';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface EventHeaderProps {
   event: TallyEvent;
@@ -44,6 +49,7 @@ export function EventHeader({
   inRoom = 0,
   tracksCheckOut = false,
 }: EventHeaderProps) {
+  const time = useTimeFormats();
   const t = useTranslations('EventHeader');
   const navigate = useNavigate();
   const { access } = useData();
@@ -78,13 +84,13 @@ export function EventHeader({
           <p className="mt-0.5 truncate text-xs text-ink-400">
             {event.location
               ? t('whenWithLocation', {
-                  when: formatEventDay(event.startAt, now),
-                  window: formatEventWindow(event),
+                  when: time.eventDay(event.startAt, now),
+                  window: time.eventWindow(event),
                   location: event.location,
                 })
               : t('when', {
-                  when: formatEventDay(event.startAt, now),
-                  window: formatEventWindow(event),
+                  when: time.eventDay(event.startAt, now),
+                  window: time.eventWindow(event),
                 })}
           </p>
         </div>
@@ -195,7 +201,7 @@ export function EventHeader({
         >
           {options.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
-              {formatShortDate(candidate.startAt)} · {candidate.title}
+              {time.shortDate(candidate.startAt)} · {candidate.title}
             </option>
           ))}
         </select>

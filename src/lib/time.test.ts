@@ -25,6 +25,16 @@ import {
   toDateTimeLocalValue,
 } from '@/lib/time';
 import { makeEvent } from '../../tests/factories';
+import { testTranslator } from '@/test/translator';
+import { DEFAULT_LOCALE } from '@/lib/locales';
+import type { TimeStrings } from '@/lib/time';
+
+// The real English catalogue and the real locale, so these still assert what a
+// reader sees — and a malformed message now fails here rather than on a screen.
+const times: TimeStrings = {
+  locale: DEFAULT_LOCALE,
+  t: testTranslator('Time') as unknown as TimeStrings['t'],
+};
 
 /** Fri 13 Feb 2026, 19:30 local. */
 const FRIDAY_EVENING = new Date(2026, 1, 13, 19, 30);
@@ -572,11 +582,11 @@ describe('the three ways a date is written on screen', () => {
   const now = FRIDAY_EVENING;
 
   it('names today, tomorrow, and everything else by its day', () => {
-    expect(formatEventDay(new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
-    expect(formatEventDay(new Date(2026, 1, 14, 8, 0), now)).toBe('Tomorrow');
-    expect(formatEventDay(new Date(2026, 1, 15, 8, 0), now)).toBe('Sun, Feb 15');
+    expect(formatEventDay(times, new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
+    expect(formatEventDay(times, new Date(2026, 1, 14, 8, 0), now)).toBe('Tomorrow');
+    expect(formatEventDay(times, new Date(2026, 1, 15, 8, 0), now)).toBe('Sun, Feb 15');
     // Yesterday is not "Today" and not "Tomorrow" — the archive uses this too.
-    expect(formatEventDay(new Date(2026, 1, 12, 8, 0), now)).toBe('Thu, Feb 12');
+    expect(formatEventDay(times, new Date(2026, 1, 12, 8, 0), now)).toBe('Thu, Feb 12');
   });
 
   it('measures both from the "now" it was handed, not from the wall clock', () => {
@@ -589,19 +599,19 @@ describe('the three ways a date is written on screen', () => {
     const realToday = new Date();
     const realTomorrow = new Date(realToday.getTime() + 86_400_000);
 
-    expect(formatEventDay(realToday, now)).not.toBe('Today');
-    expect(formatEventDay(realTomorrow, now)).not.toBe('Tomorrow');
+    expect(formatEventDay(times, realToday, now)).not.toBe('Today');
+    expect(formatEventDay(times, realTomorrow, now)).not.toBe('Tomorrow');
   });
 
   it('writes a full date and time where there is no context to read it from', () => {
     // The audit lines: no "today", because the row may be a year old.
-    expect(formatDateTime(new Date(2026, 1, 13, 19, 0))).toBe('Feb 13, 2026 · 7:00 PM');
+    expect(formatDateTime(times, new Date(2026, 1, 13, 19, 0))).toBe('Feb 13, 2026 · 7:00 PM');
   });
 
   it('writes a past instant as a distance, in the past tense', () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-    expect(formatRelative(twoHoursAgo)).toBe('2 hours ago');
+    expect(formatRelative(times, twoHoursAgo)).toBe('2 hours ago');
   });
 });
 
@@ -610,47 +620,47 @@ describe('formatSeenShort', () => {
   const now = FRIDAY_EVENING;
 
   it('names the day inside the last week, because that is the useful precision', () => {
-    expect(formatSeenShort(new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
-    expect(formatSeenShort(new Date(2026, 1, 12, 19, 30), now)).toBe('Yesterday');
-    expect(formatSeenShort(new Date(2026, 1, 8, 10, 0), now)).toBe('Sun');
-    expect(formatSeenShort(new Date(2026, 1, 7, 10, 0), now)).toBe('Sat');
+    expect(formatSeenShort(times, new Date(2026, 1, 13, 8, 0), now)).toBe('Today');
+    expect(formatSeenShort(times, new Date(2026, 1, 12, 19, 30), now)).toBe('Yesterday');
+    expect(formatSeenShort(times, new Date(2026, 1, 8, 10, 0), now)).toBe('Sun');
+    expect(formatSeenShort(times, new Date(2026, 1, 7, 10, 0), now)).toBe('Sat');
   });
 
   it('counts by calendar day, not by elapsed hours', () => {
     // Twenty-three hours earlier, but a different date: a leader reading this
     // means "which day", not "how many hours".
-    expect(formatSeenShort(new Date(2026, 1, 12, 20, 30), now)).toBe('Yesterday');
+    expect(formatSeenShort(times, new Date(2026, 1, 12, 20, 30), now)).toBe('Yesterday');
     // Ninety minutes earlier, same date.
-    expect(formatSeenShort(new Date(2026, 1, 13, 18, 0), now)).toBe('Today');
+    expect(formatSeenShort(times, new Date(2026, 1, 13, 18, 0), now)).toBe('Today');
   });
 
   it('coarsens to weeks from a week out, and keeps the singular singular', () => {
-    expect(formatSeenShort(new Date(2026, 1, 6, 19, 30), now)).toBe('1 wk ago');
-    expect(formatSeenShort(new Date(2026, 0, 23, 19, 30), now)).toBe('3 wks ago');
-    expect(formatSeenShort(new Date(2026, 0, 16, 19, 30), now)).toBe('4 wks ago');
+    expect(formatSeenShort(times, new Date(2026, 1, 6, 19, 30), now)).toBe('1 wk ago');
+    expect(formatSeenShort(times, new Date(2026, 0, 23, 19, 30), now)).toBe('3 wks ago');
+    expect(formatSeenShort(times, new Date(2026, 0, 16, 19, 30), now)).toBe('4 wks ago');
   });
 
   it('lets weeks own everything under thirty days, whatever the calendar says', () => {
     // 28 Jan -> 13 Feb is one calendar month by date-fns and sixteen days by
     // the clock. Sixteen days is not "1 mth ago".
-    expect(formatSeenShort(new Date(2026, 0, 28, 19, 30), now)).toBe('2 wks ago');
+    expect(formatSeenShort(times, new Date(2026, 0, 28, 19, 30), now)).toBe('2 wks ago');
   });
 
   it('switches to months at thirty days and to years at twelve', () => {
-    expect(formatSeenShort(new Date(2026, 0, 14, 19, 30), now)).toBe('1 mth ago');
-    expect(formatSeenShort(new Date(2025, 9, 13, 19, 30), now)).toBe('4 mths ago');
-    expect(formatSeenShort(new Date(2025, 1, 13, 19, 30), now)).toBe('1 yr ago');
-    expect(formatSeenShort(new Date(2023, 1, 13, 19, 30), now)).toBe('3 yrs ago');
+    expect(formatSeenShort(times, new Date(2026, 0, 14, 19, 30), now)).toBe('1 mth ago');
+    expect(formatSeenShort(times, new Date(2025, 9, 13, 19, 30), now)).toBe('4 mths ago');
+    expect(formatSeenShort(times, new Date(2025, 1, 13, 19, 30), now)).toBe('1 yr ago');
+    expect(formatSeenShort(times, new Date(2023, 1, 13, 19, 30), now)).toBe('3 yrs ago');
   });
 
   it('does not describe a future date in the past tense', () => {
     // A clock a few minutes out of step must not produce "-1 wks ago".
-    expect(formatSeenShort(new Date(2026, 1, 14, 9, 0), now)).toBe('Today');
+    expect(formatSeenShort(times, new Date(2026, 1, 14, 9, 0), now)).toBe('Today');
   });
 
   it('stays inside the width the column is drawn at', () => {
     const samples = [0, 1, 3, 6, 8, 20, 29, 45, 200, 400, 1200].map((days) =>
-      formatSeenShort(new Date(now.getTime() - days * 24 * 60 * 60 * 1000), now),
+      formatSeenShort(times, new Date(now.getTime() - days * 24 * 60 * 60 * 1000), now),
     );
     for (const sample of samples) expect(sample.length).toBeLessThanOrEqual(10);
   });
@@ -673,7 +683,7 @@ describe('formatSeenShort', () => {
 describe('formatEventWindow', () => {
   it('prints two clock times for a gathering that starts and ends the same day', () => {
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2026, 1, 13, 19, 0),
         endAt: new Date(2026, 1, 13, 21, 0),
       }),
@@ -684,7 +694,7 @@ describe('formatEventWindow', () => {
     // Fri 24 Oct 7:00 PM -> Sat 25 Oct 8:00 AM. Five hours short of a day and
     // still a different date, which is the only thing that decides this.
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2025, 9, 24, 19, 0),
         endAt: new Date(2025, 9, 25, 8, 0),
       }),
@@ -695,7 +705,7 @@ describe('formatEventWindow', () => {
     // The Winter Retreat: two nights, and the end time alone reads as earlier
     // than the start.
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2026, 8, 11, 17, 0),
         endAt: new Date(2026, 8, 13, 15, 0),
       }),
@@ -704,7 +714,7 @@ describe('formatEventWindow', () => {
 
   it('crosses a month and a year boundary without losing the date', () => {
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2025, 11, 31, 21, 0),
         endAt: new Date(2026, 0, 1, 1, 0),
       }),
@@ -713,16 +723,16 @@ describe('formatEventWindow', () => {
 
   it('states the start alone when there is no end, rather than throwing', () => {
     const startAt = new Date(2026, 1, 13, 19, 0);
-    expect(formatEventWindow({ startAt })).toBe('7:00 PM');
-    expect(formatEventWindow({ startAt, endAt: null })).toBe('7:00 PM');
-    expect(formatEventWindow({ startAt, endAt: undefined })).toBe('7:00 PM');
+    expect(formatEventWindow(times, { startAt })).toBe('7:00 PM');
+    expect(formatEventWindow(times, { startAt, endAt: null })).toBe('7:00 PM');
+    expect(formatEventWindow(times, { startAt, endAt: undefined })).toBe('7:00 PM');
   });
 
   it('counts calendar days, not elapsed hours', () => {
     // Two minutes long, and on two different dates. The second date is the
     // whole point of the line, so it is written.
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2026, 1, 13, 23, 59),
         endAt: new Date(2026, 1, 14, 0, 1),
       }),
@@ -730,7 +740,7 @@ describe('formatEventWindow', () => {
 
     // Twenty-three hours long, and on one date.
     expect(
-      formatEventWindow({
+      formatEventWindow(times, {
         startAt: new Date(2026, 1, 13, 0, 30),
         endAt: new Date(2026, 1, 13, 23, 30),
       }),
@@ -742,6 +752,6 @@ describe('formatEventWindow', () => {
       startAt: new Date(2026, 1, 13, 19, 0),
       endAt: new Date(2026, 1, 14, 7, 0),
     });
-    expect(formatEventWindow(event)).toBe('7:00 PM – Sat, Feb 14, 7:00 AM');
+    expect(formatEventWindow(times, event)).toBe('7:00 PM – Sat, Feb 14, 7:00 AM');
   });
 });

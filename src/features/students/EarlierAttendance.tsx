@@ -28,8 +28,8 @@
 import { useMemo } from 'react';
 import { Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useStudentHistory } from '@/hooks/useStudentHistory';
-import { formatShortDate } from '@/lib/time';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface EarlierAttendanceProps {
   studentId: string;
@@ -38,6 +38,7 @@ export interface EarlierAttendanceProps {
 }
 
 export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendanceProps) {
+  const time = useTimeFormats();
   const t = useTranslations('EarlierAttendance');
   const ids = useMemo(
     () => [studentId, ...(alsoStudentIds ?? [])],
@@ -76,7 +77,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
                   {event?.title ?? t('unknownGathering')}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {formatShortDate(event?.startAt ?? record.checkedInAt)}
+                  {time.shortDate(event?.startAt ?? record.checkedInAt)}
                 </span>
               </li>
             ))}

@@ -7,8 +7,12 @@
  */
 import { useId, useState } from 'react';
 import { TextField } from '@/components/ui';
-import { formatClock, formatShortDate, fromDateTimeLocalValue } from '@/lib/time';
+import {
+  fromDateTimeLocalValue,
+} from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { useTimeFormats, type TimeFormats } from '@/hooks/useTimeFormats';
+import { useTranslations } from 'use-intl';
 
 function parseLocal(value: string): Date | null {
   try {
@@ -19,12 +23,19 @@ function parseLocal(value: string): Date | null {
 }
 
 /** "11:00 PM", or "Jul 25, 11:00 PM" once it leaves the day of the event. */
-function describeBound(value: string, sameDayAs: string): string {
+function describeBound(
+  t: ReturnType<typeof useTranslations<'EventEditor'>>,
+  time: TimeFormats,
+  value: string,
+  sameDayAs: string,
+): string {
   const at = parseLocal(value);
-  if (!at) return '—';
+  if (!at) return t('windowUnknown');
   // Both are `datetime-local` strings, so the date halves compare directly.
   const sameDay = value.slice(0, 10) === sameDayAs.slice(0, 10);
-  return sameDay ? formatClock(at) : `${formatShortDate(at)}, ${formatClock(at)}`;
+  return sameDay
+    ? time.clock(at)
+    : t('windowDated', { date: time.shortDate(at), time: time.clock(at) });
 }
 
 /**
@@ -59,6 +70,8 @@ export function CheckInWindowField({
   onOpensChange: (value: string) => void;
   onClosesChange: (value: string) => void;
 }) {
+  const t = useTranslations('EventEditor');
+  const time = useTimeFormats();
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
 
@@ -81,34 +94,38 @@ export function CheckInWindowField({
       >
         <span className="min-w-0 flex-1">
           <span className="block text-xs font-bold uppercase tracking-wider text-ink-400">
-            Check-in window
-            {pinned ? <span className="ml-2 font-medium normal-case text-ink-500">custom</span> : null}
+            {t('windowTitle')}
+            {pinned ? (
+              <span className="ml-2 font-medium normal-case text-ink-500">{t('windowCustom')}</span>
+            ) : null}
           </span>
           <span className="mt-0.5 block truncate text-sm text-ink-200">
-            Opens {describeBound(opens, start)}, closes {describeBound(closes, start)}
+            {t('windowSummary', {
+              opens: describeBound(t, time, opens, start),
+              closes: describeBound(t, time, closes, start),
+            })}
           </span>
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs font-semibold text-brand-300">
-          {open ? 'Hide' : 'Adjust'}
+          {open ? t('windowHide') : t('windowAdjust')}
         </span>
       </button>
 
       {open ? (
         <div id={panelId} className="@container flex flex-col gap-3 border-t border-ink-800 px-3 py-3">
           <p className="text-xs leading-snug text-ink-500">
-            Tally opens this event automatically while the window is open. It defaults to an hour
-            either side and follows the event’s times until you change it here.
+            {t('windowNote')}
           </p>
           <div className="grid gap-3 @min-[30rem]:grid-cols-2">
             <TextField
-              label="Opens"
+              label={t('windowOpens')}
               type="datetime-local"
               value={opens}
               onChange={(changed) => onOpensChange(changed.target.value)}
               error={errors.checkInOpens ?? null}
             />
             <TextField
-              label="Closes"
+              label={t('windowCloses')}
               type="datetime-local"
               value={closes}
               onChange={(changed) => onClosesChange(changed.target.value)}

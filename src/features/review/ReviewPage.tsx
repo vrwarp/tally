@@ -53,7 +53,6 @@ import {
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { checkAllergyNote, checkName, checkPhone } from '@/lib/registrationFields';
-import { formatRelative } from '@/lib/time';
 import { cn, formatPhoneInput, initials } from '@/lib/utils';
 import { gradeDescription, gradeSentence, type GradeStrings } from '@/lib/grades';
 import {
@@ -71,6 +70,7 @@ import {
 import { GRADES } from '@/types';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * The whole screen's translator, as a type.
@@ -817,6 +817,7 @@ function RegistrationCard({
   onUnmerge,
   onAmend,
 }: RegistrationCardProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Review');
   const locale = useLocale();
   const grades = useGrades();
@@ -1128,10 +1129,10 @@ function RegistrationCard({
           */
           row.source === 'counselor'
             ? when
-              ? t('takenAtDoorWhen', { when: formatRelative(when) })
+              ? t('takenAtDoorWhen', { when: time.relative(when) })
               : t('takenAtDoor')
             : when
-              ? t('registeredWhen', { when: formatRelative(when) })
+              ? t('registeredWhen', { when: time.relative(when) })
               : null,
           gatheringTitle ? t('atGathering', { title: gatheringTitle }) : null,
           // Legacy: the phone form was retired, but its records live 30 days

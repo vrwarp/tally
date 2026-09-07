@@ -52,7 +52,6 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { exportFilename } from '@/lib/csv';
-import { formatSeenShort } from '@/lib/time';
 import { cn, createSearchMatcher, initials } from '@/lib/utils';
 import { gradeName, gradeSentence } from '@/lib/grades';
 import {
@@ -67,6 +66,7 @@ import {
 } from '@/types';
 import { useSyncStripStrings, useGrades } from '@/hooks/usePureStrings';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
@@ -1100,6 +1100,7 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
  * data, it is the question somebody should be asking.
  */
 function LastSeen({ at }: { at: Date | null }) {
+  const time = useTimeFormats();
   return (
     <span
       className={cn(
@@ -1110,7 +1111,7 @@ function LastSeen({ at }: { at: Date | null }) {
         at && Date.now() - at.getTime() >= THIRTY_DAYS ? 'text-ink-600' : 'text-ink-500',
       )}
     >
-      {at ? formatSeenShort(at) : null}
+      {at ? time.seenShort(at) : null}
     </span>
   );
 }

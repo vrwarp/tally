@@ -714,7 +714,17 @@
     "saveFailed": "Could not save this event. Try again.",
     "errRecurrenceWeekdays": "Pick at least one day of the week.",
     "errRecurrenceUntilMissing": "Pick a date for the repeat to end on.",
-    "errRecurrenceUntilBeforeStart": "The repeat has to end on or after the first gathering."
+    "errRecurrenceUntilBeforeStart": "The repeat has to end on or after the first gathering.",
+    "windowTitle": "Check-in window",
+    "windowCustom": "custom",
+    "windowSummary": "Opens {opens}, closes {closes}",
+    "windowHide": "Hide",
+    "windowAdjust": "Adjust",
+    "windowNote": "Tally opens this event automatically while the window is open. It defaults to an hour either side and follows the event’s times until you change it here.",
+    "windowOpens": "Opens",
+    "windowCloses": "Closes",
+    "windowDated": "{date}, {time}",
+    "windowUnknown": "—"
   },
   "LabelTemplate": {
     "enable": "Print a label at check-in",
@@ -1804,5 +1814,15 @@
     "gettingCode": "Getting a code…",
     "noCode": "Can’t reach Tally right now. Trying again shortly…",
     "stuck": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing."
+  },
+  "Time": {
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "yesterday": "Yesterday",
+    "weeksAgo": "{count, plural, one {1 wk ago} other {# wks ago}}",
+    "monthsAgo": "{count, plural, one {1 mth ago} other {# mths ago}}",
+    "yearsAgo": "{count, plural, one {1 yr ago} other {# yrs ago}}",
+    "window": "{start} – {end}",
+    "dateTime": "{date} · {time}"
   }
 }

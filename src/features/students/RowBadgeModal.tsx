@@ -32,11 +32,11 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatShortDate } from '@/lib/time';
 import { pushStudentToPlanningCenter } from '@/services/functions';
 import { setStudentStatus, updateStudent } from '@/services/students';
 import { backendLabelOf, backendOfStudent, studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Which fact was pressed. One per badge the roster can render. */
 export type RowBadgeAction =
@@ -178,6 +178,7 @@ function AllergyPanel({ student }: { student: Student }) {
  * list is built on the same flag.
  */
 function VisitorPanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const time = useTimeFormats();
   const t = useTranslations('RowBadge');
   const { user } = useAuth();
   const { show } = useToast();
@@ -205,7 +206,7 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
         {t('visitorSince', {
           name: student.firstName,
           date: student.firstAttendedAt
-            ? formatShortDate(student.firstAttendedAt)
+            ? time.shortDate(student.firstAttendedAt)
             : t('beforeTallyCounted'),
         })}
       </p>

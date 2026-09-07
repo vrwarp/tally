@@ -66,10 +66,13 @@ import {
   undoCheckIn,
   undoCheckOut,
 } from '@/services/attendance';
-import { formatClock, isCheckInOpen } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * The one left edge this screen has.
@@ -149,6 +152,7 @@ const FOCUS_EMPTY = {
 } as const satisfies Record<RosterFocus, string>;
 
 export function CheckInPage() {
+  const time = useTimeFormats();
   const t = useTranslations('CheckIn');
   const { eventId } = useParams();
   const { event, eventLoading, fromArchive, now, selectableEvents } = useActiveEvent(
@@ -640,7 +644,7 @@ export function CheckInPage() {
       const from = swapSource;
       const wrong = studentFullName(from.student);
       const right = studentFullName(entry.student);
-      const when = formatClock(from.record.checkedInAt);
+      const when = time.clock(from.record.checkedInAt);
 
       setSwapForId(null);
       setQuery("");
@@ -662,7 +666,7 @@ export function CheckInPage() {
         },
       );
     },
-    [event, user, swapSource, flash, show, write, refuseFrozen, t],
+    [event, user, swapSource, flash, show, write, refuseFrozen, t, time],
   );
 
   /**
@@ -955,7 +959,7 @@ export function CheckInPage() {
                 </span>
                 <span className="block text-xs leading-snug text-ink-300">
                   Tap the right student. {studentFullName(swapSource.student)}’s check-in moves
-                  across, still {formatClock(swapSource.record.checkedInAt)}.
+                  across, still {time.clock(swapSource.record.checkedInAt)}.
                 </span>
               </span>
               <button

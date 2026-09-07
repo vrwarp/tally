@@ -22,9 +22,9 @@
  */
 import { useState } from 'react';
 import { Button } from '@/components/ui';
-import { formatShortDate } from '@/lib/time';
 import { TRANSITION_REASON_LABEL, type Transition } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LedgerRow {
   transition: Transition;
@@ -46,6 +46,7 @@ export interface TransitionLedgerProps {
 }
 
 export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: TransitionLedgerProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Ledger');
   const tReason = useTranslations('Transitions');
   const [open, setOpen] = useState(false);
@@ -70,8 +71,8 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
         </span>
         <span className="min-w-0 flex-1 truncate">
           {showGathering
-            ? t('summary', { count: rows.length, date: formatShortDate(latest) })
-            : t('summaryHere', { count: rows.length, date: formatShortDate(latest) })}
+            ? t('summary', { count: rows.length, date: time.shortDate(latest) })
+            : t('summaryHere', { count: rows.length, date: time.shortDate(latest) })}
         </span>
       </button>
 
@@ -112,7 +113,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                       and the row that mattered was buried at the tail of the
                       sentence every other row also had. */}
                   <span className="tabular-nums text-ink-400">
-                    {formatShortDate(transition.releasedAt)}
+                    {time.shortDate(transition.releasedAt)}
                   </span>{' '}
                   · {tReason(TRANSITION_REASON_LABEL[transition.reason])}
                   {transition.note ? t('note', { note: transition.note }) : ''}

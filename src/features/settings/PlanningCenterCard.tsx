@@ -22,7 +22,6 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { PlanningCenterEditor } from '@/features/settings/PlanningCenterEditor';
-import { formatRelative } from '@/lib/time';
 import { refreshPlanningCenter } from '@/services/functions';
 import {
   fetchPlanningCenterStatus,
@@ -31,6 +30,7 @@ import {
 } from '@/services/planningCenter';
 import type { PcoStatus, PcoWriteBackMode } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 const WRITE_BACK_LABEL = {
   off: 'pcoWriteOff',
@@ -39,6 +39,7 @@ const WRITE_BACK_LABEL = {
 } as const satisfies Record<PcoWriteBackMode, string>;
 
 export function PlanningCenterCard() {
+  const time = useTimeFormats();
   const t = useTranslations('Backends');
   const { show } = useToast();
   const { profile } = useAuth();
@@ -249,7 +250,7 @@ export function PlanningCenterCard() {
                     : t('pcoCacheOn', { count: status.settings.cacheTtlSeconds })}
                   {rosterFetchedAt ? (
                     <span className="block text-ink-500">
-                      {t('lastReadHere', { when: formatRelative(rosterFetchedAt) })}
+                      {t('lastReadHere', { when: time.relative(rosterFetchedAt) })}
                     </span>
                   ) : null}
                 </dd>
@@ -258,7 +259,7 @@ export function PlanningCenterCard() {
 
             <p className="text-xs text-ink-500">
               {status.settings.managedInApp && stored?.updatedAt
-                ? t('changedHere', { when: formatRelative(stored.updatedAt) })
+                ? t('changedHere', { when: time.relative(stored.updatedAt) })
                 : t('fromDeploy')}
               {profile?.role === 'admin'
                 ? t('secretManagerNote')

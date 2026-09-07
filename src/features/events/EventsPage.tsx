@@ -50,11 +50,15 @@ import { NotYoursNotice } from '@/features/events/NotYoursNotice';
 import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
-import { formatEventDay, formatEventWindow, nextSeriesOccurrence, startOfDay } from '@/lib/time';
+import {
+  nextSeriesOccurrence,
+  startOfDay,
+} from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { setEventStatus, type EventDraft } from '@/services/events';
 import type { EventSeries, TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** How far "this week" reaches. Seven days is the horizon a Friday plans to. */
 const WEEK_DAYS = 7;
@@ -83,6 +87,7 @@ function EventRow({
   onUncancel: (event: TallyEvent) => void;
   uncancelling: boolean;
 }) {
+  const time = useTimeFormats();
   const t = useTranslations('Events');
   const cancelled = event.status === 'cancelled';
 
@@ -135,14 +140,14 @@ function EventRow({
             {event.location
               ? t('whenWithLocation', {
                   when: t('when', {
-                    day: formatEventDay(event.startAt, now),
-                    window: formatEventWindow(event),
+                    day: time.eventDay(event.startAt, now),
+                    window: time.eventWindow(event),
                   }),
                   location: event.location,
                 })
               : t('when', {
-                  day: formatEventDay(event.startAt, now),
-                  window: formatEventWindow(event),
+                  day: time.eventDay(event.startAt, now),
+                  window: time.eventWindow(event),
                 })}
           </span>
 
@@ -375,11 +380,12 @@ function QuickAction({
   existing: TallyEvent | null;
   onSchedule: (series: EventSeries) => void;
 }) {
+  const time = useTimeFormats();
   const t = useTranslations('Events');
   const occurrence = nextSeriesOccurrence(series, now);
   const when = t('when', {
-    day: formatEventDay(occurrence.startAt, now),
-    window: formatEventWindow(occurrence),
+    day: time.eventDay(occurrence.startAt, now),
+    window: time.eventWindow(occurrence),
   });
 
   if (existing) {

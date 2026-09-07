@@ -17,7 +17,6 @@
  */
 import { useEffect, useState } from 'react';
 import { Button, Modal, TextField } from '@/components/ui';
-import { formatShortDate } from '@/lib/time';
 import { useTranslations } from 'use-intl';
 import {
   TRANSITION_REASON_LABEL,
@@ -25,6 +24,8 @@ import {
   type Student,
   type TransitionReason,
 } from '@/types';
+import { useTimeStrings } from '@/hooks/useTimeFormats';
+import { formatShortDate, type TimeStrings } from '@/lib/time';
 
 export interface ReleaseTarget {
   student: Student;
@@ -70,24 +71,26 @@ function consequence(
   target: ReleaseTarget,
   reason: TransitionReason,
   threshold: number,
+  strings: TimeStrings,
 ): string {
   const name = target.student.firstName || studentFullName(target.student);
   const since = target.notSeenAnywhereSince;
 
   if (reason === 'departed') {
     return since
-      ? t('consequenceDepartedUnseen', { name, date: formatShortDate(since) })
+      ? t('consequenceDepartedUnseen', { name, date: formatShortDate(strings, since) })
       : t('consequenceDeparted', { name });
   }
 
   return since
-    ? t('consequenceMovedOnUnseen', { name, date: formatShortDate(since), threshold })
+    ? t('consequenceMovedOnUnseen', { name, date: formatShortDate(strings, since), threshold })
     : t('consequenceMovedOn', { name, threshold });
 }
 
 export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: ReleaseDialogProps) {
   const t = useTranslations('Release');
   const tReason = useTranslations('Transitions');
+  const timeStrings = useTimeStrings();
   const [reason, setReason] = useState<TransitionReason>('moved-on');
   const [note, setNote] = useState('');
 
@@ -169,7 +172,7 @@ export function ReleaseDialog({ target, threshold, busy, onClose, onConfirm }: R
               : 'bg-ink-800/60 text-ink-300 ring-ink-700')
           }
         >
-          {consequence(t, target, reason, threshold)}
+          {consequence(t, target, reason, threshold, timeStrings)}
         </p>
       </div>
     </Modal>

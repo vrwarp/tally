@@ -59,13 +59,16 @@ import { useNow } from '@/hooks/useNow';
 import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
-import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { gradeLabel } from '@/lib/grades';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useRecurrenceStrings, useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -77,6 +80,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 export function EventDetailPage() {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('EventDetail');
   const recurrenceStrings = useRecurrenceStrings();
@@ -277,7 +281,7 @@ export function EventDetailPage() {
                     {event.title}
                   </h1>
                   <p className="mt-1 text-sm text-ink-400">
-                    {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+                    {time.eventDay(event.startAt, now)} · {time.eventWindow(event)}
                   </p>
                 </div>
               </div>
@@ -311,8 +315,8 @@ export function EventDetailPage() {
                 <DetailRow
                   label={t('rowCheckIn')}
                   value={t('checkInWindow', {
-                    opens: formatClock(event.checkInOpensAt),
-                    closes: formatClock(event.checkInClosesAt),
+                    opens: time.clock(event.checkInOpensAt),
+                    closes: time.clock(event.checkInClosesAt),
                   })}
                 />
               </dl>
@@ -470,13 +474,13 @@ export function EventDetailPage() {
                           </span>
                         ) : null}
                         <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                          {formatClock(record.checkedInAt)}
+                          {time.clock(record.checkedInAt)}
                         </span>
                         {/* Only where there is one. A student with no pickup recorded
                             gets nothing here — no badge, no dash, no colour. */}
                         {event.requiresCheckOut && record.checkedOutAt ? (
                           <span className="shrink-0 text-xs tabular-nums text-ink-400">
-                            → {formatClock(record.checkedOutAt)}
+                            → {time.clock(record.checkedOutAt)}
                           </span>
                         ) : null}
                       </li>

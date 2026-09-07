@@ -3264,6 +3264,56 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "EventEditor.windowTitle": {
+    "source": "Check-in window",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowCustom": {
+    "source": "custom",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowSummary": {
+    "source": "Opens {opens}, closes {closes}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowHide": {
+    "source": "Hide",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowAdjust": {
+    "source": "Adjust",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowNote": {
+    "source": "Tally opens this event automatically while the window is open. It defaults to an hour either side and follows the event’s times until you change it here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowOpens": {
+    "source": "Opens",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowCloses": {
+    "source": "Closes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowDated": {
+    "source": "{date}, {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventEditor.windowUnknown": {
+    "source": "—",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "LabelTemplate.enable": {
     "source": "Print a label at check-in",
     "zh-Hans": "todo",
@@ -8366,6 +8416,46 @@
   },
   "Pairing.stuck": {
     "source": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.today": {
+    "source": "Today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.tomorrow": {
+    "source": "Tomorrow",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.yesterday": {
+    "source": "Yesterday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.weeksAgo": {
+    "source": "{count, plural, one {1 wk ago} other {# wks ago}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.monthsAgo": {
+    "source": "{count, plural, one {1 mth ago} other {# mths ago}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.yearsAgo": {
+    "source": "{count, plural, one {1 yr ago} other {# yrs ago}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.window": {
+    "source": "{start} – {end}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Time.dateTime": {
+    "source": "{date} · {time}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

@@ -12,10 +12,10 @@
 import { useMemo } from 'react';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
 import { computeAttendanceTrend } from '@/features/dashboard/insights';
-import { formatShortDate } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { EventAttendanceSnapshot } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Tallest bar, in px. Fixed pixels rather than percentages so the bar heights
  *  do not depend on a flex container resolving its own height first. */
@@ -57,6 +57,7 @@ export function AttendanceTrend({
   loading = false,
   className,
 }: AttendanceTrendProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Trend');
   const points = useMemo(
     () => computeAttendanceTrend(snapshots, { gatheringKey, limit }),
@@ -128,7 +129,7 @@ export function AttendanceTrend({
               <div
                 key={point.id}
                 className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${point.title} · ${formatShortDate(point.date)}: ${point.count}${
+                title={`${point.title} · ${time.shortDate(point.date)}: ${point.count}${
                   point.eventIds.length > 1 ? ` across ${point.eventIds.length} gatherings` : ''
                 }`}
               >
@@ -151,7 +152,7 @@ export function AttendanceTrend({
                   )}
                 />
                 <span className="w-full truncate text-center text-[10px] text-ink-600">
-                  {formatShortDate(point.date)}
+                  {time.shortDate(point.date)}
                 </span>
               </div>
             ))}
@@ -174,7 +175,7 @@ export function AttendanceTrend({
               {points.map((point) => (
                 <tr key={point.id}>
                   <th scope="row">{point.title}</th>
-                  <td>{formatShortDate(point.date)}</td>
+                  <td>{time.shortDate(point.date)}</td>
                   <td>{point.count}</td>
                 </tr>
               ))}

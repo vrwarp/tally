@@ -24,9 +24,9 @@ import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
-import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LockedGatheringsProps {
   events: readonly TallyEvent[];
@@ -40,6 +40,7 @@ export interface LockedGatheringsProps {
 }
 
 export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
+  const time = useTimeFormats();
   const t = useTranslations('Events');
   const { access } = useData();
   // Only now, and only on a screen that actually has one of these on it.
@@ -92,7 +93,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
                     {event.title}
                   </span>
                   <span className="block truncate text-xs text-ink-500">
-                    {formatEventWindow(event)}
+                    {time.eventWindow(event)}
                     {who ? ` · ${who}` : ''}
                   </span>
                 </span>

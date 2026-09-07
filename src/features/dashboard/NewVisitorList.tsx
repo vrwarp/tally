@@ -30,12 +30,12 @@ import {
 import { hasNoAdultContact, reachableFor } from '@/features/dashboard/insights';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { exportFilename } from '@/lib/csv';
-import { formatRelative, formatShortDate } from '@/lib/time';
 import { initials } from '@/lib/utils';
 import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type NewVisitor } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface NewVisitorListProps {
   items: readonly NewVisitor[];
@@ -151,6 +151,7 @@ function NewVisitorRow({
   reachable: boolean | undefined;
   onContactAdded?: () => void;
 }) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('NewVisitors');
   const { student, firstEventTitle, firstAttendedAt } = visitor;
@@ -187,8 +188,8 @@ function NewVisitorRow({
             </span>
           </span>
           <span className="truncate text-xs text-ink-500">
-            {firstEventTitle ?? t('unknownEvent')} · {formatShortDate(firstAttendedAt)},{' '}
-            {formatRelative(firstAttendedAt)}
+            {firstEventTitle ?? t('unknownEvent')} · {time.shortDate(firstAttendedAt)},{' '}
+            {time.relative(firstAttendedAt)}
           </span>
         </Link>
 

@@ -32,7 +32,6 @@ import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useNow } from '@/hooks/useNow';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import {
   approveKioskPairing,
@@ -41,6 +40,8 @@ import {
   type KioskStatus,
 } from '@/services/functions';
 import { useTranslations } from 'use-intl';
+import { useTimeStrings } from '@/hooks/useTimeFormats';
+import { formatRelative, type TimeStrings } from '@/lib/time';
 
 const COPY_FEEDBACK_MS = 2000;
 
@@ -315,13 +316,18 @@ function useSigningStatus(enabled: boolean): SigningState {
  */
 const JUST_NOW_MS = 45_000;
 
-function describeCheck(t: (key: 'justNow') => string, at: Date): string {
-  return Date.now() - at.getTime() < JUST_NOW_MS ? t('justNow') : formatRelative(at);
+function describeCheck(
+  t: (key: 'justNow') => string,
+  strings: TimeStrings,
+  at: Date,
+): string {
+  return Date.now() - at.getTime() < JUST_NOW_MS ? t('justNow') : formatRelative(strings, at);
 }
 
 /** The deployment's own answer, and the errand it hands over when it is no. */
 function SigningSection({ status, checkedAt, checking, check }: SigningState) {
   const t = useTranslations('KioskPair');
+  const timeStrings = useTimeStrings();
   const [copied, setCopied] = useState<CopyState>('idle');
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // So "checked 20 seconds ago" becomes "2 minutes ago" while somebody is off
@@ -417,7 +423,7 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
                 : checking
                   ? t('checking')
                   : checkedAt
-                    ? t('checkedAt', { when: describeCheck(t, checkedAt) })
+                    ? t('checkedAt', { when: describeCheck(t, timeStrings, checkedAt) })
                     : ''}
           </p>
         </div>

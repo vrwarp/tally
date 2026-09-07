@@ -21,12 +21,12 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
-import { formatClock } from '@/lib/time';
 import { cn, initials, sameItems } from '@/lib/utils';
 import { gradeLabel, gradeSentence } from '@/lib/grades';
 import { studentFullName, type RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * What the row is being used for.
@@ -140,6 +140,7 @@ export const StudentRow = memo(function StudentRow({
   onUndoCheckOut,
   tracksCheckOut = false,
 }: StudentRowProps) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('StudentRow');
   const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
@@ -189,9 +190,9 @@ export const StudentRow = memo(function StudentRow({
         ? t('ariaAlreadyCheckedIn', { who })
         : t('ariaMoveTo', { who })
     : gone
-      ? t('ariaMoreCheckedOut', { who, time: formatClock(attendance!.checkedOutAt!) })
+      ? t('ariaMoreCheckedOut', { who, time: time.clock(attendance!.checkedOutAt!) })
       : here
-        ? t('ariaMoreCheckedIn', { who, time: formatClock(attendance.checkedInAt) })
+        ? t('ariaMoreCheckedIn', { who, time: time.clock(attendance.checkedInAt) })
         : t('ariaCheckIn', { who });
   /*
    * Nothing inside the row is announced on its own, so the note has to be part
@@ -338,7 +339,7 @@ export const StudentRow = memo(function StudentRow({
                   */}
                   {gone ? (
                     <span className="text-[11px] font-medium tabular-nums text-ink-400">
-                      Out {formatClock(attendance!.checkedOutAt!)}
+                      Out {time.clock(attendance!.checkedOutAt!)}
                     </span>
                   ) : null}
                   {showHint && !unavailable ? (
@@ -430,10 +431,10 @@ export const StudentRow = memo(function StudentRow({
                 aria-busy={busy || undefined}
                 aria-label={
                   gone
-                    ? t('ariaPutBack', { who, time: formatClock(attendance.checkedOutAt!) })
+                    ? t('ariaPutBack', { who, time: time.clock(attendance.checkedOutAt!) })
                     : tracksCheckOut
-                      ? t('ariaCheckOut', { who, time: formatClock(attendance.checkedInAt) })
-                      : t('ariaUndoCheckIn', { who, time: formatClock(attendance.checkedInAt) })
+                      ? t('ariaCheckOut', { who, time: time.clock(attendance.checkedInAt) })
+                      : t('ariaUndoCheckIn', { who, time: time.clock(attendance.checkedInAt) })
                 }
                 className={cn(
                   // `ml-2` is the dead strip: a transparent margin inside the
@@ -461,7 +462,7 @@ export const StudentRow = memo(function StudentRow({
                   {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
                 </span>
                 <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
-                  {formatClock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
+                  {time.clock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
                 </span>
               </button>
             </div>

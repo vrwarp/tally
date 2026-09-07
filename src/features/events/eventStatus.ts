@@ -8,7 +8,11 @@
  * events list and the check-in chooser all have to agree about what "open"
  * means.
  */
-import { formatClock, isCheckInOpen } from '@/lib/time';
+import {
+  formatClock,
+  isCheckInOpen,
+  type TimeStrings,
+} from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 /**
@@ -37,6 +41,7 @@ export type EventStatusTranslator = (
 
 export function eventStatusLine(
   t: EventStatusTranslator,
+  strings: TimeStrings,
   event: TallyEvent,
   now: Date,
   present: number | undefined,
@@ -44,7 +49,7 @@ export function eventStatusLine(
   if (event.status === 'cancelled') return t('cancelled');
   if (isCheckInOpen(event, now)) return t('checkInOpen');
   if (event.checkInOpensAt > now) {
-    return t('checkInOpensAt', { time: formatClock(event.checkInOpensAt) });
+    return t('checkInOpensAt', { time: formatClock(strings, event.checkInOpensAt) });
   }
   if (present === undefined) return t('checkInClosed');
   return present > 0 ? t('finishedWithCount', { count: present }) : t('finishedEmpty');

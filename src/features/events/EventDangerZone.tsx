@@ -32,7 +32,6 @@ import { Button, Card, CardHeader, ErrorBanner, Modal, TextField } from '@/compo
 import { useToast } from '@/context/toastContext';
 import { confirmationPhrase, matchesConfirmation } from '@/features/events/deleteConfirmation';
 import { chainKey } from '@/lib/materialize';
-import { formatDateTime } from '@/lib/time';
 import {
   deleteEvents,
   previewEventDeletion,
@@ -40,6 +39,7 @@ import {
 } from '@/services/events';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 type Scope = 'event' | 'chain';
 
@@ -106,6 +106,7 @@ function DeleteGatheringModal({
   onClose,
   onDeleted,
 }: ConfirmProps) {
+  const time = useTimeFormats();
   const t = useTranslations('DangerZone');
   const { show } = useToast();
   const chain = chainKey(event);
@@ -204,7 +205,7 @@ function DeleteGatheringModal({
           ? t('confirmDescriptionChain')
           : // The date in full, so a confirmation about one night out of a
             // column of near-identical Fridays says which one.
-            formatDateTime(event.startAt)
+            time.dateTime(event.startAt)
       }
       footer={
         <>

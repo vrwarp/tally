@@ -14,11 +14,14 @@
  */
 import { Link } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
-import { formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
 import { eventStatusLine } from '@/features/events/eventStatus';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats, useTimeStrings } from '@/hooks/useTimeFormats';
 
 export interface EventHeroCardProps {
   event: TallyEvent;
@@ -61,6 +64,8 @@ export function EventHeroCard({
   density = 'full',
   className,
 }: EventHeroCardProps) {
+  const time = useTimeFormats();
+  const timeStrings = useTimeStrings();
   const t = useTranslations('EventHero');
   const tStatus = useTranslations('EventStatus');
   const cancelled = event.status === 'cancelled';
@@ -103,8 +108,8 @@ export function EventHeroCard({
           </h3>
           <p className="mt-0.5 text-sm text-ink-400">
             {(() => {
-              const day = formatEventDay(event.startAt, now);
-              const window = formatEventWindow(event);
+              const day = time.eventDay(event.startAt, now);
+              const window = time.eventWindow(event);
               const location = event.location;
               if (showDay) {
                 return location
@@ -143,7 +148,7 @@ export function EventHeroCard({
           the same way.
         */}
         {open || cancelled ? null : (
-          <span className="text-xs text-ink-500">{eventStatusLine(tStatus, event, now, present)}</span>
+          <span className="text-xs text-ink-500">{eventStatusLine(tStatus, timeStrings, event, now, present)}</span>
         )}
       </div>
 

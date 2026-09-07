@@ -66,7 +66,6 @@ import {
 import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
-import { formatRelative, formatShortDate } from '@/lib/time';
 import { cn, formatPhone, initials } from '@/lib/utils';
 import { gradeSentence } from '@/lib/grades';
 import {
@@ -96,6 +95,7 @@ import {
 } from '@/types';
 import { useLocale, useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -124,6 +124,7 @@ function dialable(phone: string): string {
 }
 
 export function StudentDetailPage() {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('StudentDetail');
   const tCommon = useTranslations('Common');
@@ -852,13 +853,13 @@ export function StudentDetailPage() {
               <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
               <Detail
                 label={t('firstSeen')}
-                value={seen.firstSeenAt ? formatShortDate(seen.firstSeenAt) : 'Never'}
+                value={seen.firstSeenAt ? time.shortDate(seen.firstSeenAt) : 'Never'}
               />
               <Detail
                 label={t('lastSeen')}
                 value={
                   seen.lastSeenAt
-                    ? formatShortDate(seen.lastSeenAt)
+                    ? time.shortDate(seen.lastSeenAt)
                     : // Not "Never": the year below holds no sighting, which is a
                       // smaller claim than never having come at all.
                       seen.unseenInWindow
@@ -1012,7 +1013,7 @@ export function StudentDetailPage() {
               label={t('lastSeen')}
               value={
                 seen.lastSeenAt
-                  ? formatRelative(seen.lastSeenAt)
+                  ? time.relative(seen.lastSeenAt)
                   : // The grid's own mark for a night with nothing on record. The
                     // hint carries the claim, which is about the year rather than
                     // about all of history.
@@ -1022,7 +1023,7 @@ export function StudentDetailPage() {
               }
               hint={
                 seen.lastSeenAt
-                  ? formatShortDate(seen.lastSeenAt)
+                  ? time.shortDate(seen.lastSeenAt)
                   : seen.unseenInWindow
                     ? t('lastSeenNotInYear')
                     : t('lastSeenNoCheckIns')
@@ -1174,6 +1175,7 @@ function ReleaseStanding({
   onUndo: (transition: Transition) => void;
   undoBusyId: string | null;
 }) {
+  const time = useTimeFormats();
   const t = useTranslations('StudentDetail');
   const tReason = useTranslations('Transitions');
   if (!release) {
@@ -1201,7 +1203,7 @@ function ReleaseStanding({
         {transition.note ? t('transitionNote', { note: transition.note }) : ''}
         {t('releaseMeta', {
           by: transition.releasedByName,
-          date: formatShortDate(transition.releasedAt),
+          date: time.shortDate(transition.releasedAt),
         })}
       </p>
       {inert ? (
@@ -1232,6 +1234,7 @@ function ReleaseStanding({
  * says the second part faster than any of the words do.
  */
 function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) {
+  const time = useTimeFormats();
   const t = useTranslations('StudentDetail');
   const { present, outcome, event } = entry;
 
@@ -1267,7 +1270,7 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
 
   return (
     <li
-      title={t('eventSpoken', { title: event.title, date: formatShortDate(event.startAt), status: spoken })}
+      title={t('eventSpoken', { title: event.title, date: time.shortDate(event.startAt), status: spoken })}
       className={cn(
         'w-16 rounded-xl px-1.5 py-1 text-center ring-1',
         present
@@ -1278,7 +1281,7 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
       )}
     >
       <span className="sr-only">
-        {formatShortDate(event.startAt)}: {spoken}
+        {time.shortDate(event.startAt)}: {spoken}
       </span>
       <span
         aria-hidden="true"
@@ -1287,7 +1290,7 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
           present ? 'text-present-300' : counts ? 'text-ink-200' : 'text-ink-600',
         )}
       >
-        {formatShortDate(event.startAt)}
+        {time.shortDate(event.startAt)}
       </span>
       <span
         aria-hidden="true"

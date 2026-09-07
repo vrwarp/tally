@@ -25,12 +25,12 @@ import {
   type FollowUpCsvContext,
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
-import { formatShortDate } from '@/lib/time';
 import { initials } from '@/lib/utils';
 import { gradeSentence } from '@/lib/grades';
 import { studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Past this many days an unfinished profile stops being a fresh to-do. */
 const STALE_DAYS = 7;
@@ -171,6 +171,7 @@ function IncompleteRow({
   now: Date;
   onContactAdded?: () => void;
 }) {
+  const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('Incomplete');
   const days = waitingDays(student, now);
@@ -222,7 +223,7 @@ function IncompleteRow({
                 const detail =
                   days === null
                     ? t('metaNoContact')
-                    : t('metaAdded', { date: formatShortDate(student.createdAt) });
+                    : t('metaAdded', { date: time.shortDate(student.createdAt) });
                 return grade ? t('metaWithGrade', { grade, detail }) : detail;
               })()}
             </span>

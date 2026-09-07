@@ -30,10 +30,10 @@ import { BackendsSection } from '@/features/settings/BackendsSection';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
 import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
-import { formatRelative } from '@/lib/time';
 import { saveSettings } from '@/services/events';
 import type { AppSettings } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Widest sensible window; matches the clamp in `toSettings`. */
 const MAX_WINDOW = 12;
@@ -70,6 +70,7 @@ function toForm(settings: AppSettings): ThresholdForm {
 }
 
 export function SettingsPage() {
+  const time = useTimeFormats();
   const t = useTranslations('Settings');
   const { settings, series, loading } = useData();
   const { user } = useAuth();
@@ -258,7 +259,7 @@ export function SettingsPage() {
                 {dirty
                   ? t('unsaved')
                   : settings.updatedAt
-                    ? t('lastChanged', { when: formatRelative(settings.updatedAt) })
+                    ? t('lastChanged', { when: time.relative(settings.updatedAt) })
                     : t('usingDefaults')}
               </span>
             </div>
