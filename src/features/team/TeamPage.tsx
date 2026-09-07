@@ -349,7 +349,6 @@ export function TeamPage() {
         <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <p className="mt-0.5 max-w-2xl text-balance text-sm text-ink-400">
           {t('description')}
-          phone immediately.
         </p>
 
         {/* Reference, not instruction. It was a boxed paragraph that owned half

@@ -54,6 +54,7 @@ import { formatEventDay, formatEventWindow, nextSeriesOccurrence, startOfDay } f
 import { cn } from '@/lib/utils';
 import { setEventStatus, type EventDraft } from '@/services/events';
 import type { EventSeries, TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** How far "this week" reaches. Seven days is the horizon a Friday plans to. */
 const WEEK_DAYS = 7;
@@ -82,19 +83,20 @@ function EventRow({
   onUncancel: (event: TallyEvent) => void;
   uncancelling: boolean;
 }) {
+  const t = useTranslations('Events');
   const cancelled = event.status === 'cancelled';
 
   const badges = [
-    event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">One-off</Badge> : null,
-    cancelled ? <Badge key="cancelled" tone="danger">Cancelled</Badge> : null,
+    event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">{t('badgeOneOff')}</Badge> : null,
+    cancelled ? <Badge key="cancelled" tone="danger">{t('badgeCancelled')}</Badge> : null,
     // Neutral, not `warn`. Amber is the token for something the reader has to
     // act on, and on a page whose subject is which gatherings are blocked it was
     // the only warm mark on the screen — out-shouting the title of the one row
     // that is not blocked. `Check-out` beside it already sets the precedent: a
     // mode a gathering runs in is not a caution.
-    event.requiresRsvp ? <Badge key="rsvp" tone="neutral">RSVP only</Badge> : null,
+    event.requiresRsvp ? <Badge key="rsvp" tone="neutral">{t('badgeRsvpOnly')}</Badge> : null,
     event.requiresCheckOut ? (
-      <Badge key="checkout" tone="neutral">Check-out</Badge>
+      <Badge key="checkout" tone="neutral">{t('badgeCheckOut')}</Badge>
     ) : null,
   ].filter(Boolean);
 
@@ -130,8 +132,18 @@ function EventRow({
               for the same reason, and there was no reason the rows the reader
               can actually open should keep the recipe rejected next door. */}
           <span className="mt-0.5 block text-xs leading-snug text-ink-400">
-            {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
-            {event.location ? ` · ${event.location}` : ''}
+            {event.location
+              ? t('whenWithLocation', {
+                  when: t('when', {
+                    day: formatEventDay(event.startAt, now),
+                    window: formatEventWindow(event),
+                  }),
+                  location: event.location,
+                })
+              : t('when', {
+                  day: formatEventDay(event.startAt, now),
+                  window: formatEventWindow(event),
+                })}
           </span>
 
           {/*
@@ -163,7 +175,7 @@ function EventRow({
           type="button"
           onClick={() => onUncancel(event)}
           disabled={uncancelling}
-          aria-label={`Un-cancel ${event.title}`}
+          aria-label={t('unCancelAria', { title: event.title })}
           className="min-h-16 shrink-0 rounded-xl bg-ink-800 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 active:bg-ink-700 disabled:opacity-50"
         >
           Un-cancel
@@ -253,6 +265,7 @@ function LockedBlock({ chains, dividing }: { chains: readonly LockedChain[]; div
 /* -------------------------------------------------------------------------- */
 
 function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
+  const t = useTranslations('Events');
   const { canWork } = useData();
   const { own, locked } = useMemo(
     () => partitionBand(events, canWork, 'asc'),
@@ -336,7 +349,7 @@ function Today({ events, now }: { events: readonly TallyEvent[]; now: Date }) {
             now={now}
             present={present.get(event.id)}
             to={`/events/${event.id}`}
-            cta="Open this gathering"
+            cta={t('openThisGathering')}
             density="compact"
           />
         ))}
@@ -362,8 +375,12 @@ function QuickAction({
   existing: TallyEvent | null;
   onSchedule: (series: EventSeries) => void;
 }) {
+  const t = useTranslations('Events');
   const occurrence = nextSeriesOccurrence(series, now);
-  const when = `${formatEventDay(occurrence.startAt, now)} · ${formatEventWindow(occurrence)}`;
+  const when = t('when', {
+    day: formatEventDay(occurrence.startAt, now),
+    window: formatEventWindow(occurrence),
+  });
 
   if (existing) {
     return (
@@ -410,6 +427,7 @@ function QuickAction({
 /* -------------------------------------------------------------------------- */
 
 export function EventsPage() {
+  const t = useTranslations('Events');
   const { events, series, loading, canWork } = useData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -537,9 +555,9 @@ export function EventsPage() {
     setUncancelling(event.id);
     try {
       await setEventStatus(event.id, 'scheduled', user.uid);
-      show(`${event.title} is back on`, { tone: 'success' });
+      show(t('backOn', { title: event.title }), { tone: 'success' });
     } catch {
-      show('Could not un-cancel this event. Try again.', { tone: 'error' });
+      show(t('unCancelFailed'), { tone: 'error' });
     } finally {
       setUncancelling(null);
     }
@@ -559,19 +577,19 @@ export function EventsPage() {
   return (
     <PageFrame gap="lg" className="pb-8">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-ink-50">Events</h1>
+        <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <div className="flex items-center gap-2">
           {/* Same weight as Import, and for the same reason: a grid is
               something a leader builds at the end of a term, not weekly. */}
           <Button variant="secondary" onClick={() => setGridOpen(true)}>
-            Export
+            {t('export')}
           </Button>
           {/* Quieter than "New event" on purpose: importing history happens a
               handful of times in an install's life, scheduling happens weekly. */}
           <Button variant="secondary" onClick={() => setImporting(true)}>
-            Import
+            {t('import')}
           </Button>
-          <Button onClick={() => setEditor({ event: null })}>New event</Button>
+          <Button onClick={() => setEditor({ event: null })}>{t('newEvent')}</Button>
         </div>
       </header>
 
@@ -629,7 +647,7 @@ export function EventsPage() {
                 id="events-series"
                 className="pb-2 text-xs font-bold uppercase tracking-wider text-ink-400"
               >
-                Next in each series
+                {t('nextInEachSeries')}
               </h3>
               <ul className="flex flex-col gap-2">
                 {quickActions.map(({ series: candidate, existing }) => (
@@ -648,7 +666,7 @@ export function EventsPage() {
           {nothingAhead ? (
             <EmptyState
               icon="🗓"
-              title="Nothing scheduled yet"
+              title={t('emptyTitle')}
               // The empty state has to point somewhere real, and the quick
               // actions above it are not always there: they come from
               // `eventSeries` documents, which only a seeded database has. An
@@ -656,14 +674,14 @@ export function EventsPage() {
               // on the screen, on the one screen where nothing else was either.
               description={
                 quickActions.length > 0
-                  ? 'Use a quick action above, or create a one-off for a retreat or outing.'
-                  : 'Use “New event” above to schedule a gathering, or a one-off for a retreat or outing.'
+                  ? t('emptyBodyQuick')
+                  : t('emptyBody')
               }
             />
           ) : null}
 
           <RowSection
-            title="Next seven days"
+            title={t('nextSevenDays')}
             events={thisWeek}
             now={now}
             onUncancel={onUncancel}

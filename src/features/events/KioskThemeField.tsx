@@ -28,6 +28,7 @@ import {
 } from '@/lib/kioskTheme';
 import { cn } from '@/lib/utils';
 import { painted } from './kioskPreview';
+import { useTranslations } from 'use-intl';
 
 export interface KioskThemeFieldProps {
   value: KioskTheme | null;
@@ -36,28 +37,32 @@ export interface KioskThemeFieldProps {
 
 type Slot = 'accent' | 'confirm' | 'backdrop';
 
-const SLOTS: readonly { slot: Slot; label: string; hint: string; offered: readonly KioskHue[] }[] =
-  [
-    {
-      slot: 'accent',
-      label: 'What you touch',
-      hint: 'Keys, the check-in button, the ring around whatever has focus.',
-      offered: KIOSK_HUES,
-    },
-    {
-      slot: 'confirm',
-      label: 'What just happened',
-      hint: 'The tick beside a child who is in, and the screen that says so.',
-      // The amber band is missing on purpose — see `CONFIRM_HUES`.
-      offered: CONFIRM_HUES,
-    },
-    {
-      slot: 'backdrop',
-      label: 'The room',
-      hint: 'A wash over the page and the cards. Deliberately faint.',
-      offered: KIOSK_HUES,
-    },
-  ];
+const SLOTS = [
+  {
+    slot: 'accent',
+    label: 'slotAccent',
+    hint: 'slotAccentHint',
+    offered: KIOSK_HUES,
+  },
+  {
+    slot: 'confirm',
+    label: 'slotConfirm',
+    hint: 'slotConfirmHint',
+    // The amber band is missing on purpose — see `CONFIRM_HUES`.
+    offered: CONFIRM_HUES,
+  },
+  {
+    slot: 'backdrop',
+    label: 'slotBackdrop',
+    hint: 'slotBackdropHint',
+    offered: KIOSK_HUES,
+  },
+] as const satisfies readonly {
+  slot: Slot;
+  label: string;
+  hint: string;
+  offered: readonly KioskHue[];
+}[];
 
 /**
  * One hue as it would land in a given slot, for the swatch.
@@ -83,6 +88,7 @@ function swatch(theme: KioskTheme, slot: Slot, hue: string): string {
 }
 
 export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
+  const t = useTranslations('KioskTheme');
   const [open, setOpen] = useState(false);
   const labelId = useId();
   const valueId = useId();
@@ -91,18 +97,18 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
   const colours = useMemo(() => painted(theme), [theme]);
 
   const summary = value
-    ? [
-        value.ground === 'light' ? 'Light' : 'Dark',
-        KIOSK_HUES.find((hue) => hue.name === value.accent)?.label ?? 'Sky',
-      ].join(' · ')
-    : 'Tally’s own';
+    ? t('summary', {
+        ground: value.ground === 'light' ? t('groundLight') : t('groundDark'),
+        accent: t(KIOSK_HUES.find((hue) => hue.name === value.accent)?.labelKey ?? 'hueSky'),
+      })
+    : t('summaryDefault');
 
   const set = (patch: Partial<KioskTheme>) => onChange({ ...theme, ...patch });
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
       <span id={labelId} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
-        Kiosk colours
+        {t('fieldLabel')}
       </span>
 
       <button
@@ -157,8 +163,8 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
 
           {SLOTS.map(({ slot, label, hint, offered }) => (
             <fieldset key={slot} className="flex min-w-0 flex-col gap-1.5">
-              <legend className="text-xs font-semibold text-ink-400">{label}</legend>
-              <p className="mb-1 text-xs leading-snug text-ink-500">{hint}</p>
+              <legend className="text-xs font-semibold text-ink-400">{t(label)}</legend>
+              <p className="mb-1 text-xs leading-snug text-ink-500">{t(hint)}</p>
               <div className="flex flex-wrap gap-2">
                 {offered.map((hue) => {
                   const active = theme[slot] === hue.name;
@@ -168,14 +174,14 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
                       type="button"
                       onClick={() => set({ [slot]: hue.name })}
                       aria-pressed={active}
-                      title={hue.label}
+                      title={t(hue.labelKey)}
                       className={cn(
                         'size-9 rounded-full ring-1 pointer-fine:size-7',
                         active ? 'ring-2 ring-ink-100' : 'ring-ink-700 active:opacity-80',
                       )}
                       style={{ background: swatch(theme, slot, hue.name) }}
                     >
-                      <span className="sr-only">{hue.label}</span>
+                      <span className="sr-only">{t(hue.labelKey)}</span>
                     </button>
                   );
                 })}
@@ -193,7 +199,7 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
             style={{ background: colours['--color-ink-950'] }}
           >
             <span className="text-xs font-semibold" style={{ color: colours['--color-ink-100'] }}>
-              Sunday Nursery
+              {t('previewTitle')}
             </span>
             <div className="flex items-center gap-2">
               <span
@@ -206,13 +212,13 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
                 className="rounded-md px-3 py-2 text-xs font-bold"
                 style={{ background: colours['--color-present-600'], color: '#ffffff' }}
               >
-                Check in
+                {t('previewCheckIn')}
               </span>
               <span
                 className="text-xs font-semibold"
                 style={{ color: colours['--color-present-400'] }}
               >
-                ✓ Checked in
+                {t('previewCheckedIn')}
               </span>
             </div>
             {/*
@@ -221,7 +227,7 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
               gathering may recolour it.
             */}
             <span className="text-xs" style={{ color: colours['--color-warn-400'] }}>
-              Allergies: peanuts
+              {t('previewAllergies')}
             </span>
           </div>
 
@@ -234,14 +240,14 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
               }}
               className="min-h-11 rounded-lg text-xs font-semibold text-ink-400 active:bg-ink-900 pointer-fine:min-h-8"
             >
-              Use Tally’s own colours
+              {t('useDefault')}
             </button>
           ) : null}
         </div>
       ) : null}
 
       <p className="text-xs leading-snug text-ink-500">
-        Worn by a lobby kiosk while it is bound to this gathering. Nobody’s phone changes.
+        {t('fieldHint')}
       </p>
     </div>
   );

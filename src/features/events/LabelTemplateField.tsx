@@ -571,7 +571,6 @@ export function LabelTemplateField({
                   </div>
                   <p className="-mt-1 text-xs leading-snug text-ink-500">
                     {t('marginsHint')}
-                    way the text runs.
                   </p>
 
                   <div className="flex flex-wrap items-start gap-3">

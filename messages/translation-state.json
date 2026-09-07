@@ -3713,5 +3713,710 @@
     "source": "{count, plural, one {{names} is already on this gathering.} other {{names} are already on this gathering.}}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "EventDetail.notFoundTitle": {
+    "source": "That event is not here",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.notFoundBody": {
+    "source": "It may have been deleted, or it may be older than the few months Tally keeps loaded.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.backToEvents": {
+    "source": "Back to events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.backLink": {
+    "source": "‹ Events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeRecurring": {
+    "source": "Recurring",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeOneOff": {
+    "source": "One-off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeCancelled": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeCheckInOpen": {
+    "source": "Check-in open",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeRsvpOnly": {
+    "source": "RSVP only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.badgeCheckOut": {
+    "source": "Check-out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.rowSeries": {
+    "source": "Series",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.rowRegularsFrom": {
+    "source": "Regulars from",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.rowRepeats": {
+    "source": "Repeats",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.rowLocation": {
+    "source": "Location",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.rowCheckIn": {
+    "source": "Check-in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.checkInWindow": {
+    "source": "{opens} – {closes}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.takeAttendance": {
+    "source": "Take attendance",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.edit": {
+    "source": "Edit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.unCancel": {
+    "source": "Un-cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.keepIt": {
+    "source": "Keep it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.yesCancel": {
+    "source": "Yes, cancel",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.cancelEvent": {
+    "source": "Cancel event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.cancelWarning": {
+    "source": "Cancelling hides {title} from check-in. Attendance already recorded is kept.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.backOn": {
+    "source": "{title} is back on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.cancelled": {
+    "source": "{title} cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.changeFailed": {
+    "source": "Could not change this event. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.attendance": {
+    "source": "Attendance",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.nothingYet": {
+    "source": "Nothing recorded yet — this event is still ahead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.tileCheckedIn": {
+    "source": "Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.readsAsCancelled": {
+    "source": "Counted as a cancelled gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.tileCheckedOut": {
+    "source": "Checked out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.checkedOutOf": {
+    "source": "{out} of {total} checked out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.cancelledExplain": {
+    "source": "Nobody was checked in, so Tally reads this as a cancelled gathering: it is not counted as a miss for anybody, and it does not inform the predictive roster or the trend strip.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.cancelledAdvice": {
+    "source": "If it did go ahead and nobody took attendance, you can still take it now. If it was called off, cancelling the event says so on purpose.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.formerStudent": {
+    "source": "Former student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.whoHeading": {
+    "source": "Who's on this gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.whoRestricted": {
+    "source": "{count, plural, one {# person} other {# people}} — everyone else sees it locked",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.whoOpen": {
+    "source": "Everyone on the team can take this register",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.change": {
+    "source": "Change",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventDetail.limit": {
+    "source": "Limit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.heading": {
+    "source": "Danger zone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.consequenceEvents": {
+    "source": "{count, plural, one {# gathering already recorded} other {# gatherings already recorded}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.consequenceCheckIns": {
+    "source": "{count, plural, one {# check-in} other {# check-ins}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.consequenceRsvps": {
+    "source": "{count, plural, one {# RSVP} other {# RSVPs}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.consequenceUnlinked": {
+    "source": "{count, plural, one {# one-off that borrows these regulars will lose them} other {# one-offs that borrow these regulars will lose them}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.workingOut": {
+    "source": "Working out what this would remove…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.summaryFailed": {
+    "source": "Could not work out what this would delete. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteFailed": {
+    "source": "Could not delete this. Nothing has been removed — try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteEventFailed": {
+    "source": "Could not delete this event. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deletedChain": {
+    "source": "Deleted {gatherings} and {checkIns}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deletedEventWithCheckIns": {
+    "source": "Deleted {title} and {checkIns}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deletedEvent": {
+    "source": "Deleted {title}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.confirmTitleChain": {
+    "source": "Delete every {title}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.confirmTitleEvent": {
+    "source": "Delete {title}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.confirmDescriptionChain": {
+    "source": "Every gathering in this repeat, past and future.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.keepIt": {
+    "source": "Keep it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.compareChain": {
+    "source": "Cancelling one date keeps its history and can be reversed; this keeps nothing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.compareEvent": {
+    "source": "Cancelling keeps the attendance and can be reversed; this does not.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.typeToConfirm": {
+    "source": "Type {phrase} to confirm",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.capitalsHint": {
+    "source": "Capitals do not matter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.projectedNote": {
+    "source": "This gathering comes from the repeat schedule, so there is nothing of its own to delete. Cancel it to call off this one date, or edit the event to change the schedule itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.hasAttendance": {
+    "source": "{count, plural, one {# student was checked in here.} other {# students were checked in here.}} Deleting this gathering deletes that attendance too, and the dashboard and the predictive roster are built from it. Cancelling keeps it and can be reversed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteWithCheckIns": {
+    "source": "Delete this gathering and its check-ins",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.emptyNote": {
+    "source": "Nobody has been checked in, so this event can still be removed entirely.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteEvent": {
+    "source": "Delete event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "DangerZone.deleteChain": {
+    "source": "Delete every gathering in this repeat",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.titleMulti": {
+    "source": "Import history",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.titlePco": {
+    "source": "Import from Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.close": {
+    "source": "Close",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.gatheringCount": {
+    "source": "{count, plural, one {# gathering} other {# gatherings}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.checkInCount": {
+    "source": "{count, plural, one {# check-in} other {# check-ins}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.since": {
+    "source": "since {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.factsJoin": {
+    "source": "{facts}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.withFrequency": {
+    "source": "{frequency} · {facts}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.imported": {
+    "source": "Imported",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.reImport": {
+    "source": "Re-import",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.import": {
+    "source": "Import",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.readFailed": {
+    "source": "Could not read your importable events.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.importFailed": {
+    "source": "Could not import {name}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.importedToast": {
+    "source": "{name} imported",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.emptyMulti": {
+    "source": "No connected backend has an importable event. Archived ones are not offered.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.emptyPco": {
+    "source": "Planning Center has no live Check-Ins events. Archived ones are not offered.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.working": {
+    "source": "Reading the history and writing it here… a long-running gathering can take a minute or two. Keep this open until it finishes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.safeToRepeat": {
+    "source": "Importing is safe to repeat: a re-import picks up nights since the last one and never overwrites anything edited in Tally. Volunteers are not imported — Tally's attendance is a record of students.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryTitle": {
+    "source": "{name} is in Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryGatherings": {
+    "source": "{count, plural, one {# gathering} other {# gatherings}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryGatheringsNew": {
+    "source": " ({count} new)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryGatheringsSkipped": {
+    "source": "{count, plural, one { — # empty week skipped} other { — # empty weeks skipped}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryStudents": {
+    "source": "{count} students on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryStudentsAdded": {
+    "source": " ({count} added)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryStudentsAllPresent": {
+    "source": " (all were already on it)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.summaryCheckIns": {
+    "source": "{count, number} check-ins imported",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.skippedVolunteers": {
+    "source": "{count} volunteer check-ins skipped (leaders, not students)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.skippedGuests": {
+    "source": "{count, plural, one {# one-time guest skipped (no Planning Center person behind the name)} other {# one-time guests skipped (no Planning Center person behind the name)}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.duplicatesCollapsed": {
+    "source": "{count, plural, one {# duplicate check-in collapsed} other {# duplicate check-ins collapsed}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Import.keptRows": {
+    "source": "{count, plural, one {# row kept as Tally recorded them} other {# rows kept as Tally recorded them}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.fieldLabel": {
+    "source": "Kiosk colours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.fieldHint": {
+    "source": "Worn by a lobby kiosk while it is bound to this gathering. Nobody’s phone changes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.summaryDefault": {
+    "source": "Tally’s own",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.summary": {
+    "source": "{ground} · {accent}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.groundLight": {
+    "source": "Light",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.groundDark": {
+    "source": "Dark",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotAccent": {
+    "source": "What you touch",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotAccentHint": {
+    "source": "Keys, the check-in button, the ring around whatever has focus.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotConfirm": {
+    "source": "What just happened",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotConfirmHint": {
+    "source": "The tick beside a child who is in, and the screen that says so.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotBackdrop": {
+    "source": "The room",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.slotBackdropHint": {
+    "source": "A wash over the page and the cards. Deliberately faint.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.useDefault": {
+    "source": "Use Tally’s own colours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.previewTitle": {
+    "source": "Sunday Nursery",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.previewCheckIn": {
+    "source": "Check in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.previewCheckedIn": {
+    "source": "✓ Checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.previewAllergies": {
+    "source": "Allergies: peanuts",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueSky": {
+    "source": "Sky",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueIndigo": {
+    "source": "Indigo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueViolet": {
+    "source": "Violet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueMagenta": {
+    "source": "Magenta",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueBerry": {
+    "source": "Berry",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueEmber": {
+    "source": "Ember",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueAmber": {
+    "source": "Amber",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueForest": {
+    "source": "Forest",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskTheme.hueTeal": {
+    "source": "Teal",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.title": {
+    "source": "Events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.export": {
+    "source": "Export",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.import": {
+    "source": "Import",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.newEvent": {
+    "source": "New event",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.badgeOneOff": {
+    "source": "One-off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.badgeCancelled": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.badgeRsvpOnly": {
+    "source": "RSVP only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.badgeCheckOut": {
+    "source": "Check-out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.whenWithLocation": {
+    "source": "{when} · {location}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.unCancelAria": {
+    "source": "Un-cancel {title}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.openThisGathering": {
+    "source": "Open this gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.when": {
+    "source": "{day} · {window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.backOn": {
+    "source": "{title} is back on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.unCancelFailed": {
+    "source": "Could not un-cancel this event. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.nextInEachSeries": {
+    "source": "Next in each series",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.emptyTitle": {
+    "source": "Nothing scheduled yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.emptyBodyQuick": {
+    "source": "Use a quick action above, or create a one-off for a retreat or outing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.emptyBody": {
+    "source": "Use “New event” above to schedule a gathering, or a one-off for a retreat or outing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.nextSevenDays": {
+    "source": "Next seven days",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

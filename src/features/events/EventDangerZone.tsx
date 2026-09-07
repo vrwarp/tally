@@ -39,12 +39,17 @@ import {
   type DeletionSummary,
 } from '@/services/events';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 type Scope = 'event' | 'chain';
 
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
+/**
+ * The consequence lines, as whole ICU-plural sentences.
+ *
+ * There used to be a `plural(count, one, many)` helper here that appended an
+ * English noun to a number. Chinese has no plural form and puts the measure
+ * word elsewhere, so each line is its own key with its own plural rule.
+ */
 
 /* -------------------------------------------------------------------------- */
 /* The confirmation                                                            */
@@ -59,15 +64,14 @@ function plural(count: number, one: string, many: string): string {
  * provoke.
  */
 function Consequences({ summary, scope }: { summary: DeletionSummary; scope: Scope }) {
+  const t = useTranslations('DangerZone');
   const lines = [
     // Only worth counting for a chain. On one night it would say "1 gathering"
     // above the title of the gathering it is asking about.
-    scope === 'chain' ? `${plural(summary.events, 'gathering', 'gatherings')} already recorded` : null,
-    plural(summary.checkIns, 'check-in', 'check-ins'),
-    summary.rsvps > 0 ? plural(summary.rsvps, 'RSVP', 'RSVPs') : null,
-    summary.unlinked > 0
-      ? `${plural(summary.unlinked, 'one-off', 'one-offs')} that borrow these regulars will lose them`
-      : null,
+    scope === 'chain' ? t('consequenceEvents', { count: summary.events }) : null,
+    t('consequenceCheckIns', { count: summary.checkIns }),
+    summary.rsvps > 0 ? t('consequenceRsvps', { count: summary.rsvps }) : null,
+    summary.unlinked > 0 ? t('consequenceUnlinked', { count: summary.unlinked }) : null,
   ].filter((line): line is string => line !== null);
 
   return (
@@ -102,6 +106,7 @@ function DeleteGatheringModal({
   onClose,
   onDeleted,
 }: ConfirmProps) {
+  const t = useTranslations('DangerZone');
   const { show } = useToast();
   const chain = chainKey(event);
 
@@ -141,7 +146,7 @@ function DeleteGatheringModal({
         if (!cancelled) setSummary(result);
       })
       .catch(() => {
-        if (!cancelled) setError('Could not work out what this would delete. Try again.');
+        if (!cancelled) setError(t('summaryFailed'));
       })
       .finally(() => {
         if (!cancelled) setCounting(false);
@@ -164,15 +169,21 @@ function DeleteGatheringModal({
 
       show(
         scope === 'chain'
-          ? `Deleted ${plural(result.events, 'gathering', 'gatherings')} and ${plural(result.checkIns, 'check-in', 'check-ins')}`
+          ? t('deletedChain', {
+              gatherings: t('consequenceEvents', { count: result.events }),
+              checkIns: t('consequenceCheckIns', { count: result.checkIns }),
+            })
           : result.checkIns > 0
-            ? `Deleted ${event.title} and ${plural(result.checkIns, 'check-in', 'check-ins')}`
-            : `Deleted ${event.title}`,
+            ? t('deletedEventWithCheckIns', {
+                title: event.title,
+                checkIns: t('consequenceCheckIns', { count: result.checkIns }),
+              })
+            : t('deletedEvent', { title: event.title }),
         { tone: 'success' },
       );
       onDeleted();
     } catch {
-      setError('Could not delete this. Nothing has been removed — try again.');
+      setError(t('deleteFailed'));
     } finally {
       setBusy(false);
     }
@@ -183,10 +194,14 @@ function DeleteGatheringModal({
       open={open}
       onClose={onClose}
       size="sm"
-      title={scope === 'chain' ? `Delete every ${event.title}?` : `Delete ${event.title}?`}
+      title={
+        scope === 'chain'
+          ? t('confirmTitleChain', { title: event.title })
+          : t('confirmTitleEvent', { title: event.title })
+      }
       description={
         scope === 'chain'
-          ? 'Every gathering in this repeat, past and future.'
+          ? t('confirmDescriptionChain')
           : // The date in full, so a confirmation about one night out of a
             // column of near-identical Fridays says which one.
             formatDateTime(event.startAt)
@@ -194,7 +209,7 @@ function DeleteGatheringModal({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Keep it
+            {t('keepIt')}
           </Button>
           <Button
             variant="danger"
@@ -211,7 +226,7 @@ function DeleteGatheringModal({
         {scope === 'chain' ? (
           <>
             {counting ? (
-              <p className="text-sm text-ink-400">Working out what this would remove…</p>
+              <p className="text-sm text-ink-400">{t('workingOut')}</p>
             ) : summary ? (
               <Consequences summary={summary} scope="chain" />
             ) : null}
@@ -231,15 +246,15 @@ function DeleteGatheringModal({
         <p className="text-sm leading-relaxed text-ink-300">
           This cannot be undone.{' '}
           {scope === 'chain'
-            ? 'Cancelling one date keeps its history and can be reversed; this keeps nothing.'
-            : 'Cancelling keeps the attendance and can be reversed; this does not.'}
+            ? t('compareChain')
+            : t('compareEvent')}
         </p>
 
         {error ? <ErrorBanner message={error} /> : null}
 
         <TextField
-          label={`Type ${phrase} to confirm`}
-          hint="Capitals do not matter."
+          label={t('typeToConfirm', { phrase })}
+          hint={t('capitalsHint')}
           value={typed}
           onChange={(changed) => setTyped(changed.target.value)}
           autoComplete="off"
@@ -266,6 +281,7 @@ export interface EventDangerZoneProps {
 }
 
 export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZoneProps) {
+  const t = useTranslations('DangerZone');
   const { show } = useToast();
   const [confirming, setConfirming] = useState<Scope | null>(null);
   const [confirmingEmpty, setConfirmingEmpty] = useState(false);
@@ -285,15 +301,18 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
       const result = await deleteEvents({ scope: 'event', eventId: event.id });
       show(
         result.checkIns > 0
-          ? `Deleted ${event.title} and ${plural(result.checkIns, 'check-in', 'check-ins')}`
-          : `Deleted ${event.title}`,
+          ? t('deletedEventWithCheckIns', {
+              title: event.title,
+              checkIns: t('consequenceCheckIns', { count: result.checkIns }),
+            })
+          : t('deletedEvent', { title: event.title }),
         { tone: 'success' },
       );
       onDeleted();
     } catch {
       // The confirmation stays up: a failure here is almost always a hallway
       // connection, and asking again should be one tap rather than two.
-      show('Could not delete this event. Try again.', { tone: 'error' });
+      show(t('deleteEventFailed'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -302,7 +321,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
   return (
     <>
       <Card>
-        <CardHeader title="Danger zone" />
+        <CardHeader title={t('heading')} />
         <div className="flex flex-col gap-2 p-4">
           {!event.materialized ? (
             /*
@@ -314,20 +333,15 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
              * the whole repeat is a different question, and it is below.
              */
             <p className="text-sm text-ink-400">
-              This gathering comes from the repeat schedule, so there is nothing of its own to
-              delete. Cancel it to call off this one date, or edit the event to change the schedule
-              itself.
+              {t('projectedNote')}
             </p>
           ) : checkedIn > 0 ? (
             <>
               <p className="text-sm text-ink-400">
-                {plural(checkedIn, 'student', 'students')}{' '}
-                {checkedIn === 1 ? 'was' : 'were'} checked in here. Deleting this gathering deletes
-                that attendance too, and the dashboard and the predictive roster are built from it.
-                Cancelling keeps it and can be reversed.
+                {t('hasAttendance', { count: checkedIn })}
               </p>
               <Button variant="secondary" onClick={() => setConfirming('event')}>
-                Delete this gathering and its check-ins
+                {t('deleteWithCheckIns')}
               </Button>
             </>
           ) : confirmingEmpty ? (
@@ -342,7 +356,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
                   className="flex-1"
                   onClick={() => setConfirmingEmpty(false)}
                 >
-                  Keep it
+                  {t('keepIt')}
                 </Button>
                 <Button
                   variant="danger"
@@ -357,10 +371,10 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           ) : (
             <>
               <p className="text-sm text-ink-400">
-                Nobody has been checked in, so this event can still be removed entirely.
+                {t('emptyNote')}
               </p>
               <Button variant="secondary" onClick={() => setConfirmingEmpty(true)}>
-                Delete event
+                {t('deleteEvent')}
               </Button>
             </>
           )}
@@ -380,7 +394,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
                 recorded, their check-ins, and the dates the schedule has not reached yet.
               </p>
               <Button variant="secondary" onClick={() => setConfirming('chain')}>
-                Delete every gathering in this repeat
+                {t('deleteChain')}
               </Button>
             </div>
           ) : null}

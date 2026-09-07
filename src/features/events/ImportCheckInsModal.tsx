@@ -31,6 +31,7 @@ import {
   type CheckInsImportSummary,
   type PcoErrorReport,
 } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface ImportCheckInsModalProps {
   open: boolean;
@@ -62,11 +63,12 @@ function EventRow({
   showSource: boolean;
   onImport: (event: SourcedEvent) => void;
 }) {
+  const t = useTranslations('Import');
   const since = formatSince(event.firstGatheringAt);
   const facts = [
-    `${event.gatheringCount} ${event.gatheringCount === 1 ? 'gathering' : 'gatherings'}`,
-    `${event.checkInCount.toLocaleString()} check-ins`,
-    ...(since ? [`since ${since}`] : []),
+    t('gatheringCount', { count: event.gatheringCount }),
+    t('checkInCount', { count: event.checkInCount }),
+    ...(since ? [t('since', { when: since })] : []),
   ].join(' · ');
 
   return (
@@ -77,11 +79,12 @@ function EventRow({
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-medium text-ink-100">{event.name}</span>
           {showSource ? <Badge tone="neutral">{BACKEND_LABELS[event.backendId]}</Badge> : null}
-          {event.alreadyImported ? <Badge tone="success">Imported</Badge> : null}
+          {event.alreadyImported ? <Badge tone="success">{t('imported')}</Badge> : null}
         </span>
         <span className="block text-xs text-ink-500">
-          {event.frequency && event.frequency !== 'None' ? `${event.frequency} · ` : ''}
-          {facts}
+          {event.frequency && event.frequency !== 'None'
+            ? t('withFrequency', { frequency: event.frequency, facts })
+            : facts}
         </span>
       </span>
 
@@ -92,60 +95,53 @@ function EventRow({
         disabled={disabled && !importing}
         onClick={() => onImport(event)}
       >
-        {event.alreadyImported ? 'Re-import' : 'Import'}
+        {event.alreadyImported ? t('reImport') : t('import')}
       </Button>
     </li>
   );
 }
 
 function Summary({ summary }: { summary: CheckInsImportSummary }) {
+  const t = useTranslations('Import');
   const { gatherings, students, checkIns } = summary;
 
   const skippedParts = [
     ...(checkIns.skippedVolunteers > 0
-      ? [`${checkIns.skippedVolunteers} volunteer check-ins skipped (leaders, not students)`]
+      ? [t('skippedVolunteers', { count: checkIns.skippedVolunteers })]
       : []),
     ...(checkIns.skippedOneTimeGuests > 0
-      ? [
-          `${checkIns.skippedOneTimeGuests} one-time ${
-            checkIns.skippedOneTimeGuests === 1 ? 'guest' : 'guests'
-          } skipped (no Planning Center person behind the name)`,
-        ]
+      ? [t('skippedGuests', { count: checkIns.skippedOneTimeGuests })]
       : []),
     ...(checkIns.duplicatesCollapsed > 0
-      ? [
-          `${checkIns.duplicatesCollapsed} duplicate ${
-            checkIns.duplicatesCollapsed === 1 ? 'check-in' : 'check-ins'
-          } collapsed`,
-        ]
+      ? [t('duplicatesCollapsed', { count: checkIns.duplicatesCollapsed })]
       : []),
     ...(checkIns.kept > 0
-      ? [`${checkIns.kept} ${checkIns.kept === 1 ? 'row' : 'rows'} kept as Tally recorded them`]
+      ? [t('keptRows', { count: checkIns.kept })]
       : []),
   ];
 
   return (
     <div className="flex flex-col gap-3 rounded-xl bg-present-500/10 p-4 ring-1 ring-present-500/25">
       <p className="text-sm font-semibold text-present-400">
-        {summary.eventName} is in Tally
+        {t('summaryTitle', { name: summary.eventName })}
       </p>
       <ul className="flex flex-col gap-1 text-sm text-ink-200">
         <li>
-          {gatherings.created + gatherings.existing} gatherings
+          {t('summaryGatherings', { count: gatherings.created + gatherings.existing })}
           {gatherings.created > 0 && gatherings.existing > 0
-            ? ` (${gatherings.created} new)`
+            ? t('summaryGatheringsNew', { count: gatherings.created })
             : ''}
           {gatherings.skippedEmpty > 0
-            ? ` — ${gatherings.skippedEmpty} empty ${
-                gatherings.skippedEmpty === 1 ? 'week' : 'weeks'
-              } skipped`
+            ? t('summaryGatheringsSkipped', { count: gatherings.skippedEmpty })
             : ''}
         </li>
         <li>
-          {students.found} students on the roster
-          {students.added > 0 ? ` (${students.added} added)` : ' (all were already on it)'}
+          {t('summaryStudents', { count: students.found })}
+          {students.added > 0
+            ? t('summaryStudentsAdded', { count: students.added })
+            : t('summaryStudentsAllPresent')}
         </li>
-        <li>{checkIns.written.toLocaleString()} check-ins imported</li>
+        <li>{t('summaryCheckIns', { count: checkIns.written })}</li>
       </ul>
       {skippedParts.length > 0 ? (
         <p className="text-xs text-ink-400">{skippedParts.join(' · ')}</p>
@@ -162,6 +158,7 @@ function Summary({ summary }: { summary: CheckInsImportSummary }) {
 }
 
 export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps) {
+  const t = useTranslations('Import');
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
 
@@ -210,7 +207,7 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
       const answered = settled.filter((entry) => entry.events !== null);
       if (answered.length === 0) {
         setEvents([]);
-        setError(pcoErrorReport(settled[0]?.cause, 'Could not read your importable events.'));
+        setError(pcoErrorReport(settled[0]?.cause, t('readFailed')));
         return;
       }
       setEvents(
@@ -251,12 +248,12 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
               : candidate,
           ) ?? current,
       );
-      show(`${data.eventName} imported`, { tone: 'success' });
+      show(t('importedToast', { name: data.eventName }), { tone: 'success' });
       // The import may have added students; the roster's cache key is the
       // membership, so the next read must not reuse an answer from before it.
       await refreshRoster(true);
     } catch (cause) {
-      setError(pcoErrorReport(cause, `Could not import ${event.name}.`));
+      setError(pcoErrorReport(cause, t('importFailed', { name: event.name })));
     } finally {
       setImportingId(null);
     }
@@ -266,7 +263,7 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
     <Modal
       open={open}
       onClose={onClose}
-      title={multiSource ? 'Import history' : 'Import from Planning Center'}
+      title={multiSource ? t('titleMulti') : t('titlePco')}
       description={
         multiSource
           ? "Bring an event's whole attendance history into Tally: every time it met, everyone who attended, and every check-in. The source is only read — nothing there changes."
@@ -300,8 +297,8 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
         ) : events.length === 0 && !error ? (
           <p className="px-1 text-sm text-ink-400">
             {multiSource
-              ? 'No connected backend has an importable event. Archived ones are not offered.'
-              : 'Planning Center has no live Check-Ins events. Archived ones are not offered.'}
+              ? t('emptyMulti')
+              : t('emptyPco')}
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -320,14 +317,11 @@ export function ImportCheckInsModal({ open, onClose }: ImportCheckInsModalProps)
 
         {importingId !== null ? (
           <p className="px-1 text-xs text-ink-500">
-            Reading the history and writing it here… a long-running gathering can take a minute or
-            two. Keep this open until it finishes.
+            {t('working')}
           </p>
         ) : (
           <p className="px-1 text-xs text-ink-500">
-            Importing is safe to repeat: a re-import picks up nights since the last one and never
-            overwrites anything edited in Tally. Volunteers are not imported — Tally's attendance
-            is a record of students.
+            {t('safeToRepeat')}
           </p>
         )}
       </div>

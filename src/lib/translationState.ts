@@ -83,13 +83,9 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
  * whatever that button currently says, in whatever language it says it.
  */
 export const QUOTED_IN: readonly { message: string; quotes: string; strip?: string }[] = [
-  /*
-   * Empty until extraction reaches the screens that do this. The known
-   * candidates are the empty states that name a button — Events' *Use "New
-   * event" above…* and the check-in screen's pointers at Quick add — and they
-   * are declared here the moment those keys exist, not remembered. See
-   * docs/i18n.md Phase 2.
-   */
+  // The events empty state tells a leader to press a button by name, so it has
+  // to keep saying whatever that button currently says.
+  { message: 'Events.emptyBody', quotes: 'Events.newEvent' },
 ];
 
 export function flatten(obj: Messages, prefix = ''): Map<string, string> {
