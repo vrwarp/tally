@@ -8658,5 +8658,85 @@
     "source": "{date} · {time}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Birthday.finishTheYear": {
+    "source": "Finish the year, or take it out — a birthday can go in without one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.halfADate": {
+    "source": "That is half a date. Give a month and a day at least.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.justTheNumbers": {
+    "source": "Just the numbers — the year is optional.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.leftEmpty": {
+    "source": "Left empty, the birthday Planning Center holds stays as it is.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.keepGoingYear": {
+    "source": "Keep going, or leave the year out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.keepGoing": {
+    "source": "Keep going.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.leapDayNeedsYear": {
+    "source": "Planning Center cannot hold 29 February without a year, and it has none for them. Give the year too.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.noSuchDay": {
+    "source": "That day does not exist in that month.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.notThatYear": {
+    "source": "February had no 29th in that year.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.futureYear": {
+    "source": "That year has not happened yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.earlyYear": {
+    "source": "Years run from {earliest} to now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.said": {
+    "source": "{date}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.alreadyHeld": {
+    "source": "{date} — already what Planning Center holds.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.noYear": {
+    "source": "{date}, with no year. Planning Center will show no age.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.keepingHeldYear": {
+    "source": "{date}, keeping the year Planning Center holds.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Birthday.keepingYear": {
+    "source": "{date}, keeping {year}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

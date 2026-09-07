@@ -35,7 +35,7 @@ import { pcoPersonUrl } from '@/lib/planningCenter';
 import { pushStudentToPlanningCenter } from '@/services/functions';
 import { setStudentStatus, updateStudent } from '@/services/students';
 import { backendLabelOf, backendOfStudent, studentFullName, type Student } from '@/types';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Which fact was pressed. One per badge the roster can render. */
@@ -256,6 +256,7 @@ function BirthdayPanel({
   onDone: () => void;
 }) {
   const t = useTranslations('RowBadge');
+  const locale = useLocale();
   const state = birthdayState(student.birthday, now);
   const backend = backendOfStudent(student);
   const label = backendLabelOf(student);
@@ -292,7 +293,7 @@ function BirthdayPanel({
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(onFile)}</p>
+          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(locale, onFile)}</p>
           <p className="text-sm text-ink-400">{said[state]}</p>
           {/*
             Only where the year is genuinely unknown, and it now says whose gap

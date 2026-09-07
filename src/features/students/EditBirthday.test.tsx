@@ -197,7 +197,7 @@ describe('the birthday badge', () => {
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.type(box, '112');
     expect(box).toHaveValue('11 / 2');
-    expect(screen.getByText(/^2 November/)).toBeInTheDocument();
+    expect(screen.getByText(/^November 2/)).toBeInTheDocument();
 
     await userEvent.clear(box);
     await userEvent.type(box, '1214');
@@ -205,11 +205,11 @@ describe('the birthday badge', () => {
     // them — `MM / DD / YYYY` with the year still to come.
     expect(box).toHaveValue('12 / 14 / ');
     expect(screen.getByText('YYYY')).toBeInTheDocument();
-    expect(screen.getByText(/^14 December/)).toBeInTheDocument();
+    expect(screen.getByText(/^December 14/)).toBeInTheDocument();
 
     await userEvent.type(box, '2011');
     expect(box).toHaveValue('12 / 14 / 2011');
-    expect(screen.getByText('14 December 2011.')).toBeInTheDocument();
+    expect(screen.getByText('December 14, 2011.')).toBeInTheDocument();
   });
 
   /**
@@ -237,7 +237,7 @@ describe('the birthday badge', () => {
   it('queues the day, and leaves the row to the job', async () => {
     openBadge(linked({ birthday: '03-14' }));
 
-    expect(screen.getByText('14 March')).toBeInTheDocument();
+    expect(screen.getByText('March 14')).toBeInTheDocument();
 
     const box = screen.getByRole('textbox', { name: 'Birthday' });
     await userEvent.clear(box);
@@ -286,14 +286,14 @@ describe('the birthday badge', () => {
 
   /**
    * The year the roster does not carry and this read does. Without it the panel
-   * printed "14 March" over a box opened on `03 / 14 /`, which reads as a year
+   * printed "March 14" over a box opened on `03 / 14 /`, which reads as a year
    * nobody has ever filled in — on a student Planning Center holds one for.
    */
   it('shows the year Planning Center holds, and opens the box on it', () => {
     personDetails.current = details({ birthdate: '2011-03-14' });
     openBadge(linked({ birthday: '03-14' }));
 
-    expect(screen.getByText('14 March 2011')).toBeInTheDocument();
+    expect(screen.getByText('March 14, 2011')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Birthday' })).toHaveValue('03 / 14 / 2011');
     expect(screen.queryByText(/holds no year/)).toBeNull();
   });
@@ -307,7 +307,7 @@ describe('the birthday badge', () => {
     personDetails.current = details({ birthdate: '03-14' });
     openBadge(linked({ birthday: '03-14' }));
 
-    expect(screen.getByText('14 March')).toBeInTheDocument();
+    expect(screen.getByText('March 14')).toBeInTheDocument();
     expect(screen.getByText(/Planning Center holds no year for Sofia/)).toBeInTheDocument();
   });
 

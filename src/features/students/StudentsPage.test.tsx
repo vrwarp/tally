@@ -449,15 +449,15 @@ describe('StudentsPage birthday badges', () => {
   it('marks the week ahead with the date, not the word "soon"', () => {
     renderRoster([withBirthday('03-18')]);
     expect(
-      within(row(/Bea/)).getByRole('button', { name: /birthday is on 18 March/i }),
-    ).toHaveTextContent('18 Mar');
+      within(row(/Bea/)).getByRole('button', { name: /birthday is on March 18/i }),
+    ).toHaveTextContent('Mar 18');
   });
 
   it('marks the week behind too, because that is the one a ministry misses', () => {
     renderRoster([withBirthday('03-10')]);
     expect(
-      within(row(/Bea/)).getByRole('button', { name: /birthday was on 10 March/i }),
-    ).toHaveTextContent('10 Mar');
+      within(row(/Bea/)).getByRole('button', { name: /birthday was on March 10/i }),
+    ).toHaveTextContent('Mar 10');
   });
 
   it('says so when Planning Center holds no birthdate', () => {

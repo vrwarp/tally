@@ -65,7 +65,7 @@ import {
   type UpstreamEdit,
 } from '@/types';
 import { useSyncStripStrings, useGrades } from '@/hooks/usePureStrings';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
@@ -1147,6 +1147,7 @@ function BirthdayBadge({
   onPress: () => void;
 }) {
   const t = useTranslations('Students');
+  const locale = useLocale();
   if (state === 'quiet') return null;
 
   const name = student.firstName;
@@ -1186,8 +1187,8 @@ function BirthdayBadge({
     );
   }
 
-  const day = formatBirthdayShort(student.birthday, now);
-  const spoken = formatBirthdayLong(student.birthday);
+  const day = formatBirthdayShort(locale, student.birthday, now);
+  const spoken = formatBirthdayLong(locale, student.birthday);
 
   const TITLES: Record<'today' | 'soon' | 'recent', string> = {
     today: t('birthdayToday', { name }),

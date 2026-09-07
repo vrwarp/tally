@@ -1349,10 +1349,11 @@ function BirthdaySection({
   onSaved: () => void;
 }) {
   const t = useTranslations('StudentDetail');
+  const locale = useLocale();
   const [editing, setEditing] = useState(false);
 
   // The date as it will be printed, with the year where there is one to print.
-  const day = formatBirthdayLong(onFile);
+  const day = formatBirthdayLong(locale, onFile);
   // The window is a fact about the day of the year, so the roster's is enough
   // and it does not wait for a read: cake this week is not a detail lookup.
   const state = birthdayState(student.birthday, now);

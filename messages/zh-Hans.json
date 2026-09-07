@@ -1864,5 +1864,23 @@
     "yearsAgo": "{count, plural, one {1 yr ago} other {# yrs ago}}",
     "window": "{start} – {end}",
     "dateTime": "{date} · {time}"
+  },
+  "Birthday": {
+    "finishTheYear": "Finish the year, or take it out — a birthday can go in without one.",
+    "halfADate": "That is half a date. Give a month and a day at least.",
+    "justTheNumbers": "Just the numbers — the year is optional.",
+    "leftEmpty": "Left empty, the birthday Planning Center holds stays as it is.",
+    "keepGoingYear": "Keep going, or leave the year out.",
+    "keepGoing": "Keep going.",
+    "leapDayNeedsYear": "Planning Center cannot hold 29 February without a year, and it has none for them. Give the year too.",
+    "noSuchDay": "That day does not exist in that month.",
+    "notThatYear": "February had no 29th in that year.",
+    "futureYear": "That year has not happened yet.",
+    "earlyYear": "Years run from {earliest} to now.",
+    "said": "{date}.",
+    "alreadyHeld": "{date} — already what Planning Center holds.",
+    "noYear": "{date}, with no year. Planning Center will show no age.",
+    "keepingHeldYear": "{date}, keeping the year Planning Center holds.",
+    "keepingYear": "{date}, keeping {year}."
   }
 }

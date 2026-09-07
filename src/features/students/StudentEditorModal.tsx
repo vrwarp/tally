@@ -62,6 +62,7 @@ import {
 } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useBirthdayStrings } from '@/hooks/useBirthdayStrings';
 
 function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);
@@ -147,6 +148,7 @@ export interface StudentEditorModalProps {
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
   const grades = useGrades();
   const t = useTranslations('StudentEditor');
+  const birthdayStrings = useBirthdayStrings();
   const tCommon = useTranslations('Common');
   const { user, profile } = useAuth();
   const { show } = useToast();
@@ -354,7 +356,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       // The whole date, not the roster's day: `writable` is only ever true once
       // the details have landed, so the year on file is known here — and
       // comparing against the day alone would send a birthday nobody changed.
-      const read = readBirthdayField(form.birthday, {
+      const read = readBirthdayField(birthdayStrings, form.birthday, {
         onFile: details?.birthdate ?? student?.birthday ?? null,
       });
       if (!read.ok) {

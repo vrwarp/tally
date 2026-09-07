@@ -24,6 +24,7 @@ import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { backendLabelOf, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useBirthdayStrings } from '@/hooks/useBirthdayStrings';
 
 export interface BirthdayFieldProps {
   value: string;
@@ -65,7 +66,8 @@ export function BirthdayField({
   disabled,
   now,
 }: BirthdayFieldProps) {
-  const note = describeBirthdayField(value, { onFile, now });
+  const birthdayStrings = useBirthdayStrings();
+  const note = describeBirthdayField(birthdayStrings, value, { onFile, now });
   const wrong = error ?? (note.tone === 'bad' ? note.say : null);
 
   return (
@@ -120,6 +122,7 @@ export interface EditBirthdayProps {
  * hang this off.
  */
 export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayProps) {
+  const birthdayStrings = useBirthdayStrings();
   const t = useTranslations('ParentContact');
   const { show } = useToast();
   const { user, profile } = useAuth();
@@ -131,7 +134,7 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    const read = readBirthdayField(text, { onFile: held });
+    const read = readBirthdayField(birthdayStrings, text, { onFile: held });
     if (!read.ok) {
       setProblem(read.error);
       return;
