@@ -338,7 +338,30 @@ export function Kiosk() {
         binding={binding}
         registrationId="uxr-registration"
         // Never settles: the frame under review is the step, not its result.
-        submit={() => new Promise(() => {})}
+        /*
+         * How the callable behaves, because the saving screen is a function of
+         * it and of nothing else.
+         *
+         * `hang` is the default and the frame most rounds are about: a call
+         * still in the air, which is the only way to photograph either meter —
+         * against anything real the response beats the shutter. `deadline` and
+         * `refuse` are the two ways it ends badly, and they say different
+         * things now that a sticker may already be in somebody's hand.
+         */
+        submit={() =>
+          new Promise((_resolve, reject) => {
+            const mode = params.get('submit');
+            if (mode === 'deadline' || mode === 'refuse') {
+              setTimeout(
+                () =>
+                  reject({
+                    code: mode === 'deadline' ? 'functions/deadline-exceeded' : 'functions/invalid-argument',
+                  }),
+                Number(params.get('after') ?? 400),
+              );
+            }
+          })
+        }
         onRegistered={() => {}}
         onEarlyPrint={() => {}}
         onClose={() => {}}

@@ -269,6 +269,8 @@ export function RegistrationFlow({
    * keeps saying so.
    */
   const [tagsOut, setTagsOut] = useState(false);
+  /** Which way the last attempt ended badly, for the header above the sentence. */
+  const [failure, setFailure] = useState<FailureCause | null>(null);
   /** The completion beat's timer, cleared if this screen goes first. */
   const finishRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(finishRef.current), []);
@@ -322,10 +324,11 @@ export function RegistrationFlow({
          * came back, so the sentence is chosen here from the shape of the
          * failure rather than relayed from the wire.
          */
-        dispatch({
-          type: 'failed',
-          cause: error.code?.includes(DEADLINE_EXCEEDED) ? 'gave-up' : 'refused',
-        });
+        const cause: FailureCause = error.code?.includes(DEADLINE_EXCEEDED)
+          ? 'gave-up'
+          : 'refused';
+        setFailure(cause);
+        dispatch({ type: 'failed', cause });
       });
   }, [
     submit,
@@ -410,7 +413,16 @@ export function RegistrationFlow({
         See the same rule on the search screen's root for the mechanism. */
     <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr_auto_auto]">
       <Header
-        title={titleFor(state, childNumber)}
+        /*
+         * "Something went wrong" is right for a refusal and wrong for a
+         * deadline: the body below it says we do not know what happened, and a
+         * header that has already decided contradicts it in larger type.
+         */
+        title={
+          state.step === 'error' && failure === 'gave-up'
+            ? 'Taking a while'
+            : titleFor(state, childNumber)
+        }
         subtitle={subtitleFor(state, binding)}
         onBack={() => {
           haptic(8);
@@ -505,13 +517,13 @@ export function RegistrationFlow({
             )}
           </>
         ) : (
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-3 pb-6">
           {state.step === 'submitting' && (
             <SavingScreen roster={state.children} phase={savePhase} tagsOut={tagsOut} />
           )}
 
           {state.step === 'success' && (
-            <div className="flex flex-col items-center gap-4 pt-6 text-center">
+            <div className="flex flex-col items-center gap-4 text-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-present-600/20 text-5xl">
                 ✓
               </div>
@@ -527,7 +539,7 @@ export function RegistrationFlow({
           )}
 
           {state.step === 'error' && (
-            <div className="flex flex-col gap-4 pt-6 text-center">
+            <div className="flex flex-col gap-5 text-center">
               <p className="text-xl text-ink-200">{state.message}</p>
               <Big label="Try again" tone="brand" onPick={runSubmit} />
             </div>
@@ -735,7 +747,7 @@ function Meter({
       <div className="kiosk-meter">
         <div
           data-testid="save-meter-fill"
-          className="kiosk-meter-fill"
+          className={`kiosk-meter-fill ${mode === 'full' ? 'kiosk-meter-done' : ''}`}
           style={{
             transform: `scaleX(${scale})`,
             transitionDuration:
@@ -785,7 +797,7 @@ function SavingScreen({
   tagsOut: boolean;
 }) {
   return (
-    <div className="flex min-h-full flex-col gap-5 pt-3">
+    <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         {roster.map((child, index) => (
           <div
@@ -805,7 +817,7 @@ function SavingScreen({
         ))}
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-7">
         <Meter
           label={tagsOut ? 'Name tags printing' : 'Checking them in…'}
           mode={phase === 'processing' ? 'running' : 'full'}

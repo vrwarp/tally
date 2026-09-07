@@ -1184,6 +1184,16 @@
 }
 
 /*
+ * A step that is finished, in the green this app already spends on "checked
+ * in". Two full-width brand bars say the same thing twice and leave a parent
+ * reading the labels to find out which one is still working; the colour says it
+ * before the words do.
+ */
+.kiosk-meter-done {
+  background: var(--color-present-600);
+}
+
+/*
  * Dialog entrances. `<dialog>` is `display: none` while closed, so both of
  * these run on open without any mount/unmount bookkeeping in React.
  */

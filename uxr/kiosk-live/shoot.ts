@@ -68,6 +68,15 @@ const SCENES: {
    */
   scrollToEnd?: boolean;
   /**
+   * Milliseconds to sit *after* the drive, for a screen that keeps moving once
+   * it has been reached.
+   *
+   * `settle` waits before the presses and cannot photograph the saving screen:
+   * that one is reached by pressing the commit, and which of its two meters is
+   * up depends only on how long you then stand there.
+   */
+  hold?: number;
+  /**
    * Extra milliseconds to sit before the shot, for the states that arrive on
    * their own clock: the photograph fades in 350ms late over 1200ms, so a
    * frame shot at the default settle catches a backdrop at a twentieth of its
@@ -254,6 +263,108 @@ const SCENES: {
       '5', '5', '5', '0', '1', '2', '3', '4', '5', '6', 'Next',
     ],
   },
+  /*
+   * The screen a family waits on, which for eight rounds was two words on an
+   * empty tablet and could not be shot at all — the emulator answered faster
+   * than the shutter. Both meters, and both ways it ends badly.
+   */
+  {
+    id: 'saving-processing',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: [
+      'R', 'O', 'B', 'I', 'N', 'Next',
+      'F', 'I', 'E', 'L', 'D', 'S', 'Next',
+      '4th grade', 'Next',
+      // One press, and it is both the answer and the way past the question.
+      'No allergies',
+      'D', 'A', 'N', 'A', 'Next',
+      // The adult's surname arrives carrying the child's, so this step is a
+      // confirmation rather than a second spelling of the same word.
+      'Next',
+      '5', '5', '5', '0', '1', '0', '3', '3', '4', '4', 'Next',
+      'Add another child',
+      'S', 'A', 'M', 'Next',
+      'Next',
+      '2nd grade', 'Next',
+      'No allergies',
+      'Check in Robin and Sam',
+    ],
+    hold: 2_000,
+  },
+  {
+    id: 'saving-printed',
+    query: 'screen=register',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: [
+      'R', 'O', 'B', 'I', 'N', 'Next',
+      'F', 'I', 'E', 'L', 'D', 'S', 'Next',
+      '4th grade', 'Next',
+      // One press, and it is both the answer and the way past the question.
+      'No allergies',
+      'D', 'A', 'N', 'A', 'Next',
+      // The adult's surname arrives carrying the child's, so this step is a
+      // confirmation rather than a second spelling of the same word.
+      'Next',
+      '5', '5', '5', '0', '1', '0', '3', '3', '4', '4', 'Next',
+      'Add another child',
+      'S', 'A', 'M', 'Next',
+      'Next',
+      '2nd grade', 'Next',
+      'No allergies',
+      'Check in Robin and Sam',
+    ],
+    // Past `PROCESSING_MS`, so the tags have gone and the second meter is up.
+    hold: 6_500,
+  },
+  {
+    id: 'saving-timeout',
+    query: 'screen=register&submit=deadline&after=6200',
+    views: ['phone', 'kioskwide'],
+    drive: [
+      'R', 'O', 'B', 'I', 'N', 'Next',
+      'F', 'I', 'E', 'L', 'D', 'S', 'Next',
+      '4th grade', 'Next',
+      // One press, and it is both the answer and the way past the question.
+      'No allergies',
+      'D', 'A', 'N', 'A', 'Next',
+      // The adult's surname arrives carrying the child's, so this step is a
+      // confirmation rather than a second spelling of the same word.
+      'Next',
+      '5', '5', '5', '0', '1', '0', '3', '3', '4', '4', 'Next',
+      'Add another child',
+      'S', 'A', 'M', 'Next',
+      'Next',
+      '2nd grade', 'Next',
+      'No allergies',
+      'Check in Robin and Sam',
+    ],
+    hold: 7_000,
+  },
+  {
+    id: 'saving-refused',
+    query: 'screen=register&submit=refuse&after=400',
+    views: ['kioskwide'],
+    drive: [
+      'R', 'O', 'B', 'I', 'N', 'Next',
+      'F', 'I', 'E', 'L', 'D', 'S', 'Next',
+      '4th grade', 'Next',
+      // One press, and it is both the answer and the way past the question.
+      'No allergies',
+      'D', 'A', 'N', 'A', 'Next',
+      // The adult's surname arrives carrying the child's, so this step is a
+      // confirmation rather than a second spelling of the same word.
+      'Next',
+      '5', '5', '5', '0', '1', '0', '3', '3', '4', '4', 'Next',
+      'Add another child',
+      'S', 'A', 'M', 'Next',
+      'Next',
+      '2nd grade', 'Next',
+      'No allergies',
+      'Check in Robin and Sam',
+    ],
+    hold: 1_000,
+  },
 ];
 
 const args = process.argv.slice(2);
@@ -338,6 +449,8 @@ for (const scene of SCENES) {
       await target.dispatchEvent('pointerup', at);
       await page.waitForTimeout(60);
     }
+
+    if (scene.hold) await page.waitForTimeout(scene.hold);
 
     if (scene.scrollToEnd) {
       await page.evaluate(() => {
