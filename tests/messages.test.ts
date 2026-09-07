@@ -177,3 +177,41 @@ describe('the kiosk message slice', () => {
     }
   });
 });
+
+/**
+ * Keys nothing reads.
+ *
+ * A catalogue only grows: a screen gets reworded, the key it used stays, and a
+ * translator is asked for a sentence nobody will ever see. Deliberately
+ * forgiving — a key counts as used if its bare name appears anywhere in the
+ * source at all — so the dynamic lookups this repo does on purpose
+ * (`t(CHILD_LABEL_KEYS[position])`, `t(SIZE_LABELS[size])`) read as used
+ * rather than as dead.
+ */
+describe('the catalogue holds nothing nobody reads', () => {
+  function sources(dir: string, found: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) sources(full, found);
+      else if (/\.(tsx?|mjs)$/.test(entry.name)) found.push(full);
+    }
+    return found;
+  }
+
+  it('every key in en.json is looked up somewhere', () => {
+    const files = [
+      ...sources(path.join(process.cwd(), 'src')),
+      path.join(process.cwd(), 'scripts', 'sync-kiosk-messages.mjs'),
+    ];
+    const source = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+
+    const dead: string[] = [];
+    for (const [namespace, entries] of Object.entries(en!)) {
+      for (const key of Object.keys(entries as Record<string, unknown>)) {
+        if (!new RegExp(`\\b${key}\\b`).test(source)) dead.push(`${namespace}.${key}`);
+      }
+    }
+
+    expect(dead).toEqual([]);
+  });
+});

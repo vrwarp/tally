@@ -20,6 +20,7 @@
  * which is the same write-back check that form made before showing its field.
  */
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'use-intl';
 import { haptic, NO_GRADE } from '@/lib/utils';
 import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { useGrades } from '@/hooks/usePureStrings';
@@ -46,9 +47,31 @@ import {
   type QuestionRow,
   type DraftChild,
   type RegistrationMode,
+  type QuestionStrings,
   type RegistrationState,
   type StepKind,
 } from './steps';
+
+/**
+ * The wizard's translator, as a type.
+ *
+ * `titleFor`, `subtitleFor`, `questionFor`, `commitLabel` and `welcomeLine`
+ * are pure functions of the state — that is what makes them testable beside the
+ * reducer — so they take it as an argument rather than reaching for a hook.
+ */
+type RegisterTranslator = ReturnType<typeof useTranslations<'Register'>>;
+
+/**
+ * The words `steps.ts` needs to write the run out, in the shape it takes.
+ *
+ * Memoised on the two translators, so `QuestionStack`'s memo still holds
+ * across a keystroke — the whole point of that component.
+ */
+function useQuestionStrings(): QuestionStrings {
+  const t = useTranslations('Register');
+  const grades = useGrades();
+  return useMemo(() => ({ t: t as unknown as QuestionStrings['t'], grades }), [t, grades]);
+}
 
 /**
  * How long a half-typed registration is left on the glass.
@@ -227,6 +250,9 @@ export function RegistrationFlow({
   onEarlyPrint,
   onClose,
 }: RegistrationFlowProps) {
+  const t = useTranslations('Register');
+  const locale = useLocale();
+  const questionStrings = useQuestionStrings();
   // Absent on a binding written before the flag existed, and absent means no.
   const tracksCheckOut = binding.requiresCheckOut ?? false;
   const [state, dispatch] = useReducer(
@@ -423,9 +449,9 @@ export function RegistrationFlow({
         title={
           state.step === 'error' && failure === 'gave-up'
             ? 'Taking a while'
-            : titleFor(state, childNumber)
+            : titleFor(t, state, childNumber)
         }
-        subtitle={subtitleFor(state, binding)}
+        subtitle={subtitleFor(t, state, binding)}
         onBack={() => {
           haptic(8);
           if (goBack(state) === null) onClose();
@@ -492,8 +518,12 @@ export function RegistrationFlow({
                   */
                   <p className="px-1 pt-1 text-base text-ink-400">
                     {anchors && anchors.length > 0
-                      ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
-                      : 'Joining your family.'}
+                      ? t('joiningNamed', {
+                          names: new Intl.ListFormat(locale, { type: 'conjunction' }).format(
+                            anchors.map((sibling) => sibling.firstName),
+                          ),
+                        })
+                      : t('joiningYourFamily')}
                   </p>
                 )}
               </div>
@@ -514,7 +544,7 @@ export function RegistrationFlow({
               */}
             {state.step !== 'confirm' && (
               <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
-                {questionFor(state)}
+                {questionFor(t, state)}
               </div>
             )}
           </>
@@ -529,21 +559,26 @@ export function RegistrationFlow({
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-present-600/20 text-5xl">
                 ✓
               </div>
-              <p className="text-2xl font-semibold text-ink-100">{welcomeLine(state.children)}</p>
+              <p className="text-2xl font-semibold text-ink-100">
+                {welcomeLine(t, locale, state.children)}
+              </p>
               {/* The whole handoff, in one sentence: this is how they find
                   themselves next week without anybody's help. */}
               <p className="text-xl text-ink-400">
-                Next time, just type{' '}
-                <span className="font-semibold tracking-widest text-ink-100">{state.last4}</span> —
-                the last 4 digits of your phone.
+                {t.rich('nextTime', {
+                  last4: state.last4,
+                  digits: (chunks) => (
+                    <span className="font-semibold tracking-widest text-ink-100">{chunks}</span>
+                  ),
+                })}
               </p>
             </div>
           )}
 
           {state.step === 'error' && (
             <div className="flex flex-col gap-5 text-center">
-              <p className="text-xl text-ink-200">{state.message}</p>
-              <Big label="Try again" tone="brand" onPick={runSubmit} />
+              <p className="text-xl text-ink-200">{state.message || t('couldNotSave')}</p>
+              <Big label={t('tryAgain')} tone="brand" onPick={runSubmit} />
             </div>
           )}
           </div>
@@ -612,7 +647,7 @@ export function RegistrationFlow({
               {state.step === 'child-allergies' && (
                 <div className="flex-1">
                   <Big
-                    label="No allergies"
+                    label={t('noAllergies')}
                     tone={state.buffer === '' ? 'brand' : undefined}
                     onPick={() => dispatch({ type: 'no-allergies' })}
                   />
@@ -620,7 +655,7 @@ export function RegistrationFlow({
               )}
               <div className="flex-1">
                 <Big
-                  label="Next"
+                  label={t('next')}
                   tone="brand"
                   disabled={!canAdvance(state)}
                   onPick={() => dispatch({ type: 'next' })}
@@ -659,12 +694,12 @@ export function RegistrationFlow({
                   above the keys is what *they* entered, and a placeholder
                   sitting in that slot read as something a previous family had
                   already put there. What the box is for is said above it. */}
-              {readoutFor(state) && (
+              {readoutFor(questionStrings, state) && (
                 <span
                   data-testid="readout"
                   className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl"
                 >
-                  {readoutFor(state)}
+                  {readoutFor(questionStrings, state)}
                 </span>
               )}
               {/* Where the next letter lands, so the band reads as a live field
@@ -695,7 +730,7 @@ export function RegistrationFlow({
       ) : state.step === 'success' ? (
         <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
           <div className="mx-auto w-full max-w-2xl">
-            <Big label="Done" onPick={onClose} />
+            <Big label={t('done')} onPick={onClose} />
           </div>
         </div>
       ) : (
@@ -851,6 +886,7 @@ function ConfirmConsole({
   onAdd: () => void;
   onCommit: () => void;
 }) {
+  const t = useTranslations('Register');
   return (
     <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
       {/* The family's own measure, as above — these buttons commit the rows
@@ -878,7 +914,7 @@ function ConfirmConsole({
           * A fixed band above a fixed pair, present from first paint, so
           * nothing here moves when a child is added.
           */}
-        <p className="pt-1 pb-2 text-center text-xl text-ink-400">Anyone else to add?</p>
+        <p className="pt-1 pb-2 text-center text-xl text-ink-400">{t('anyoneElseToAdd')}</p>
         {/*
           * The offer the fork screen used to carry, in the shape it carried it
           * — the quiet button above the brand one, so a parent who learned
@@ -888,15 +924,13 @@ function ConfirmConsole({
           * screens earlier.
           */}
         <Big
-          label="Add another child"
+          label={t('addAnotherChild')}
           disabled={roster.length >= MAX_CHILDREN}
           onPick={onAdd}
         />
-        <Big label={commitLabel(roster)} tone="brand" onPick={onCommit} />
+        <Big label={commitLabel(t, roster)} tone="brand" onPick={onCommit} />
         {roster.length >= MAX_CHILDREN && (
-          <p className="text-center text-base text-ink-500">
-            That is as many as one go takes — a leader can add the rest.
-          </p>
+          <p className="text-center text-base text-ink-500">{t('maxChildren')}</p>
         )}
       </div>
     </div>
@@ -922,6 +956,7 @@ function Header({
   canClose: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations('Register');
   const tap = useTap();
 
   return (
@@ -955,7 +990,7 @@ function Header({
           canBack ? '' : 'invisible'
         }`}
       >
-        ← Back
+        {t('back')}
       </button>
       <div className="min-w-0 pt-1 text-center">
         <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">{title}</div>
@@ -1004,7 +1039,8 @@ const QuestionStack = memo(function QuestionStack({
   roster: QuestionListState['children'];
   onReopen: (step: StepKind, child: number | null) => void;
 }) {
-  const sections = questionList({
+  const strings = useQuestionStrings();
+  const sections = questionList(strings, {
     step,
     children: roster,
     draft,
@@ -1046,6 +1082,7 @@ function QuestionRowView({
   row: QuestionRow;
   onReopen: (step: StepKind, child: number | null) => void;
 }) {
+  const t = useTranslations('Register');
   const tap = useTap();
   const shell = `flex h-14 w-full items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
     row.state === 'now'
@@ -1078,7 +1115,7 @@ function QuestionRowView({
           sentence somewhere else on the screen. */}
       {row.resumeHere && (
         <span className="shrink-0 text-sm tracking-[0.08em] text-ink-500 uppercase kiosk:text-base">
-          back to this
+          {t('backToThis')}
         </span>
       )}
     </>
@@ -1102,7 +1139,7 @@ function QuestionRowView({
       tabIndex={-1}
       data-testid={`question-${row.id}`}
       data-state={row.state}
-      aria-label={`${row.label}: ${row.answer}. Change it.`}
+      aria-label={t('reopenAria', { label: row.label, answer: row.answer })}
       {...tap(() => onReopen(row.step, row.child))}
       className={`${shell} active:bg-ink-700`}
     >
@@ -1255,7 +1292,7 @@ function gradeChipLabel(grades: GradeStrings, grade: Grade): string {
   return grade === 0 ? grades('shortK') : String(grade);
 }
 
-function titleFor(state: RegistrationState, childNumber: number): string {
+function titleFor(t: RegisterTranslator, state: RegistrationState, childNumber: number): string {
   switch (state.step) {
     case 'child-first':
     case 'child-last':
@@ -1268,26 +1305,30 @@ function titleFor(state: RegistrationState, childNumber: number): string {
           // neighbour's boy, a child on a different number. The same words as
           // the button that started this, which is the only relationship the
           // kiosk can actually vouch for: they are arriving together.
-          'Another child'
+          t('titleAnotherChild')
         : childNumber === 1
-          ? 'Your child'
-          : `Child ${childNumber}`;
+          ? t('titleYourChild')
+          : t('titleChildNumber', { number: childNumber });
     case 'guardian-first':
     case 'guardian-last':
     case 'guardian-phone':
-      return 'And you';
+      return t('titleGuardian');
     case 'confirm':
-      return 'Does this look right?';
+      return t('titleConfirm');
     case 'submitting':
-      return 'One moment';
+      return t('titleSubmitting');
     case 'success':
-      return 'All done';
+      return t('titleSuccess');
     case 'error':
-      return 'Something went wrong';
+      return t('titleError');
   }
 }
 
-function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
+function subtitleFor(
+  t: RegisterTranslator,
+  state: RegistrationState,
+  binding: KioskBinding,
+): string {
   switch (state.step) {
     /*
      * The typing steps name the field against the readout now, so this line
@@ -1319,7 +1360,7 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
     case 'guardian-phone':
       // Said before the number is typed rather than after: a parent wants to
       // know why it is being asked for while they decide whether to give it.
-      return 'This is how you check in next time.';
+      return t('subtitlePhone');
     case 'confirm':
       return binding.title;
     default:
@@ -1343,22 +1384,22 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
  * carries the gathering on those steps now, which is what a parent glancing up
  * is checking.
  */
-function questionFor(state: RegistrationState): string {
+function questionFor(t: RegisterTranslator, state: RegistrationState): string {
   switch (state.step) {
     case 'child-first':
-      return "Child's first name";
+      return t('placeholderChildFirst');
     case 'child-last':
-      return "Child's last name";
+      return t('placeholderChildLast');
     case 'child-grade':
-      return 'What grade are they in?';
+      return t('subtitleGrade');
     case 'child-allergies':
-      return 'Any allergies we should know about?';
+      return t('subtitleAllergies');
     case 'guardian-first':
-      return 'Your first name';
+      return t('placeholderYourFirst');
     case 'guardian-last':
-      return 'Your last name';
+      return t('placeholderYourLast');
     case 'guardian-phone':
-      return 'Your phone number';
+      return t('placeholderPhone');
     default:
       return '';
   }
@@ -1386,18 +1427,22 @@ function questionFor(state: RegistrationState): string {
  * one- and two-child forms are the sentence the success screen already speaks,
  * so the button promises exactly what the next screen confirms.
  */
-function commitLabel(children: readonly DraftChild[]): string {
+function commitLabel(t: RegisterTranslator, children: readonly DraftChild[]): string {
   const names = children.map((child) => child.firstName);
-  if (names.length === 1) return `Check in ${names[0]}`;
-  if (names.length === 2) return `Check in ${names[0]} and ${names[1]}`;
-  return `Check in ${names.length} children`;
+  if (names.length === 1) return t('checkInOne', { name: names[0]! });
+  if (names.length === 2) return t('checkInTwo', { first: names[0]!, second: names[1]! });
+  return t('checkInMany', { count: names.length });
 }
 
-function welcomeLine(children: readonly DraftChild[]): string {
+function welcomeLine(
+  t: RegisterTranslator,
+  locale: string,
+  children: readonly DraftChild[],
+): string {
   const names = children.map((child) => child.firstName);
   const list =
     names.length <= 1
       ? (names[0] ?? '')
-      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-  return `${list} ${names.length === 1 ? 'is' : 'are'} checked in. Welcome!`;
+      : new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
+  return t('welcomeLine', { names: list, count: names.length });
 }

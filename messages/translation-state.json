@@ -4499,11 +4499,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Import.factsJoin": {
-    "source": "{facts}",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Import.withFrequency": {
     "source": "{frequency} · {facts}",
     "zh-Hans": "todo",
@@ -8449,16 +8444,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Search.notYourFamily": {
-    "source": "Not your family?",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "Search.firstTimeHere": {
-    "source": "First time here?",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Search.typeAName": {
     "source": "Type a name",
     "zh-Hans": "todo",
@@ -8609,11 +8594,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Register.thatsEveryone": {
-    "source": "That's everyone",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Register.maxChildren": {
     "source": "That is as many as one go takes — a leader can add the rest.",
     "zh-Hans": "todo",
@@ -8649,16 +8629,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Register.checkIn": {
-    "source": "Check in",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "Register.checkInEveryone": {
-    "source": "Check in everyone",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Register.done": {
     "source": "Done",
     "zh-Hans": "todo",
@@ -8686,11 +8656,6 @@
   },
   "Register.titleChildNumber": {
     "source": "Child {number}",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "Register.titleAnother": {
-    "source": "Anybody else?",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -8729,11 +8694,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Register.subtitleAnother": {
-    "source": "You can add the whole family in one go.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Register.subtitlePhone": {
     "source": "This is how you check in next time.",
     "zh-Hans": "todo",
@@ -8746,11 +8706,6 @@
   },
   "Register.placeholderChildLast": {
     "source": "Child's last name",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "Register.placeholderAllergies": {
-    "source": "Allergies",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -8776,6 +8731,66 @@
   },
   "Register.next": {
     "source": "Next",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.labelFirstName": {
+    "source": "First name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.labelLastName": {
+    "source": "Last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.labelGrade": {
+    "source": "Grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.labelAllergies": {
+    "source": "Allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.labelPhone": {
+    "source": "Phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.allergiesNone": {
+    "source": "None",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.anyoneElseToAdd": {
+    "source": "Anyone else to add?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.backToThis": {
+    "source": "back to this",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.reopenAria": {
+    "source": "{label}: {answer}. Change it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkInOne": {
+    "source": "Check in {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkInTwo": {
+    "source": "Check in {first} and {second}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Register.checkInMany": {
+    "source": "Check in {count} children",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
