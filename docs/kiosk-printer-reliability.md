@@ -288,7 +288,7 @@ chunk; the screen additions land in the first-paint budget and stay library-free
 **`src/kiosk/printing/index.ts`**:
 
 - Exported timing constants (Stryker `ignoreStatic` needs them exported and tested):
-  `RECOVERY_GRACE_MS = 1_500`, `RECOVERY_BACKOFF_MS = [1_000, 5_000, 30_000, 60_000]` (last
+  `RECOVERY_GRACE_MS = 1_500`, `RECOVERY_ATTEMPT_MS = [0, 1_000, 5_000, 30_000, 60_000]` (last
   repeats), `BOOT_RETRY_MS = [2_000, 3_000, 5_000]`, `CLOSE_CAP_MS = 2_000`. Module state
   `recovery: { timer, attempt } | null`, `bootRetry`, `lifecycle` (like `watching`).
 - `PrinterState.unpaired` becomes `{ kind: 'unpaired'; searching: boolean }`.

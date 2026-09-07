@@ -257,8 +257,8 @@ function describe(error: unknown): { message: string; advice: string | null } {
       // The library waits for the printer to say it is ready for the next job
       // after the last page. A printer that printed every page and then went
       // quiet is not one that stopped responding — the sticker is in the tray.
-      const printed = (error as { pagesPrinted?: unknown }).pagesPrinted;
-      if (typeof printed === 'number' && printed > 0) {
+      const printed = Number((error as { pagesPrinted?: unknown }).pagesPrinted);
+      if (printed > 0) {
         return {
           message: 'The printer went quiet after printing.',
           advice: 'If the next label does not come out, turn it off and on again.',
@@ -305,9 +305,11 @@ function errorInfo(error: unknown): Record<string, string> {
   if (typeof failure?.name === 'string') info.error = failure.name;
   if (typeof failure?.code === 'string') info.code = failure.code;
   if (typeof failure?.message === 'string') info.message = failure.message;
-  const cause = failure?.cause as { name?: unknown; message?: unknown } | null | undefined;
-  if (typeof cause?.name === 'string') info.cause = cause.name;
-  if (typeof cause?.message === 'string') info.causeMessage = cause.message;
+  // `underlying` rather than `cause`: the record's `cause` is why the kiosk
+  // acted, and the two are written into the same entry.
+  const underlying = failure?.cause as { name?: unknown; message?: unknown } | null | undefined;
+  if (typeof underlying?.name === 'string') info.underlying = underlying.name;
+  if (typeof underlying?.message === 'string') info.underlyingMessage = underlying.message;
   return info;
 }
 
@@ -432,15 +434,15 @@ let lifecycle: (() => void) | null = null;
 export const RECOVERY_GRACE_MS = 1_500;
 
 /**
- * How long between attempts to reopen a printer that is still on the bus.
+ * How long each attempt to reopen a printer still on the bus waits, by attempt.
  *
- * The first attempt is immediate and silent — most of these are one rejected
- * transfer, and the reopen simply works. The second is the one that gets to
- * colour the screen, with the real error. The last interval repeats: a claim
- * held by another tab is released when that tab closes, and a kiosk that
- * stopped asking would never notice.
+ * The first is immediate and silent — most of these are one rejected transfer,
+ * and the reopen simply works. The second is the one that gets to colour the
+ * screen, with the real error. The last interval repeats: a claim held by
+ * another tab is released when that tab closes, and a kiosk that stopped asking
+ * would never notice.
  */
-export const RECOVERY_BACKOFF_MS = [1_000, 5_000, 30_000, 60_000] as const;
+export const RECOVERY_ATTEMPT_MS = [0, 1_000, 5_000, 30_000, 60_000] as const;
 
 /**
  * How long a configured printer the browser does not list at boot is looked
@@ -544,8 +546,7 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
 }
 
 function scheduleAttempt(dead: BrotherQLPrinterCore, attempt: number): void {
-  const delay =
-    attempt === 0 ? 0 : RECOVERY_BACKOFF_MS[Math.min(attempt - 1, RECOVERY_BACKOFF_MS.length - 1)];
+  const delay = RECOVERY_ATTEMPT_MS[Math.min(attempt, RECOVERY_ATTEMPT_MS.length - 1)];
   recovery = {
     dead,
     attempt,
@@ -596,7 +597,6 @@ async function adopt(
     startRecovery(device);
   });
   await device.open();
-  cancelTimers();
   setState({ kind: 'ready', config: active }, cause);
 }
 

@@ -270,8 +270,16 @@ async function pairedDevicesCalls(): Promise<unknown[][]> {
 /** The browser's device list, as the recovery and a wake ask for it. */
 async function listedDevices() {
   const core = await import('@vrwarp/brother-ql-webusb/printer-core');
-  return core.getPairedPrinterDevices as unknown as { mock: { calls: unknown[][] } };
+  return core.getPairedPrinterDevices as unknown as ReturnType<typeof vi.fn>;
 }
+
+/** The record without its clock: what happened, in order. */
+function said(printing: typeof Printing): string[] {
+  return printing.printerLog().map(printing.describeEntry);
+}
+
+const LABEL = { job: new Uint8Array(4), pageCount: 1 };
+const JOB = { studentId: 'pco_1', name: 'Ada', template: TEMPLATE, values: {} };
 
 /** Lets the promise chains inside the module settle without moving the clock. */
 async function settle(): Promise<void> {
@@ -563,6 +571,24 @@ describe('pairing', () => {
       model: 'QL-810W',
       label: '62x29',
     });
+    // Built with the record's tracer, or the transport narrates to nobody.
+    expect(cores.made.at(-1)).toMatchObject({
+      options: { model: 'QL-810W', diagnostics: { event: expect.any(Function) } },
+    });
+  });
+
+  it('lets go of the printer it was holding before opening the one picked', async () => {
+    const first = makeDevice();
+    usb.paired = [first];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    usb.request = () => ({ productName: null });
+
+    await printing.pairPrinter({ model: 'QL-810W', label: '62x29' });
+
+    expect(first.close).toHaveBeenCalledTimes(1);
+    expect(printing.currentState().kind).toBe('ready');
   });
 
   it('says nothing when the chooser is dismissed', async () => {
@@ -849,8 +875,10 @@ describe('what a screen is told when something is wrong', () => {
       message: 'The printer is in Editor Lite mode.',
       advice: 'Hold the Editor Lite button until its light goes out.',
     });
-    expect(await troubleFrom({ code: 'transfer-timeout' })).toMatchObject({
+    expect(await troubleFrom({ code: 'transfer-timeout' })).toEqual({
+      kind: 'trouble',
       message: 'The printer stopped responding.',
+      advice: 'Turn it off and on again.',
     });
     expect(await troubleFrom({ code: 'status-timeout' })).toMatchObject({
       message: 'The printer stopped responding.',
@@ -1719,6 +1747,7 @@ describe('recovering without a human', () => {
 
     expect(listed.mock.calls).toHaveLength(0);
     expect(printing.currentState().kind).toBe('ready');
+    expect(said(printing).some((line) => line.startsWith('kiosk transport-lost'))).toBe(false);
   });
 
   it('does not blame an unplug for a label that died with the transport', async () => {
@@ -1983,5 +2012,667 @@ describe('checking a busy printer', () => {
     release();
     await checking;
     expect(device.queryStatus).toHaveBeenCalled();
+  });
+});
+
+describe('what the record says, exactly', () => {
+  /*
+   * The record is only worth having if a line in it means one thing. These pin
+   * the lines themselves — category, event, every key and value — scenario by
+   * scenario, so a renamed event or a dropped field is a failing test rather
+   * than a puzzle on a Sunday.
+   */
+  const BOOT = [
+    'kiosk ready model="QL-810W" label="62x29" discarded=false',
+    'usb devices cause="boot" count=1 hasSerial=true vendorId=1273 productId=8347',
+    'state ready cause="boot"',
+  ];
+
+  async function booted() {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    return { device, printing };
+  }
+
+  it('boot, with a printer', async () => {
+    const { printing } = await booted();
+
+    expect(said(printing)).toEqual(BOOT);
+  });
+
+  it('a kiosk nobody set up, and a browser that cannot', async () => {
+    // Idle was the state before boot, so a boot that stays idle is not a change
+    // and writes nothing down — the record is transitions, not heartbeats.
+    const idle = await load();
+    await idle.ready();
+    expect(said(idle)).toEqual([]);
+
+    configured();
+    usb.supported = false;
+    const unsupported = await load();
+    await unsupported.ready();
+    expect(said(unsupported)).toEqual(['state unsupported cause="boot"']);
+  });
+
+  it('boot, with nothing listed, and the search that follows', async () => {
+    configured();
+    const printing = await load();
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(`${state.kind}${'searching' in state ? `:${state.searching}` : ''}`));
+
+    await printing.ready();
+    expect(said(printing)).toEqual([
+      'kiosk ready model="QL-810W" label="62x29" discarded=false',
+      'usb devices cause="boot" count=0',
+      'state unpaired cause="boot"',
+    ]);
+
+    await tick(2_000);
+    await tick(3_000);
+    await tick(5_000);
+    expect(said(printing).slice(3)).toEqual([
+      'usb devices cause="boot-retry" count=0',
+      'usb devices cause="boot-retry" count=0',
+      'usb devices cause="boot-settled" count=0',
+      'state unpaired cause="boot-settled"',
+    ]);
+    // The early looks are silent; only the first word and the last are published.
+    expect(seen).toEqual(['idle', 'unpaired:true', 'unpaired:false']);
+  });
+
+  it('a transport lost with the printer still listed', async () => {
+    const { device, printing } = await booted();
+
+    device.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(said(printing).slice(3)).toEqual([
+      'kiosk transport-lost hasSerial=true vendorId=1273 productId=8347',
+      'usb devices cause="transport-lost" count=1 present=true same=true',
+      'kiosk recovery attempt=0',
+      'usb devices cause="recovery" count=1 hasSerial=true vendorId=1273 productId=8347',
+    ]);
+  });
+
+  it('a transport lost with the printer gone', async () => {
+    const { device, printing } = await booted();
+    usb.paired = [];
+
+    device.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(said(printing).slice(3)).toEqual([
+      'kiosk transport-lost hasSerial=true vendorId=1273 productId=8347',
+      'usb devices cause="transport-lost" count=0 present=false same=false',
+      'state trouble cause="transport-lost" message="The printer was unplugged."',
+    ]);
+  });
+
+  it('a device list that could not be read during a recovery', async () => {
+    const { device, printing } = await booted();
+    (await listedDevices()).mockRejectedValueOnce(new Error('bus down'));
+
+    device.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    // Without a list there is no verdict, so the attempt is made anyway.
+    expect(said(printing).slice(3)).toEqual([
+      'kiosk transport-lost hasSerial=true vendorId=1273 productId=8347',
+      'kiosk devices-failed cause="transport-lost" error="Error" message="bus down"',
+      'kiosk recovery attempt=0',
+      'usb devices cause="recovery" count=1 hasSerial=true vendorId=1273 productId=8347',
+    ]);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
+  it('the browser saying the printer went, and came back', async () => {
+    const { device, printing } = await booted();
+
+    usb.watchers?.disconnect(device.device);
+    const returned = makeDevice();
+    usb.paired = [returned];
+    usb.watchers?.connect(returned.device);
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('ready'));
+
+    expect(said(printing).slice(3)).toEqual([
+      'usb disconnect hasSerial=true vendorId=1273 productId=8347 ours=true',
+      'state trouble cause="usb-disconnect" message="The printer was unplugged."',
+      'usb connect hasSerial=true vendorId=1273 productId=8347',
+      'usb devices cause="usb-connect" count=1 hasSerial=true vendorId=1273 productId=8347',
+      'state ready cause="usb-connect"',
+    ]);
+  });
+
+  it('pairing, a chooser dismissed, and a chooser that threw', async () => {
+    tables.models = ['QL-800', 'QL-810W', 'QL-1110NWB'];
+    usb.request = () => ({ productName: 'Brother QL-1110NWB' });
+    const paired = await load();
+    await paired.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    expect(said(paired)).toEqual([
+      'kiosk pair hasSerial=false productName="Brother QL-1110NWB"',
+      'state ready cause="pair"',
+    ]);
+
+    // The record persists, so each fresh module below starts from a wiped device.
+    usb.request = null;
+    window.localStorage.clear();
+    const dismissed = await load();
+    await dismissed.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    expect(said(dismissed)).toEqual(['kiosk pair-cancelled']);
+
+    usb.request = () => {
+      throw Object.assign(new Error('nope'), { code: 'claim-failed', platformHint: 'Close it.' });
+    };
+    window.localStorage.clear();
+    const failed = await load();
+    await failed.pairPrinter({ model: 'QL-810W', label: '62x29' });
+    expect(said(failed)).toEqual([
+      'kiosk pair-failed error="Error" code="claim-failed" message="nope"',
+      'state trouble cause="pair-failed" message="Something else on this device is holding the printer."',
+    ]);
+  });
+
+  it('a status read that failed', async () => {
+    const device = makeDevice({
+      queryStatus: vi.fn(async () => {
+        throw Object.assign(new Error('timed out'), { code: 'status-timeout' });
+      }),
+    });
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    await printing.checkPrinter();
+
+    expect(said(printing).slice(3)).toEqual([
+      'kiosk status-failed error="Error" code="status-timeout" message="timed out"',
+      'state trouble cause="status-failed" message="The printer stopped responding."',
+    ]);
+  });
+
+  it('a label that failed, one that was skipped, and one that came out of the trouble', async () => {
+    const { device, printing } = await booted();
+
+    queue.options.onFailure?.({ code: 'printer-error', errors: [{ message: 'Out of labels.' }] }, JOB);
+    queue.options.onDropped?.('stale', JOB);
+    await queue.options.send(LABEL);
+
+    expect(device.sendRaw).toHaveBeenCalled();
+    expect(said(printing).slice(3)).toEqual([
+      'kiosk label-failed code="printer-error"',
+      'state trouble cause="label-failed" message="Out of labels."',
+      'kiosk label-stale',
+      'state trouble cause="label-stale" message="A label was skipped because it would have printed too late."',
+      'state ready cause="label-printed"',
+    ]);
+  });
+
+  it('a label that reopened the printer on its way out', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const device = makeDevice();
+    usb.paired = [device];
+
+    await queue.options.send(LABEL);
+
+    expect(said(printing).slice(3)).toEqual([
+      'usb devices cause="label" count=1 hasSerial=true vendorId=1273 productId=8347',
+      'state ready cause="label"',
+    ]);
+  });
+
+  it('the media changed without re-pairing', async () => {
+    const { printing } = await booted();
+
+    await printing.configure({ model: 'QL-810W', label: '62' });
+
+    expect(said(printing).slice(3)).toEqual(['kiosk configure model="QL-810W" label="62"']);
+  });
+
+  it('the page coming and going', async () => {
+    const { device, printing } = await booted();
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    await settle();
+    const shown = new Event('pageshow');
+    Object.defineProperty(shown, 'persisted', { value: true });
+    window.dispatchEvent(shown);
+    await settle();
+    document.dispatchEvent(new Event('freeze'));
+    document.dispatchEvent(new Event('resume'));
+    await settle();
+    window.dispatchEvent(new Event('pagehide'));
+    await settle();
+
+    expect(device.close).toHaveBeenCalledTimes(1);
+    expect(said(printing).slice(3)).toEqual([
+      'page visibilitychange visible=true',
+      'usb devices cause="wake:visibilitychange" count=1 present=true',
+      'page pageshow persisted=true',
+      'usb devices cause="wake:pageshow" count=1 present=true',
+      'page freeze',
+      'page resume',
+      'usb devices cause="wake:resume" count=1 present=true',
+      'page pagehide',
+      'kiosk close cause="pagehide" opened=true',
+    ]);
+  });
+
+  it('a wake that could not read the device list keeps the printer', async () => {
+    const { device, printing } = await booted();
+    (await listedDevices()).mockRejectedValueOnce(new Error('bus down'));
+
+    window.dispatchEvent(new Event('pageshow'));
+    await settle();
+
+    expect(device.close).not.toHaveBeenCalled();
+    expect(said(printing).slice(3)).toEqual([
+      'page pageshow',
+      'kiosk devices-failed cause="wake:pageshow" error="Error" message="bus down"',
+    ]);
+  });
+
+  it('closing with nothing held', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    await printing.closePrinter('reload');
+
+    expect(said(printing).at(-1)).toBe('kiosk close cause="reload" opened=false');
+  });
+
+  it('an error with the browser’s own error inside it', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    (await pairedDevices()).mockRejectedValueOnce(
+      Object.assign(new Error('The printer was disconnected.'), {
+        name: 'BrotherQLError',
+        code: 'disconnected',
+        cause: Object.assign(new Error('The device was disconnected.'), { name: 'NotFoundError' }),
+      }),
+    );
+
+    usb.watchers?.connect();
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('trouble'));
+
+    expect(said(printing).slice(3)).toEqual([
+      'usb connect',
+      'kiosk open-failed cause="usb-connect" error="BrotherQLError" code="disconnected" message="The printer was disconnected." underlying="NotFoundError" underlyingMessage="The device was disconnected."',
+      'state trouble cause="usb-connect" message="The printer was unplugged."',
+    ]);
+  });
+
+  it('a device with less to say for itself', async () => {
+    const { printing } = await booted();
+
+    usb.watchers?.connect({ productName: 'QL-800' });
+    await settle();
+    usb.watchers?.connect({ vendorId: 1273, productId: 8347, serialNumber: '' });
+    await settle();
+
+    expect(said(printing).filter((line) => line.startsWith('usb connect'))).toEqual([
+      'usb connect hasSerial=false productName="QL-800"',
+      'usb connect hasSerial=false vendorId=1273 productId=8347',
+    ]);
+  });
+
+  it('the same trouble twice is one line; a different trouble is another', async () => {
+    const printing = await load();
+    const failure = (message: string) => ({ code: 'printer-error', errors: [{ message }] });
+
+    queue.options.onFailure?.(failure('Out of labels.'), JOB);
+    queue.options.onFailure?.(failure('Out of labels.'), JOB);
+    queue.options.onFailure?.(failure('The lid is open.'), JOB);
+
+    expect(said(printing).filter((line) => line.startsWith('state'))).toEqual([
+      'state trouble cause="label-failed" message="Out of labels."',
+      'state trouble cause="label-failed" message="The lid is open."',
+    ]);
+  });
+});
+
+describe('which device is this kiosk’s', () => {
+  async function holding(device = makeDevice()) {
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    return { device, printing };
+  }
+
+  it('is decided by vendor, product and serial, not by name', async () => {
+    const { device, printing } = await holding();
+
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8347, serialNumber: 'another' });
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8200, serialNumber: SERIAL });
+    usb.watchers?.disconnect({ vendorId: 1000, productId: 8347, serialNumber: SERIAL });
+    expect(device.close).not.toHaveBeenCalled();
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+
+    usb.watchers?.disconnect({
+      vendorId: 1273,
+      productId: 8347,
+      serialNumber: SERIAL,
+      productName: 'Anything',
+    });
+    expect(device.close).toHaveBeenCalled();
+
+    expect(said(printing).filter((line) => line.startsWith('usb disconnect'))).toEqual([
+      'usb disconnect hasSerial=true vendorId=1273 productId=8347 ours=false',
+      'usb disconnect hasSerial=true vendorId=1273 productId=8200 ours=false',
+      'usb disconnect hasSerial=true vendorId=1000 productId=8347 ours=false',
+      'usb disconnect hasSerial=true vendorId=1273 productId=8347 productName="Anything" ours=true',
+    ]);
+  });
+
+  it('matches a printer with no serial against one with none', async () => {
+    const { device, printing } = await holding(
+      makeDevice({ device: { vendorId: 1273, productId: 8347, serialNumber: null, productName: null } }),
+    );
+
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8347 });
+
+    expect(said(printing).at(-2)).toBe('usb disconnect hasSerial=false vendorId=1273 productId=8347 ours=true');
+    expect(device.close).toHaveBeenCalled();
+  });
+
+  it('takes a second disconnect with nothing held as its own, and only writes it down', async () => {
+    const { device, printing } = await holding();
+
+    usb.watchers?.disconnect(device.device);
+    usb.watchers?.disconnect(device.device);
+
+    expect(device.close).toHaveBeenCalledTimes(1);
+    expect(said(printing).filter((line) => line.startsWith('usb disconnect'))).toHaveLength(2);
+  });
+
+  it('stays let go of once the browser says it went', async () => {
+    const { device: first, printing } = await holding();
+    usb.watchers?.disconnect(first.device);
+    expect(first.close).toHaveBeenCalledTimes(1);
+
+    const second = makeDevice();
+    usb.paired = [second];
+    usb.watchers?.connect(second.device);
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('ready'));
+
+    // Reopening does not close the one already let go of a second time.
+    expect(first.close).toHaveBeenCalledTimes(1);
+    expect(second.open).toHaveBeenCalled();
+  });
+
+  it('opens the configured model when more than one Brother device is paired', async () => {
+    tables.models = ['QL-800', 'QL-810W'];
+    const first = makeDevice({
+      device: { vendorId: 1273, productId: 8347, serialNumber: 'one', productName: 'Brother QL-800' },
+    });
+    const second = makeDevice({
+      device: { vendorId: 1273, productId: 8348, serialNumber: 'two', productName: 'Brother QL-810W' },
+    });
+    usb.paired = [first, second];
+    configured('QL-810W');
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(second.open).toHaveBeenCalled();
+    expect(first.open).not.toHaveBeenCalled();
+    expect(said(printing)[1]).toBe(
+      'usb devices cause="boot" count=2 hasSerial=true vendorId=1273 productId=8348 productName="Brother QL-810W"',
+    );
+  });
+});
+
+describe('the recovery, at its edges', () => {
+  async function lost() {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    device.emit('disconnect');
+    return { device, printing };
+  }
+
+  it('does not restart the grace period for the same transport dying twice', async () => {
+    const { device } = await lost();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    device.emit('disconnect');
+    await vi.advanceTimersByTimeAsync(500);
+    await settle();
+
+    expect((await listedDevices()).mock.calls).toHaveLength(1);
+  });
+
+  it('has nothing to decide once a label has reopened a different printer', async () => {
+    const { printing } = await lost();
+    await vi.advanceTimersByTimeAsync(500);
+    const second = makeDevice();
+    usb.paired = [second];
+    await queue.options.send(LABEL);
+
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(said(printing).some((line) => line.includes('cause="transport-lost"'))).toBe(false);
+    expect(said(printing).some((line) => line.startsWith('kiosk recovery'))).toBe(false);
+  });
+
+  it('drops a verdict about a printer that was replaced while the list was being read', async () => {
+    const { printing } = await lost();
+    let resolveList: (devices: unknown[]) => void = () => {};
+    (await listedDevices()).mockImplementationOnce(
+      () =>
+        new Promise<unknown[]>((resolve) => {
+          resolveList = resolve;
+        }),
+    );
+    await vi.advanceTimersByTimeAsync(printing.RECOVERY_GRACE_MS);
+    await settle();
+    const second = makeDevice();
+    usb.paired = [second];
+    await queue.options.send(LABEL);
+
+    resolveList([second.device]);
+    await tick(0);
+
+    expect(said(printing).some((line) => line.includes('cause="transport-lost" count'))).toBe(false);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
+  it('skips an attempt on a printer a label has reopened in the meantime', async () => {
+    const { device, printing } = await lost();
+    device.open.mockRejectedValue({ code: 'claim-failed' });
+    await tick(printing.RECOVERY_GRACE_MS);
+    expect(said(printing)).toContain('kiosk recovery attempt=0');
+    const second = makeDevice();
+    usb.paired = [second];
+    await queue.options.send(LABEL);
+
+    await tick(1_000);
+
+    expect(said(printing)).not.toContain('kiosk recovery attempt=1');
+  });
+
+  it('is over once it has succeeded, so a label dying afterwards is an unplug again', async () => {
+    const { printing } = await lost();
+    await tick(printing.RECOVERY_GRACE_MS);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+
+    queue.options.onFailure?.({ code: 'disconnected' }, JOB);
+
+    expect(printing.currentState()).toMatchObject({ message: 'The printer was unplugged.' });
+  });
+
+  it('stops trying once the printer has left between the verdict and the attempt', async () => {
+    const { printing } = await lost();
+    let resolveList: (devices: unknown[]) => void = () => {};
+    (await listedDevices()).mockImplementationOnce(
+      () =>
+        new Promise<unknown[]>((resolve) => {
+          resolveList = resolve;
+        }),
+    );
+    await vi.advanceTimersByTimeAsync(printing.RECOVERY_GRACE_MS);
+    await settle();
+    const stillListed = usb.paired.map((core) => (core as { device: unknown }).device);
+    usb.paired = [];
+    resolveList(stillListed);
+    await tick(0);
+    // The silent first attempt found nothing and said nothing.
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+
+    await tick(1_000);
+    expect(printing.currentState()).toEqual({ kind: 'unpaired', searching: false });
+    const asked = (await pairedDevicesCalls()).length;
+
+    await tick(60_000);
+    expect((await pairedDevicesCalls()).length).toBe(asked);
+  });
+
+  it('still shows a printer’s own complaint while it is deciding', async () => {
+    const { printing } = await lost();
+
+    queue.options.onFailure?.({ code: 'printer-error', errors: [{ message: 'Out of labels.' }] }, JOB);
+
+    expect(printing.currentState()).toMatchObject({ kind: 'trouble', message: 'Out of labels.' });
+  });
+
+  it('is cancelled by a connect event before it has decided', async () => {
+    const { device, printing } = await lost();
+
+    usb.watchers?.connect(device.device);
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+    expect(said(printing).some((line) => line.includes('cause="transport-lost"'))).toBe(false);
+  });
+
+  it('is cancelled by letting go of the printer', async () => {
+    const { printing } = await lost();
+
+    await printing.closePrinter('reload');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect((await listedDevices()).mock.calls).toHaveLength(0);
+    expect(said(printing).at(-1)).toBe('kiosk close cause="reload" opened=false');
+  });
+
+  it('is cancelled by unwatch, along with the page listeners', async () => {
+    const { printing } = await lost();
+
+    printing.unwatch();
+    await tick(printing.RECOVERY_GRACE_MS);
+    const before = said(printing).length;
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('pageshow'));
+    window.dispatchEvent(new Event('pagehide'));
+    document.dispatchEvent(new Event('freeze'));
+    document.dispatchEvent(new Event('resume'));
+    await settle();
+
+    expect((await listedDevices()).mock.calls).toHaveLength(0);
+    expect(said(printing)).toHaveLength(before);
+    expect(usb.stopWatching).toBe(1);
+  });
+});
+
+describe('the boot search, at its edges', () => {
+  it('is ended by a connect event', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const device = makeDevice();
+    usb.paired = [device];
+
+    usb.watchers?.connect(device.device);
+    await vi.waitFor(() => expect(printing.currentState().kind).toBe('ready'));
+    const asked = (await pairedDevicesCalls()).length;
+    await tick(10_000);
+
+    expect((await pairedDevicesCalls()).length).toBe(asked);
+  });
+
+  it('is abandoned once a label has found the printer', async () => {
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(state.kind));
+    const device = makeDevice();
+    usb.paired = [device];
+    await queue.options.send(LABEL);
+
+    await tick(10_000);
+
+    expect(seen).toEqual(['unpaired', 'ready']);
+  });
+
+  it('leaves no search behind once a printer was found at boot', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    usb.paired = [];
+    device.opened = false;
+
+    const state = await printing.configure({ model: 'QL-810W', label: '62' });
+
+    expect(state).toEqual({ kind: 'unpaired', searching: false });
+  });
+});
+
+describe('asking the printer what it is, at its edges', () => {
+  it('takes a model read off the printer at a check, not only at pairing', async () => {
+    tables.models = ['QL-800', 'QL-810W'];
+    const device = makeDevice({
+      device: { vendorId: 1273, productId: 8347, serialNumber: SERIAL, productName: 'Brother QL-800' },
+    });
+    usb.paired = [device];
+    configured('QL-810W', '62x29');
+    const printing = await load();
+    await printing.ready();
+
+    const found = await printing.checkPrinter();
+
+    expect(found?.config.model).toBe('QL-800');
+    expect(said(printing)).toContain('kiosk configure model="QL-800" label="62x29"');
+  });
+
+  it('turns the tables refusing the model into trouble rather than a throw', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    Object.defineProperty(tables, 'fits', {
+      configurable: true,
+      get() {
+        throw Object.assign(new Error('no such model'), { code: 'unknown-model' });
+      },
+    });
+    try {
+      const found = await printing.checkPrinter();
+
+      expect(found).toMatchObject({ matched: [] });
+      expect(printing.currentState()).toEqual({
+        kind: 'trouble',
+        message: 'This kiosk is set up for a printer it cannot find.',
+        advice: null,
+      });
+      expect(said(printing).at(-1)).toBe(
+        'state trouble cause="tables" message="This kiosk is set up for a printer it cannot find."',
+      );
+    } finally {
+      Object.defineProperty(tables, 'fits', { configurable: true, writable: true, value: [] });
+    }
   });
 });
