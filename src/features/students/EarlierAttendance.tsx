@@ -29,6 +29,7 @@ import { useMemo } from 'react';
 import { Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useStudentHistory } from '@/hooks/useStudentHistory';
 import { formatShortDate } from '@/lib/time';
+import { useTranslations } from 'use-intl';
 
 export interface EarlierAttendanceProps {
   studentId: string;
@@ -37,6 +38,7 @@ export interface EarlierAttendanceProps {
 }
 
 export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendanceProps) {
+  const t = useTranslations('EarlierAttendance');
   const ids = useMemo(
     () => [studentId, ...(alsoStudentIds ?? [])],
     [studentId, alsoStudentIds],
@@ -46,7 +48,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
   return (
     <Card>
       <CardHeader
-        title="Every gathering they came to"
+        title={t('title')}
         {...(started && entries.length > 0 ? { count: entries.length } : {})}
       />
 
@@ -71,7 +73,7 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
                 <span className="min-w-0 truncate text-sm text-ink-200">
                   {/* A record whose event document is gone still happened, and
                       saying so is more honest than dropping the row. */}
-                  {event?.title ?? 'A gathering no longer on record'}
+                  {event?.title ?? t('unknownGathering')}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
                   {formatShortDate(event?.startAt ?? record.checkedInAt)}
@@ -84,17 +86,17 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
         {loading ? <SkeletonRows count={3} /> : null}
 
         {started && !loading && entries.length === 0 && !error ? (
-          <p className="text-sm text-ink-400">Tally has no check-ins on record for them.</p>
+          <p className="text-sm text-ink-400">{t('noCheckIns')}</p>
         ) : null}
 
         {!loading && hasMore ? (
           <Button variant="secondary" fullWidth onClick={loadMore}>
-            {started ? 'Show more' : 'Show every gathering they came to'}
+            {started ? t('showMore') : t('showMoreAria')}
           </Button>
         ) : null}
 
         {started && !hasMore && entries.length > 0 ? (
-          <p className="text-center text-xs text-ink-600">That is everything on record.</p>
+          <p className="text-center text-xs text-ink-600">{t('allLoaded')}</p>
         ) : null}
       </div>
     </Card>

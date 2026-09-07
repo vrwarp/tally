@@ -23,6 +23,7 @@ import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/l
 import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { backendLabelOf, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface BirthdayFieldProps {
   value: string;
@@ -119,6 +120,7 @@ export interface EditBirthdayProps {
  * hang this off.
  */
 export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayProps) {
+  const t = useTranslations('ParentContact');
   const { show } = useToast();
   const { user, profile } = useAuth();
   // `undefined` is "the host has no details", not "no birthdate": a host that
@@ -169,11 +171,11 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
         authorName: profile?.displayName ?? user?.email ?? 'Somebody',
       });
       void written.catch(() => {
-        setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
+        setProblem(t('backendUnreachable', { backend: backendLabelOf(student) }));
       });
       invalidatePersonDetails(student.id);
       onSaved?.();
-      show(`Saving ${student.firstName}\u2019s birthday to ${backendLabelOf(student)}.`);
+      show(t('savingBirthday', { name: student.firstName, backend: backendLabelOf(student) }));
       onDone();
     } catch {
       setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);

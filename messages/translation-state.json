@@ -5169,6 +5169,96 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "SyncStrip.oneNewPerson": {
+    "source": "One new person, never a second copy.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.nowPointsAt": {
+    "source": "Now points at",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.theSurvivingRecord": {
+    "source": "the surviving record",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.theSurvivor": {
+    "source": "the survivor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.survivorMeta": {
+    "source": "#{id} · the survivor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.youEdited": {
+    "source": "You edited",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.mergedAt": {
+    "source": "merged {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.onTheRecordNow": {
+    "source": "On the record now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.inBackend": {
+    "source": "in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.youTyped": {
+    "source": "You typed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.cancelThisEdit": {
+    "source": "Cancel this edit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fixAndSendAgain": {
+    "source": "Fix and send again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.sendItAgain": {
+    "source": "Send it again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.openSurvivor": {
+    "source": "Open {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.keepTheirs": {
+    "source": "Keep theirs",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.sendMineAgain": {
+    "source": "Send mine again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.discardTheEdit": {
+    "source": "Discard the edit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.gotIt": {
+    "source": "Got it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "JobChip.queuedLong": {
     "source": "Queued",
     "zh-Hans": "todo",
@@ -5296,11 +5386,6 @@
   },
   "JobChip.cancelledShort": {
     "source": "Cancelled",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "JobChip.cancelledTitle": {
-    "source": "",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5521,6 +5606,1091 @@
   },
   "Students.queuedPress": {
     "source": "{name} is not in {backend} yet — push them now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.loading": {
+    "source": "Loading student…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notReadableTitle": {
+    "source": "This student cannot be read right now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notFoundTitle": {
+    "source": "No student with that link.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notReadableBody": {
+    "source": "Their name and grade come from the connected directory, which Tally cannot reach.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notFoundBody": {
+    "source": "They may have been removed, or the link is stale.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.backToStudents": {
+    "source": "Back to students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.allStudents": {
+    "source": "All students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noContactOnFile": {
+    "source": "No contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.editProfile": {
+    "source": "Edit profile",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.removeFromRoster": {
+    "source": "Remove from roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.addBackToRoster": {
+    "source": "Add back to roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.removeHint": {
+    "source": "Keeps every gathering they attended; they just stop appearing at the door.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.removeHintUpstream": {
+    "source": "Removing them here leaves their {backend} record alone, and keeps every gathering they attended.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.theContactOnFile": {
+    "source": "the contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.oneOffEvents": {
+    "source": "One-off events",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.releaseFailed": {
+    "source": "Could not save the release. Nothing changed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.undoFailed": {
+    "source": "Could not undo the release.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recordedIn": {
+    "source": "Recorded in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.detailsLoading": {
+    "source": "Loading…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.firstSeen": {
+    "source": "First seen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lastSeen": {
+    "source": "Last seen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notInLastYear": {
+    "source": "Not in the last year",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recreateNameNote": {
+    "source": "Tally never stored their name — it lived on the deleted record. Enter it to re-create them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.relinkNote": {
+    "source": "If they were merged into another record, this relinks instead of creating a duplicate.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.openTheirProfile": {
+    "source": "Open their profile",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.missedInARow": {
+    "source": "Missed in a row",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noLongerExpected": {
+    "source": "No longer expected…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.backSince": {
+    "source": "back since, so it no longer applies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.readingPermissions": {
+    "source": "Reading what Planning Center allows…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recreateFailed": {
+    "source": "Could not re-create them in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.backOnRoster": {
+    "source": "{name} is back on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.takenOffRoster": {
+    "source": "{name} taken off the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.statusChangeFailed": {
+    "source": "Could not change {name}'s status.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.pushRefused": {
+    "source": "{backend} did not accept the push.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noGradeIn": {
+    "source": "No grade in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lookingUpIn": {
+    "source": "Looking this up in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.callAria": {
+    "source": "Call {contact} at {phone}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.textAria": {
+    "source": "Text {contact} at {phone}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.emailAria": {
+    "source": "Email {contact} at {email}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.contactPrefix": {
+    "source": "{name} · ",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.createdWaitingPush": {
+    "source": "Created in Tally. Waiting to be pushed to {backend} — send them now, or the next push retry will.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.createdNotLinked": {
+    "source": "Created in Tally and not linked to a {backend} person.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.pushTo": {
+    "source": "Push to {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.worstOnMia": {
+    "source": "{scope} — on the MIA list at {threshold}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.worstRun": {
+    "source": "{scope}, their worst run",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.historyError": {
+    "source": "Could not load attendance history. {error}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.dropsIn": {
+    "source": "Drops in — {attended} of {eligible}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.transitionNote": {
+    "source": " · “{note}”",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.eventSpoken": {
+    "source": "{title} · {date}: {status}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.wasMarkedNoLonger": {
+    "source": "Was marked no longer expected — <back>back since, so it no longer applies</back>",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noLongerExpectedHere": {
+    "source": "No longer expected here — {reason}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.releaseMeta": {
+    "source": " · {by}, {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.undo": {
+    "source": "Undo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.pushed": {
+    "source": "Pushed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.streakNotSeenAny": {
+    "source": "not seen at any gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.streakNoGatheringYet": {
+    "source": "no gathering of their own yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lastSeenNever": {
+    "source": "Never",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lastSeenDash": {
+    "source": "—",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lastSeenNotInYear": {
+    "source": "not at any gathering in the last year",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.lastSeenNoCheckIns": {
+    "source": "no check-ins yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.withheld": {
+    "source": "{count, plural, one {{titles} is left out — not a gathering you work. Nothing above counts those nights, so this is a shorter history than somebody on it would see.} other {{titles} are left out — not gatherings you work. Nothing above counts those nights, so this is a shorter history than somebody on them would see.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noGatheringsTitle": {
+    "source": "No gatherings on record yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noGatheringsBody": {
+    "source": "Attendance appears here as soon as this student has been checked into something.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.oneOffNoStreak": {
+    "source": "Trips and retreats — no streak applies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.noneHappened": {
+    "source": "None of these gatherings happened",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notOneTheyComeTo": {
+    "source": "Not one they come to",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.atMostRecent": {
+    "source": "At the most recent one",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.missedInARowCount": {
+    "source": "{count} missed in a row",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.missedInARowMia": {
+    "source": "{count} missed in a row · MIA",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.attendanceNoOne": {
+    "source": "No one",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.attendanceNotOnIt": {
+    "source": "Not on it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.didNotHappen": {
+    "source": "this gathering did not happen, so it counts as neither",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notAGatheringTheyComeTo": {
+    "source": "not a gathering they come to",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.notOnThisTrip": {
+    "source": "not on this trip",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdayThisWeek": {
+    "source": "This week",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdayPastWeek": {
+    "source": "This past week",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdayNotOnFile": {
+    "source": "Not on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.addBirthday": {
+    "source": "Add a birthday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.change": {
+    "source": "Change",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdaySavedOptionalYear": {
+    "source": "Saved in Planning Center. The year is optional.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdaySavedNoYear": {
+    "source": "Saved in Planning Center, which holds no year for them — so it shows no age.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.birthdaySaved": {
+    "source": "Saved in Planning Center.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.changeItThere": {
+    "source": "Change it there",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.addOneThere": {
+    "source": "Add one there",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.recreateIn": {
+    "source": "Re-create in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.titleMulti": {
+    "source": "Add a student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.titlePco": {
+    "source": "Add from Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.descriptionMulti": {
+    "source": "Search every connected directory at once. Tally records that they are on the roster and nothing else about them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.descriptionPco": {
+    "source": "Search your church directory. Tally records that they are on the roster and nothing else about them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.searchLabelMulti": {
+    "source": "Search your directories",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.searchLabelPco": {
+    "source": "Search Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.searchPlaceholder": {
+    "source": "Name or email…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.anyoneMulti": {
+    "source": "Anyone in your directories can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.anyonePco": {
+    "source": "Anyone in Planning Center can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.noMatchMulti": {
+    "source": "Nobody matches “{query}”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.noMatchPco": {
+    "source": "Nobody in Planning Center matches “{query}”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.noGradeIn": {
+    "source": "No grade in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.inactiveIn": {
+    "source": " · inactive in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.onTheRoster": {
+    "source": "On the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.add": {
+    "source": "Add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.importListLink": {
+    "source": "Adding a whole group? Import a Planning Center list →",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.noLists": {
+    "source": "Planning Center returned no lists.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.noCount": {
+    "source": "No count",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.peopleCount": {
+    "source": "{count} people",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.rulesBroken": {
+    "source": " · rules no longer work",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.searchFailed": {
+    "source": "Could not run that search.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.addFailed": {
+    "source": "Could not add that student.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.listsFailed": {
+    "source": "Could not read your Planning Center lists.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.importFailed": {
+    "source": "Could not import that list.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.backOnRoster": {
+    "source": "{name} is back on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.added": {
+    "source": "{name} added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.allAlreadyOn": {
+    "source": "Everyone on “{list}” was already on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "AddStudent.importedCount": {
+    "source": "{added} of {total} from “{list}” added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleAllergy": {
+    "source": "Allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleContact": {
+    "source": "Contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleVisitor": {
+    "source": "Still a visitor?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleBirthday": {
+    "source": "Birthday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleInactive": {
+    "source": "No longer on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.titleQueued": {
+    "source": "Waiting for {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.onFile": {
+    "source": "On file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.flagNoNote": {
+    "source": "{backend} has the flag set but no note against it. Somebody upstream knows why.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.visitorSince": {
+    "source": "{name} has been coming since {date}. Clearing this takes them off the new-visitor list on the dashboard; nothing else about them changes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.beforeTallyCounted": {
+    "source": "before Tally counted",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.leaveIt": {
+    "source": "Leave it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.saving": {
+    "source": "Saving…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.notAVisitor": {
+    "source": "Not a visitor any more",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.promoted": {
+    "source": "{name} is on the roster as a regular.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.saveFailed": {
+    "source": "That could not be saved. Check the connection and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.birthdayToday": {
+    "source": "Today.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.birthdaySoon": {
+    "source": "Coming up this week.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.birthdayRecent": {
+    "source": "Just gone — this past week.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.birthdayQuiet": {
+    "source": "Not near today.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.readingPermissions": {
+    "source": "Reading what {backend} allows…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.addInPco": {
+    "source": "Add one in Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.changeInPco": {
+    "source": "Change it in Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.birthdayUpstreamOnly": {
+    "source": "Birthdays are {backend}'s field, and write-back is not on — add or correct it in {backend} itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.inactiveExplain": {
+    "source": "Inactive students are history rather than roster: they are hidden from the default view and from check-in, and every attendance record they are in is kept.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.inactiveUpstreamNote": {
+    "source": " {backend} may say inactive too, in which case the next roster read will set it back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.makeActiveAgain": {
+    "source": "Make active again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.reactivated": {
+    "source": "{name} is back on the active roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.queuedExplain": {
+    "source": "{name} exists in Tally only. Attendance is being recorded either way — this is about the person record upstream, not about the counting.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.queuedBadge": {
+    "source": "Queued",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.queuedClears": {
+    "source": " clears itself as soon as the push lands.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.later": {
+    "source": "Later",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.pushing": {
+    "source": "Pushing…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.pushNow": {
+    "source": "Push now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.pushed": {
+    "source": "{name} is in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "RowBadge.pushFailed": {
+    "source": "The push did not go through. Nothing was changed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.titleEdit": {
+    "source": "Edit {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.titleAdd": {
+    "source": "Add a student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.descriptionAdd": {
+    "source": "Created in Tally, and pushed to your people system automatically when write-back allows it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.saveChanges": {
+    "source": "Save changes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.addStudent": {
+    "source": "Add student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.nickname": {
+    "source": "Nickname",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.nicknameHint": {
+    "source": "Optional. Shown beside the first name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.managedHint": {
+    "source": "Managed in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.upstreamHint": {
+    "source": "Saved in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.gradeAddsThere": {
+    "source": "{backend} holds no grade for them. Choosing one adds it there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.allergies": {
+    "source": "Allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.allergiesReading": {
+    "source": "Reading what {backend} has…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.allergiesHint": {
+    "source": "Saved in {backend} as medical notes. Clearing this deletes it there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.notes": {
+    "source": "Notes",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.notesHint": {
+    "source": "Visible to the core team. Keep it to what a leader needs to know.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.status": {
+    "source": "Status",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.statusLinkedHint": {
+    "source": "Whether they are on the roster is set with Remove from roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.statusHint": {
+    "source": "Inactive students stay in history but leave every roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.statusActive": {
+    "source": "Active",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.statusInactive": {
+    "source": "Inactive",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.changeItThere": {
+    "source": "Change it there",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.saveFailed": {
+    "source": "Could not save this student.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.correctionFailed": {
+    "source": "{name}’s correction could not be saved. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.notesFailed": {
+    "source": "{name}’s notes could not be saved. Try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.savingTo": {
+    "source": "{name} — saving to {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.saved": {
+    "source": "{name} saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.addedToast": {
+    "source": "{name} added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentEditor.contactPrefix": {
+    "source": "{name} · ",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.noAdultInHousehold": {
+    "source": "{backend} has no adult in this household yet, so there is nobody to put a number on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.keptIn": {
+    "source": "Contact details are kept in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addItThereLink": {
+    "source": "Add it there",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addItThere": {
+    "source": "Add it there.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.tallyCanAddOne": {
+    "source": "{backend} has no adult in this household yet. Tally can add one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addAnAdult": {
+    "source": "＋ Add an adult",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addAContact": {
+    "source": "＋ Add a contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.savedOnto": {
+    "source": "Saved onto {contact} in {backend}. Either field is enough.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.theAdultOnFile": {
+    "source": "the adult on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.adultPhone": {
+    "source": "Adult’s phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.phoneInvalid": {
+    "source": "That is not a number anybody could ring.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.adultEmail": {
+    "source": "Adult’s email",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.emailInvalid": {
+    "source": "That does not look like an email address.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.adultFirstName": {
+    "source": "Adult’s first name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.adultLastName": {
+    "source": "Adult’s last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.reachFailed": {
+    "source": "Could not reach {backend} to add this. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.isThisTheAdult": {
+    "source": "Is this the adult to call for {name}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.whichIsTheAdult": {
+    "source": "Which of these is the adult to call for {name}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.candidateAria": {
+    "source": "{candidate} is the adult to call for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.hasContactIn": {
+    "source": "Has contact details in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.noContactYet": {
+    "source": "No contact details on file yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.noneOfThese": {
+    "source": "None of these",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.addADifferent": {
+    "source": "Add a different {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.person": {
+    "source": "person",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.householdNote": {
+    "source": "Putting them in this household keeps one record. A second copy of the same adult has to be merged by hand later.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.modalTitle": {
+    "source": "Add a contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.backendUnreachable": {
+    "source": "{backend} could not be reached. Nothing was changed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "ParentContact.savingBirthday": {
+    "source": "Saving {name}’s birthday to {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.title": {
+    "source": "Some of this roster is out of date",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.description": {
+    "source": "{names} could not be reached, so this file will not be a complete picture.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.exportAnyway": {
+    "source": "Export anyway",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.savedCopy": {
+    "source": "{count, plural, one {# student} other {# students}} from this device’s saved copy.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.savedCopyWithDate": {
+    "source": "{count, plural, one {# student} other {# students}} from this device’s saved copy, last read {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.unresolved": {
+    "source": "{count, plural, one {# roster entry could not be named at all and is not in this file. Tally holds no name for it, so there is no row to mark.} other {# roster entries could not be named at all and are not in this file. Tally holds no name for them, so there is no row to mark.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PartialRoster.partialNote": {
+    "source": "If you go ahead, the filename will end in <code>-partial</code> and every row will carry the date its backend was last read.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.title": {
+    "source": "Every gathering they came to",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.unknownGathering": {
+    "source": "A gathering no longer on record",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.noCheckIns": {
+    "source": "Tally has no check-ins on record for them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.allLoaded": {
+    "source": "That is everything on record.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.showMore": {
+    "source": "Show more",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EarlierAttendance.showMoreAria": {
+    "source": "Show every gathering they came to",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

@@ -29,6 +29,7 @@
 import { Button, Modal } from '@/components/ui';
 import { formatDateTime } from '@/lib/time';
 import type { RosterBackendStatus } from '@/services/functions';
+import { useTranslations } from 'use-intl';
 
 export interface PartialRosterDialogProps {
   open: boolean;
@@ -51,21 +52,23 @@ export function PartialRosterDialog({
   onRetry,
   retrying = false,
 }: PartialRosterDialogProps) {
+  const t = useTranslations('PartialRoster');
+  const tErrors = useTranslations('Errors');
   const names = down.map((backend) => backend.displayName).join(' and ');
 
   return (
     <Modal
       open={open}
       onClose={onCancel}
-      title="Some of this roster is out of date"
-      description={`${names} could not be reached, so this file will not be a complete picture.`}
+      title={t('title')}
+      description={t('description', { names })}
       footer={
         <>
           <Button variant="secondary" onClick={onRetry} loading={retrying}>
-            Try again
+            {tErrors('tryAgain')}
           </Button>
           <Button variant="primary" onClick={onConfirm}>
-            Export anyway
+            {t('exportAnyway')}
           </Button>
         </>
       }
@@ -77,12 +80,12 @@ export function PartialRosterDialog({
               <p className="font-semibold text-ink-100">{backend.displayName}</p>
               {backend.error ? <p className="mt-0.5 text-warn-400">{backend.error}</p> : null}
               <p className="mt-0.5 text-xs text-ink-500">
-                {backend.people} student{backend.people === 1 ? '' : 's'} from this device&rsquo;s
-                saved copy
                 {backend.fetchedAt
-                  ? `, last read ${formatDateTime(new Date(backend.fetchedAt))}`
-                  : ''}
-                .
+                  ? t('savedCopyWithDate', {
+                      count: backend.people,
+                      when: formatDateTime(new Date(backend.fetchedAt)),
+                    })
+                  : t('savedCopy', { count: backend.people })}
               </p>
             </li>
           ))}
@@ -90,15 +93,12 @@ export function PartialRosterDialog({
 
         {unresolved > 0 ? (
           <p>
-            {unresolved} roster {unresolved === 1 ? 'entry' : 'entries'} could not be named at all
-            and {unresolved === 1 ? 'is' : 'are'} not in this file. Tally holds no name for{' '}
-            {unresolved === 1 ? 'it' : 'them'}, so there is no row to mark.
+            {t('unresolved', { count: unresolved })}
           </p>
         ) : null}
 
         <p className="text-xs text-ink-500">
-          If you go ahead, the filename will end in <code>-partial</code> and every row will carry
-          the date its backend was last read.
+          {t.rich('partialNote', { code: (chunks) => <code>{chunks}</code> })}
         </p>
       </div>
     </Modal>

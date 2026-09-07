@@ -67,7 +67,7 @@ import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatRelative, formatShortDate } from '@/lib/time';
-import { cn, formatPhone, gradeSentence, initials, joinList } from '@/lib/utils';
+import { cn, formatPhone, gradeSentence, initials } from '@/lib/utils';
 import {
   addRosterMember,
   pushStudentToPlanningCenter,
@@ -93,6 +93,7 @@ import {
   type Transition,
   type TransitionReason,
 } from '@/types';
+import { useLocale, useTranslations } from 'use-intl';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -121,6 +122,9 @@ function dialable(phone: string): string {
 }
 
 export function StudentDetailPage() {
+  const t = useTranslations('StudentDetail');
+  const tCommon = useTranslations('Common');
+  const locale = useLocale();
   const { studentId } = useParams();
   const navigate = useNavigate();
   const { students, events, series, settings, loading, rosterError, refreshRoster, upstreamEdits } =
@@ -302,7 +306,7 @@ export function StudentDetailPage() {
     const groups = [...recurring.values()];
     // One-offs last: they are not a gathering, and nothing above them applies.
     if (oneOff.length > 0) {
-      groups.push({ key: ONE_OFF_GROUP, title: 'One-off events', standing: null, entries: oneOff });
+      groups.push({ key: ONE_OFF_GROUP, title: t('oneOffEvents'), standing: null, entries: oneOff });
     }
     return groups;
   }, [snapshots, series, student, settings]);
@@ -388,7 +392,7 @@ export function StudentDetailPage() {
       });
       setPendingRelease(null);
     } catch {
-      show('Could not save the release. Nothing changed.', { tone: 'error' });
+      show(t('releaseFailed'), { tone: 'error' });
     } finally {
       setReleaseBusy(false);
     }
@@ -399,7 +403,7 @@ export function StudentDetailPage() {
     try {
       await undoRelease(transition.chainKey, transition.studentId);
     } catch {
-      show('Could not undo the release.', { tone: 'error' });
+      show(t('undoFailed'), { tone: 'error' });
     } finally {
       setReleaseUndoBusyKey(null);
     }
@@ -437,7 +441,7 @@ export function StudentDetailPage() {
   const streak = worst.streak;
 
   if (!student) {
-    if (loading) return <LoadingScreen message="Loading student…" />;
+    if (loading) return <LoadingScreen message={t('loading')} />;
     return (
       /* The same frame as the page it stands in for. A hand-written container
          here was how this branch used to sit 80px left of every other screen
@@ -449,18 +453,18 @@ export function StudentDetailPage() {
         <Card>
           <EmptyState
             icon={rosterError ? '⚠️' : '🤷'}
-            title={rosterError ? 'This student cannot be read right now.' : 'No student with that link.'}
+            title={rosterError ? t('notReadableTitle') : t('notFoundTitle')}
             description={
               rosterError
-                ? 'Their name and grade come from the connected directory, which Tally cannot reach.'
-                : 'They may have been removed, or the link is stale.'
+                ? t('notReadableBody')
+                : t('notFoundBody')
             }
             action={
               <Link
                 to="/students"
                 className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700"
               >
-                Back to students
+                {t('backToStudents')}
               </Link>
             }
           />
@@ -482,7 +486,7 @@ export function StudentDetailPage() {
    * friend, and the upstream read that finds them takes any family relation
    * flagged as an emergency contact.
    */
-  const contactLabel = details?.contactName?.trim() || 'the contact on file';
+  const contactLabel = details?.contactName?.trim() || t('theContactOnFile');
 
   /*
    * Whether anyone can actually be reached — answered from what is on screen.
@@ -536,7 +540,7 @@ export function StudentDetailPage() {
       refreshDetails();
       if (continueAs && continueAs !== student.id) navigate(`/students/${continueAs}`);
     } catch (cause) {
-      show(cause instanceof Error ? cause.message : `Could not re-create them in ${backendName}.`, {
+      show(cause instanceof Error ? cause.message : t('recreateFailed', { backend: backendName }), {
         tone: 'error',
       });
     } finally {
@@ -570,7 +574,7 @@ export function StudentDetailPage() {
       } else {
         await setStudentStatus(student.id, next, user.uid);
       }
-      show(next === 'active' ? `${name} is back on the roster` : `${name} taken off the roster`, {
+      show(next === 'active' ? t('backOnRoster', { name }) : t('takenOffRoster', { name }), {
         tone: 'success',
       });
 
@@ -584,7 +588,7 @@ export function StudentDetailPage() {
        */
       if (next === 'inactive' && backend !== null) navigate('/students');
     } catch {
-      show(`Could not change ${name}'s status.`, { tone: 'error' });
+      show(t('statusChangeFailed', { name }), { tone: 'error' });
     } finally {
       setStatusBusy(false);
     }
@@ -598,7 +602,7 @@ export function StudentDetailPage() {
       show(result.data.message, { tone: result.data.status === 'skipped' ? 'info' : 'success' });
     } catch (cause) {
       const message =
-        cause instanceof Error ? cause.message : `${backendName} did not accept the push.`;
+        cause instanceof Error ? cause.message : t('pushRefused', { backend: backendName });
       setPush({ state: 'error', message });
       show(message, { tone: 'error' });
     }
@@ -621,7 +625,7 @@ export function StudentDetailPage() {
         to="/students"
         className="inline-flex min-h-11 w-fit items-center gap-1 text-sm text-ink-400 hover:text-ink-100"
       >
-        <span aria-hidden="true">‹</span> All students
+        <span aria-hidden="true">‹</span> {t('allStudents')}
       </Link>
 
       <header className="flex items-start gap-3">
@@ -643,12 +647,12 @@ export function StudentDetailPage() {
             typed into Tally is a grade Tally has.
           */}
           <p className="mt-0.5 text-sm text-ink-500">
-            {grade ?? `No grade in ${backendName}`}
+            {grade ?? t('noGradeIn', { backend: backendName })}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {student.isVisitor ? <Badge tone="brand">Visitor</Badge> : null}
             {recordGone ? <Badge tone="danger">{backendName} record missing</Badge> : null}
-            {unreachable && !recordGone ? <Badge tone="warn">No contact on file</Badge> : null}
+            {unreachable && !recordGone ? <Badge tone="warn">{t('noContactOnFile')}</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">Inactive</Badge> : null}
             {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
           </div>
@@ -681,19 +685,19 @@ export function StudentDetailPage() {
           variant={editNeedsAHuman ? 'secondary' : 'primary'}
           onClick={() => setEditorOpen(true)}
         >
-          Edit profile
+          {t('editProfile')}
         </Button>
         <Button
           variant={student.status === 'active' ? 'secondary' : 'success'}
           onClick={() => void toggleStatus()}
           loading={statusBusy}
         >
-          {student.status === 'active' ? 'Remove from roster' : 'Add back to roster'}
+          {student.status === 'active' ? t('removeFromRoster') : t('addBackToRoster')}
         </Button>
         <span className="text-xs text-ink-500">
           {backend !== null
-            ? `Removing them here leaves their ${backendName} record alone, and keeps every gathering they attended.`
-            : 'Keeps every gathering they attended; they just stop appearing at the door.'}
+            ? t('removeHintUpstream', { backend: backendName })
+            : t('removeHint')}
         </span>
       </div>
 
@@ -740,7 +744,7 @@ export function StudentDetailPage() {
                  * common answer takes; the rarer, shorter answers leave a little
                  * air rather than pulling the page up.
                  */
-                <div className="mt-2" role="status" aria-label={`Looking this up in ${backendName}`}>
+                <div className="mt-2" role="status" aria-label={t('lookingUpIn', { backend: backendName })}>
                   <div aria-hidden="true" className="flex items-center gap-2">
                     <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
                     <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
@@ -764,14 +768,14 @@ export function StudentDetailPage() {
                       <>
                         <ContactLink
                           href={`tel:${dialable(phone)}`}
-                          label={`Call ${contactLabel} at ${formatPhone(phone)}`}
+                          label={t('callAria', { contact: contactLabel, phone: formatPhone(phone) })}
                           icon="📞"
                         >
                           Call
                         </ContactLink>
                         <ContactLink
                           href={`sms:${dialable(phone)}`}
-                          label={`Text ${contactLabel} at ${formatPhone(phone)}`}
+                          label={t('textAria', { contact: contactLabel, phone: formatPhone(phone) })}
                           icon="💬"
                         >
                           Text
@@ -781,7 +785,7 @@ export function StudentDetailPage() {
                     {email ? (
                       <ContactLink
                         href={`mailto:${email}`}
-                        label={`Email ${contactLabel} at ${email}`}
+                        label={t('emailAria', { contact: contactLabel, email })}
                         icon="✉"
                       >
                         Email
@@ -796,7 +800,7 @@ export function StudentDetailPage() {
                       whole attendance card below from stepping down when the
                       answer arrives. */}
                   <p className="mt-2 min-h-10 text-sm text-ink-300 sm:min-h-5">
-                    {details?.contactName ? `${details.contactName} · ` : ''}
+                    {details?.contactName ? t('contactPrefix', { name: details.contactName }) : ''}
                     {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
                     {phone && email ? ' · ' : ''}
                     {email ? <span className="break-all">{email}</span> : null}
@@ -813,7 +817,7 @@ export function StudentDetailPage() {
                   Allergies
                 </p>
                 <p className="mt-0.5 text-sm text-ink-100">
-                  {details?.allergies ?? (detailsPending ? 'Loading…' : `Recorded in ${backendName}.`)}
+                  {details?.allergies ?? (detailsPending ? t('detailsLoading') : t('recordedIn', { backend: backendName }))}
                 </p>
               </div>
             ) : null}
@@ -844,18 +848,18 @@ export function StudentDetailPage() {
             <dl className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
               <Detail label="Status" value={student.status === 'active' ? 'Active' : 'Inactive'} />
               <Detail
-                label="First seen"
+                label={t('firstSeen')}
                 value={seen.firstSeenAt ? formatShortDate(seen.firstSeenAt) : 'Never'}
               />
               <Detail
-                label="Last seen"
+                label={t('lastSeen')}
                 value={
                   seen.lastSeenAt
                     ? formatShortDate(seen.lastSeenAt)
                     : // Not "Never": the year below holds no sighting, which is a
                       // smaller claim than never having come at all.
                       seen.unseenInWindow
-                      ? 'Not in the last year'
+                      ? t('notInLastYear')
                       : 'Never'
                 }
               />
@@ -882,13 +886,12 @@ export function StudentDetailPage() {
                   {recreateForm.open ? (
                     <div className="flex flex-col gap-2">
                       <p className="text-xs text-ink-400">
-                        Tally never stored their name — it lived on the deleted record. Enter it
-                        to re-create them.
+                        {t('recreateNameNote')}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <input
                           className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
-                          placeholder="First name"
+                          placeholder={tCommon('firstName')}
                           value={recreateForm.firstName}
                           onChange={(event) =>
                             setRecreateForm((form) => ({ ...form, firstName: event.target.value }))
@@ -896,7 +899,7 @@ export function StudentDetailPage() {
                         />
                         <input
                           className="min-h-11 flex-1 rounded-lg border border-ink-700 bg-ink-900 px-3 text-sm text-ink-100"
-                          placeholder="Last name"
+                          placeholder={tCommon('lastName')}
                           value={recreateForm.lastName}
                           onChange={(event) =>
                             setRecreateForm((form) => ({ ...form, lastName: event.target.value }))
@@ -915,11 +918,10 @@ export function StudentDetailPage() {
                         (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
                       }
                     >
-                      Re-create in {backendName}
+                      {t('recreateIn', { backend: backendName })}
                     </Button>
                     <span className="text-xs text-ink-500">
-                      If they were merged into another record, this relinks instead of creating a
-                      duplicate.
+                      {t('relinkNote')}
                     </span>
                   </div>
                 </div>
@@ -938,7 +940,7 @@ export function StudentDetailPage() {
                         rel="noreferrer"
                         className="font-semibold text-brand-300 underline"
                       >
-                        Open their profile
+                        {t('openTheirProfile')}
                       </a>
                     </>
                   ) : null}
@@ -947,8 +949,8 @@ export function StudentDetailPage() {
                 <div className="mt-1 flex flex-col gap-2">
                   <p className="text-sm text-ink-300">
                     {student.upstreamPushPending
-                      ? `Created in Tally. Waiting to be pushed to ${backendName} — send them now, or the next push retry will.`
-                      : `Created in Tally and not linked to a ${backendName} person.`}
+                      ? t('createdWaitingPush', { backend: backendName })
+                      : t('createdNotLinked', { backend: backendName })}
                   </p>
                   {student.upstreamPushPending ? (
                     <div className="flex flex-wrap items-center gap-2">
@@ -958,7 +960,7 @@ export function StudentDetailPage() {
                         loading={push.state === 'busy'}
                         disabled={push.state === 'done'}
                       >
-                        {push.state === 'done' ? 'Pushed' : `Push to ${backendName}`}
+                        {push.state === 'done' ? t('pushed') : t('pushTo', { backend: backendName })}
                       </Button>
                       <span
                         role="status"
@@ -987,7 +989,7 @@ export function StudentDetailPage() {
 
           <div className="grid grid-cols-2 gap-2 px-4 py-3">
             <StatTile
-              label="Missed in a row"
+              label={t('missedInARow')}
               value={streak}
               hint={
                 // Named, always. "Missed 3 in a row" without saying three of what
@@ -995,16 +997,16 @@ export function StudentDetailPage() {
                 // accusation about the whole ministry rather than about a Friday.
                 worst.scope
                   ? streak >= settings.miaConsecutiveMisses
-                    ? `${worst.scope} — on the MIA list at ${settings.miaConsecutiveMisses}`
-                    : `${worst.scope}, their worst run`
+                    ? t('worstOnMia', { scope: worst.scope, threshold: settings.miaConsecutiveMisses })
+                    : t('worstRun', { scope: worst.scope })
                   : streak > 0
-                    ? 'not seen at any gathering'
-                    : 'no gathering of their own yet'
+                    ? t('streakNotSeenAny')
+                    : t('streakNoGatheringYet')
               }
               tone={streakTone}
             />
             <StatTile
-              label="Last seen"
+              label={t('lastSeen')}
               value={
                 seen.lastSeenAt
                   ? formatRelative(seen.lastSeenAt)
@@ -1012,22 +1014,22 @@ export function StudentDetailPage() {
                     // hint carries the claim, which is about the year rather than
                     // about all of history.
                     seen.unseenInWindow
-                    ? '—'
-                    : 'Never'
+                    ? t('lastSeenDash')
+                    : t('lastSeenNever')
               }
               hint={
                 seen.lastSeenAt
                   ? formatShortDate(seen.lastSeenAt)
                   : seen.unseenInWindow
-                    ? 'not at any gathering in the last year'
-                    : 'no check-ins yet'
+                    ? t('lastSeenNotInYear')
+                    : t('lastSeenNoCheckIns')
               }
             />
           </div>
 
           {historyError ? (
             <div className="px-4 pb-3">
-              <ErrorBanner message={`Could not load attendance history. ${historyError}`} />
+              <ErrorBanner message={t('historyError', { error: historyError })} />
             </div>
           ) : null}
 
@@ -1037,11 +1039,13 @@ export function StudentDetailPage() {
                   be, and a red banner over it would read as a fault to fix. It
                   is a footnote on the numbers, so it looks like one. */}
               <p className="rounded-xl bg-ink-950 px-3 py-2 text-xs text-ink-400 ring-1 ring-ink-800">
-                {joinList(withheldTitles)}{' '}
-                {withheldTitles.length === 1 ? 'is' : 'are'} left out — not{' '}
-                {withheldTitles.length === 1 ? 'a gathering' : 'gatherings'} you work. Nothing above
-                counts those nights, so this is a shorter history than somebody on{' '}
-                {withheldTitles.length === 1 ? 'it' : 'them'} would see.
+                {t('withheld', {
+                  count: withheldTitles.length,
+                  titles: new Intl.ListFormat(locale, {
+                    style: 'long',
+                    type: 'conjunction',
+                  }).format(withheldTitles),
+                })}
               </p>
             </div>
           ) : null}
@@ -1050,8 +1054,8 @@ export function StudentDetailPage() {
             <SkeletonRows count={4} />
           ) : groups.length === 0 ? (
             <EmptyState
-              title="No gatherings on record yet."
-              description="Attendance appears here as soon as this student has been checked into something."
+              title={t('noGatheringsTitle')}
+              description={t('noGatheringsBody')}
             />
           ) : (
             groups.map((group) => (
@@ -1064,9 +1068,9 @@ export function StudentDetailPage() {
                     {group.key === ONE_OFF_GROUP
                       ? // Nothing to be missed: a retreat is not an instance of
                         // anything, and a streak over trips would mean nothing.
-                        'Trips and retreats — no streak applies'
+                        t('oneOffNoStreak')
                       : group.standing === null
-                        ? 'None of these gatherings happened'
+                        ? t('noneHappened')
                         : !group.standing.wasRegular
                           ? // Nobody was expecting them here, so nothing was
                             // missed. A bare "8 missed in a row" beside a student
@@ -1074,15 +1078,13 @@ export function StudentDetailPage() {
                             // spring, is an accusation rather than a count — and
                             // the MIA list will not name them here either.
                             group.standing.attended === 0
-                            ? 'Not one they come to'
-                            : `Drops in — ${group.standing.attended} of ${group.standing.eligible}`
+                            ? t('notOneTheyComeTo')
+                            : t('dropsIn', { attended: group.standing.attended, eligible: group.standing.eligible })
                           : group.standing.consecutiveMisses === 0
-                            ? 'At the most recent one'
-                            : `${group.standing.consecutiveMisses} missed in a row${
-                                group.standing.consecutiveMisses >= settings.miaConsecutiveMisses
-                                  ? ' · MIA'
-                                  : ''
-                              }`}
+                            ? t('atMostRecent')
+                            : group.standing.consecutiveMisses >= settings.miaConsecutiveMisses
+                              ? t('missedInARowMia', { count: group.standing.consecutiveMisses })
+                              : t('missedInARowCount', { count: group.standing.consecutiveMisses })}
                   </p>
                 </header>
 
@@ -1169,11 +1171,13 @@ function ReleaseStanding({
   onUndo: (transition: Transition) => void;
   undoBusyId: string | null;
 }) {
+  const t = useTranslations('StudentDetail');
+  const tReason = useTranslations('Transitions');
   if (!release) {
     return (
       <div className="flex justify-end px-4 pt-2">
         <Button variant="ghost" size="sm" onClick={onRelease}>
-          No longer expected…
+          {t('noLongerExpected')}
         </Button>
       </div>
     );
@@ -1184,20 +1188,22 @@ function ReleaseStanding({
   return (
     <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl bg-ink-950 px-3 py-1 ring-1 ring-ink-800">
       <p className={cn('min-w-0 flex-1 truncate text-xs', inert ? 'text-ink-500' : 'text-ink-300')}>
-        {inert ? (
-          <>
-            Was marked no longer expected —{' '}
-            <span className="text-present-400">back since, so it no longer applies</span>
-          </>
-        ) : (
-          <>No longer expected here — {TRANSITION_REASON_LABEL[transition.reason]}</>
-        )}
-        {transition.note ? ` · “${transition.note}”` : ''} · {transition.releasedByName},{' '}
-        {formatShortDate(transition.releasedAt)}
+        {inert
+          ? t.rich('wasMarkedNoLonger', {
+              back: (chunks) => <span className="text-present-400">{chunks}</span>,
+            })
+          : t('noLongerExpectedHere', {
+              reason: tReason(TRANSITION_REASON_LABEL[transition.reason]),
+            })}
+        {transition.note ? t('transitionNote', { note: transition.note }) : ''}
+        {t('releaseMeta', {
+          by: transition.releasedByName,
+          date: formatShortDate(transition.releasedAt),
+        })}
       </p>
       {inert ? (
         <Button variant="ghost" size="sm" onClick={onRelease}>
-          No longer expected…
+          {t('noLongerExpected')}
         </Button>
       ) : (
         <Button
@@ -1206,7 +1212,7 @@ function ReleaseStanding({
           onClick={() => onUndo(transition)}
           loading={undoBusyId === transition.id}
         >
-          Undo
+          {t('undo')}
         </Button>
       )}
     </div>
@@ -1223,6 +1229,7 @@ function ReleaseStanding({
  * says the second part faster than any of the words do.
  */
 function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) {
+  const t = useTranslations('StudentDetail');
   const { present, outcome, event } = entry;
 
   // Not held is not missed. A cancelled night is nobody's absence, so it reads
@@ -1239,25 +1246,25 @@ function NightChip({ entry, theirs }: { entry: HistoryEntry; theirs: boolean }) 
       ? !held
         ? outcome === 'cancelled'
           ? 'Cancelled'
-          : 'No one'
+          : t('attendanceNoOne')
         : '—'
       : event.mode === 'oneoff'
-        ? 'Not on it'
+        ? t('attendanceNotOnIt')
         : 'Missed';
 
   const spoken = present
     ? 'present'
     : !held
-      ? 'this gathering did not happen, so it counts as neither'
+      ? t('didNotHappen')
       : !theirs
-        ? 'not a gathering they come to'
+        ? t('notAGatheringTheyComeTo')
         : event.mode === 'oneoff'
-          ? 'not on this trip'
+          ? t('notOnThisTrip')
           : 'missed';
 
   return (
     <li
-      title={`${event.title} · ${formatShortDate(event.startAt)}: ${spoken}`}
+      title={t('eventSpoken', { title: event.title, date: formatShortDate(event.startAt), status: spoken })}
       className={cn(
         'w-16 rounded-xl px-1.5 py-1 text-center ring-1',
         present
@@ -1335,6 +1342,7 @@ function BirthdaySection({
   /** Re-reads the details, which are where the year on this page comes from. */
   onSaved: () => void;
 }) {
+  const t = useTranslations('StudentDetail');
   const [editing, setEditing] = useState(false);
 
   // The date as it will be printed, with the year where there is one to print.
@@ -1348,8 +1356,8 @@ function BirthdaySection({
   // in August being looked at in March, and it has nothing to add to the date.
   const NEAR: Record<Exclude<BirthdayState, 'missing' | 'quiet'>, string> = {
     today: 'Today',
-    soon: 'This week',
-    recent: 'This past week',
+    soon: t('birthdayThisWeek'),
+    recent: t('birthdayPastWeek'),
   };
 
   return (
@@ -1369,7 +1377,7 @@ function BirthdaySection({
         <>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <p className={cn('text-sm tabular-nums', day ? 'text-ink-100' : 'text-ink-400')}>
-              {day ?? 'Not on file'}
+              {day ?? t('birthdayNotOnFile')}
               {/*
                 The year's room, held whether or not there is a year to put in
                 it.
@@ -1397,7 +1405,7 @@ function BirthdaySection({
             ) : null}
             {writable && !recordGone ? (
               <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                {day ? 'Change' : 'Add a birthday'}
+                {day ? t('change') : t('addBirthday')}
               </Button>
             ) : null}
           </div>
@@ -1416,13 +1424,13 @@ function BirthdaySection({
                 as something Tally is holding back.
               */}
               {!day
-                ? 'Saved in Planning Center. The year is optional.'
+                ? t('birthdaySavedOptionalYear')
                 : birthdayYear(onFile) === null
-                  ? 'Saved in Planning Center, which holds no year for them — so it shows no age.'
-                  : 'Saved in Planning Center.'}
+                  ? t('birthdaySavedNoYear')
+                  : t('birthdaySaved')}
             </p>
           ) : gateLoading ? (
-            <p className="mt-1 text-xs text-ink-500">Reading what Planning Center allows…</p>
+            <p className="mt-1 text-xs text-ink-500">{t('readingPermissions')}</p>
           ) : (
             <p className="mt-1 text-xs text-ink-500">
               Kept in Planning Center.{' '}
@@ -1432,7 +1440,7 @@ function BirthdaySection({
                 rel="noreferrer"
                 className="font-semibold text-brand-300 underline"
               >
-                {day ? 'Change it there' : 'Add one there'}
+                {day ? t('changeItThere') : t('addOneThere')}
               </a>
               .
             </p>

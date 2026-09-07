@@ -74,7 +74,12 @@ interface Words {
   long: ChipKey;
   short: ChipKey;
   tone: Tone;
-  title: ChipKey;
+  /**
+   * Null for the one state with nothing to add. An empty catalogue entry would
+   * be the obvious spelling and the parity test refuses it — rightly: a
+   * translator handed "" cannot tell a deliberate blank from a missed key.
+   */
+  title: ChipKey | null;
 }
 
 /**
@@ -97,12 +102,7 @@ const WORDS: Record<UpstreamEditState, Words> = {
   merged: { long: 'mergedLong', short: 'mergedShort', tone: 'bad', title: 'mergedTitle' },
   failed: { long: 'failedLong', short: 'failedShort', tone: 'bad', title: 'failedTitle' },
   orphaned: { long: 'orphanedLong', short: 'orphanedShort', tone: 'bad', title: 'orphanedTitle' },
-  cancelled: {
-    long: 'cancelledLong',
-    short: 'cancelledShort',
-    tone: 'mute',
-    title: 'cancelledTitle',
-  },
+  cancelled: { long: 'cancelledLong', short: 'cancelledShort', tone: 'mute', title: null },
 };
 
 /** The one wording that is derived from the clock rather than stored. */
@@ -168,7 +168,7 @@ export function JobChip({ edit, now, short, held, href, className }: JobChipProp
     return (
       <a
         href={href}
-        title={t(words.title)}
+        title={words.title ? t(words.title) : undefined}
         className={cn(
           classes,
           "relative cursor-pointer after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] lg:after:inset-0",
@@ -180,7 +180,7 @@ export function JobChip({ edit, now, short, held, href, className }: JobChipProp
   }
 
   return (
-    <span className={classes} title={t(words.title)}>
+    <span className={classes} title={words.title ? t(words.title) : undefined}>
       {body}
     </span>
   );
