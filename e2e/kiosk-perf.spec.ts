@@ -1317,8 +1317,8 @@ test.describe('kiosk performance', () => {
     });
 
     await step('submit → checked in', async () => {
-      await expect(kiosk.getByText(`Wren ${surname}`)).toBeVisible();
-      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      await expect(kiosk.getByTestId('question-child-0-child-first')).toContainText('Wren');
+      await kiosk.getByRole('button', { name: /^Check in / }).click();
       await expect(kiosk.getByText(/are checked in/i)).toBeVisible({ timeout: 30_000 });
     });
 

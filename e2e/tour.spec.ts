@@ -520,7 +520,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Both children, the adult, the number — and the one allergy note, under the child it belongs to. This is the last point at which a correction costs a tap rather than a leader, and the family reading it is reading their own typing before it becomes a record a reviewer acts on. Emails and second guardians are still not here: a lobby form that asks for everything is a lobby form nobody finishes.',
       });
 
-      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      await kiosk.getByRole('button', { name: 'Check in Chidi and Ada' }).click();
       await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'Nobody has met us',
@@ -564,7 +564,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await typeOnKiosk(kiosk, cast.duplicatePhone);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await kiosk.getByRole('button', { name: `Check in ${cast.doorFirst}` }).click();
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
       await backToSearch(kiosk);
 
@@ -728,7 +728,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'No adult\'s name, no phone number, no second household invented — a name, a grade, one tap for allergies, and a confirm that names the siblings this child is joining. That is the whole of it. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before believing any of them. At approval the household comes from an existing sibling, which is the fix for a real bug: a family gaining a second child used to gain a second *household*, with the first child left behind in the original and invisible from the new one.',
       });
 
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await kiosk.getByRole('button', { name: 'Check in Emil' }).click();
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
       await backToSearch(kiosk);
 
@@ -761,7 +761,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
       await typeOnKiosk(kiosk, cast.phone);
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await kiosk.getByRole('button', { name: 'Check in Zuri' }).click();
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
       await backToSearch(kiosk);
 

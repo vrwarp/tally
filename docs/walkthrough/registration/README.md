@@ -187,15 +187,15 @@ Next commits the fix to the child it belongs to and returns straight to the ques
 
 ## And you
 
-### 18. Does this look right?
+### 18. Nothing above the rule has moved
 
 *One child, ready to check in* · `confirm` · 73 taps from the resting screen
 
-The family on one screen, and the two things a parent might want to do with it. **Add another child** is the offer the deleted fork used to carry, in the shape it carried it — the quiet button above the brand one — but here it stands against the list rather than four screens in front of it. That is the whole argument for the move: "anybody else?" cannot be answered from a parent's memory of what they typed forty seconds ago, and this is the screen where the family is written out, so a missing child is noticed by reading rather than by remembering.
+The confirm keeps the run. Press **Next** on the phone question and the body does not change at all — same eleven rows, same order, same place — while the console below it changes completely. The confirm used to replace all of this with a receipt of the same facts in a different shape, at the one moment a parent is asked to check them, and its rows stopped being buttons exactly when repair was being asked for. Here every row is still a button. And there are two questions on this screen rather than one: the header asks whether the typing is right, over the rows that answer that by touch; **Anyone else to add?** sits on top of the two buttons that answer *it*. The commit names who it is about to check in, which the adult's row is deliberately not part of — a guardian never gets an attendance row, and "Check in everyone" said otherwise in front of the family it named.
 
-![Does this look right? — landscape](shots/landscape-18-does-this-look-right.png)
+![Nothing above the rule has moved — landscape](shots/landscape-18-nothing-above-the-rule-has-moved.png)
 
-<img src="shots/portrait-18-does-this-look-right.png" width="320" alt="Does this look right? — portrait">
+<img src="shots/portrait-18-nothing-above-the-rule-has-moved.png" width="320" alt="Nothing above the rule has moved — portrait">
 
 ## Child 2
 
@@ -249,15 +249,15 @@ Each child answers for themselves: the box opens empty on every entry to this st
 
 <img src="shots/portrait-23-allergies-asked-again-from-scratch.png" width="320" alt="Allergies, asked again from scratch — portrait">
 
-### 24. Both of them, and the button changes its mind
+### 24. Both of them, and the button names them
 
 *Two children, ready to check in* · `confirm (two children)` · 82 taps from the resting screen
 
-Back at the confirm, one child heavier — and this is the second look at the first child's name, ten seconds after it was typed and again at the end. The allergy note from the first child is printed under her name, because this list is the family checking their own typing, the one moment the reader is the writer. The commit says "Check in everyone" now rather than "Check in": it counts what it is about to do.
+Back at the confirm, one child heavier — and this is the second look at the first child's name, ten seconds after it was typed and again at the end. Every fact under its own label: "Adeyeminkx" beside **Last name** is easier to check than the same word run into a sentence, and the allergy note sits on the row that asked for it. The commit reads **Check in Chidi and Ada** rather than "Check in everyone", which named a set the kiosk does not act on: the adult below them is on this screen, is not checked in, and is now visibly not in the button either.
 
-![Both of them, and the button changes its mind — landscape](shots/landscape-24-both-of-them-and-the-button-changes-its-mind.png)
+![Both of them, and the button names them — landscape](shots/landscape-24-both-of-them-and-the-button-names-them.png)
 
-<img src="shots/portrait-24-both-of-them-and-the-button-changes-its-mind.png" width="320" alt="Both of them, and the button changes its mind — portrait">
+<img src="shots/portrait-24-both-of-them-and-the-button-names-them.png" width="320" alt="Both of them, and the button names them — portrait">
 
 ## And you
 
@@ -389,7 +389,7 @@ Nothing reached Planning Center. Every child a family registers is written held,
 
 *Six children — the cap* · `confirm (at MAX_CHILDREN)` · 201 taps from the resting screen
 
-Six is the wizard's cap and the server's. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. This is also the confirm holding as much as it ever has to: the list hangs from the bottom against the button on purpose, and this frame is what that costs when the list is long. Whether the parent of six can check six names here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.
+Six is the wizard's cap and the server's. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. Past two the commit counts rather than lists, because six names would not fit a button. This is also the confirm holding as much as it ever has to: twenty-seven rows in a region that shows about fifteen, so it scrolls — which the receipt it replaced could not do at all. Whether the parent of six can check six children here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.
 
 ![Six rows, and the offer goes dead — landscape](shots/landscape-37-six-rows-and-the-offer-goes-dead.png)
 

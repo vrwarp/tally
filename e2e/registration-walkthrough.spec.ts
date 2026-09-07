@@ -408,9 +408,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'And you',
         state: 'One child, ready to check in',
         step: 'confirm',
-        title: 'Does this look right?',
+        title: 'Nothing above the rule has moved',
         caption:
-          'The family on one screen, and the two things a parent might want to do with it. **Add another child** is the offer the deleted fork used to carry, in the shape it carried it — the quiet button above the brand one — but here it stands against the list rather than four screens in front of it. That is the whole argument for the move: "anybody else?" cannot be answered from a parent\'s memory of what they typed forty seconds ago, and this is the screen where the family is written out, so a missing child is noticed by reading rather than by remembering.',
+          'The confirm keeps the run. Press **Next** on the phone question and the body does not change at all — same eleven rows, same order, same place — while the console below it changes completely. The confirm used to replace all of this with a receipt of the same facts in a different shape, at the one moment a parent is asked to check them, and its rows stopped being buttons exactly when repair was being asked for. Here every row is still a button. And there are two questions on this screen rather than one: the header asks whether the typing is right, over the rows that answer that by touch; **Anyone else to add?** sits on top of the two buttons that answer *it*. The commit names who it is about to check in, which the adult\'s row is deliberately not part of — a guardian never gets an attendance row, and "Check in everyone" said otherwise in front of the family it named.',
       });
 
       /* ---- Child 2, from the confirm --------------------------------------- */
@@ -471,9 +471,9 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         flow: 'Child 2',
         state: 'Two children, ready to check in',
         step: 'confirm (two children)',
-        title: 'Both of them, and the button changes its mind',
+        title: 'Both of them, and the button names them',
         caption:
-          'Back at the confirm, one child heavier — and this is the second look at the first child\'s name, ten seconds after it was typed and again at the end. The allergy note from the first child is printed under her name, because this list is the family checking their own typing, the one moment the reader is the writer. The commit says "Check in everyone" now rather than "Check in": it counts what it is about to do.',
+          'Back at the confirm, one child heavier — and this is the second look at the first child\'s name, ten seconds after it was typed and again at the end. Every fact under its own label: "Adeyeminkx" beside **Last name** is easier to check than the same word run into a sentence, and the allergy note sits on the row that asked for it. The commit reads **Check in Chidi and Ada** rather than "Check in everyone", which named a set the kiosk does not act on: the adult below them is on this screen, is not checked in, and is now visibly not in the button either.',
       });
 
       /* ---- The write, and what it teaches -------------------------------- */
@@ -495,7 +495,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         await route.continue();
       });
 
-      await press(/Check in everyone/i);
+      await press(/^Check in Chidi and Ada$/);
       await shoot(
         {
           flow: 'And you',
@@ -651,7 +651,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
           'No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. Four questions, then this. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.',
       });
 
-      await press(/Check in/i);
+      await press(/^Check in Emeka$/);
       await shoot(
         {
           flow: 'The second child',
@@ -708,7 +708,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         step: 'confirm (at MAX_CHILDREN)',
         title: 'Six rows, and the offer goes dead',
         caption:
-          'Six is the wizard\'s cap and the server\'s. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. This is also the confirm holding as much as it ever has to: the list hangs from the bottom against the button on purpose, and this frame is what that costs when the list is long. Whether the parent of six can check six names here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.',
+          'Six is the wizard\'s cap and the server\'s. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. Past two the commit counts rather than lists, because six names would not fit a button. This is also the confirm holding as much as it ever has to: twenty-seven rows in a region that shows about fifteen, so it scrolls — which the receipt it replaced could not do at all. Whether the parent of six can check six children here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.',
       });
       await press(/^Cancel$/);
 

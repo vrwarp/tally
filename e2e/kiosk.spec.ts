@@ -861,10 +861,15 @@ test.describe('registering a family at the kiosk', () => {
       await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
       await kiosk.getByRole('button', { name: /^Next$/ }).click();
 
-      // The confirm screen: the whole family, and one button.
-      await expect(kiosk.getByText(`Wren ${SURNAME}`)).toBeVisible();
-      await expect(kiosk.getByText(`Fox ${SURNAME}`)).toBeVisible();
-      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      // The confirm screen: the run itself, still on the glass, and a commit
+      // that names exactly who it is about to check in.
+      await expect(kiosk.getByTestId('question-child-0-child-first')).toContainText('Wren');
+      await expect(kiosk.getByTestId('question-child-1-child-first')).toContainText('Fox');
+      await expect(kiosk.getByTestId('question-child-1-child-last')).toContainText(SURNAME);
+      // The adult is on the screen and is not in the button — they never get
+      // an attendance row, and "everyone" used to say otherwise.
+      await expect(kiosk.getByTestId('question-adult-guardian-first')).toContainText('Dana');
+      await kiosk.getByRole('button', { name: 'Check in Wren and Fox' }).click();
 
       await expect(kiosk.getByText('Wren and Fox are checked in. Welcome!')).toBeVisible({
         timeout: 20_000,
@@ -937,7 +942,7 @@ test.describe('registering a family at the kiosk', () => {
       const [first, last] = CHECKED_IN.split(' ') as [string, string];
       await enterChild(kiosk, first, last, '4th grade');
       await enterGuardian(kiosk, 'Dana', last, '5550199001');
-      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await kiosk.getByRole('button', { name: `Check in ${first}` }).click();
 
       await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 20_000 });
       // And the handoff they will use next week, which the refusal never got to.
@@ -1002,9 +1007,12 @@ test.describe('registering a family at the kiosk', () => {
       // forty keys — and it answers and moves on in the one press.
       await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
 
-      // The family checking their own typing, before it becomes a record.
-      await expect(kiosk.getByText('Allergies: Peanuts And Bee Stings')).toBeVisible();
-      await kiosk.getByRole('button', { name: /Check in everyone/i }).click();
+      // The family checking their own typing, before it becomes a record —
+      // under the label that asked for it, on a row that is still a button.
+      await expect(kiosk.getByTestId('question-child-0-child-allergies')).toContainText(
+        'Peanuts And Bee Stings',
+      );
+      await kiosk.getByRole('button', { name: 'Check in Juniper and Rowan' }).click();
       await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({
         timeout: 20_000,
       });

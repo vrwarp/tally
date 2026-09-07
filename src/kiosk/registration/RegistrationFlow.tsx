@@ -33,7 +33,6 @@ import {
   applyKey,
   canAdvance,
   chooseGrade,
-  formatPhone,
   goBack,
   initialState,
   isTypingStep,
@@ -224,8 +223,24 @@ export function RegistrationFlow({
   /* Whose questions are on screen: the child being added, or — when a row has
      been tapped to fix it — the child that row belongs to. */
   const childNumber = (state.editing ?? state.children.length) + 1;
-  /* Every step that asks a question: the list above, the console below. */
-  const showsList = isTypingStep(state.step) || state.step === 'child-grade';
+  /*
+   * Every step that draws the run above the console — which now includes the
+   * confirm.
+   *
+   * The confirm used to replace the body with a receipt of the same facts in a
+   * different shape, at the one moment a parent is asked to check them. So the
+   * screen they had been reading for ninety seconds vanished exactly when it
+   * was needed, and its rows — buttons on every other step — stopped being
+   * buttons here, which made repair hardest at the moment it is asked for.
+   *
+   * Keeping the list means the body does not move at all between the last
+   * question and the confirm: only the console changes, and it changes
+   * completely. It also puts the confirm inside the scroll region, which the
+   * receipt never had — six children on one confirm is more than the glass
+   * holds.
+   */
+  const showsList =
+    isTypingStep(state.step) || state.step === 'child-grade' || state.step === 'confirm';
 
   /*
    * A long family scrolls, and the end of the list is what a parent wants —
@@ -294,6 +309,20 @@ export function RegistrationFlow({
                   resume={state.resume}
                   onReopen={reopenRow}
                 />
+                {state.step === 'confirm' && state.mode === 'sibling' && (
+                  /*
+                    Who this child is being added to. The kiosk guessed the
+                    family from four digits (see family.ts for how much of a
+                    guess that is), so the guess goes on the glass rather than
+                    staying in the request — a parent looking at a stranger's
+                    children in their own confirmation cannot miss it.
+                  */
+                  <p className="px-1 pt-1 text-base text-ink-400">
+                    {anchors && anchors.length > 0
+                      ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
+                      : 'Joining your family.'}
+                  </p>
+                )}
               </div>
             </div>
             {/*
@@ -305,48 +334,19 @@ export function RegistrationFlow({
               * row in the list is the index, saying where somebody is in the
               * run and what they can go back and fix; this is the question, in
               * the same glance as the thumb.
+              *
+              * Not on the confirm: there the header carries the question and
+              * the console carries the fork, and a third line saying the same
+              * thing a third time would only ask which one to answer.
               */}
-            <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
-              {questionFor(state)}
-            </div>
+            {state.step !== 'confirm' && (
+              <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
+                {questionFor(state)}
+              </div>
+            )}
           </>
         ) : (
           <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
-          {state.step === 'confirm' && (
-            /* Against the commit, not stranded a screen above it. This is the
-               last thing a parent reads before a record goes upstream, and on a
-               portrait tablet the list of their own children sat a thousand
-               pixels from the button that files it. */
-            <div className="mt-auto flex flex-col gap-2 pt-2">
-              {state.children.map((child, index) => (
-                <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
-              ))}
-              {state.mode === 'sibling' ? (
-                /*
-                  Who this child is being added to. The kiosk guessed the family
-                  from four digits (see family.ts for how much of a guess that
-                  is), so the guess goes on the glass above the button rather
-                  than staying in the request — a parent looking at a stranger's
-                  children in their own confirmation cannot miss it.
-                */
-                <p className="px-1 pt-1 text-base text-ink-400">
-                  {anchors && anchors.length > 0
-                    ? `Joining ${anchors.map((sibling) => sibling.firstName).join(', ')}.`
-                    : 'Joining your family.'}
-                </p>
-              ) : (
-                <div className="flex h-16 items-center justify-between rounded-xl bg-ink-900/60 px-5">
-                  <span className="truncate text-lg text-ink-300">
-                    {state.guardian.firstName} {state.guardian.lastName}
-                  </span>
-                  <span className="pl-3 text-base whitespace-nowrap text-ink-500">
-                    {formatPhone(state.guardian.phone)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
           {state.step === 'submitting' && (
             <p className="pt-10 text-center text-xl text-ink-400">Saving…</p>
           )}
@@ -391,8 +391,18 @@ export function RegistrationFlow({
       {/* The bottom row: the readout and whatever fills it — letters, digits or
           the grade chips — with the action that ends the step above them. The
           same object on every question, which is what keeps the rule above it
-          from moving between steps. */}
-      {showsList ? (
+          from moving between steps.
+
+          The confirm is tested first because it draws the same body as a
+          question and a different console: it is the one step where the run
+          stays still and this whole region changes. */}
+      {state.step === 'confirm' ? (
+        <ConfirmConsole
+          roster={state.children}
+          onAdd={() => dispatch({ type: 'add-child' })}
+          onCommit={runSubmit}
+        />
+      ) : showsList ? (
         <div className="flex flex-col gap-1.5">
           {/*
             * The band is drawn on the body's own measure — `max-w-2xl` inside
@@ -509,39 +519,6 @@ export function RegistrationFlow({
             <Keyboard onKey={onKey} shift={state.shift} />
           )}
         </div>
-      ) : state.step === 'confirm' ? (
-        <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
-          {/* The family's own measure, as above — these buttons commit the
-              rows they sit under. */}
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
-            {/*
-              * The offer the fork used to carry, in the shape it carried it —
-              * the quiet button above the brand one, so a parent who learned
-              * that pair on the old screen meets the same pair here.
-              *
-              * It belongs on this screen rather than on one of its own:
-              * "anybody else?" cannot be answered from memory, and this is
-              * where the family is written out. A parent notices a missing
-              * child by reading the list, not by being asked about it four
-              * screens earlier.
-              */}
-            <Big
-              label="Add another child"
-              disabled={state.children.length >= MAX_CHILDREN}
-              onPick={() => dispatch({ type: 'add-child' })}
-            />
-            <Big
-              label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
-              tone="brand"
-              onPick={runSubmit}
-            />
-            {state.children.length >= MAX_CHILDREN && (
-              <p className="text-center text-base text-ink-500">
-                That is as many as one go takes — a leader can add the rest.
-              </p>
-            )}
-          </div>
-        </div>
       ) : state.step === 'success' ? (
         <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
           <div className="mx-auto w-full max-w-2xl">
@@ -551,6 +528,74 @@ export function RegistrationFlow({
       ) : (
         <div className="h-4" />
       )}
+    </div>
+  );
+}
+
+/**
+ * The confirm's console: the fork, and the commit.
+ *
+ * Its own component because it is the one console that is not a question's —
+ * the body above it is the same list the last question drew, and everything
+ * that changes when a parent arrives here changes in this box.
+ */
+function ConfirmConsole({
+  roster,
+  onAdd,
+  onCommit,
+}: {
+  roster: readonly DraftChild[];
+  onAdd: () => void;
+  onCommit: () => void;
+}) {
+  return (
+    <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+      {/* The family's own measure, as above — these buttons commit the rows
+          they sit under. */}
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+        {/*
+          * The fork, asked where it is answered.
+          *
+          * The header asks whether the typing is right; these two buttons
+          * answer whether anybody is missing, which is a different question,
+          * and for a while the screen only asked the first one. Both belong,
+          * and they belong in different places: the header keeps the question
+          * whose failure is expensive and silent — a misspelt name becomes a
+          * roster row, a sticker and a record upstream, and nobody catches it
+          * until a weekday, next to the duplicate it caused — while this one
+          * sits on top of the buttons that answer it. The same move the typing
+          * steps make with `questionFor`.
+          *
+          * Not phrased as a yes and a no. A yes/no pair reads as two answers
+          * of equal weight and these are not: a second child is rare, the
+          * quiet/brand contrast already says which one a parent is here for,
+          * and "No, check them in" would put back exactly the ambiguity
+          * `commitLabel` exists to remove.
+          *
+          * A fixed band above a fixed pair, present from first paint, so
+          * nothing here moves when a child is added.
+          */}
+        <p className="pt-1 pb-2 text-center text-xl text-ink-400">Anyone else to add?</p>
+        {/*
+          * The offer the fork screen used to carry, in the shape it carried it
+          * — the quiet button above the brand one, so a parent who learned
+          * that pair on the old screen meets the same pair here. It belongs on
+          * this screen rather than on one of its own: a parent notices a
+          * missing child by reading the list, not by being asked about it four
+          * screens earlier.
+          */}
+        <Big
+          label="Add another child"
+          disabled={roster.length >= MAX_CHILDREN}
+          onPick={onAdd}
+        />
+        <Big label={commitLabel(roster)} tone="brand" onPick={onCommit} />
+        {roster.length >= MAX_CHILDREN && (
+          <p className="text-center text-base text-ink-500">
+            That is as many as one go takes — a leader can add the rest.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -792,31 +837,6 @@ function GradeChips({
   );
 }
 
-/** One child as the wizard has them: the name, the grade, and any note. */
-function ChildRow({ child }: { child: DraftChild }) {
-  return (
-    <div className="flex min-h-16 flex-col justify-center rounded-xl bg-ink-900 px-5 py-2.5">
-      <div className="flex items-center justify-between">
-        <span className="truncate text-xl font-semibold text-ink-100">
-          {child.firstName} {child.lastName}
-        </span>
-        <span className="pl-3 text-base whitespace-nowrap text-ink-400">
-          {child.grade === null ? NO_GRADE : gradeDescription(child.grade)}
-        </span>
-      </div>
-      {/*
-        * On the roster rows a warn-tone dot is all the kiosk shows; here the
-        * note itself is printed, because this list is the family checking
-        * their own typing — the one moment the person reading it is the
-        * person who wrote it, before it becomes a record a reviewer acts on.
-        */}
-      {child.allergies !== '' && (
-        <div className="truncate text-base text-warn-400">Allergies: {child.allergies}</div>
-      )}
-    </div>
-  );
-}
-
 function Big({
   label,
   onPick,
@@ -848,7 +868,10 @@ function Big({
             : 'bg-ink-800 text-ink-100 active:bg-ink-600'
       }`}
     >
-      {label}
+      {/* Truncating, because one of these labels is written from a family's own
+          names now — two long ones would otherwise push the button's minimum
+          past the glass, the same way the readout used to widen the header. */}
+      <span className="min-w-0 truncate px-4">{label}</span>
     </button>
   );
 }
@@ -1024,6 +1047,28 @@ function questionFor(state: RegistrationState): string {
  * text node — a family reads it as a sentence, and so does anything testing
  * that it says what it should.
  */
+/**
+ * What the commit button says, which is what it does.
+ *
+ * It used to say "Check in everyone" over a list whose last row is the adult —
+ * and the adult is never checked in. The callable writes one attendance row per
+ * child and only per child; a guardian's name and number live on the review
+ * record, TTL'd, and travel upstream as a household contact. So "everyone"
+ * named a set the kiosk does not act on, in front of the family it named.
+ *
+ * Naming the subject removes the ambiguity and has nowhere to put it back.
+ * Names up to two, because two is the whole of the multi-child case in
+ * practice and six of them would not fit the button; a count beyond that. The
+ * one- and two-child forms are the sentence the success screen already speaks,
+ * so the button promises exactly what the next screen confirms.
+ */
+function commitLabel(children: readonly DraftChild[]): string {
+  const names = children.map((child) => child.firstName);
+  if (names.length === 1) return `Check in ${names[0]}`;
+  if (names.length === 2) return `Check in ${names[0]} and ${names[1]}`;
+  return `Check in ${names.length} children`;
+}
+
 function welcomeLine(children: readonly DraftChild[]): string {
   const names = children.map((child) => child.firstName);
   const list =
