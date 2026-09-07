@@ -32,6 +32,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import {
   QUOTED_IN,
+  REQUIRED_WORDING,
   SAME_VALUE_GROUPS,
   flatten,
   messageArguments,
@@ -128,6 +129,7 @@ for (const [canonical, ...members] of SAME_VALUE_GROUPS) {
 }
 // Messages that quote another key draft AFTER it, with its live translation inlined.
 const QUOTES_BY_MESSAGE = new Map(QUOTED_IN.map((quote) => [quote.message, quote]));
+const REQUIRED_BY_KEY = new Map(REQUIRED_WORDING.map((rule) => [rule.key, rule]));
 
 function quotedValue(flat: Map<string, string>, quotes: string, strip?: string): string {
   let value = flat.get(quotes) ?? en.get(quotes)!;
@@ -136,7 +138,14 @@ function quotedValue(flat: Map<string, string>, quotes: string, strip?: string):
 }
 
 interface DraftExtras {
-  /** The exact current translation of a UI element this message quotes. */
+  /**
+   * Wording the draft must carry verbatim.
+   *
+   * Two sources, and the gate below treats them the same. A `QUOTED_IN` message
+   * must contain the current translation of the element it quotes; a
+   * `REQUIRED_WORDING` key must contain a word the device makes true — see
+   * there for the kiosk keyboard that is the only entry so far.
+   */
   mustContain?: string;
 }
 
@@ -180,7 +189,7 @@ async function draft(
       '- Keep leading and trailing punctuation and symbols (…, ·, —, +, %, →) in place.',
       '- "previous" is the prior translation of an older English source — preserve its terminology where it is still accurate.',
       '- "context" is a translator note about where the string appears and what it pairs with.',
-      '- "mustContain" is the exact current translation of a UI element this message quotes; it must appear VERBATIM inside your translation.',
+      '- "mustContain" is wording this string must carry — the current translation of a UI element it quotes, or a word the device makes true. It must appear VERBATIM inside your translation, worked into natural phrasing rather than appended.',
       '- Never translate a person\'s name, an event title somebody typed, or a {{token}}.',
       '',
       'GLOSSARY:',
@@ -310,6 +319,12 @@ async function main(): Promise<void> {
     const pass2 = work.filter((key) => QUOTES_BY_MESSAGE.has(key));
     console.log(`${locale}: ${MODE.todo ? 'filling' : 'drafting'} ${work.length} key(s)…`);
 
+    /** Wording a key must carry whatever else it says. See `REQUIRED_WORDING`. */
+    const required = (key: string): DraftExtras | null => {
+      const wanted = REQUIRED_BY_KEY.get(key)?.text[locale];
+      return wanted === undefined ? null : { mustContain: wanted };
+    };
+
     const apply = (drafted: Map<string, string>) => {
       for (const [key, value] of drafted) {
         flat.set(key, value);
@@ -318,7 +333,18 @@ async function main(): Promise<void> {
       }
     };
 
-    apply(await draft(locale, pass1));
+    apply(
+      await draft(
+        locale,
+        pass1,
+        new Map(
+          pass1.flatMap((key) => {
+            const extra = required(key);
+            return extra ? [[key, extra] as const] : [];
+          }),
+        ),
+      ),
+    );
     if (pass2.length > 0) {
       const extras = new Map(
         pass2.map((key) => {

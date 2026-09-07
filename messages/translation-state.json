@@ -8701,21 +8701,25 @@
   },
   "Register.placeholderChildFirst": {
     "source": "Child's first name",
+    "context": "The question above the kiosk keyboard while a parent types their child's given name. Names the field rather than saying \"type here\", and must say the name wanted is the English one (英文): the keyboard under it is a fixed QWERTY with no IME, so a Chinese name cannot be entered here at all.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Register.placeholderChildLast": {
     "source": "Child's last name",
+    "context": "As Register.placeholderChildFirst, for the surname. English-only (英文) for the same reason — there is no IME on the kiosk keyboard.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Register.placeholderYourFirst": {
     "source": "Your first name",
+    "context": "The same question, asked about the adult registering the family. English-only (英文): the kiosk keyboard has no IME.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Register.placeholderYourLast": {
     "source": "Your last name",
+    "context": "The adult's surname, on the kiosk. English-only (英文): the kiosk keyboard has no IME.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -8736,11 +8740,13 @@
   },
   "Register.labelFirstName": {
     "source": "First name",
+    "context": "The registration wizard's question list, on the kiosk: the row label beside the answer, for a child and for the adult alike. The kiosk keyboard is a fixed QWERTY with no IME, so the only name that can be typed here is an English one — say so (英文).",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Register.labelLastName": {
     "source": "Last name",
+    "context": "As Register.labelFirstName — the surname row of the kiosk's question list. English-only for the same reason, so say so (英文).",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },

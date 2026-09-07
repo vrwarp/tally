@@ -21,6 +21,7 @@ import { LOCALES } from '@/lib/locales';
 import { KIOSK_NAMESPACES, stale as staleKioskSlices, usedNamespaces } from '../scripts/sync-kiosk-messages.mjs';
 import {
   QUOTED_IN,
+  REQUIRED_WORDING,
   SAME_VALUE_GROUPS,
   flatten,
   messageArguments,
@@ -101,6 +102,9 @@ describe('message catalogues', () => {
         expect(enFlat.has(message), `unknown message in QUOTED_IN: ${message}`).toBe(true);
         expect(enFlat.has(quotes), `unknown quoted key in QUOTED_IN: ${quotes}`).toBe(true);
       }
+      for (const { key } of REQUIRED_WORDING) {
+        expect(enFlat.has(key), `unknown key in REQUIRED_WORDING: ${key}`).toBe(true);
+      }
     });
 
     it('same-value groups render identically', () => {
@@ -126,6 +130,30 @@ describe('message catalogues', () => {
           expect(
             flat.get(message)?.includes(quoted),
             `${locale}: ${message} must quote ${quotes} verbatim (${JSON.stringify(quoted)})`,
+          ).toBe(true);
+        }
+      }
+    });
+
+    /*
+     * Untranslated keys are skipped, and that is not a hole: a `todo` entry
+     * holds the English source verbatim, so asserting 英文 against it would
+     * fail every key on the day the catalogue is drafted rather than the day
+     * one is drafted wrong. The drafting script carries the same constraint as
+     * a `mustContain`, which is where it bites first.
+     */
+    it('keys that must name a language do', () => {
+      if (!fs.existsSync(STATE_FILE)) return;
+      const state: TranslationState = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      for (const [locale, catalog] of catalogs) {
+        const flat = flatten(catalog);
+        for (const { key, text, why } of REQUIRED_WORDING) {
+          const wanted = text[locale];
+          if (wanted === undefined) continue;
+          if ((state[key]?.[locale as 'zh-Hans' | 'zh-Hant'] ?? 'todo') === 'todo') continue;
+          expect(
+            flat.get(key)?.includes(wanted),
+            `${locale}: ${key} must contain ${JSON.stringify(wanted)} — ${why}`,
           ).toBe(true);
         }
       }

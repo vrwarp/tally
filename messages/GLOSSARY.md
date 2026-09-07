@@ -56,3 +56,13 @@ Never translated: **Tally**, **Planning Center**, student and adult names, event
 titles a leader typed, label-template `{{tokens}}`, Material icon names
 (`local_fire_department`), backend document ids, and grade values. These are
 data, not chrome — see `docs/i18n.md` rule 4.
+
+The kiosk's name questions say 英文. The lobby keyboard is a fixed QWERTY and
+the kiosk never focuses a focusable element — that is what lets it avoid the
+device's slow native keyboard — so there is no IME on the glass and a Chinese
+name cannot be typed there however the question is phrased. English is not a
+preference at that step, it is the only thing the keys make; the Chinese
+question therefore asks for the English name (英文名字 / 英文姓氏), and naming
+the constraint is also what answers it. English needs no such warning, so this
+is a deliberate divergence between the locales. Declared and enforced as
+`REQUIRED_WORDING` in `src/lib/translationState.ts`.

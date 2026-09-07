@@ -88,6 +88,45 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
   { message: 'Events.emptyBody', quotes: 'Events.newEvent' },
 ];
 
+/**
+ * Keys whose translation must carry a particular word, per locale.
+ *
+ * The third kind of cross-key dependency, and the odd one out: the other two
+ * tie a key to another key, and this ties a key to a *fact about the device*.
+ *
+ * It exists for the registration wizard's name questions. The kiosk keyboard is
+ * one static QWERTY layout and the kiosk never focuses a focusable element —
+ * that is what lets it avoid the device's slow native keyboard — so there is no
+ * IME on the glass, and a parent cannot type 蔡秉洲 into it however the question
+ * is worded. English is not a preference there, it is the only thing the
+ * keyboard can produce, so the Chinese question has to say 英文 and the English
+ * one has nothing to warn about. Naming the constraint is also what answers it:
+ * a field labelled 英文名字 is asking for exactly what the keys under it make.
+ *
+ * `text` constrains the *fact*, not the phrasing — 英文名字 and 英文名 both
+ * satisfy it — and a locale left out is unconstrained. Enforced by the parity
+ * test once a translation exists, and fed to the drafting script as a
+ * `mustContain`, which rejects a draft that drops it rather than shipping one.
+ */
+export const REQUIRED_WORDING: readonly {
+  key: string;
+  text: Readonly<Record<string, string>>;
+  why: string;
+}[] = (
+  [
+    'Register.labelFirstName',
+    'Register.labelLastName',
+    'Register.placeholderChildFirst',
+    'Register.placeholderChildLast',
+    'Register.placeholderYourFirst',
+    'Register.placeholderYourLast',
+  ] as const
+).map((key) => ({
+  key,
+  text: { 'zh-Hans': '英文', 'zh-Hant': '英文' },
+  why: 'The kiosk keyboard is Latin-only, so this name can only be typed in English.',
+}));
+
 export function flatten(obj: Messages, prefix = ''): Map<string, string> {
   const out = new Map<string, string>();
   for (const [key, value] of Object.entries(obj)) {
