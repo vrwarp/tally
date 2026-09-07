@@ -11,7 +11,8 @@
  * validation are worth testing without rendering anything, and this file is the
  * one place that knows what 'done' means for each question.
  */
-import type { Grade } from '@/types';
+import { gradeDescription, NO_GRADE, ordinalGrade } from '@/lib/utils';
+import { PRE_K, type Grade } from '@/types';
 import type { KioskKey, ShiftState } from '../components/Keyboard';
 
 /** The most children one run of the wizard may add. Mirrors the server's cap. */
@@ -93,10 +94,26 @@ export interface RegistrationState {
    * church's people backend can hold the answer. Asking without that would be
    * collecting a family's medical note into a screen that silently drops it —
    * the retired phone form made the same check before showing its field. On
-   * the state rather than threaded as a parameter, because `chooseGrade`
-   * advances internally and every caller would have to carry it.
+   * On the state rather than threaded as a parameter, because it decides where
+   * a child's last question leads and half this file needs to know.
    */
   allergiesSupported: boolean;
+  /**
+   * Whether this child's grade has been chosen, as opposed to defaulted.
+   *
+   * The draft opens on a grade — the middle of the band, or none where children
+   * are handed back — so the record always holds one and cannot say whether
+   * anybody picked it. That could stay unsaid while a chip was the only way off
+   * the step. Now that the step carries a **Next** like every other one the
+   * difference matters: without this a parent could press past the question and
+   * file a grade they never chose, and "No grade" is an answer here rather than
+   * a blank somebody fills in later.
+   *
+   * One child's worth of lifetime, like `noAllergies`: a fresh draft starts
+   * unpicked, and a child un-banked back onto the step starts picked, because
+   * they answered it once already.
+   */
+  gradePicked: boolean;
   /**
    * Whether "No allergies" is ticked on the allergies step.
    *
@@ -162,6 +179,7 @@ export function initialState(args: {
     registrationId: args.registrationId,
     allergiesSupported: args.allergiesSupported === true,
     noAllergies: false,
+    gradePicked: false,
     children: [],
     draft: {
       firstName: '',
@@ -180,6 +198,25 @@ export function initialState(args: {
 /* -------------------------------------------------------------------------- */
 /* The buffer                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/** Whether a step is one of the questions a child is asked. */
+export function isChildStep(step: StepKind): boolean {
+  return (
+    step === 'child-first' ||
+    step === 'child-last' ||
+    step === 'child-grade' ||
+    step === 'child-allergies'
+  );
+}
+
+/** Whether a step is one of the three the adult is asked. */
+export function isAdultStep(step: StepKind): boolean {
+  return (
+    step === 'guardian-first' ||
+    step === 'guardian-last' ||
+    step === 'guardian-phone'
+  );
+}
 
 /** Which steps the keyboard is typing into at all. */
 export function isTypingStep(step: StepKind): boolean {
@@ -317,6 +354,8 @@ export function applyKey(
 export function canAdvance(state: RegistrationState): boolean {
   if (state.step === 'guardian-phone')
     return state.buffer.length === PHONE_LENGTH;
+  // A chip has to have been pressed — see `gradePicked`.
+  if (state.step === 'child-grade') return state.gradePicked;
   // An empty allergies buffer is not an unanswered question — it is the
   // answer most families give.
   if (state.step === 'child-allergies') return true;
@@ -394,8 +433,9 @@ function bankChild(state: RegistrationState, draft: DraftChild): RegistrationSta
     backFromConfirm: step === 'confirm' ? lastChildQuestion(state) : state.backFromConfirm,
     buffer: '',
     shift: 'on',
-    // Each child answers for themselves — see `noAllergies`.
+    // Each child answers for themselves — see `noAllergies` and `gradePicked`.
     noAllergies: false,
+    gradePicked: false,
   };
 }
 
@@ -503,13 +543,21 @@ export function toggleNoAllergies(state: RegistrationState): RegistrationState {
   return { ...state, noAllergies, buffer: noAllergies ? '' : state.buffer, shift: 'on' };
 }
 
-/** The grade chips. `null` is 'No grade' — an answer, not a skip. */
+/**
+ * The grade chips. `null` is 'No grade' — an answer, not a skip.
+ *
+ * A chip selects rather than advancing, now that the step carries **Next** and
+ * the readout like every other one. It costs a tap per child and buys two
+ * things: a console that is the same object on every screen, so the rule above
+ * it never moves between questions, and a parent who can see the year they
+ * picked before it is committed to a roster and a sticker.
+ */
 export function chooseGrade(
   state: RegistrationState,
   grade: Grade | null,
 ): RegistrationState {
   if (state.step !== 'child-grade') return state;
-  return advance({ ...state, draft: { ...state.draft, grade } });
+  return { ...state, draft: { ...state.draft, grade }, gradePicked: true };
 }
 
 /**
@@ -530,6 +578,7 @@ export function addAnotherChild(state: RegistrationState): RegistrationState {
     step: 'child-first',
     buffer: '',
     shift: 'on',
+    gradePicked: false,
   };
 }
 
@@ -570,7 +619,205 @@ function reopenLastChild(state: RegistrationState): RegistrationState {
         shift: autoShiftAfter(draft.allergies),
         noAllergies: false,
       }
-    : { ...state, children, draft, step: 'child-grade', buffer: '', shift: 'on' };
+    : {
+        ...state,
+        children,
+        draft,
+        step: 'child-grade',
+        buffer: '',
+        shift: 'on',
+        // They answered it once; Next should not be dead on the way back.
+        gradePicked: true,
+      };
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* The list the wizard draws                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** One question in the run, as the list shows it. */
+export interface QuestionRow {
+  /** Stable within a run — a React key, and the address of a tap. */
+  id: string;
+  /** The step this row is about; what reopening it would land on. */
+  step: StepKind;
+  /** Which child it belongs to, or null for the adult's three. */
+  child: number | null;
+  label: string;
+  /** The committed answer. Empty on any row not answered yet. */
+  answer: string;
+  state: 'done' | 'now' | 'todo';
+}
+
+export interface QuestionSection {
+  title: string;
+  rows: QuestionRow[];
+}
+
+const CHILD_STEPS = ['child-first', 'child-last', 'child-grade', 'child-allergies'] as const;
+const CHILD_LABELS = ['First name', 'Last name', 'Grade', 'Allergies'] as const;
+const ADULT_STEPS = ['guardian-first', 'guardian-last', 'guardian-phone'] as const;
+const ADULT_LABELS = ['First name', 'Last name', 'Phone'] as const;
+
+/** The grade as a row shows it — short, because the row is labelled "Grade". */
+function gradeAnswer(grade: Grade | null): string {
+  if (grade === null) return NO_GRADE;
+  // `gradeDescription` says "4th grade", which under a label reading "Grade" is
+  // the word twice. The two years with no number of their own keep their names.
+  return grade === PRE_K || grade === 0 ? gradeDescription(grade) : ordinalGrade(grade);
+}
+
+function childAnswer(child: DraftChild, step: StepKind): string {
+  switch (step) {
+    case 'child-first':
+      return child.firstName;
+    case 'child-last':
+      return child.lastName;
+    case 'child-grade':
+      return gradeAnswer(child.grade);
+    // Stryker disable next-line StringLiteral: callers walk `CHILD_STEPS`, so
+    // the only step that reaches here is the allergy note. Written out because
+    // the union will grow.
+    default:
+      return child.allergies === '' ? 'None' : child.allergies;
+  }
+}
+
+function adultAnswer(guardian: RegistrationState['guardian'], step: StepKind): string {
+  switch (step) {
+    case 'guardian-first':
+      return guardian.firstName;
+    case 'guardian-last':
+      return guardian.lastName;
+    // Stryker disable next-line StringLiteral: as `childAnswer` — callers walk
+    // `ADULT_STEPS` and nothing else arrives.
+    default:
+      return formatPhone(guardian.phone);
+  }
+}
+
+/**
+ * Where a section stands: the index of the question being answered inside it,
+ * or a whole section behind the parent, or one still in front of them.
+ *
+ * The two words are not expressible as an index. A section nobody has reached
+ * is every row `todo`, and no position produces that — 0 would make the first
+ * row the one being answered, on a section the parent has not arrived at.
+ */
+type SectionAt = number | 'behind' | 'ahead';
+
+function runState(at: SectionAt, position: number): QuestionRow['state'] {
+  if (at === 'behind') return 'done';
+  if (at === 'ahead') return 'todo';
+  return position < at ? 'done' : position === at ? 'now' : 'todo';
+}
+
+/**
+ * What the readout shows: the answer being built, however it is being built.
+ *
+ * A grade is tapped rather than typed, and it lands in the same band as every
+ * other answer — which is what that band is for. Empty until a chip is pressed,
+ * so the gathering's default never shows as something a parent chose.
+ */
+export function readoutFor(state: RegistrationState): string {
+  if (state.step === 'child-grade') {
+    return state.gradePicked ? gradeAnswer(state.draft.grade) : '';
+  }
+  if (state.step === 'guardian-phone') return formatPhone(state.buffer);
+  return state.buffer;
+}
+
+/**
+ * Every question in the run, in the order it is asked.
+ *
+ * The wizard put one question on the glass and nothing else, which on an
+ * upright tablet left a 664px hole — half the screen — between the question and
+ * the keys. This is what fills it: what has been answered, what is being
+ * answered, and what is still to come. A parent can see the shape of the thing
+ * they are half way through, and check the name they typed forty seconds ago
+ * without pressing Back four times to reach it.
+ *
+ * ## Order
+ *
+ * Chronological, which is not the same as grouped by person. A second child is
+ * added from the confirm screen — after the adult — so the run reads: the first
+ * child, then you, then anybody added later. Grouping the children would mean
+ * the list reordering itself mid-run, and a list that holds still while the
+ * highlight travels down it is most of why this works: nothing moves under a
+ * thumb.
+ *
+ * ## What counts as answered
+ *
+ * Only what is behind the parent. A row not yet reached shows no answer even
+ * where the record already holds one — the draft opens on this gathering's
+ * default grade, and printing that beside "Grade" would tell a family they had
+ * answered a question nobody asked them.
+ */
+/** Everything the list reads. Deliberately not the buffer — see the component. */
+export type QuestionListState = Pick<
+  RegistrationState,
+  'step' | 'children' | 'draft' | 'guardian' | 'allergiesSupported' | 'mode'
+>;
+
+export function questionList(state: QuestionListState): QuestionSection[] {
+  const onChild = isChildStep(state.step);
+  const onAdult = isAdultStep(state.step);
+  /* The draft is the last child of the run while its own questions are up. */
+  const roster = onChild ? [...state.children, state.draft] : state.children;
+  const current = onChild ? roster.length - 1 : -1;
+  const childSteps: readonly StepKind[] = state.allergiesSupported
+    ? CHILD_STEPS
+    : CHILD_STEPS.slice(0, 3);
+  const childAt: SectionAt = onChild ? childSteps.indexOf(state.step) : 'behind';
+  /*
+   * Off the adult's own steps the phone settles the section: it is the last of
+   * the three, so having it means all three were answered — which is the case
+   * for every child added after the first, since they are added from the
+   * confirm screen.
+   */
+  const adultAt: SectionAt = onAdult
+    ? ADULT_STEPS.indexOf(state.step as (typeof ADULT_STEPS)[number])
+    : state.guardian.phone !== ''
+      ? 'behind'
+      : 'ahead';
+
+  const sections: QuestionSection[] = [];
+  roster.forEach((child, index) => {
+    sections.push({
+      title: index === 0 ? 'Your child' : `Child ${index + 1}`,
+      rows: childSteps.map((step, position) => {
+        const rowState = runState(index === current ? childAt : 'behind', position);
+        return {
+          id: `child-${index}-${step}`,
+          step,
+          child: index,
+          label: CHILD_LABELS[position]!,
+          answer: rowState === 'done' ? childAnswer(child, step) : '',
+          state: rowState,
+        };
+      }),
+    });
+    // The adult sits after the first child and before any later one, because
+    // that is where they are asked about. A sibling run never asks at all.
+    if (index === 0 && state.mode === 'family') {
+      sections.push({
+        title: 'And you',
+        rows: ADULT_STEPS.map((step, position) => {
+          const rowState = runState(adultAt, position);
+          return {
+            id: `adult-${step}`,
+            step,
+            child: null,
+            label: ADULT_LABELS[position]!,
+            answer: rowState === 'done' ? adultAnswer(state.guardian, step) : '',
+            state: rowState,
+          };
+        }),
+      });
+    }
+  });
+  return sections;
 }
 
 /**
@@ -608,7 +855,7 @@ export function goBack(state: RegistrationState): RegistrationState | null {
         shift: autoShiftAfter(state.draft.lastName),
       };
     case 'child-allergies':
-      return { ...state, step: 'child-grade', buffer: '', shift: 'on' };
+      return { ...state, step: 'child-grade', buffer: '', shift: 'on', gradePicked: true };
     case 'guardian-first':
       return reopenLastChild(state);
     case 'guardian-last':

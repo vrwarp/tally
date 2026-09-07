@@ -293,6 +293,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       });
 
       await press('4th grade', true);
+      await next();
       await shoot({
         flow: 'Your child',
         state: 'Registering — question 4 of 4',
@@ -437,6 +438,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       });
 
       await press('2nd grade', true);
+      await next();
       await shoot({
         flow: 'Child 2',
         state: 'Second child — question 4 of 4',
@@ -612,6 +614,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
       });
 
       await press('Kindergarten', true);
+      await next();
       await shoot({
         flow: 'The second child',
         state: 'Sibling — question 4 of 4',
@@ -672,6 +675,7 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
         if (index === 0) await type(`Nwosu${RUN}`);
         await next();
         await press('No grade', true);
+        await next();
         await tap(kiosk.getByRole('checkbox', { name: /No allergies/i }).click());
         await next();
         if (index === 0) {
