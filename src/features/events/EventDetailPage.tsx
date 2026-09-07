@@ -64,7 +64,7 @@ import { cn, gradeLabel, NO_GRADE } from '@/lib/utils';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
-import { useRecurrenceStrings } from '@/hooks/useRecurrenceStrings';
+import { useRecurrenceStrings } from '@/hooks/usePureStrings';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (

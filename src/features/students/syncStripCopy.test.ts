@@ -8,8 +8,13 @@
  * catches it if somebody reads the screenshot.
  */
 import { describe, expect, it } from 'vitest';
-import { describeFields, syncStripCopy } from '@/features/students/syncStripCopy';
+import {
+  describeFields,
+  syncStripCopy,
+  type SyncStripStrings,
+} from '@/features/students/syncStripCopy';
 import type { UpstreamEdit } from '@/types';
+import { testTranslator } from '@/test/translator';
 
 const NOW = new Date('2026-03-14T09:00:00Z');
 
@@ -41,7 +46,7 @@ function job(over: Partial<UpstreamEdit> = {}): UpstreamEdit {
 }
 
 function copy(edit: UpstreamEdit) {
-  return syncStripCopy({
+  return syncStripCopy(strings, {
     edit,
     now: NOW,
     backend: 'Planning Center',
@@ -50,6 +55,15 @@ function copy(edit: UpstreamEdit) {
     ago: '15 seconds ago',
   });
 }
+
+/*
+ * The real English catalogue, so these assertions still measure the paragraph
+ * a leader reads — and now also that every ICU key behind it renders.
+ */
+const strings: SyncStripStrings = {
+  t: testTranslator('SyncStrip') as unknown as SyncStripStrings['t'],
+  locale: 'en',
+};
 
 describe('a job that could not be delivered', () => {
   /**
@@ -151,15 +165,20 @@ describe('every state a leader can be looking at', () => {
 });
 
 describe('naming the fields somebody changed', () => {
+  /*
+   * The serial comma is `Intl.ListFormat`'s, and deliberate: it is standard
+   * en-US, no style omits it, and nothing hand-rolled produces the 、 a
+   * Chinese list needs. Same trade as the recurrence describer.
+   */
   it('reads as English rather than as a field list', () => {
-    expect(describeFields({ patch: { lastName: 'Ito' } })).toBe('Last name');
-    expect(describeFields({ patch: { lastName: 'Ito', grade: 8 } })).toBe('Last name and grade');
-    expect(describeFields({ patch: { lastName: 'Ito', grade: 8, birthday: '2011-04-02' } })).toBe(
-      'Last name, grade and birthday',
+    expect(describeFields(strings, { patch: { lastName: 'Ito' } })).toBe('Last name');
+    expect(describeFields(strings, { patch: { lastName: 'Ito', grade: 8 } })).toBe('Last name and grade');
+    expect(describeFields(strings, { patch: { lastName: 'Ito', grade: 8, birthday: '2011-04-02' } })).toBe(
+      'Last name, grade, and birthday',
     );
   });
 
   it('says something rather than nothing for an empty patch', () => {
-    expect(describeFields({ patch: {} })).toBe('This profile');
+    expect(describeFields(strings, { patch: {} })).toBe('This profile');
   });
 });

@@ -35,7 +35,7 @@ import { formatShortDate } from '@/lib/time';
 import { cn, haptic } from '@/lib/utils';
 import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
 import { useTranslations } from 'use-intl';
-import { useRecurrenceStrings } from '@/hooks/useRecurrenceStrings';
+import { useRecurrenceStrings } from '@/hooks/usePureStrings';
 
 /**
  * No "days". Every day is every weekday of a weekly rule, chosen in the picker

@@ -4993,5 +4993,535 @@
     "source": "That is every gathering Tally has a record of.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldFirstName": {
+    "source": "first name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldNickname": {
+    "source": "nickname",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldLastName": {
+    "source": "last name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldGrade": {
+    "source": "grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldAllergies": {
+    "source": "allergies",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldBirthday": {
+    "source": "birthday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.fieldsNone": {
+    "source": "This profile",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.byYou": {
+    "source": "by you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.byPerson": {
+    "source": "by {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.queuedOnDeviceHeading": {
+    "source": "Held on this phone — no signal",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.queuedOnDeviceBody": {
+    "source": "{fields}, {by} {ago}. It has not left the device yet, and it goes as soon as you have signal — as long as Tally is still open. Closing this tab before then loses it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.queuedHeading": {
+    "source": "Queued for {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.queuedBody": {
+    "source": "{fields}, {by} {ago}. Nothing has reached {backend} yet, so you can still stop it — and it goes on its own, even if you close this.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.stalledHeading": {
+    "source": "Taking longer than it should",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.stalledBody": {
+    "source": "{fields}, {by} {ago}. It may still land — nothing has failed, and nothing you typed is lost.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.sendingHeading": {
+    "source": "Sending to {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.sendingBody": {
+    "source": "{fields}, {by} {ago}. A server is talking to {backend} about it now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.waitingHeading": {
+    "source": "Waiting on {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.waitingBody": {
+    "source": "{fields}, {by} {ago}. {backend} asked Tally to slow down, so it is paused and resumes on its own. Nothing is stuck.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.landedHeading": {
+    "source": "Saved in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.landedBody": {
+    "source": "{fields}, {by} {ago}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.differsHeading": {
+    "source": "{backend} holds a different value",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.differsBody": {
+    "source": "Your edit went out and did not overwrite anything — somebody had already changed the same field. Nothing of yours was written, and nothing of theirs was lost. Which one is right is yours to say.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.mergedHeading": {
+    "source": "This record was merged into another person",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.mergedBody": {
+    "source": "Your correction followed the merge and landed on the survivor, not here. This page now reads from them, and the ids below are what moved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.orphanedHeading": {
+    "source": "No longer in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.orphanedBody": {
+    "source": "{fields}, {by} {ago}. It has nowhere to land: the person it names was deleted — deleted outright, not merged into anybody. Nothing is lost, and neither is any gathering they attended — re-creating sends the edit with them, so nobody types it twice. Tally searches {backend} for a matching person first and links to them if it finds one, rather than adding a second.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.exhaustedHeading": {
+    "source": "Could not reach {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.exhaustedBody": {
+    "source": "{fields}, {by} {ago}. Tally tried and gave up, and has stopped trying on its own — sending it again is usually all it takes. Nothing was saved, and nothing you typed is lost.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.refusedHeading": {
+    "source": "{backend} refused this edit",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.refusedBodyWithMessage": {
+    "source": "{fields}, {by} {ago}. {message} Nothing was saved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.refusedBody": {
+    "source": "{fields}, {by} {ago}. Nothing was saved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.somebody": {
+    "source": "somebody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.you": {
+    "source": "you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "SyncStrip.rowCaption": {
+    "source": "{fields} · {author}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.queuedLong": {
+    "source": "Queued",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.queuedShort": {
+    "source": "Queued",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.queuedTitle": {
+    "source": "Written down and not sent yet — you can still cancel it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.sendingLong": {
+    "source": "Sending",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.sendingShort": {
+    "source": "Sending",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.sendingTitle": {
+    "source": "A server is talking to the people backend about this one right now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.waitingLong": {
+    "source": "Waiting",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.waitingShort": {
+    "source": "Waiting",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.waitingTitle": {
+    "source": "The backend asked Tally to slow down. It resumes on its own — nothing is stuck.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.landedLong": {
+    "source": "Saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.landedShort": {
+    "source": "Saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.landedTitle": {
+    "source": "Saved upstream.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.differsLong": {
+    "source": "Changed upstream",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.differsShort": {
+    "source": "Changed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.differsTitle": {
+    "source": "It landed on a value nobody typed — somebody changed the same field upstream. It will not resolve itself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.mergedLong": {
+    "source": "Merged upstream",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.mergedShort": {
+    "source": "Merged",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.mergedTitle": {
+    "source": "The person you edited was merged into somebody else upstream. Your correction landed on them, under a different id.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.failedLong": {
+    "source": "Save failed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.failedShort": {
+    "source": "Failed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.failedTitle": {
+    "source": "The backend refused this edit. Open the record to see why.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.orphanedLong": {
+    "source": "No upstream record",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.orphanedShort": {
+    "source": "No record",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.orphanedTitle": {
+    "source": "The person this edit names no longer exists upstream.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.cancelledLong": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.cancelledShort": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.cancelledTitle": {
+    "source": "",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.stalledLong": {
+    "source": "Still sending",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.stalledShort": {
+    "source": "Sending",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.stalledTitle": {
+    "source": "Taking longer than it should. It may still land — nothing has failed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "JobChip.withAge": {
+    "source": "{words} · {age}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.title": {
+    "source": "Students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.countAll": {
+    "source": "{count, plural, one {# student} other {# students}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.countFiltered": {
+    "source": "{shown} of {total}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.actions": {
+    "source": "Actions",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.newVisitor": {
+    "source": "New visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.addFromDirectory": {
+    "source": "Add from directory",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.addFromPco": {
+    "source": "Add from Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.twoWaysShort": {
+    "source": "Two ways onto the roster, weekly first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.actionsTitle": {
+    "source": "Roster actions",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.actionsDescription": {
+    "source": "Two ways onto the roster, and the one file that leaves it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.exportBlockedLoading": {
+    "source": "Still reading the roster — nothing to export yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.exportBlockedError": {
+    "source": "The roster could not be read, so an export would not be a true list.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.namePlaceholder": {
+    "source": "Name…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.allGrades": {
+    "source": "All grades",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.quickFilters": {
+    "source": "Quick filters",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.inFlight": {
+    "source": "In flight",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.needsYou": {
+    "source": "Needs you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.incompleteProfiles": {
+    "source": "Incomplete profiles",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.clearFilters": {
+    "source": "Clear filters",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.rosterErrorTitle": {
+    "source": "The roster could not be read.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.rosterErrorBody": {
+    "source": "Whoever is on it is still on it — Tally needs their backend to put names to them. The banner above has the details.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.emptyFilteredTitle": {
+    "source": "Nobody matches those filters.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.emptyTitle": {
+    "source": "No students on the roster yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.emptyFilteredBody": {
+    "source": "Widen the search, or add the student if this is their first time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.emptyBody": {
+    "source": "Add students from your church directory, or add one by hand.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.rowAriaWithGrade": {
+    "source": "{name}, {grade}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.rowAriaNoGrade": {
+    "source": "{name}, no grade on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.visitorTitle": {
+    "source": "{name} is marked as a new visitor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.visitorPress": {
+    "source": "{name} is marked as a visitor — change that",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.allergyPress": {
+    "source": "Read what {name} is allergic to",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.addContactPress": {
+    "source": "Add a contact for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.inactivePress": {
+    "source": "{name} is inactive — put them back on the roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.noBirthdayTitle": {
+    "source": "{backend} holds no birthdate for this student",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.noBirthdayPress": {
+    "source": "No birthday on file for {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.noBirthday": {
+    "source": "No birthday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.birthdayToday": {
+    "source": "{name}'s birthday is today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.birthdaySoon": {
+    "source": "{name}'s birthday is on {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.birthdayRecent": {
+    "source": "{name}'s birthday was on {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.queuedTitle": {
+    "source": "Waiting to be created in {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Students.queuedPress": {
+    "source": "{name} is not in {backend} yet — push them now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

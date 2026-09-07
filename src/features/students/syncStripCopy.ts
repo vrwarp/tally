@@ -26,22 +26,41 @@
  */
 import { editedFields, isStalled, type UpstreamEdit, type UpstreamEditField } from '@/types';
 
+/**
+ * Everything this copy needs from the catalogue, handed in as data.
+ *
+ * A pure module cannot call a hook, and every sentence below is a whole one
+ * with named slots — the field list, who made the edit, how long ago, and
+ * which backend. `StudentSyncStrip` supplies the translator and the locale.
+ */
+export interface SyncStripStrings {
+  t: (key: string, values?: Record<string, string>) => string;
+  locale: string;
+}
+
 const FIELD_NAMES: Record<UpstreamEditField, string> = {
-  firstName: 'first name',
-  nickname: 'nickname',
-  lastName: 'last name',
-  grade: 'grade',
-  allergies: 'allergies',
-  birthday: 'birthday',
+  firstName: 'fieldFirstName',
+  nickname: 'fieldNickname',
+  lastName: 'fieldLastName',
+  grade: 'fieldGrade',
+  allergies: 'fieldAllergies',
+  birthday: 'fieldBirthday',
 };
 
 /** "Last name and grade", "Birthday", "Last name, grade and allergies". */
-export function describeFields(edit: Pick<UpstreamEdit, 'patch'>): string {
-  const names = editedFields(edit).map((field) => FIELD_NAMES[field]);
-  if (names.length === 0) return 'This profile';
+export function describeFields(
+  { t, locale }: SyncStripStrings,
+  edit: Pick<UpstreamEdit, 'patch'>,
+): string {
+  const names = editedFields(edit).map((field) => t(FIELD_NAMES[field]));
+  if (names.length === 0) return t('fieldsNone');
   if (names.length === 1) return capitalise(names[0]!);
-  const last = names[names.length - 1]!;
-  return capitalise(`${names.slice(0, -1).join(', ')} and ${last}`);
+  // `Intl.ListFormat`, because the separator and the conjunction belong to the
+  // language. `capitalise` is a no-op on a script with no case, which is the
+  // right outcome rather than something to branch on.
+  return capitalise(
+    new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(names),
+  );
 }
 
 function capitalise(value: string): string {
@@ -71,10 +90,12 @@ export interface SyncStripInput {
   ago: string;
 }
 
-export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
+export function syncStripCopy(strings: SyncStripStrings, input: SyncStripInput): SyncStripCopy {
+  const { t } = strings;
   const { edit, backend, mine, authorFirstName, ago } = input;
-  const fields = describeFields(edit);
-  const by = mine ? 'by you' : `by ${authorFirstName}`;
+  const fields = describeFields(strings, edit);
+  const by = mine ? t('byYou') : t('byPerson', { name: authorFirstName });
+  const slots = { fields, by, ago, backend };
 
   switch (edit.state) {
     case 'queued':
@@ -88,7 +109,7 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
         ? {
             tone: 'run',
             glyph: '▪',
-            heading: 'Held on this phone — no signal',
+            heading: t('queuedOnDeviceHeading'),
             /*
              * "Even if you lock the screen" was here, and Tally cannot keep it.
              * The Firestore client is built with a memory cache on purpose
@@ -101,13 +122,13 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
              * for the walk back to the office and one who is told a fortnight
              * later that the surname never changed.
              */
-            body: `${fields}, ${by} ${ago}. It has not left the device yet, and it goes as soon as you have signal — as long as Tally is still open. Closing this tab before then loses it.`,
+            body: t('queuedOnDeviceBody', slots),
           }
         : {
             tone: 'run',
             glyph: '▪',
-            heading: `Queued for ${backend}`,
-            body: `${fields}, ${by} ${ago}. Nothing has reached ${backend} yet, so you can still stop it — and it goes on its own, even if you close this.`,
+            heading: t('queuedHeading', slots),
+            body: t('queuedBody', slots),
           };
 
     case 'sending':
@@ -115,59 +136,56 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
         ? {
             tone: 'run',
             glyph: '→',
-            heading: 'Taking longer than it should',
-            body: `${fields}, ${by} ${ago}. It may still land — nothing has failed, and nothing you typed is lost.`,
+            heading: t('stalledHeading'),
+            body: t('stalledBody', slots),
           }
         : {
             tone: 'run',
             glyph: '→',
-            heading: `Sending to ${backend}`,
-            body: `${fields}, ${by} ${ago}. A server is talking to ${backend} about it now.`,
+            heading: t('sendingHeading', slots),
+            body: t('sendingBody', slots),
           };
 
     case 'waiting':
       return {
         tone: 'run',
         glyph: '‖',
-        heading: `Waiting on ${backend}`,
-        body: `${fields}, ${by} ${ago}. ${backend} asked Tally to slow down, so it is paused and resumes on its own. Nothing is stuck.`,
+        heading: t('waitingHeading', slots),
+        body: t('waitingBody', slots),
       };
 
     case 'landed':
       return {
         tone: 'run',
         glyph: '✓',
-        heading: `Saved in ${backend}`,
-        body: `${fields}, ${by} ${ago}.`,
+        heading: t('landedHeading', slots),
+        body: t('landedBody', slots),
       };
 
     case 'differs':
       return {
         tone: 'bad',
         glyph: '≠',
-        heading: `${backend} holds a different value`,
-        body: `Your edit went out and did not overwrite anything — somebody had already changed the same field. Nothing of yours was written, and nothing of theirs was lost. Which one is right is yours to say.`,
+        heading: t('differsHeading', slots),
+        body: t('differsBody'),
       };
 
     case 'merged':
       return {
         tone: 'bad',
         glyph: '≠',
-        heading: 'This record was merged into another person',
+        heading: t('mergedHeading'),
         // No name and no date: they are in the two cells below, and a value
         // that appears in a cell does not appear in the paragraph.
-        body: `Your correction followed the merge and landed on the survivor, not here. This page now reads from them, and the ids below are what moved.`,
+        body: t('mergedBody'),
       };
 
     case 'orphaned':
       return {
         tone: 'bad',
         glyph: '⊘',
-        heading: `No longer in ${backend}`,
-        body:
-          `${fields}, ${by} ${ago}. It has nowhere to land: the person it names was deleted — deleted outright, not merged into anybody. ` +
-          `Nothing is lost, and neither is any gathering they attended — re-creating sends the edit with them, so nobody types it twice. ` +
-          `Tally searches ${backend} for a matching person first and links to them if it finds one, rather than adding a second.`,
+        heading: t('orphanedHeading', slots),
+        body: t('orphanedBody', slots),
       };
 
     case 'failed':
@@ -186,13 +204,13 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
         ? {
             tone: 'bad',
             glyph: '!',
-            heading: `Could not reach ${backend}`,
-            body: `${fields}, ${by} ${ago}. Tally tried and gave up, and has stopped trying on its own — sending it again is usually all it takes. Nothing was saved, and nothing you typed is lost.`,
+            heading: t('exhaustedHeading', slots),
+            body: t('exhaustedBody', slots),
           }
         : {
             tone: 'bad',
             glyph: '!',
-            heading: `${backend} refused this edit`,
+            heading: t('refusedHeading', slots),
             /*
              * The field sentence first, the backend's own words after, in that
              * order on every state in this file. Inverted here once, and the
@@ -201,8 +219,8 @@ export function syncStripCopy(input: SyncStripInput): SyncStripCopy {
              * screen in the queue where the words are all there is.
              */
             body: edit.message
-              ? `${fields}, ${by} ${ago}. ${edit.message} Nothing was saved.`
-              : `${fields}, ${by} ${ago}. Nothing was saved.`,
+              ? t('refusedBodyWithMessage', { ...slots, message: edit.message })
+              : t('refusedBody', slots),
           };
   }
 }

@@ -28,6 +28,8 @@ import {
   type UpstreamEdit,
   type UpstreamEditState,
 } from '@/types';
+import { useTranslations } from 'use-intl';
+import type en from '../../../messages/en.json';
 
 type Tone = 'run' | 'ok' | 'bad' | 'mute' | 'held';
 
@@ -60,79 +62,55 @@ const GLYPHS: Record<UpstreamEditState, string> = {
   cancelled: '▪',
 };
 
+/**
+ * The three keys a state's chip reads, and its one tone.
+ *
+ * A `string` here would widen against the typed catalogue and every lookup
+ * below would stop compiling — which is the check doing its job.
+ */
+type ChipKey = Exclude<keyof typeof en.JobChip, 'withAge'>;
+
 interface Words {
-  long: string;
-  short: string;
+  long: ChipKey;
+  short: ChipKey;
   tone: Tone;
-  title: string;
+  title: ChipKey;
 }
 
+/**
+ * Keys rather than words: this is a module-level table read at render, and a
+ * table cannot call a hook. `tone` and the glyph stay here because they are
+ * the same in every language.
+ */
 const WORDS: Record<UpstreamEditState, Words> = {
-  queued: {
-    long: 'Queued',
-    short: 'Queued',
-    tone: 'run',
-    title: 'Written down and not sent yet — you can still cancel it.',
-  },
-  sending: {
-    long: 'Sending',
-    short: 'Sending',
-    tone: 'run',
-    title: 'A server is talking to the people backend about this one right now.',
-  },
-  waiting: {
-    long: 'Waiting',
-    short: 'Waiting',
-    tone: 'run',
-    title: 'The backend asked Tally to slow down. It resumes on its own — nothing is stuck.',
-  },
-  landed: {
-    long: 'Saved',
-    short: 'Saved',
-    tone: 'ok',
-    title: 'Saved upstream.',
-  },
-  differs: {
-    long: 'Changed upstream',
-    short: 'Changed',
-    tone: 'bad',
-    title:
-      'It landed on a value nobody typed — somebody changed the same field upstream. It will not resolve itself.',
-  },
+  queued: { long: 'queuedLong', short: 'queuedShort', tone: 'run', title: 'queuedTitle' },
+  sending: { long: 'sendingLong', short: 'sendingShort', tone: 'run', title: 'sendingTitle' },
+  waiting: { long: 'waitingLong', short: 'waitingShort', tone: 'run', title: 'waitingTitle' },
+  landed: { long: 'landedLong', short: 'landedShort', tone: 'ok', title: 'landedTitle' },
+  differs: { long: 'differsLong', short: 'differsShort', tone: 'bad', title: 'differsTitle' },
   /*
    * A different word from `differs`, on purpose and against the same glyph.
    * "Somebody edited a field" and "this child is now a different person
    * upstream" are the same shape of trouble and completely different errands,
    * and on a phone the word is all a row gets — the caption is `lg:` only.
    */
-  merged: {
-    long: 'Merged upstream',
-    short: 'Merged',
-    tone: 'bad',
-    title:
-      'The person you edited was merged into somebody else upstream. Your correction landed on them, under a different id.',
+  merged: { long: 'mergedLong', short: 'mergedShort', tone: 'bad', title: 'mergedTitle' },
+  failed: { long: 'failedLong', short: 'failedShort', tone: 'bad', title: 'failedTitle' },
+  orphaned: { long: 'orphanedLong', short: 'orphanedShort', tone: 'bad', title: 'orphanedTitle' },
+  cancelled: {
+    long: 'cancelledLong',
+    short: 'cancelledShort',
+    tone: 'mute',
+    title: 'cancelledTitle',
   },
-  failed: {
-    long: 'Save failed',
-    short: 'Failed',
-    tone: 'bad',
-    title: 'The backend refused this edit. Open the record to see why.',
-  },
-  orphaned: {
-    long: 'No upstream record',
-    short: 'No record',
-    tone: 'bad',
-    title: 'The person this edit names no longer exists upstream.',
-  },
-  cancelled: { long: 'Cancelled', short: 'Cancelled', tone: 'mute', title: '' },
 };
 
 /** The one wording that is derived from the clock rather than stored. */
 const STALLED: Words = {
-  long: 'Still sending',
-  short: 'Sending',
+  long: 'stalledLong',
+  short: 'stalledShort',
   tone: 'run',
-  title: 'Taking longer than it should. It may still land — nothing has failed.',
+  title: 'stalledTitle',
 };
 
 export interface JobChipProps {
@@ -154,6 +132,7 @@ export interface JobChipProps {
 }
 
 export function JobChip({ edit, now, short, held, href, className }: JobChipProps) {
+  const t = useTranslations('JobChip');
   const stalled = isStalled(edit, now);
   const words = stalled ? STALLED : WORDS[edit.state];
   const tone: Tone = held ? 'held' : words.tone;
@@ -163,7 +142,7 @@ export function JobChip({ edit, now, short, held, href, className }: JobChipProp
   const body = (
     <>
       <span aria-hidden="true">{glyph}</span>
-      {short ? words.short : `${words.long} · ${age}`}
+      {short ? t(words.short) : t('withAge', { words: t(words.long), age })}
       {href ? (
         <span aria-hidden="true" className="ml-0.5">
           ↓
@@ -189,7 +168,7 @@ export function JobChip({ edit, now, short, held, href, className }: JobChipProp
     return (
       <a
         href={href}
-        title={words.title}
+        title={t(words.title)}
         className={cn(
           classes,
           "relative cursor-pointer after:absolute after:-inset-x-1 after:-inset-y-3 after:content-[''] lg:after:inset-0",
@@ -201,7 +180,7 @@ export function JobChip({ edit, now, short, held, href, className }: JobChipProp
   }
 
   return (
-    <span className={classes} title={words.title}>
+    <span className={classes} title={t(words.title)}>
       {body}
     </span>
   );

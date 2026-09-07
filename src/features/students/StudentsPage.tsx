@@ -71,11 +71,15 @@ import {
   type Student,
   type UpstreamEdit,
 } from '@/types';
+import { useSyncStripStrings } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
 export function StudentsPage() {
+  const t = useTranslations('Students');
+  const tErrors = useTranslations('Errors');
   const {
     students,
     loading,
@@ -245,9 +249,9 @@ export function StudentsPage() {
   );
 
   const exportBlockedReason = !rosterSettled
-    ? 'Still reading the roster — nothing to export yet.'
+    ? t('exportBlockedLoading')
     : rosterError
-      ? 'The roster could not be read, so an export would not be a true list.'
+      ? t('exportBlockedError')
       : null;
 
   const [confirmingPartial, setConfirmingPartial] = useState<{
@@ -311,15 +315,12 @@ export function StudentsPage() {
         <div className="flex min-h-11 flex-col justify-center">
           <h1 className="text-xl font-bold text-ink-50">Students</h1>
           <p className="mt-0.5 text-sm text-ink-500">
-            <span className="tabular-nums">{visible.length}</span>
+            {/* "1 students" is what this printed for a ministry with one
+                student on it. The filtered branch beside it — "1 of 50" — was
+                always right, which is how it survived this long. */}
             {visible.length === students.length
-              ? // "1 students" is what this printed for a ministry with one
-                // student on it. The filtered branch beside it — "1 of 50" —
-                // was always right, which is how it survived this long.
-                visible.length === 1
-                ? ' student'
-                : ' students'
-              : ` of ${students.length}`}
+              ? t('countAll', { count: visible.length })
+              : t('countFiltered', { shown: visible.length, total: students.length })}
           </p>
         </div>
         <Button
@@ -328,11 +329,11 @@ export function StudentsPage() {
           aria-haspopup="dialog"
           onClick={() => setActionsOpen(true)}
         >
-          Actions
+          {t('actions')}
         </Button>
         <div className="hidden flex-wrap items-center justify-end gap-2 lg:flex">
           {/*
-            Two ways onto the roster, weekly first.
+            {t('twoWaysShort')}
 
             Both are quiet now. The import used to be the only brand-filled
             thing on the screen — the loudest, widest object on a page whose job
@@ -342,10 +343,10 @@ export function StudentsPage() {
             takes the top line of the toolbar to itself.
           */}
           <Button variant="secondary" onClick={() => setEditorOpen(true)}>
-            New visitor
+            {t('newVisitor')}
           </Button>
           <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
-            {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
+            {multiBackend ? t('addFromDirectory') : t('addFromPco')}
           </Button>
           {/*
             The third control, and the only one on this page whose output leaves
@@ -371,8 +372,8 @@ export function StudentsPage() {
         <Modal
           open
           onClose={() => setActionsOpen(false)}
-          title="Roster actions"
-          description="Two ways onto the roster, and the one file that leaves it."
+          title={t('actionsTitle')}
+          description={t('actionsDescription')}
           size="sm"
         >
           <div className="flex flex-col gap-2">
@@ -386,7 +387,7 @@ export function StudentsPage() {
                 setEditorOpen(true);
               }}
             >
-              New visitor
+              {t('newVisitor')}
             </Button>
             <Button
               variant="secondary"
@@ -396,7 +397,7 @@ export function StudentsPage() {
                 setAddFromPcoOpen(true);
               }}
             >
-              {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
+              {multiBackend ? t('addFromDirectory') : t('addFromPco')}
             </Button>
             <ExportCsvButton
               build={buildExport}
@@ -459,7 +460,7 @@ export function StudentsPage() {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Name…"
+            placeholder={t('namePlaceholder')}
             value={query}
             onChange={(changed) => setQuery(changed.target.value)}
             /*
@@ -482,7 +483,7 @@ export function StudentsPage() {
               setGrade(changed.target.value ? (Number(changed.target.value) as Grade) : null)
             }
           >
-            <option value="">All grades</option>
+            <option value="">{t('allGrades')}</option>
             {GRADES.map((value) => (
               <option key={value} value={value}>
                 {gradeName(value)}
@@ -514,7 +515,7 @@ export function StudentsPage() {
         */}
         <div
           role="group"
-          aria-label="Quick filters"
+          aria-label={t('quickFilters')}
           className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:shrink-0"
         >
           <span className="flex shrink-0 flex-wrap gap-2">
@@ -522,14 +523,14 @@ export function StudentsPage() {
               active={quick === 'inFlight'}
               onPress={() => setQuick((current) => (current === 'inFlight' ? 'none' : 'inFlight'))}
             >
-              In flight
+              {t('inFlight')}
               <ChipCount active={quick === 'inFlight'}>{inFlightCount}</ChipCount>
             </FilterChip>
             <FilterChip
               active={quick === 'needsYou'}
               onPress={() => setQuick((current) => (current === 'needsYou' ? 'none' : 'needsYou'))}
             >
-              Needs you
+              {t('needsYou')}
               <ChipCount active={quick === 'needsYou'}>{needsYouCount}</ChipCount>
             </FilterChip>
           </span>
@@ -538,7 +539,7 @@ export function StudentsPage() {
             active={quick === 'incomplete'}
             onPress={() => setQuick((current) => (current === 'incomplete' ? 'none' : 'incomplete'))}
           >
-            Incomplete profiles
+            {t('incompleteProfiles')}
             <ChipCount active={quick === 'incomplete'}>{incompleteCount}</ChipCount>
           </FilterChip>
           <FilterChip
@@ -555,7 +556,7 @@ export function StudentsPage() {
               onClick={clearFilters}
               className="min-h-11 rounded-full px-3 text-xs font-semibold text-ink-400 underline underline-offset-4 hover:text-ink-100"
             >
-              Clear filters
+              {t('clearFilters')}
             </button>
           ) : null}
         </div>
@@ -574,31 +575,31 @@ export function StudentsPage() {
           rosterError ? (
             <EmptyState
               icon="⚠️"
-              title="The roster could not be read."
-              description="Whoever is on it is still on it — Tally needs their backend to put names to them. The banner above has the details."
+              title={t('rosterErrorTitle')}
+              description={t('rosterErrorBody')}
               action={
                 <Button variant="secondary" onClick={() => void refreshRoster(true)}>
-                  Try again
+                  {tErrors('tryAgain')}
                 </Button>
               }
             />
           ) : (
             <EmptyState
               icon="🔍"
-              title={isFiltered ? 'Nobody matches those filters.' : 'No students on the roster yet.'}
+              title={isFiltered ? t('emptyFilteredTitle') : t('emptyTitle')}
               description={
                 isFiltered
-                  ? 'Widen the search, or add the student if this is their first time.'
-                  : 'Add students from your church directory, or add one by hand.'
+                  ? t('emptyFilteredBody')
+                  : t('emptyBody')
               }
               action={
                 isFiltered ? (
                   <Button variant="secondary" onClick={clearFilters}>
-                    Clear filters
+                    {t('clearFilters')}
                   </Button>
                 ) : (
                   <Button onClick={() => setAddFromPcoOpen(true)}>
-                    {multiBackend ? 'Add from directory' : 'Add from Planning Center'}
+                    {multiBackend ? t('addFromDirectory') : t('addFromPco')}
                   </Button>
                 )
               }
@@ -735,6 +736,7 @@ const StudentListRow = memo(function StudentListRow({
   uid: string | null;
   onBadge: (student: Student, action: RowBadgeAction) => void;
 }) {
+  const t = useTranslations('Students');
   const name = `${student.firstName} ${student.lastName}`;
   const birthday = birthdayState(student.birthday, now);
   const spokenGrade = gradeSentence(student);
@@ -772,7 +774,7 @@ const StudentListRow = memo(function StudentListRow({
       <Link
         to={`/students/${student.id}`}
         aria-label={
-          spokenGrade ? `${name}, ${spokenGrade}` : `${name}, no grade on file`
+          spokenGrade ? t('rowAriaWithGrade', { name, grade: spokenGrade }) : t('rowAriaNoGrade', { name })
         }
         className="absolute inset-0 rounded-lg"
       />
@@ -899,9 +901,9 @@ const StudentListRow = memo(function StudentListRow({
           {student.isVisitor ? (
             <Badge
               tone="brand"
-              title={`${student.firstName} is marked as a new visitor`}
+              title={t('visitorTitle', { name: student.firstName })}
               onPress={() => onBadge(student, 'visitor')}
-              pressLabel={`${name} is marked as a visitor — change that`}
+              pressLabel={t('visitorPress', { name })}
             >
               Visitor
             </Badge>
@@ -933,7 +935,7 @@ const StudentListRow = memo(function StudentListRow({
             <WarningBadge
               warning="allergy"
               onPress={() => onBadge(student, 'allergy')}
-              pressLabel={`Read what ${name} is allergic to`}
+              pressLabel={t('allergyPress', { name })}
             />
           ) : null}
           {/*
@@ -960,7 +962,7 @@ const StudentListRow = memo(function StudentListRow({
             <WarningBadge
               warning="incomplete-profile"
               onPress={() => onBadge(student, 'contact')}
-              pressLabel={`Add a contact for ${name}`}
+              pressLabel={t('addContactPress', { name })}
             />
           ) : (
             <WarningBadge
@@ -972,7 +974,7 @@ const StudentListRow = memo(function StudentListRow({
             <Badge
               tone="neutral"
               onPress={() => onBadge(student, 'inactive')}
-              pressLabel={`${name} is inactive — put them back on the roster`}
+              pressLabel={t('inactivePress', { name })}
             >
               Inactive
             </Badge>
@@ -1029,9 +1031,15 @@ function JobBand({
   now: Date;
   uid: string | null;
 }) {
+  const syncStrings = useSyncStripStrings();
   const mine = edit.createdBy === uid;
-  const author = mine ? 'you' : (edit.createdByName.split(/\s+/)[0] ?? 'somebody');
-  const caption = `${describeFields(edit)} · ${author}`;
+  const author = mine
+    ? syncStrings.t('you')
+    : (edit.createdByName.split(/\s+/)[0] ?? syncStrings.t('somebody'));
+  const caption = syncStrings.t('rowCaption', {
+    fields: describeFields(syncStrings, edit),
+    author,
+  });
 
   return (
     <span className="hidden min-w-0 flex-1 items-center gap-2 text-xs text-ink-500 lg:flex">
@@ -1141,6 +1149,7 @@ function BirthdayBadge({
   now: Date;
   onPress: () => void;
 }) {
+  const t = useTranslations('Students');
   if (state === 'quiet') return null;
 
   const name = student.firstName;
@@ -1170,12 +1179,12 @@ function BirthdayBadge({
     return (
       <Badge
         tone="neutral"
-        title={`${backendLabelOf(student)} holds no birthdate for this student`}
+        title={t('noBirthdayTitle', { backend: backendLabelOf(student) })}
         onPress={onPress}
-        pressLabel={`No birthday on file for ${name}`}
+        pressLabel={t('noBirthdayPress', { name })}
         className="hidden lg:inline-flex"
       >
-        No birthday
+        {t('noBirthday')}
       </Badge>
     );
   }
@@ -1184,9 +1193,9 @@ function BirthdayBadge({
   const spoken = formatBirthdayLong(student.birthday);
 
   const TITLES: Record<'today' | 'soon' | 'recent', string> = {
-    today: `${name}'s birthday is today`,
-    soon: `${name}'s birthday is on ${spoken}`,
-    recent: `${name}'s birthday was on ${spoken}`,
+    today: t('birthdayToday', { name }),
+    soon: t('birthdaySoon', { name, date: spoken ?? '' }),
+    recent: t('birthdayRecent', { name, date: spoken ?? '' }),
   };
 
   return (
@@ -1228,15 +1237,16 @@ function QueuedBadge({
   onPress: () => void;
   name: string;
 }) {
+  const t = useTranslations('Students');
   if (backendOfStudent(student) !== null) return null;
 
   const label = backendLabelOf(student);
   return (
     <Badge
       tone="neutral"
-      title={`Waiting to be created in ${label}`}
+      title={t('queuedTitle', { backend: label })}
       onPress={onPress}
-      pressLabel={`${name} is not in ${label} yet — push them now`}
+      pressLabel={t('queuedPress', { name, backend: label })}
     >
       Queued
     </Badge>

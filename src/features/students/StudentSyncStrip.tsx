@@ -38,6 +38,7 @@ import {
   type UpstreamEdit,
   type UpstreamEditPatch,
 } from '@/types';
+import { useSyncStripStrings } from '@/hooks/usePureStrings';
 
 /** The short guard, shared so the two frames that show it cannot drift apart. */
 export const ONE_NEW_PERSON = 'One new person, never a second copy.';
@@ -75,14 +76,15 @@ export function StudentSyncStrip({
   onFix,
   onRecreate,
 }: StudentSyncStripProps) {
+  const syncStrings = useSyncStripStrings();
   const backend = backendLabelOf(student);
   const mine = edit.createdBy === uid;
-  const copy = syncStripCopy({
+  const copy = syncStripCopy(syncStrings, {
     edit,
     now,
     backend,
     mine,
-    authorFirstName: edit.createdByName.split(/\s+/)[0] ?? 'somebody',
+    authorFirstName: edit.createdByName.split(/\s+/)[0] ?? syncStrings.t('somebody'),
     ago: formatRelative(edit.createdAt),
   });
 

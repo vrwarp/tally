@@ -1,5 +1,5 @@
 /**
- * What `src/lib/recurrence.ts` needs from the catalogue, in one place.
+ * What the pure sentence-builders need from the catalogue, in one place.
  *
  * The describers there build a *sentence* — "Every 2 weeks on Fri and Sun,
  * until Mar 5, 2027" — out of clauses whose order, whose list separator and
@@ -13,6 +13,7 @@
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import type { RecurrenceStrings } from '@/lib/recurrence';
+import type { SyncStripStrings } from '@/features/students/syncStripCopy';
 
 export function useRecurrenceStrings(): RecurrenceStrings {
   const t = useTranslations('Recurrence');
@@ -25,6 +26,20 @@ export function useRecurrenceStrings(): RecurrenceStrings {
       t: t as unknown as RecurrenceStrings['t'],
       locale,
     }),
+    [t, locale],
+  );
+}
+
+/**
+ * The same arrangement for `syncStripCopy`, which builds a paragraph out of a
+ * field list, who made the edit and how long ago — all of which move around
+ * the sentence differently per language.
+ */
+export function useSyncStripStrings(): SyncStripStrings {
+  const t = useTranslations('SyncStrip');
+  const locale = useLocale();
+  return useMemo(
+    () => ({ t: t as unknown as SyncStripStrings['t'], locale }),
     [t, locale],
   );
 }
