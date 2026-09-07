@@ -21,6 +21,7 @@ import {
   formatSeenShort,
   formatShortDate,
   formatWeekdayDate,
+  formatWeekdayDay,
   type TimeStrings,
 } from '@/lib/time';
 
@@ -35,6 +36,8 @@ export interface TimeFormats {
   shortDate: (date: Date) => string;
   /** "Sun, Feb 15" — the day itself, never "Today". */
   weekdayDate: (date: Date) => string;
+  /** "Sun 15" — for a ladder whose head has already named the month. */
+  weekdayDay: (date: Date) => string;
   /** "7:00 PM". */
   clock: (date: Date) => string;
   /** "2 hours ago", and "in 2 hours" for a date that has not happened. */
@@ -58,6 +61,7 @@ export function useTimeFormats(): TimeFormats {
       dateTime: (date) => formatDateTime(strings, date),
       shortDate: (date) => formatShortDate(strings, date),
       weekdayDate: (date) => formatWeekdayDate(strings, date),
+      weekdayDay: (date) => formatWeekdayDay(strings, date),
       clock: (date) => formatClock(strings, date),
       relative: (date, now) => formatRelative(strings, date, now),
       seenShort: (date, now) => formatSeenShort(strings, date, now),

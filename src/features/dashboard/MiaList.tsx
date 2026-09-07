@@ -137,9 +137,7 @@ export function MiaList({
                 // The toast beside this one has always got it right ("Copied 1
                 // name"); this string is the one that leaves the app, and "1
                 // students" landed in the team group chat.
-                title={`Follow-up — ${items.length} ${
-                  items.length === 1 ? 'student' : 'students'
-                } we have not seen:`}
+                title={t('copyTitle', { count: items.length })}
               />
               <ExportCsvButton
                 build={() => ({

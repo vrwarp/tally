@@ -492,9 +492,9 @@ export function StudentsPage() {
             value={status}
             onChange={(changed) => setStatus(changed.target.value as StatusFilter)}
           >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="all">Everyone</option>
+            <option value="active">{tCommon('active')}</option>
+            <option value="inactive">{tCommon('inactive')}</option>
+            <option value="all">{t('statusEveryone')}</option>
           </SelectField>
         </div>
 

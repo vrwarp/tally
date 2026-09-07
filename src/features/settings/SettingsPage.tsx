@@ -236,10 +236,9 @@ export function SettingsPage() {
                     value={form.newVisitorWindowDays}
                     onValueChange={setNumber('newVisitorWindowDays')}
                     error={errors.newVisitorWindowDays}
-                    hint={`A first-timer stays on the “New faces” list for ${Math.max(
-                      1,
-                      form.newVisitorWindowDays,
-                    )} days.`}
+                    hint={t('newFacesHint', {
+                      days: Math.max(1, form.newVisitorWindowDays),
+                    })}
                   />
                 </div>
               </div>

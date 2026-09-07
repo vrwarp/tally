@@ -263,7 +263,8 @@
     "missedInARow": "Missed {count} {gathering} gatherings in a row.",
     "notSeenAtLast": "Not seen at any of the last {count} gatherings.",
     "resolve": "Resolve…",
-    "resolveAria": "No longer expected — {name}"
+    "resolveAria": "No longer expected — {name}",
+    "copyTitle": "{count, plural, one {Follow-up — # student we have not seen:} other {Follow-up — # students we have not seen:}}"
   },
   "Incomplete": {
     "title": "Incomplete profiles",
@@ -531,7 +532,8 @@
     "previewWas": " · was {count}",
     "previewStudents": " {count, plural, one {student} other {students}}",
     "title": "Settings",
-    "intro": "Thresholds and connections apply to every counselor's phone immediately. Appearance is yours alone. Who may sign in lives on <team>Team</team>, and the lobby screen on <kiosk>Kiosk</kiosk>."
+    "intro": "Thresholds and connections apply to every counselor's phone immediately. Appearance is yours alone. Who may sign in lives on <team>Team</team>, and the lobby screen on <kiosk>Kiosk</kiosk>.",
+    "newFacesHint": "A first-timer stays on the “New faces” list for {days} days."
   },
   "Backends": {
     "refresh": "Refresh",
@@ -1318,7 +1320,8 @@
     "birthdaySoon": "{name}'s birthday is on {date}",
     "birthdayRecent": "{name}'s birthday was on {date}",
     "queuedTitle": "Waiting to be created in {backend}",
-    "queuedPress": "{name} is not in {backend} yet — push them now"
+    "queuedPress": "{name} is not in {backend} yet — push them now",
+    "statusEveryone": "Everyone"
   },
   "StudentDetail": {
     "loading": "Loading student…",
@@ -1414,7 +1417,8 @@
     "birthdayKeptIn": "Kept in Planning Center.",
     "recordMissingBadge": "{backend} record missing",
     "visitorBadge": "Visitor",
-    "inactiveBadge": "Inactive"
+    "inactiveBadge": "Inactive",
+    "attendanceDescription": "{count, plural, one {The last year, by gathering — # finished gathering.} other {The last year, by gathering — # finished gatherings.}}"
   },
   "AddStudent": {
     "titleMulti": "Add a student",

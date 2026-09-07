@@ -987,9 +987,7 @@ export function StudentDetailPage() {
         <Card>
           <CardHeader
             title={tCommon('attendance')}
-            description={`The last year, by gathering — ${recentEvents.length} finished ${
-              recentEvents.length === 1 ? 'gathering' : 'gatherings'
-            }.`}
+            description={t('attendanceDescription', { count: recentEvents.length })}
           />
 
           <div className="grid grid-cols-2 gap-2 px-4 py-3">

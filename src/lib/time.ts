@@ -270,6 +270,36 @@ export function formatWeekdayDate(strings: TimeStrings, date: Date): string {
   );
 }
 
+/**
+ * "Sun 15" — a weekday and a day of the month, and nothing else.
+ *
+ * For a ladder whose head has already said which month it is in. `Intl` has no
+ * option set for exactly this pair, so it is composed from the parts rather
+ * than pattern-matched: `formatToParts` names them, and the separator is
+ * whatever that locale put between them.
+ */
+export function formatWeekdayDay(strings: TimeStrings, date: Date): string {
+  const parts = dateFormat(strings.locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).formatToParts(date);
+  const keep = new Set(['weekday', 'day']);
+  // Everything up to the last part worth keeping, minus the month and the
+  // literal that follows it — so "Sun, Feb 15" becomes "Sun, 15" in English and
+  // 2月15日周日 loses its 2月 in Chinese.
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i]!;
+    if (keep.has(part.type)) out.push(part.value);
+    else if (part.type === 'literal' && out.length > 0 && i + 1 < parts.length) {
+      const next = parts.slice(i + 1).find((p) => p.type !== 'literal');
+      if (next && keep.has(next.type)) out.push(part.value);
+    }
+  }
+  return out.join('').trim();
+}
+
 export function formatShortDate(strings: TimeStrings, date: Date): string {
   return dateFormat(strings.locale, { month: 'short', day: 'numeric' }).format(date);
 }

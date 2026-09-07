@@ -1179,6 +1179,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Mia.copyTitle": {
+    "source": "{count, plural, one {Follow-up — # student we have not seen:} other {Follow-up — # students we have not seen:}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Incomplete.title": {
     "source": "Incomplete profiles",
     "zh-Hans": "todo",
@@ -2386,6 +2391,11 @@
   },
   "Settings.intro": {
     "source": "Thresholds and connections apply to every counselor's phone immediately. Appearance is yours alone. Who may sign in lives on <team>Team</team>, and the lobby screen on <kiosk>Kiosk</kiosk>.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.newFacesHint": {
+    "source": "A first-timer stays on the “New faces” list for {days} days.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -6114,6 +6124,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Students.statusEveryone": {
+    "source": "Everyone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "StudentDetail.loading": {
     "source": "Loading student…",
     "zh-Hans": "todo",
@@ -6581,6 +6596,11 @@
   },
   "StudentDetail.inactiveBadge": {
     "source": "Inactive",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "StudentDetail.attendanceDescription": {
+    "source": "{count, plural, one {The last year, by gathering — # finished gathering.} other {The last year, by gathering — # finished gatherings.}}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
