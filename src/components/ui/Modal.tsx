@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { swallowTrailingClick, type Press } from '@/components/ui/trailingClick';
 
 /**
  * How wide the panel is allowed to get once it stops being a sheet. Phones
@@ -82,25 +83,70 @@ export function Modal({
   const headingId = useId();
   const descriptionId = `${headingId}-description`;
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+  /**
+   * Where the press that is currently on this dialog landed.
+   *
+   * Recorded only while the dialog is showing, which is what makes the guard
+   * below narrow: a dismissal that no press produced arms nothing.
+   */
+  const pressRef = useRef<Press | null>(null);
 
-    if (open && !dialog.open) {
-      // Every showing starts clean, including the second showing of a modal
-      // the caller keeps mounted.
+  /*
+   * Layout, not passive.
+   *
+   * Both halves need it. The `close()` on the way out has to happen while the
+   * `<dialog>` is still in the document — most callers here dismiss by
+   * rendering `null` rather than by passing `open={false}` (`ReleaseDialog` is
+   * one), so without this the element is torn out of the tree with the browser
+   * still holding it in the top layer, and nothing ever closes it. And the
+   * trailing-click guard has to be armed before the browser goes on to
+   * dispatch the click that the dismissing press is about to produce; a
+   * passive effect can land after the click it exists to catch.
+   */
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !open) return;
+
+    // Every showing starts clean, including the second showing of a modal
+    // the caller keeps mounted.
+    dirtyRef.current = false;
+    pressRef.current = null;
+    if (!dialog.open) dialog.showModal();
+    // Put the caret in the first field so a counselor can start typing
+    // immediately instead of aiming at a text box.
+    const firstField = dialog.querySelector<HTMLElement>(
+      'input:not([type="hidden"]):not([disabled]), select, textarea',
+    );
+    firstField?.focus();
+
+    const remember = (event: PointerEvent) => {
+      pressRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
+    };
+    const forget = () => {
+      pressRef.current = null;
+    };
+
+    window.addEventListener('pointerdown', remember, { capture: true });
+    // A press the browser has decided was a scroll, and a key, are both the end
+    // of the gesture: neither leaves a click for us to catch.
+    window.addEventListener('pointercancel', forget, { capture: true });
+    window.addEventListener('keydown', forget, { capture: true });
+
+    /*
+     * Closing, by whichever route: `open` went false, or the caller unmounted
+     * us mid-gesture. Both arrive here, and both leave the same trailing click
+     * behind.
+     */
+    return () => {
+      window.removeEventListener('pointerdown', remember, { capture: true });
+      window.removeEventListener('pointercancel', forget, { capture: true });
+      window.removeEventListener('keydown', forget, { capture: true });
+
       dirtyRef.current = false;
-      dialog.showModal();
-      // Put the caret in the first field so a counselor can start typing
-      // immediately instead of aiming at a text box.
-      const firstField = dialog.querySelector<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]), select, textarea',
-      );
-      firstField?.focus();
-    } else if (!open && dialog.open) {
-      dirtyRef.current = false;
-      dialog.close();
-    }
+      if (dialog.open) dialog.close();
+      swallowTrailingClick(pressRef.current);
+      pressRef.current = null;
+    };
   }, [open]);
 
   /*
