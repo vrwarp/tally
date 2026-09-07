@@ -1923,5 +1923,665 @@
     "source": "Check-in window is closed — you can still record attendance.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Theme.cardTitle": {
+    "source": "Appearance",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.cardDescription": {
+    "source": "Just for this device — it is not shared with the rest of the team.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.labelSystem": {
+    "source": "Match device",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.labelLight": {
+    "source": "Light",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.labelDark": {
+    "source": "Dark",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.hintSystem": {
+    "source": "Follows your phone, including when it switches at sunset.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.hintLight": {
+    "source": "Always light, whatever the device is doing.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.hintDark": {
+    "source": "Always dark. Easier on the eyes in a dim room.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.hintSystemNowLight": {
+    "source": "Follows your phone, including when it switches at sunset. Right now that is light.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Theme.hintSystemNowDark": {
+    "source": "Follows your phone, including when it switches at sunset. Right now that is dark.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.loading": {
+    "source": "Loading settings…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.predictiveTitle": {
+    "source": "Predictive roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.predictiveDescription": {
+    "source": "Who lands in the “Recent” block at the top of a check-in screen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.attendedAtLeast": {
+    "source": "Attended at least",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.ofTheLast": {
+    "source": "Of the last",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.miaAfterMisses": {
+    "source": "MIA after misses",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.newVisitorWindow": {
+    "source": "New visitor window (days)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.rule": {
+    "source": "Show students who came to at least <n>{min}</n> of the last <n>{window}</n> {cadence}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.ruleNote": {
+    "source": "Each series counts only its own history — Friday never predicts Sunday. A brand-new series relaxes the threshold to whatever history exists, so the block is never empty for the wrong reason.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.saveThresholds": {
+    "source": "Save thresholds",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.unsaved": {
+    "source": "Unsaved changes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.lastChanged": {
+    "source": "Last changed {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.usingDefaults": {
+    "source": "Using the built-in defaults.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.saved": {
+    "source": "Settings saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.saveFailed": {
+    "source": "Could not save these settings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.errAtLeastOne": {
+    "source": "At least 1.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.errBetween": {
+    "source": "Between 1 and {max}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.errWindowTooSmall": {
+    "source": "Cannot ask for more gatherings than the window holds.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceGatherings": {
+    "source": "gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceSundays": {
+    "source": "Sundays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceMondays": {
+    "source": "Mondays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceTuesdays": {
+    "source": "Tuesdays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceWednesdays": {
+    "source": "Wednesdays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceThursdays": {
+    "source": "Thursdays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceFridays": {
+    "source": "Fridays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.cadenceSaturdays": {
+    "source": "Saturdays",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewFixValues": {
+    "source": "Fix the values above and this will show what they would do to your roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewWorking": {
+    "source": "Working out what these thresholds mean right now…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewNoHistory": {
+    "source": "Once a few gatherings have happened, this will show how many students each threshold picks out.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewHeading": {
+    "source": "With your ministry as it stands today",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewPredicted": {
+    "source": " of {count} predicted",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewMiaLabel": {
+    "source": "Flagged as missing in action",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewWas": {
+    "source": " · was {count}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Settings.previewStudents": {
+    "source": " {count, plural, one {student} other {students}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.refresh": {
+    "source": "Refresh",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.change": {
+    "source": "Change",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.notSetUp": {
+    "source": "Not set up",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.connected": {
+    "source": "Connected",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.unreachable": {
+    "source": "Unreachable",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.switchedOff": {
+    "source": "Switched off",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.reviewThem": {
+    "source": "Review them",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.customApiAddress": {
+    "source": "Custom API address",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.requestsGoTo": {
+    "source": "Requests go to {url}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.studentsVisible": {
+    "source": "{count, plural, one {student} other {students}} visible",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.headingRoster": {
+    "source": "Roster",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.headingWriteBack": {
+    "source": "Write-back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.headingFreshness": {
+    "source": "Freshness",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.headingNewStudents": {
+    "source": "New students",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.changedHere": {
+    "source": "Changed here {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.fromDeploy": {
+    "source": "These settings came with the deploy. Changing any of them here takes over from it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.lastReadHere": {
+    "source": "This device last read it {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoTitle": {
+    "source": "Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoDescription": {
+    "source": "Where Tally reads your people from. It keeps no copy of them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoChecking": {
+    "source": "Checking the Planning Center connection",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoAskFailed": {
+    "source": "Could not ask Tally about the connection.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoRefreshed": {
+    "source": "Read the roster again from Planning Center",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoRefreshFailed": {
+    "source": "Could not refresh from Planning Center.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoSaved": {
+    "source": "Planning Center settings saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteOff": {
+    "source": "Tally never writes to Planning Center. Visitors stay queued until this is turned on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteCreate": {
+    "source": "Tally creates people it has not seen before, but never edits an existing one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteFull": {
+    "source": "Tally creates people, and Edit profile saves a linked student’s name, grade and allergies straight to Planning Center. It can also add an adult — creating the household if there is none — and put a phone number or email on them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoCacheOff": {
+    "source": "Caching is off. Every screen asks Planning Center directly — slower, and always current.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoCacheOn": {
+    "source": "An answer is reused for up to {count, plural, one {# second} other {# seconds}} before Tally asks Planning Center again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoRosterNote": {
+    "source": "Who is on the roster is Tally's own list — add and remove students on the Students screen. Planning Center supplies their names, grades and parent contact, and Tally stores none of it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoUnresolved": {
+    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Planning Center — deleted or merged upstream.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoQueuedWriteOff": {
+    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet — and none will be created while write-back is off.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoQueued": {
+    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Push them from the Queued badge on their roster row.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoRosterOffline": {
+    "source": "This device is showing a roster it saved earlier. Check-in still works; anyone added since will not appear until Planning Center is reachable again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.secretManagerNote": {
+    "source": " The credentials themselves live in Secret Manager and are not editable from the app.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Title": {
+    "source": "Attendees",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Description": {
+    "source": "A second place Tally can read people from, beside Planning Center.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Checking": {
+    "source": "Checking the Attendees connection",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32AskFailed": {
+    "source": "Could not ask Tally about the connections.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Refreshed": {
+    "source": "Read the roster again from every connected backend",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32RefreshFailed": {
+    "source": "Could not refresh the connections.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Saved": {
+    "source": "Attendees settings saved",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteOff": {
+    "source": "Tally never writes to Attendees. Visitors stay queued until this is turned on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteCreate": {
+    "source": "Tally creates attendees it has not seen before, but never edits an existing one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteFull": {
+    "source": "Tally creates attendees, and Edit profile saves a linked student’s name, grade, allergies and birthday straight to Attendees. It can also add an adult to the family and fill in their phone or email.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32RosterNote": {
+    "source": "Students added from Attendees keep their Attendees record as the source of their name, grade and family — exactly as Planning Center students do theirs.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32Unresolved": {
+    "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Attendees — removed upstream.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32NothingConnected": {
+    "source": "Nothing is connected yet. Run the setup command on your Attendees server, put its token in Secret Manager, then enter the addresses and slugs it prints under Change.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.tokenNote": {
+    "source": " The token itself lives in Secret Manager and is not editable from the app.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.newStudentsDescription": {
+    "source": "Which system a student created in Tally — a quick-add at the door — is pushed to.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.defaultChanged": {
+    "source": "New students now go to {backend}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.defaultChangeFailed": {
+    "source": "Could not change where new students go.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.queuedGoingTo": {
+    "source": "{count, plural, one {# student is} other {# students are}} queued and will go to {backend} on the next push.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.notMoved": {
+    "source": "Students already linked to a backend are not moved by this — it decides only where a brand-new student's record is created.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.heldForReview": {
+    "source": "{count, plural, one {# student registered themselves at the kiosk and is waiting for somebody to approve them.} other {# students registered themselves at the kiosk and are waiting for somebody to approve them.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.saveSettings": {
+    "source": "Save settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.editorSaveFailed": {
+    "source": "Could not save these settings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoEditorTitle": {
+    "source": "Planning Center settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.lowestGrade": {
+    "source": "Lowest grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.highestGrade": {
+    "source": "Highest grade",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.gradeRangeError": {
+    "source": "Cannot end below where it starts.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoGradeBandNote": {
+    "source": "Who is on the roster is decided on the Students screen, one student at a time. This band only says where a student Planning Center has no grade for lands, and it is the range the app understands at all.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.writeBackOff": {
+    "source": "Off — never change anything",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.writeBackCreatePeople": {
+    "source": "Create new people only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.writeBackFull": {
+    "source": "Create and update managed fields",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteHintOff": {
+    "source": "Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteHintCreate": {
+    "source": "Tally creates people it has not seen before, after searching for a match. It never edits an existing person.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoWriteHintFull": {
+    "source": "Tally creates people, and Edit profile becomes editable for students Planning Center already has — first name, last name, grade and medical notes are saved there. A leader can also add an adult, and the household if there is none. It offers anybody Planning Center already has by that name before creating a second record, and never overwrites a number on file.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.cacheLabel": {
+    "source": "Reuse an answer for (seconds)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoCacheHintOff": {
+    "source": "Off. Every screen asks Planning Center directly — slower, and always current.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoCacheHintOn": {
+    "source": "Eight counselors opening Tally in the same minute cost one read instead of eight. A name corrected in Planning Center appears within {seconds} seconds.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.apiAddress": {
+    "source": "API address",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.pcoApiAddressHint": {
+    "source": "Leave empty to use whatever the deploy configured — currently {url}. Every request carries this church's credentials, so any other address sends them somewhere else: set this only for a proxy you run, or a test rig.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32EditorTitle": {
+    "source": "Attendees settings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteHintOff": {
+    "source": "Tally never writes to Attendees. Visitors added at the door stay queued until this is turned on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteHintCreate": {
+    "source": "Tally creates attendees it has not seen before, after searching for a match. It never edits an existing one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32WriteHintFull": {
+    "source": "Tally creates attendees, and Edit profile becomes editable for students Attendees already has — name, grade, allergies and birthday are saved there. A leader can also add an adult to the family, and fill in their phone or email when Attendees has none.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32ConnectedHint": {
+    "source": "Attendees serves the roster alongside any other connected backend.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32DisconnectedHint": {
+    "source": "Switched off. Students already linked to Attendees stay on the roster but their names cannot be read until this is turned back on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32DivisionId": {
+    "source": "Division id",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32MeetSlug": {
+    "source": "Meet slug",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32CharacterSlug": {
+    "source": "Character slug",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32AssemblySlug": {
+    "source": "Assembly slug",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32SlugsNote": {
+    "source": "Where your students live in Attendees. The setup command on the Attendees side prints all four — they name the division and meet whose attendees are the roster, and the character new students join.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32GradeBandNote": {
+    "source": "The band a student with no grade in Attendees lands in, and the range the app understands at all.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32CacheHintOff": {
+    "source": "Off. Every screen asks Attendees directly — slower, and always current.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32CacheHintOn": {
+    "source": "Eight counselors opening Tally in the same minute cost one read instead of eight. A name corrected in Attendees appears within {seconds} seconds.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Backends.a32ApiAddressHint": {
+    "source": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

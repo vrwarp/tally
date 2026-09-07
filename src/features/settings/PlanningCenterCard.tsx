@@ -30,23 +30,16 @@ import {
   type PcoStoredConfig,
 } from '@/services/planningCenter';
 import type { PcoStatus, PcoWriteBackMode } from '@/types';
+import { useTranslations } from 'use-intl';
 
-const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
-  off: 'Tally never writes to Planning Center. Visitors stay queued until this is turned on.',
-  create: 'Tally creates people it has not seen before, but never edits an existing one.',
-  full: 'Tally creates people, and Edit profile saves a linked student’s name, grade and allergies straight to Planning Center. It can also add an adult — creating the household if there is none — and put a phone number or email on them.',
-};
-
-function describeCache(seconds: number): string {
-  if (seconds === 0) {
-    return 'Caching is off. Every screen asks Planning Center directly — slower, and always current.';
-  }
-  return `An answer is reused for up to ${seconds} ${
-    seconds === 1 ? 'second' : 'seconds'
-  } before Tally asks Planning Center again.`;
-}
+const WRITE_BACK_LABEL = {
+  off: 'pcoWriteOff',
+  create: 'pcoWriteCreate',
+  full: 'pcoWriteFull',
+} as const satisfies Record<PcoWriteBackMode, string>;
 
 export function PlanningCenterCard() {
+  const t = useTranslations('Backends');
   const { show } = useToast();
   const { profile } = useAuth();
   const { refreshRoster, rosterFetchedAt, rosterOffline } = useData();
@@ -64,7 +57,7 @@ export function PlanningCenterCard() {
     try {
       setStatus(await fetchPlanningCenterStatus(force));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not ask Tally about the connection.');
+      setError(cause instanceof Error ? cause.message : t('pcoAskFailed'));
     } finally {
       setLoading(false);
     }
@@ -92,9 +85,9 @@ export function PlanningCenterCard() {
       // the read lands.
       await refreshPlanningCenter();
       await Promise.all([check(true), refreshRoster(true)]);
-      show('Read the roster again from Planning Center', { tone: 'success' });
+      show(t('pcoRefreshed'), { tone: 'success' });
     } catch {
-      show('Could not refresh from Planning Center.', { tone: 'error' });
+      show(t('pcoRefreshFailed'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -110,21 +103,21 @@ export function PlanningCenterCard() {
    */
   const afterSave = async () => {
     await Promise.all([check(true), refreshRoster(true)]);
-    show('Planning Center settings saved', { tone: 'success' });
+    show(t('pcoSaved'), { tone: 'success' });
   };
 
   return (
     <Card>
       <CardHeader
-        title="Planning Center"
-        description="Where Tally reads your people from. It keeps no copy of them."
+        title={t('pcoTitle')}
+        description={t('pcoDescription')}
         action={
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
-              Refresh
+              {t('refresh')}
             </Button>
             <Button size="sm" onClick={() => setEditing(true)} disabled={!status}>
-              Change
+              {t('change')}
             </Button>
           </div>
         }
@@ -147,7 +140,7 @@ export function PlanningCenterCard() {
              * to rely on, and one loading region must not have two voices.
              */}
             <span role="status" className="sr-only">
-              Checking the Planning Center connection
+              {t('pcoChecking')}
             </span>
             <div aria-hidden="true">
               <SkeletonRows count={3} />
@@ -157,11 +150,11 @@ export function PlanningCenterCard() {
           <>
             <div className="flex flex-wrap items-center gap-2">
               {!status.configured ? (
-                <Badge tone="warn">Not set up</Badge>
+                <Badge tone="warn">{t('notSetUp')}</Badge>
               ) : status.reachable ? (
-                <Badge tone="success">Connected</Badge>
+                <Badge tone="success">{t('connected')}</Badge>
               ) : (
-                <Badge tone="danger">Unreachable</Badge>
+                <Badge tone="danger">{t('unreachable')}</Badge>
               )}
 
               {status.peopleVisible !== null ? (
@@ -169,7 +162,7 @@ export function PlanningCenterCard() {
                   <span className="font-semibold tabular-nums text-ink-100">
                     {status.peopleVisible}
                   </span>{' '}
-                  {status.peopleVisible === 1 ? 'student' : 'students'} visible
+                  {t('studentsVisible', { count: status.peopleVisible })}
                 </span>
               ) : null}
 
@@ -179,8 +172,8 @@ export function PlanningCenterCard() {
                 // the person who set it knows, so the badge states the fact and
                 // the address rather than guessing at the intent. It must never
                 // be a silent state on a screen that otherwise says "Connected".
-                <Badge tone="warn" title={`Requests go to ${status.settings.baseUrl}`}>
-                  Custom API address
+                <Badge tone="warn" title={t('requestsGoTo', { url: status.settings.baseUrl })}>
+                  {t('customApiAddress')}
                 </Badge>
               ) : null}
             </div>
@@ -193,8 +186,7 @@ export function PlanningCenterCard() {
 
             {rosterOffline ? (
               <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-                This device is showing a roster it saved earlier. Check-in still works; anyone added
-                since will not appear until Planning Center is reachable again.
+                {t('pcoRosterOffline')}
               </p>
             ) : null}
 
@@ -211,26 +203,22 @@ export function PlanningCenterCard() {
              */}
             <dl className="grid gap-2 text-sm lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] lg:gap-x-6">
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">Roster</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">{t('headingRoster')}</dt>
                 <dd className="text-ink-300">
-                  Who is on the roster is Tally's own list — add and remove students on the Students
-                  screen. Planning Center supplies their names, grades and parent contact, and Tally
-                  stores none of it.
+                  {t('pcoRosterNote')}
                   {status.unresolved > 0 ? (
                     <span className="block text-warn-400">
-                      {status.unresolved}{' '}
-                      {status.unresolved === 1 ? 'student is' : 'students are'} on the roster but can
-                      no longer be read from Planning Center — deleted or merged upstream.
+                      {t('pcoUnresolved', { count: status.unresolved })}
                     </span>
                   ) : null}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                  Write-back
+                  {t('headingWriteBack')}
                 </dt>
                 <dd className="text-ink-300">
-                  {WRITE_BACK_LABEL[status.settings.writeBack]}
+                  {t(WRITE_BACK_LABEL[status.settings.writeBack])}
                   {/*
                    * Sits under the mode rather than under Roster so the two are
                    * read together: a queue and an "off" beside each other say
@@ -244,24 +232,24 @@ export function PlanningCenterCard() {
                           : 'block text-ink-500'
                       }
                     >
-                      {status.queued} {status.queued === 1 ? 'student has' : 'students have'} no
-                      Planning Center person yet
                       {status.settings.writeBack === 'off'
-                        ? ' — and none will be created while write-back is off.'
-                        : '. Push them from the Queued badge on their roster row.'}
+                        ? t('pcoQueuedWriteOff', { count: status.queued })
+                        : t('pcoQueued', { count: status.queued })}
                     </span>
                   ) : null}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                  Freshness
+                  {t('headingFreshness')}
                 </dt>
                 <dd className="text-ink-300">
-                  {describeCache(status.settings.cacheTtlSeconds)}
+                  {status.settings.cacheTtlSeconds === 0
+                    ? t('pcoCacheOff')
+                    : t('pcoCacheOn', { count: status.settings.cacheTtlSeconds })}
                   {rosterFetchedAt ? (
                     <span className="block text-ink-500">
-                      This device last read it {formatRelative(rosterFetchedAt)}.
+                      {t('lastReadHere', { when: formatRelative(rosterFetchedAt) })}
                     </span>
                   ) : null}
                 </dd>
@@ -270,10 +258,10 @@ export function PlanningCenterCard() {
 
             <p className="text-xs text-ink-500">
               {status.settings.managedInApp && stored?.updatedAt
-                ? `Changed here ${formatRelative(stored.updatedAt)}.`
-                : 'These settings came with the deploy. Changing any of them here takes over from it.'}
+                ? t('changedHere', { when: formatRelative(stored.updatedAt) })
+                : t('fromDeploy')}
               {profile?.role === 'admin'
-                ? ' The credentials themselves live in Secret Manager and are not editable from the app.'
+                ? t('secretManagerNote')
                 : ''}
             </p>
           </>

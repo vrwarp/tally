@@ -33,19 +33,27 @@ import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { formatRelative } from '@/lib/time';
 import { saveSettings } from '@/services/events';
 import type { AppSettings } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Widest sensible window; matches the clamp in `toSettings`. */
 const MAX_WINDOW = 12;
 
+/**
+ * "Sundays", by weekday index, as keys.
+ *
+ * Not derivable from `Intl.DateTimeFormat`, which names a day and not a
+ * recurring one — and the two are the same word in Chinese, which is exactly
+ * the sort of thing a catalogue should get to decide.
+ */
 const DAY_PLURALS = [
-  'Sundays',
-  'Mondays',
-  'Tuesdays',
-  'Wednesdays',
-  'Thursdays',
-  'Fridays',
-  'Saturdays',
-];
+  'cadenceSundays',
+  'cadenceMondays',
+  'cadenceTuesdays',
+  'cadenceWednesdays',
+  'cadenceThursdays',
+  'cadenceFridays',
+  'cadenceSaturdays',
+] as const;
 
 type ThresholdForm = Pick<
   AppSettings,
@@ -62,6 +70,7 @@ function toForm(settings: AppSettings): ThresholdForm {
 }
 
 export function SettingsPage() {
+  const t = useTranslations('Settings');
   const { settings, series, loading } = useData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -77,16 +86,16 @@ export function SettingsPage() {
   const errors = {
     predictiveOfLastN:
       form.predictiveOfLastN < 1 || form.predictiveOfLastN > MAX_WINDOW
-        ? `Between 1 and ${MAX_WINDOW}.`
+        ? t('errBetween', { max: MAX_WINDOW })
         : null,
     predictiveMinAttended:
       form.predictiveMinAttended < 1
-        ? 'At least 1.'
+        ? t('errAtLeastOne')
         : form.predictiveMinAttended > form.predictiveOfLastN
-          ? 'Cannot ask for more gatherings than the window holds.'
+          ? t('errWindowTooSmall')
           : null,
-    miaConsecutiveMisses: form.miaConsecutiveMisses < 1 ? 'At least 1.' : null,
-    newVisitorWindowDays: form.newVisitorWindowDays < 1 ? 'At least 1.' : null,
+    miaConsecutiveMisses: form.miaConsecutiveMisses < 1 ? t('errAtLeastOne') : null,
+    newVisitorWindowDays: form.newVisitorWindowDays < 1 ? t('errAtLeastOne') : null,
   };
   const valid = Object.values(errors).every((error) => error === null);
   const dirty = (Object.keys(form) as (keyof ThresholdForm)[]).some(
@@ -100,7 +109,7 @@ export function SettingsPage() {
   // A concrete day name beats "gatherings": the sentence should read the way a
   // leader would say it out loud.
   const anchor = series.find((candidate) => candidate.active) ?? series[0] ?? null;
-  const cadence = anchor ? (DAY_PLURALS[anchor.dayOfWeek] ?? 'gatherings') : 'gatherings';
+  const cadence = t(anchor ? (DAY_PLURALS[anchor.dayOfWeek] ?? 'cadenceGatherings') : 'cadenceGatherings');
 
   const handleSave = async () => {
     if (!user || !valid || saving) return;
@@ -108,15 +117,15 @@ export function SettingsPage() {
     setSaveError(null);
     try {
       await saveSettings(form, user.uid);
-      show('Settings saved', { tone: 'success' });
+      show(t('saved'), { tone: 'success' });
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : 'Could not save these settings.');
+      setSaveError(cause instanceof Error ? cause.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <LoadingScreen message="Loading settings…" />;
+  if (loading) return <LoadingScreen message={t('loading')} />;
 
   return (
     <PageFrame>
@@ -161,8 +170,8 @@ export function SettingsPage() {
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader
-            title="Predictive roster"
-            description="Who lands in the “Recent” block at the top of a check-in screen."
+            title={t('predictiveTitle')}
+            description={t('predictiveDescription')}
           />
 
           <div className="flex flex-col gap-4 px-4 py-3">
@@ -175,7 +184,7 @@ export function SettingsPage() {
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-3">
                   <NumberStepperField
-                    label="Attended at least"
+                    label={t('attendedAtLeast')}
                     min={1}
                     max={MAX_WINDOW}
                     value={form.predictiveMinAttended}
@@ -183,7 +192,7 @@ export function SettingsPage() {
                     error={errors.predictiveMinAttended}
                   />
                   <NumberStepperField
-                    label="Of the last"
+                    label={t('ofTheLast')}
                     min={1}
                     max={MAX_WINDOW}
                     value={form.predictiveOfLastN}
@@ -196,20 +205,18 @@ export function SettingsPage() {
                   aria-live="polite"
                   className="rounded-xl bg-brand-500/10 px-3 py-2 text-sm text-brand-200 ring-1 ring-brand-500/25"
                 >
-                  Show students who came to at least{' '}
-                  <span className="font-bold tabular-nums">{form.predictiveMinAttended}</span> of
-                  the last <span className="font-bold tabular-nums">{form.predictiveOfLastN}</span>{' '}
-                  {cadence}.
-                  <span className="mt-1 block text-xs text-brand-200/70">
-                    Each series counts only its own history — Friday never predicts Sunday. A
-                    brand-new series relaxes the threshold to whatever history exists, so the
-                    block is never empty for the wrong reason.
-                  </span>
+                  {t.rich('rule', {
+                    min: form.predictiveMinAttended,
+                    window: form.predictiveOfLastN,
+                    cadence,
+                    n: (chunks) => <span className="font-bold tabular-nums">{chunks}</span>,
+                  })}
+                  <span className="mt-1 block text-xs text-brand-200/70">{t('ruleNote')}</span>
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                   <NumberStepperField
-                    label="MIA after misses"
+                    label={t('miaAfterMisses')}
                     min={1}
                     max={99}
                     value={form.miaConsecutiveMisses}
@@ -220,7 +227,7 @@ export function SettingsPage() {
                     } in a row.`}
                   />
                   <NumberStepperField
-                    label="New visitor window (days)"
+                    label={t('newVisitorWindow')}
                     min={1}
                     max={365}
                     value={form.newVisitorWindowDays}
@@ -245,14 +252,14 @@ export function SettingsPage() {
                 loading={saving}
                 disabled={!dirty || !valid}
               >
-                Save thresholds
+                {t('saveThresholds')}
               </Button>
               <span className="text-xs text-ink-500">
                 {dirty
-                  ? 'Unsaved changes.'
+                  ? t('unsaved')
                   : settings.updatedAt
-                    ? `Last changed ${formatRelative(settings.updatedAt)}.`
-                    : 'Using the built-in defaults.'}
+                    ? t('lastChanged', { when: formatRelative(settings.updatedAt) })
+                    : t('usingDefaults')}
               </span>
             </div>
           </div>

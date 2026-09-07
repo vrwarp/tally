@@ -15,18 +15,31 @@ import { Card, CardHeader } from '@/components/ui';
 import { useTheme } from '@/context/themeContext';
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'use-intl';
 
-const LABEL: Record<ThemePreference, string> = {
-  system: 'Match device',
-  light: 'Light',
-  dark: 'Dark',
-};
+const LABEL = {
+  system: 'labelSystem',
+  light: 'labelLight',
+  dark: 'labelDark',
+} as const satisfies Record<ThemePreference, string>;
 
-const HINT: Record<ThemePreference, string> = {
-  system: 'Follows your phone, including when it switches at sunset.',
-  light: 'Always light, whatever the device is doing.',
-  dark: 'Always dark. Easier on the eyes in a dim room.',
-};
+const HINT = {
+  system: 'hintSystem',
+  light: 'hintLight',
+  dark: 'hintDark',
+} as const satisfies Record<ThemePreference, string>;
+
+/**
+ * What "match device" resolves to right now, said in full.
+ *
+ * Two whole sentences rather than the hint plus an appended clause: "Right now
+ * that is dark" needs the resolved word inflected into the sentence, and the
+ * word itself (`light` / `dark`) is one this catalogue already translates.
+ */
+const SYSTEM_NOW = {
+  light: 'hintSystemNowLight',
+  dark: 'hintSystemNowDark',
+} as const;
 
 /** A sun, a moon, and a device that cannot make its mind up. */
 function ThemeIcon({ preference }: { preference: ThemePreference }) {
@@ -66,13 +79,14 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
 }
 
 export function ThemeCard({ className }: { className?: string }) {
+  const t = useTranslations('Theme');
   const { preference, theme, setPreference } = useTheme();
 
   return (
     <Card className={className}>
       <CardHeader
-        title="Appearance"
-        description="Just for this device — it is not shared with the rest of the team."
+        title={t('cardTitle')}
+        description={t('cardDescription')}
       />
 
       {/*
@@ -111,15 +125,14 @@ export function ThemeCard({ className }: { className?: string }) {
                 )}
               >
                 <ThemeIcon preference={option} />
-                {LABEL[option]}
+                {t(LABEL[option])}
               </button>
             );
           })}
         </div>
 
         <p aria-live="polite" className="text-xs text-ink-500">
-          {HINT[preference]}
-          {preference === 'system' ? ` Right now that is ${theme}.` : ''}
+          {preference === 'system' ? t(SYSTEM_NOW[theme]) : t(HINT[preference])}
         </p>
       </div>
     </Card>
