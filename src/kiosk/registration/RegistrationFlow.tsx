@@ -394,43 +394,55 @@ export function RegistrationFlow({
           from moving between steps. */}
       {showsList ? (
         <div className="flex flex-col gap-1.5">
-          <div className="flex gap-2 px-2 pt-2">
-            {/*
-              * The allergies step answers in two ways, so it shows two ways —
-              * side by side, in the band **Next** already had, so the console
-              * keeps its height and the rule above it does not move.
-              *
-              * "None" is what most families have to say, and a medical field
-              * with forty keys under it and no visible way to say it collects
-              * "None", "N/A" and "no allergies" as free text: three spellings
-              * of a blank, bound for the church's database as though they were
-              * notes. This is that answer, in one press, spelled the same way
-              * every time.
-              *
-              * The colour says which one is being offered rather than the
-              * position: while the box is empty **No allergies** is the live
-              * answer and Next is dead, because there is nothing yet to press
-              * Next with. Type one letter and they trade — Next takes the
-              * brand and the blank goes quiet. Two lit buttons would only ask
-              * which is the real one, which is what a tick beside a keyboard
-              * was already asking.
-              */}
-            {state.step === 'child-allergies' && (
+          {/*
+            * The band is drawn on the body's own measure — `max-w-2xl` inside
+            * `px-6`, the pair the question list is laid out on — rather than
+            * on the width of the glass. A button wider than the boxes it
+            * commits reads as belonging to something else, and on a 1280-wide
+            * kiosk it ran three hundred pixels past them on either side.
+            *
+            * The keyboard below it is the exception and stays full-bleed: it
+            * is not part of the run, it is the thing under the thumbs.
+            */}
+          <div className="px-6 pt-2">
+            <div className="mx-auto flex w-full max-w-2xl gap-2">
+              {/*
+                * The allergies step answers in two ways, so it shows two ways —
+                * side by side, in the band **Next** already had, so the console
+                * keeps its height and the rule above it does not move.
+                *
+                * "None" is what most families have to say, and a medical field
+                * with forty keys under it and no visible way to say it collects
+                * "None", "N/A" and "no allergies" as free text: three spellings
+                * of a blank, bound for the church's database as though they
+                * were notes. This is that answer, in one press, spelled the
+                * same way every time.
+                *
+                * The colour says which one is being offered rather than the
+                * position: while the box is empty **No allergies** is the live
+                * answer and Next is dead, because there is nothing yet to press
+                * Next with. Type one letter and they trade — Next takes the
+                * brand and the blank goes quiet. Two lit buttons would only ask
+                * which is the real one, which is what a tick beside a keyboard
+                * was already asking.
+                */}
+              {state.step === 'child-allergies' && (
+                <div className="flex-1">
+                  <Big
+                    label="No allergies"
+                    tone={state.buffer === '' ? 'brand' : undefined}
+                    onPick={() => dispatch({ type: 'no-allergies' })}
+                  />
+                </div>
+              )}
               <div className="flex-1">
                 <Big
-                  label="No allergies"
-                  tone={state.buffer === '' ? 'brand' : undefined}
-                  onPick={() => dispatch({ type: 'no-allergies' })}
+                  label="Next"
+                  tone="brand"
+                  disabled={!canAdvance(state)}
+                  onPick={() => dispatch({ type: 'next' })}
                 />
               </div>
-            )}
-            <div className="flex-1">
-              <Big
-                label="Next"
-                tone="brand"
-                disabled={!canAdvance(state)}
-                onPick={() => dispatch({ type: 'next' })}
-              />
             </div>
           </div>
           {/*
@@ -498,36 +510,43 @@ export function RegistrationFlow({
           )}
         </div>
       ) : state.step === 'confirm' ? (
-        <div className="flex flex-col gap-2 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
-          {/*
-            * The offer the fork used to carry, in the shape it carried it —
-            * the quiet button above the brand one, so a parent who learned that
-            * pair on the old screen meets the same pair here.
-            *
-            * It belongs on this screen rather than on one of its own: "anybody
-            * else?" cannot be answered from memory, and this is where the
-            * family is written out. A parent notices a missing child by reading
-            * the list, not by being asked about it four screens earlier.
-            */}
-          <Big
-            label="Add another child"
-            disabled={state.children.length >= MAX_CHILDREN}
-            onPick={() => dispatch({ type: 'add-child' })}
-          />
-          <Big
-            label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
-            tone="brand"
-            onPick={runSubmit}
-          />
-          {state.children.length >= MAX_CHILDREN && (
-            <p className="text-center text-base text-ink-500">
-              That is as many as one go takes — a leader can add the rest.
-            </p>
-          )}
+        <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          {/* The family's own measure, as above — these buttons commit the
+              rows they sit under. */}
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+            {/*
+              * The offer the fork used to carry, in the shape it carried it —
+              * the quiet button above the brand one, so a parent who learned
+              * that pair on the old screen meets the same pair here.
+              *
+              * It belongs on this screen rather than on one of its own:
+              * "anybody else?" cannot be answered from memory, and this is
+              * where the family is written out. A parent notices a missing
+              * child by reading the list, not by being asked about it four
+              * screens earlier.
+              */}
+            <Big
+              label="Add another child"
+              disabled={state.children.length >= MAX_CHILDREN}
+              onPick={() => dispatch({ type: 'add-child' })}
+            />
+            <Big
+              label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
+              tone="brand"
+              onPick={runSubmit}
+            />
+            {state.children.length >= MAX_CHILDREN && (
+              <p className="text-center text-base text-ink-500">
+                That is as many as one go takes — a leader can add the rest.
+              </p>
+            )}
+          </div>
         </div>
       ) : state.step === 'success' ? (
-        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
-          <Big label="Done" onPick={onClose} />
+        <div className="px-6 py-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          <div className="mx-auto w-full max-w-2xl">
+            <Big label="Done" onPick={onClose} />
+          </div>
         </div>
       ) : (
         <div className="h-4" />
