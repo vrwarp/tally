@@ -333,7 +333,7 @@ test.describe('deciding a family', () => {
       await expect(card).toBeVisible({ timeout: 30_000 });
       // The badge carries the number of days; the strip carries what is lost.
       await expect(card.getByText(/days left/i)).toBeVisible();
-      await expect(card.getByText(/the phone number goes with it/i)).toBeVisible();
+      await expect(card.getByText(/the phone number are deleted/i)).toBeVisible();
     } finally {
       await removeRegistration(registrationId, 1);
     }

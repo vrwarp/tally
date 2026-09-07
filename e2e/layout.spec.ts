@@ -88,7 +88,7 @@ test.describe('layout', () => {
       'Vandersteen-Okonkwo Fitzwilliam Abernathy Featherstonehaugh Wintermute Vasquez';
 
     await gotoReady(page, '/students');
-    await (await rosterAction(page, /new visitor/i)).click();
+    await (await rosterAction(page, /add by hand/i)).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/first name/i).fill('Bartholomew');
@@ -146,7 +146,7 @@ test.describe('layout', () => {
       'Vandersteen-Okonkwo Fitzwilliam Abernathy Featherstonehaugh Wintermute Vasquez';
 
     await gotoReady(page, '/students');
-    await (await rosterAction(page, /new visitor/i)).click();
+    await (await rosterAction(page, /add by hand/i)).click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/first name/i).fill('Wilhelmina');

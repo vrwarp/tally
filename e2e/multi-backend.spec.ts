@@ -114,7 +114,7 @@ test.describe('Two backends at once', () => {
      * so all this test does is add somebody and watch the linkage arrive.
      */
     await gotoReady(page, '/students');
-    await (await rosterAction(page, /new visitor/i)).click();
+    await (await rosterAction(page, /add by hand/i)).click();
     const editor = page.getByRole('dialog', { name: /add a student/i });
     await editor.getByLabel(/first name/i).fill('Keanu');
     await editor.getByLabel(/last name/i).fill('Māhoe');

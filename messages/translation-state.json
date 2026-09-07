@@ -1491,12 +1491,12 @@
     "zh-Hant": "machine"
   },
   "Mia.exportScopeScoped": {
-    "source": "{gathering} mia",
+    "source": "{gathering} stopped-coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Mia.exportScope": {
-    "source": "mia",
+    "source": "stopped-coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2792,7 +2792,7 @@
     "zh-Hant": "machine"
   },
   "Settings.previewMiaLabel": {
-    "source": "Flagged as missing in action",
+    "source": "Flagged as stopped coming",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

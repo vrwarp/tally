@@ -24,7 +24,7 @@ test.describe('dashboard', () => {
 
     await expect(page.getByRole('heading', { name: /insights/i })).toBeVisible();
 
-    for (const heading of [/missing in action/i, /new faces/i, /incomplete profiles/i]) {
+    for (const heading of [/stopped coming/i, /new faces/i, /incomplete profiles/i]) {
       await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible();
     }
 
@@ -33,7 +33,7 @@ test.describe('dashboard', () => {
     // count the heading carries and on rows that link to a real student. The
     // count hydrates after the heading paints, so polled — same patience the
     // incomplete-profiles heading below already gets.
-    const mia = page.getByRole('heading', { name: /missing in action/i }).first();
+    const mia = page.getByRole('heading', { name: /stopped coming/i }).first();
     await expect
       .poll(async () => Number(/(\d+)/.exec(await mia.innerText())?.[1] ?? 0), {
         timeout: 20_000,
@@ -316,7 +316,7 @@ test.describe('dashboard', () => {
      */
     const mia = page
       .locator('section')
-      .filter({ has: page.getByRole('heading', { name: /missing in action/i }) })
+      .filter({ has: page.getByRole('heading', { name: /stopped coming/i }) })
       .first();
     await expect(mia).toBeVisible();
     await mia.locator('a[href^="/students/"]').first().click();
