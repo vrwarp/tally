@@ -49,15 +49,25 @@ const SLOP_PX = 12;
 /**
  * How long a gesture may still be in flight behind us. Matches the kiosk's
  * `GESTURE_MS`: one number in this codebase for the same question. The
- * synthesised click is along within a frame or two of the press in practice;
- * this is only the backstop for the case where it never comes at all.
+ * synthesised click is along within a frame or two of the lift in practice;
+ * this is only the backstop for the case where it never comes at all, which is
+ * every browser that has no ghost to send — and without it the guard would sit
+ * armed for the rest of the page's life.
+ *
+ * It is not what makes the guard safe. That is the `pointerdown` rule below:
+ * a click that brought a press of its own is let through however long the
+ * guard has been waiting.
  */
 export const TRAILING_CLICK_MS = 1000;
 
-/** Where a press landed, and when. */
+/** Where a press landed, and when it ended. */
 export interface Press {
   x: number;
   y: number;
+  /**
+   * When the hand came off — not when it went down. A press held for a second
+   * is still a press, and the clock the ghost runs on starts at the lift.
+   */
   at: number;
 }
 
@@ -68,8 +78,9 @@ export interface Press {
  * listener waiting for a click nobody will make.
  */
 export function swallowTrailingClick(press: Press | null): () => void {
-  // Nothing pressed the dialog, or the gesture is long over: there is no ghost
-  // to catch, and arming for one would only risk eating a real click.
+  // Nothing pressed the dialog, or the lift was long enough ago that no click
+  // can still be owed — a dialog closed by a save completing rather than by a
+  // hand. There is no ghost to catch, and arming would only risk a real click.
   if (!press || Date.now() - press.at > TRAILING_CLICK_MS) return () => undefined;
 
   let timer = 0;

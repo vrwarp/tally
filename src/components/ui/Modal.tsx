@@ -122,11 +122,29 @@ export function Modal({
     const remember = (event: PointerEvent) => {
       pressRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
     };
+    /*
+     * The gesture ends when the hand comes off, and it is from *there* that the
+     * trailing click is owed — so that is the moment `at` records.
+     *
+     * Stamping it at the press instead made a slow press unguarded: hold the ×
+     * for a second before letting go and the record was already too old to arm
+     * anything, which is exactly backwards. A press held for a second is still
+     * a press, and it still owes the page a click.
+     *
+     * The staleness that stamp exists to catch is the other shape — a dialog
+     * closed long after anybody touched it, by a save completing or a caller
+     * changing its mind — and measuring from the lift still catches that.
+     */
+    const release = () => {
+      const press = pressRef.current;
+      if (press) press.at = Date.now();
+    };
     const forget = () => {
       pressRef.current = null;
     };
 
     window.addEventListener('pointerdown', remember, { capture: true });
+    window.addEventListener('pointerup', release, { capture: true });
     // A press the browser has decided was a scroll, and a key, are both the end
     // of the gesture: neither leaves a click for us to catch.
     window.addEventListener('pointercancel', forget, { capture: true });
@@ -139,6 +157,7 @@ export function Modal({
      */
     return () => {
       window.removeEventListener('pointerdown', remember, { capture: true });
+      window.removeEventListener('pointerup', release, { capture: true });
       window.removeEventListener('pointercancel', forget, { capture: true });
       window.removeEventListener('keydown', forget, { capture: true });
 

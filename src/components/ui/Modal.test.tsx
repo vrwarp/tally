@@ -157,6 +157,10 @@ describe('Modal dismissal', () => {
     window.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: x, clientY: y }));
   }
 
+  function releaseAt(x: number, y: number) {
+    window.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: x, clientY: y }));
+  }
+
   function trailingClickAt(node: HTMLElement, x: number, y: number) {
     fireEvent(
       node,
@@ -263,6 +267,86 @@ describe('Modal dismissal', () => {
     // No press behind this dismissal, so there is no gesture for a later click
     // to be orphaned from.
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    trailingClickAt(screen.getByRole('button', { name: 'Export CSV' }), 640, 560);
+
+    expect(exported).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A hand that rests before it lifts is still a hand.
+   *
+   * The window is measured from the lift, not from the moment of contact —
+   * measured from contact, holding the × for a second put the press beyond the
+   * guard's reach and let the trailing click through, which is the one case it
+   * exists for.
+   */
+  it('guards a press that was held a while before it was released', () => {
+    const exported = vi.fn();
+    const clock = vi.spyOn(Date, 'now');
+    let now = 1_700_000_000_000;
+    clock.mockImplementation(() => now);
+
+    function Screen() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <Underneath onClick={exported} />
+          {open ? (
+            <Modal open onClose={() => setOpen(false)} title="No longer expected here">
+              <p>Why this student is no longer expected.</p>
+            </Modal>
+          ) : null}
+        </>
+      );
+    }
+
+    render(<Screen />);
+
+    pressAt(640, 560);
+    now += 1_500; // held well past the window before letting go
+    releaseAt(640, 560);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    trailingClickAt(screen.getByRole('button', { name: 'Export CSV' }), 640, 560);
+
+    expect(exported).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The staleness the window is actually for: a dialog that goes away long
+   * after anybody touched it — a save completing, a caller changing its mind —
+   * owes nobody a click.
+   */
+  it('arms nothing when the dialog closes long after the last press', () => {
+    const exported = vi.fn();
+    const clock = vi.spyOn(Date, 'now');
+    let now = 1_700_000_000_000;
+    clock.mockImplementation(() => now);
+
+    function Screen() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <Underneath onClick={exported} />
+          {open ? (
+            <Modal open onClose={() => setOpen(false)} title="No longer expected here">
+              <button type="button" onClick={() => undefined}>
+                Something in the dialog
+              </button>
+            </Modal>
+          ) : null}
+        </>
+      );
+    }
+
+    const { rerender } = render(<Screen />);
+
+    pressAt(640, 560);
+    releaseAt(640, 560);
+    now += 60_000; // a minute of nothing, then the dialog closes by itself
+    rerender(<Screen />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
     trailingClickAt(screen.getByRole('button', { name: 'Export CSV' }), 640, 560);
 
     expect(exported).toHaveBeenCalledTimes(1);
