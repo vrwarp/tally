@@ -137,6 +137,23 @@ export interface LabelQueue {
   print(job: LabelJob): void;
   forget(studentId: string): void;
   /**
+   * The child this label was for turns out to have a different id than the one
+   * it was queued under.
+   *
+   * Exactly one caller: a registration whose stickers went to the printer
+   * before the callable answered, so they were keyed by the run they belong to
+   * rather than by children who did not have ids yet. Everything downstream of
+   * a printed label looks the child back up on the roster by this id — the
+   * printer screen's log reprints a row that way, and the confirm's "last
+   * printed at" reads it — so a label left under the temporary key is a row
+   * that silently does nothing for the one family whose label is newest.
+   *
+   * Whichever side of the drain the answer lands on is covered: one already in
+   * the log is re-keyed there, and one still on its way to the wire is recorded
+   * through the alias when it lands.
+   */
+  rekey(from: string, to: string): void;
+  /**
    * The evening's attempts, most recent first, for the printer screen.
    *
    * This replaces a `lastPrinted`/`reprintLast` pair, and the reason is the
@@ -162,13 +179,15 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
   let pumping: Promise<void> | null = null;
   const printed: PrintedLabel[] = [];
   let nextRecordId = 0;
+  /** Temporary key → the id its child turned out to have. See `rekey`. */
+  const aliases = new Map<string, string>();
 
   /** Newest first, bounded, and only for jobs that are about a child. */
   function record(job: LabelJob, failed: boolean): void {
     if (!job.name) return;
     printed.unshift({
       id: `p${(nextRecordId += 1)}`,
-      studentId: job.studentId,
+      studentId: aliases.get(job.studentId) ?? job.studentId,
       name: job.name,
       atMs: now(),
       failed,
@@ -272,12 +291,35 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       warm.delete(studentId);
     },
 
+    rekey(from, to) {
+      if (from === to) return;
+      /*
+       * Recorded through the alias rather than by patching what is queued,
+       * because the label most likely to be re-keyed is not in `pending` at
+       * all: `print` pumps immediately, so a single sticker is usually already
+       * shifted out and sitting in `drain`'s own local, awaiting the wire. The
+       * alias is read at the moment the row is written, which is the one place
+       * every path — sent, failed, dropped — passes through.
+       */
+      aliases.set(from, to);
+      for (let index = 0; index < printed.length; index += 1) {
+        const row = printed[index]!;
+        if (row.studentId === from) printed[index] = { ...row, studentId: to };
+      }
+      const warmed = warm.get(from);
+      if (warmed) {
+        warm.delete(from);
+        warm.set(to, warmed);
+      }
+    },
+
     printedTonight() {
       return printed;
     },
 
     forgetPrinted() {
       printed.length = 0;
+      aliases.clear();
     },
 
     depth() {

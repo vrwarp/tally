@@ -31,6 +31,7 @@ import type { PrinterState } from './printing';
 // The same arrangement again for the registration wizard: a screen most
 // families never reach must not sit on the path to the one they all use.
 import type * as RegistrationModule from './registration';
+import type { Grade } from '@/types';
 import {
   bindingIsLive,
   clearBinding,
@@ -1711,6 +1712,69 @@ export function KioskApp() {
   );
 
   /**
+   * The run whose stickers have already gone, so they cannot go twice.
+   *
+   * A registration prints from two places now — the saving screen, five seconds
+   * in, and `onRegistered` when the callable answers — and on a slow evening
+   * both happen. Keyed by the run rather than by a boolean because "Try again"
+   * re-enters the submit under the same `registrationId`: a retry that reached
+   * `onRegistered` must not put a second sticker on the tape for a child
+   * already wearing one.
+   */
+  const printedRunRef = useRef<string | null>(null);
+
+  /**
+   * The stickers, before anybody knows whether the family was written.
+   *
+   * Five seconds into a save that has not come back — see `PROCESSING_MS`. The
+   * label needs nothing from the server: every token on it is a name the parent
+   * typed or a fact about the gathering, and the allergy note is the one the
+   * wizard was told rather than the one no lookup can answer. What is missing
+   * is the child's id, so the label is queued under the run's own — and adopted
+   * onto the real one in `onRegistered`, because the log rows downstream are
+   * looked back up on the roster by it.
+   *
+   * The risk this takes is bounded and deliberate: it only ever happens on a
+   * save already slow enough to have held a parent for five seconds, which is
+   * also the window in which they are still standing here to be told if it then
+   * fails. See the timeout wording in `RegistrationFlow`.
+   */
+  const onEarlyPrint = useCallback(
+    (
+      registrationId: string,
+      children: readonly { firstName: string; lastName: string; grade: Grade | null; allergies: string }[],
+    ) => {
+      if (!prints || !binding || !printing) return;
+      printedRunRef.current = registrationId;
+      for (const [index, child] of children.entries()) {
+        try {
+          const id = printing.pendingLabelId(registrationId, index);
+          printing.rememberAllergyNote(id, child.allergies);
+          printing.printLabel(
+            {
+              id,
+              firstName: child.firstName,
+              lastName: child.lastName,
+              grade: child.grade,
+              // Nothing searches this row — it is a label's worth of a child,
+              // not a roster entry, and it is gone as soon as the real one
+              // lands. `tokenValuesFor` reads neither field.
+              searchName: '',
+              hasAllergies: child.allergies !== '',
+            },
+            binding,
+          );
+        } catch {
+          // Same rule as everywhere else a label is queued: a printer may not
+          // reach back into the screen a family is standing at.
+        }
+      }
+      setPrintTick((tick) => tick + 1);
+    },
+    [binding, printing, prints],
+  );
+
+  /**
    * A family that exists now, and did not a second ago.
    *
    * The server has already written them, checked them in and patched the phone
@@ -1785,6 +1849,23 @@ export function KioskApp() {
           for (const student of added) next.set(student.id, checkedInAt);
           return next;
         });
+      }
+
+      /*
+       * The stickers already went, on the saving screen, under this run's own
+       * id — so what is left is to tell the printing module who those children
+       * turned out to be. Nothing is queued here: a second sticker per child is
+       * a staff reprint, never a consequence of a slow call answering.
+       */
+      if (printing && printedRunRef.current === result.registrationId) {
+        for (const [index, student] of added.entries()) {
+          printing.adoptStudentId(
+            printing.pendingLabelId(result.registrationId, index),
+            student.id,
+          );
+        }
+        setPrintTick((tick) => tick + 1);
+        return;
       }
 
       if (prints && result.checkedIn) {
@@ -1932,6 +2013,7 @@ export function KioskApp() {
               ...(carryNotes ? { allergies: notes } : {}),
             });
           }}
+          onEarlyPrint={onEarlyPrint}
           onRegistered={(result, notes) =>
             onRegistered({
               notes,

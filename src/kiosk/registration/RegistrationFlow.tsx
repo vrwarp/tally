@@ -19,7 +19,7 @@
  * collect it is retired; it is gated on the binding's `allergiesSupported`,
  * which is the same write-back check that form made before showing its field.
  */
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -63,6 +63,39 @@ const INACTIVITY_MS = 90_000;
  * number somebody has to remember.
  */
 const SUCCESS_AUTO_RETURN_MS = 8_000;
+
+/**
+ * How long the first bar takes, and — if the callable has not answered by then
+ * — when the name tags go anyway.
+ *
+ * Five seconds is not a guess about the call; it is the length of wait at which
+ * a screen with nothing moving on it stops reading as *working* and starts
+ * reading as *broken*. A save that comes back inside it never spends it: the
+ * bar completes early and the second one is never drawn, so the common evening
+ * is unchanged and the risk of a sticker outrunning its registration is
+ * confined to the calls that were already slow.
+ */
+export const PROCESSING_MS = 5_000;
+
+/**
+ * The completion beat.
+ *
+ * Long enough for a bar to be seen arriving at its end, short enough not to be
+ * a wait. Without it a fast save paints a bar at a fifth of its width and then
+ * takes the screen away, and progress that vanishes part-drawn reads as
+ * *cancelled* — the exact impression the bar is there to prevent.
+ */
+export const SNAP_MS = 300;
+
+/**
+ * Where the saving screen is, which is not quite where the run is.
+ *
+ * `state.step` says `submitting` for the whole window; this says which half of
+ * it. `processing` is the first bar, `saving` is the second — reached only by a
+ * call that has already cost a parent five seconds, and the point at which
+ * their name tags are printed. `finishing` is the beat above.
+ */
+type SavePhase = 'processing' | 'saving' | 'finishing';
 
 type Action =
   | { type: 'key'; key: KioskKey }
@@ -169,6 +202,15 @@ export interface RegistrationFlowProps {
    * for a child this new. See `rememberAllergyNote`.
    */
   onRegistered: (result: RegisterFamilyResult, notes: readonly string[]) => void;
+  /**
+   * Print the name tags now, without waiting to hear whether the family was
+   * written — `PROCESSING_MS` into a call that has not answered.
+   *
+   * Called at most once per run. The caller keys the labels by the run and
+   * adopts the real ids when the response lands, so a sticker that outran its
+   * registration is still the same sticker afterwards.
+   */
+  onEarlyPrint: (registrationId: string, children: readonly DraftChild[]) => void;
   /** Back to search: cancelled, timed out, or finished. */
   onClose: () => void;
 }
@@ -180,6 +222,7 @@ export function RegistrationFlow({
   anchors,
   submit,
   onRegistered,
+  onEarlyPrint,
   onClose,
 }: RegistrationFlowProps) {
   // Absent on a binding written before the flag existed, and absent means no.
@@ -217,11 +260,24 @@ export function RegistrationFlow({
 
   /* ---- The call ---------------------------------------------------------- */
 
+  const [savePhase, setSavePhase] = useState<SavePhase>('processing');
+  /**
+   * Whether this run's name tags have already gone.
+   *
+   * Separate from the phase because it survives it: once the tags are out the
+   * second meter stays on the screen through `finishing`, and the first one
+   * keeps saying so.
+   */
+  const [tagsOut, setTagsOut] = useState(false);
+  /** The completion beat's timer, cleared if this screen goes first. */
+  const finishRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(finishRef.current), []);
   const submittedRef = useRef(false);
   const runSubmit = useCallback(() => {
     if (submittedRef.current) return;
     submittedRef.current = true;
     haptic();
+    setSavePhase('processing');
     dispatch({ type: 'submitting' });
     void submit({
       registrationId: state.registrationId,
@@ -235,11 +291,22 @@ export function RegistrationFlow({
         // A retry re-sends the same registrationId, which is what makes the
         // callable answer rather than create a second family.
         submittedRef.current = false;
-        dispatch({ type: 'submitted', result });
+        /*
+         * The roster half now, the screen half a beat later.
+         *
+         * `onRegistered` is what greens their rows, makes them searchable and —
+         * unless the saving screen already did it — prints. None of that waits
+         * for an animation. What waits is the step change: the bar is given
+         * `SNAP_MS` to be seen arriving at its end, because a bar that is
+         * replaced part-drawn reads as a thing that stopped rather than a thing
+         * that finished.
+         */
         onRegistered(
           result,
           state.children.map((child) => child.allergies),
         );
+        setSavePhase('finishing');
+        finishRef.current = setTimeout(() => dispatch({ type: 'submitted', result }), SNAP_MS);
       })
       .catch((error: { code?: string }) => {
         submittedRef.current = false;
@@ -269,6 +336,29 @@ export function RegistrationFlow({
     anchorIds,
     onRegistered,
   ]);
+
+  /* ---- Five seconds in, with nothing back ---------------------------------- */
+
+  /*
+   * The handoff: the first bar ends, the name tags go, and the second bar takes
+   * over for however long the call still needs.
+   *
+   * Armed on entering `submitting` and disarmed by leaving it, so a save that
+   * answers first never reaches this and the tags print the ordinary way, from
+   * `onRegistered`, against ids the server has already given. Only a call that
+   * has held a parent for five seconds prints ahead of its own answer — which
+   * is also the case where the tags in their hand are the only thing on this
+   * screen that is certainly true.
+   */
+  useEffect(() => {
+    if (state.step !== 'submitting' || savePhase !== 'processing') return;
+    const timer = setTimeout(() => {
+      onEarlyPrint(state.registrationId, state.children);
+      setTagsOut(true);
+      setSavePhase('saving');
+    }, PROCESSING_MS);
+    return () => clearTimeout(timer);
+  }, [state.step, state.registrationId, state.children, savePhase, onEarlyPrint]);
 
   useEffect(() => {
     if (state.step !== 'success') return;
@@ -417,7 +507,7 @@ export function RegistrationFlow({
         ) : (
           <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
           {state.step === 'submitting' && (
-            <p className="pt-10 text-center text-xl text-ink-400">Saving…</p>
+            <SavingScreen roster={state.children} phase={savePhase} tagsOut={tagsOut} />
           )}
 
           {state.step === 'success' && (
@@ -597,6 +687,136 @@ export function RegistrationFlow({
       ) : (
         <div className="h-4" />
       )}
+    </div>
+  );
+}
+
+/**
+ * How long the second meter is drawn to run for.
+ *
+ * Not a prediction — the callable's own deadline is seventy seconds and this is
+ * just past it, so the bar is still moving whenever there is anything to wait
+ * for. The easing is what carries the meaning: it decelerates hard, so the
+ * distance left never closes and the meter cannot promise an arrival it does
+ * not know about.
+ */
+const SLOW_METER_MS = 75_000;
+
+/** Where a meter starts, so it reads as a bar rather than as an empty track. */
+const METER_FLOOR = 0.03;
+
+/**
+ * One meter, and what it is a meter of.
+ *
+ * `running` is the phase's own curve; `full` is the completion beat. The arm is
+ * two frames rather than one because a transition set in the same paint as its
+ * starting value does not run — the browser has nothing to interpolate from.
+ */
+function Meter({
+  label,
+  mode,
+  slow,
+}: {
+  label: string;
+  mode: 'running' | 'full';
+  slow: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const first = requestAnimationFrame(() => setArmed(true));
+    return () => cancelAnimationFrame(first);
+  }, []);
+
+  const scale =
+    mode === 'full' ? 1 : !armed ? METER_FLOOR : slow ? 0.985 : 1;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="kiosk-meter">
+        <div
+          data-testid="save-meter-fill"
+          className="kiosk-meter-fill"
+          style={{
+            transform: `scaleX(${scale})`,
+            transitionDuration:
+              mode === 'full' ? `${SNAP_MS}ms` : slow ? `${SLOW_METER_MS}ms` : `${PROCESSING_MS}ms`,
+            // Linear where the end is known and near, and a hard deceleration
+            // where it is neither.
+            transitionTimingFunction:
+              mode === 'full' ? 'ease-out' : slow ? 'cubic-bezier(0, 0.55, 0.1, 1)' : 'linear',
+          }}
+        />
+      </div>
+      <p className="text-center text-lg text-ink-400 kiosk:text-xl">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * The screen a family looks at while the callable is in the air.
+ *
+ * It used to be the word "Saving…" under the word "One moment" on an otherwise
+ * empty screen — two phrasings of the same idea, nothing moving, and four
+ * fifths of a lobby tablet blank. A screen with nothing happening on it is
+ * indistinguishable from a screen that has crashed, and the parent's own answer
+ * to that is to press something.
+ *
+ * So it shows the two things it actually knows. The family, because the wait is
+ * *about* them and the names are the one content this screen can be certain of
+ * — the same rows the confirm just showed, held still so the last thing a
+ * parent read is still there. And the progress, in the only honest shape
+ * available: a first meter that ends where the name tags print, and — for the
+ * saves slow enough to need it — a second that keeps moving without ever
+ * claiming to arrive.
+ *
+ * The two meters stack rather than replace one another. A single track running
+ * to its end and starting again at nothing reads as progress lost, whatever the
+ * label says; two rows, the first one finished and staying finished, read as a
+ * thing with a step behind it. What makes that legible rather than decorative
+ * is that the step between them is real: the name tags come out.
+ */
+function SavingScreen({
+  roster,
+  phase,
+  tagsOut,
+}: {
+  roster: readonly DraftChild[];
+  phase: SavePhase;
+  tagsOut: boolean;
+}) {
+  return (
+    <div className="flex min-h-full flex-col gap-5 pt-3">
+      <div className="flex flex-col gap-2">
+        {roster.map((child, index) => (
+          <div
+            key={index}
+            data-testid="saving-child"
+            className="flex h-14 items-center justify-between gap-3 rounded-xl bg-ink-900 px-5 kiosk:h-16"
+          >
+            <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+              {`${child.firstName} ${child.lastName}`.trim()}
+            </span>
+            {child.grade !== null && (
+              <span className="shrink-0 text-base text-ink-500 kiosk:text-lg">
+                {gradeDescription(child.grade)}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <Meter
+          label={tagsOut ? 'Name tags printing' : 'Checking them in…'}
+          mode={phase === 'processing' ? 'running' : 'full'}
+          slow={false}
+        />
+        {/* Only for the saves that earned it. Most evenings this is never
+            drawn, and the screen is one meter that fills and is gone. */}
+        {tagsOut && (
+          <Meter label="Saving…" mode={phase === 'finishing' ? 'full' : 'running'} slow />
+        )}
+      </div>
     </div>
   );
 }

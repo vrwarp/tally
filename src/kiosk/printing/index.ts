@@ -57,7 +57,13 @@ import type { Label } from '@vrwarp/brother-ql-webusb/labels';
 import { fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
-import { allergyFor, forgetAllergies, forgetAllergy, startAllergyLookup } from './allergy';
+import {
+  adoptAllergyNote,
+  allergyFor,
+  forgetAllergies,
+  forgetAllergy,
+  startAllergyLookup,
+} from './allergy';
 import { matchLabels, modelFromProductName, preferredLabel } from './detect';
 import { tokenValuesFor } from './tokens';
 import {
@@ -1113,6 +1119,31 @@ export function printLabel(student: KioskStudent, binding: KioskBinding): void {
   // simply left to the warm: the printer screen reaches `printLabel` too.
   startAllergyLookup(student, template);
   queue.print(jobFor(student, binding, template));
+}
+
+/**
+ * The id a registration's sticker is queued under before its child has one.
+ *
+ * The run's own id and the child's place in it, which is unique for as long as
+ * it needs to be and is reproducible from either side — `adoptStudentId` is
+ * handed the same pair when the callable finally answers.
+ */
+export function pendingLabelId(registrationId: string, index: number): string {
+  return `${registrationId}:${index}`;
+}
+
+/**
+ * The child whose sticker went to the printer before the server named them.
+ *
+ * Everything downstream of a printed label looks the child up on the roster by
+ * this id: the printer screen's log reprints a row that way, and the reprint
+ * confirm reads "last printed at" from it. A label left under the temporary key
+ * is a dead row for the one family whose sticker is newest — and the likeliest
+ * to be asked about, because it is the one that has just come out.
+ */
+export function adoptStudentId(from: string, to: string): void {
+  queue.rekey(from, to);
+  adoptAllergyNote(from, to);
 }
 
 /** The confirm screen closed without confirming; its label is not wanted. */

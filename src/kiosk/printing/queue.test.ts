@@ -533,6 +533,72 @@ describe('the label queue', () => {
     });
   });
 
+  describe('adopting the id a child turns out to have', () => {
+    /*
+     * A registration's stickers can go to the printer before the callable names
+     * the children, so they are queued under the run rather than under ids that
+     * do not exist yet. Everything downstream looks the child back up on the
+     * roster by that id — the log reprints a row that way — so the label has to
+     * end up under the real one whichever side of the drain the answer lands on.
+     */
+    it('re-keys a label still waiting to be sent', async () => {
+      const send = fakeSend();
+      const blocked = deferred();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: async (result) => {
+          await blocked.promise;
+          await send.fn(result);
+        },
+      });
+
+      queue.print(job('run-7:0', 'Robin'));
+      queue.rekey('run-7:0', 'new-robin');
+      blocked.release();
+      await queue.idle();
+
+      expect(queue.printedTonight()).toEqual([
+        expect.objectContaining({ studentId: 'new-robin', name: 'Robin' }),
+      ]);
+    });
+
+    it('re-keys one the log has already recorded', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      queue.print(job('run-7:0', 'Robin'));
+      await queue.idle();
+      queue.rekey('run-7:0', 'new-robin');
+
+      expect(queue.printedTonight()).toEqual([
+        expect.objectContaining({ studentId: 'new-robin', name: 'Robin' }),
+      ]);
+    });
+
+    it('leaves everybody else alone', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      queue.print(job('run-7:0', 'Robin'));
+      queue.print(job('ada', 'Ada'));
+      await queue.idle();
+      queue.rekey('run-7:0', 'new-robin');
+
+      expect(queue.printedTonight().map((entry) => entry.studentId)).toEqual([
+        'ada',
+        'new-robin',
+      ]);
+    });
+
+    it('is a no-op when the id has not changed', async () => {
+      const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
+
+      queue.print(job('ada', 'Ada'));
+      await queue.idle();
+      queue.rekey('ada', 'ada');
+
+      expect(queue.printedTonight().map((entry) => entry.studentId)).toEqual(['ada']);
+    });
+  });
+
   describe("the evening's log", () => {
     it('is empty before anything has printed', () => {
       const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });

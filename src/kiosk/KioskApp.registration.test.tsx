@@ -27,6 +27,7 @@ import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskA
  * mocked: what these tests are about is the wizard driving the real kiosk.
  */
 import '@/kiosk/registration';
+import { PROCESSING_MS, SNAP_MS } from '@/kiosk/registration/RegistrationFlow';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
@@ -79,6 +80,10 @@ const printing = {
   // The other half of that: the one note the callable above cannot answer, so
   // it is handed over instead of asked for. See printing/allergy.ts.
   rememberAllergyNote: vi.fn(),
+  // The two halves of a sticker that went to the printer before its child had
+  // an id: the key it is queued under, and the id it turns out to want.
+  pendingLabelId: vi.fn((registrationId: string, index: number) => `${registrationId}:${index}`),
+  adoptStudentId: vi.fn(),
 } as unknown as KioskPrinting;
 
 /** What the callable answers. Reassigned per test. */
@@ -255,6 +260,22 @@ async function tapRow(id: string): Promise<void> {
   await settle();
 }
 
+/**
+ * The commit, and the completion beat behind it.
+ *
+ * The saving screen holds for `SNAP_MS` after the callable answers, so its
+ * meter is seen arriving at its end rather than vanishing part-drawn. Well
+ * inside `PROCESSING_MS`, so nothing here reaches the early print — that window
+ * is opened deliberately, by `registerHangs`.
+ */
+async function commit(label: RegExp | string): Promise<void> {
+  await tap(label);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(SNAP_MS);
+  });
+  await settle();
+}
+
 async function enterChild(first: string, last: string, grade: string): Promise<void> {
   await type(first);
   await tap('Next');
@@ -370,7 +391,7 @@ describe('registering a family', () => {
   it('sends one call for the whole family, checked in against this gathering', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.eventId).toBe('friday-today');
@@ -389,7 +410,7 @@ describe('registering a family', () => {
   it('teaches the family their four digits before it lets them go', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(screen.getByText('Robin and Sam are checked in. Welcome!')).toBeTruthy();
     expect(screen.getByText('3344')).toBeTruthy();
@@ -399,7 +420,7 @@ describe('registering a family', () => {
     configurePrinter();
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(2);
     expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
@@ -409,7 +430,7 @@ describe('registering a family', () => {
   it('leaves the family searchable by name and by their digits, at once', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
     await tap('Done');
 
     // Nothing was refetched: the server patched the index, and the answer that
@@ -426,7 +447,7 @@ describe('registering a family', () => {
   it('shows them as checked in, so a second family cannot re-tap them', async () => {
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
     await tap('Done');
     await type('Robin');
 
@@ -445,7 +466,7 @@ describe('registering a family', () => {
     configurePrinter();
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
     await tap('Done');
 
     await type('Robin');
@@ -462,6 +483,114 @@ describe('registering a family', () => {
 });
 
 describe('while the call is in the air', () => {
+  it('shows the family it is saving, rather than an empty screen', async () => {
+    // Two phrasings of "wait" on four fifths of a blank tablet is what this
+    // replaced. The names are the one thing this screen can be certain of, and
+    // they are the thing the wait is about.
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+
+    expect(screen.getAllByTestId('saving-child').map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Robin Fields'),
+      expect.stringContaining('Sam Fields'),
+    ]);
+    expect(screen.getByText('Checking them in…')).toBeTruthy();
+  });
+
+  it('prints the name tags rather than holding them behind a slow save', async () => {
+    /*
+     * Every token on the sticker is a name the parent typed or a fact about the
+     * gathering, so nothing on it needs the server. What it does not have is the
+     * child's id — hence the run's own, adopted below once the answer lands.
+     */
+    configurePrinter();
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+
+    expect(printing.printLabel).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+
+    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
+      .toEqual(['Robin', 'Sam']);
+    // And the second meter is up, saying so.
+    expect(screen.getByText('Name tags printing')).toBeTruthy();
+    expect(screen.getByText('Saving…')).toBeTruthy();
+  });
+
+  it('gives the early stickers the ids their children turn out to have', async () => {
+    /*
+     * The printer screen's log reprints a row by looking the child up on the
+     * roster, and the reprint confirm reads "last printed at" the same way. A
+     * label left under the run's own key is a dead row for the one family whose
+     * sticker is newest — and the likeliest to be asked about.
+     */
+    configurePrinter();
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+
+    const queued = (printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => call[0].id,
+    );
+    await act(async () => {
+      releaseRegister();
+      await vi.advanceTimersByTimeAsync(SNAP_MS);
+    });
+    await settle();
+
+    expect((printing.adoptStudentId as ReturnType<typeof vi.fn>).mock.calls).toEqual([
+      [queued[0], 'new-robin'],
+      [queued[1], 'new-sam'],
+    ]);
+  });
+
+  it('does not print a second time when the answer finally lands', async () => {
+    // The stickers are already on the tape and a child cannot wear two. A
+    // second copy is a staff reprint, never a consequence of a slow call.
+    configurePrinter();
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+    await act(async () => {
+      releaseRegister();
+      await vi.advanceTimersByTimeAsync(SNAP_MS);
+    });
+    await settle();
+
+    expect(printing.printLabel).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not print early on the ordinary evening, when the call comes back first', async () => {
+    // The whole risk of a sticker outrunning its registration is confined to
+    // the saves that were already slow; a normal one is unchanged.
+    configurePrinter();
+    await mount();
+    await fillInTheFamily();
+    await commit('Check in Robin and Sam');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+
+    expect(printing.printLabel).toHaveBeenCalledTimes(2);
+    expect(printing.adoptStudentId).not.toHaveBeenCalled();
+    // The second meter was never drawn.
+    expect(screen.queryByText('Saving…')).toBeNull();
+  });
+
   it('takes Back away, so a parent cannot drop their own registration mid-flight', async () => {
     /*
      * `goBack` has no case for `submitting`, so it answered null — and null is
@@ -475,7 +604,7 @@ describe('while the call is in the air', () => {
     registerHangs = true;
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(screen.getByText('One moment')).toBeTruthy();
     await tap(/← Back/);
@@ -483,6 +612,7 @@ describe('while the call is in the air', () => {
 
     await act(async () => {
       releaseRegister();
+      await vi.advanceTimersByTimeAsync(SNAP_MS);
     });
     await settle();
     expect(screen.getByText('3344')).toBeTruthy();
@@ -771,12 +901,15 @@ describe('when it does not work', () => {
     registerFails = true;
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(screen.getByText(/please see a leader/)).toBeTruthy();
 
     registerFails = false;
     await tap('Try again');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SNAP_MS);
+    });
 
     expect(sent).toHaveLength(2);
     expect(sent[1]!.registrationId).toBe(sent[0]!.registrationId);
@@ -796,7 +929,7 @@ describe('when it does not work', () => {
     registerError = { code: 'functions/deadline-exceeded' };
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(screen.getByText(/taking longer than expected/i)).toBeTruthy();
     expect(screen.queryByText(/could not save that/i)).toBeNull();
@@ -812,7 +945,7 @@ describe('when it does not work', () => {
     registerError = { code: 'functions/invalid-argument' };
     await mount();
     await fillInTheFamily();
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(screen.getByText(/could not save that/i)).toBeTruthy();
   });
@@ -960,7 +1093,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap('Add another child');
     await enterChild('Sam', 'Fields', '2');
     await tap('No allergies');
-    await tap('Check in Robin and Sam');
+    await commit('Check in Robin and Sam');
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.allergies).toEqual(['Peanuts', null]);
@@ -977,7 +1110,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await enterChild('Robin', 'Fields', '4');
     await tap('No allergies');
     await enterGuardian('Dana', 'Fields', '5550103344');
-    await tap('Check in Robin');
+    await commit('Check in Robin');
 
     expect(sent).toHaveLength(1);
     // Not [null] — absent. An all-null array says nothing, and omitting it
@@ -1002,7 +1135,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await type('Peanuts');
     await tap('Next');
     await enterGuardian('Dana', 'Fields', '5550103344');
-    await tap('Check in Robin');
+    await commit('Check in Robin');
 
     // Before the sticker, because the sticker is drawn from it — the rule the
     // printing module's own tests pin from the other side.
@@ -1016,7 +1149,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await enterChild('Robin', 'Fields', '4');
     await tap('No allergies');
     await enterGuardian('Dana', 'Fields', '5550103344');
-    await tap('Check in Robin');
+    await commit('Check in Robin');
 
     expect(printing.rememberAllergyNote).toHaveBeenCalledWith('new-robin', '');
   });

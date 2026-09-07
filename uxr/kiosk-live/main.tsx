@@ -340,6 +340,7 @@ export function Kiosk() {
         // Never settles: the frame under review is the step, not its result.
         submit={() => new Promise(() => {})}
         onRegistered={() => {}}
+        onEarlyPrint={() => {}}
         onClose={() => {}}
       />
     );

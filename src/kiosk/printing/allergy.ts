@@ -206,6 +206,23 @@ export function forgetAllergy(studentId: string): void {
 }
 
 /**
+ * Move a note onto the id the child turned out to have.
+ *
+ * The other half of `adoptStudentId`: a registration's label is rasterised
+ * under the run's own key, and `allergyFor` is read *during* that rasterise —
+ * so if the callable answers while a sticker is still being drawn, the note has
+ * to be findable under both names for the drawing to finish correctly. Copied
+ * rather than moved for exactly that reason; the old key ages out of the bound
+ * the way every other entry does.
+ */
+export function adoptAllergyNote(from: string, to: string): void {
+  const note = held.get(from);
+  if (note === undefined || from === to) return;
+  makeRoom();
+  held.set(to, note);
+}
+
+/**
  * Drop the lot.
  *
  * For unbinding — a kiosk that has left a gathering has no business still
