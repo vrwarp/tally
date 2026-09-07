@@ -33,12 +33,13 @@ import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Presets rather than a date picker: these are the three questions asked. */
 const WINDOWS = [
-  { value: '8', label: 'Last 8 gatherings', count: 8 },
-  { value: '90', label: 'Last 3 months', days: 90 },
-  { value: '365', label: 'Last 12 months', days: 365 },
+  { value: '8', label: 'rangeLast8', count: 8 },
+  { value: '90', label: 'rangeLast3Months', days: 90 },
+  { value: '365', label: 'rangeLast12Months', days: 365 },
 ] as const;
 
 export interface AttendanceGridModalProps {
@@ -47,6 +48,7 @@ export interface AttendanceGridModalProps {
 }
 
 export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps) {
+  const t = useTranslations('Grid');
   const { events, series, students, canWork, rosterBackends } = useData();
 
   const gatherings = useMemo(
@@ -117,8 +119,8 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
     <Modal
       open={open}
       onClose={onClose}
-      title="Attendance grid"
-      description="One gathering, students down and dates across — for a spreadsheet."
+      title={t('title')}
+      description={t('description')}
       footer={
         <ExportCsvButton
           // The exception to the ghost default: in a modal footer this is the
@@ -135,8 +137,8 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
           })}
           count={grid && grid.gatherings.length > 0 ? rowCount : 0}
           noun="students"
-          label="Download CSV"
-          blockedReason={loading ? 'Still reading the registers.' : null}
+          label={t('downloadCsv')}
+          blockedReason={loading ? t('stillReading') : null}
         />
       }
     >
@@ -160,13 +162,13 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
             </SelectField>
 
             <SelectField
-              label="How far back"
+              label={t('howFarBack')}
               value={window}
               onChange={(changed) => setWindow(changed.target.value)}
             >
               {WINDOWS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
-                  {entry.label}
+                  {t(entry.label)}
                 </option>
               ))}
             </SelectField>
@@ -193,17 +195,12 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
                 */}
                 {grid && grid.presumedCancelled > 0 ? (
                   <p className="text-ink-500">
-                    {grid.presumedCancelled}{' '}
-                    {grid.presumedCancelled === 1 ? 'gathering had' : 'gatherings had'} nobody
-                    checked in and {grid.presumedCancelled === 1 ? 'is' : 'are'} left out, the way
-                    every other screen treats them.
+                    {t('presumedCancelled', { count: grid.presumedCancelled })}
                   </p>
                 ) : null}
                 {grid && grid.denied > 0 ? (
                   <p className="text-warn-400">
-                    {grid.denied} {grid.denied === 1 ? 'gathering is' : 'gatherings are'} not yours
-                    to read, so {grid.denied === 1 ? 'it has' : 'they have'} no column here — rather
-                    than a column of zeros saying nobody came.
+                    {t('denied', { count: grid.denied })}
                   </p>
                 ) : null}
               </div>

@@ -64,6 +64,7 @@ import { cn, gradeLabel, NO_GRADE } from '@/lib/utils';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useRecurrenceStrings } from '@/hooks/useRecurrenceStrings';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -76,6 +77,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function EventDetailPage() {
   const t = useTranslations('EventDetail');
+  const recurrenceStrings = useRecurrenceStrings();
   const { eventId } = useParams();
   const { events, series, students, loading, canWork, access, rosterBackends } = useData();
   const { user } = useAuth();
@@ -300,7 +302,7 @@ export function EventDetailPage() {
                 {event.recurrence ? (
                   <DetailRow
                     label={t('rowRepeats')}
-                    value={describeRecurrence(event.recurrence, event.startAt)}
+                    value={describeRecurrence(recurrenceStrings, event.recurrence, event.startAt)}
                   />
                 ) : null}
                 {event.location ? <DetailRow label={t('rowLocation')} value={event.location} /> : null}

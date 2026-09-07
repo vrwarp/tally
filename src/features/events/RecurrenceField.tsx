@@ -34,6 +34,8 @@ import {
 import { formatShortDate } from '@/lib/time';
 import { cn, haptic } from '@/lib/utils';
 import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useRecurrenceStrings } from '@/hooks/useRecurrenceStrings';
 
 /**
  * No "days". Every day is every weekday of a weekly rule, chosen in the picker
@@ -61,13 +63,14 @@ function WeekdayPicker({
   selected: readonly number[];
   onToggle: (weekday: number) => void;
 }) {
+  const t = useTranslations('Recurrence');
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-ink-300">Repeat on</span>
+      <span className="text-sm font-medium text-ink-300">{t('repeatOn')}</span>
       {/* Fixed-size circles in a plain row rather than a stretched one: seven
           targets spread across a desktop-width modal stop reading as a week. */}
-      <div role="group" aria-label="Repeat on" className="flex flex-wrap gap-2">
-        {WEEKDAY_INITIALS.map((initial, weekday) => {
+      <div role="group" aria-label={t('repeatOn')} className="flex flex-wrap gap-2">
+        {WEEKDAY_INITIALS.map((initialKey, weekday) => {
           const on = selected.includes(weekday);
           return (
             <button
@@ -78,7 +81,7 @@ function WeekdayPicker({
               aria-pressed={on}
               // The visible label is a single letter; the accessible one has to
               // say which day it actually is.
-              aria-label={WEEKDAY_NAMES[weekday]}
+              aria-label={t(WEEKDAY_NAMES[weekday]!)}
               onClick={() => {
                 haptic(8);
                 onToggle(weekday);
@@ -91,7 +94,7 @@ function WeekdayPicker({
                   : 'bg-ink-900 text-ink-300 ring-ink-700 active:bg-ink-800',
               )}
             >
-              <span aria-hidden="true">{initial}</span>
+              <span aria-hidden="true">{t(initialKey)}</span>
             </button>
           );
         })}
@@ -117,6 +120,8 @@ export interface RecurrenceFieldProps {
 }
 
 export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFieldProps) {
+  const t = useTranslations('Recurrence');
+  const recurrenceStrings = useRecurrenceStrings();
   // Choosing "Custom…" has to open the panel even when the rule currently in
   // hand happens to match a shortlist entry — that is the whole point of the
   // option. A rule that matches nothing opens it regardless.
@@ -124,13 +129,13 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
   if (!anchor) {
     return (
-      <SelectField label="Repeats" defaultValue="weekly" disabled hint="Pick a start date first.">
-        <option value="weekly">Weekly</option>
+      <SelectField label={t('repeats')} defaultValue="weekly" disabled hint={t('pickStartFirst')}>
+        <option value="weekly">{t('weekly')}</option>
       </SelectField>
     );
   }
 
-  const presets = recurrencePresets(anchor);
+  const presets = recurrencePresets(recurrenceStrings, anchor);
   const matched = matchRecurrencePreset(value, anchor);
   const isCustom = matched === 'custom' || customOpen;
   const selected: RecurrencePresetId = isCustom ? 'custom' : matched;
@@ -184,7 +189,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
   return (
     <div className="flex flex-col gap-3">
       <SelectField
-        label="Repeats"
+        label={t('repeats')}
         value={selected}
         onChange={(changed) => handlePresetChange(changed.target.value)}
         error={error ?? null}
@@ -194,18 +199,18 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
             {preset.label}
           </option>
         ))}
-        <option value="custom">Custom…</option>
+        <option value="custom">{t('custom')}</option>
       </SelectField>
 
       {isCustom ? (
         <fieldset className="flex flex-col gap-4 rounded-xl bg-ink-950/40 p-3 ring-1 ring-ink-800">
           <legend className="px-1 text-xs font-bold uppercase tracking-wider text-ink-400">
-            Custom repeat
+            {t('customTitle')}
           </legend>
 
           <div className="grid grid-cols-2 gap-3">
             <NumberStepperField
-              label="Repeat every"
+              label={t('repeatEvery')}
               value={value.interval}
               min={1}
               max={MAX_INTERVAL}
@@ -232,35 +237,39 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
           {value.frequency === 'monthly' ? (
             <SelectField
-              label="Monthly pattern"
+              label={t('monthlyPattern')}
               value={value.monthlyMode}
               onChange={(changed) =>
                 patch({ monthlyMode: changed.target.value as RecurrenceRule['monthlyMode'] })
               }
               hint={
                 anchor.getDate() > 28
-                  ? `A month with no ${anchor.getDate()}th is skipped rather than moved.`
+                  ? t('monthSkipped', { day: anchor.getDate() })
                   : undefined
               }
             >
               <option value="dayOfMonth">Monthly on day {anchor.getDate()}</option>
-              <option value="dayOfWeek">Monthly on {describeMonthlyWeekday(anchor)}</option>
+              <option value="dayOfWeek">
+                {t('monthlyOnWeekdayOption', {
+                  which: describeMonthlyWeekday(recurrenceStrings, anchor),
+                })}
+              </option>
             </SelectField>
           ) : null}
 
           <SelectField
-            label="Ends"
+            label={t('ends')}
             value={endsModeOf(value)}
             onChange={(changed) => handleEndsChange(changed.target.value as EndsMode)}
           >
-            <option value="never">Never</option>
-            <option value="on">On a date</option>
-            <option value="after">After a number of times</option>
+            <option value="never">{t('never')}</option>
+            <option value="on">{t('endOnDate')}</option>
+            <option value="after">{t('endAfterCount')}</option>
           </SelectField>
 
           {value.until !== null ? (
             <TextField
-              label="Last date"
+              label={t('lastDate')}
               type="date"
               value={value.until}
               onChange={(changed) => patch({ until: changed.target.value })}
@@ -272,12 +281,12 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
           {value.count !== null ? (
             <NumberStepperField
-              label="Number of gatherings"
+              label={t('numberOfGatherings')}
               value={value.count}
               min={1}
               max={MAX_COUNT}
               onValueChange={(count) => patch({ count })}
-              hint="Counting the one above as the first."
+              hint={t('countingFirst')}
             />
           ) : null}
         </fieldset>
@@ -289,7 +298,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
           {preview.length === 3 ? '…' : ''}
         </p>
       ) : (
-        <p className="text-xs text-ink-500">This is the only gathering the repeat covers.</p>
+        <p className="text-xs text-ink-500">{t('onlyGathering')}</p>
       )}
     </div>
   );

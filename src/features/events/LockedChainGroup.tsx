@@ -36,6 +36,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { LockedEventRow } from '@/features/events/LockedEventRow';
 import { sharedDetail, sharedWeekday, type LockedChain } from '@/features/events/lockedChains';
+import { useTranslations } from 'use-intl';
 
 export interface LockedChainGroupProps {
   chain: LockedChain;
@@ -58,6 +59,7 @@ export interface LockedChainGroupProps {
  * to line up.
  */
 function SoloLockedRow({ chain, detail }: { chain: LockedChain; detail: string | null }) {
+  const t = useTranslations('Events');
   const event = chain.events[0]!;
 
   return (
@@ -75,7 +77,7 @@ function SoloLockedRow({ chain, detail }: { chain: LockedChain; detail: string |
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-ink-200">
-            <span className="sr-only">Not yours · </span>
+            <span className="sr-only">{t('notYoursPrefix')}</span>
             {chain.label}
             <span className="font-normal text-ink-400"> ·</span>{' '}
             {format(event.startAt, 'EEE, MMM d')}
@@ -100,6 +102,7 @@ function headDate(chain: LockedChain): string {
 }
 
 export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedChainGroupProps) {
+  const t = useTranslations('Events');
   const detail = sharedDetail(chain.events);
   const weekday = sharedWeekday(chain.events);
   const listId = useId();
@@ -138,9 +141,9 @@ export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedCha
               <span className="min-w-0 truncate">
                 {/* The count, for a reader who cannot see the right margin. It
                     is the same fact the `lg:` span below carries, said once. */}
-                <span className="sr-only">{`Not yours · ${chain.events.length} gatherings · `}</span>
+                <span className="sr-only">{t('notYoursChain', { count: chain.events.length })}</span>
                 {chain.label}
-                <span className="font-normal text-ink-400">{` · ${lead}`}</span> {headDate(chain)}
+                <span className="font-normal text-ink-400">{t('leadSuffix', { lead })}</span> {headDate(chain)}
               </span>
 
               {/*

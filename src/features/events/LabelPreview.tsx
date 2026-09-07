@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { labelFont, layoutLabel, type LabelBox, type MeasureText } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
 import { SAMPLE_VALUES } from '@/features/events/labelSamples';
+import { useTranslations } from 'use-intl';
 
 /** How wide the preview is drawn, in CSS pixels. */
 const PREVIEW_WIDTH_PX = 320;
@@ -44,6 +45,7 @@ export function LabelPreview({
   rotated?: boolean;
   className?: string;
 }) {
+  const t = useTranslations('Events');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notes, setNotes] = useState<{ dropped: number; scaled: boolean }>({
     dropped: 0,
@@ -119,7 +121,7 @@ export function LabelPreview({
         // A white sticker on a dark form needs an edge, or it reads as a hole.
         className="rounded-sm shadow-md ring-1 ring-ink-700"
         role="img"
-        aria-label="Preview of the printed label"
+        aria-label={t('labelPreviewAria')}
       />
       {/*
         * Said out loud, because the alternative is a leader designing a
@@ -127,12 +129,11 @@ export function LabelPreview({
         */}
       {notes.dropped > 0 ? (
         <p className="pt-2 text-xs leading-snug text-warn-400">
-          {notes.dropped === 1 ? 'The last line does not' : `The last ${notes.dropped} lines do not`} fit
-          on this label and will not be printed.
+          {t('labelDropped', { count: notes.dropped })}
         </p>
       ) : notes.scaled ? (
         <p className="pt-2 text-xs leading-snug text-ink-500">
-          Everything has been scaled down to fit. Fewer or smaller lines would print larger.
+          {t('labelScaledDown')}
         </p>
       ) : null}
     </div>

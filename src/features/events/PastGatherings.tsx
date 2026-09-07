@@ -29,6 +29,7 @@ import { usePastEvents } from '@/hooks/usePastEvents';
 import { formatEventWindow } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** "July 2026" — the ruler the rows hang off, so each row only needs a day. */
 const MONTH = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
@@ -89,6 +90,7 @@ function AttendanceStat({
   count: number | undefined;
   locked?: boolean;
 }) {
+  const t = useTranslations('PastGatherings');
   if (event.status === 'cancelled') {
     return <Badge tone="danger">Cancelled</Badge>;
   }
@@ -105,7 +107,7 @@ function AttendanceStat({
     return (
       <span className="block text-right text-[11px] leading-tight text-ink-500">
         <span aria-hidden>🔒</span>
-        <span className="block">not yours</span>
+        <span className="block">{t('notYours')}</span>
       </span>
     );
   }
@@ -122,8 +124,8 @@ function AttendanceStat({
   if (count === 0) {
     return (
       <span className="block text-right text-[11px] leading-tight text-ink-500">
-        Nobody
-        <span className="block">checked in</span>
+        {t('nobody')}
+        <span className="block">{t('checkedInUnit')}</span>
       </span>
     );
   }
@@ -151,9 +153,9 @@ function AttendanceStat({
       <span aria-hidden="true" className="text-base font-bold tabular-nums text-ink-100">
         {count}
       </span>
-      <span className="sr-only">{count} students checked in</span>
+      <span className="sr-only">{t('spokenCount', { count })}</span>
       <span aria-hidden="true" className="block text-[11px] leading-none text-ink-400">
-        checked in
+        {t('checkedInUnit')}
       </span>
     </span>
   );
@@ -207,6 +209,7 @@ export function PastEventRow({
    */
   destination?: PastEventDestination;
 }) {
+  const t = useTranslations('PastGatherings');
   return (
     <li>
       <Link
@@ -220,7 +223,7 @@ export function PastEventRow({
           {/* A step closer than it was: with two series alternating down this
               list, the date is the only thing telling one row from another. */}
           <span className="mt-0.5 block truncate text-xs text-ink-400">
-            {format(event.startAt, 'EEE d')} · {formatEventWindow(event)}
+            {t('when', { day: format(event.startAt, 'EEE d'), window: formatEventWindow(event) })}
           </span>
         </span>
 
@@ -241,6 +244,8 @@ export interface PastGatheringsProps {
 }
 
 export function PastGatherings({ before }: PastGatheringsProps) {
+  const t = useTranslations('PastGatherings');
+  const tErrors = useTranslations('Errors');
   const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
   const { canWork } = useData();
   /*
@@ -312,13 +317,13 @@ export function PastGatherings({ before }: PastGatheringsProps) {
       {/* A half of the calendar, at the same rank as "Upcoming" opposite it —
           not a group inside one. */}
       <h2 id="past-gatherings" className="pb-3 text-lg font-bold text-ink-50">
-        Past gatherings
+        {t('title')}
       </h2>
 
       {empty ? (
         <EmptyState
-          title="Nothing has happened yet"
-          description="Gatherings appear here once they are past."
+          title={t('emptyTitle')}
+          description={t('emptyBody')}
         />
       ) : null}
 
@@ -404,7 +409,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
               onClick={retry}
               className="mt-2 block min-h-11 font-semibold underline underline-offset-4"
             >
-              Try again
+              {tErrors('tryAgain')}
             </button>
           }
         />
@@ -437,14 +442,14 @@ export function PastGatherings({ before }: PastGatheringsProps) {
           onClick={loadMore}
           className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
         >
-          Load older gatherings
+          {t('loadOlder')}
         </button>
       ) : null}
 
       {/* Left-aligned, like everything else in this column. */}
       {!hasMore && !loading && events.length > 0 ? (
         <p className="pt-4 pb-1 text-xs text-ink-500">
-          That is every gathering Tally has a record of.
+          {t('allLoaded')}
         </p>
       ) : null}
     </section>

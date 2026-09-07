@@ -39,6 +39,7 @@ import { DEFAULT_KIOSK_THEME, type KioskTheme } from '@/lib/kioskTheme';
 import { fetchKioskBackdrop, type StoredKioskBackdrop } from '@/services/kioskBackdrops';
 import { cn } from '@/lib/utils';
 import { painted } from './kioskPreview';
+import { useTranslations } from 'use-intl';
 
 /**
  * What the form holds: nothing, the photograph the event already points at,
@@ -64,8 +65,8 @@ export interface KioskBackdropFieldProps {
  * that is a fact to meet on Tuesday rather than at 8:55 on Sunday.
  */
 const CROPS = [
-  { label: 'On a shelf', width: 1280, height: 800, box: { width: 232, height: 145 } },
-  { label: 'Stood on end', width: 800, height: 1280, box: { width: 91, height: 145 } },
+  { label: 'onAShelf', width: 1280, height: 800, box: { width: 232, height: 145 } },
+  { label: 'stoodOnEnd', width: 800, height: 1280, box: { width: 91, height: 145 } },
 ] as const;
 
 /**
@@ -119,6 +120,7 @@ function uploadedOn(date: Date): string {
 }
 
 export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFieldProps) {
+  const t = useTranslations('KioskBackdrop');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,12 +174,12 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
 
   const summary =
     value.kind === 'none'
-      ? 'None'
+      ? t('summaryNone')
       : value.kind === 'new'
-        ? `New photo · ${describePrepared(value.prepared)}`
+        ? t('newPhoto', { detail: describePrepared(value.prepared) })
         : stored?.id === value.id && stored.image?.updatedAt
-          ? `Photo · uploaded ${uploadedOn(stored.image.updatedAt)}`
-          : 'Photo';
+          ? t('storedPhoto', { when: uploadedOn(stored.image.updatedAt) })
+          : t('summaryPhoto');
 
   const pick = async (file: File | null) => {
     if (!file) return;
@@ -189,7 +191,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
       setError(
         thrown instanceof BackdropImageError
           ? thrown.message
-          : 'Couldn’t read that photo — try a different one.',
+          : t('readFailed'),
       );
     } finally {
       setBusy(false);
@@ -199,7 +201,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
   return (
     <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
       <span id={labelId} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
-        Kiosk photo
+        {t('fieldLabel')}
       </span>
 
       <button
@@ -298,13 +300,13 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                             className="relative text-[10px] leading-tight font-semibold"
                             style={{ color: colours['--color-ink-100'] }}
                           >
-                            Type a name
+                            {t('previewTypeAName')}
                           </div>
                           <div
                             className="relative text-[6px] leading-tight"
                             style={{ color: colours['--color-ink-300'] }}
                           >
-                            or the last 4 digits of your phone
+                            {t('previewOrPhone')}
                           </div>
                         </div>
                       </div>
@@ -325,7 +327,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                         ))}
                       </div>
                     </div>
-                    <span className="text-[10px] text-ink-500">{crop.label}</span>
+                    <span className="text-[10px] text-ink-500">{t(crop.label)}</span>
                   </div>
                 );
               })}
@@ -390,7 +392,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
               }}
               className="min-h-11 rounded-lg text-xs font-semibold text-ink-400 active:bg-ink-900 pointer-fine:min-h-8"
             >
-              No photo — colours only
+              {t('noPhoto')}
             </button>
           )}
         </div>

@@ -26,6 +26,7 @@ import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
 import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface LockedGatheringsProps {
   events: readonly TallyEvent[];
@@ -39,6 +40,7 @@ export interface LockedGatheringsProps {
 }
 
 export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
+  const t = useTranslations('Events');
   const { access } = useData();
   // Only now, and only on a screen that actually has one of these on it.
   const { byUid } = useTeam(events.length > 0);
@@ -67,7 +69,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
 
         <ul className="flex flex-col gap-1 pt-2">
           {events.map((event) => {
-            const who = approvers(event, access, byUid);
+            const who = approvers(t, event, access, byUid);
 
             return (
               /*

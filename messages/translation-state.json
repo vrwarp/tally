@@ -4418,5 +4418,580 @@
     "source": "Next seven days",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Events.removeIcon": {
+    "source": "Remove icon",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.noIcon": {
+    "source": "No icon",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.searchIcons": {
+    "source": "Search icons",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.searchIconsPlaceholder": {
+    "source": "Search icons — campfire, pizza, bus…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.notYoursPrefix": {
+    "source": "Not yours · ",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.notYoursChain": {
+    "source": "Not yours · {count, plural, one {# gathering} other {# gatherings}} · ",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.leadSuffix": {
+    "source": " · {lead}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.oneApprover": {
+    "source": "{name} can add you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.twoApprovers": {
+    "source": "{first} or {second} can add you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.lockedRestricted": {
+    "source": "Only people added to this gathering can take its register.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.lockedExplain": {
+    "source": "You are still signed in to Tally and everything else is unchanged — this one gathering has been narrowed to a set of people, and you are not on the list yet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.askOneOfThese": {
+    "source": "Ask one of these to add you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.askAnAdmin": {
+    "source": "Ask an admin to add you to this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.labelPreviewAria": {
+    "source": "Preview of the printed label",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.labelScaledDown": {
+    "source": "Everything has been scaled down to fit. Fewer or smaller lines would print larger.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.labelDropped": {
+    "source": "{count, plural, one {The last line does not fit on this label and will not be printed.} other {The last # lines do not fit on this label and will not be printed.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.fieldLabel": {
+    "source": "Kiosk photo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.noPhoto": {
+    "source": "No photo — colours only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.newPhoto": {
+    "source": "New photo · {detail}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.storedPhoto": {
+    "source": "Photo · uploaded {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.onAShelf": {
+    "source": "On a shelf",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.stoodOnEnd": {
+    "source": "Stood on end",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.readFailed": {
+    "source": "Couldn’t read that photo — try a different one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.previewTypeAName": {
+    "source": "Type a name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.previewOrPhone": {
+    "source": "or the last 4 digits of your phone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.summaryNone": {
+    "source": "None",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "KioskBackdrop.summaryPhoto": {
+    "source": "Photo",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.repeatOn": {
+    "source": "Repeat on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.custom": {
+    "source": "Custom…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.customTitle": {
+    "source": "Custom repeat",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.endOnDate": {
+    "source": "On a date",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.endAfterCount": {
+    "source": "After a number of times",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.onlyGathering": {
+    "source": "This is the only gathering the repeat covers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.pickStartFirst": {
+    "source": "Pick a start date first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.repeatEvery": {
+    "source": "Repeat every",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.monthlyPattern": {
+    "source": "Monthly pattern",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.lastDate": {
+    "source": "Last date",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.numberOfGatherings": {
+    "source": "Number of gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.countingFirst": {
+    "source": "Counting the one above as the first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.monthSkipped": {
+    "source": "A month with no {day}th is skipped rather than moved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.doesNotRepeat": {
+    "source": "Does not repeat",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.daily": {
+    "source": "Daily",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weeklyOn": {
+    "source": "Weekly on {days}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.everyNWeeksOn": {
+    "source": "Every {interval} weeks on {days}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.monthlyOn": {
+    "source": "Monthly on {which}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.everyNMonthsOn": {
+    "source": "Every {interval} months on {which}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.whichWeekday": {
+    "source": "the {ordinal} {weekday}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.whichDay": {
+    "source": "day {day}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.annuallyOn": {
+    "source": "Annually on {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.everyNYearsOn": {
+    "source": "Every {interval} years on {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.withCount": {
+    "source": "{pattern}, {count, plural, one {# time} other {# times}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.withUntil": {
+    "source": "{pattern}, until {date}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ordinalFirst": {
+    "source": "first",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ordinalSecond": {
+    "source": "second",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ordinalThird": {
+    "source": "third",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ordinalFourth": {
+    "source": "fourth",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ordinalLast": {
+    "source": "last",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.monthlyOnWeekdayOption": {
+    "source": "Monthly on {which}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.repeats": {
+    "source": "Repeats",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekly": {
+    "source": "Weekly",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.ends": {
+    "source": "Ends",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.never": {
+    "source": "Never",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdaySunday": {
+    "source": "Sunday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayMonday": {
+    "source": "Monday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayTuesday": {
+    "source": "Tuesday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayWednesday": {
+    "source": "Wednesday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayThursday": {
+    "source": "Thursday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayFriday": {
+    "source": "Friday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdaySaturday": {
+    "source": "Saturday",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortSun": {
+    "source": "Sun",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortMon": {
+    "source": "Mon",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortTue": {
+    "source": "Tue",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortWed": {
+    "source": "Wed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortThu": {
+    "source": "Thu",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortFri": {
+    "source": "Fri",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayShortSat": {
+    "source": "Sat",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialSun": {
+    "source": "S",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialMon": {
+    "source": "M",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialTue": {
+    "source": "T",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialWed": {
+    "source": "W",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialThu": {
+    "source": "T",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialFri": {
+    "source": "F",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Recurrence.weekdayInitialSat": {
+    "source": "S",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.cancelled": {
+    "source": "Cancelled",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.checkInOpen": {
+    "source": "Check-in is open",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.checkInOpensAt": {
+    "source": "Check-in opens at {time}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.checkInClosed": {
+    "source": "Check-in has closed",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.finishedWithCount": {
+    "source": "Finished · {count} checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventStatus.finishedEmpty": {
+    "source": "Finished · nobody was checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.whenDayWindowLocation": {
+    "source": "{day} · {window} · {location}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.whenDayWindow": {
+    "source": "{day} · {window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.whenWindowLocation": {
+    "source": "{window} · {location}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.whenWindow": {
+    "source": "{window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.checkInOpen": {
+    "source": "Check-in open",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHero.rsvpOnly": {
+    "source": "RSVP only",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.title": {
+    "source": "Attendance grid",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.description": {
+    "source": "One gathering, students down and dates across — for a spreadsheet.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.downloadCsv": {
+    "source": "Download CSV",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.stillReading": {
+    "source": "Still reading the registers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.howFarBack": {
+    "source": "How far back",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.rangeLast8": {
+    "source": "Last 8 gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.rangeLast3Months": {
+    "source": "Last 3 months",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.rangeLast12Months": {
+    "source": "Last 12 months",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.presumedCancelled": {
+    "source": "{count, plural, one {# gathering had nobody checked in and is left out, the way every other screen treats them.} other {# gatherings had nobody checked in and are left out, the way every other screen treats them.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Grid.denied": {
+    "source": "{count, plural, one {# gathering is not yours to read, so it has no column here — rather than a column of zeros saying nobody came.} other {# gatherings are not yours to read, so they have no column here — rather than a column of zeros saying nobody came.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.title": {
+    "source": "Past gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.notYours": {
+    "source": "not yours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.nobody": {
+    "source": "Nobody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.checkedInUnit": {
+    "source": "checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.spokenCount": {
+    "source": "{count} students checked in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.when": {
+    "source": "{day} · {window}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.emptyTitle": {
+    "source": "Nothing has happened yet",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.emptyBody": {
+    "source": "Gatherings appear here once they are past.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.loadOlder": {
+    "source": "Load older gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "PastGatherings.allLoaded": {
+    "source": "That is every gathering Tally has a record of.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   }
 }

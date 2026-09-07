@@ -17,6 +17,7 @@ import { EventIcon } from '@/components/ui/EventIcon';
 import { TextField } from '@/components/ui';
 import { findEventIcon, searchEventIcons } from '@/lib/eventIcons';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'use-intl';
 
 export interface IconPickerFieldProps {
   /** The selected Material Symbols name, or null. */
@@ -26,6 +27,7 @@ export interface IconPickerFieldProps {
 }
 
 export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps) {
+  const t = useTranslations('Events');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -70,7 +72,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
       >
         <EventIcon name={value} size="md" tone={selected ? 'brand' : 'neutral'} />
         <span id={valueId} className="min-w-0 flex-1 truncate text-sm text-ink-200">
-          {selected ? selected.label : 'No icon'}
+          {selected ? selected.label : t('noIcon')}
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs font-semibold text-brand-300">
           {open ? 'Done' : 'Change'}
@@ -80,13 +82,13 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
       {open ? (
         <div className="mt-1 flex flex-col gap-2 rounded-xl bg-ink-950 p-2 ring-1 ring-ink-800">
           <TextField
-            label="Search icons"
+            label={t('searchIcons')}
             labelHidden
             type="search"
             value={query}
             onChange={(changed) => setQuery(changed.target.value)}
             onClear={() => setQuery('')}
-            placeholder="Search icons — campfire, pizza, bus…"
+            placeholder={t('searchIconsPlaceholder')}
             autoComplete="off"
           />
 
@@ -136,7 +138,7 @@ export function IconPickerField({ value, onChange, hint }: IconPickerFieldProps)
               onClick={() => choose(null)}
               className="min-h-11 rounded-lg text-xs font-semibold text-ink-400 active:bg-ink-900 pointer-fine:min-h-8"
             >
-              Remove icon
+              {t('removeIcon')}
             </button>
           ) : null}
         </div>

@@ -32,6 +32,7 @@ import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface NotYoursNoticeProps {
   /**
@@ -49,6 +50,7 @@ function join(names: readonly string[]): string {
 }
 
 export function NotYoursNotice({ events }: NotYoursNoticeProps) {
+  const t = useTranslations('Events');
   const { access, canWork } = useData();
   const { can } = useAuth();
 
@@ -108,7 +110,7 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
           the demotion mark or with the column divider underneath. */}
       <ul className="flex shrink-0 flex-col gap-1 pl-7 pt-2 text-xs lg:pl-8 lg:pt-0">
         {chains.map(({ key, event }) => {
-          const who = approvers(event, access, byUid);
+          const who = approvers(t, event, access, byUid);
           return (
             <li key={key} className="flex min-w-0 items-baseline gap-2">
               <span className="shrink-0 font-semibold text-ink-400 lg:min-w-32">{event.title}</span>
