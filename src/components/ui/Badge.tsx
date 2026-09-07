@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 import { WARNING_META } from '@/components/ui/warnings';
 import type { RosterWarning } from '@/types';
@@ -146,9 +147,12 @@ export function WarningBadge({
   pressLabel,
   className,
 }: WarningBadgeProps) {
+  const t = useTranslations('Warnings');
   const meta = WARNING_META[warning];
   const note = detail?.trim() ? detail.trim() : null;
-  const spoken = note ? `${meta.label}: ${note}` : meta.label;
+  const label = t(meta.labelKey);
+  const short = t(meta.shortKey);
+  const spoken = note ? t('withDetail', { label, detail: note }) : label;
 
   return (
     <Badge
@@ -193,10 +197,10 @@ export function WarningBadge({
       )}
       {note ? (
         <span aria-hidden="true" className="min-w-0 break-words text-xs leading-snug">
-          {meta.short}: <span className="font-medium">{note}</span>
+          {t('shortWithDetail', { short, detail: note })}
         </span>
       ) : (
-        <span aria-hidden="true">{meta.short}</span>
+        <span aria-hidden="true">{short}</span>
       )}
     </Badge>
   );

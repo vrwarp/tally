@@ -207,7 +207,23 @@ export function pcoErrorMarkdown(report: PcoErrorReport): string {
   return `${sections.join('\n\n')}\n`;
 }
 
-/** The kinds, in words rather than in enum. */
+/**
+ * The kinds, as a key into `Pco.*`, for the screen.
+ *
+ * Split from `describeKind` below because the two callers want different
+ * things. What a person reads on the details panel is chrome and is
+ * translated; what `pcoErrorMarkdown` builds is a diagnostic somebody pastes
+ * into an email to whoever administers the Planning Center account, and that
+ * stays English on purpose — the same carve-out Numbers makes for its
+ * protocol-level failure text. See docs/i18n.md.
+ */
+export function pcoKindKey(kind: PcoErrorDebug['kind']): 'kindApi' | 'kindNetwork' | 'kindUnknown' {
+  if (kind === 'api') return 'kindApi';
+  if (kind === 'network') return 'kindNetwork';
+  return 'kindUnknown';
+}
+
+/** The kinds, in words rather than in enum — English, for the debug report. */
 export function describeKind(kind: PcoErrorDebug['kind']): string {
   if (kind === 'api') return 'Planning Center answered with an error';
   if (kind === 'network') return 'Planning Center could not be reached';

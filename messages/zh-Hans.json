@@ -2,7 +2,9 @@
   "Common": {
     "language": "Language",
     "loadingRoster": "Loading the roster",
-    "loadingHistory": "Loading attendance history"
+    "loadingHistory": "Loading attendance history",
+    "loading": "Loading…",
+    "loadingAria": "Loading"
   },
   "Nav": {
     "checkIn": "Check in",
@@ -49,5 +51,74 @@
     "thisGathering": "this gathering",
     "someoneUnknown": "Someone no longer on the roster",
     "somebody": "Somebody"
+  },
+  "Errors": {
+    "boundaryTitle": "Something went wrong.",
+    "boundaryTitleScreen": "Something went wrong loading this screen.",
+    "boundaryChunk": "Tally was updated while this page was open. Reloading will pick up the new version.",
+    "boundaryCarryOn": "The rest of Tally is still working — you can go back and carry on.",
+    "tryAgain": "Try again",
+    "reload": "Reload Tally",
+    "technicalDetails": "Technical details"
+  },
+  "Export": {
+    "csv": "Export CSV",
+    "viewerWarning": "Exported — this browser may show the file instead of saving it.",
+    "failed": "Could not save the file on this device.",
+    "downloadedStudents": "Downloaded {count, plural, one {# student} other {# students}}",
+    "downloadedCheckIns": "Downloaded {count, plural, one {# check-in} other {# check-ins}}",
+    "ariaEmpty": "{label} — nothing to export",
+    "ariaStudents": "{label} — {count, plural, one {# student} other {# students}}",
+    "ariaCheckIns": "{label} — {count, plural, one {# check-in} other {# check-ins}}"
+  },
+  "Warnings": {
+    "allergyLabel": "Has allergies on file",
+    "allergyShort": "Allergy",
+    "recordMissingLabel": "Planning Center record missing — check-in frozen",
+    "recordMissingShort": "Frozen",
+    "incompleteLabel": "No contact on file",
+    "incompleteShort": "No contact",
+    "withDetail": "{label}: {detail}",
+    "shortWithDetail": "{short}: {detail}"
+  },
+  "Roster": {
+    "backendDown": "{names} could not be reached. Students from there may be missing or out of date until it answers again; everything else on this roster is current.",
+    "staleShowing": "These names are the roster this device saved earlier. Check-in still works, and anyone added since will be missing until the connection comes back.",
+    "staleEmpty": "Nobody can be shown until the roster source answers. Students already on the roster have not been lost — Tally simply cannot read their names right now."
+  },
+  "Pco": {
+    "emptyBody": "Planning Center sent an empty body.",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details",
+    "tryingTo": "Trying to",
+    "whatHappened": "What happened",
+    "noRequest": "There is no request to show: this failed before Tally asked Planning Center anything.",
+    "copyBlocked": "Copying is blocked on this device — select the text above instead.",
+    "neverReached": "The call never reached Planning Center.",
+    "saidThis": "Planning Center said",
+    "copyDebug": "Copy debug details",
+    "copied": "Debug details copied to the clipboard",
+    "kindApi": "Planning Center answered with an error",
+    "kindNetwork": "Planning Center could not be reached",
+    "kindUnknown": "Unrecognised failure",
+    "copiedShort": "Copied",
+    "request": "Request",
+    "response": "Response",
+    "code": "Code",
+    "when": "When",
+    "error": "Error"
+  },
+  "Fields": {
+    "clearSearch": "Clear search",
+    "clearNamed": "Clear {label}",
+    "decrease": "Decrease {label}",
+    "increase": "Increase {label}"
+  },
+  "Account": {
+    "signOut": "Sign out",
+    "signedIn": "Signed in",
+    "roleCounselor": "counselor",
+    "roleCore": "core",
+    "roleAdmin": "admin"
   }
 }

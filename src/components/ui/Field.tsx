@@ -9,6 +9,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { cn, formatPhoneInput, haptic } from '@/lib/utils';
+import { useTranslations } from 'use-intl';
 
 /*
  * Two sizes, chosen by pointer rather than by viewport.
@@ -143,6 +144,7 @@ export function TextField({
   ghost,
   ...rest
 }: TextFieldProps) {
+  const t = useTranslations('Fields');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // A search box and a dropdown rendered as identical rounded rectangles are
@@ -230,7 +232,13 @@ export function TextField({
           {clearable ? (
             <button
               type="button"
-              aria-label={isSearch ? 'Clear search' : `Clear ${label.toLowerCase()}`}
+              /*
+                 `toLowerCase()` on the field's own label is a Latin habit that
+                 does nothing in Chinese and is wrong in German. The label is a
+                 named argument now, and each language decides for itself how
+                 the two halves sit together.
+              */
+              aria-label={isSearch ? t('clearSearch') : t('clearNamed', { label: label.toLowerCase() })}
               onClick={clear}
               className={
                 'absolute top-1/2 right-0.5 flex size-11 -translate-y-1/2 items-center ' +
@@ -446,6 +454,7 @@ export function NumberStepperField({
   disabled,
   onValueChange,
 }: NumberStepperFieldProps) {
+  const t = useTranslations('Fields');
   const step = (delta: number) => {
     const next = Math.min(max, Math.max(min, (Number.isFinite(value) ? value : min) + delta));
     // Nothing changed: the value is already at the end of its range. A buzz here
@@ -467,7 +476,7 @@ export function NumberStepperField({
           )}
         >
           <StepButton
-            label={`Decrease ${label}`}
+            label={t('decrease', { label })}
             glyph="−"
             side="left"
             disabled={disabled || value <= min}
@@ -497,7 +506,7 @@ export function NumberStepperField({
             }
           />
           <StepButton
-            label={`Increase ${label}`}
+            label={t('increase', { label })}
             glyph="+"
             side="right"
             disabled={disabled || value >= max}

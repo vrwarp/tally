@@ -14,6 +14,16 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Common.loading": {
+    "source": "Loading…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Common.loadingAria": {
+    "source": "Loading",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Nav.checkIn": {
     "source": "Check in",
     "zh-Hans": "todo",
@@ -221,6 +231,281 @@
   },
   "Dashboard.somebody": {
     "source": "Somebody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.boundaryTitle": {
+    "source": "Something went wrong.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.boundaryTitleScreen": {
+    "source": "Something went wrong loading this screen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.boundaryChunk": {
+    "source": "Tally was updated while this page was open. Reloading will pick up the new version.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.boundaryCarryOn": {
+    "source": "The rest of Tally is still working — you can go back and carry on.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.tryAgain": {
+    "source": "Try again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.reload": {
+    "source": "Reload Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.technicalDetails": {
+    "source": "Technical details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.csv": {
+    "source": "Export CSV",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.viewerWarning": {
+    "source": "Exported — this browser may show the file instead of saving it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.failed": {
+    "source": "Could not save the file on this device.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.downloadedStudents": {
+    "source": "Downloaded {count, plural, one {# student} other {# students}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.downloadedCheckIns": {
+    "source": "Downloaded {count, plural, one {# check-in} other {# check-ins}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.ariaEmpty": {
+    "source": "{label} — nothing to export",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.ariaStudents": {
+    "source": "{label} — {count, plural, one {# student} other {# students}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Export.ariaCheckIns": {
+    "source": "{label} — {count, plural, one {# check-in} other {# check-ins}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.allergyLabel": {
+    "source": "Has allergies on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.allergyShort": {
+    "source": "Allergy",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.recordMissingLabel": {
+    "source": "Planning Center record missing — check-in frozen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.recordMissingShort": {
+    "source": "Frozen",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.incompleteLabel": {
+    "source": "No contact on file",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.incompleteShort": {
+    "source": "No contact",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.withDetail": {
+    "source": "{label}: {detail}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Warnings.shortWithDetail": {
+    "source": "{short}: {detail}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Roster.backendDown": {
+    "source": "{names} could not be reached. Students from there may be missing or out of date until it answers again; everything else on this roster is current.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Roster.staleShowing": {
+    "source": "These names are the roster this device saved earlier. Check-in still works, and anyone added since will be missing until the connection comes back.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Roster.staleEmpty": {
+    "source": "Nobody can be shown until the roster source answers. Students already on the roster have not been lost — Tally simply cannot read their names right now.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.emptyBody": {
+    "source": "Planning Center sent an empty body.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.showDetails": {
+    "source": "Show details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.hideDetails": {
+    "source": "Hide details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.tryingTo": {
+    "source": "Trying to",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.whatHappened": {
+    "source": "What happened",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.noRequest": {
+    "source": "There is no request to show: this failed before Tally asked Planning Center anything.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.copyBlocked": {
+    "source": "Copying is blocked on this device — select the text above instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.neverReached": {
+    "source": "The call never reached Planning Center.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.saidThis": {
+    "source": "Planning Center said",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.copyDebug": {
+    "source": "Copy debug details",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.copied": {
+    "source": "Debug details copied to the clipboard",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.kindApi": {
+    "source": "Planning Center answered with an error",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.kindNetwork": {
+    "source": "Planning Center could not be reached",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.kindUnknown": {
+    "source": "Unrecognised failure",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.copiedShort": {
+    "source": "Copied",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.request": {
+    "source": "Request",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.response": {
+    "source": "Response",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.code": {
+    "source": "Code",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.when": {
+    "source": "When",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pco.error": {
+    "source": "Error",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Fields.clearSearch": {
+    "source": "Clear search",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Fields.clearNamed": {
+    "source": "Clear {label}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Fields.decrease": {
+    "source": "Decrease {label}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Fields.increase": {
+    "source": "Increase {label}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Account.signOut": {
+    "source": "Sign out",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Account.signedIn": {
+    "source": "Signed in",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Account.roleCounselor": {
+    "source": "counselor",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Account.roleCore": {
+    "source": "core",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Account.roleAdmin": {
+    "source": "admin",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   }

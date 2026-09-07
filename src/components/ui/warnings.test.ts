@@ -24,10 +24,11 @@ import {
   ROSTER_WARNINGS,
   WARNING_META,
   warningGlyph,
-  warningLabel,
-  warningShort,
+  warningLabelKey,
+  warningShortKey,
   warningTone,
 } from '@/components/ui/warnings';
+import en from '../../../messages/en.json';
 import type { RosterWarning } from '@/types';
 
 const ALL = ROSTER_WARNINGS as readonly RosterWarning[];
@@ -44,13 +45,19 @@ describe('WARNING_META', () => {
     expect([...ALL].sort()).toEqual(['allergy', 'incomplete-profile', 'record-missing']);
   });
 
+  /*
+   * Through the English catalogue, because that is where the words live now.
+   * The table names a key; what a reader actually sees is `Warnings.*` in
+   * en.json, and the length rule below is a rule about the rendered chip. The
+   * Chinese catalogues are held to the same key set by tests/messages.test.ts.
+   */
   it('gives every condition a spoken sentence and a short form', () => {
     for (const warning of ALL) {
-      expect(warningLabel(warning).length).toBeGreaterThan(0);
-      expect(warningShort(warning).length).toBeGreaterThan(0);
+      expect(en.Warnings[warningLabelKey(warning)].length).toBeGreaterThan(0);
+      expect(en.Warnings[warningShortKey(warning)].length).toBeGreaterThan(0);
       // The short form sits in a fixed-width lane on two roster rows. Long
       // enough to wrap is long enough to change a row's height.
-      expect(warningShort(warning).length).toBeLessThanOrEqual(12);
+      expect(en.Warnings[warningShortKey(warning)].length).toBeLessThanOrEqual(12);
     }
   });
 });
@@ -72,7 +79,7 @@ describe('the amber rule', () => {
     // counselor that amber is usually paperwork.
     expect(warningTone('incomplete-profile')).toBe('neutral');
     expect(warningGlyph('incomplete-profile')).toBeNull();
-    expect(warningLabel('incomplete-profile')).toBe('No contact on file');
+    expect(en.Warnings[warningLabelKey('incomplete-profile')]).toBe('No contact on file');
   });
 });
 
@@ -88,7 +95,7 @@ describe('the red rule', () => {
     // be hurt, so it is red and it carries no ⚠.
     expect(warningTone('record-missing')).not.toBe('warn');
     expect(warningGlyph('record-missing')).toBeNull();
-    expect(warningLabel('record-missing')).toMatch(/check-in frozen/);
+    expect(en.Warnings[warningLabelKey('record-missing')]).toMatch(/check-in frozen/);
   });
 });
 
@@ -113,8 +120,8 @@ describe('one tone per condition', () => {
       const meta = WARNING_META[warning];
       expect(warningTone(warning)).toBe(meta.tone);
       expect(warningGlyph(warning)).toBe(meta.glyph);
-      expect(warningLabel(warning)).toBe(meta.label);
-      expect(warningShort(warning)).toBe(meta.short);
+      expect(warningLabelKey(warning)).toBe(meta.labelKey);
+      expect(warningShortKey(warning)).toBe(meta.shortKey);
     }
   });
 });

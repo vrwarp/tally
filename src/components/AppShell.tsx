@@ -47,6 +47,17 @@ interface NavItem {
   core?: boolean;
 }
 
+/**
+ * A role's stored value is `counselor` / `core` / `admin`; what a person reads
+ * is a word in their language. Spelled out rather than built from the value, so
+ * the key set stays greppable and a new role is a compile error here.
+ */
+const ROLE_LABEL = {
+  counselor: 'Account.roleCounselor',
+  core: 'Account.roleCore',
+  admin: 'Account.roleAdmin',
+} as const;
+
 const NAV: NavItem[] = [
   { to: '/', labelKey: 'checkIn', icon: '✓' },
   { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true },
@@ -103,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const items = NAV.filter((item) => !item.core || can('core'));
   const showNav = items.length > 1;
 
-  const displayName = profile?.displayName || profile?.email || 'Signed in';
+  const displayName = profile?.displayName || profile?.email || t('Account.signedIn');
   const initial = displayName.charAt(0).toUpperCase();
 
   /*
@@ -129,7 +140,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-baseline gap-2">
           <p className="truncate text-xs text-ink-400">{profile?.email}</p>
           <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-500">
-            {profile?.role}
+            {/* `uppercase` above is a Latin-only effect and simply does
+                nothing to Chinese, which is the right outcome rather than
+                something to work around. */}
+            {profile ? t(ROLE_LABEL[profile.role]) : null}
           </span>
         </div>
         <button
@@ -141,7 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           }}
           className="-ml-2 mt-1 flex min-h-11 w-fit items-center rounded-lg px-2 text-sm font-medium text-danger-400 hover:bg-ink-800 pointer-fine:min-h-8"
         >
-          Sign out
+          {t('Account.signOut')}
         </button>
       </div>
       {/* Every active member, unlike the two below it.
