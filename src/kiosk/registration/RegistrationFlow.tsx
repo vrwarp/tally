@@ -27,12 +27,11 @@ import type { KioskBinding } from '../binding';
 import { PhonePad } from './PhonePad';
 import { useTap } from '../components/tapGuard';
 import {
+  addAnotherChild,
   advance,
-  answerAnother,
   applyKey,
   canAdvance,
   chooseGrade,
-  familyOf,
   formatPhone,
   goBack,
   initialState,
@@ -65,39 +64,42 @@ type Action =
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'grade'; grade: Grade | null }
-  | { type: 'another'; more: boolean }
+  | { type: 'add-child' }
   | { type: 'no-allergies' }
   | { type: 'submitting' }
   | { type: 'submitted'; result: RegisterFamilyResult }
   | { type: 'failed' };
 
-function makeReducer(requiresCheckOut: boolean) {
-  return function reduce(state: RegistrationState, action: Action): RegistrationState {
-    switch (action.type) {
-      case 'key':
-        return applyKey(state, action.key);
-      case 'next':
-        return advance(state);
-      case 'back':
-        return goBack(state) ?? state;
-      case 'grade':
-        return chooseGrade(state, action.grade);
-      case 'another':
-        return answerAnother(state, action.more, requiresCheckOut);
-      case 'no-allergies':
-        return toggleNoAllergies(state);
-      case 'submitting':
-        return { ...state, step: 'submitting', message: '' };
-      case 'submitted':
-        return { ...state, step: 'success', last4: action.result.last4 };
-      case 'failed':
-        return {
-          ...state,
-          step: 'error',
-          message: 'We could not save that just now — please see a leader.',
-        };
-    }
-  };
+/*
+ * A plain function, not a factory. It used to close over `requiresCheckOut` for
+ * the fork's sake; the gathering's grade default now lives on the state, where
+ * banking a child can reach it.
+ */
+function reduce(state: RegistrationState, action: Action): RegistrationState {
+  switch (action.type) {
+    case 'key':
+      return applyKey(state, action.key);
+    case 'next':
+      return advance(state);
+    case 'back':
+      return goBack(state) ?? state;
+    case 'grade':
+      return chooseGrade(state, action.grade);
+    case 'add-child':
+      return addAnotherChild(state);
+    case 'no-allergies':
+      return toggleNoAllergies(state);
+    case 'submitting':
+      return { ...state, step: 'submitting', message: '' };
+    case 'submitted':
+      return { ...state, step: 'success', last4: action.result.last4 };
+    case 'failed':
+      return {
+        ...state,
+        step: 'error',
+        message: 'We could not save that just now — please see a leader.',
+      };
+  }
 }
 
 export interface RegistrationFlowProps {
@@ -134,7 +136,6 @@ export function RegistrationFlow({
 }: RegistrationFlowProps) {
   // Absent on a binding written before the flag existed, and absent means no.
   const tracksCheckOut = binding.requiresCheckOut ?? false;
-  const reduce = useMemo(() => makeReducer(tracksCheckOut), [tracksCheckOut]);
   const [state, dispatch] = useReducer(
     reduce,
     {
@@ -207,7 +208,6 @@ export function RegistrationFlow({
 
   /* ---- Render ------------------------------------------------------------ */
 
-  const family = familyOf(state);
   const childNumber = state.children.length + 1;
 
   return (
@@ -269,6 +269,29 @@ export function RegistrationFlow({
           {isTypingStep(state.step) && (
             <div className="text-center text-xl text-ink-300 kiosk:text-2xl">
               {placeholderFor(state)}
+            </div>
+          )}
+          {/*
+            * How much of this is left, said once, on the step that changes the
+            * subject.
+            *
+            * The "Anybody else?" screen used to sit between the children and
+            * the adult, and however badly its **That's everyone** read, it was
+            * a visible seam: a screen with no keyboard, so a parent registered
+            * that something had changed. Without it the adult's three questions
+            * arrive in a frame identical to the four before them, and the only
+            * things that differ are the title and the field name.
+            *
+            * Here rather than in the subtitle for two reasons. That slot is
+            * shared by `guardian-first` and `guardian-last`, so a count put in
+            * it would tell a parent "three" on the screen where two remain; and
+            * it is the flow's one line of identity, which a parent glancing up
+            * uses to check they are still at the right gathering. This region
+            * is empty on every typing step and costs nothing.
+            */}
+          {state.step === 'guardian-first' && (
+            <div className="text-center text-base text-ink-400 kiosk:text-lg">
+              Three quick questions about you.
             </div>
           )}
           {state.step === 'child-grade' && (
@@ -334,37 +357,6 @@ export function RegistrationFlow({
                 </span>
                 No allergies
               </button>
-            </div>
-          )}
-
-          {state.step === 'another' && (
-            <div className="mt-auto flex flex-col gap-3 pt-2">
-              {/*
-                * Who is on the list so far, above the two buttons.
-                *
-                * The question is "anybody else?", and a parent cannot answer it
-                * against their own memory of what they typed forty seconds ago
-                * — least of all the parent of four, which is exactly the parent
-                * this loop exists for. Naming them also catches the mistake
-                * this screen is otherwise the last chance to catch: a child
-                * entered twice, or the one whose name went in wrong.
-                */}
-              <div className="flex flex-col gap-2">
-                {family.map((child, index) => (
-                  <ChildRow key={`${child.firstName}-${child.lastName}-${index}`} child={child} />
-                ))}
-              </div>
-              <Big
-                label="Add another child"
-                disabled={family.length >= MAX_CHILDREN}
-                onPick={() => dispatch({ type: 'another', more: true })}
-              />
-              <Big label="That's everyone" tone="brand" onPick={() => dispatch({ type: 'another', more: false })} />
-              {family.length >= MAX_CHILDREN && (
-                <p className="text-center text-base text-ink-500">
-                  That is as many as one go takes — a leader can add the rest.
-                </p>
-              )}
             </div>
           )}
 
@@ -535,12 +527,32 @@ export function RegistrationFlow({
           )}
         </div>
       ) : state.step === 'confirm' ? (
-        <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+        <div className="flex flex-col gap-2 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
+          {/*
+            * The offer the fork used to carry, in the shape it carried it —
+            * the quiet button above the brand one, so a parent who learned that
+            * pair on the old screen meets the same pair here.
+            *
+            * It belongs on this screen rather than on one of its own: "anybody
+            * else?" cannot be answered from memory, and this is where the
+            * family is written out. A parent notices a missing child by reading
+            * the list, not by being asked about it four screens earlier.
+            */}
+          <Big
+            label="Add another child"
+            disabled={state.children.length >= MAX_CHILDREN}
+            onPick={() => dispatch({ type: 'add-child' })}
+          />
           <Big
             label={state.children.length === 1 ? 'Check in' : 'Check in everyone'}
             tone="brand"
             onPick={runSubmit}
           />
+          {state.children.length >= MAX_CHILDREN && (
+            <p className="text-center text-base text-ink-500">
+              That is as many as one go takes — a leader can add the rest.
+            </p>
+          )}
         </div>
       ) : state.step === 'success' ? (
         <div className="p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
@@ -740,8 +752,6 @@ function titleFor(state: RegistrationState, childNumber: number): string {
         : childNumber === 1
           ? 'Your child'
           : `Child ${childNumber}`;
-    case 'another':
-      return 'Anybody else?';
     case 'guardian-first':
     case 'guardian-last':
     case 'guardian-phone':
@@ -775,8 +785,6 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
       // hay fever is nobody's business at a check-in desk is being invited to
       // skip, not interrogated.
       return 'Any allergies we should know about?';
-    case 'another':
-      return 'You can add the whole family in one go.';
     /*
      * The adult's two steps share one line, and it is context rather than a
      * label: the readout under it already says "Your first name". A subtitle
