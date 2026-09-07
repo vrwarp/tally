@@ -16,6 +16,7 @@
     "src/kiosk/printing/**/*.ts",
     "src/kiosk/registration/steps.ts",
     "!src/**/*.test.{ts,tsx}",
+    "!src/**/*.d.ts",
     "!src/**/*.fuzz.test.{ts,tsx}",
     "!src/lib/firebase.ts",
     "!src/kiosk/services.ts",
