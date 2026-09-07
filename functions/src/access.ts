@@ -38,6 +38,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { seededAdminEmails } from './config.js';
 import { emailKey, type Role } from './pco/mapping.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
+import type { ServerCode } from './generated/serverCodes.js';
 
 /** Mirrors `ProvisionAccessResult` in src/services/functions.ts. */
 export interface ProvisionAccessResult {
@@ -193,12 +194,16 @@ export const provisionAccess = onCall<void, Promise<ProvisionAccessResult>>(
   { timeoutSeconds: 30, memory: '256MiB' },
   async (request: CallableRequest<void>): Promise<ProvisionAccessResult> => {
     if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'Sign in before requesting access.');
+      throw new HttpsError('unauthenticated', 'Sign in before requesting access.', {
+        code: 'auth.signInToRequest' satisfies ServerCode,
+      });
     }
 
     const token = request.auth.token;
     if (!isGoogleSignIn(token)) {
-      throw new HttpsError('failed-precondition', 'Tally only accepts Google sign-in.');
+      throw new HttpsError('failed-precondition', 'Tally only accepts Google sign-in.', {
+        code: 'auth.googleOnly' satisfies ServerCode,
+      });
     }
 
     const displayName = typeof token.name === 'string' && token.name.trim() ? token.name.trim() : null;

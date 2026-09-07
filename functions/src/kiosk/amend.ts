@@ -209,8 +209,8 @@ async function amendChild(context: {
   }
 
   const corrected: RegistrationChild = {
-    firstName: parseName(child.firstName, "The child's first name"),
-    lastName: parseName(child.lastName, "The child's last name"),
+    firstName: parseName(child.firstName, 'childFirst'),
+    lastName: parseName(child.lastName, 'childLast'),
     grade: parseGrade(child.grade),
   };
   const allergies = parseAllergyNote(child.allergies);
@@ -463,8 +463,8 @@ async function amendGuardian(context: {
   }
 
   const corrected = {
-    firstName: parseName(guardian.firstName, "The adult's first name"),
-    lastName: parseName(guardian.lastName, "The adult's last name"),
+    firstName: parseName(guardian.firstName, 'adultFirst'),
+    lastName: parseName(guardian.lastName, 'adultLast'),
     phone: parseRegistrationPhone(guardian.phone),
   };
 

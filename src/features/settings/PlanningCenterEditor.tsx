@@ -25,6 +25,7 @@ import { savePlanningCenterConfig, type PcoConfigDraft } from '@/services/planni
 import { GRADES, type PcoEffectiveSettings, type PcoWriteBackMode } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useServerText } from '@/hooks/useServerText';
 
 const WRITE_BACK_HINT = {
   off: 'pcoWriteHintOff',
@@ -73,6 +74,7 @@ export function PlanningCenterEditor({
   onClose,
   onSaved,
 }: PlanningCenterEditorProps) {
+  const serverText = useServerText();
   const t = useTranslations('Backends');
   const tCommon = useTranslations('Common');
   const grades = useGrades();
@@ -123,7 +125,7 @@ export function PlanningCenterEditor({
       await onSaved();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t('editorSaveFailed'));
+      setError(serverText(cause, t('editorSaveFailed')));
     } finally {
       setSaving(false);
     }

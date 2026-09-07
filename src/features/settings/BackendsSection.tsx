@@ -33,6 +33,7 @@ import {
 } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useServerText } from '@/hooks/useServerText';
 
 const WRITE_BACK_LABEL = {
   off: 'a32WriteOff',
@@ -41,6 +42,7 @@ const WRITE_BACK_LABEL = {
 } as const satisfies Record<PcoWriteBackMode, string>;
 
 export function BackendsSection() {
+  const serverText = useServerText();
   const time = useTimeFormats();
   const t = useTranslations('Backends');
   const { show } = useToast();
@@ -62,7 +64,7 @@ export function BackendsSection() {
       setStatuses(await fetchBackendStatuses(force));
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : t('a32AskFailed'),
+        serverText(cause, t('a32AskFailed')),
       );
     } finally {
       setLoading(false);
@@ -75,7 +77,7 @@ export function BackendsSection() {
     } catch {
       setStored(null);
     }
-  }, [t]);
+  }, [t, serverText]);
 
   useEffect(() => {
     void check();

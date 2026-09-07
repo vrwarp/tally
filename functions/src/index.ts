@@ -70,6 +70,7 @@ import {
   type UpdateStudentProfileResult,
 } from './backends/types.js';
 import { BACKEND_SECRETS, resolveConfig, type PcoConfig } from './config.js';
+import type { ServerCode } from './generated/serverCodes.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { ChainAccessReader } from './eventAccess.js';
 import { checkInsRootEventId } from './pco/checkins.js';
@@ -183,11 +184,21 @@ async function pcoBackendFor(
  * whichever backend new students go to — the write paths that land here for
  * an unlinked student are exactly the ones about to create them somewhere.
  */
+/**
+ * Why a student has no backend to talk to — the sentence, and its code where
+ * there is one to give. See `notConfigured` for the split.
+ */
+interface BackendProblem {
+  error: string;
+  code?: ServerCode;
+  args?: Record<string, string | number>;
+}
+
 async function backendForStudent(
   registry: BackendRegistry,
   database: FirestoreLike,
   studentId: string,
-): Promise<{ backend: PeopleBackend } | { error: string }> {
+): Promise<{ backend: PeopleBackend } | BackendProblem> {
   let backendId = parseStudentId(studentId)?.backendId ?? null;
   if (!backendId) {
     const snapshot = await database.doc(`${PATHS.students}/${studentId}`).get();
@@ -198,11 +209,17 @@ async function backendForStudent(
 
   const backend = registry.get(backendId);
   if (!backend) {
-    return {
-      error:
-        registry.configErrorOf(backendId) ??
-        `${registry.displayNameOf(backendId)} is not connected.`,
-    };
+    const problem = registry.configErrorOf(backendId);
+    // As `notConfigured`: the specific problem names deploy-time values and
+    // stays English; the generic one is what a leader can meet, so it is the
+    // one that carries a code.
+    return problem === null
+      ? {
+          error: `${registry.displayNameOf(backendId)} is not connected.`,
+          code: 'backend.notConnected',
+          args: { backend: registry.displayNameOf(backendId) },
+        }
+      : { error: problem };
   }
   return { backend };
 }
@@ -238,14 +255,15 @@ async function resolveDetailsTarget(
     }
     if (!linkage) {
       // An unlinked visitor has no upstream record to have details.
-      throw new HttpsError('not-found', 'That student is not linked to a people backend.');
+      throw refuse(
+        'not-found',
+        'notFound.studentUnlinked',
+        'That student is not linked to a people backend.',
+      );
     }
     const backend = registry.get(linkage.backendId);
     if (!backend) {
-      throw new HttpsError(
-        'failed-precondition',
-        registry.configErrorOf(linkage.backendId) ?? 'Not configured.',
-      );
+      throw notConfigured(registry.configErrorOf(linkage.backendId));
     }
     return { backend, personId: linkage.personId };
   }
@@ -256,7 +274,7 @@ async function resolveDetailsTarget(
   }
   const backend = registry.get('pco');
   if (!backend) {
-    throw new HttpsError('failed-precondition', registry.configErrorOf('pco') ?? 'Not configured.');
+    throw notConfigured(registry.configErrorOf('pco'));
   }
   return { backend, personId };
 }
@@ -328,10 +346,10 @@ async function readCaller(uid: string): Promise<Caller> {
 
 /** Any signed-in, active member of the team. The role is read from Firestore. */
 async function requireMember(uid: string | undefined): Promise<void> {
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!uid) throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
   const caller = await readCaller(uid);
   if (!caller.active) {
-    throw new HttpsError('permission-denied', 'Your access to Tally is not active.');
+    throw refuse('permission-denied', 'auth.notActive', 'Your access to Tally is not active.');
   }
 }
 
@@ -350,8 +368,9 @@ async function requireOnChain(uid: string, chain: string): Promise<void> {
   const caller = await readCaller(uid);
   const reader = new ChainAccessReader(getFirestore(), uid, caller.role === 'admin');
   if (!(await reader.canWork(chain))) {
-    throw new HttpsError(
+    throw refuse(
       'permission-denied',
+      'auth.notOnGathering',
       'Only people added to that gathering can work it.',
     );
   }
@@ -372,10 +391,10 @@ async function requireOnEvent(uid: string, eventId: string): Promise<void> {
 
 /** Core-team gate. The role is read from Firestore, never from the request. */
 async function requireCoreTeam(uid: string | undefined): Promise<void> {
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!uid) throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
   const caller = await readCaller(uid);
   if (!caller.active || (caller.role !== 'core' && caller.role !== 'admin')) {
-    throw new HttpsError('permission-denied', 'Only the core team can do that.');
+    throw refuse('permission-denied', 'auth.coreOnly', 'Only the core team can do that.');
   }
 }
 
@@ -387,10 +406,10 @@ async function requireCoreTeam(uid: string | undefined): Promise<void> {
  * API that rate-limits does not want a stampede.
  */
 async function requireAdmin(uid: string | undefined): Promise<void> {
-  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!uid) throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
   const caller = await readCaller(uid);
   if (!caller.active || caller.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'Only an admin can do that.');
+    throw refuse('permission-denied', 'auth.adminOnly', 'Only an admin can do that.');
   }
 }
 
@@ -408,7 +427,45 @@ async function requireAdmin(uid: string | undefined): Promise<void> {
  * screen's "Details" panel and the person they forward it to — see
  * ./pco/debug.ts for what that payload may and may not contain.
  */
-function reportBackendFailure(displayName: string, error: unknown, what: string): never {
+/**
+ * A callable's refusal, named so the client can say it in its own language.
+ *
+ * `details` is where a code rides — beside the debug payload a backend failure
+ * already carries, never instead of it. The `message` stays English: it is what
+ * a log line records, and what a client older than this deploy falls back to
+ * when it meets a code it has never heard of. See `generated/serverCodes.ts`.
+ */
+function refuse(
+  kind: ConstructorParameters<typeof HttpsError>[0],
+  code: ServerCode,
+  message: string,
+  args?: Record<string, string | number>,
+  debug?: Record<string, unknown>,
+): HttpsError {
+  return new HttpsError(kind, message, { ...debug, code, ...(args ? { args } : {}) });
+}
+
+/**
+ * Not configured, in its two voices.
+ *
+ * `configErrorOf` answers with the specific problem — "Planning Center is not
+ * configured: PCO_APP_ID is missing." — which names deploy-time values and is
+ * addressed to whoever holds them. That stays English, the same carve-out
+ * `firebaseConfig.ts` gets. The bare fallback is the one a leader can meet
+ * without knowing any of that, so it is the one with a code.
+ */
+function notConfigured(problem: string | null): HttpsError {
+  return problem === null
+    ? refuse('failed-precondition', 'backend.notConfigured', 'Not configured.')
+    : new HttpsError('failed-precondition', problem);
+}
+
+function reportBackendFailure(
+  displayName: string,
+  error: unknown,
+  what: string,
+  code: Extract<ServerCode, `backend.unreachable.${string}`>,
+): never {
   if (error instanceof HttpsError) throw error;
   // A configuration problem an adapter could only discover mid-flight. The
   // message already says which value is wrong; the code says whose fault it is.
@@ -420,22 +477,28 @@ function reportBackendFailure(displayName: string, error: unknown, what: string)
   logger.error(`Failed to ${what}`, { error: String(error), backend: debug });
 
   const status = backendFailureStatus(error);
+  const args = { backend: displayName };
+  const carried = debug as unknown as Record<string, unknown>;
   if (status === 429) {
-    throw new HttpsError(
+    throw refuse(
       'resource-exhausted',
+      'backend.rateLimited',
       `${displayName} is rate-limiting us. Try again in a moment.`,
-      debug,
+      args,
+      carried,
     );
   }
   if (status === 401 || status === 403) {
-    throw new HttpsError(
+    throw refuse(
       'permission-denied',
+      'backend.credentialsRejected',
       `${displayName} rejected Tally's credentials. A leader needs to check the connection in Settings.`,
-      debug,
+      args,
+      carried,
     );
   }
 
-  throw new HttpsError('unavailable', `Could not reach ${displayName} to ${what}.`, debug);
+  throw refuse('unavailable', code, `Could not reach ${displayName} to ${what}.`, args, carried);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -506,10 +569,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
     const registry = await createRegistry(database);
     const enabled = registry.ids();
     if (enabled.length === 0) {
-      throw new HttpsError(
-        'failed-precondition',
-        registry.configErrorOf('pco') ?? 'Not configured.',
-      );
+      throw notConfigured(registry.configErrorOf('pco'));
     }
 
     const scan = await scanRoster(database);
@@ -558,7 +618,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
 
     if (!results.some((result) => result.ok)) {
       const first = results[0]!;
-      return reportBackendFailure(first.displayName, first.thrown, 'load the roster');
+      return reportBackendFailure(first.displayName, first.thrown, 'load the roster', 'backend.unreachable.roster');
     }
 
     /*
@@ -670,10 +730,7 @@ export const searchPlanningCenterPeople = onCall<
   const targets = isBackendId(asked) ? [asked] : registry.ids();
   const reachable = targets.filter((id) => registry.get(id) !== null);
   if (reachable.length === 0) {
-    throw new HttpsError(
-      'failed-precondition',
-      registry.configErrorOf(targets[0] ?? 'pco') ?? 'Not configured.',
-    );
+    throw notConfigured(registry.configErrorOf(targets[0] ?? 'pco'));
   }
 
   const settled = await Promise.all(
@@ -694,6 +751,7 @@ export const searchPlanningCenterPeople = onCall<
       first.backend.displayName,
       first.error,
       `search ${first.backend.displayName}`,
+      'backend.unreachable.search',
     );
   }
 
@@ -808,7 +866,7 @@ async function readPersonDetails(
         writeBackFull && !details.householdAdult && backend.capabilities.adultCreatable,
     };
   } catch (error) {
-    return reportBackendFailure(backend.displayName, error, 'load this student');
+    return reportBackendFailure(backend.displayName, error, 'load this student', 'backend.unreachable.student');
   }
 }
 
@@ -1027,10 +1085,7 @@ export const getAllergyNotes = onCall<
     const targets = [...byBackend.entries()].filter(([backendId]) => registry.get(backendId));
     if (targets.length === 0) {
       const [firstAsked] = byBackend.keys();
-      throw new HttpsError(
-        'failed-precondition',
-        registry.configErrorOf(firstAsked ?? 'pco') ?? 'Not configured.',
-      );
+      throw notConfigured(registry.configErrorOf(firstAsked ?? 'pco'));
     }
 
     const settled = await Promise.all(
@@ -1047,7 +1102,7 @@ export const getAllergyNotes = onCall<
     const failed = settled.filter((entry) => !entry.ok);
     if (failed.length === settled.length) {
       const first = failed[0]!;
-      return reportBackendFailure(first.backend.displayName, first.error, 'read the allergy notes');
+      return reportBackendFailure(first.backend.displayName, first.error, 'read the allergy notes', 'backend.unreachable.allergies');
     }
 
     // Person ids do not collide across backends (numeric vs UUID), so one map
@@ -1078,10 +1133,7 @@ export const getParentContactStatus = onCall<
     const registry = await createRegistry(db());
     const enabled = registry.ids();
     if (enabled.length === 0) {
-      throw new HttpsError(
-        'failed-precondition',
-        registry.configErrorOf('pco') ?? 'Not configured.',
-      );
+      throw notConfigured(registry.configErrorOf('pco'));
     }
 
     const scan = await scanRoster(db());
@@ -1124,6 +1176,7 @@ export const getParentContactStatus = onCall<
         first.backend.displayName,
         first.error,
         'check which students have a contact',
+      'backend.unreachable.contactCheck',
       );
     }
 
@@ -1447,7 +1500,7 @@ export const listPlanningCenterLists = onCall<
 
     const config = await resolveConfig(db());
     if (!config.appId || !config.secret) {
-      throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+      throw notConfigured(config.configError);
     }
 
     // Deliberately not `clientFor`, which refuses on *any* configuration
@@ -1466,7 +1519,7 @@ export const listPlanningCenterLists = onCall<
       const limit = typeof request.data?.limit === 'number' ? request.data.limit : undefined;
       return { lists: await fetchLists({ client, search, limit }) };
     } catch (error) {
-      return reportBackendFailure('Planning Center', error, 'load your Planning Center lists');
+      return reportBackendFailure('Planning Center', error, 'load your Planning Center lists', 'backend.unreachable.lists');
     }
   },
 );
@@ -1531,10 +1584,7 @@ export const addRosterMember = onCall<
   const registry = await createRegistry(db());
   const backend = registry.get(backendId);
   if (!backend) {
-    throw new HttpsError(
-      'failed-precondition',
-      registry.configErrorOf(backendId) ?? 'Not configured.',
-    );
+    throw notConfigured(registry.configErrorOf(backendId));
   }
 
   // Confirm the person is real before recording that they are on the roster: a
@@ -1546,7 +1596,12 @@ export const addRosterMember = onCall<
   try {
     const check = await backend.checkPerson({ personId });
     if (check.outcome === 'gone') {
-      throw new HttpsError('not-found', `${backend.displayName} has no person with that id.`);
+      throw refuse(
+        'not-found',
+        'notFound.personInBackend',
+        `${backend.displayName} has no person with that id.`,
+        { backend: backend.displayName },
+      );
     }
     rosterPersonId = check.personId;
     checkedA32Alias = check.a32PersonId;
@@ -1555,6 +1610,7 @@ export const addRosterMember = onCall<
       backend.displayName,
       error,
       `check that person in ${backend.displayName}`,
+      'backend.unreachable.personCheck',
     );
   }
 
@@ -1661,7 +1717,7 @@ export const removeRosterMember = onCall<{ studentId: string }, Promise<{ status
 
     const ref = db().doc(`${PATHS.students}/${studentId}`);
     const snapshot = await ref.get();
-    if (!snapshot.exists) throw new HttpsError('not-found', 'No such student.');
+    if (!snapshot.exists) throw refuse('not-found', 'notFound.student', 'No such student.');
 
     await ref.set(
       {
@@ -1695,16 +1751,21 @@ export const importPlanningCenterList = onCall<
   }
 
   const { backend, config } = await pcoBackendFor(db());
-  if (!backend) throw new HttpsError('failed-precondition', config.configError ?? 'Not configured.');
+  if (!backend) throw notConfigured(config.configError);
   if (!backend.fetchListMemberIds) {
-    throw new HttpsError('failed-precondition', `${backend.displayName} does not have lists.`);
+    throw refuse(
+      'failed-precondition',
+      'backend.noLists',
+      `${backend.displayName} does not have lists.`,
+      { backend: backend.displayName },
+    );
   }
 
   let personIds: string[];
   try {
     personIds = await backend.fetchListMemberIds(listId);
   } catch (error) {
-    return reportBackendFailure(backend.displayName, error, 'read that Planning Center list');
+    return reportBackendFailure(backend.displayName, error, 'read that Planning Center list', 'backend.unreachable.listMembers');
   }
 
   const database = db();
@@ -1775,19 +1836,21 @@ export const listCheckInsEvents = onCall<
     const registry = await createRegistry(db());
     const backend = registry.get(backendId);
     if (!backend) {
-      throw new HttpsError(
-        'failed-precondition',
-        registry.configErrorOf(backendId) ?? 'Not configured.',
-      );
+      throw notConfigured(registry.configErrorOf(backendId));
     }
     if (!backend.listImportableEvents) {
-      throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+      throw refuse(
+        'failed-precondition',
+        'backend.noHistory',
+        `${backend.displayName} has no history to import.`,
+        { backend: backend.displayName },
+      );
     }
 
     try {
       return { events: await backend.listImportableEvents() };
     } catch (error) {
-      return reportBackendFailure(backend.displayName, error, 'list your Check-Ins events');
+      return reportBackendFailure(backend.displayName, error, 'list your Check-Ins events', 'backend.unreachable.eventList');
     }
   },
 );
@@ -1823,13 +1886,15 @@ export const importCheckInsEvent = onCall<
   const registry = await createRegistry(db());
   const backend = registry.get(backendId);
   if (!backend) {
-    throw new HttpsError(
-      'failed-precondition',
-      registry.configErrorOf(backendId) ?? 'Not configured.',
-    );
+    throw notConfigured(registry.configErrorOf(backendId));
   }
   if (!backend.importHistory) {
-    throw new HttpsError('failed-precondition', `${backend.displayName} has no history to import.`);
+    throw refuse(
+      'failed-precondition',
+      'backend.noHistory',
+      `${backend.displayName} has no history to import.`,
+      { backend: backend.displayName },
+    );
   }
 
   /*
@@ -1884,7 +1949,7 @@ export const importCheckInsEvent = onCall<
       existingStudentIds,
     });
   } catch (error) {
-    return reportBackendFailure(backend.displayName, error, 'import that Check-Ins event');
+    return reportBackendFailure(backend.displayName, error, 'import that Check-Ins event', 'backend.unreachable.eventImport');
   }
 });
 
@@ -1958,7 +2023,9 @@ export const setParentContact = onCall<
   const registry = await createRegistry(db());
   const resolution = await backendForStudent(registry, db(), studentId);
   if ('error' in resolution) {
-    throw new HttpsError('failed-precondition', resolution.error);
+    throw resolution.code
+      ? refuse('failed-precondition', resolution.code, resolution.error, resolution.args)
+      : new HttpsError('failed-precondition', resolution.error);
   }
   const backend = resolution.backend;
 
@@ -1975,6 +2042,7 @@ export const setParentContact = onCall<
       backend.displayName,
       error,
       `add a parent contact in ${backend.displayName}`,
+      'backend.unreachable.parentContact',
     );
   }
 
@@ -2024,7 +2092,9 @@ export const updateStudentProfile = onCall<
   const registry = await createRegistry(db());
   const resolution = await backendForStudent(registry, db(), studentId);
   if ('error' in resolution) {
-    throw new HttpsError('failed-precondition', resolution.error);
+    throw resolution.code
+      ? refuse('failed-precondition', resolution.code, resolution.error, resolution.args)
+      : new HttpsError('failed-precondition', resolution.error);
   }
   const backend = resolution.backend;
 
@@ -2045,6 +2115,7 @@ export const updateStudentProfile = onCall<
       backend.displayName,
       error,
       `save this profile to ${backend.displayName}`,
+      'backend.unreachable.profileSave',
     );
   }
 
@@ -2095,7 +2166,9 @@ export const addParent = onCall<
   const registry = await createRegistry(db());
   const resolution = await backendForStudent(registry, db(), studentId);
   if ('error' in resolution) {
-    throw new HttpsError('failed-precondition', resolution.error);
+    throw resolution.code
+      ? refuse('failed-precondition', resolution.code, resolution.error, resolution.args)
+      : new HttpsError('failed-precondition', resolution.error);
   }
   const backend = resolution.backend;
 
@@ -2116,6 +2189,7 @@ export const addParent = onCall<
       backend.displayName,
       error,
       `add a parent in ${backend.displayName}`,
+      'backend.unreachable.parentAdd',
     );
   }
 
@@ -2155,7 +2229,9 @@ export const recreatePlanningCenterPerson = onCall<
   const registry = await createRegistry(db());
   const resolution = await backendForStudent(registry, db(), studentId);
   if ('error' in resolution) {
-    throw new HttpsError('failed-precondition', resolution.error);
+    throw resolution.code
+      ? refuse('failed-precondition', resolution.code, resolution.error, resolution.args)
+      : new HttpsError('failed-precondition', resolution.error);
   }
   const backend = resolution.backend;
 
@@ -2173,6 +2249,7 @@ export const recreatePlanningCenterPerson = onCall<
       backend.displayName,
       error,
       `re-create this student in ${backend.displayName}`,
+      'backend.unreachable.recreate',
     );
   }
 
@@ -2670,7 +2747,11 @@ export const materializeOccurrence = onCall<
   // Not an error the caller can fix by retrying: either the rule does not put a
   // gathering there, or it has since been changed so that it no longer does.
   if (!result) {
-    throw new HttpsError('not-found', 'That is not a gathering the schedule describes.');
+    throw refuse(
+      'not-found',
+      'notFound.gathering',
+      'That is not a gathering the schedule describes.',
+    );
   }
 
   return result;
@@ -2931,7 +3012,7 @@ export const deleteEvents = onCall<
   // merely describe — there is no document to remove — or another device
   // removed it first, and both read the same way to whoever is looking.
   if (!summary) {
-    throw new HttpsError('not-found', 'That gathering is no longer here.');
+    throw refuse('not-found', 'notFound.gatheringGone', 'That gathering is no longer here.');
   }
 
   return summary;
@@ -2960,7 +3041,11 @@ export const startKioskPairing = onCall<void, Promise<StartPairingResult>>(
   async (): Promise<StartPairingResult> => {
     const result = await startPairing(db(), new Date());
     if (result === 'busy') {
-      throw new HttpsError('resource-exhausted', 'Too many kiosks are pairing right now. Try again in a few minutes.');
+      throw refuse(
+        'resource-exhausted',
+        'backend.pairingBusy',
+        'Too many kiosks are pairing right now. Try again in a few minutes.',
+      );
     }
     return result;
   },
@@ -3085,7 +3170,7 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
   { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' },
   async (request) => {
     if (request.auth?.token?.kiosk !== true) {
-      throw new HttpsError('permission-denied', 'Registration happens at a kiosk.');
+      throw refuse('permission-denied', 'auth.kioskOnly', 'Registration happens at a kiosk.');
     }
     await requireMember(request.auth?.uid);
 
@@ -3103,7 +3188,9 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
       });
     } catch (error) {
       if (error instanceof RegistrationInputError) {
-        throw new HttpsError('invalid-argument', error.message);
+        throw error.code
+          ? refuse('invalid-argument', error.code, error.message)
+          : new HttpsError('invalid-argument', error.message);
       }
       throw error;
     }
@@ -3133,7 +3220,7 @@ export const recordVisitorParent = onCall<
   await requireMember(request.auth?.uid);
   const uid = request.auth?.uid;
   if (typeof uid !== 'string') {
-    throw new HttpsError('unauthenticated', 'Sign in first.');
+    throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
   }
 
   try {
@@ -3145,7 +3232,9 @@ export const recordVisitorParent = onCall<
     });
   } catch (error) {
     if (error instanceof RegistrationInputError) {
-      throw new HttpsError('invalid-argument', error.message);
+      throw error.code
+        ? refuse('invalid-argument', error.code, error.message)
+        : new HttpsError('invalid-argument', error.message);
     }
     throw error;
   }
@@ -3345,7 +3434,9 @@ export const amendRegistration = onCall<
     });
   } catch (error) {
     if (error instanceof RegistrationInputError) {
-      throw new HttpsError('invalid-argument', error.message);
+      throw error.code
+        ? refuse('invalid-argument', error.code, error.message)
+        : new HttpsError('invalid-argument', error.message);
     }
     throw error;
   }
@@ -3426,7 +3517,7 @@ export const refreshKioskPhoneIndex = onCall<
       logger: logger,
     });
   } catch (error) {
-    reportBackendFailure('A people backend', error, 'rebuild the kiosk phone index');
+    reportBackendFailure('A people backend', error, 'rebuild the kiosk phone index', 'backend.unreachable.phoneIndex');
   }
 });
 

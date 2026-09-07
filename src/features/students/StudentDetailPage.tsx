@@ -96,6 +96,7 @@ import {
 import { useLocale, useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useServerText } from '@/hooks/useServerText';
 
 /** The group one-off events go in. Not a `chainKey`, and cannot collide with one. */
 const ONE_OFF_GROUP = 'one-off';
@@ -124,6 +125,7 @@ function dialable(phone: string): string {
 }
 
 export function StudentDetailPage() {
+  const serverText = useServerText();
   const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('StudentDetail');
@@ -544,7 +546,7 @@ export function StudentDetailPage() {
       refreshDetails();
       if (continueAs && continueAs !== student.id) navigate(`/students/${continueAs}`);
     } catch (cause) {
-      show(cause instanceof Error ? cause.message : t('recreateFailed', { backend: backendName }), {
+      show(serverText(cause, t('recreateFailed', { backend: backendName })), {
         tone: 'error',
       });
     } finally {
@@ -606,7 +608,7 @@ export function StudentDetailPage() {
       show(result.data.message, { tone: result.data.status === 'skipped' ? 'info' : 'success' });
     } catch (cause) {
       const message =
-        cause instanceof Error ? cause.message : t('pushRefused', { backend: backendName });
+        serverText(cause, t('pushRefused', { backend: backendName }));
       setPush({ state: 'error', message });
       show(message, { tone: 'error' });
     }

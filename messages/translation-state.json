@@ -484,6 +484,296 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Errors.auth.signIn": {
+    "source": "Sign in first.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.signInToRequest": {
+    "source": "Sign in before requesting access.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.notActive": {
+    "source": "Your access to Tally is not active.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.googleOnly": {
+    "source": "Tally only accepts Google sign-in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.coreOnly": {
+    "source": "Only the core team can do that.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.adminOnly": {
+    "source": "Only an admin can do that.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.notOnGathering": {
+    "source": "Only people added to that gathering can work it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.auth.kioskOnly": {
+    "source": "Registration happens at a kiosk.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.student": {
+    "source": "No such student.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.studentUnlinked": {
+    "source": "That student is not linked to a people backend.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.gathering": {
+    "source": "That is not a gathering the schedule describes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.gatheringGone": {
+    "source": "That gathering is no longer here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.personInBackend": {
+    "source": "{backend} has no person with that id.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.notFound.registration": {
+    "source": "That registration has already been dealt with.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.notConfigured": {
+    "source": "Not configured.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.notConnected": {
+    "source": "{backend} is not connected.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.rateLimited": {
+    "source": "{backend} is rate-limiting us. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.credentialsRejected": {
+    "source": "{backend} rejected Tally’s credentials. A leader needs to check the connection in Settings.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.noLists": {
+    "source": "{backend} does not have lists.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.noHistory": {
+    "source": "{backend} has no history to import.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.pairingBusy": {
+    "source": "Too many kiosks are pairing right now. Try again in a few minutes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.roster": {
+    "source": "Could not reach {backend} to load the roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.student": {
+    "source": "Could not reach {backend} to load this student.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.allergies": {
+    "source": "Could not reach {backend} to read the allergy notes.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.phoneIndex": {
+    "source": "Could not reach {backend} to rebuild the kiosk phone index.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.lists": {
+    "source": "Could not reach {backend} to load your Planning Center lists.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.listMembers": {
+    "source": "Could not reach {backend} to read that Planning Center list.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.eventList": {
+    "source": "Could not reach {backend} to list your Check-Ins events.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.eventImport": {
+    "source": "Could not reach {backend} to import that Check-Ins event.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.search": {
+    "source": "Could not reach {backend} to search {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.contactCheck": {
+    "source": "Could not reach {backend} to check which students have a contact.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.personCheck": {
+    "source": "Could not reach {backend} to check that person in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.parentContact": {
+    "source": "Could not reach {backend} to add a parent contact in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.profileSave": {
+    "source": "Could not reach {backend} to save this profile to {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.parentAdd": {
+    "source": "Could not reach {backend} to add a parent in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.backend.unreachable.recreate": {
+    "source": "Could not reach {backend} to re-create this student in {backend}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childFirst.required": {
+    "source": "The child's first name is required.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childFirst.tooLong": {
+    "source": "The child's first name is too long.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childFirst.hasNumbers": {
+    "source": "The child's first name cannot contain numbers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childFirst.needsLetter": {
+    "source": "The child's first name needs at least one letter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childLast.required": {
+    "source": "The child's last name is required.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childLast.tooLong": {
+    "source": "The child's last name is too long.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childLast.hasNumbers": {
+    "source": "The child's last name cannot contain numbers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.childLast.needsLetter": {
+    "source": "The child's last name needs at least one letter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultFirst.required": {
+    "source": "The adult's first name is required.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultFirst.tooLong": {
+    "source": "The adult's first name is too long.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultFirst.hasNumbers": {
+    "source": "The adult's first name cannot contain numbers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultFirst.needsLetter": {
+    "source": "The adult's first name needs at least one letter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultLast.required": {
+    "source": "The adult's last name is required.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultLast.tooLong": {
+    "source": "The adult's last name is too long.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultLast.hasNumbers": {
+    "source": "The adult's last name cannot contain numbers.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.adultLast.needsLetter": {
+    "source": "The adult's last name needs at least one letter.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.gradeRange": {
+    "source": "grade must be a whole number from -1 (Pre-K) to 12, or null.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.phoneRequired": {
+    "source": "A phone number is required.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.phoneDigits": {
+    "source": "Enter a 10-digit phone number.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.phoneShape": {
+    "source": "That does not look like a phone number.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.allergyText": {
+    "source": "allergies must be text.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.field.allergyTooLong": {
+    "source": "That allergy note is too long.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Export.csv": {
     "source": "Export CSV",
     "zh-Hans": "todo",

@@ -106,8 +106,8 @@ export function parseRecordVisitorParentRequest(data: unknown): ParsedVisitorPar
     studentId,
     registrationId,
     guardian: {
-      firstName: parseName(rawGuardian.firstName, "The adult's first name"),
-      lastName: parseName(rawGuardian.lastName, "The adult's last name"),
+      firstName: parseName(rawGuardian.firstName, 'adultFirst'),
+      lastName: parseName(rawGuardian.lastName, 'adultLast'),
       phone: parseRegistrationPhone(rawGuardian.phone),
     },
     eventId: typeof body.eventId === 'string' && body.eventId.trim().length > 0

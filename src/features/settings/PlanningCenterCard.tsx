@@ -31,6 +31,7 @@ import {
 import type { PcoStatus, PcoWriteBackMode } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useServerText } from '@/hooks/useServerText';
 
 const WRITE_BACK_LABEL = {
   off: 'pcoWriteOff',
@@ -39,6 +40,7 @@ const WRITE_BACK_LABEL = {
 } as const satisfies Record<PcoWriteBackMode, string>;
 
 export function PlanningCenterCard() {
+  const serverText = useServerText();
   const time = useTimeFormats();
   const t = useTranslations('Backends');
   const { show } = useToast();
@@ -58,7 +60,7 @@ export function PlanningCenterCard() {
     try {
       setStatus(await fetchPlanningCenterStatus(force));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t('pcoAskFailed'));
+      setError(serverText(cause, t('pcoAskFailed')));
     } finally {
       setLoading(false);
     }
@@ -70,7 +72,7 @@ export function PlanningCenterCard() {
     } catch {
       setStored(null);
     }
-  }, [t]);
+  }, [t, serverText]);
 
   useEffect(() => {
     void check();

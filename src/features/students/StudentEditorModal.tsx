@@ -63,6 +63,7 @@ import {
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useBirthdayStrings } from '@/hooks/useBirthdayStrings';
+import { useServerText } from '@/hooks/useServerText';
 
 function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);
@@ -146,6 +147,7 @@ export interface StudentEditorModalProps {
 }
 
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
+  const serverText = useServerText();
   const grades = useGrades();
   const t = useTranslations('StudentEditor');
   const birthdayStrings = useBirthdayStrings();
@@ -496,7 +498,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       }
       onClose();
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : t('saveFailed'));
+      setSaveError(serverText(cause, t('saveFailed')));
     } finally {
       setSaving(false);
     }

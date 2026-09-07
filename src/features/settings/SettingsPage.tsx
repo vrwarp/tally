@@ -34,6 +34,7 @@ import { saveSettings } from '@/services/events';
 import type { AppSettings } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useServerText } from '@/hooks/useServerText';
 
 /** Widest sensible window; matches the clamp in `toSettings`. */
 const MAX_WINDOW = 12;
@@ -70,6 +71,7 @@ function toForm(settings: AppSettings): ThresholdForm {
 }
 
 export function SettingsPage() {
+  const serverText = useServerText();
   const time = useTimeFormats();
   const t = useTranslations('Settings');
   const { settings, series, loading } = useData();
@@ -120,7 +122,7 @@ export function SettingsPage() {
       await saveSettings(form, user.uid);
       show(t('saved'), { tone: 'success' });
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : t('saveFailed'));
+      setSaveError(serverText(cause, t('saveFailed')));
     } finally {
       setSaving(false);
     }

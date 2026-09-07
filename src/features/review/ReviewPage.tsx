@@ -71,6 +71,7 @@ import { GRADES } from '@/types';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useFieldError } from '@/hooks/useFieldError';
 
 /**
  * The whole screen's translator, as a type.
@@ -553,6 +554,7 @@ function ChildEditor({
   onCancel: () => void;
   onSave: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
+  const tField = useFieldError();
   const t = useTranslations('Review');
   const grades = useGrades();
   const [firstName, setFirstName] = useState(child.firstName);
@@ -569,13 +571,13 @@ function ChildEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    const first = checkName(firstName, "The child's first name");
-    const last = checkName(lastName, "The child's last name");
+    const first = checkName(firstName, 'childFirst');
+    const last = checkName(lastName, 'childLast');
     const note = checkAllergyNote(allergies);
     setErrors({
-      firstName: first.ok ? undefined : first.error,
-      lastName: last.ok ? undefined : last.error,
-      allergies: note.ok ? undefined : note.error,
+      firstName: first.ok ? undefined : tField(first.code),
+      lastName: last.ok ? undefined : tField(last.code),
+      allergies: note.ok ? undefined : tField(note.code),
     });
     if (!first.ok || !last.ok || !note.ok) return;
 
@@ -685,6 +687,7 @@ function GuardianEditor({
     phone: string;
   }) => Promise<AmendRegistrationResult>;
 }) {
+  const tField = useFieldError();
   const t = useTranslations('Review');
   const [firstName, setFirstName] = useState(guardian.firstName);
   const [lastName, setLastName] = useState(guardian.lastName);
@@ -701,13 +704,13 @@ function GuardianEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    const first = checkName(firstName, "The adult's first name");
-    const last = checkName(lastName, "The adult's last name");
+    const first = checkName(firstName, 'adultFirst');
+    const last = checkName(lastName, 'adultLast');
     const number = checkPhone(phone);
     setErrors({
-      firstName: first.ok ? undefined : first.error,
-      lastName: last.ok ? undefined : last.error,
-      phone: number.ok ? undefined : number.error,
+      firstName: first.ok ? undefined : tField(first.code),
+      lastName: last.ok ? undefined : tField(last.code),
+      phone: number.ok ? undefined : tField(number.code),
     });
     if (!first.ok || !last.ok || !number.ok) return;
 

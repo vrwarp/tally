@@ -102,7 +102,83 @@
     "contactDetailsUnreachable": "Could not reach {backend} for these details.",
     "incompleteDenied": "Only the core team can see which profiles are incomplete.",
     "incompleteUnreachable": "Could not check which profiles are incomplete — the people system did not answer.",
-    "olderGatherings": "Could not load older gatherings."
+    "olderGatherings": "Could not load older gatherings.",
+    "auth": {
+      "signIn": "Sign in first.",
+      "signInToRequest": "Sign in before requesting access.",
+      "notActive": "Your access to Tally is not active.",
+      "googleOnly": "Tally only accepts Google sign-in.",
+      "coreOnly": "Only the core team can do that.",
+      "adminOnly": "Only an admin can do that.",
+      "notOnGathering": "Only people added to that gathering can work it.",
+      "kioskOnly": "Registration happens at a kiosk."
+    },
+    "notFound": {
+      "student": "No such student.",
+      "studentUnlinked": "That student is not linked to a people backend.",
+      "gathering": "That is not a gathering the schedule describes.",
+      "gatheringGone": "That gathering is no longer here.",
+      "personInBackend": "{backend} has no person with that id.",
+      "registration": "That registration has already been dealt with."
+    },
+    "backend": {
+      "notConfigured": "Not configured.",
+      "notConnected": "{backend} is not connected.",
+      "rateLimited": "{backend} is rate-limiting us. Try again in a moment.",
+      "credentialsRejected": "{backend} rejected Tally’s credentials. A leader needs to check the connection in Settings.",
+      "noLists": "{backend} does not have lists.",
+      "noHistory": "{backend} has no history to import.",
+      "pairingBusy": "Too many kiosks are pairing right now. Try again in a few minutes.",
+      "unreachable": {
+        "roster": "Could not reach {backend} to load the roster.",
+        "student": "Could not reach {backend} to load this student.",
+        "allergies": "Could not reach {backend} to read the allergy notes.",
+        "phoneIndex": "Could not reach {backend} to rebuild the kiosk phone index.",
+        "lists": "Could not reach {backend} to load your Planning Center lists.",
+        "listMembers": "Could not reach {backend} to read that Planning Center list.",
+        "eventList": "Could not reach {backend} to list your Check-Ins events.",
+        "eventImport": "Could not reach {backend} to import that Check-Ins event.",
+        "search": "Could not reach {backend} to search {backend}.",
+        "contactCheck": "Could not reach {backend} to check which students have a contact.",
+        "personCheck": "Could not reach {backend} to check that person in {backend}.",
+        "parentContact": "Could not reach {backend} to add a parent contact in {backend}.",
+        "profileSave": "Could not reach {backend} to save this profile to {backend}.",
+        "parentAdd": "Could not reach {backend} to add a parent in {backend}.",
+        "recreate": "Could not reach {backend} to re-create this student in {backend}."
+      }
+    },
+    "field": {
+      "childFirst": {
+        "required": "The child's first name is required.",
+        "tooLong": "The child's first name is too long.",
+        "hasNumbers": "The child's first name cannot contain numbers.",
+        "needsLetter": "The child's first name needs at least one letter."
+      },
+      "childLast": {
+        "required": "The child's last name is required.",
+        "tooLong": "The child's last name is too long.",
+        "hasNumbers": "The child's last name cannot contain numbers.",
+        "needsLetter": "The child's last name needs at least one letter."
+      },
+      "adultFirst": {
+        "required": "The adult's first name is required.",
+        "tooLong": "The adult's first name is too long.",
+        "hasNumbers": "The adult's first name cannot contain numbers.",
+        "needsLetter": "The adult's first name needs at least one letter."
+      },
+      "adultLast": {
+        "required": "The adult's last name is required.",
+        "tooLong": "The adult's last name is too long.",
+        "hasNumbers": "The adult's last name cannot contain numbers.",
+        "needsLetter": "The adult's last name needs at least one letter."
+      },
+      "gradeRange": "grade must be a whole number from -1 (Pre-K) to 12, or null.",
+      "phoneRequired": "A phone number is required.",
+      "phoneDigits": "Enter a 10-digit phone number.",
+      "phoneShape": "That does not look like a phone number.",
+      "allergyText": "allergies must be text.",
+      "allergyTooLong": "That allergy note is too long."
+    }
   },
   "Export": {
     "csv": "Export CSV",
