@@ -230,7 +230,10 @@ async function enterChild(first: string, last: string, grade: string): Promise<v
   await tap('Clear');
   await type(last);
   await tap('Next');
+  // A chip selects rather than advancing now; Next leaves the question, as on
+  // every other step.
   await tap(grade);
+  await tap('Next');
 }
 
 /** The adult's three questions, from their first name to the confirm. */
@@ -413,7 +416,10 @@ describe('the four things a parent touches', () => {
     await tap('Clear');
     await type('Fields');
     await tap('Next');
+    expect(screen.getAllByText('What grade are they in?').length).toBeGreaterThan(0);
+
     await tap('4');
+    await tap('Next');
     expect(screen.getAllByText('Your first name').length).toBeGreaterThan(0);
     /*
      * And the header is not the same words again. It carries the gathering,
@@ -424,22 +430,34 @@ describe('the four things a parent touches', () => {
     expect(screen.getAllByText('Friday Fellowship').length).toBeGreaterThan(0);
   });
 
-  it('says how much of the adult’s half is left, once, where it changes the subject', async () => {
+  it('shows the whole run, so the adult’s half is not a surprise', async () => {
     /*
-     * The "Anybody else?" screen used to stand here, and however badly its
-     * **That's everyone** read, it was a visible seam: a screen with no
-     * keyboard on it. Without one, three questions about the adult arrive in a
-     * frame identical to the four before them.
+     * The "Anybody else?" screen used to stand between the children and the
+     * adult, and however badly its **That's everyone** read, it was a visible
+     * seam. Without one, three questions about the adult would arrive in a
+     * frame identical to the four before them — so the run is on the glass
+     * from the first question, named rather than counted.
      */
     await mount();
     await tap(/Register your child/);
-    await enterChild('Robin', 'Fields', '4');
-    expect(screen.getByText('Three quick questions about you.')).toBeTruthy();
 
-    // And only there. On the next question two remain, so a count would lie.
-    await type('Dana');
-    await tap('Next');
-    expect(screen.queryByText('Three quick questions about you.')).toBeNull();
+    expect(screen.getByTestId('question-child-0-child-first')).toHaveAttribute(
+      'data-state',
+      'now',
+    );
+    for (const id of ['adult-guardian-first', 'adult-guardian-last', 'adult-guardian-phone']) {
+      expect(screen.getByTestId(`question-${id}`)).toHaveAttribute('data-state', 'todo');
+    }
+
+    // And the answers fill in behind, so a name typed forty seconds ago can be
+    // checked without pressing Back four times to reach it.
+    await enterChild('Robin', 'Fields', '4');
+    expect(screen.getByTestId('question-child-0-child-first')).toHaveTextContent('Robin');
+    expect(screen.getByTestId('question-child-0-child-grade')).toHaveTextContent('4th');
+    expect(screen.getByTestId('question-adult-guardian-first')).toHaveAttribute(
+      'data-state',
+      'now',
+    );
   });
 
   it('reopens the child a parent backs out of, rather than a nameless one', async () => {
@@ -459,6 +477,7 @@ describe('the four things a parent touches', () => {
     // Back on the grade chips, for the child whose grade they are.
     expect(screen.getAllByText('What grade are they in?').length).toBeGreaterThan(0);
     await tap('4');
+    await tap('Next');
     await enterGuardian('Dana', 'Fields', '5550103344');
 
     // One child on the confirm, not one and a blank.
@@ -524,6 +543,7 @@ describe('the four things a parent touches', () => {
 
     expect(screen.queryByText('-1')).toBeNull();
     await tap('Pre-K');
+    await tap('Next');
     await enterGuardian('Dana', 'Fields', '5550103344');
 
     // And it is a real answer, not a blank: the wizard records the year.

@@ -19,7 +19,7 @@
  * collect it is retired; it is gated on the binding's `allergiesSupported`,
  * which is the same write-back check that form made before showing its field.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { gradeDescription, haptic, NO_GRADE } from '@/lib/utils';
 import { GRADES, PRE_K, type Grade, type RegisterFamilyResult } from '@/types';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
@@ -37,6 +37,10 @@ import {
   initialState,
   isTypingStep,
   MAX_CHILDREN,
+  questionList,
+  readoutFor,
+  type QuestionListState,
+  type QuestionRow,
   toggleNoAllergies,
   type DraftChild,
   type RegistrationMode,
@@ -209,6 +213,20 @@ export function RegistrationFlow({
   /* ---- Render ------------------------------------------------------------ */
 
   const childNumber = state.children.length + 1;
+  /* Every step that asks a question: the list above, the console below. */
+  const showsList = isTypingStep(state.step) || state.step === 'child-grade';
+
+  /*
+   * A long family scrolls, and the end of the list is what a parent wants —
+   * the child they are entering now, against the question they are answering.
+   * Per step rather than per keystroke: nothing in the list changes while a
+   * name is being typed.
+   */
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [state.step, state.children.length]);
 
   return (
     /* The column is the glass, never its widest item. A name typed to
@@ -229,89 +247,41 @@ export function RegistrationFlow({
         onClose={onClose}
       />
 
-      <div className="flex min-h-0 flex-col overflow-y-auto overscroll-contain scroll-touch px-6">
-        {/*
-          * On a typing step the body hangs from the bottom of its region
-          * rather than the top, so that what a step puts here — today, the
-          * "No allergies" tick — stays against the readout it belongs to.
-          * The readout moved down to the keyboard (see below) and this is the
-          * half of that move that keeps the step whole: a question, its answer
-          * and the keys in one block under the hand, instead of one control
-          * marooned under the header.
-          *
-          * `mt-auto` rather than `justify-end`, because this region scrolls:
-          * an auto margin collapses to nothing once the content is taller than
-          * the box, where end-justified content would push its own top out of
-          * reach.
-          */}
-        <div
-          className={`mx-auto flex w-full max-w-2xl flex-col gap-3 pb-2 ${
-            'min-h-full'
-          }`}
-        >
-          {/*
-            * The step's question, in the region where its answer gets built.
-            *
-            * It has been in three places across this loop. In the header it was
-            * fourteen pixels of `ink-500` — 4.24:1, under the AA floor — at the
-            * far end of the screen from the hand, and the only thing telling
-            * step two of this wizard from step five. Hard against the readout it
-            * was legible and adjacent but it left this region empty: a third of
-            * the screen with nothing in it, and the first object below the title
-            * a disabled **Next**, which is what made the register step read as a
-            * screen that had not finished loading beside the search screen it
-            * came from.
-            *
-            * Here, and quieter than search's "Type a name", because that one is
-            * the whole screen and this one shares its step with a header that
-            * already says whose turn it is.
-            */}
-          {isTypingStep(state.step) && (
-            <div className="text-center text-xl text-ink-300 kiosk:text-2xl">
-              {placeholderFor(state)}
-            </div>
-          )}
-          {/*
-            * How much of this is left, said once, on the step that changes the
-            * subject.
-            *
-            * The "Anybody else?" screen used to sit between the children and
-            * the adult, and however badly its **That's everyone** read, it was
-            * a visible seam: a screen with no keyboard, so a parent registered
-            * that something had changed. Without it the adult's three questions
-            * arrive in a frame identical to the four before them, and the only
-            * things that differ are the title and the field name.
-            *
-            * Here rather than in the subtitle for two reasons. That slot is
-            * shared by `guardian-first` and `guardian-last`, so a count put in
-            * it would tell a parent "three" on the screen where two remain; and
-            * it is the flow's one line of identity, which a parent glancing up
-            * uses to check they are still at the right gathering. This region
-            * is empty on every typing step and costs nothing.
-            */}
-          {state.step === 'guardian-first' && (
-            <div className="text-center text-base text-ink-400 kiosk:text-lg">
-              Three quick questions about you.
-            </div>
-          )}
-          {state.step === 'child-grade' && (
-            <div className="mt-auto grid grid-cols-3 gap-2 pt-2">
-              {GRADES.map((grade) => (
-                <GradeChip
-                  key={grade}
-                  label={gradeChipLabel(grade)}
-                  hint={gradeDescription(grade)}
-                  onPick={() => dispatch({ type: 'grade', grade })}
+      {/*
+        * The body is the run, written out.
+        *
+        * One question on the glass and nothing else left a 664px hole on an
+        * upright tablet — half the screen — between the question and the keys
+        * that answer it. What fills it is the list: what has been answered,
+        * what is being answered now, and what is still to come. It replaced the
+        * "Anybody else?" screen's job of forewarning and the line that stood in
+        * for it, and it gives a parent somewhere to look that is not a void.
+        *
+        * The list scrolls and the question does not: `questionFor` is a sibling
+        * of the scroll box, not a child of it, so it stays against the console
+        * however long a family gets.
+        */}
+      <div className="flex min-h-0 flex-col px-6">
+        {showsList ? (
+          <>
+            <div
+              ref={listRef}
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch"
+            >
+              {/* `mt-auto` rather than `justify-end`: an auto margin collapses
+                  to nothing once the content is taller than the box, where
+                  end-justified content would push its own top out of reach. */}
+              <div className="mx-auto mt-auto flex w-full max-w-2xl flex-col gap-2 pt-2 pb-1">
+                <QuestionStack
+                  step={state.step}
+                  roster={state.children}
+                  draft={state.draft}
+                  guardian={state.guardian}
+                  allergiesSupported={state.allergiesSupported}
+                  mode={state.mode}
                 />
-              ))}
-              {/* Last, because it is the one chip here that is not an answer.
-                  In reading position one, styled like the fourteen real values,
-                  it reads as the default — and what it produces is a
-                  grade-less record for the core team to adjudicate. */}
-              <GradeChip label={NO_GRADE} onPick={() => dispatch({ type: 'grade', grade: null })} />
+              </div>
             </div>
-          )}
-
           {state.step === 'child-allergies' && (
             /*
               * The way to say "nothing", where the typing would have started.
@@ -329,7 +299,7 @@ export function RegistrationFlow({
               * parent can see they are in, and a button that had already been
               * pressed would look exactly like one that had not.
               */
-            <div className="mt-auto pt-2">
+            <div className="mx-auto w-full max-w-2xl pt-2">
               <button
                 type="button"
                 tabIndex={-1}
@@ -360,6 +330,22 @@ export function RegistrationFlow({
             </div>
           )}
 
+            {/*
+              * The question, against the keys that answer it.
+              *
+              * It was at the top of this region, which on a portrait tablet put
+              * it six hundred pixels above the thing a parent presses to answer
+              * it. Said here as well as in the list above — deliberately: the
+              * row in the list is the index, saying where somebody is in the
+              * run and what they can go back and fix; this is the question, in
+              * the same glance as the thumb.
+              */}
+            <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
+              {questionFor(state)}
+            </div>
+          </>
+        ) : (
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col gap-3 pb-2">
           {state.step === 'confirm' && (
             /* Against the commit, not stranded a screen above it. This is the
                last thing a parent reads before a record goes upstream, and on a
@@ -421,7 +407,8 @@ export function RegistrationFlow({
               <Big label="Try again" tone="brand" onPick={runSubmit} />
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/*
@@ -435,9 +422,11 @@ export function RegistrationFlow({
         */}
       <div className="border-t border-ink-800/70" />
 
-      {/* The bottom row: the readout and the keyboard where something is being
-          typed, the one action that ends the step where it is not. */}
-      {isTypingStep(state.step) ? (
+      {/* The bottom row: the readout and whatever fills it — letters, digits or
+          the grade chips — with the action that ends the step above them. The
+          same object on every question, which is what keeps the rule above it
+          from moving between steps. */}
+      {showsList ? (
         <div className="flex flex-col gap-1.5">
           <div className="px-2 pt-2">
             {/*
@@ -495,30 +484,42 @@ export function RegistrationFlow({
             }`}
           >
             <div className="mx-auto flex h-16 max-w-2xl items-center justify-center px-4">
-              {/* Letters only, and empty until there are some. The search screen
-                  teaches a parent two taps earlier that the bold word above the
-                  keys is what *they* typed; a placeholder sitting in that slot
-                  read as something a previous family had already entered. What
-                  the box is for is said above it, at size. */}
-              {state.buffer && (
+              {/* The answer so far, however it is being given — typed, dialled
+                  or tapped off a chip. Empty until there is one: the search
+                  screen teaches a parent two taps earlier that the bold word
+                  above the keys is what *they* entered, and a placeholder
+                  sitting in that slot read as something a previous family had
+                  already put there. What the box is for is said above it. */}
+              {readoutFor(state) && (
                 <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
-                  {state.step === 'guardian-phone' ? formatPhone(state.buffer) : state.buffer}
+                  {readoutFor(state)}
                 </span>
               )}
               {/* Where the next letter lands, so the band reads as a live field
-                  rather than as a gap. Always rendered — on an empty step it is
-                  the only thing here, which is the point. See `.kiosk-caret`. */}
-              <span
-                aria-hidden
-                data-testid="readout-caret"
-                className={`kiosk-caret${state.noAllergies ? ' kiosk-caret--still' : ''}`}
-              />
+                  rather than as a gap. Only where something is typed — a grade
+                  is chosen off a grid, and a caret blinking beside it would
+                  promise a keyboard that is not there. See `.kiosk-caret`. */}
+              {isTypingStep(state.step) && (
+                <span
+                  aria-hidden
+                  data-testid="readout-caret"
+                  className={`kiosk-caret${state.noAllergies ? ' kiosk-caret--still' : ''}`}
+                />
+              )}
             </div>
           </div>
-          {/* The one question on this screen that is a number gets the shape
-              everybody already knows for one. See PhonePad. */}
+          {/* The one question that is a number gets the shape everybody already
+              knows for one; the one that is a year gets a grid of years. Both
+              stand where the keyboard stands, in the keyboard's own footprint,
+              because they are that question's keys. */}
           {state.step === 'guardian-phone' ? (
             <PhonePad onKey={onKey} />
+          ) : state.step === 'child-grade' ? (
+            <GradeChips
+              grade={state.draft.grade}
+              picked={state.gradePicked}
+              onPick={(grade) => dispatch({ type: 'grade', grade })}
+            />
           ) : (
             /*
               * Greyed and inert while "No allergies" is ticked. The keys stay
@@ -642,6 +643,127 @@ function Header({
   );
 }
 
+/**
+ * The run, written out beside the question being answered.
+ *
+ * Memoised on what it draws and nothing else — see `QuestionListState`. A
+ * keystroke changes the buffer and the shift state, and neither is here, so
+ * this subtree does not re-render while a name is being typed. That is the
+ * discipline the keyboard already keeps, for the same reason: the work in a
+ * keystroke is the thing this file guards hardest.
+ */
+const QuestionStack = memo(function QuestionStack({
+  step,
+  roster,
+  draft,
+  guardian,
+  allergiesSupported,
+  mode,
+}: Omit<QuestionListState, 'children'> & { roster: QuestionListState['children'] }) {
+  const sections = questionList({
+    step,
+    children: roster,
+    draft,
+    guardian,
+    allergiesSupported,
+    mode,
+  });
+
+  return (
+    <>
+      {sections.map((section) => (
+        <div key={section.title} className="flex flex-col gap-1.5">
+          <div className="px-1 pt-1 text-sm tracking-[0.14em] text-ink-500 uppercase kiosk:text-base">
+            {section.title}
+          </div>
+          {section.rows.map((row) => (
+            <QuestionRowView key={row.id} row={row} />
+          ))}
+        </div>
+      ))}
+    </>
+  );
+});
+
+/**
+ * One question in the list.
+ *
+ * Three states and each is a different claim. Answered is filled, because it
+ * holds something; the one being answered wears the accent, because it is where
+ * the parent is; and one still to come is an outline, because an empty filled
+ * row reads as an answer somebody failed to give.
+ */
+function QuestionRowView({ row }: { row: QuestionRow }) {
+  return (
+    <div
+      data-testid={`question-${row.id}`}
+      data-state={row.state}
+      className={`flex h-14 items-center justify-between gap-3 rounded-xl px-5 kiosk:h-16 ${
+        row.state === 'now'
+          ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
+          : row.state === 'done'
+            ? 'bg-ink-900'
+            : 'ring-1 ring-ink-800/70'
+      }`}
+    >
+      <span
+        className={`truncate text-base kiosk:text-lg ${
+          row.state === 'now'
+            ? 'font-semibold text-brand-300'
+            : row.state === 'done'
+              ? 'text-ink-500'
+              : 'text-ink-600'
+        }`}
+      >
+        {row.label}
+      </span>
+      {row.answer !== '' && (
+        <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+          {row.answer}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The grade grid, standing where the keyboard stands.
+ *
+ * Four across rather than three, which is what lets fifteen chips land in four
+ * rows instead of five — and four rows of `h-[4.375rem]` are the keyboard's
+ * five rows to the pixel, at both of the key heights `Keyboard` uses. So the
+ * console is the same height on this question as on every other, and the rule
+ * above it does not move when the question changes.
+ */
+function GradeChips({
+  grade,
+  picked,
+  onPick,
+}: {
+  grade: Grade | null;
+  picked: boolean;
+  onPick: (grade: Grade | null) => void;
+}) {
+  return (
+    <div className="mx-auto grid w-full grid-cols-4 gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0">
+      {GRADES.map((year) => (
+        <GradeChip
+          key={year}
+          label={gradeChipLabel(year)}
+          hint={gradeDescription(year)}
+          selected={picked && grade === year}
+          onPick={() => onPick(year)}
+        />
+      ))}
+      {/* Last, because it is the one chip here that is not an answer. In
+          reading position one, styled like the fourteen real values, it reads
+          as the default — and what it produces is a grade-less record for the
+          core team to adjudicate. */}
+      <GradeChip label={NO_GRADE} selected={picked && grade === null} onPick={() => onPick(null)} />
+    </div>
+  );
+}
+
 /** One child as the wizard has them: the name, the grade, and any note. */
 function ChildRow({ child }: { child: DraftChild }) {
   return (
@@ -703,7 +825,17 @@ function Big({
   );
 }
 
-function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPick: () => void }) {
+function GradeChip({
+  label,
+  hint,
+  selected,
+  onPick,
+}: {
+  label: string;
+  hint?: string;
+  selected: boolean;
+  onPick: () => void;
+}) {
   const tap = useTap();
 
   return (
@@ -711,11 +843,16 @@ function GradeChip({ label, hint, onPick }: { label: string; hint?: string; onPi
       type="button"
       tabIndex={-1}
       aria-label={hint ?? label}
+      aria-pressed={selected}
       {...tap(() => {
         haptic();
         onPick();
       })}
-      className="flex h-16 items-center justify-center rounded-xl bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600"
+      className={`flex h-[4.375rem] items-center justify-center rounded-xl text-xl font-semibold tall:h-20 ${
+        selected
+          ? 'bg-brand-600/25 text-brand-200 ring-2 ring-brand-500'
+          : 'bg-ink-800 text-ink-100 active:bg-ink-600'
+      }`}
     >
       {label}
     </button>
@@ -786,13 +923,15 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
     case 'child-first':
     case 'child-last':
       return binding.title;
+    /*
+     * The question moved down to the console, where the answer is given. These
+     * two go back to identity with the rest: a parent glancing up wants to know
+     * they are still at the right gathering, not to read the same sentence
+     * twice at opposite ends of the type ramp.
+     */
     case 'child-grade':
-      return 'What grade are they in?';
     case 'child-allergies':
-      // "we should know about" and not "do they have": a parent whose child's
-      // hay fever is nobody's business at a check-in desk is being invited to
-      // skip, not interrogated.
-      return 'Any allergies we should know about?';
+      return binding.title;
     /*
      * The adult's two steps share one line, and it is context rather than a
      * label: the readout under it already says "Your first name". A subtitle
@@ -814,22 +953,31 @@ function subtitleFor(state: RegistrationState, binding: KioskBinding): string {
 }
 
 /**
- * What the empty readout says.
+ * The question, said against the thing that answers it.
  *
- * The field's own name, not "Type here" — which repeated the shape of the
- * screen back at somebody and named nothing. It matters most on the two steps
- * where the question above and the answer below could belong to either person
- * in the room: "Child's last name" and "Your last name" are the same box until
- * one of them says which.
+ * The field's own name where a field is what it is, not "Type here" — which
+ * repeated the shape of the screen back at somebody and named nothing. It
+ * matters most on the two steps where the question and the answer could belong
+ * to either person in the room: "Child's last name" and "Your last name" are
+ * the same box until one of them says which.
+ *
+ * The grade and the allergy note ask a sentence rather than name a field,
+ * because neither has a field to name — a year comes off a grid, and "any
+ * allergies we should know about?" is deliberately an invitation to skip rather
+ * than an interrogation. Both used to be said by the header instead; the header
+ * carries the gathering on those steps now, which is what a parent glancing up
+ * is checking.
  */
-function placeholderFor(state: RegistrationState): string {
+function questionFor(state: RegistrationState): string {
   switch (state.step) {
     case 'child-first':
       return "Child's first name";
     case 'child-last':
       return "Child's last name";
+    case 'child-grade':
+      return 'What grade are they in?';
     case 'child-allergies':
-      return 'Allergies';
+      return 'Any allergies we should know about?';
     case 'guardian-first':
       return 'Your first name';
     case 'guardian-last':
