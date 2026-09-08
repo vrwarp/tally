@@ -19,7 +19,16 @@
  * collect it is retired; it is gated on the binding's `allergiesSupported`,
  * which is the same write-back check that form made before showing its field.
  */
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
 import { gradeDescription, type GradeStrings } from '@/lib/grades';
@@ -430,16 +439,42 @@ export function RegistrationFlow({
     isTypingStep(state.step) || state.step === 'child-grade' || state.step === 'confirm';
 
   /*
-   * A long family scrolls, and the end of the list is what a parent wants —
-   * the child they are entering now, against the question they are answering.
-   * Per step rather than per keystroke: nothing in the list changes while a
-   * name is being typed.
+   * A long family scrolls, and two things want the glass: the end of the run,
+   * and the question being asked right now.
+   *
+   * The end alone is what shipped, and on the shortest glass it hid the one row
+   * the step is about. A first registration opens with seven rows and two
+   * headings on it — four for the child, three for the adult — which a phone
+   * cannot hold, so the list settled at the phone number and "Child's first
+   * name" was asked above the fold, with the accent that says *here* scrolled
+   * out of sight. The same thing happens to any row reopened from the top of a
+   * long family.
+   *
+   * So the end is still where the list settles — what has just been typed
+   * belongs on the glass — and the row wearing the accent is then pulled back
+   * if that settling took it off. `nearest` is deliberate: it is the smallest
+   * movement that satisfies both, so a row already visible does not jump.
+   *
+   * Per step rather than per keystroke, and `editing` is in the list because
+   * reopening a row is how the accent moves without the step changing. Nothing
+   * in the list changes while a name is being typed, and a list that re-scrolled
+   * under a thumb would undo a parent who had scrolled up to check an earlier
+   * answer.
    */
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const list = listRef.current;
-    if (list) list.scrollTop = list.scrollHeight;
-  }, [state.step, state.children.length]);
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+    /*
+     * Found through the DOM rather than by threading a ref down: the accent is
+     * already on the glass as `data-state`, the list is a memo over a pure
+     * list-builder, and a ref per row would have to survive that memo. The
+     * confirm has no such row and wants the end of the run anyway, which is
+     * what it gets.
+     */
+    list.querySelector('[data-state="now"]')?.scrollIntoView({ block: 'nearest' });
+  }, [state.step, state.editing, state.children.length]);
 
   return (
     /* The column is the glass, never its widest item. A name typed to
@@ -494,12 +529,26 @@ export function RegistrationFlow({
         * of the scroll box, not a child of it, so it stays against the console
         * however long a family gets.
         */}
-      <div className="flex min-h-0 flex-col px-6">
+      <div className="flex min-h-0 flex-col">
         {showsList ? (
           <>
+            {/*
+              * The `px-6` gutter is on the scrolling box rather than around it,
+              * which is where the other kiosk lists keep theirs — `SearchScreen`,
+              * `SiblingScreen`, `ReprintScreen` — and it is not tidiness: a box
+              * that scrolls clips on *both* axes (CSS has no "scroll down, spill
+              * sideways") and it clips at its padding edge. With the gutter
+              * outside, the rows ran the full width of that edge and the ring,
+              * which a browser draws as a shadow *outside* the border box, was
+              * shaved off down both sides — so every unanswered field lost its
+              * left and right strokes and the list read as a stack of
+              * open-ended lines rather than boxes. The question below and the
+              * screens that stand in for the list carry the same gutter, so
+              * nothing moved but the clip.
+              */}
             <div
               ref={listRef}
-              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch"
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch px-6"
             >
               {/* `mt-auto` rather than `justify-end`: an auto margin collapses
                   to nothing once the content is taller than the box, where
@@ -551,13 +600,15 @@ export function RegistrationFlow({
               * thing a third time would only ask which one to answer.
               */}
             {state.step !== 'confirm' && (
-              <div className="mx-auto w-full max-w-2xl pt-3 pb-1 text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
-                {questionFor(t, state)}
+              <div className="px-6 pt-3 pb-1">
+                <div className="mx-auto w-full max-w-2xl text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
+                  {questionFor(t, state)}
+                </div>
               </div>
             )}
           </>
         ) : (
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-3 pb-6">
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-3 px-6 pb-6">
           {state.step === 'submitting' && (
             <SavingScreen roster={state.children} phase={savePhase} tagsOut={tagsOut} />
           )}
@@ -1097,7 +1148,13 @@ function QuestionRowView({
 }) {
   const t = useTranslations('Register');
   const tap = useTap();
-  const shell = `flex h-14 w-full items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
+  /*
+   * `scroll-mt-10` is what the layout effect above scrolls this row *to*: forty
+   * pixels is the section heading and the gap under it, so a row pulled back
+   * into view arrives with "YOUR CHILD" or "AND YOU" above it rather than flush
+   * against a cut edge, which is the same row with no answer to "whose?".
+   */
+  const shell = `flex h-14 w-full scroll-mt-10 items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
     row.state === 'now'
       ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
       : row.state === 'done'
