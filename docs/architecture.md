@@ -165,8 +165,9 @@ tight enough to fail if somebody reaches for the barrel instead and bundles the 
 
 **Printing cannot fail a check-in, and never tells a parent.** `onConfirm` already paints the tick
 before the write lands; the label goes last, wrapped, after the attendance write is dispatched. A
-printer problem surfaces as an amber dot in the corner of the search screen and a sentence on the
-staff printer screen — never beside the green tick, where a red line reads as "your check-in failed"
+printer problem surfaces as an amber dot in the corner of the search screen — tappable, and the one
+door onto a staff screen that is not behind the held **Clear**, because the dot is the only thing on
+the kiosk that knows — and a sentence on the staff printer screen; never beside the green tick, where a red line reads as "your check-in failed"
 to somebody who cannot fix a printer anyway. A check-out prints nothing at all: the sticker went on at
 the door, and a parent re-tapping a child who is already checked in does not print either — except
 inside the ten minutes after this kiosk checked them in, once, which is the whole of the exception

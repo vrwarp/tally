@@ -525,3 +525,101 @@ describe('the printer screen, opened from the staff gate', () => {
     expect(screen.getByText(/Label printer/i)).toBeTruthy();
   });
 });
+
+/*
+ * The amber dot, as a door.
+ *
+ * The dot is the only thing on a lobby kiosk that says the printer has stopped,
+ * and until now saying so was all it did: a volunteer who saw it had to hold
+ * **Clear** for two seconds and find **Label printer** behind the gate. It
+ * opens the printer screen now, and the way out follows the way in — a screen
+ * reached from the check-in screen hands the kiosk back to it rather than
+ * leaving somebody on a staff screen they never asked for.
+ */
+describe('the printer screen, opened from the dot', () => {
+  /** What the corner looks like when the printer has stopped. */
+  function inTrouble(): void {
+    vi.mocked(printing.currentState).mockReturnValue({
+      kind: 'trouble',
+      message: { key: 'troubleUnplugged' },
+      advice: { key: 'advicePlugBackIn' },
+    });
+  }
+
+  /** The dot: a button in the corner, named for what it is warning about. */
+  async function tapDot(): Promise<void> {
+    const dot = screen.getByLabelText(/Label printer needs attention/i);
+    await act(async () => {
+      fireEvent.pointerDown(dot);
+      fireEvent.pointerUp(dot);
+    });
+    await settle();
+  }
+
+  it('is not a door at all while the printer is fine', async () => {
+    await mount();
+
+    expect(screen.queryByLabelText(/Label printer needs attention/i)).toBeNull();
+  });
+
+  it('opens the printer screen without the two-second hold', async () => {
+    inTrouble();
+    await mount();
+    await tapDot();
+
+    expect(screen.getByText(/^Label printer$/i)).toBeTruthy();
+    // The sentence the dot could not carry, which is the whole reason to open it.
+    expect(screen.getByText(/The printer was unplugged/i)).toBeTruthy();
+  });
+
+  it('says where its way out goes, and goes there', async () => {
+    inTrouble();
+    await mount();
+    await tapDot();
+
+    // Not the bare "Done" the staff-screen door gets: this one crosses back out
+    // of the staff flow, so it names the screen it lands on.
+    await tap(/Done — back to check-in/i);
+
+    expect(screen.getByText('Sunday Nursery')).toBeTruthy();
+    expect(screen.queryByText(/Staff · this kiosk/i)).toBeNull();
+    expect(screen.queryByText(/^Label printer$/i)).toBeNull();
+    // Still bound, and still the screen a parent uses.
+    expect(localStorage.getItem(KIOSK_KEYS.binding)).not.toBeNull();
+  });
+
+  it('leaves the staff screen’s own way out saying Done', async () => {
+    inTrouble();
+    await mount();
+    await holdClear();
+    await tap(/Label printer/i);
+
+    expect(screen.queryByText(/Done — back to check-in/i)).toBeNull();
+    await tap(/^Done$/);
+
+    // Back where the volunteer was, which on this door is the staff screen.
+    expect(screen.getByText(/Reprint a name tag/i)).toBeTruthy();
+  });
+
+  /*
+   * The reprint confirm remembers which of the printer screen's two doors was
+   * used. Backing out of it used to be rebuilt from the word "printer", which
+   * with one entrance was the same thing and with two is a guess.
+   */
+  it('comes back to the printer screen a reprint was started from, and then home', async () => {
+    inTrouble();
+    vi.mocked(printing.printedTonight).mockReturnValue([
+      { id: 'label-1', studentId: ADA.id, name: 'Ada Lovelace', atMs: Date.now(), failed: false },
+    ]);
+    await mount();
+    await tapDot();
+
+    await pickRow('Ada Lovelace');
+    expect(screen.getByText(/Staff · reprint a name tag/i)).toBeTruthy();
+    await tap(/Back/);
+
+    expect(screen.getByText(/^Label printer$/i)).toBeTruthy();
+    await tap(/Done — back to check-in/i);
+    expect(screen.getByText('Sunday Nursery')).toBeTruthy();
+  });
+});

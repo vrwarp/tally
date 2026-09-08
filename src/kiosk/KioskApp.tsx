@@ -158,14 +158,30 @@ export type KioskRefresh = 'idle' | 'refreshing' | 'done' | 'failed';
 type SiblingOverlay = { kind: 'sibling'; from: ConfirmOverlay };
 
 /**
+ * The printer screen, and where its **Done** goes.
+ *
+ * Two doors onto it now. `staff` is the old one, behind the two-second hold on
+ * Clear, and **Done** goes back to the staff screen the volunteer was on.
+ * `home` is the amber dot in the corner of the search screen — one tap from a
+ * parent-facing screen, so **Done** returns straight to it rather than dropping
+ * somebody who only wanted to know what the dot meant onto a staff screen they
+ * never asked for.
+ */
+type PrinterOverlay = { kind: 'printer'; from: 'staff' | 'home' };
+
+/**
  * Where a reprint confirm was opened from, so Back is a return.
  *
  * The two doors onto the same act — find a name, or pick a row out of the
  * evening's log — go through one confirm, and a volunteer who backs out of it
  * belongs on the screen they came from rather than on whichever one the code
  * happens to name first.
+ *
+ * The printer's door is carried whole rather than named, the way `SiblingOverlay`
+ * carries its confirm: that screen now has two ways in of its own, and a return
+ * that rebuilt it from the word "printer" would forget which of them was used.
  */
-type ReprintFrom = 'reprint' | 'printer';
+type ReprintFrom = 'reprint' | PrinterOverlay;
 
 type Overlay =
   | ConfirmOverlay
@@ -187,7 +203,7 @@ type Overlay =
   | { kind: 'staff' }
   | { kind: 'reprint' }
   | { kind: 'reprint-confirm'; student: KioskStudent; from: ReprintFrom }
-  | { kind: 'printer' }
+  | PrinterOverlay
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
   /**
    * The refusal — a check-in offered to a gathering that has not opened yet.
@@ -1739,6 +1755,26 @@ export function KioskApp() {
    */
   const onStaffGate = useCallback(() => setOverlay({ kind: 'staff' }), []);
 
+  /**
+   * The amber dot, tapped.
+   *
+   * The one door onto a staff screen that is not behind the two-second hold,
+   * and it is the right one to open: the dot is the only thing on this kiosk
+   * that says the printer has stopped, so the thing that says it should be the
+   * thing that explains it. **Done** on that screen comes back here — see
+   * `PrinterOverlay`.
+   *
+   * A `useCallback`, and the identity is the point: this rides into the
+   * memoized header, which exists so that a keystroke does not re-render it.
+   *
+   * The trailing click of this tap is somebody else's problem already —
+   * `useOrphanClickGuard` keys on the overlay, so the click that lands after
+   * the printer screen has arrived is not an act on it. That guard was written
+   * for this exact accident on the staff screen's own door, where the click
+   * landed on **Choose a different printer**.
+   */
+  const onPrinterDot = useCallback(() => setOverlay({ kind: 'printer', from: 'home' }), []);
+
   /* ---- Registration ------------------------------------------------------- */
 
   /*
@@ -2212,7 +2248,7 @@ export function KioskApp() {
               setSentId(null);
               setOverlay({ kind: 'reprint' });
             }}
-            onPrinter={() => setOverlay({ kind: 'printer' })}
+            onPrinter={() => setOverlay({ kind: 'printer', from: 'staff' })}
             onChangeEvent={() => setOverlay({ kind: 'unbind' })}
             onStay={leaveStaff}
           />
@@ -2241,12 +2277,12 @@ export function KioskApp() {
             printerNeedsAttention={printerUnready}
             onPrint={() => {
               reprintFor(overlay.student);
-              setOverlay({ kind: overlay.from === 'printer' ? 'printer' : 'reprint' });
+              setOverlay(overlay.from === 'reprint' ? { kind: 'reprint' } : overlay.from);
             }}
             onBack={() => {
               // Backed out, so the raster warmed on the way in is not wanted.
               printing?.forgetLabel(overlay.student.id);
-              setOverlay({ kind: overlay.from === 'printer' ? 'printer' : 'reprint' });
+              setOverlay(overlay.from === 'reprint' ? { kind: 'reprint' } : overlay.from);
             }}
           />
         ) : (
@@ -2269,7 +2305,9 @@ export function KioskApp() {
               const student = students.find((row) => row.id === label.studentId);
               if (student) {
                 printing?.warmLabel(grades, locale, student, binding);
-                setOverlay({ kind: 'reprint-confirm', student, from: 'printer' });
+                // The door itself rather than the word: this screen has two
+                // ways in, and Back has to come home to the one that was used.
+                setOverlay({ kind: 'reprint-confirm', student, from: overlay });
               }
             }}
             onReprintByName={() => {
@@ -2277,9 +2315,14 @@ export function KioskApp() {
               setSentId(null);
               setOverlay({ kind: 'reprint' });
             }}
+            returnsTo={overlay.from === 'home' ? 'check-in' : 'staff'}
             onDone={() => {
               setPrinterConfig(readPrinterConfig());
-              setOverlay({ kind: 'staff' });
+              // Opened from the dot, so **Done** is a return to the screen the
+              // dot is on — `leaveStaff` rather than the staff screen, because
+              // the buffer and the sent row belong to a flow nobody entered.
+              if (overlay.from === 'home') leaveStaff();
+              else setOverlay({ kind: 'staff' });
             }}
           />
         );
@@ -2440,6 +2483,7 @@ export function KioskApp() {
         // Only "trouble" — a kiosk with no printer is not a kiosk with a broken
         // one, and neither is one whose printer is simply unpaired.
         printerNeedsAttention={printerState?.kind === 'trouble'}
+        onPrinter={onPrinterDot}
         // Mounted, not merely configured: the header's token step exists for
         // the photograph actually behind the glass, and until the pixels have
         // resolved there is nothing behind it but the page.
