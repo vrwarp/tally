@@ -40,6 +40,7 @@ import { findEventIcon } from '@/lib/eventIcons';
 import { eventWindow, type KioskBinding } from '@/kiosk/binding';
 import { Backdrop } from '@/kiosk/components/Backdrop';
 import type { KioskKey } from '@/kiosk/components/Keyboard';
+import { KioskIntlProvider } from '@/kiosk/KioskIntlProvider';
 import { RegistrationFlow } from '@/kiosk/registration/RegistrationFlow';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
 import { ChangeEventScreen } from '@/kiosk/screens/ChangeEventScreen';
@@ -396,4 +397,16 @@ export function Kiosk() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Kiosk />);
+/*
+ * The same provider `src/kiosk/main.tsx` mounts, and for the same reason: every
+ * screen here reads its words through `useTranslations`, so without it the
+ * harness renders an exception instead of a kiosk — which is what it did, in
+ * silence, from the day the kiosk was translated. A shooter that writes a frame
+ * per scene whatever the page contains cannot notice; the frames are only
+ * useless.
+ */
+createRoot(document.getElementById('root')!).render(
+  <KioskIntlProvider>
+    <Kiosk />
+  </KioskIntlProvider>,
+);
