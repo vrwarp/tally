@@ -171,6 +171,17 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
   // The events empty state tells a leader to press a button by name, so it has
   // to keep saying whatever that button currently says.
   { message: 'Events.emptyBody', quotes: 'Events.newEvent' },
+  /*
+   * The same duty, and the pin that was missing when it was needed.
+   *
+   * `Backends.pcoQueued` tells a leader to press a badge by name. The badge was
+   * renamed to "Not sent yet" during the English copy audit and this sentence
+   * went on saying "Queued" — so the instruction was unfollowable in English
+   * before it was unfollowable in Chinese, and it stayed that way until a
+   * Simplified reviewer read the two strings side by side. One entry here would
+   * have failed the build the day the badge moved.
+   */
+  { message: 'Backends.pcoQueued', quotes: 'Students.badgeQueued' },
 ];
 
 /**

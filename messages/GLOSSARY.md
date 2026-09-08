@@ -26,16 +26,18 @@ of `zh-Hans`: 登录→登錄 is a real word and the wrong one — Taiwan says �
 | admin | 管理员 | 管理員 | |
 | grade | 年级 | 年級 | Pre-K through 12th |
 | allergy / allergies | 过敏 | 過敏 | the label carries it; the roster only records *that* there is one |
-| kiosk | 签到台 | 簽到台 | what a parent sees it as, not the hardware |
+| kiosk | 签到台 | 簽到台 | the tablet a parent touches — not the hardware, and not the desk below |
+| check-in desk (staffed) | 接待台 | 服務台 | the counter with a person behind it; NEVER 签到台 / 簽到台 |
 | label | 名牌 | 名牌 | the printed sticker a child wears |
 | printer | 打印机 | 印表機 | vocabulary divergence |
 | RSVP | 报名 | 報名 | |
 | registration | 登记 | 登記 | what a family fills in at the kiosk |
 | review / held | 待审核 | 待審核 | the queue a registration waits in |
 | merge | 合并 | 合併 | vocabulary divergence |
-| MIA (missed in a row) | 连续缺席 | 連續缺席 | never the English initialism |
+| MIA, the count | 连续缺席 | 連續缺席 | never the English initialism |
+| stopped coming, the list | 久未出现 | 久未出現 | an observation, not a verdict on a teenager |
 | insights | 概览 | 概覽 | the core team's screen |
-| release (a student) | 结束跟进 | 結束跟進 | stop chasing them; not 释放 / 釋放 |
+| no longer expected (at a gathering) | 不再算应到 | 不再預期出席 | see the note below — the two scripts diverge on purpose |
 | follow up | 跟进 | 跟進 | |
 | profile | 个人资料 | 個人資料 | |
 | contact | 联系方式 | 聯絡方式 | vocabulary divergence |
@@ -48,6 +50,34 @@ of `zh-Hans`: 登录→登錄 is a real word and the wrong one — Taiwan says �
 | export | 导出 | 匯出 | vocabulary divergence |
 | settings | 设置 | 設定 | vocabulary divergence |
 | Planning Center | Planning Center | Planning Center | a product name; never translated |
+
+The **no longer expected** row is the one place the two catalogues use different
+*constructions* rather than different words, and the divergence is grammatical
+rather than regional.
+
+The action removes a student from one gathering's expected list. It is not
+`release` — no English control says that word; the buttons say "Stop expecting
+them" and "No longer expected here", and `release` survives only inside two
+consequence sentences as a back-reference. It is not 结束跟进 / 結束跟進 either:
+`Release.hintMovedOn` says follow-up *continues* in the moved-on branch, so that
+term is false for half the feature. And it is not 不再列入, which wants an object
+and reads as removal from the roster beside the neighbouring 从名单移除.
+
+`zh-Hant` takes **不再預期出席**, because 預期 is already how this catalogue
+renders English *expect* everywhere else. 預期 is transitive with the expecter as
+its subject, so the student must sit in the object slot — 不再預期 {name} 出席,
+不再預期 {count} 人出席 — never the subject, or the line says the students
+stopped expecting.
+
+`zh-Hans` takes **不再算应到**, because in mainland Mandarin 预期 is forecast
+register (比预期久) and the roll-call sense belongs to 应到／实到. 应到 is
+lexically passive — "due to arrive" — so the student is the correct subject and
+the slot problem does not arise.
+
+Scope is carried by an adverbial in both: 这里不再算应到 /
+不再預期出席這場聚會. In `Mia.noLongerExpectedAt` the 在 is load-bearing —
+without it the filled `{gathering}` becomes the subject and the line says the
+gathering is no longer expected.
 
 Register: parents at the kiosk are addressed as 您 — they are guests in the
 lobby and the screen is speaking to them directly. Staff-facing screens use 你.

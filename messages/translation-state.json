@@ -2666,6 +2666,12 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Settings.miaAfterMissesHint": {
+    "source": "{count, plural, one {Flag a student after # missed gathering in a row.} other {Flag a student after # missed gatherings in a row.}}",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine",
+    "context": "Hint under the \"Misses in a row\" stepper on Settings. Restates the number as the behaviour it causes. Was a hardcoded English template literal in SettingsPage.tsx and rendered English on both Chinese locales."
+  },
   "Settings.newVisitorWindow": {
     "source": "Days on the “New faces” list",
     "zh-Hans": "machine",
@@ -2982,7 +2988,7 @@
     "zh-Hant": "machine"
   },
   "Backends.pcoQueued": {
-    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Push them from the Queued badge on their roster row.",
+    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Push them from the Not sent yet badge on their roster row.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
