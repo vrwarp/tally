@@ -679,6 +679,86 @@ describe('the four things a parent touches', () => {
     );
   });
 
+  it('keeps the question being asked on the glass, however long the run is', async () => {
+    /*
+     * The list settles at the end of the run, and on the shortest glass that is
+     * how the accent went missing: a first registration is seven rows and two
+     * headings, a phone holds five, so the row wearing "here" was scrolled off
+     * the top of the very screen asking for it — with a parent looking at
+     * "Child's first name" over four empty boxes, none of them lit.
+     *
+     * jsdom has no layout, so what is pinned here is the instruction rather
+     * than the pixels: the row the run is on is the one asked to come into
+     * view, at every step and on the first frame of the wizard. The frames are
+     * in `uxr/kiosk-live` — `register-first--phone` is the one this is about.
+     */
+    const shown: Element[] = [];
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      shown.push(this);
+    });
+
+    await mount();
+    await tap(/Register your child/);
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-child-0-child-first'));
+
+    await type('Robin');
+    await tap('Next');
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-child-0-child-last'));
+
+    await tap('Clear');
+    await type('Fields');
+    await tap('Next');
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-child-0-child-grade'));
+
+    await tap('4');
+    await tap('Next');
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-adult-guardian-first'));
+  });
+
+  it('follows a reopened row even when the step it lands on has not changed', async () => {
+    /*
+     * The second child's first name and the first child's first name are the
+     * same step, so a parent on the former who taps the latter moves the accent
+     * without moving `step` — and a list scrolled per step would sit still,
+     * leaving the row they just asked to fix off the top of a list now nine
+     * rows long. `editing` is what tells the two apart, which is why it is
+     * watched alongside the step.
+     */
+    const shown: Element[] = [];
+    vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      shown.push(this);
+    });
+
+    await mount();
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    await tap('Add another child');
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-child-1-child-first'));
+
+    await tapRow('child-0-child-first');
+    expect(shown.at(-1)).toBe(screen.getByTestId('question-child-0-child-first'));
+  });
+
+  it('gives the row outlines room inside the box that clips them', async () => {
+    /*
+     * A box that scrolls clips on both axes — there is no "scroll down, spill
+     * sideways" — and it clips at its padding edge, while a ring is drawn as a
+     * shadow *outside* the border box. With the gutter around the scroller
+     * instead of on it, every unanswered row lost its left and right strokes
+     * and the list read as a stack of open-ended lines. The frame that showed
+     * it is `register-first--phone`.
+     */
+    await mount();
+    await tap(/Register your child/);
+    const list = screen.getByTestId('question-child-0-child-first').closest('.overflow-y-auto');
+    expect(list).toHaveClass('px-6');
+  });
+
   it('reopens the child a parent backs out of, rather than a nameless one', async () => {
     /*
      * Banking the child mints a blank draft behind them, so a parent who

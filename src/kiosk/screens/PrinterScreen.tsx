@@ -411,8 +411,15 @@ export function PrinterScreen({
                     className={`flex h-14 w-full shrink-0 items-center justify-between rounded-lg bg-ink-800 px-4 text-left active:bg-ink-700 kiosk:h-16 ${
                       /* The row a volunteer most wants — a label that never came
                          out — was distinguished by fourteen pixels of amber text
-                         on the right edge of a five-row list. */
-                      entry.failed ? 'ring-1 ring-warn-500/40' : ''
+                         on the right edge of a five-row list.
+
+                         Inset, because this list scrolls: a scrolling box clips
+                         at its padding edge on both axes, and there is no gutter
+                         between these rows and that edge — so an outer ring,
+                         which a browser draws outside the border box, arrived
+                         with its left and right strokes shaved off. The same
+                         defect the register's question list had. */
+                      entry.failed ? 'inset-ring-1 inset-ring-warn-500/40' : ''
                     }`}
                   >
                     <span className="min-w-0 truncate text-base font-semibold text-ink-100 kiosk:text-lg">
