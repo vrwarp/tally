@@ -42,9 +42,12 @@ const ADA: KioskStudent = {
  */
 const ENGLISH_PROMPT = /^type a name$/i;
 /*
- * Not 請輸入姓名 — the Chinese copy review rewrote this prompt to name the keys
- * the lobby keyboard actually makes, because a Chinese-named child IS findable
- * here through pinyin and a bare 姓名 sends a parent hunting for an IME.
+ * Not 請輸入姓名 — the prompt names the keys the lobby keyboard actually makes,
+ * because a bare 姓名 sends a parent hunting for an IME that is not on the
+ * glass. It deliberately promises nothing about *matching*: `withPinyin` can
+ * only widen a name somebody entered in Chinese upstream, and nothing
+ * standardises that, so the screen states a fact about the keyboard rather than
+ * a claim about the roster.
  */
 const CHINESE_PROMPT = '請用英文字母輸入姓名';
 
