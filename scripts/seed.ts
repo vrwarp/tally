@@ -33,6 +33,7 @@ import {
   writeBatch,
   type Firestore,
 } from 'firebase/firestore';
+import { HISTORY_WEEKS, rosterAnchor } from './seedCalendar';
 import type { KioskTheme } from '../src/lib/kioskTheme';
 import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from '../src/lib/labelTemplate';
 import { SERIES_IDS, paths } from '../src/lib/paths';
@@ -185,29 +186,6 @@ function isoDay(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const dayOfMonth = `${date.getDate()}`.padStart(2, '0');
   return `${date.getFullYear()}-${month}-${dayOfMonth}`;
-}
-
-/**
- * The most recent September 1st that is comfortably behind `now` — when the
- * roster was set up.
- *
- * This used to anchor on the *calendar* school year, treating August as
- * already belonging to the next one — so for the whole of August (and the
- * first days of each September) it returned a date in the future. The two
- * fallbacks built on it then poisoned every derivation at once: `createdAt`
- * said no regular could have attended anything (MIA count 0), and
- * `firstAttendedAt` put the entire roster inside the New Visitors window
- * (42 "new faces"). The dashboard e2e suite failed for a month each year,
- * starting at midnight UTC on August 1st.
- *
- * A week's margin, not a day's: the `firstAttendedAt` fallback sits five days
- * after this date and must itself stay in the past.
- */
-function schoolYearStart(now: Date): Date {
-  const candidate = new Date(now.getFullYear(), 8, 1, 9, 0, 0, 0);
-  return addDays(candidate, 7) <= now
-    ? candidate
-    : new Date(now.getFullYear() - 1, 8, 1, 9, 0, 0, 0);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -682,7 +660,15 @@ function buildEvents(now: Date): BuiltEvent[] {
     }
   };
 
-  addWeekly(SERIES_IDS.fridayFellowship, 'Friday Fellowship', friday.startAt, friday.endAt, 8);
+  // `HISTORY_WEEKS`, not an 8: `rosterAnchor` has to stand behind whatever
+  // this is, and a literal here is how the two came apart. See seedCalendar.ts.
+  addWeekly(
+    SERIES_IDS.fridayFellowship,
+    'Friday Fellowship',
+    friday.startAt,
+    friday.endAt,
+    HISTORY_WEEKS,
+  );
   addWeekly(SERIES_IDS.sundaySchool, 'Sunday School', sunday.startAt, sunday.endAt, 6);
 
   // The retreat sits four weeks out, far enough ahead that the RSVP list is
@@ -865,7 +851,7 @@ function isQuickAddBand(band: Band): boolean {
 }
 
 function buildStudents(now: Date, rng: () => number): BuiltStudent[] {
-  const yearStart = schoolYearStart(now);
+  const yearStart = rosterAnchor(now);
 
   return SEED_STUDENTS.map((seed, index) => {
     const isQuickAdd = isQuickAddBand(seed.band);
@@ -932,7 +918,7 @@ function buildAttendance(
 
   const driftCutoff = new Date(now.getTime() - 28 * DAY_MS);
   const departureCutoff = new Date(now.getTime() - 45 * DAY_MS);
-  const yearStart = schoolYearStart(now);
+  const yearStart = rosterAnchor(now);
 
   const rows: AttendanceRow[] = [];
   const firstEver = new Set<string>();
@@ -1180,8 +1166,8 @@ function collectWrites(now: Date): {
         labelTemplate: event.labelTemplate,
         kioskTheme: event.kioskTheme,
         status: 'scheduled',
-        createdAt: schoolYearStart(now),
-        updatedAt: schoolYearStart(now),
+        createdAt: rosterAnchor(now),
+        updatedAt: rosterAnchor(now),
         createdBy: SEED_AUTHOR,
       },
     });
@@ -1307,7 +1293,7 @@ function collectWrites(now: Date): {
       data: {
         email: member.email,
         role: member.role,
-        invitedAt: schoolYearStart(now),
+        invitedAt: rosterAnchor(now),
         invitedBy: SEED_AUTHOR,
       },
     });

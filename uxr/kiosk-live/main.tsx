@@ -385,6 +385,7 @@ export function Kiosk() {
       checkedOutIds={new Set()}
       tracksCheckOut={binding.requiresCheckOut ?? false}
       printerNeedsAttention={params.get('printer') === '1'}
+      onPrinter={() => {}}
       backdrop={photoUrl !== null}
       refresh="idle"
       widening={false}

@@ -275,10 +275,13 @@ A parent is never told. A red line beside a green tick reads as "your check-in
 failed", and a parent cannot fix a printer anyway.
 
 What appears instead is a small **amber dot in the top-right corner of the search
-screen**. Hold **Clear** for two seconds, open the printer screen from the staff
-screen, and it says what is actually wrong — cover open, out of media, unplugged,
-or another program holding the device. The staff reprint screens say so in words,
-because a volunteer standing there *can* do something about it.
+screen**. **Tap the dot** and the printer screen opens on the spot, saying what is
+actually wrong — cover open, out of media, unplugged, or another program holding
+the device — and **Done — back to check-in** hands the kiosk straight back to the
+lobby. (The old way in is still there: hold **Clear** for two seconds and take
+**Label printer** off the staff screen. **Done** returns to the staff screen from
+that door, because that is where the volunteer was.) The staff reprint screens say
+so in words too, because a volunteer standing there *can* do something about it.
 
 ### What the kiosk does on its own
 

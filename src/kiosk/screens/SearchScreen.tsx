@@ -140,12 +140,19 @@ const SearchHeader = memo(function SearchHeader({
   title,
   line,
   printerNeedsAttention,
+  onPrinter,
 }: {
   iconPath: string | null | undefined;
   title: string;
   /** The line under the title, already decided: the hours, opens-at, or closed. */
   line: string;
   printerNeedsAttention: boolean;
+  /**
+   * Open the printer screen. Reached only through the dot, so it is only ever
+   * called on a kiosk whose printer is in trouble — and it has to be stable,
+   * because this memo is what keeps the header out of every keystroke.
+   */
+  onPrinter: () => void;
 }) {
   /*
    * The hours line's photograph step (ink-500 → ink-300 while the picture is
@@ -158,6 +165,7 @@ const SearchHeader = memo(function SearchHeader({
    */
   tallyRender('SearchHeader');
   const t = useTranslations('Search');
+  const tap = useTap();
   return (
     /* The staff gate used to be an invisible square over this corner; it is a
        hold on **Clear** now — see `onStaffGate`. */
@@ -171,14 +179,36 @@ const SearchHeader = memo(function SearchHeader({
         * that a keystroke changes text and never geometry, and a warning that
         * appears mid-evening must not push the results down by a line.
         *
-        * What a volunteer does about it is hold the opposite corner and look
-        * at the printer screen, which says what is actually wrong.
+        * It is also the way in. The dot is the only thing on the kiosk that
+        * knows the printer has stopped, and until now a volunteer who saw it
+        * had to hold **Clear** for two seconds and then find **Label printer**
+        * behind the gate — three deliberate acts to answer a question the
+        * corner of the screen had already asked. Tapping it opens the printer
+        * screen, and **Done** there comes straight back here rather than
+        * leaving somebody on a staff screen they never asked for.
+        *
+        * The dot stays 12px because it is the same warning it was; the button
+        * around it is 44 and reaches the corner, so the target is a thumb's
+        * worth of glass while the mark on it is still a mark. Geometry is
+        * unchanged either way — it is absolute, and the button is drawn
+        * concentric with the dot it replaced.
         */}
       {printerNeedsAttention && (
-        <span
+        <button
+          type="button"
+          tabIndex={-1}
           aria-label={t('printerNeedsAttention')}
-          className="absolute top-[max(1rem,var(--spacing-safe-top))] right-4 h-3 w-3 rounded-full bg-warn-500"
-        />
+          {...tap(() => {
+            // The quiet buzz the standing chips wear, not the door's: this is a
+            // mark in a corner, and it answers like one.
+            haptic(8);
+            onPrinter();
+          })}
+          className="absolute top-[calc(max(1rem,var(--spacing-safe-top))-1rem)] right-0 flex h-11 w-11 items-center justify-center rounded-full active:bg-ink-800"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <span className="block h-3 w-3 rounded-full bg-warn-500" />
+        </button>
       )}
       {/*
         * The header answers *where and when*, and nothing else.
@@ -449,6 +479,7 @@ export function SearchScreen({
   checkedOutIds,
   tracksCheckOut,
   printerNeedsAttention,
+  onPrinter,
   backdrop,
   refresh,
   widening,
@@ -466,6 +497,8 @@ export function SearchScreen({
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
   printerNeedsAttention: boolean;
+  /** What the dot opens — the printer screen. See SearchHeader. */
+  onPrinter: () => void;
   /** The gathering's photograph is mounted behind this screen. See SearchHeader. */
   backdrop: boolean;
   /**
@@ -762,6 +795,7 @@ export function SearchScreen({
         title={binding.title}
         line={headerLine}
         printerNeedsAttention={printerNeedsAttention}
+        onPrinter={onPrinter}
       />
 
       {/*

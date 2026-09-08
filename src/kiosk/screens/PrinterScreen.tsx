@@ -167,6 +167,7 @@ export function PrinterScreen({
   printedTonight,
   onReprint,
   onReprintByName,
+  returnsTo = 'staff',
   onDone,
 }: {
   printing: KioskPrinting;
@@ -191,9 +192,22 @@ export function PrinterScreen({
    * reprint could be aimed at, so the door is not drawn rather than drawn dead.
    */
   onReprintByName?: () => void;
+  /**
+   * Where **Done** goes, because the button has to say so.
+   *
+   * This screen has two ways in — the staff screen behind the hold on Clear,
+   * and the amber dot on the check-in screen — and the way out follows the way
+   * in. A volunteer who tapped the dot to find out what it meant is one tap
+   * from the lobby's own screen again, and the button says as much rather than
+   * making them find out by pressing it.
+   */
+  returnsTo?: 'staff' | 'check-in';
   onDone: () => void;
 }) {
   const t = useTranslations('Printer');
+  // The staff flow's own word for the way out, borrowed for the one entrance
+  // that has one: the reprint screen has said it this way since it shipped.
+  const tStaff = useTranslations('Staff');
   // The kiosk's language, for the log's clock times and the test label.
   const locale = useLocale();
   // The log's five ages, in the shape `describeAge` takes — see `AgeStrings`.
@@ -737,9 +751,12 @@ export function PrinterScreen({
           type="button"
           tabIndex={-1}
           {...tap(onDone)}
-          className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
+          /* `min-w-0 shrink truncate`, because this button has two labels now
+             and the longer one names where it goes — the same shape the reprint
+             screen's way out already wears for the same sentence. */
+          className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
         >
-          {t('done')}
+          {returnsTo === 'check-in' ? tStaff('doneBackToCheckIn') : t('done')}
         </button>
       </div>
     </div>
