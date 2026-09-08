@@ -74,6 +74,18 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
    * once the copy audit retired "MIA" and both landed on the same plain words.
    */
   ['Dashboard.tileMia', 'Mia.title'],
+
+  /*
+   * The kiosk's own prompt, and the preview of it a leader sees while choosing a
+   * backdrop photograph in the event editor.
+   *
+   * Added after they drifted. The Chinese copy review rewrote the kiosk prompt
+   * and left the preview saying the old thing, so `KioskBackdropField` showed a
+   * leader a screen the lobby does not have — the one defect a preview exists
+   * to make impossible. Same English, so nothing in a catalogue comparison
+   * could see it.
+   */
+  ['Search.typeAName', 'KioskBackdrop.previewTypeAName'],
   ['Team.title', 'Nav.team'],
   ['Settings.title', 'Nav.settings'],
 

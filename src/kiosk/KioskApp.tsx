@@ -82,6 +82,8 @@ import { SuccessScreen } from './screens/SuccessScreen';
 import { NotOpenScreen } from './screens/NotOpenScreen';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
+import type { Locale } from '@/lib/locales';
+import { useLocaleControl } from '@/i18n/localeContext';
 
 export type KioskServices = typeof ServicesModule;
 export type KioskPrinting = typeof PrintingModule;
@@ -276,6 +278,33 @@ const MIN_WIDEN_SPINNER_MS = 1_500;
 const ABANDONED_MS = 2 * 60_000;
 
 /**
+ * What the glass goes back to speaking when nobody is using it.
+ *
+ * A language on a lobby kiosk is something one family chose, not a setting the
+ * tablet holds. The people behind them are strangers to them, and a screen left
+ * in somebody else's script is one more thing to get past before they can
+ * start — the chip's own purpose wearing the opposite face.
+ *
+ * English rather than "whatever it was set to at pairing", because this app's
+ * house language is English and the Chinese is the accommodation. A church
+ * whose lobby is Chinese-first would want the resting language to be a
+ * property of the mount instead; that is a different feature, and this constant
+ * is where it would begin.
+ */
+const RESTING_LOCALE: Locale = 'en';
+
+/**
+ * How long a language nobody is touching stays on the home screen.
+ *
+ * Long enough to read the screen it was chosen for — the chip sits on the
+ * search screen and the next thing after it is typing a name — and short enough
+ * that the family after does not inherit it. Between the staff gate's
+ * forty-five seconds and the wizard's ninety, under `ABANDONED_MS`'s two-minute
+ * backstop, so it is never also the clock that clears somebody's typing.
+ */
+const LANGUAGE_RESET_MS = 60_000;
+
+/**
  * What the reprint search shows while nobody has that screen open.
  *
  * One frozen object rather than a fresh `{ results: [] }` per render, so the
@@ -327,6 +356,7 @@ export function KioskApp() {
   // The kiosk's own language, not the browser's — the dates and times below
   // are formatted against it. See `eventWindow` in binding.ts.
   const locale = useLocale();
+  const { setLocale } = useLocaleControl();
   // The connector `opensAtLabel` needs; see there for why it is handed in.
   const dayAtTime = useCallback(
     (values: { day: string; time: string }) => tDoor('dayAtTime', values),
@@ -466,6 +496,53 @@ export function KioskApp() {
       window.removeEventListener('keydown', touched, { capture: true });
     };
   }, []);
+
+  /*
+   * The language goes home when the family does.
+   *
+   * Two ways back, because there are two ways to stop using a kiosk. One is to
+   * finish — the check-in lands, the success screen thanks them by name, and
+   * four seconds later the glass is the front door again. That is an edge, and
+   * `awayRef` catches it, so the queue behind them meets English. The other is
+   * to drift off mid-thought, which no transition marks at all; the clock below
+   * asks how long ago the glass was last touched instead.
+   *
+   * Keyed on leaving-and-returning rather than on `calm`, and the difference is
+   * a real case: clearing a mistyped name empties the buffer without anybody
+   * having gone anywhere, and a parent who lost their language for pressing
+   * Clear would have to find the chip again in the middle of their own search.
+   *
+   * `phase === 'ready'` scopes all of it to the family-facing screen. Pairing,
+   * printer setup and the chooser belong to a volunteer, and a language picked
+   * while mounting the tablet is a decision rather than a leftover.
+   */
+  const away = overlay !== null || registering !== null;
+  const awayRef = useRef(away);
+  useEffect(() => {
+    const cameHome = awayRef.current && !away;
+    awayRef.current = away;
+    if (phase === 'ready' && cameHome) setLocale(RESTING_LOCALE);
+  }, [away, phase, setLocale]);
+
+  useEffect(() => {
+    if (phase !== 'ready' || away || locale === RESTING_LOCALE) return;
+    /*
+     * Re-armed rather than polled: a touch moves the deadline without causing a
+     * render, so the timer has to re-read `touchedAtRef` when it fires and wait
+     * out whatever is left rather than assume the deadline it was set for.
+     */
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      const since = Date.now() - touchedAtRef.current;
+      if (since >= LANGUAGE_RESET_MS) {
+        setLocale(RESTING_LOCALE);
+        return;
+      }
+      timer = setTimeout(check, LANGUAGE_RESET_MS - since);
+    };
+    timer = setTimeout(check, LANGUAGE_RESET_MS);
+    return () => clearTimeout(timer);
+  }, [away, locale, phase, setLocale]);
 
   /**
    * The pulse revisions this kiosk last acted on — seeded from disk, so the
