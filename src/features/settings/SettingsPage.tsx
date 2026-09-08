@@ -227,9 +227,9 @@ export function SettingsPage() {
                     value={form.miaConsecutiveMisses}
                     onValueChange={setNumber('miaConsecutiveMisses')}
                     error={errors.miaConsecutiveMisses}
-                    hint={`Flag a student after ${Math.max(1, form.miaConsecutiveMisses)} missed ${
-                      form.miaConsecutiveMisses === 1 ? 'gathering' : 'gatherings'
-                    } in a row.`}
+                    hint={t('miaAfterMissesHint', {
+                      count: Math.max(1, form.miaConsecutiveMisses),
+                    })}
                   />
                   <NumberStepperField
                     label={t('newVisitorWindow')}

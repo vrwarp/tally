@@ -129,6 +129,69 @@ describe('messageArguments', () => {
     expect(messageArguments('Hello { name }')).toEqual(['{name}']);
   });
 
+  /*
+   * The four below exist because the mutation gate found them, and each one is
+   * a rule this function has to enforce rather than a line it happens to run.
+   * The gate covers `translationState.ts` alone on a branch that only touches
+   * it, so a survivor here is the difference between a passing and a failing
+   * build — but the reason to want them is that every one describes a way a
+   * translated catalogue could silently disagree with `en.json`.
+   */
+
+  it('ignores braces that do not hold an argument name', () => {
+    // A stray brace in prose is not an argument, and treating it as one would
+    // make en.json disagree with a translation that punctuated differently.
+    expect(messageArguments('Press {the big button} to go on')).toEqual([]);
+    expect(messageArguments('{}')).toEqual([]);
+    expect(messageArguments('a {b-c} d')).toEqual([]);
+  });
+
+  it('walks the branches of a plural, select or selectordinal and nothing else', () => {
+    // The branch bodies of a submessage are messages, so an argument inside one
+    // is real: this is the case the walker exists for.
+    expect(messageArguments('{n, plural, one {# of {total}} other {# of {total}}}')).toEqual([
+      '{n}',
+      '{total}',
+    ]);
+    /*
+     * A `date` or `number` argument has a style, not branches. Its braces —
+     * ICU skeletons use them — are formatting syntax, and anything read out of
+     * them would be an argument the catalogue does not have.
+     */
+    expect(messageArguments('{when, date, {skeleton}}')).toEqual(['{when}']);
+  });
+
+  it('stops at an unclosed brace instead of reading past the end', () => {
+    /*
+     * Malformed input reaches this from a half-finished translation, and the
+     * answer is nothing rather than a throw or a hang. Nothing rather than a
+     * partial answer is the right one: an unclosed brace means the outer
+     * argument never closed either, so there is no argument here that the
+     * catalogue could be held to.
+     */
+    expect(messageArguments('{count, plural, other {# of {total}')).toEqual([]);
+    expect(messageArguments('Hello {name')).toEqual([]);
+  });
+});
+
+describe('unflatten, on keys the catalogue does not have', () => {
+  it('skips a key in the order that the map is missing', () => {
+    /*
+     * `order` is en.json's key list and the map is a translation, so a key the
+     * translation has not reached yet is absent. Writing it as `undefined`
+     * would put a null into the catalogue and fail the "no empty messages"
+     * test with a confusing message; skipping leaves the key genuinely missing,
+     * which is what the parity test is there to report.
+     */
+    const flat = new Map([
+      ['A.one', 'first'],
+      ['A.three', 'third'],
+    ]);
+    const out = unflatten(flat, ['A.one', 'A.two', 'A.three']);
+    expect(out).toEqual({ A: { one: 'first', three: 'third' } });
+    expect(Object.keys(out.A as Record<string, unknown>)).toEqual(['one', 'three']);
+  });
+
   it('has nothing to say about a message with no arguments in it', () => {
     expect(messageArguments('Just words.')).toEqual([]);
     expect(messageArguments('')).toEqual([]);
