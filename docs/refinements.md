@@ -344,11 +344,13 @@ the keys were easy to miss between. They were: 6px of air between two 73px
 plates is a seam a thumb cannot feel for, and a mistype on this board is silent
 — every key buzzes the same whether or not it was the one aimed at. Round 3's
 move ran again over the whole board rather than one row: every key gives up
-another 2px of height and ~1.8 of width, the gutter goes to 8px, the Z row's to
-20, and the twenty-cell track absorbs the width change on its own. Measured on
-all three glass shapes, the board occupies the same box it did — 390×320,
-800×360, 1024×320 — the pitch is unchanged, and the bar's centre is still the
-board's. The keyboard now shares the phone pad's gutter, which was 8px already.
+6px of height and ~3.6 of width, the gutter goes to 10px, the Z row's to 24,
+and the twenty-cell track absorbs the width change on its own. It took two
+passes — 8px read as still too tight on the glass, which is the argument for
+measuring a seam with a thumb rather than in a diff. Measured on all three
+glass shapes, the board occupies the same box it did — 390×320, 800×360,
+1024×320 — the pitch is unchanged, and the bar's centre is still the board's.
+A letter is 69×58 on the lobby tablet, where it was 73×62.
 
 Shipped: `centered-safe` — `Clear · space · ’ · -` on the twenty-cell track,
 Clear giving 8px to its bar side, every key 2px shorter, the punctuation legends

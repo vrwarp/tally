@@ -39,34 +39,34 @@
  * they meant (`docs/refinements.md`). Now every edge of the bottom row is an
  * edge of the rows above it and the bar's centre is the board's, to the pixel.
  *
- * The gutter is 8px, not the 6 the board shipped with. Six pixels between two
+ * The gutter is 10px, not the 6 the board shipped with. Six pixels between two
  * plates the size of a thumbprint is a seam a finger cannot feel for, and what
  * a parent notices is not the seam but the wrong letter in the readout — on
  * this board a mistype is silent, because every key buzzes the same whether it
- * was the one they aimed at or its neighbour. So every key gives up 2px of
- * height and ~1.8 of width and the gutters take what they gave: the pitch does
+ * was the one they aimed at or its neighbour. So every key gives up 6px of
+ * height and ~3.6 of width and the gutters take what they gave: the pitch does
  * not move, the board's width and height do not move, and a low or wide miss
  * lands on glass that types nothing rather than on the key next door. On the
- * 800px lobby tablet that is a 71px key in an 8px gutter, where it was 73 in 6.
- * Holding the board's own height is
- * not housekeeping — the grade grid stands exactly where this board stands
- * (see `GradeChips` in registration/RegistrationFlow.tsx) and the rule above
- * the console must not shift when the question changes.
+ * 800px lobby tablet that is a 69px key in a 10px gutter, where it was 73 in 6.
+ * Holding the board's own height is not housekeeping — the grade grid and the
+ * phone pad stand in this board's footprint on the wizard (see `GradeChips` and
+ * `PhonePad` in registration/) and the rule above the console must not shift
+ * when the question changes.
  *
  * The horizontal half of that comes free: the twenty fractional cells absorb
- * the wider gap on their own, 1.9px off each. The vertical half is paid for in
- * the key heights below — 4px off each of five rows is 20px, and it lands as
- * 2px on each of the three gutters between the letter rows and 14px on the one
+ * the wider gap on their own, 3.8px off each. The vertical half is paid for in
+ * the key heights below — 6px off each of five rows is 30px, and it lands as
+ * 4px on each of the three gutters between the letter rows and 18px on the one
  * under the Z row. That arithmetic is what `keyboardHeight` in haptics.test.tsx
  * holds to: the board is 304px of keys and gutters, 344 on a tall screen, and a
  * key height that changes without repaying it moves the console's top edge.
  *
  * Two seams on this board carry unequal consequences, and both get more air
- * than the 8px between two letters. Clear wipes the buffer with no undo, so it
+ * than the 10px between two letters. Clear wipes the buffer with no undo, so it
  * gives 8px back on its bar side — off Clear rather than off the bar, which
  * keeps the bar on its axis and its columns. And a correction is the commonest
  * gesture here: ⌫ sits over the hyphen and, on the wizard, ⇧ over Clear, so the
- * gutter above the bottom row is 20px where the board's is 8. A low miss lands
+ * gutter above the bottom row is 24px where the board's is 10. A low miss lands
  * on nothing. The board's height is unchanged and no row is a different height
  * from any other.
  */
@@ -102,11 +102,11 @@ const KEY_CLASS =
   /* `tall:` steps the keys up on a screen stood on end — see the variant's
      note in index.css. A kiosk is read and reached at arm's length by
      somebody standing, so a key that is comfortable in a hand is small on
-     a shelf. The two heights are 3.5rem and 4rem less 4px: the trim that pays
-     for the deeper gutter above the bottom row and for the board's 8px gutter
+     a shelf. The two heights are 3.5rem and 4rem less 6px: the trim that pays
+     for the deeper gutter above the bottom row and for the board's 10px gutter
      everywhere else (see the header), invisible on its own and the same on
      every row. */
-  'flex h-[3.25rem] min-w-0 select-none items-center justify-center rounded-lg ' +
+  'flex h-[3.125rem] min-w-0 select-none items-center justify-center rounded-lg ' +
   /* Solid here, tinted by context: while the gathering's photograph is up,
      the search screen's `kiosk-has-backdrop` class turns these fills to 80%
      glass (see index.css) — the room glints in the gutters, the caps hold
@@ -114,14 +114,14 @@ const KEY_CLASS =
      is the feedback. Every screen without that class, the wizard's and the
      reprint search's keyboards included, keeps this keyboard byte-identical
      to the one that shipped. */
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-[3.75rem] kiosk:text-2xl';
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-[3.625rem] kiosk:text-2xl';
 
 /*
  * One row of the track. Twenty cells rather than ten so the home row's
  * half-key stagger and the Z row's key-and-a-half flanks are whole cells too;
  * `col-span-*` on each key is the whole of a key's geometry.
  */
-const ROW_CLASS = 'grid grid-cols-[repeat(20,minmax(0,1fr))] gap-2';
+const ROW_CLASS = 'grid grid-cols-[repeat(20,minmax(0,1fr))] gap-2.5';
 
 /*
  * The two marks a name can carry, set as key labels rather than as raw glyphs.
@@ -257,7 +257,7 @@ export const Keyboard = memo(function Keyboard({
          became the largest empty rectangle in the frame. Capped to the measure
          the results and the readout sit on, the keys stay a family across the
          three shapes and the screen has one left edge instead of two. */
-      className="mx-auto flex w-full flex-col gap-2 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0"
+      className="mx-auto flex w-full flex-col gap-2.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0"
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >
@@ -314,11 +314,11 @@ export const Keyboard = memo(function Keyboard({
         * where the one key a parent must aim at on the wizard shared a seam
         * with the one key that wipes what they typed.
         *
-        * `mt-[12px]` on top of the container's gap is the 20px gutter the
+        * `mt-[14px]` on top of the container's gap is the 24px gutter the
         * trimmed keys paid for: what sits under ⌫ here is a mark that goes on
         * a sticker, and what sits under ⇧ on the wizard is Clear.
         */}
-      <div className={`${ROW_CLASS} mt-[12px]`}>
+      <div className={`${ROW_CLASS} mt-[14px]`}>
         <button
           type="button"
           tabIndex={-1}
@@ -329,7 +329,7 @@ export const Keyboard = memo(function Keyboard({
           onPointerCancel={onClearHeld ? cancelHold : undefined}
           /* `mr-2`: Clear gives 8px back on its bar side, so the seam between
              the most-tapped key on the row and the only one with no undo is
-             16px where every other seam is 8. Off Clear rather than off the
+             18px where every other seam is 10. Off Clear rather than off the
              bar, which keeps the bar on its axis and both its column edges. */
           className={`${KEY_CLASS} col-span-4 mr-2 text-base font-medium text-ink-300 ${
             onClearHeld ? 'kiosk-hold-key' : ''
