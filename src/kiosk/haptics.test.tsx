@@ -172,11 +172,47 @@ describe('the kiosk keyboard’s geometry', () => {
     const { container } = render(<Keyboard onKey={vi.fn()} />);
 
     // Clear gives 8px back on its bar side; the bottom row sits under a deeper
-    // gutter than the 6px between the rows above.
+    // gutter than the 10px between the rows above.
     expect(screen.getByText('Clear').className).toMatch(/\bmr-2\b/);
     const rows = [...container.firstElementChild!.children];
-    expect(rows.at(-1)!.className).toMatch(/\bmt-\[10px\]/);
+    expect(rows.at(-1)!.className).toMatch(/\bmt-\[14px\]/);
     for (const row of rows.slice(0, -1)) expect(row.className).not.toMatch(/\bmt-/);
+  });
+
+  /** A Tailwind length in CSS pixels: an arbitrary value, or the spacing scale. */
+  function px(value: string): number {
+    if (value.endsWith('rem')) return Number(value.slice(0, -3)) * 16;
+    if (value.endsWith('px')) return Number(value.slice(0, -2));
+    return Number(value) * 4;
+  }
+
+  /**
+   * What five rows of keys and their gutters come to, in CSS pixels.
+   *
+   * The board's height is not the board's business alone: the grade grid stands
+   * where it stands, and the rule above the console must not move when the
+   * wizard reaches the one question that is not typed. So the gutters can only
+   * ever be widened out of the keys — 6px of air between two plates a thumb's
+   * width apart is how a parent lands on the key beside the one they meant, and
+   * the answer was 6px off every key rather than 6px onto the board.
+   */
+  function keyboardHeight(container: HTMLElement, tall: boolean): number {
+    const board = container.firstElementChild!;
+    const rows = [...board.children];
+    const keys = rows[0]!.firstElementChild!.className;
+    const height = [...keys.matchAll(/(?:^|\s)(tall:)?h-\[([\d.]+(?:rem|px))\]/g)].find(
+      ([, prefix]) => Boolean(prefix) === tall,
+    )![2]!;
+    const gap = /(?:^|\s)gap-([\d.]+)\b/.exec(board.className)![1]!;
+    const gutter = /(?:^|\s)mt-\[([\d.]+px)\]/.exec(rows.at(-1)!.className)![1]!;
+    return rows.length * px(height) + (rows.length - 1) * px(gap) + px(gutter);
+  }
+
+  it('spends the same height however the keys and the gutters divide it', () => {
+    const { container } = render(<Keyboard onKey={vi.fn()} />);
+
+    expect(keyboardHeight(container, false)).toBe(304);
+    expect(keyboardHeight(container, true)).toBe(344);
   });
 });
 
