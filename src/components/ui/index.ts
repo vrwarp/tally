@@ -17,7 +17,7 @@ export {
 } from '@/components/ui/Field';
 export { Modal, type ModalProps } from '@/components/ui/Modal';
 export { Badge, WarningBadge, type BadgeProps } from '@/components/ui/Badge';
-export { WARNING_META, warningLabel, type WarningMeta } from '@/components/ui/warnings';
+export { WARNING_META, warningLabelKey, type WarningMeta } from '@/components/ui/warnings';
 export {
   EmptyState,
   ErrorBanner,

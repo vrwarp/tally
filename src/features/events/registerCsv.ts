@@ -31,7 +31,7 @@
  */
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isoDate, isoDateTime, toCsv, type CsvColumn } from '@/lib/csv';
-import { gradeLabel } from '@/lib/utils';
+import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
 import type { AttendanceRecord, Rsvp, Student, TallyEvent } from '@/types';
 
@@ -101,7 +101,7 @@ export function registerRows(
   });
 }
 
-function columns(context: RegisterCsvContext): CsvColumn<RegisterRow>[] {
+function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<RegisterRow>[] {
   const { event, namesByUid, backends } = context;
 
   const base: CsvColumn<RegisterRow>[] = [
@@ -111,7 +111,7 @@ function columns(context: RegisterCsvContext): CsvColumn<RegisterRow>[] {
     { header: 'first_name', value: (row) => row.student?.firstName ?? '' },
     { header: 'last_name', value: (row) => row.student?.lastName ?? '' },
     { header: 'grade', value: (row) => row.student?.grade ?? null },
-    { header: 'grade_label', value: (row) => (row.student ? gradeLabel(row.student) : '') },
+    { header: 'grade_label', value: (row) => (row.student ? gradeLabel(grades, row.student) : '') },
     { header: 'event_id', value: () => event.id },
     { header: 'event_title', value: () => event.title },
     { header: 'event_date', value: () => isoDate(event.startAt) },
@@ -177,13 +177,14 @@ function columns(context: RegisterCsvContext): CsvColumn<RegisterRow>[] {
 }
 
 export function buildRegisterCsv(
+  grades: GradeStrings,
   rows: readonly RegisterRow[],
   context: RegisterCsvContext,
 ): string {
-  return toCsv(columns(context), rows);
+  return toCsv(columns(grades, context), rows);
 }
 
 /** Exported for the tests that pin the conditional header shapes. */
-export function registerCsvHeaders(context: RegisterCsvContext): string[] {
-  return columns(context).map((column) => column.header);
+export function registerCsvHeaders(grades: GradeStrings, context: RegisterCsvContext): string[] {
+  return columns(grades, context).map((column) => column.header);
 }

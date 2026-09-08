@@ -18,19 +18,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { labelFont, layoutLabel, type LabelBox, type MeasureText } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
-import { SAMPLE_VALUES } from '@/features/events/labelSamples';
+import { sampleValues, type SampleStrings } from '@/features/events/labelSamples';
+import { useTranslations } from 'use-intl';
 
 /** How wide the preview is drawn, in CSS pixels. */
 const PREVIEW_WIDTH_PX = 320;
 
 export function LabelPreview({
   template,
-  values = SAMPLE_VALUES,
+  values,
   box,
   rotated = false,
   className,
 }: {
   template: LabelTemplate;
+  /** Defaults to the full sample child — see `labelSamples.ts`. */
   values?: LabelTokenValues;
   /** The media to preview against, in printer dots. */
   box: LabelBox;
@@ -44,6 +46,9 @@ export function LabelPreview({
   rotated?: boolean;
   className?: string;
 }) {
+  const t = useTranslations('Events');
+  const tLabel = useTranslations('LabelTemplate');
+  const shown = values ?? sampleValues(tLabel as unknown as SampleStrings);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notes, setNotes] = useState<{ dropped: number; scaled: boolean }>({
     dropped: 0,
@@ -54,8 +59,8 @@ export function LabelPreview({
   // the array identity does — the editor rebuilds this object on every keystroke
   // either way, but depending on the identity would hide a mutation.
   const key = useMemo(
-    () => JSON.stringify([template, values, box, rotated]),
-    [template, values, box, rotated],
+    () => JSON.stringify([template, shown, box, rotated]),
+    [template, shown, box, rotated],
   );
 
   useEffect(() => {
@@ -71,7 +76,7 @@ export function LabelPreview({
 
     // Measured unscaled, in dots, so the layout sees the same numbers the
     // printer will. The transforms below only change how it is painted.
-    const layout = layoutLabel(template, values, box, measure);
+    const layout = layoutLabel(template, shown, box, measure);
 
     /*
      * The sticker's two dimensions, swapped when it is turned — the same
@@ -119,7 +124,7 @@ export function LabelPreview({
         // A white sticker on a dark form needs an edge, or it reads as a hole.
         className="rounded-sm shadow-md ring-1 ring-ink-700"
         role="img"
-        aria-label="Preview of the printed label"
+        aria-label={t('labelPreviewAria')}
       />
       {/*
         * Said out loud, because the alternative is a leader designing a
@@ -127,12 +132,11 @@ export function LabelPreview({
         */}
       {notes.dropped > 0 ? (
         <p className="pt-2 text-xs leading-snug text-warn-400">
-          {notes.dropped === 1 ? 'The last line does not' : `The last ${notes.dropped} lines do not`} fit
-          on this label and will not be printed.
+          {t('labelDropped', { count: notes.dropped })}
         </p>
       ) : notes.scaled ? (
         <p className="pt-2 text-xs leading-snug text-ink-500">
-          Everything has been scaled down to fit. Fewer or smaller lines would print larger.
+          {t('labelScaledDown')}
         </p>
       ) : null}
     </div>

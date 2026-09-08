@@ -15,6 +15,7 @@ import { buildRoster } from '@/features/roster/predictiveRoster';
 import { computeMia } from '@/features/dashboard/insights';
 import { cn } from '@/lib/utils';
 import type { AppSettings, TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Enough history for the widest window a threshold can ask for. */
 const HISTORY_EVENTS = 14;
@@ -29,6 +30,7 @@ export interface ThresholdPreviewProps {
 }
 
 export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps) {
+  const t = useTranslations('Settings');
   const { students, events, series, settings, canWork } = useData();
   const now = useNow(60_000);
 
@@ -144,22 +146,21 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
   if (!valid) {
     return (
       <p className="text-xs text-ink-500">
-        Fix the values above and this will show what they would do to your roster.
+        {t('previewFixValues')}
       </p>
     );
   }
 
   if (loading && snapshots.length === 0) {
     return (
-      <p className="text-xs text-ink-500">Working out what these thresholds mean right now…</p>
+      <p className="text-xs text-ink-500">{t('previewWorking')}</p>
     );
   }
 
   if (snapshots.length === 0) {
     return (
       <p className="text-xs text-ink-500">
-        Once a few gatherings have happened, this will show how many students each threshold picks
-        out.
+        {t('previewNoHistory')}
       </p>
     );
   }
@@ -169,7 +170,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
   return (
     <div className="flex flex-col gap-2 rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-        With your ministry as it stands today
+        {t('previewHeading')}
       </p>
 
       {predicted.length > 0 ? (
@@ -179,7 +180,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
               <span className="truncate">{entry.title}</span>
               <span className="shrink-0 tabular-nums">
                 <span className="font-semibold text-ink-100">{entry.recent}</span>
-                <span className="text-ink-500"> of {entry.eligible} predicted</span>
+                <span className="text-ink-500">{t('previewPredicted', { count: entry.eligible })}</span>
               </span>
             </li>
           ))}
@@ -187,7 +188,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
       ) : null}
 
       <p className="flex items-baseline justify-between gap-3 border-t border-ink-800 pt-2 text-sm text-ink-300">
-        <span>Flagged as missing in action</span>
+        <span>{t('previewMiaLabel')}</span>
         <span className="shrink-0 tabular-nums">
           <span className={cn('font-semibold', changed ? 'text-warn-400' : 'text-ink-100')}>
             {miaNow}
@@ -195,12 +196,12 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
           {changed ? (
             // The delta is the point: a leader is choosing how many phone calls
             // they are signing themselves up for this week.
-            <span className="text-ink-500"> · was {miaSaved}</span>
+            <span className="text-ink-500">{t('previewWas', { count: miaSaved })}</span>
           ) : (
             // "1 students" is the same bug the follow-up copy used to paste
             // into a group chat, and this line is read while somebody decides
             // how many phone calls they are signing up for.
-            <span className="text-ink-500"> {miaNow === 1 ? 'student' : 'students'}</span>
+            <span className="text-ink-500">{t('previewStudents', { count: miaNow })}</span>
           )}
         </span>
       </p>

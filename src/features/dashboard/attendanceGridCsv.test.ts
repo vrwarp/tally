@@ -13,6 +13,9 @@ import {
 } from '@/features/dashboard/attendanceGridCsv';
 import { makeEvent, makeStudent } from '../../../tests/factories';
 import type { EventAttendanceSnapshot, Student, TallyEvent } from '@/types';
+import { testGrades } from '@/test/translator';
+
+const grades = testGrades();
 
 function snapshot(
   event: TallyEvent,
@@ -128,7 +131,7 @@ describe('buildAttendanceGridCsv', () => {
     [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_1', 'pco_2'])],
     [AMARA, BEN],
   );
-  const csv = buildAttendanceGridCsv(result, { backends: [] });
+  const csv = buildAttendanceGridCsv(grades, result, { backends: [] });
   const rows = csvRows(csv);
 
   it('heads each gathering column with its date, sortable and locale-free', () => {
@@ -163,7 +166,7 @@ describe('buildAttendanceGridCsv', () => {
       [snapshot(gathering(1), ['pco_1']), snapshot(gathering(15), ['pco_3'])],
       [late],
     );
-    const lateRows = csvRows(buildAttendanceGridCsv(lateGrid, { backends: [] }));
+    const lateRows = csvRows(buildAttendanceGridCsv(grades, lateGrid, { backends: [] }));
     const dateIndex = lateRows[0]!.indexOf('2026-05-01');
     expect(lateRows[1]![dateIndex]).toBe('');
   });
@@ -171,7 +174,7 @@ describe('buildAttendanceGridCsv', () => {
   it('leaves the rate blank rather than dividing by zero', () => {
     const brandNew = makeStudent({ id: 'pco_4', createdAt: new Date(2026, 6, 1) });
     const emptyGrid = grid([snapshot(gathering(1), ['pco_1'])], [brandNew]);
-    const emptyRows = csvRows(buildAttendanceGridCsv(emptyGrid, { backends: [] }));
+    const emptyRows = csvRows(buildAttendanceGridCsv(grades, emptyGrid, { backends: [] }));
     expect(emptyRows[1]![emptyRows[0]!.indexOf('rate')]).toBe('');
   });
 

@@ -15,7 +15,7 @@
  *    a roster.
  *  - **the counter is shared.** A staff reprint spends the parent's one.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
@@ -259,7 +259,7 @@ describe('the staff reprint flow', () => {
     await tap(/Print name tag/i);
 
     expect(printing.reprintLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.reprintLabel).mock.calls[0]?.[0]).toMatchObject({ id: ADA.id });
+    expect(vi.mocked(printing.reprintLabel).mock.calls[0]?.[2]).toMatchObject({ id: ADA.id });
 
     expect(services.performCheckIn).not.toHaveBeenCalled();
     expect(services.performCheckOut).not.toHaveBeenCalled();

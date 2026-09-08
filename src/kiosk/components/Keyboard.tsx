@@ -52,6 +52,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
 import { tallyRender } from '../renderTally';
 import { HOLD_DELAY_MS, HOLD_MS } from './HoldButton';
+import { useTranslations } from 'use-intl';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -145,6 +146,8 @@ export const Keyboard = memo(function Keyboard({
   onClearHeld?: () => void;
 }) {
   tallyRender('Keyboard');
+  const t = useTranslations('Door');
+  const tCommon = useTranslations('Common');
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
   const handlerRef = useRef(onKey);
@@ -252,7 +255,7 @@ export const Keyboard = memo(function Keyboard({
                 type="button"
                 tabIndex={-1}
                 data-key="shift"
-                aria-label={shift === 'lock' ? 'Caps lock on' : shift === 'on' ? 'Shift on' : 'Shift'}
+                aria-label={shift === 'lock' ? t('capsLock') : shift === 'on' ? t('shiftOn') : t('shift')}
                 aria-pressed={shift !== 'off'}
                 className={`${KEY_CLASS} col-span-3 text-2xl ${shift === 'off' ? '' : 'bg-ink-600 text-white'}`}
               >
@@ -272,7 +275,7 @@ export const Keyboard = memo(function Keyboard({
               type="button"
               tabIndex={-1}
               data-key="backspace"
-              aria-label="Delete"
+              aria-label={t('delete')}
               className={`${KEY_CLASS} col-span-3 text-2xl`}
             >
               ⌫
@@ -317,9 +320,9 @@ export const Keyboard = memo(function Keyboard({
               : undefined
           }
         >
-          Clear
+          {tCommon('clear')}
         </button>
-        <button type="button" tabIndex={-1} data-key="space" aria-label="Space" className={`${KEY_CLASS} col-span-12`}>
+        <button type="button" tabIndex={-1} data-key="space" aria-label={t('space')} className={`${KEY_CLASS} col-span-12`}>
           &nbsp;
         </button>
         {/*
@@ -334,10 +337,10 @@ export const Keyboard = memo(function Keyboard({
           * A letter wide each, in the far corner under ⌫, where a miss costs a
           * mark a parent can see in the readout rather than the whole field.
           */}
-        <button type="button" tabIndex={-1} data-key="'" aria-label="Apostrophe" className={`${KEY_CLASS} col-span-2`}>
+        <button type="button" tabIndex={-1} data-key="'" aria-label={t('apostrophe')} className={`${KEY_CLASS} col-span-2`}>
           <span className={MARK_CLASS}>&rsquo;</span>
         </button>
-        <button type="button" tabIndex={-1} data-key="-" aria-label="Hyphen" className={`${KEY_CLASS} col-span-2`}>
+        <button type="button" tabIndex={-1} data-key="-" aria-label={t('hyphen')} className={`${KEY_CLASS} col-span-2`}>
           <span className={`${MARK_CLASS} -translate-y-[0.04em]`}>-</span>
         </button>
       </div>

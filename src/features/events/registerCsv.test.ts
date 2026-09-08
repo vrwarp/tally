@@ -14,6 +14,9 @@ import {
 } from '@/features/events/registerCsv';
 import { makeAttendance, makeEvent, makeRsvp, makeStudent } from '../../../tests/factories';
 import type { Student } from '@/types';
+import { testGrades } from '@/test/translator';
+
+const grades = testGrades();
 
 const NAMES = new Map([['u1', 'Miriam']]);
 
@@ -75,26 +78,26 @@ describe('registerRows', () => {
 
 describe('buildRegisterCsv — conditional columns', () => {
   it('omits the check-out columns on a gathering that does not track it', () => {
-    const headers = registerCsvHeaders(context(makeEvent({ requiresCheckOut: false })));
+    const headers = registerCsvHeaders(grades, context(makeEvent({ requiresCheckOut: false })));
     // A column of blanks reads as missing data; "this gathering does not do
     // that" is not something an empty cell can say.
     expect(headers).not.toContain('checked_out_at');
   });
 
   it('carries the check-out columns on a room children are checked out from', () => {
-    const headers = registerCsvHeaders(context(makeEvent({ requiresCheckOut: true })));
+    const headers = registerCsvHeaders(grades, context(makeEvent({ requiresCheckOut: true })));
     expect(headers).toContain('checked_out_at');
     expect(headers).toContain('checked_out_by');
     expect(headers).toContain('checked_out_by_uid');
   });
 
   it('carries the RSVP columns only on a one-off', () => {
-    expect(registerCsvHeaders(context(makeEvent({ mode: 'oneoff' })))).toContain('rsvp');
-    expect(registerCsvHeaders(context(makeEvent({ mode: 'recurring' })))).not.toContain('rsvp');
+    expect(registerCsvHeaders(grades, context(makeEvent({ mode: 'oneoff' })))).toContain('rsvp');
+    expect(registerCsvHeaders(grades, context(makeEvent({ mode: 'recurring' })))).not.toContain('rsvp');
   });
 
   it('never names its first column ID', () => {
-    expect(registerCsvHeaders(context())[0]).toBe('student_id');
+    expect(registerCsvHeaders(grades, context())[0]).toBe('student_id');
   });
 });
 
@@ -102,7 +105,7 @@ describe('buildRegisterCsv — who recorded it', () => {
   function rowFor(record: ReturnType<typeof makeAttendance>) {
     const event = makeEvent();
     const rows = registerRows(event, [record], [], byId(AMARA));
-    return cells(buildRegisterCsv(rows, context(event)), 0);
+    return cells(buildRegisterCsv(grades, rows, context(event)), 0);
   }
 
   it('resolves a uid to a name and keeps the raw value beside it', () => {
@@ -142,7 +145,7 @@ describe('buildRegisterCsv — a student the roster no longer names', () => {
   it('keeps the id and the times, and leaves the name blank', () => {
     const event = makeEvent();
     const rows = registerRows(event, [makeAttendance({ studentId: 'pco_99' })], [], byId());
-    const row = cells(buildRegisterCsv(rows, context(event)), 0);
+    const row = cells(buildRegisterCsv(grades, rows, context(event)), 0);
 
     expect(row.student_id).toBe('pco_99');
     expect(row.first_name).toBe('');

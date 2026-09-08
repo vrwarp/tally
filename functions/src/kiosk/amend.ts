@@ -65,6 +65,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { buildSearchName, nameKey } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -209,8 +210,8 @@ async function amendChild(context: {
   }
 
   const corrected: RegistrationChild = {
-    firstName: parseName(child.firstName, "The child's first name"),
-    lastName: parseName(child.lastName, "The child's last name"),
+    firstName: parseName(child.firstName, 'childFirst'),
+    lastName: parseName(child.lastName, 'childLast'),
     grade: parseGrade(child.grade),
   };
   const allergies = parseAllergyNote(child.allergies);
@@ -285,7 +286,7 @@ async function amendChild(context: {
     lastName: corrected.lastName,
     // The kiosk searches on this, so it has to move with the name or a family
     // corrected on Tuesday stops being findable on Friday.
-    searchName: buildSearchName(corrected.firstName, corrected.lastName),
+    searchName: withPinyin(buildSearchName(corrected.firstName, corrected.lastName)),
     updatedAt: at,
     updatedBy: uid,
   };
@@ -463,8 +464,8 @@ async function amendGuardian(context: {
   }
 
   const corrected = {
-    firstName: parseName(guardian.firstName, "The adult's first name"),
-    lastName: parseName(guardian.lastName, "The adult's last name"),
+    firstName: parseName(guardian.firstName, 'adultFirst'),
+    lastName: parseName(guardian.lastName, 'adultLast'),
     phone: parseRegistrationPhone(guardian.phone),
   };
 

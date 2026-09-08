@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { getParentContactStatus } from '@/services/functions';
+import { useTranslations } from 'use-intl';
 
 /** Empty rather than absent, so callers never have to branch on "not asked yet". */
 const NOTHING: ReadonlyMap<string, boolean> = new Map();
@@ -46,6 +47,7 @@ export interface AdultContactResult {
 }
 
 export function useAdultContact(): AdultContactResult {
+  const t = useTranslations('Errors');
   const [reachable, setReachable] = useState<ReadonlyMap<string, boolean>>(() => held ?? NOTHING);
   // Stryker disable next-line ArrowFunction,ConditionalExpression: the
   // `loaded` the caller sees is `loaded || held !== null`, so a session that
@@ -89,8 +91,8 @@ export function useAdultContact(): AdultContactResult {
         const code = (cause as { code?: string })?.code ?? '';
         setError(
           code.includes('permission-denied')
-            ? 'Only the core team can see which profiles are incomplete.'
-            : 'Could not check which profiles are incomplete — the people system did not answer.',
+            ? t('incompleteDenied')
+            : t('incompleteUnreachable'),
         );
       })
       .finally(() => {
@@ -100,7 +102,7 @@ export function useAdultContact(): AdultContactResult {
     return () => {
       stale = true;
     };
-  }, [attempt]);
+  }, [attempt, t]);
 
   const refresh = useCallback(() => {
     setError(null);

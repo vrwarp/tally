@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { PRE_K } from '@/types';
 
 /** Tailwind-aware class name join. */
 export function cn(...inputs: ClassValue[]): string {
@@ -453,72 +452,14 @@ function approximatelyIncludes(text: string, needle: string, budget: number): bo
   return false;
 }
 
-/** `6` -> `6th`, `11` -> `11th`. */
-export function ordinalGrade(grade: number): string {
-  const suffix =
-    grade % 100 >= 11 && grade % 100 <= 13
-      ? 'th'
-      : (['th', 'st', 'nd', 'rd'][grade % 10] ?? 'th');
-  return `${grade}${suffix}`;
-}
-
-/**
- * The short token for a grade: `Pre-K`, `K`, `1st`, `9th`.
- *
- * The two grades below 1st have names rather than numbers, and `ordinalGrade`
- * would print "0th" and "-1th" for them — the second of which is not a
- * hypothetical: it reached a lobby screen. Everything below Pre-K has no grade
- * at all and never reaches here — see `Grade`.
- *
- * "Pre-K" rather than "PK", because that is what Planning Center calls it on
- * the profile these children arrive from — so it is the name already on the
- * screen the office is looking at while a volunteer reads the label.
+/*
+ * The grade helpers used to live here — `ordinalGrade`, `gradeName`,
+ * `gradeDescription`, `gradeLabel`, `gradeSentence`, `NO_GRADE`. They moved to
+ * `lib/grades.ts` when they stopped being string formatting and became
+ * translation: "9th" is an English ordinal that no other language builds the
+ * same way, so the suffix is an ICU `selectordinal` now and each function
+ * takes the catalogue.
  */
-export function gradeName(grade: number): string {
-  if (grade === PRE_K) return 'Pre-K';
-  return grade === 0 ? 'K' : ordinalGrade(grade);
-}
-
-/**
- * The same thing with its noun, for the places that read "9th grade".
- *
- * Kindergarten needs the whole word: "K grade" is not English, and a screen
- * reader saying it beside a child's name is worse. Pre-K is the same — it is
- * already the name of the year, so "Pre-K grade" only adds a stumble.
- */
-export function gradeDescription(grade: number): string {
-  if (grade === PRE_K) return 'Pre-K';
-  return grade === 0 ? 'Kindergarten' : `${ordinalGrade(grade)} grade`;
-}
-
-/** What a grade slot says when there is no grade to put in it. */
-export const NO_GRADE = 'No grade';
-
-/**
- * The ordinal to print for somebody's grade, or null when nobody has one.
- *
- * A null grade is every adult on a hand-picked roster — the leaders and
- * volunteers a list-mode roster deliberately carries — and every child too
- * young to have one. It used to be spelled as a number plus a `gradeOnFile`
- * flag, and the flag was routinely wrong: the sync set it from whether the
- * upstream value was *blank*, not whether it had been clamped, so a real 3rd
- * grader was printed as a 6th grader as a fact about them.
- *
- * Callers with a slot to fill fall back to `NO_GRADE`; callers where the grade
- * is one clause of a longer line drop the clause instead, because "No grade ·"
- * spends the width that line needs on the thing it is least about.
- */
-export function gradeLabel(student: { grade: number | null }): string | null {
-  return student.grade === null ? null : gradeName(student.grade);
-}
-
-/**
- * The same, with its noun — for aria labels and any line that reads "9th
- * grade". Kindergarten becomes "Kindergarten" rather than "K grade".
- */
-export function gradeSentence(student: { grade: number | null }): string | null {
-  return student.grade === null ? null : gradeDescription(student.grade);
-}
 
 /** Stable "AB" avatar initials. */
 export function initials(firstName: string, lastName: string): string {
@@ -591,9 +532,43 @@ const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
  * of the two lists. `StudentRow` sets the surname a step back so the scan has
  * something to land on.
  */
-export function sortByName<T extends { lastName: string; firstName: string }>(a: T, b: T): number {
+/** Han characters, the ones `Intl.Collator` cannot file under a letter. */
+const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+
+/**
+ * What to file a person under, when their name is not written in letters.
+ *
+ * `Intl.Collator` orders Hanzi by stroke or by pinyin depending on the locale,
+ * and in either case it puts *all* of them together — before the Latin names in
+ * a `zh` collation, after them in an `en` one. Neither is a list a counselor can
+ * scan: 蔡秉洲 belongs between Bergman and Chen, which is where a person looking
+ * for them would go.
+ *
+ * Doing that means romanizing the name, and romanizing means a dictionary close
+ * to a megabyte — which is exactly what `functions/src/names/pinyin.ts` refuses
+ * to put in a bundle. So the server has already done it: `searchName` carries
+ * the romanization, and by contract the canonical one is the token immediately
+ * after the Chinese. This reads it back. A name with no Chinese in it costs one
+ * failed regexp, which is nearly every name.
+ *
+ * Falls back to the name itself — a student written before the backfill ran, or
+ * one whose `searchName` the client rebuilt a moment ago and the trigger has
+ * not yet widened. They file under Han for a second, which is where they were.
+ */
+export function nameSortKey(person: { firstName: string; searchName?: string }): string {
+  if (!HAN.test(person.firstName)) return person.firstName;
+  const tokens = person.searchName?.split(' ') ?? [];
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    if (HAN.test(tokens[index]!)) return tokens[index + 1] ?? person.firstName;
+  }
+  return person.firstName;
+}
+
+export function sortByName<
+  T extends { lastName: string; firstName: string; searchName?: string },
+>(a: T, b: T): number {
   return (
-    NAME_COLLATOR.compare(a.firstName, b.firstName) ||
+    NAME_COLLATOR.compare(nameSortKey(a), nameSortKey(b)) ||
     NAME_COLLATOR.compare(a.lastName, b.lastName)
   );
 }
@@ -622,9 +597,9 @@ export function partition<T>(items: readonly T[], predicate: (item: T) => boolea
   return [pass, fail];
 }
 
-/** "Friday", "Friday and Sunday", "Friday, Sunday and Wednesday" — for prose. */
-export function joinList(parts: readonly string[]): string {
-  if (parts.length <= 1) return parts[0] ?? '';
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
-  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-}
+/*
+ * `joinList` used to live here — "Friday, Sunday and Wednesday", hand-rolled.
+ * Every caller now goes through `Intl.ListFormat`, which knows that a Chinese
+ * list is joined with 、 and 和 rather than commas and "and". Nothing is left
+ * to keep.
+ */

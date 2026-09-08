@@ -48,12 +48,18 @@ import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import { gatheringOptions } from '@/lib/gatherings';
 import type { KioskTheme } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
-import { defaultRecurrence, retimeRecurrence, validateRecurrence } from '@/lib/recurrence';
+import {
+  defaultRecurrence,
+  retimeRecurrence,
+  validateRecurrence,
+  type RecurrenceProblem,
+} from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
 import { addMinutes, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/time';
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import { putKioskBackdrop } from '@/services/kioskBackdrops';
 import type { EventMode, RecurrenceRule, TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** House defaults for the check-in window, in minutes around the event. */
 const OPENS_BEFORE_MIN = 60;
@@ -107,8 +113,25 @@ interface EditorForm {
   closesPinned: boolean;
 }
 
-type EditorErrors = Partial<
-  Record<'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'recurrence', string>
+/**
+ * What is wrong with the form, as `EventEditor.*` keys rather than sentences.
+ *
+ * `validateForm` is pure and cannot call a hook, and the same value is read in
+ * two places — the field it belongs to, and the summary beside the save
+ * button — so it names the message once and both sites translate it.
+ */
+export type EditorErrorKey =
+  | 'errTitle'
+  | 'errStart'
+  | 'errEnd'
+  | 'errEndBeforeStart'
+  | 'errPickTime'
+  | 'errOpensAfterStart'
+  | 'errClosesBeforeEnd'
+  | RecurrenceProblem;
+
+export type EditorErrors = Partial<
+  Record<'title' | 'start' | 'end' | 'checkInOpens' | 'checkInCloses' | 'recurrence', EditorErrorKey>
 >;
 
 interface ParsedTimes {
@@ -183,25 +206,25 @@ function buildForm(
 function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTimes | null } {
   const errors: EditorErrors = {};
 
-  if (!form.title.trim()) errors.title = 'Give this event a name.';
+  if (!form.title.trim()) errors.title = 'errTitle';
 
   const startAt = parseLocal(form.start);
   const endAt = parseLocal(form.end);
   const checkInOpensAt = parseLocal(form.checkInOpens);
   const checkInClosesAt = parseLocal(form.checkInCloses);
 
-  if (!startAt) errors.start = 'Pick a start date and time.';
-  if (!endAt) errors.end = 'Pick an end date and time.';
-  if (startAt && endAt && endAt <= startAt) errors.end = 'The event has to end after it starts.';
+  if (!startAt) errors.start = 'errStart';
+  if (!endAt) errors.end = 'errEnd';
+  if (startAt && endAt && endAt <= startAt) errors.end = 'errEndBeforeStart';
 
-  if (!checkInOpensAt) errors.checkInOpens = 'Pick a time.';
+  if (!checkInOpensAt) errors.checkInOpens = 'errPickTime';
   else if (startAt && checkInOpensAt > startAt) {
-    errors.checkInOpens = 'Check-in has to be open by the time the event starts.';
+    errors.checkInOpens = 'errOpensAfterStart';
   }
 
-  if (!checkInClosesAt) errors.checkInCloses = 'Pick a time.';
+  if (!checkInClosesAt) errors.checkInCloses = 'errPickTime';
   else if (endAt && checkInClosesAt < endAt) {
-    errors.checkInCloses = 'Check-in has to stay open until the event ends.';
+    errors.checkInCloses = 'errClosesBeforeEnd';
   }
 
   // Only checkable once there is a start to anchor against — the rule is
@@ -234,13 +257,33 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
  * message out. And the summary below rides the footer, beside the button that
  * fired it, so the press has a visible consequence where the press happened.
  */
-const ERROR_FIELDS: { key: keyof EditorErrors; label: (mode: EventMode) => string }[] = [
-  { key: 'title', label: () => 'Title' },
-  { key: 'start', label: (mode) => (mode === 'recurring' ? 'Next start' : 'Starts') },
-  { key: 'end', label: (mode) => (mode === 'recurring' ? 'Next end' : 'Ends') },
-  { key: 'recurrence', label: () => 'Repeats' },
-  { key: 'checkInOpens', label: () => 'Check-in opens' },
-  { key: 'checkInCloses', label: () => 'Check-in closes' },
+/**
+ * A field's own label, which the summary quotes.
+ *
+ * Annotated rather than inferred: `as const` freezes an object's properties but
+ * not a function's return type, so without this the labels widen back to
+ * `string` and the typed catalogue rejects them.
+ */
+type FieldLabelKey =
+  | 'fieldTitle'
+  | 'fieldRepeats'
+  | 'labelNextStart'
+  | 'labelStarts'
+  | 'labelNextEnd'
+  | 'labelEnds'
+  | 'labelCheckInOpens'
+  | 'labelCheckInCloses';
+
+const ERROR_FIELDS: readonly {
+  key: keyof EditorErrors;
+  label: (mode: EventMode) => FieldLabelKey;
+}[] = [
+  { key: 'title', label: () => 'fieldTitle' },
+  { key: 'start', label: (mode) => (mode === 'recurring' ? 'labelNextStart' : 'labelStarts') },
+  { key: 'end', label: (mode) => (mode === 'recurring' ? 'labelNextEnd' : 'labelEnds') },
+  { key: 'recurrence', label: () => 'fieldRepeats' },
+  { key: 'checkInOpens', label: () => 'labelCheckInOpens' },
+  { key: 'checkInCloses', label: () => 'labelCheckInCloses' },
 ];
 
 /**
@@ -251,16 +294,23 @@ const ERROR_FIELDS: { key: keyof EditorErrors; label: (mode: EventMode) => strin
  * do not say which time, and the field they belong to is the collapsed check-in
  * window at the far end of the other column.
  */
-function summariseErrors(errors: EditorErrors, mode: EventMode): string | null {
+/** The editor's own translator, narrowed so the summary can take it as data. */
+type EditorTranslator = ReturnType<typeof useTranslations<'EventEditor'>>;
+
+function summariseErrors(
+  t: EditorTranslator,
+  errors: EditorErrors,
+  mode: EventMode,
+): string | null {
   const found: string[] = [];
   for (const { key, label } of ERROR_FIELDS) {
     const message = errors[key];
-    if (message) found.push(`${label(mode)}: ${message}`);
+    if (message) found.push(t('errorLine', { field: t(label(mode)), message: t(message) }));
   }
 
   const [first, ...rest] = found;
   if (!first) return null;
-  return rest.length === 0 ? first : `${first} (+${rest.length} more)`;
+  return rest.length === 0 ? first : t('errorMore', { first, count: rest.length });
 }
 
 /**
@@ -324,6 +374,8 @@ export function EventEditorModal({
   defaults,
   onSaved,
 }: EventEditorModalProps) {
+  const t = useTranslations('EventEditor');
+  const tCommon = useTranslations('Common');
   const { events, series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -513,11 +565,11 @@ export function EventEditorModal({
         eventId = await createEvent(draft, user.uid);
       }
 
-      show(event ? 'Event updated' : `${draft.title} scheduled`, { tone: 'success' });
+      show(event ? t('saved') : t('scheduled', { title: draft.title }), { tone: 'success' });
       onSaved?.(eventId);
       onClose();
     } catch {
-      show('Could not save this event. Try again.', { tone: 'error' });
+      show(t('saveFailed'), { tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -536,7 +588,7 @@ export function EventEditorModal({
   };
 
   const formId = `event-editor-${event?.id ?? 'new'}`;
-  const summary = summariseErrors(errors, form.mode);
+  const summary = summariseErrors(t, errors, form.mode);
 
   // The gatherings a trip can borrow its regulars from. Only offered on a
   // one-off, so it costs nothing to compute for the other half of the form.
@@ -546,22 +598,22 @@ export function EventEditorModal({
   // save — so what was already chosen stays choosable.
   const chainOptions =
     form.predictFromChain && !chains.some((chain) => chain.key === form.predictFromChain)
-      ? [...chains, { key: form.predictFromChain, title: 'The gathering already chosen' }]
+      ? [...chains, { key: form.predictFromChain, title: t('chainAlreadyChosen') }]
       : chains;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={isEditing ? 'Edit event' : 'New event'}
+      title={isEditing ? t('titleEdit') : t('titleNew')}
       description={
         isEditing
           ? form.mode === 'recurring'
-            ? 'The dates ahead follow the schedule; this changes them from here on.'
-            : 'Changes apply to this gathering only.'
+            ? t('descriptionRecurring')
+            : t('descriptionOneOff')
           : form.mode === 'recurring'
-            ? 'Recurring gatherings predict their roster from their own past gatherings.'
-            : 'A trip borrows its predicted roster from a gathering that repeats.'
+            ? t('hintRecurring')
+            : t('hintOneOff')
       }
       size="lg"
       footer={
@@ -590,10 +642,10 @@ export function EventEditorModal({
 
           <div className={ACTION_BAR}>
             <Button variant="secondary" size="lg" onClick={onClose}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button type="submit" form={formId} size="lg" loading={saving}>
-              {isEditing ? 'Save changes' : 'Schedule event'}
+              {isEditing ? t('saveChanges') : t('scheduleEvent')}
             </Button>
           </div>
         </div>
@@ -615,12 +667,12 @@ export function EventEditorModal({
         className="grid gap-6 lg:grid-cols-2 lg:gap-x-0"
         noValidate
       >
-        <Section title="The gathering" className="lg:pr-7">
+        <Section title={t('sectionGathering')} className="lg:pr-7">
           <TextField
-            label="Title"
+            label={t('fieldTitle')}
             value={form.title}
             onChange={(changed) => patch({ title: changed.target.value })}
-            error={errors.title ?? null}
+            error={errors.title ? t(errors.title) : null}
             autoCapitalize="words"
             autoComplete="off"
             required
@@ -637,30 +689,30 @@ export function EventEditorModal({
           <IconPickerField
             value={form.icon || null}
             onChange={(icon) => patch({ icon: icon ?? '' })}
-            hint="Shown wherever this gathering is listed."
+            hint={t('iconHint')}
           />
 
           <TextAreaField
-            label="Description"
+            label={t('fieldDescription')}
             value={form.description}
             onChange={(changed) => patch({ description: changed.target.value })}
-            placeholder="Games, a talk and pizza. Bring a friend."
+            placeholder={t('descriptionPlaceholder')}
             rows={2}
-            hint="A sentence for the people turning up. Shown on the check-in screen when this is today’s gathering."
+            hint={t('descriptionHint')}
           />
 
           <SelectField
-            label="Type"
+            label={t('fieldType')}
             value={form.mode}
             onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
             hint={
               form.mode === 'recurring'
-                ? 'Everyone active is on the roster, and its own past gatherings mark the regulars “Recent”.'
-                : 'Happens once. Can borrow another gathering’s regulars, and limit its roster to the students who RSVP’d.'
+                ? t('typeHintRecurring')
+                : t('typeHintOneOff')
             }
           >
-            <option value="recurring">Recurring</option>
-            <option value="oneoff">One-off — retreat, outing</option>
+            <option value="recurring">{t('typeRecurring')}</option>
+            <option value="oneoff">{t('typeOneOff')}</option>
           </SelectField>
 
           {/*
@@ -704,19 +756,19 @@ export function EventEditorModal({
             */}
           <div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2 pointer-fine:gap-3">
             <TextField
-              label={form.mode === 'recurring' ? 'Next start' : 'Starts'}
+              label={t(form.mode === 'recurring' ? 'labelNextStart' : 'labelStarts')}
               type="datetime-local"
               value={form.start}
               onChange={(changed) => handleStartChange(changed.target.value)}
-              error={errors.start ?? null}
+              error={errors.start ? t(errors.start) : null}
               required
             />
             <TextField
-              label={form.mode === 'recurring' ? 'Next end' : 'Ends'}
+              label={t(form.mode === 'recurring' ? 'labelNextEnd' : 'labelEnds')}
               type="datetime-local"
               value={form.end}
               onChange={(changed) => handleEndChange(changed.target.value)}
-              error={errors.end ?? null}
+              error={errors.end ? t(errors.end) : null}
               required
             />
             {form.mode === 'recurring' ? (
@@ -724,7 +776,7 @@ export function EventEditorModal({
               // a fact about the pair, and hung off "Next start" alone it wraps
               // to two lines and leaves the column ragged.
               <p className="text-xs leading-snug text-ink-500 @min-[26rem]:col-span-2">
-                The upcoming gathering. Instances already held keep the times they ran at.
+                {t('upcomingNote')}
               </p>
             ) : null}
           </div>
@@ -735,12 +787,12 @@ export function EventEditorModal({
               anchor={parseLocal(form.start)}
               value={form.recurrence}
               onChange={(recurrence) => patch({ recurrence })}
-              error={errors.recurrence ?? null}
+              error={errors.recurrence ? t(errors.recurrence) : null}
             />
           ) : null}
         </Section>
 
-        <Section title="Roster & details" className="lg:border-l lg:border-ink-800 lg:pl-7">
+        <Section title={t('sectionRosterDetails')} className="lg:border-l lg:border-ink-800 lg:pl-7">
           <CheckInWindowField
             opens={form.checkInOpens}
             closes={form.checkInCloses}
@@ -764,16 +816,16 @@ export function EventEditorModal({
           {form.mode === 'oneoff' ? (
             <>
               <SelectField
-                label="Predicted roster"
+                label={t('predictedRoster')}
                 value={form.predictFromChain}
                 onChange={(changed) => patch({ predictFromChain: changed.target.value })}
                 hint={
                   form.predictFromChain
-                    ? 'Its regulars are marked “Recent” here. Everybody else is still on the roster.'
-                    : 'A trip has no past of its own. Borrow a gathering’s regulars and “Recent” still means something.'
+                    ? t('predictedHintRecurring')
+                    : t('predictedHintOneOff')
                 }
               >
-                <option value="">No prediction — the whole roster</option>
+                <option value="">{t('noPrediction')}</option>
                 {chainOptions.map((chain) => (
                   <option key={chain.key} value={chain.key}>
                     {chain.title}
@@ -784,8 +836,8 @@ export function EventEditorModal({
               {/* Who may be on the coach at all, which the prediction above
                   never decides — see `isEligible`. */}
               <CheckboxField
-                label="Limit the roster to students who RSVP’d"
-                hint="Nobody else appears at check-in, so the trip list stays closed."
+                label={t('rsvpOnly')}
+                hint={t('rsvpOnlyHint')}
                 checked={form.requiresRsvp}
                 onChange={(changed) => patch({ requiresRsvp: changed.target.checked })}
               />
@@ -796,8 +848,8 @@ export function EventEditorModal({
               change: a room children are checked out from is most often the one
               that repeats every Sunday. */}
           <CheckboxField
-            label="Track check-out"
-            hint="Volunteers record when each child is checked out, and the roster shows a live room count."
+            label={t('trackCheckOut')}
+            hint={t('trackCheckOutHint')}
             checked={form.requiresCheckOut}
             onChange={(changed) => patch({ requiresCheckOut: changed.target.checked })}
           />
@@ -834,10 +886,10 @@ export function EventEditorModal({
           />
 
           <TextField
-            label="Location"
+            label={t('fieldLocation')}
             value={form.location}
             onChange={(changed) => patch({ location: changed.target.value })}
-            placeholder="Youth room"
+            placeholder={t('locationPlaceholder')}
             autoComplete="off"
           />
 
@@ -845,11 +897,11 @@ export function EventEditorModal({
               people turning up. Saying so is cheaper than watching the two
               fields slowly become copies of each other. */}
           <TextAreaField
-            label="Notes"
+            label={t('fieldNotes')}
             value={form.notes}
             onChange={(changed) => patch({ notes: changed.target.value })}
-            placeholder="Meet at the church car park at 5:45…"
-            hint="For the core team. Only shown on the event page."
+            placeholder={t('notesPlaceholder')}
+            hint={t('notesHint')}
           />
         </Section>
       </form>

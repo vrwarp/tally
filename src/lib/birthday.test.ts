@@ -14,6 +14,7 @@ import {
   isRealBirthday,
   parseBirthday,
 } from '@/lib/birthday';
+import { DEFAULT_LOCALE as LOCALE } from '@/lib/locales';
 
 /** Sat 14 March 2026. */
 const MARCH_14 = new Date(2026, 2, 14, 10, 0);
@@ -83,17 +84,17 @@ describe('birthdayState', () => {
 
 describe('formatting a birthday', () => {
   it('gives the badge a short form and a sentence a long one', () => {
-    expect(formatBirthdayShort('03-14', MARCH_14)).toBe('14 Mar');
-    expect(formatBirthdayLong('03-14')).toBe('14 March');
+    expect(formatBirthdayShort(LOCALE, '03-14', MARCH_14)).toBe('Mar 14');
+    expect(formatBirthdayLong(LOCALE, '03-14')).toBe('March 14');
   });
 
   it('formats 29 February as itself rather than rolling it forward', () => {
-    expect(formatBirthdayLong('02-29')).toBe('29 February');
+    expect(formatBirthdayLong(LOCALE, '02-29')).toBe('February 29');
   });
 
   it('has nothing to say when there is no birthday', () => {
-    expect(formatBirthdayShort(null, MARCH_14)).toBeNull();
-    expect(formatBirthdayLong(null)).toBeNull();
+    expect(formatBirthdayShort(LOCALE, null, MARCH_14)).toBeNull();
+    expect(formatBirthdayLong(LOCALE, null)).toBeNull();
   });
 });
 
@@ -165,9 +166,9 @@ describe('taking a birthday apart', () => {
   });
 
   it('says a date with its year, and a day without one', () => {
-    expect(formatBirthdayLong('2011-03-14')).toBe('14 March 2011');
-    expect(formatBirthdayLong('03-14')).toBe('14 March');
-    expect(formatBirthdayLong(null)).toBeNull();
+    expect(formatBirthdayLong(LOCALE, '2011-03-14')).toBe('March 14, 2011');
+    expect(formatBirthdayLong(LOCALE, '03-14')).toBe('March 14');
+    expect(formatBirthdayLong(LOCALE, null)).toBeNull();
   });
 });
 

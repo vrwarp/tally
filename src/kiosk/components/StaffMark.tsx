@@ -14,11 +14,14 @@
  * above the instruction. It is a label: it takes the fill the quiet controls
  * beside the keyboard take, no ring, and shrinks to its own words.
  */
+import { useTranslations } from 'use-intl';
+
 export function StaffMark() {
+  const t = useTranslations('Door');
   return (
     <div className="flex items-center justify-center">
       <span className="inline-flex items-center rounded-lg bg-ink-800/70 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-300 kiosk:text-base">
-        Staff · reprint a name tag
+        {t('staffReprint')}
       </span>
     </div>
   );

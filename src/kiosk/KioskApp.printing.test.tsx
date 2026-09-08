@@ -16,7 +16,7 @@
  * check-in. The tick is painted before the write and before the label, and a
  * printer that throws must leave that untouched.
  */
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
@@ -204,7 +204,7 @@ describe('printing from the kiosk flow', () => {
     await tap('Check in');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[0].id).toBe(ADA.id);
+    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[2].id).toBe(ADA.id);
   });
 
   it('warms the label when the confirm screen opens, before anything is tapped', async () => {
@@ -281,8 +281,10 @@ describe('printing from the kiosk flow', () => {
   it('says nothing to a parent about the printer', async () => {
     vi.mocked(printing.currentState).mockReturnValue({
       kind: 'trouble',
-      message: 'No media when printing',
-      advice: 'Check the roll.',
+      // The printer library's own words, which is one of the two notes that
+      // is not a key of ours — see `PrinterNote`.
+      message: { text: 'No media when printing' },
+      advice: { text: 'Check the roll.' },
     });
 
     await mount();
@@ -335,13 +337,13 @@ describe('a family checked in together', () => {
     await pickAda();
 
     // The sibling arrives ticked, so their label is worth the same head start.
-    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[0].id).sort()).toEqual(
+    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
 
     await tap(/check in all 2/i);
 
-    expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[0].id).sort()).toEqual(
+    expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
   });
@@ -356,7 +358,7 @@ describe('a family checked in together', () => {
 
     expect(printing.forgetLabel).toHaveBeenCalledWith(BYRON.id);
     expect(printing.printLabel).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[0].id).toBe(ADA.id);
+    expect(vi.mocked(printing.printLabel).mock.calls[0]?.[2].id).toBe(ADA.id);
   });
 
   it('warms nothing for a family being checked out', async () => {

@@ -11,7 +11,7 @@
  * validation are worth testing without rendering anything, and this file is the
  * one place that knows what 'done' means for each question.
  */
-import { gradeDescription, NO_GRADE, ordinalGrade } from '@/lib/utils';
+import { gradeDescription, gradeName, type GradeStrings } from '@/lib/grades';
 import { PRE_K, type Grade } from '@/types';
 import type { KioskKey, ShiftState } from '../components/Keyboard';
 
@@ -791,31 +791,63 @@ export interface QuestionSection {
 }
 
 const CHILD_STEPS = ['child-first', 'child-last', 'child-grade', 'child-allergies'] as const;
-const CHILD_LABELS = ['First name', 'Last name', 'Grade', 'Allergies'] as const;
 const ADULT_STEPS = ['guardian-first', 'guardian-last', 'guardian-phone'] as const;
-const ADULT_LABELS = ['First name', 'Last name', 'Phone'] as const;
 
-/** The grade as a row shows it — short, because the row is labelled "Grade". */
-function gradeAnswer(grade: Grade | null): string {
-  if (grade === null) return NO_GRADE;
-  // `gradeDescription` says "4th grade", which under a label reading "Grade" is
-  // the word twice. The two years with no number of their own keep their names.
-  return grade === PRE_K || grade === 0 ? gradeDescription(grade) : ordinalGrade(grade);
+/**
+ * The words the list needs, and the grade names beside them.
+ *
+ * This module is the wizard's reducer — pure, and driven directly by its own
+ * tests — so it cannot reach a translator. The component hands one in, the way
+ * every other pure formatter in this repo takes its catalogue as an argument.
+ */
+export interface QuestionStrings {
+  t: (
+    key:
+      | 'labelFirstName'
+      | 'labelLastName'
+      | 'labelGrade'
+      | 'labelAllergies'
+      | 'labelPhone'
+      | 'allergiesNone'
+      | 'titleYourChild'
+      | 'titleChildNumber'
+      | 'titleGuardian',
+    values?: Record<string, string | number>,
+  ) => string;
+  grades: GradeStrings;
 }
 
-function childAnswer(child: DraftChild, step: StepKind): string {
+const CHILD_LABEL_KEYS = [
+  'labelFirstName',
+  'labelLastName',
+  'labelGrade',
+  'labelAllergies',
+] as const;
+const ADULT_LABEL_KEYS = ['labelFirstName', 'labelLastName', 'labelPhone'] as const;
+
+/** The grade as a row shows it — short, because the row is labelled "Grade". */
+function gradeAnswer(strings: QuestionStrings, grade: Grade | null): string {
+  if (grade === null) return strings.grades('none');
+  // `gradeDescription` says "4th grade", which under a label reading "Grade" is
+  // the word twice. The two years with no number of their own keep their names.
+  return grade === PRE_K || grade === 0
+    ? gradeDescription(strings.grades, grade)
+    : gradeName(strings.grades, grade);
+}
+
+function childAnswer(strings: QuestionStrings, child: DraftChild, step: StepKind): string {
   switch (step) {
     case 'child-first':
       return child.firstName;
     case 'child-last':
       return child.lastName;
     case 'child-grade':
-      return gradeAnswer(child.grade);
+      return gradeAnswer(strings, child.grade);
     // Stryker disable next-line StringLiteral: callers walk `CHILD_STEPS`, so
     // the only step that reaches here is the allergy note. Written out because
     // the union will grow.
     default:
-      return child.allergies === '' ? 'None' : child.allergies;
+      return child.allergies === '' ? strings.t('allergiesNone') : child.allergies;
   }
 }
 
@@ -855,9 +887,9 @@ function runState(at: SectionAt, position: number): QuestionRow['state'] {
  * other answer — which is what that band is for. Empty until a chip is pressed,
  * so the gathering's default never shows as something a parent chose.
  */
-export function readoutFor(state: RegistrationState): string {
+export function readoutFor(strings: QuestionStrings, state: RegistrationState): string {
   if (state.step === 'child-grade') {
-    return state.gradePicked ? gradeAnswer(currentChild(state).grade) : '';
+    return state.gradePicked ? gradeAnswer(strings, currentChild(state).grade) : '';
   }
   if (state.step === 'guardian-phone') return formatPhone(state.buffer);
   return state.buffer;
@@ -902,7 +934,10 @@ export type QuestionListState = Pick<
   | 'resume'
 >;
 
-export function questionList(state: QuestionListState): QuestionSection[] {
+export function questionList(
+  strings: QuestionStrings,
+  state: QuestionListState,
+): QuestionSection[] {
   /*
    * Where the run is, which is not where the screen is once a row has been
    * tapped: `step` is then the question being fixed, and `resume` is the place
@@ -934,15 +969,18 @@ export function questionList(state: QuestionListState): QuestionSection[] {
   const sections: QuestionSection[] = [];
   roster.forEach((child, index) => {
     sections.push({
-      title: index === 0 ? 'Your child' : `Child ${index + 1}`,
+      title:
+        index === 0
+          ? strings.t('titleYourChild')
+          : strings.t('titleChildNumber', { number: index + 1 }),
       rows: childSteps.map((step, position) => {
         const rowState = runState(index === current ? childAt : 'behind', position);
         return {
           id: `child-${index}-${step}`,
           step,
           child: index,
-          label: CHILD_LABELS[position]!,
-          answer: rowState === 'done' ? childAnswer(child, step) : '',
+          label: strings.t(CHILD_LABEL_KEYS[position]!),
+          answer: rowState === 'done' ? childAnswer(strings, child, step) : '',
           state: rowState,
           canReopen: rowState === 'done',
           resumeHere: false,
@@ -953,14 +991,14 @@ export function questionList(state: QuestionListState): QuestionSection[] {
     // that is where they are asked about. A sibling run never asks at all.
     if (index === 0 && state.mode === 'family') {
       sections.push({
-        title: 'And you',
+        title: strings.t('titleGuardian'),
         rows: ADULT_STEPS.map((step, position) => {
           const rowState = runState(adultAt, position);
           return {
             id: `adult-${step}`,
             step,
             child: null,
-            label: ADULT_LABELS[position]!,
+            label: strings.t(ADULT_LABEL_KEYS[position]!),
             answer: rowState === 'done' ? adultAnswer(state.guardian, step) : '',
             state: rowState,
             canReopen: rowState === 'done',

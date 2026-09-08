@@ -20,7 +20,7 @@
  * sides of the wire, because a refresh follows a write and the held answer is
  * the state from before that write.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { makeStudent } from '../../tests/factories';

@@ -73,6 +73,7 @@ import {
 } from './device';
 import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
 import { createPrinterLog, isNoise, type PrinterLogEntry } from './log';
+import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
@@ -80,7 +81,7 @@ export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from 
 export type { PrinterConfig } from './device';
 
 /* The record of what happened, and the two ways the printer screen reads a line of it. */
-export { describeAge, describeEntry } from './log';
+export { describeAge, describeEntry, type AgeStrings } from './log';
 export type { PrinterLogEntry } from './log';
 
 /* What a child's tokens come to, kept reachable through the one handle. */
@@ -126,9 +127,49 @@ declare const __E2E_HOOKS__: boolean;
  * Deliberately coarse. The only consumer is a staff surface deciding between
  * "fine", "somebody needs to look at this" and a sentence saying what.
  */
+/**
+ * A sentence for a volunteer, as either a catalogue key or somebody else's words.
+ *
+ * This module runs outside React and is imported by the label queue, so it
+ * cannot translate anything: what it knows is *which* sentence, and the screen
+ * that draws it is what turns that into words. Hence `key`.
+ *
+ * `text` is the other half, and it is not a fallback — two of these sentences
+ * genuinely come from outside Tally. The Brother library's status flags carry
+ * their own wording for a jam or an open lid, and a platform hint on a claim
+ * failure is the browser's. Neither is ours to have a key for, and neither
+ * survives translation, so they arrive as the words they are.
+ */
+export type PrinterNote =
+  | { key: PrinterNoteKey }
+  | { text: string };
+
+/** Every sentence about the printer that Tally itself writes. */
+export type PrinterNoteKey =
+  | 'troubleReported'
+  | 'adviceLidRollCutter'
+  | 'troubleUnplugged'
+  | 'advicePlugBackIn'
+  | 'troubleHeld'
+  | 'troubleEditorLite'
+  | 'adviceEditorLite'
+  | 'troubleQuietAfterPrint'
+  | 'adviceNextLabel'
+  | 'troubleUnresponsive'
+  | 'adviceOffAndOn'
+  | 'troubleBusy'
+  | 'adviceTryAgain'
+  | 'troubleLabelFit'
+  | 'adviceLabelSize'
+  | 'troubleNotFound'
+  | 'troubleDidNotPrint'
+  | 'troubleUnsupported'
+  | 'troubleStale'
+  | 'adviceCheckPrinter';
+
 export type PrinterState =
   | { kind: 'idle' }
-  | { kind: 'unsupported'; message: string }
+  | { kind: 'unsupported'; message: PrinterNote }
   /**
    * Set up with a printer the browser does not list. `searching` while the
    * boot retry is still looking — the printer may just be slow to enumerate
@@ -137,7 +178,7 @@ export type PrinterState =
    */
   | { kind: 'unpaired'; searching: boolean }
   | { kind: 'ready'; config: PrinterConfig }
-  | { kind: 'trouble'; message: string; advice: string | null };
+  | { kind: 'trouble'; message: PrinterNote; advice: PrinterNote | null };
 
 /**
  * What asking the printer about itself came to.
@@ -200,9 +241,17 @@ const tracer = {
 /** Whether two states would read the same on a screen. */
 function sameState(a: PrinterState, b: PrinterState): boolean {
   if (a.kind !== b.kind) return false;
-  if (a.kind === 'trouble' && b.kind === 'trouble') return a.message === b.message;
+  // By what the note *says*, not by object identity: `describe` builds a fresh
+  // `{ key }` for every failure, so comparing references would write the same
+  // trouble down twice.
+  if (a.kind === 'trouble' && b.kind === 'trouble') return noteId(a.message) === noteId(b.message);
   if (a.kind === 'unpaired' && b.kind === 'unpaired') return a.searching === b.searching;
   return true;
+}
+
+/** A note as one stable token for the record — its key, or the words it came as. */
+function noteId(note: PrinterNote): string {
+  return 'key' in note ? note.key : note.text;
 }
 
 /**
@@ -217,7 +266,10 @@ function setState(next: PrinterState, cause: string): void {
     log.record(
       'state',
       next.kind,
-      next.kind === 'trouble' ? { cause, message: next.message } : { cause },
+      // The note's *identity*, not its words: this record is copied out for
+      // support, and a key that means the same thing in every language is more
+      // use there than a sentence that changes with the kiosk's setting.
+      next.kind === 'trouble' ? { cause, message: noteId(next.message) } : { cause },
     );
   }
   state = next;
@@ -243,26 +295,29 @@ export function subscribe(listener: (state: PrinterState) => void): () => void {
  * than to a shrug — an unknown failure that says nothing is worse than one that
  * says too much.
  */
-function describe(error: unknown): { message: string; advice: string | null } {
+function describe(error: unknown): { message: PrinterNote; advice: PrinterNote | null } {
   const code = (error as { code?: string } | null)?.code;
-  const advice = (error as { platformHint?: string } | null)?.platformHint ?? null;
+  const hint = (error as { platformHint?: string } | null)?.platformHint ?? null;
+  const advice: PrinterNote | null = hint === null ? null : { text: hint };
 
   switch (code) {
     case 'printer-error': {
       const flags = (error as { errors?: { message: string }[] }).errors ?? [];
+      const flag = flags[0]?.message;
       return {
-        message: flags[0]?.message ?? 'The printer reported a problem.',
-        advice: 'Check the lid, the roll and the cutter.',
+        // The library's own words for a jam or an open lid — see `PrinterNote`.
+        message: flag ? { text: flag } : { key: 'troubleReported' },
+        advice: { key: 'adviceLidRollCutter' },
       };
     }
     case 'disconnected':
-      return { message: 'The printer was unplugged.', advice: 'Plug it back in.' };
+      return { message: { key: 'troubleUnplugged' }, advice: { key: 'advicePlugBackIn' } };
     case 'claim-failed':
-      return { message: 'Something else on this device is holding the printer.', advice };
+      return { message: { key: 'troubleHeld' }, advice };
     case 'editor-lite':
       return {
-        message: 'The printer is in Editor Lite mode.',
-        advice: 'Hold the Editor Lite button until its light goes out.',
+        message: { key: 'troubleEditorLite' },
+        advice: { key: 'adviceEditorLite' },
       };
     case 'status-timeout': {
       // The library waits for the printer to say it is ready for the next job
@@ -271,27 +326,28 @@ function describe(error: unknown): { message: string; advice: string | null } {
       const printed = Number((error as { pagesPrinted?: unknown }).pagesPrinted);
       if (printed > 0) {
         return {
-          message: 'The printer went quiet after printing.',
-          advice: 'If the next label does not come out, turn it off and on again.',
+          message: { key: 'troubleQuietAfterPrint' },
+          advice: { key: 'adviceNextLabel' },
         };
       }
-      return { message: 'The printer stopped responding.', advice: 'Turn it off and on again.' };
+      return { message: { key: 'troubleUnresponsive' }, advice: { key: 'adviceOffAndOn' } };
     }
     case 'transfer-timeout':
-      return { message: 'The printer stopped responding.', advice: 'Turn it off and on again.' };
+      return { message: { key: 'troubleUnresponsive' }, advice: { key: 'adviceOffAndOn' } };
     case 'busy':
-      return { message: 'The printer is busy with a label.', advice: 'Try again in a moment.' };
+      return { message: { key: 'troubleBusy' }, advice: { key: 'adviceTryAgain' } };
     case 'raster':
       return {
-        message: 'This label does not fit the media the kiosk is set to.',
-        advice: 'Check the label size on this screen.',
+        message: { key: 'troubleLabelFit' },
+        advice: { key: 'adviceLabelSize' },
       };
     case 'unknown-model':
     case 'unknown-label':
-      return { message: 'This kiosk is set up for a printer it cannot find.', advice: null };
+      return { message: { key: 'troubleNotFound' }, advice: null };
     default:
       return {
-        message: error instanceof Error ? error.message : 'The label did not print.',
+        message:
+          error instanceof Error ? { text: error.message } : { key: 'troubleDidNotPrint' },
         advice: null,
       };
   }
@@ -497,7 +553,11 @@ function lose(gone: BrotherQLPrinterCore, cause: string): void {
   if (printer === gone) printer = null;
   void gone.close().catch(() => {});
   setState(
-    { kind: 'trouble', message: 'The printer was unplugged.', advice: 'Plug it back in.' },
+    {
+      kind: 'trouble',
+      message: { key: 'troubleUnplugged' },
+      advice: { key: 'advicePlugBackIn' },
+    },
     cause,
   );
 }
@@ -629,7 +689,7 @@ export async function ready(): Promise<PrinterState> {
     setState(
       {
         kind: 'unsupported',
-        message: 'This browser cannot talk to a USB printer.',
+        message: { key: 'troubleUnsupported' },
         // No advice: nobody in a lobby is going to change browser, and the
         // person who can is reading the setup docs rather than this screen.
       },
@@ -1063,8 +1123,8 @@ const queue = createLabelQueue({
       setState(
         {
           kind: 'trouble',
-          message: 'A label was skipped because it would have printed too late.',
-          advice: 'Check the printer.',
+          message: { key: 'troubleStale' },
+          advice: { key: 'adviceCheckPrinter' },
         },
         'label-stale',
       );
@@ -1073,6 +1133,8 @@ const queue = createLabelQueue({
 });
 
 function jobFor(
+  grades: GradeStrings,
+  locale: string,
   student: KioskStudent,
   binding: KioskBinding,
   template: LabelTemplate,
@@ -1085,7 +1147,7 @@ function jobFor(
     // looking for the child they can see.
     name: `${student.firstName} ${student.lastName}`.trim(),
     template,
-    values: tokenValuesFor(student, binding),
+    values: tokenValuesFor(grades, locale, student, binding),
   };
 }
 
@@ -1096,13 +1158,18 @@ function jobFor(
  * moving by the time the tick paints. Callers gate this on the intent being a
  * check-in: a check-out prints nothing, so warming one is work thrown away.
  */
-export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
+export function warmLabel(
+  grades: GradeStrings,
+  locale: string,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
   const template = binding.labelTemplate;
   if (!template) return;
   // Before the queue, not after: `warm` starts rasterising synchronously, and
   // the rasteriser is what waits for this.
   startAllergyLookup(student, template);
-  queue.warm(jobFor(student, binding, template));
+  queue.warm(jobFor(grades, locale, student, binding, template));
 }
 
 /**
@@ -1112,13 +1179,18 @@ export function warmLabel(student: KioskStudent, binding: KioskBinding): void {
  * success screen has already been set, and nothing about a sticker may reach
  * back into a screen that has told a parent their child is checked in.
  */
-export function printLabel(student: KioskStudent, binding: KioskBinding): void {
+export function printLabel(
+  grades: GradeStrings,
+  locale: string,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
   const template = binding.labelTemplate;
   if (!template) return;
   // A no-op when `warmLabel` already started it, and the reason this is not
   // simply left to the warm: the printer screen reaches `printLabel` too.
   startAllergyLookup(student, template);
-  queue.print(jobFor(student, binding, template));
+  queue.print(jobFor(grades, locale, student, binding, template));
 }
 
 /**
@@ -1171,8 +1243,13 @@ export function forgetLabel(studentId: string): void {
  * second one, and `docs/kiosk-reprint.md` for why a wider parent-facing reprint
  * is a roll of labels on the floor.
  */
-export function reprintLabel(student: KioskStudent, binding: KioskBinding): void {
-  printLabel(student, binding);
+export function reprintLabel(
+  grades: GradeStrings,
+  locale: string,
+  student: KioskStudent,
+  binding: KioskBinding,
+): void {
+  printLabel(grades, locale, student, binding);
 }
 
 /**
@@ -1184,10 +1261,15 @@ export function reprintLabel(student: KioskStudent, binding: KioskBinding): void
  * Lines that come to nothing are dropped exactly as the renderer drops them, so
  * the preview cannot promise a line the label will not have.
  */
-export function labelPreview(student: KioskStudent, binding: KioskBinding): string[] {
+export function labelPreview(
+  grades: GradeStrings,
+  locale: string,
+  student: KioskStudent,
+  binding: KioskBinding,
+): string[] {
   const template = binding.labelTemplate;
   if (!template) return [];
-  const values = tokenValuesFor(student, binding);
+  const values = tokenValuesFor(grades, locale, student, binding);
   return template.lines
     .map((line) => fillLabelTokens(line.text, values))
     .filter((text) => text.length > 0);
@@ -1216,7 +1298,7 @@ export function printedTonight(): readonly PrintedLabel[] {
  * Uses the real path — worker, raster, transport — so a successful test print
  * proves the whole chain rather than just that the device answers.
  */
-export function testPrint(): void {
+export function testPrint(locale: string): void {
   const active = config;
   if (!active) return;
   queue.print({
@@ -1231,7 +1313,7 @@ export function testPrint(): void {
     },
     values: {
       eventTitle: `${active.model} · ${active.label}`,
-      time: new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+      time: new Date().toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
     },
   });
 }

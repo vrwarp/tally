@@ -18,8 +18,9 @@ import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { shortName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
-import { formatEventDay, formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LockedGatheringProps {
   event: TallyEvent;
@@ -35,6 +36,8 @@ export function LockedGathering({
   backTo = '/',
   backLabel = 'Check-in',
 }: LockedGatheringProps) {
+  const time = useTimeFormats();
+  const t = useTranslations('Events');
   const { access } = useData();
   const { byUid } = useTeam(true);
 
@@ -58,24 +61,26 @@ export function LockedGathering({
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-ink-100">{event.title}</h1>
           <p className="text-sm text-ink-500">
-            {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+            {t('when', {
+              day: time.eventDay(event.startAt, now),
+              window: time.eventWindow(event),
+            })}
           </p>
         </div>
       </header>
 
       <div className="rounded-2xl bg-ink-900 p-4 ring-1 ring-ink-800">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink-200">
-          <span aria-hidden>🔒</span> Only people added to this gathering can take its register.
+          <span aria-hidden>🔒</span> {t('lockedRestricted')}
         </p>
         <p className="pt-1 text-sm text-ink-500">
-          You are still signed in to Tally and everything else is unchanged — this one gathering
-          has been narrowed to a set of people, and you are not on the list yet.
+          {t('lockedExplain')}
         </p>
 
         {people.length > 0 ? (
           <>
             <h2 className="pt-4 text-xs font-bold uppercase tracking-wider text-ink-400">
-              Ask one of these to add you
+              {t('askOneOfThese')}
             </h2>
             <ul className="flex flex-col pt-1">
               {people.map((profile) => (
@@ -97,7 +102,7 @@ export function LockedGathering({
            * nobody at all. Either way "find an admin" is the true next step and
            * a blank space is not.
            */
-          <p className="pt-3 text-sm text-ink-500">Ask an admin to add you to this gathering.</p>
+          <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
         )}
       </div>
     </div>

@@ -28,7 +28,6 @@
 import { Button } from '@/components/ui';
 import { syncStripCopy } from '@/features/students/syncStripCopy';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import {
   backendLabelOf,
@@ -38,9 +37,12 @@ import {
   type UpstreamEdit,
   type UpstreamEditPatch,
 } from '@/types';
+import { useSyncStripStrings } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** The short guard, shared so the two frames that show it cannot drift apart. */
-export const ONE_NEW_PERSON = 'One new person, never a second copy.';
+/** The key for the promise the re-create button makes. */
+export const ONE_NEW_PERSON = 'oneNewPerson';
 
 export interface StudentSyncStripProps {
   student: Student;
@@ -75,15 +77,17 @@ export function StudentSyncStrip({
   onFix,
   onRecreate,
 }: StudentSyncStripProps) {
+  const time = useTimeFormats();
+  const syncStrings = useSyncStripStrings();
   const backend = backendLabelOf(student);
   const mine = edit.createdBy === uid;
-  const copy = syncStripCopy({
+  const copy = syncStripCopy(syncStrings, {
     edit,
     now,
     backend,
     mine,
-    authorFirstName: edit.createdByName.split(/\s+/)[0] ?? 'somebody',
-    ago: formatRelative(edit.createdAt),
+    authorFirstName: edit.createdByName.split(/\s+/)[0] ?? syncStrings.t('somebody'),
+    ago: time.relative(edit.createdAt),
   });
 
   const loud = needsAHuman(edit);
@@ -102,13 +106,15 @@ export function StudentSyncStrip({
     edit.state === 'merged'
       ? [
           {
-            label: 'Now points at',
-            value: edit.survivorName ?? 'the surviving record',
-            meta: edit.survivorPersonId ? `#${edit.survivorPersonId} · the survivor` : 'the survivor',
+            label: syncStrings.t('nowPointsAt'),
+            value: edit.survivorName ?? syncStrings.t('theSurvivingRecord'),
+            meta: edit.survivorPersonId
+              ? syncStrings.t('survivorMeta', { id: edit.survivorPersonId })
+              : syncStrings.t('theSurvivor'),
             live: true,
           },
           {
-            label: 'You edited',
+            label: syncStrings.t('youEdited'),
             value: `${student.firstName} ${student.lastName}`.trim(),
             /*
              * The id the edit named, beside the one it landed on. Both, because
@@ -118,7 +124,7 @@ export function StudentSyncStrip({
              */
             meta: [
               personIdFromStudentId(student.id) ? `#${personIdFromStudentId(student.id)}` : null,
-              `merged ${formatRelative(edit.settledAt ?? edit.updatedAt)}`,
+              syncStrings.t('mergedAt', { when: time.relative(edit.settledAt ?? edit.updatedAt) }),
             ]
               .filter(Boolean)
               .join(' · '),
@@ -127,15 +133,15 @@ export function StudentSyncStrip({
       : edit.state === 'differs' && edit.observed
         ? [
             {
-              label: 'On the record now',
+              label: syncStrings.t('onTheRecordNow'),
               value: describeValue(edit.observed),
-              meta: `in ${backend}`,
+              meta: syncStrings.t('inBackend', { backend }),
               live: true,
             },
             {
-              label: 'You typed',
+              label: syncStrings.t('youTyped'),
               value: describeValue(edit.patch),
-              meta: mine ? 'you' : edit.createdByName,
+              meta: mine ? syncStrings.t('you') : edit.createdByName,
             },
           ]
         : null;
@@ -168,7 +174,7 @@ export function StudentSyncStrip({
         <div className="flex w-full flex-col gap-1 lg:w-auto">
           {edit.state === 'queued' ? (
             <Button variant="secondary" className="w-full lg:w-auto" onClick={onCancel}>
-              Cancel this edit
+              {syncStrings.t('cancelThisEdit')}
             </Button>
           ) : null}
           {/*
@@ -191,20 +197,20 @@ export function StudentSyncStrip({
           {edit.state === 'failed' ? (
             edit.failure === 'validation' ? (
               <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onFix}>
-                Fix and send again
+                {syncStrings.t('fixAndSendAgain')}
               </Button>
             ) : (
               <Button variant={loud ? 'primary' : 'secondary'} className="w-full lg:w-auto" onClick={onRetry}>
-                Send it again
+                {syncStrings.t('sendItAgain')}
               </Button>
             )
           ) : null}
           {edit.state === 'orphaned' ? (
             <>
               <Button variant="primary" className="w-full lg:w-auto" onClick={onRecreate}>
-                Re-create them in {backend}
+                {syncStrings.t('recreateIn', { backend })}
               </Button>
-              <span className="text-xs text-ink-500">{ONE_NEW_PERSON}</span>
+              <span className="text-xs text-ink-500">{syncStrings.t(ONE_NEW_PERSON)}</span>
             </>
           ) : null}
           {edit.state === 'merged' && edit.survivorPersonId ? (
@@ -214,9 +220,13 @@ export function StudentSyncStrip({
                 className="w-full lg:w-auto"
                 onClick={() => window.open(pcoPersonUrl(edit.survivorPersonId!), '_blank')}
               >
-                Open {edit.survivorName ?? 'the survivor'}
+                {syncStrings.t('openSurvivor', {
+                  name: edit.survivorName ?? syncStrings.t('theSurvivor'),
+                })}
               </Button>
-              <span className="text-xs text-ink-500">Opens them in {backend}.</span>
+              <span className="text-xs text-ink-500">
+                {syncStrings.t('opensThemIn', { backend })}
+              </span>
             </>
           ) : null}
           {/*
@@ -227,10 +237,10 @@ export function StudentSyncStrip({
           {edit.state === 'differs' ? (
             <>
               <Button variant="secondary" className="w-full lg:w-auto" onClick={onDismiss}>
-                Keep theirs
+                {syncStrings.t('keepTheirs')}
               </Button>
               <Button variant="secondary" className="mt-3 w-full lg:mt-2 lg:w-auto" onClick={onRetry}>
-                Send mine again
+                {syncStrings.t('sendMineAgain')}
               </Button>
             </>
           ) : null}
@@ -242,7 +252,7 @@ export function StudentSyncStrip({
             onClick={onDismiss}
             className="min-h-11 text-sm font-semibold text-ink-400 underline underline-offset-4 lg:min-h-0"
           >
-            {edit.state === 'failed' ? 'Discard the edit' : 'Got it'}
+            {edit.state === 'failed' ? syncStrings.t('discardTheEdit') : syncStrings.t('gotIt')}
           </button>
         ) : null}
       </div>

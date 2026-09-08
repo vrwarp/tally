@@ -45,10 +45,13 @@
  * again would return the same people they are standing in front of. Name only.
  */
 import { useEffect, useMemo, useRef } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { searchStudents, MAX_RESULTS, type KioskStudent } from '../search';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 export function SiblingScreen({
   student,
@@ -74,6 +77,8 @@ export function SiblingScreen({
   onRegister: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations('Confirm');
+  const grades = useGrades();
   /*
    * Name only — `last4Index` is deliberately not threaded in. The four digits
    * are how this family was found a moment ago, so searching them again
@@ -110,12 +115,12 @@ export function SiblingScreen({
           {...tap(() => onBack())}
           className="absolute top-[max(0.75rem,var(--spacing-safe-top))] left-4 h-12 rounded-lg px-3 text-base text-ink-400 active:bg-ink-800"
         >
-          ← Back
+          {t('back')}
         </button>
         <div className="text-lg font-semibold text-ink-200">
-          Who else is with {student.firstName}?
+          {t('whoElseWith', { name: student.firstName })}
         </div>
-        <div className="text-sm text-ink-500">Type their first or last name.</div>
+        <div className="text-sm text-ink-500">{t('typeTheirName')}</div>
       </div>
 
       {/*
@@ -134,7 +139,7 @@ export function SiblingScreen({
               {buffer}
             </span>
           ) : (
-            <span className="text-xl text-ink-500">Child&rsquo;s name</span>
+            <span className="text-xl text-ink-500">{t('childsName')}</span>
           )}
         </div>
       </div>
@@ -146,9 +151,7 @@ export function SiblingScreen({
       >
         <div className="mx-auto flex max-w-2xl flex-col gap-2 pb-2">
           {buffer.length > 0 && results.length === 0 && (
-            <div className="pt-6 text-center text-lg text-ink-400">
-              No match — are they new?
-            </div>
+            <div className="pt-6 text-center text-lg text-ink-400">{t('noMatchNew')}</div>
           )}
           {results.slice(0, MAX_RESULTS).map((found) => {
             /*
@@ -173,11 +176,11 @@ export function SiblingScreen({
                 </span>
                 <span className="pl-3 text-base whitespace-nowrap text-ink-400">
                   {present ? (
-                    <span className="font-semibold text-present-400">✓ Checked in</span>
+                    <span className="font-semibold text-present-400">{t('checkedIn')}</span>
                   ) : found.grade === null ? (
                     ''
                   ) : (
-                    gradeDescription(found.grade)
+                    gradeDescription(grades, found.grade)
                   )}
                 </span>
               </button>
@@ -202,7 +205,7 @@ export function SiblingScreen({
           })}
           className="flex h-12 items-center justify-center rounded-xl bg-brand-600/15 px-6 text-base font-semibold text-brand-300 ring-1 ring-brand-500/40 active:bg-brand-600/30"
         >
-          Not on the list? Add a new child
+          {t('addNewChild')}
         </button>
       </div>
 

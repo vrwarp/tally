@@ -19,6 +19,7 @@
 import { memo, useCallback, useRef } from 'react';
 import { haptic } from '@/lib/utils';
 import type { KioskKey } from '../components/Keyboard';
+import { useTranslations } from 'use-intl';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -43,6 +44,8 @@ export const PhonePad = memo(function PhonePad({
 }: {
   onKey: (key: KioskKey) => void;
 }) {
+  const t = useTranslations('Register');
+  const tCommon = useTranslations('Common');
   const handlerRef = useRef(onKey);
   handlerRef.current = onKey;
 
@@ -90,7 +93,7 @@ export const PhonePad = memo(function PhonePad({
         data-key="clear"
         className={`${KEY_CLASS} text-base font-medium text-ink-300`}
       >
-        Clear
+        {tCommon('clear')}
       </button>
       <button
         key="0"
@@ -105,7 +108,7 @@ export const PhonePad = memo(function PhonePad({
         type="button"
         tabIndex={-1}
         data-key="backspace"
-        aria-label="Delete"
+        aria-label={t('delete')}
         className={`${KEY_CLASS} text-2xl`}
       >
         ⌫

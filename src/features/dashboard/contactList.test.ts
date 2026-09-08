@@ -8,11 +8,19 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildContactList } from '@/features/dashboard/contactList';
+import { testTranslator } from '@/test/translator';
 import { makeStudent } from '../../../tests/factories';
+import { testGrades } from '@/test/translator';
+
+const grades = testGrades();
+
+// The real English catalogue, so these assertions still measure what a person
+// pastes — and now also that the keys behind it render.
+const t = testTranslator('FollowUp');
 
 describe('buildContactList', () => {
   it('puts the grade in brackets after the name', () => {
-    const line = buildContactList('Chase:', [
+    const line = buildContactList(t, grades, 'Chase:', [
       makeStudent({ firstName: 'Alena', lastName: 'Ruiz', grade: 9 }),
     ]).split('\n')[1];
 
@@ -20,7 +28,7 @@ describe('buildContactList', () => {
   });
 
   it('drops the brackets for somebody Planning Center holds no grade for', () => {
-    const line = buildContactList('Chase:', [
+    const line = buildContactList(t, grades, 'Chase:', [
       makeStudent({ firstName: 'Alan', lastName: 'Wan', grade: null }),
     ]).split('\n')[1];
 

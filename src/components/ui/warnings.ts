@@ -10,10 +10,17 @@ import type { RosterWarning } from '@/types';
 export type WarningTone = 'neutral' | 'warn' | 'danger';
 
 export interface WarningMeta {
-  /** Full sentence for screen readers and tooltips. */
-  label: string;
+  /**
+   * A key into `Warnings.*`, not a sentence.
+   *
+   * This module is pure data with no React in it — it cannot call a hook — and
+   * the words differ per language while the tone and the glyph do not. So the
+   * table decides everything about how a flag *looks* and names what it
+   * *says*; `WarningBadge` does the lookup.
+   */
+  labelKey: 'allergyLabel' | 'recordMissingLabel' | 'incompleteLabel';
   /** Two-to-seven characters, for a badge on a roster row. */
-  short: string;
+  shortKey: 'allergyShort' | 'recordMissingShort' | 'incompleteShort';
   /** The one colour this condition wears, on every screen that shows it. */
   tone: WarningTone;
   /**
@@ -56,25 +63,25 @@ export interface WarningMeta {
  * disagreed with it in all three directions at once, which is how a student's
  * missing phone number ended up amber on one screen and grey on another one
  * navigation away. Read a badge's colour off this table — `warningTone`,
- * `warningGlyph`, `warningShort` — or, better, render `WarningBadge`, which
+ * `warningGlyph`, `warningShortKey` — or, better, render `WarningBadge`, which
  * does it for you.
  */
 export const WARNING_META: Record<RosterWarning, WarningMeta> = {
   allergy: {
-    label: 'Has allergies on file',
-    short: 'Allergy',
+    labelKey: 'allergyLabel',
+    shortKey: 'allergyShort',
     tone: 'warn',
     glyph: '⚠',
   },
   'record-missing': {
-    label: 'Planning Center record missing — check-in frozen',
-    short: 'Frozen',
+    labelKey: 'recordMissingLabel',
+    shortKey: 'recordMissingShort',
     tone: 'danger',
     glyph: null,
   },
   'incomplete-profile': {
-    label: 'No contact on file',
-    short: 'No contact',
+    labelKey: 'incompleteLabel',
+    shortKey: 'incompleteShort',
     tone: 'neutral',
     glyph: null,
   },
@@ -94,13 +101,13 @@ export const ROSTER_WARNINGS = [
   'incomplete-profile',
 ] as const satisfies readonly RosterWarning[];
 
-export function warningLabel(warning: RosterWarning): string {
-  return WARNING_META[warning].label;
+export function warningLabelKey(warning: RosterWarning): WarningMeta['labelKey'] {
+  return WARNING_META[warning].labelKey;
 }
 
 /** The short form for the eye. */
-export function warningShort(warning: RosterWarning): string {
-  return WARNING_META[warning].short;
+export function warningShortKey(warning: RosterWarning): WarningMeta['shortKey'] {
+  return WARNING_META[warning].shortKey;
 }
 
 /** The one colour this condition wears. There is no second opinion. */

@@ -22,11 +22,13 @@
  * to the chooser.
  */
 import { useEffect, useRef } from 'react';
+import { useTranslations } from 'use-intl';
 import { useTap } from '../components/tapGuard';
 
 const AUTO_RETURN_MS = 6000;
 
 export function NotOpenScreen({ opensAt, onDone }: { opensAt: string; onDone: () => void }) {
+  const t = useTranslations('Door');
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
   const tap = useTap();
@@ -50,13 +52,11 @@ export function NotOpenScreen({ opensAt, onDone }: { opensAt: string; onDone: ()
         🕑
       </div>
       <div>
-        <div className="text-4xl font-bold text-ink-50">Not open yet</div>
-        <div className="pt-3 text-2xl text-ink-300">Check-in opens {opensAt}.</div>
-        <div className="pt-3 text-xl text-ink-500">
-          If that is not this gathering, please see a leader.
-        </div>
+        <div className="text-4xl font-bold text-ink-50">{t('notOpenTitle')}</div>
+        <div className="pt-3 text-2xl text-ink-300">{t('notOpenWhen', { when: opensAt })}</div>
+        <div className="pt-3 text-xl text-ink-500">{t('notThisGathering')}</div>
       </div>
-      <div className="text-lg text-ink-500">Tap anywhere to carry on</div>
+      <div className="text-lg text-ink-500">{t('tapToCarryOn')}</div>
     </div>
   );
 }

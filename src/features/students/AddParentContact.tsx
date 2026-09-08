@@ -38,6 +38,7 @@ import {
   type PcoPersonDetails,
   type Student,
 } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface AddParentContactProps {
   student: Student;
@@ -75,11 +76,8 @@ function usableEmail(raw: string): boolean {
 }
 
 function Missing({ label }: { label: string }) {
-  return (
-    <p className="mt-1 text-sm text-warn-400">
-      Nothing in {label} — nobody can reach this family in an emergency.
-    </p>
-  );
+  const t = useTranslations('ParentContact');
+  return <p className="mt-1 text-sm text-warn-400">{t('nothingIn', { backend: label })}</p>;
 }
 
 export function AddParentContact({
@@ -89,6 +87,7 @@ export function AddParentContact({
   defaultOpen = false,
   onCancel,
 }: AddParentContactProps) {
+  const t = useTranslations('ParentContact');
   const [open, setOpen] = useState(defaultOpen);
   const backend = backendOfStudent(student);
   const label = backendLabelOf(student);
@@ -99,8 +98,7 @@ export function AddParentContact({
       <>
         <Missing label={label} />
         <p className="mt-1 text-xs text-ink-500">
-          Tally holds no contact details of its own. Once this student reaches {label}, their
-          contact details are added there.
+          {t('noneOfOurOwn', { backend: label })}
         </p>
       </>
     );
@@ -118,8 +116,8 @@ export function AddParentContact({
           {details && !details.householdAdult
             ? // Write-back is turned down: the family still has to be built,
               // and the backend is the only place that can do it.
-              `${label} has no adult in this household yet, so there is nobody to put a number on.`
-            : `Contact details are kept in ${label}.`}{' '}
+              t('noAdultInHousehold', { backend: label })
+            : t('keptIn', { backend: label })}{' '}
           {backend === 'pco' && student.pcoPersonId ? (
             // Only Planning Center has a product page to link to.
             <>
@@ -129,12 +127,12 @@ export function AddParentContact({
                 rel="noreferrer"
                 className="font-semibold text-brand-300 underline"
               >
-                Add it there
+                {t('addItThereLink')}
               </a>
               .
             </>
           ) : (
-            'Add it there.'
+            t('addItThere')
           )}
         </p>
       </>
@@ -147,11 +145,11 @@ export function AddParentContact({
         <Missing label={label} />
         {creatable ? (
           <p className="mt-1 text-xs text-ink-500">
-            {label} has no adult in this household yet. Tally can add one.
+            {t('tallyCanAddOne', { backend: label })}
           </p>
         ) : null}
         <Button variant="secondary" size="sm" className="mt-2" onClick={() => setOpen(true)}>
-          {creatable ? '＋ Add an adult' : '＋ Add a contact'}
+          {creatable ? t('addAnAdult') : t('addAContact')}
         </Button>
       </>
     );
@@ -184,6 +182,8 @@ function ContactForm({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const t = useTranslations('ParentContact');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -230,7 +230,7 @@ function ContactForm({
       // meant for the person reading it.
       setProblem(response.data.message);
     } catch {
-      setProblem(`Could not reach ${backendLabelOf(student)} to add this. Try again in a moment.`);
+      setProblem(t('reachFailed', { backend: backendLabelOf(student) }));
     } finally {
       setBusy(false);
     }
@@ -239,32 +239,34 @@ function ContactForm({
   return (
     <form onSubmit={(event) => void submit(event)} className="mt-2 flex flex-col gap-3">
       <p className="text-xs text-ink-500">
-        Saved onto {details?.contactName ?? 'the adult on file'} in {backendLabelOf(student)}. Either
-        field is enough.
+        {t('savedOnto', {
+          contact: details?.contactName ?? t('theAdultOnFile'),
+          backend: backendLabelOf(student),
+        })}
       </p>
 
       <PhoneField
-        label="Adult’s phone"
+        label={t('adultPhone')}
         autoComplete="tel"
         value={phone}
         onValueChange={setPhone}
-        error={phoneOk ? null : 'That is not a number anybody could ring.'}
+        error={phoneOk ? null : t('phoneInvalid')}
       />
       <TextField
-        label="Adult’s email"
+        label={t('adultEmail')}
         type="email"
         inputMode="email"
         autoComplete="email"
         value={email}
         onChange={(changed) => setEmail(changed.target.value)}
-        error={emailOk ? null : 'That does not look like an email address.'}
+        error={emailOk ? null : t('emailInvalid')}
       />
 
       {problem ? <p className="text-sm text-danger-400">{problem}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
         <Button
           type="button"
@@ -274,7 +276,7 @@ function ContactForm({
             setProblem(null);
           }}
         >
-          Cancel
+          {tCommon('cancel')}
         </Button>
       </div>
     </form>
@@ -294,6 +296,8 @@ function AdultForm({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const t = useTranslations('ParentContact');
+  const tCommon = useTranslations('Common');
   const { show } = useToast();
   const [firstName, setFirstName] = useState('');
   // Right far more often than it is wrong, and wrong is one edit away. A blank
@@ -361,7 +365,7 @@ function AdultForm({
 
       setProblem(response.data.message);
     } catch {
-      setProblem(`Could not reach ${backendLabelOf(student)} to add this. Try again in a moment.`);
+      setProblem(t('reachFailed', { backend: backendLabelOf(student) }));
     } finally {
       setBusy(false);
       setPending(null);
@@ -379,8 +383,8 @@ function AdultForm({
         */}
         <p className="text-sm font-semibold text-ink-100">
           {candidates.length === 1
-            ? `Is this the adult to call for ${student.firstName}?`
-            : `Which of these is the adult to call for ${student.firstName}?`}
+            ? t('isThisTheAdult', { name: student.firstName })
+            : t('whichIsTheAdult', { name: student.firstName })}
         </p>
 
         {/*
@@ -401,7 +405,7 @@ function AdultForm({
                   onClick={() => void send({ personId: candidate.pcoPersonId })}
                   disabled={busy}
                   aria-busy={choosing || undefined}
-                  aria-label={`${candidate.name} is the adult to call for ${student.firstName}`}
+                  aria-label={t('candidateAria', { candidate: candidate.name, name: student.firstName })}
                   className={cn(
                     'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1',
                     'bg-ink-900 ring-ink-800 transition-colors active:bg-ink-800 disabled:opacity-60',
@@ -419,8 +423,8 @@ function AdultForm({
                     </span>
                     <span className="block truncate text-xs text-ink-500">
                       {candidate.reachable
-                        ? `Has contact details in ${backendLabelOf(student)}`
-                        : 'No contact details on file yet'}
+                        ? t('hasContactIn', { backend: backendLabelOf(student) })
+                        : t('noContactYet')}
                     </span>
                   </span>
                   {choosing ? (
@@ -465,10 +469,12 @@ function AdultForm({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-ink-100">
-                  None of these
+                  {t('noneOfThese')}
                 </span>
                 <span className="block truncate text-xs text-ink-500">
-                  Add a different {`${firstName.trim()} ${lastName.trim()}`.trim() || 'person'}
+                  {t('addADifferent', {
+                    name: `${firstName.trim()} ${lastName.trim()}`.trim() || t('person'),
+                  })}
                 </span>
               </span>
               {pending === 'new' ? (
@@ -499,7 +505,7 @@ function AdultForm({
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {tCommon('cancel')}
           </Button>
         </div>
 
@@ -510,8 +516,7 @@ function AdultForm({
           two buttons they came here for.
         */}
         <p className="text-xs text-ink-500">
-          Putting them in this household keeps one record. A second copy of the same adult has to be
-          merged by hand later.
+          {t('householdNote')}
         </p>
       </div>
     );
@@ -526,14 +531,15 @@ function AdultForm({
       className="mt-2 flex flex-col gap-3"
     >
       <p className="text-xs text-ink-500">
-        Added to {backendLabelOf(student)} as an adult in {student.firstName}&rsquo;s household, and
-        the household itself if there is not one yet. A phone number or email is optional now and
-        can be added later.
+        {t('addedAsAdult', {
+          backend: backendLabelOf(student),
+          name: student.firstName,
+        })}
       </p>
 
       <div className="grid grid-cols-2 gap-3">
         <TextField
-          label="Adult’s first name"
+          label={t('adultFirstName')}
           value={firstName}
           onChange={(changed) => setFirstName(changed.target.value)}
           autoCapitalize="words"
@@ -541,7 +547,7 @@ function AdultForm({
           required
         />
         <TextField
-          label="Adult’s last name"
+          label={t('adultLastName')}
           value={lastName}
           onChange={(changed) => setLastName(changed.target.value)}
           autoCapitalize="words"
@@ -550,27 +556,27 @@ function AdultForm({
       </div>
 
       <PhoneField
-        label="Adult’s phone"
+        label={t('adultPhone')}
         autoComplete="tel"
         value={phone}
         onValueChange={setPhone}
-        error={phoneOk ? null : 'That is not a number anybody could ring.'}
+        error={phoneOk ? null : t('phoneInvalid')}
       />
       <TextField
-        label="Adult’s email"
+        label={t('adultEmail')}
         type="email"
         inputMode="email"
         autoComplete="email"
         value={email}
         onChange={(changed) => setEmail(changed.target.value)}
-        error={emailOk ? null : 'That does not look like an email address.'}
+        error={emailOk ? null : t('emailInvalid')}
       />
 
       {problem ? <p className="text-sm text-danger-400">{problem}</p> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" loading={busy} disabled={!valid}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
         <Button
           type="button"
@@ -580,7 +586,7 @@ function AdultForm({
             setProblem(null);
           }}
         >
-          Cancel
+          {tCommon('cancel')}
         </Button>
       </div>
     </form>

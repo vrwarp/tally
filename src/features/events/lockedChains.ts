@@ -24,6 +24,7 @@
  * read as alphabetical-by-title.
  */
 import { chainKey } from '@/lib/materialize';
+import { formatClock, type TimeStrings } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 export interface LockedChain {
@@ -90,7 +91,11 @@ export function partitionBand(
  * building — comes back `null` and stays on the rows, which is what makes an
  * exception visible instead of drowning it in six copies of the rule.
  */
-export function sharedDetail(events: readonly TallyEvent[]): string | null {
+export function sharedDetail(
+  strings: TimeStrings,
+  join: (values: { window: string; location: string }) => string,
+  events: readonly TallyEvent[],
+): string | null {
   if (events.length === 0) return null;
 
   const first = events[0]!;
@@ -106,17 +111,19 @@ export function sharedDetail(events: readonly TallyEvent[]): string | null {
     ? first.location
     : null;
 
-  return location ? `${formatWindow(first)} · ${location}` : formatWindow(first);
+  const window_ = formatWindow(strings, first);
+  return location ? join({ window: window_, location }) : window_;
 }
 
 /**
  * Not `formatEventWindow`, which takes the whole event: this runs over a chain
  * and only ever needs the two clocks.
  */
-function formatWindow(event: TallyEvent): string {
-  const clock = (date: Date) =>
-    date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${clock(event.startAt)} – ${clock(event.endAt)}`;
+function formatWindow(strings: TimeStrings, event: TallyEvent): string {
+  return strings.t('window', {
+    start: formatClock(strings, event.startAt),
+    end: formatClock(strings, event.endAt),
+  });
 }
 
 /**

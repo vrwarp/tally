@@ -22,8 +22,9 @@
  */
 import { useState } from 'react';
 import { Button } from '@/components/ui';
-import { formatShortDate } from '@/lib/time';
 import { TRANSITION_REASON_LABEL, type Transition } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LedgerRow {
   transition: Transition;
@@ -45,6 +46,10 @@ export interface TransitionLedgerProps {
 }
 
 export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: TransitionLedgerProps) {
+  const time = useTimeFormats();
+  const t = useTranslations('Ledger');
+  const tReason = useTranslations('Transitions');
+  const tCommon = useTranslations('Common');
   const [open, setOpen] = useState(false);
 
   if (rows.length === 0) return null;
@@ -66,8 +71,9 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
           {open ? '▾' : '▸'}
         </span>
         <span className="min-w-0 flex-1 truncate">
-          {rows.length} no longer expected{showGathering ? '' : ' here'} · latest{' '}
-          {formatShortDate(latest)}
+          {showGathering
+            ? t('summary', { count: rows.length, date: time.shortDate(latest) })
+            : t('summaryHere', { count: rows.length, date: time.shortDate(latest) })}
         </span>
       </button>
 
@@ -108,10 +114,10 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                       and the row that mattered was buried at the tail of the
                       sentence every other row also had. */}
                   <span className="tabular-nums text-ink-400">
-                    {formatShortDate(transition.releasedAt)}
+                    {time.shortDate(transition.releasedAt)}
                   </span>{' '}
-                  · {TRANSITION_REASON_LABEL[transition.reason]}
-                  {transition.note ? ` — “${transition.note}”` : ''}
+                  · {tReason(TRANSITION_REASON_LABEL[transition.reason])}
+                  {transition.note ? t('note', { note: transition.note }) : ''}
                   {/* Bound to its separator: wrapping left the middot hanging
                       alone at the right margin on every row of the phone. */}
                   <span className="whitespace-nowrap"> · {transition.releasedByName}</span>
@@ -119,8 +125,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                     // Their own attendance outranks the record, and the strip
                     // says so rather than quietly dropping the row.
                     <span className="whitespace-nowrap text-present-400">
-                      {' '}
-                      · back since — no longer in effect
+                      {t('backSince')}
                     </span>
                   ) : null}
                 </p>
@@ -137,7 +142,7 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                 onClick={() => onUndo(transition)}
                 loading={undoBusyId === transition.id}
               >
-                Undo
+                {tCommon('undo')}
               </Button>
             </li>
           ))}

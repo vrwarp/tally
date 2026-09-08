@@ -42,7 +42,8 @@ import {
   readBirthdayField,
 } from '@/lib/birthdayField';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatPhone, gradeDescription } from '@/lib/utils';
+import { formatPhone } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { createStudent, updateStudent, type StudentDraft } from '@/services/students';
 import {
@@ -59,6 +60,10 @@ import {
   type StudentStatus,
   type UpstreamEditPatch,
 } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useBirthdayStrings } from '@/hooks/useBirthdayStrings';
+import { useServerText } from '@/hooks/useServerText';
 
 function isPcoManaged(field: keyof Student): boolean {
   return (PCO_MANAGED_STUDENT_FIELDS as readonly string[]).includes(field);
@@ -142,6 +147,11 @@ export interface StudentEditorModalProps {
 }
 
 export function StudentEditorModal({ open, onClose, student, onSaved }: StudentEditorModalProps) {
+  const serverText = useServerText();
+  const grades = useGrades();
+  const t = useTranslations('StudentEditor');
+  const birthdayStrings = useBirthdayStrings();
+  const tCommon = useTranslations('Common');
   const { user, profile } = useAuth();
   const { show } = useToast();
   const formId = useId();
@@ -211,8 +221,8 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
   /** True only under full write-back; false while the details load. */
   const writable = linked && details?.profileWritable === true;
   const locked = (field: keyof Student) => linked && isPcoManaged(field) && !writable;
-  const managedHint = `Managed in ${label}`;
-  const upstreamHint = `Saved in ${label}`;
+  const managedHint = t('managedHint', { backend: label });
+  const upstreamHint = t('upstreamHint', { backend: label });
 
   /**
    * Whether the backend holds no grade for this student.
@@ -227,7 +237,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     : !writable
       ? undefined
       : gradeUnknown
-        ? `${label} holds no grade for them. Choosing one adds it there.`
+        ? t('gradeAddsThere', { backend: label })
         : upstreamHint;
 
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) =>
@@ -348,7 +358,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
       // The whole date, not the roster's day: `writable` is only ever true once
       // the details have landed, so the year on file is known here — and
       // comparing against the day alone would send a birthday nobody changed.
-      const read = readBirthdayField(form.birthday, {
+      const read = readBirthdayField(birthdayStrings, form.birthday, {
         onFile: details?.birthdate ?? student?.birthday ?? null,
       });
       if (!read.ok) {
@@ -399,7 +409,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             // appear to report it. It is the one failure here nobody would
             // otherwise be told about.
             void written.catch(() => {
-              show(`${student.firstName}\u2019s correction could not be saved. Try again.`);
+              show(t('correctionFailed', { name: student.firstName }));
             });
             queued = true;
           }
@@ -446,13 +456,13 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             : student,
         );
         void stored.catch(() => {
-          show(`${student.firstName}\u2019s notes could not be saved. Try again.`);
+          show(t('notesFailed', { name: student.firstName }));
         });
 
         const saved = {
           message: queued
-            ? `${studentFullName({ firstName, lastName })} — saving to ${label}`
-            : `${studentFullName(student)} saved`,
+            ? t('savingTo', { name: studentFullName({ firstName, lastName }), backend: label })
+            : t('saved', { name: studentFullName(student) }),
         };
 
         if (queued) {
@@ -484,11 +494,11 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           },
           user.uid,
         );
-        show(`${firstName} ${lastName} added`, { tone: 'success' });
+        show(t('addedToast', { name: `${firstName} ${lastName}` }), { tone: 'success' });
       }
       onClose();
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : 'Could not save this student.');
+      setSaveError(serverText(cause, t('saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -498,19 +508,19 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     <Modal
       open={open}
       onClose={onClose}
-      title={student ? `Edit ${studentFullName(student)}` : 'Add a student'}
+      title={student ? t('titleEdit', { name: studentFullName(student) }) : t('titleAdd')}
       description={
         student
           ? undefined
-          : 'Created in Tally, and pushed to your people system automatically when write-back allows it.'
+          : t('descriptionAdd')
       }
       footer={
         <>
           <Button variant="secondary" size="lg" onClick={onClose}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button type="submit" form={formId} size="lg" loading={saving}>
-            {student ? 'Save changes' : 'Add student'}
+            {student ? t('saveChanges') : t('addStudent')}
           </Button>
         </>
       }
@@ -526,8 +536,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           <p className="rounded-xl bg-brand-500/10 px-3 py-2 text-xs text-brand-200 ring-1 ring-brand-500/25">
             {writable ? (
               <>
-                Name, grade, birthday and allergies are {label}'s, and Save writes them there —
-                Tally keeps no copy.
+                {t('writableNote', { backend: label })}
                 {backend === 'pco' && student.pcoPersonId ? (
                   // Only Planning Center has a product page to link out to.
                   <>
@@ -538,17 +547,16 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
                       rel="noreferrer"
                       className="font-semibold underline"
                     >
-                      Open in {label}
+                      {t('openIn', { backend: label })}
                     </a>
-                    .
+                    {t('fullStop')}
                   </>
                 ) : null}{' '}
-                Notes live in Tally.
+                {t('notesLiveHere')}
               </>
             ) : (
               <>
-                Name, grade, birthday, allergies and status come from {label} and would be
-                overwritten by the next sync.
+                {t('readOnlyNote', { backend: label })}
                 {backend === 'pco' && student.pcoPersonId ? (
                   <>
                     {' '}
@@ -558,14 +566,14 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
                       rel="noreferrer"
                       className="font-semibold underline"
                     >
-                      Edit them in {label}
+                      {t('editThemIn', { backend: label })}
                     </a>
-                    .
+                    {t('fullStop')}
                   </>
                 ) : (
-                  <> Edit them in {label} itself, or turn write-back on.</>
+                  <> {t('editThemInHere', { backend: label })}</>
                 )}{' '}
-                Notes live in Tally.
+                {t('notesLiveHere')}
               </>
             )}
           </p>
@@ -576,7 +584,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <TextField
-              label="First name"
+              label={tCommon('firstName')}
               value={form.firstName}
               onChange={(changed) => update('firstName', changed.target.value)}
               error={errors.firstName ?? null}
@@ -587,7 +595,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
               required
             />
             <TextField
-              label="Last name"
+              label={tCommon('lastName')}
               value={form.lastName}
               onChange={(changed) => update('lastName', changed.target.value)}
               error={errors.lastName ?? null}
@@ -600,10 +608,10 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           </div>
           <div className="grid grid-cols-2 gap-3">
             <TextField
-              label="Nickname"
+              label={t('nickname')}
               value={form.nickname}
               onChange={(changed) => update('nickname', changed.target.value)}
-              hint={locked('firstName') ? managedHint : 'Optional. Shown beside the first name.'}
+              hint={locked('firstName') ? managedHint : t('nicknameHint')}
               disabled={locked('firstName')}
               autoCapitalize="words"
               autoComplete="off"
@@ -612,7 +620,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         </div>
 
         <SelectField
-          label="Grade"
+          label={tCommon('grade')}
           value={form.grade ?? ''}
           onChange={(changed) =>
             update('grade', changed.target.value ? (Number(changed.target.value) as Grade) : null)
@@ -638,10 +646,10 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
           {/* Offered on a create too, now: a nursery child genuinely has no
               grade, and the alternative was a leader picking one at random for
               a three-year-old. */}
-          {gradeUnknown || !student ? <option value="">No grade</option> : null}
+          {gradeUnknown || !student ? <option value="">{tCommon('noGrade')}</option> : null}
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {gradeDescription(value)}
+              {gradeDescription(grades, value)}
             </option>
           ))}
         </SelectField>
@@ -674,7 +682,7 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
         */}
         {writable ? (
           <TextAreaField
-            label="Allergies"
+            label={t('allergies')}
             value={form.allergies}
             onChange={(changed) => {
               setAllergiesEdited(true);
@@ -682,21 +690,21 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
             }}
             hint={
               detailsLoading
-                ? `Reading what ${label} has…`
-                : `Saved in ${label} as medical notes. Clearing this deletes it there.`
+                ? t('allergiesReading', { backend: label })
+                : t('allergiesHint', { backend: label })
             }
           />
         ) : null}
 
         <TextAreaField
-          label="Notes"
+          label={t('notes')}
           value={form.notes}
           onChange={(changed) => update('notes', changed.target.value)}
-          hint="Visible to the core team. Keep it to what a leader needs to know."
+          hint={t('notesHint')}
         />
 
         <SelectField
-          label="Status"
+          label={t('status')}
           value={form.status}
           onChange={(changed) => update('status', changed.target.value as StudentStatus)}
           hint={
@@ -704,13 +712,13 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
               ? // Never written upstream, in any mode: nothing in Planning
                 // Center is ever deactivated from Tally. Who is on the roster is
                 // Tally's own list, and that is the control on the student's page.
-                'Whether they are on the roster is set with Remove from roster.'
-              : 'Inactive students stay in history but leave every roster.'
+                t('statusLinkedHint')
+              : t('statusHint')
           }
           disabled={linked}
         >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="active">{t('statusActive')}</option>
+          <option value="inactive">{t('statusInactive')}</option>
         </SelectField>
       </form>
 
@@ -751,26 +759,27 @@ function ContactSection({
   loading: boolean;
   onAdded: () => void;
 }) {
+  const t = useTranslations('StudentEditor');
   const onFile = details?.contactPhone || details?.contactEmail ? details : null;
   const backend = student ? backendOfStudent(student) : null;
   const label = student ? backendLabelOf(student) : 'Planning Center';
 
   return (
     <div className="mt-4 rounded-xl bg-ink-900 px-3 py-2.5 ring-1 ring-ink-800">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Contact</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{t('contactHeading')}</p>
 
       {!student || backend === null ? (
         <p className="mt-1 text-sm text-ink-300">
-          Once this student reaches {label}, their contact details are added there.
+          {t('contactLater', { backend: label })}
         </p>
       ) : loading && !details ? (
-        <p className="mt-1 text-sm text-ink-500">Reading what {label} has…</p>
+        <p className="mt-1 text-sm text-ink-500">{t('contactReading', { backend: label })}</p>
       ) : onFile ? (
         // Already reachable, so there is nothing for Tally to add: the write
         // path only ever fills a gap, and never overwrites what is on file.
         <>
           <p className="mt-1 text-sm text-ink-100">
-            {onFile.contactName ? `${onFile.contactName} · ` : ''}
+            {onFile.contactName ? t('contactPrefix', { name: onFile.contactName }) : ''}
             {onFile.contactPhone ? (
               <span className="tabular-nums">{formatPhone(onFile.contactPhone)}</span>
             ) : null}
@@ -778,7 +787,7 @@ function ContactSection({
             {onFile.contactEmail ? <span className="break-all">{onFile.contactEmail}</span> : null}
           </p>
           <p className="mt-1 text-xs text-ink-500">
-            Kept in {label}.
+            {t('contactKeptIn', { backend: label })}
             {backend === 'pco' && student.pcoPersonId ? (
               // Only Planning Center has a product page to link out to.
               <>
@@ -789,9 +798,9 @@ function ContactSection({
                   rel="noreferrer"
                   className="font-semibold text-brand-300 underline"
                 >
-                  Change it there
+                  {t('changeItThere')}
                 </a>
-                .
+                {t('fullStop')}
               </>
             ) : null}
           </p>

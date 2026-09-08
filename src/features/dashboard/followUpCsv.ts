@@ -32,7 +32,7 @@
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isUnreachable } from '@/features/dashboard/insights';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
-import { gradeLabel } from '@/lib/utils';
+import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
 import type { OneOffOnlyStudent } from '@/features/dashboard/insights';
 import type { MiaStudent, NewVisitor, Student } from '@/types';
@@ -62,6 +62,7 @@ function workColumns<T>(): CsvColumn<T>[] {
 }
 
 function studentColumns<T>(
+  grades: GradeStrings,
   of: (row: T) => Student,
   context: FollowUpCsvContext,
 ): CsvColumn<T>[] {
@@ -70,7 +71,7 @@ function studentColumns<T>(
     { header: 'first_name', value: (row) => of(row).firstName },
     { header: 'last_name', value: (row) => of(row).lastName },
     { header: 'grade', value: (row) => of(row).grade },
-    { header: 'grade_label', value: (row) => gradeLabel(of(row)) },
+    { header: 'grade_label', value: (row) => gradeLabel(grades, of(row)) },
     {
       header: 'contact_on_file',
       value: (row) => {
@@ -90,12 +91,13 @@ function studentColumns<T>(
 }
 
 export function buildMiaCsv(
+  grades: GradeStrings,
   items: readonly MiaStudent[],
   context: FollowUpCsvContext,
 ): string {
   return toCsv(
     [
-      ...studentColumns<MiaStudent>((item) => item.student, context),
+      ...studentColumns<MiaStudent>(grades, (item) => item.student, context),
       // Blank when the row belongs to no gathering — somebody who used to come
       // and has since been at nothing. `gathering_key` disambiguates.
       { header: 'gathering', value: (item) => item.gatheringTitle ?? '' },
@@ -111,12 +113,13 @@ export function buildMiaCsv(
 }
 
 export function buildNewVisitorCsv(
+  grades: GradeStrings,
   items: readonly NewVisitor[],
   context: FollowUpCsvContext,
 ): string {
   return toCsv(
     [
-      ...studentColumns<NewVisitor>((item) => item.student, context),
+      ...studentColumns<NewVisitor>(grades, (item) => item.student, context),
       { header: 'first_attended', value: (item) => isoDate(item.firstAttendedAt) },
       { header: 'first_event', value: (item) => item.firstEventTitle },
       { header: 'first_event_id', value: (item) => item.firstEventId },
@@ -134,12 +137,13 @@ export function buildNewVisitorCsv(
  * repeats, so "missed three in a row" is not a sentence about them.
  */
 export function buildOneOffOnlyCsv(
+  grades: GradeStrings,
   items: readonly OneOffOnlyStudent[],
   context: FollowUpCsvContext,
 ): string {
   return toCsv(
     [
-      ...studentColumns<OneOffOnlyStudent>((item) => item.student, context),
+      ...studentColumns<OneOffOnlyStudent>(grades, (item) => item.student, context),
       { header: 'met_at', value: (item) => isoDate(item.metAt) },
       { header: 'met_at_event', value: (item) => item.events[0]?.title ?? '' },
       { header: 'missed_since', value: (item) => item.missedSince },
@@ -150,13 +154,14 @@ export function buildOneOffOnlyCsv(
 }
 
 export function buildIncompleteProfileCsv(
+  grades: GradeStrings,
   students: readonly Student[],
   context: FollowUpCsvContext,
   now: Date,
 ): string {
   return toCsv(
     [
-      ...studentColumns<Student>((student) => student, context),
+      ...studentColumns<Student>(grades, (student) => student, context),
       { header: 'is_visitor', value: (student) => student.isVisitor },
       { header: 'added_on', value: (student) => isoDate(student.createdAt) },
       {

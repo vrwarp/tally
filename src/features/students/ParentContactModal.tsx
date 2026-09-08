@@ -20,6 +20,7 @@ import { invalidateAdultContact } from '@/hooks/useAdultContact';
 import { invalidatePersonDetails, usePersonDetails } from '@/hooks/usePersonDetails';
 import { AddParentContact } from '@/features/students/AddParentContact';
 import { backendLabelOf, studentFullName, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface ParentContactPanelProps {
   student: Student;
@@ -38,6 +39,7 @@ export interface ParentContactPanelProps {
  * behind it agree with itself afterwards.
  */
 export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPanelProps) {
+  const tErrors = useTranslations('Errors');
   const { details, loading, loaded, error, retry, refresh } = usePersonDetails(student);
   const { refreshRoster } = useData();
 
@@ -47,7 +49,7 @@ export function ParentContactPanel({ student, onDone, onAdded }: ParentContactPa
         <ErrorBanner message={error} />
         <div className="flex justify-end">
           <Button variant="secondary" onClick={retry}>
-            Try again
+            {tErrors('tryAgain')}
           </Button>
         </div>
       </div>
@@ -102,11 +104,12 @@ export interface ParentContactModalProps {
  * the next five students off the screen.
  */
 export function ParentContactModal({ student, onClose, onAdded }: ParentContactModalProps) {
+  const t = useTranslations('ParentContact');
   return (
     <Modal
       open
       onClose={onClose}
-      title="Add a contact"
+      title={t('modalTitle')}
       description={studentFullName(student)}
       size="sm"
     >

@@ -16,6 +16,7 @@ import {
   splitFirstName,
   trimmed,
 } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import type { AdultContact } from '../pco/mapping.js';
 import type { RosterPerson } from '../pco/roster.js';
@@ -132,7 +133,7 @@ export function mapAttendeeToRosterPerson(attendee: A32Attendee): RosterPerson {
     lastName,
     grade,
     status: statusOf(attendee),
-    searchName: buildSearchName(firstName, lastName),
+    searchName: withPinyin(buildSearchName(firstName, lastName)),
     // Same contract as the Planning Center roster: a roster read does not
     // hydrate families, and null means "we did not look".
     profileComplete: null,

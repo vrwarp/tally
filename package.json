@@ -26,10 +26,12 @@
     "test:mutation": "stryker run",
     "test:mutation:incremental": "stryker run --incremental",
     "test:mutation:survivors": "node scripts/mutation-survivors.mjs",
+    "translate": "tsx scripts/translate-messages.ts",
     "functions:build": "npm --prefix functions run build",
     "functions:invokers": "tsx scripts/callable-invokers.ts",
     "prune:occurrences": "npm --prefix functions run build && node functions/lib/prune.js",
     "repair:chains": "npm --prefix functions run build && node functions/lib/repair.js",
+    "pinyin:backfill": "npm --prefix functions run build && node functions/lib/pinyinBackfill.js",
     "functions:install": "npm --prefix functions install",
     "emulators": "firebase emulators:start --project demo-tally --export-on-exit=./.emulator-data",
     "emulators:resume": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",
@@ -54,6 +56,9 @@
     "walkthrough:themes:capture": "WALKTHROUGH=1 playwright test --project=chromium-desktop e2e/theme-walkthrough.spec.ts",
     "walkthrough:themes:build": "tsx scripts/build-theme-walkthrough.ts",
     "walkthrough:themes": "npm run walkthrough:themes:capture && npm run walkthrough:themes:build",
+    "walkthrough:i18n:capture": "WALKTHROUGH=1 playwright test --project=chromium-mobile e2e/i18n-walkthrough.spec.ts",
+    "walkthrough:i18n:build": "tsx scripts/build-i18n-walkthrough.ts",
+    "walkthrough:i18n": "npm run walkthrough:i18n:capture && npm run walkthrough:i18n:build",
     "walkthrough:registration:capture": "WALKTHROUGH=1 playwright test --project=chromium-desktop e2e/registration-walkthrough.spec.ts",
     "walkthrough:registration:build": "tsx scripts/build-registration-walkthrough.ts",
     "walkthrough:registration:review": "tsx scripts/build-registration-review.ts",
@@ -87,9 +92,11 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.18.2",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "use-intl": "^4.14.2"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@eslint/js": "^10.0.1",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/test": "^1.62.0",
@@ -118,6 +125,7 @@
     "typescript-eslint": "^8.66.0",
     "vite": "^8.2.0",
     "vite-plugin-pwa": "^1.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "zod": "^4.5.4"
   }
 }

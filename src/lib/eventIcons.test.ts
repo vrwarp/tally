@@ -12,7 +12,12 @@
  * looking for a campfire types `local_fire_department`.
  */
 import { describe, expect, it } from 'vitest';
-import { EVENT_ICONS, findEventIcon, searchEventIcons } from '@/lib/eventIcons';
+import fs from 'node:fs';
+import path from 'node:path';
+import { EVENT_ICONS, findEventIcon } from '@/lib/eventIcons';
+import { searchEventIcons } from '@/lib/eventIconSearch';
+import { EVENT_ICON_TERMS } from '@/lib/eventIconTerms';
+import en from '../../messages/en.json';
 
 describe('the catalogue', () => {
   it('names every icon exactly once', () => {
@@ -140,5 +145,137 @@ describe('searchEventIcons', () => {
     'walk',
   ])('has something to offer for "%s"', (query) => {
     expect(searchEventIcons(query).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The Chinese half of the haystack.
+ *
+ * The picker is in the main app on a real keyboard, so a leader reading Chinese
+ * can type Chinese — but only if the words are in the index. The pinyin is
+ * there so they do not have to switch IME in the middle of a form.
+ */
+describe('searching the picker in Chinese', () => {
+  it('finds a campfire by the word for one', () => {
+    expect(searchEventIcons('露营').map((icon) => icon.name)).toContain(
+      'local_fire_department',
+    );
+  });
+
+  it('finds it in Traditional as well as Simplified', () => {
+    // One bag serves both catalogues, which is why both spellings are in it.
+    expect(searchEventIcons('露營').map((icon) => icon.name)).toContain(
+      'local_fire_department',
+    );
+  });
+
+  it('finds it by pinyin, so nobody has to switch IME mid-form', () => {
+    expect(searchEventIcons('luying').map((icon) => icon.name)).toContain(
+      'local_fire_department',
+    );
+  });
+
+  it('finds a Bible study by the word a church uses for it', () => {
+    expect(searchEventIcons('查经').map((icon) => icon.name)).toContain('menu_book');
+    expect(searchEventIcons('chajing').map((icon) => icon.name)).toContain('menu_book');
+  });
+
+  /*
+   * The plan's rule, and the reason nothing gets worse: the English keywords
+   * stay in the haystack whatever language the screen is in. A leader who
+   * learned the word "camp" from the last five years of Tally still types it.
+   */
+  it('keeps the English words in reach whoever is reading', () => {
+    const chinese = (icon: { name: string }) => `露营 ${icon.name}`;
+    expect(searchEventIcons('campfire', chinese).map((icon) => icon.name)).toContain(
+      'local_fire_department',
+    );
+  });
+
+  /*
+   * The paste path, which no translation may touch: somebody arriving with
+   * `local_fire_department` from Google's own documentation has to land on the
+   * icon it names.
+   */
+  it('never loses the Material name', () => {
+    const chinese = () => '营火';
+    expect(searchEventIcons('local_fire_department', chinese).map((icon) => icon.name)).toContain(
+      'local_fire_department',
+    );
+  });
+
+  it('searches the label the reader can actually see', () => {
+    const shouty = (icon: { name: string }) =>
+      icon.name === 'redeem' ? '聖誕節聚會' : icon.name;
+    expect(searchEventIcons('聖誕節', shouty).map((icon) => icon.name)).toEqual(['redeem']);
+  });
+});
+
+describe('the Chinese term bags', () => {
+  it('covers every icon in the catalogue', () => {
+    const missing = EVENT_ICONS.filter((icon) => !EVENT_ICON_TERMS[icon.name]);
+    expect(missing.map((icon) => icon.name)).toEqual([]);
+  });
+
+  it('names nothing the catalogue does not have', () => {
+    const names = new Set(EVENT_ICONS.map((icon) => icon.name));
+    const orphans = Object.keys(EVENT_ICON_TERMS).filter((name) => !names.has(name));
+    expect(orphans).toEqual([]);
+  });
+
+  it('carries pinyin as well as characters, or a leader must switch IME', () => {
+    for (const [name, terms] of Object.entries(EVENT_ICON_TERMS)) {
+      expect(/[a-z]/.test(terms), `${name} has no romanization in it`).toBe(true);
+      expect(/[\u4e00-\u9fff]/.test(terms), `${name} has no Chinese in it`).toBe(true);
+    }
+  });
+});
+
+/**
+ * The labels are prose and live in the catalogue; the definitions here keep a
+ * copy because they are the English fallback and the source a translator was
+ * given. Two copies of one sentence is a drift waiting to happen, so they are
+ * pinned to each other — the same argument as `FIELD_MESSAGES` in
+ * `registrationFields.ts`.
+ */
+describe('the picker labels', () => {
+  const labels = en.EventIcons as Record<string, string>;
+
+  it('says the same thing in the catalogue as in the code', () => {
+    for (const icon of EVENT_ICONS) {
+      expect(labels[icon.name], `EventIcons.${icon.name}`).toBe(icon.label);
+    }
+  });
+
+  it('has no entry for an icon that has gone', () => {
+    const names = new Set(EVENT_ICONS.map((icon) => icon.name));
+    expect(Object.keys(labels).filter((name) => !names.has(name))).toEqual([]);
+  });
+});
+
+/**
+ * The dictionary that produced the pinyin above must never reach a bundle.
+ *
+ * It is a dependency of the functions package alone, so an import from `src/`
+ * fails the build rather than merely costing 200 kB — but the failure would be
+ * a resolution error somebody could "fix" by installing it at the root, which
+ * is exactly the wrong repair. This says so first.
+ */
+describe('the pinyin dictionary', () => {
+  function sources(dir: string, found: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) sources(full, found);
+      // Test files excluded: this one names the package in order to forbid it.
+      else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) found.push(full);
+    }
+    return found;
+  }
+
+  it('is never imported from the app', () => {
+    const guilty = sources(path.join(process.cwd(), 'src')).filter((file) =>
+      /from '"'"'pinyin-pro'"'"'|require\('"'"'pinyin-pro'"'"'\)/.test(fs.readFileSync(file, 'utf8')),
+    );
+    expect(guilty, 'pinyin runs on the server; see functions/src/names/pinyin.ts').toEqual([]);
   });
 });

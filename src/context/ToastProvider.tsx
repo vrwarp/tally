@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { ToastContext, type Toast, type ToastContextValue } from '@/context/toastContext';
+import { useTranslations } from 'use-intl';
 
 /** How long a toast stays up when the caller says nothing. */
 export const DEFAULT_DURATION_MS = 4000;
@@ -18,6 +19,7 @@ export const DEFAULT_DURATION_MS = 4000;
 export const SHORT_DURATION_MS = 1800;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const tCommon = useTranslations('Common');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const counter = useRef(0);
@@ -152,7 +154,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
              */}
             <button
               type="button"
-              aria-label="Dismiss"
+              aria-label={tCommon('dismiss')}
               className="pointer-events-auto -my-3 -mr-3 grid size-11 shrink-0 place-items-center rounded-lg text-lg leading-none opacity-70 hover:opacity-100 focus-visible:opacity-100"
               onClick={() => dismiss(toast.id)}
             >

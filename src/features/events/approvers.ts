@@ -22,7 +22,14 @@ import { shortName } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import type { EventAccess, TallyEvent, UserProfile } from '@/types';
 
+/** The two keys this hint can be, as a narrow function type. */
+export type ApproverTranslator = (
+  key: 'oneApprover' | 'twoApprovers',
+  values?: Record<string, string>,
+) => string;
+
 export function approvers(
+  t: ApproverTranslator,
   event: Pick<TallyEvent, 'id' | 'seriesId' | 'recurrenceRootId'>,
   access: ReadonlyMap<string, EventAccess>,
   byUid: ReadonlyMap<string, UserProfile>,
@@ -41,6 +48,6 @@ export function approvers(
     .filter((name): name is string => name !== null);
 
   if (names.length === 0) return null;
-  if (names.length === 1) return `${names[0]} can add you`;
-  return `${names[0]} or ${names[1]} can add you`;
+  if (names.length === 1) return t('oneApprover', { name: names[0]! });
+  return t('twoApprovers', { first: names[0]!, second: names[1]! });
 }

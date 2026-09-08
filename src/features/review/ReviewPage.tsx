@@ -53,8 +53,8 @@ import {
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { checkAllergyNote, checkName, checkPhone } from '@/lib/registrationFields';
-import { formatRelative } from '@/lib/time';
-import { cn, formatPhoneInput, gradeDescription, gradeSentence, initials } from '@/lib/utils';
+import { cn, formatPhoneInput, initials } from '@/lib/utils';
+import { gradeDescription, gradeSentence, type GradeStrings } from '@/lib/grades';
 import {
   amendRegistration,
   approveRegistration,
@@ -68,6 +68,20 @@ import {
   type StudentCandidate,
 } from '@/services/functions';
 import { GRADES } from '@/types';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useLocale, useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useFieldError } from '@/hooks/useFieldError';
+
+/**
+ * The whole screen's translator, as a type.
+ *
+ * Every helper below composes a sentence out of names, numbers and clauses, so
+ * they take it as an argument the way `lib/grades.ts` takes a `GradeStrings` —
+ * a module-level function cannot call a hook, and threading `t` is what keeps
+ * the sentences in the catalogue rather than in the code.
+ */
+type ReviewTranslator = ReturnType<typeof useTranslations<'Review'>>;
 
 const DAY_MS = 24 * 60 * 60_000;
 /** Under a week left before the sweep takes the record. */
@@ -84,13 +98,18 @@ function nameOf(child: { firstName: string; lastName: string }): string {
 }
 
 /** A roster row a duplicate might be. Named enough to tell two children apart. */
-function summaryLabel(summary: ReviewStudentSummary): string {
-  if (!summary.known) return 'A student on the roster';
-  const grade = gradeSentence(summary) ?? 'no grade on file';
-  return `${nameOf(summary)} · ${grade}`;
+function summaryLabel(
+  t: ReviewTranslator,
+  grades: GradeStrings,
+  summary: ReviewStudentSummary,
+): string {
+  if (!summary.known) return t('unknownStudent');
+  const grade = gradeSentence(grades, summary) ?? t('noGradeOnFile');
+  return t('summaryLabel', { name: nameOf(summary), grade });
 }
 
 export function ReviewPage() {
+  const t = useTranslations('Review');
   const { show } = useToast();
   const { events } = useData();
 
@@ -177,11 +196,11 @@ export function ReviewPage() {
           status: 'refused',
           possibleDuplicates: null,
           last4Changed: false,
-          message: refusalOf(error),
+          message: refusalOf(t, error),
         };
       }
     },
-    [load, show],
+    [load, show, t],
   );
 
   const act = async (registrationId: string, run: () => Promise<string>) => {
@@ -191,7 +210,7 @@ export function ReviewPage() {
       show(await run(), { tone: 'success' });
       await load();
     } catch {
-      show('Could not reach the server. Try again in a moment.', { tone: 'error' });
+      show(t('actionFailed'), { tone: 'error' });
     } finally {
       setBusy(null);
     }
@@ -201,20 +220,15 @@ export function ReviewPage() {
     <PageFrame width="lg">
       <header>
         <h1 className="flex items-center gap-2 text-xl font-bold text-ink-50">
-          Families to review
+          {t('title')}
           {/* The size of the job, before the first scroll. A reviewer with three
               minutes needs to know whether this is a two-minute Tuesday. */}
           {rows !== null && rows.length > 0 ? <Badge tone="neutral">{rows.length}</Badge> : null}
         </h1>
-        <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
-          Two doors, one queue: families who put themselves on the roster at the lobby kiosk, and
-          contacts a counselor was given beside a visitor they quick-added. Everybody named
-          here is on the roster and was checked in — no adult has gone into the church&rsquo;s
-          database yet. Soonest to be cleared first.
-        </p>
+        <p className="mt-0.5 max-w-2xl text-sm text-ink-500">{t('intro')}</p>
       </header>
 
-      {error ? <ErrorBanner message="Could not read the registrations waiting for review." /> : null}
+      {error ? <ErrorBanner message={t('loadFailed')} /> : null}
 
       {rows === null ? (
         <Card>
@@ -233,10 +247,7 @@ export function ReviewPage() {
         null
       ) : rows.length === 0 ? (
         <Card>
-          <EmptyState
-            title="Nothing waiting."
-            description="A family who registers at the lobby kiosk, or an adult’s details a counselor takes at a door, waits here until somebody approves them."
-          />
+          <EmptyState title={t('emptyTitle')} description={t('emptyBody')} />
         </Card>
       ) : (
         <>
@@ -313,7 +324,7 @@ export function ReviewPage() {
           </div>
           {/* The one thing the queue never said: that this is all of it. */}
           <p className="text-center text-sm text-ink-500">
-            That is all {rows.length}. Nothing else is waiting to be reviewed.
+            {t('thatIsAll', { count: rows.length })}
           </p>
         </>
       )}
@@ -383,11 +394,11 @@ interface RegistrationCardProps {
  * repeating, and a reviewer reading "internal" under a name box learns nothing
  * except that the app is talking to itself.
  */
-function refusalOf(error: unknown): string {
+function refusalOf(t: ReviewTranslator, error: unknown): string {
   const message = error instanceof Error ? error.message.trim() : '';
   return message.length > 0 && message !== 'internal' && !message.startsWith('INTERNAL')
     ? message
-    : 'Could not save that correction. Try again in a moment.';
+    : t('amendFailed');
 }
 
 /**
@@ -454,6 +465,7 @@ function EditButton({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations('Review');
   return (
     <button
       type="button"
@@ -462,7 +474,7 @@ function EditButton({
       onClick={onClick}
       className="flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm text-brand-400 ring-1 ring-ink-800 transition-colors hover:bg-ink-900 disabled:opacity-60 pointer-fine:min-h-8"
     >
-      Edit
+      {t('edit')}
     </button>
   );
 }
@@ -493,16 +505,17 @@ function EditorActions({
   saving: boolean;
   onCancel: () => void;
 }) {
+  const t = useTranslations('Review');
   return (
     <div className="mt-1 flex flex-col gap-5 border-t border-ink-800 pt-4 lg:grid lg:grid-cols-2 lg:gap-6">
-      <Decision caption="Leaves this family exactly as the kiosk recorded them.">
+      <Decision caption={t('editorCancelCaption')}>
         <Button
           variant="secondary"
           className="mt-auto min-h-12 w-full lg:w-auto"
           onClick={onCancel}
           disabled={saving}
         >
-          Cancel
+          {t('cancel')}
         </Button>
       </Decision>
       <Decision caption={caption}>
@@ -512,7 +525,7 @@ function EditorActions({
           disabled={saving}
           aria-busy={saving || undefined}
         >
-          Save the correction
+          {t('save')}
         </Button>
       </Decision>
     </div>
@@ -541,6 +554,9 @@ function ChildEditor({
   onCancel: () => void;
   onSave: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
+  const tField = useFieldError();
+  const t = useTranslations('Review');
+  const grades = useGrades();
   const [firstName, setFirstName] = useState(child.firstName);
   const [lastName, setLastName] = useState(child.lastName);
   const [grade, setGrade] = useState<number | null>(child.grade);
@@ -555,13 +571,13 @@ function ChildEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    const first = checkName(firstName, "The child's first name");
-    const last = checkName(lastName, "The child's last name");
+    const first = checkName(firstName, 'childFirst');
+    const last = checkName(lastName, 'childLast');
     const note = checkAllergyNote(allergies);
     setErrors({
-      firstName: first.ok ? undefined : first.error,
-      lastName: last.ok ? undefined : last.error,
-      allergies: note.ok ? undefined : note.error,
+      firstName: first.ok ? undefined : tField(first.code),
+      lastName: last.ok ? undefined : tField(last.code),
+      allergies: note.ok ? undefined : tField(note.code),
     });
     if (!first.ok || !last.ok || !note.ok) return;
 
@@ -584,12 +600,14 @@ function ChildEditor({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-ink-200">Editing {nameOf(child)}</p>
+      <p className="text-sm font-semibold text-ink-200">
+        {t('editingChild', { name: nameOf(child) })}
+      </p>
       {refusal ? <ErrorBanner message={refusal} /> : null}
 
       <div className="grid gap-3 lg:grid-cols-3">
         <TextField
-          label="First name"
+          label={t('firstName')}
           autoFocus
           autoComplete="off"
           value={firstName}
@@ -597,14 +615,14 @@ function ChildEditor({
           onChange={(event) => setFirstName(event.target.value)}
         />
         <TextField
-          label="Last name"
+          label={t('lastName')}
           autoComplete="off"
           value={lastName}
           error={errors.lastName ?? null}
           onChange={(event) => setLastName(event.target.value)}
         />
         <SelectField
-          label="Grade"
+          label={t('grade')}
           value={grade === null ? '' : String(grade)}
           onChange={(event) =>
             setGrade(event.target.value === '' ? null : Number(event.target.value))
@@ -612,21 +630,21 @@ function ChildEditor({
         >
           {/* First, and an answer rather than a blank: a child too young for a
               grade has none, and the roster stores that as no grade at all. */}
-          <option value="">No grade</option>
+          <option value="">{t('noGrade')}</option>
           {GRADES.map((value) => (
             <option key={value} value={value}>
-              {gradeDescription(value)}
+              {gradeDescription(grades, value)}
             </option>
           ))}
         </SelectField>
       </div>
 
       <TextAreaField
-        label="Allergies"
+        label={t('allergies')}
         rows={2}
         value={allergies}
         error={errors.allergies ?? null}
-        hint="Goes into the church’s database with them when this family is approved."
+        hint={t('allergiesHint')}
         onChange={(event) => setAllergies(event.target.value)}
       />
 
@@ -639,8 +657,8 @@ function ChildEditor({
                  also *asking the roster again*, and the answer can hold the
                  approve button that was free a moment ago — which reads as the
                  app breaking unless the button that caused it said so first. */
-              'Renames this row on Tally’s roster and asks the roster again whether anybody already has that name. Nothing is sent to the church’s database.'
-            : 'Corrects this child on Tally’s roster. Nothing is sent to the church’s database.'
+              t('childRenameCaption')
+            : t('childEditCaption')
         }
       />
     </form>
@@ -669,6 +687,8 @@ function GuardianEditor({
     phone: string;
   }) => Promise<AmendRegistrationResult>;
 }) {
+  const tField = useFieldError();
+  const t = useTranslations('Review');
   const [firstName, setFirstName] = useState(guardian.firstName);
   const [lastName, setLastName] = useState(guardian.lastName);
   const [phone, setPhone] = useState(formatPhoneInput(guardian.phone));
@@ -684,13 +704,13 @@ function GuardianEditor({
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    const first = checkName(firstName, "The adult's first name");
-    const last = checkName(lastName, "The adult's last name");
+    const first = checkName(firstName, 'adultFirst');
+    const last = checkName(lastName, 'adultLast');
     const number = checkPhone(phone);
     setErrors({
-      firstName: first.ok ? undefined : first.error,
-      lastName: last.ok ? undefined : last.error,
-      phone: number.ok ? undefined : number.error,
+      firstName: first.ok ? undefined : tField(first.code),
+      lastName: last.ok ? undefined : tField(last.code),
+      phone: number.ok ? undefined : tField(number.code),
     });
     if (!first.ok || !last.ok || !number.ok) return;
 
@@ -713,12 +733,12 @@ function GuardianEditor({
   return (
     <form onSubmit={submit} className="rounded-xl bg-ink-950 px-3 py-3 ring-1 ring-brand-500/40">
       <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-ink-200">Editing the adult</p>
+        <p className="text-sm font-semibold text-ink-200">{t('editingGuardian')}</p>
         {refusal ? <ErrorBanner message={refusal} /> : null}
 
         <div className="grid gap-3 lg:grid-cols-3">
           <TextField
-            label="First name"
+            label={t('firstName')}
             autoFocus
             autoComplete="off"
             value={firstName}
@@ -726,17 +746,17 @@ function GuardianEditor({
             onChange={(event) => setFirstName(event.target.value)}
           />
           <TextField
-            label="Last name"
+            label={t('lastName')}
             autoComplete="off"
             value={lastName}
             error={errors.lastName ?? null}
             onChange={(event) => setLastName(event.target.value)}
           />
           <PhoneField
-            label="Phone"
+            label={t('phone')}
             value={phone}
             error={errors.phone ?? null}
-            hint="The last four are what this family types at the kiosk."
+            hint={t('phoneHint')}
             onValueChange={setPhone}
           />
         </div>
@@ -751,8 +771,8 @@ function GuardianEditor({
                    door next Friday, and a correction that only fixed the
                    spelling would leave them unfindable under the right number
                    and findable under somebody else's. */
-                `Changes the digits this family types at the kiosk from ${oldLast4} to ${newLast4} — the old four stop finding them. Nothing is sent to the church’s database.`
-              : 'Corrects the adult recorded on this registration. Nothing is sent to the church’s database.'
+                t('guardianDigitsCaption', { from: oldLast4, to: newLast4 })
+              : t('guardianEditCaption')
           }
         />
       </div>
@@ -766,16 +786,27 @@ function stillHeld(row: PendingRegistration): PendingRegistrationChild[] {
 }
 
 /** "Ade, Chidi and Ngozi" — names, because a count is not a person. */
-function listNames(children: PendingRegistrationChild[]): string {
-  return joinNames(children.map((child) => child.firstName)) ?? 'these children';
+function listNames(
+  t: ReviewTranslator,
+  locale: string,
+  children: PendingRegistrationChild[],
+): string {
+  return joinNames(locale, children.map((child) => child.firstName)) ?? t('theseChildren');
 }
 
-/** "Ada", "Ada and Bo", "Ada, Bo and Cy" — null when there is nobody to name. */
-function joinNames(values: readonly string[]): string | null {
+/**
+ * "Ada", "Ada and Bo", "Ada, Bo and Cy" — null when there is nobody to name.
+ *
+ * `Intl.ListFormat` rather than a hand-rolled join, because the separator is
+ * not punctuation a language happens to use: Chinese wants 、 between the items
+ * and 和 before the last, and no amount of comma-splicing gets there. The one
+ * thing it changes in English is the serial comma before "and", which this
+ * screen did not have and now does.
+ */
+function joinNames(locale: string, values: readonly string[]): string | null {
   const names = values.map((name) => name.trim()).filter(Boolean);
   if (names.length === 0) return null;
-  if (names.length === 1) return names[0]!;
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
 }
 
 function RegistrationCard({
@@ -789,6 +820,10 @@ function RegistrationCard({
   onUnmerge,
   onAmend,
 }: RegistrationCardProps) {
+  const time = useTimeFormats();
+  const t = useTranslations('Review');
+  const locale = useLocale();
+  const grades = useGrades();
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
   /**
@@ -849,6 +884,8 @@ function RegistrationCard({
   const daysLeft = Math.max(1, Math.ceil((row.expiresInMs ?? 0) / DAY_MS));
 
   const held = stillHeld(row);
+  /** `listNames` with this card's translator and locale already supplied. */
+  const names = (children: PendingRegistrationChild[]) => listNames(t, locale, children);
   /**
    * Everything on this card that is a judgement, held while one is being typed.
    *
@@ -893,7 +930,7 @@ function RegistrationCard({
     row.lastErrorKind !== 'children' &&
     row.lastErrorKind !== 'both';
   /** The children this card is *about*, held or not — for a sentence to name. */
-  const named = listNames(held.length > 0 ? held : row.children);
+  const named = names(held.length > 0 ? held : row.children);
   /*
    * The adult is what the backend refused, which is usually refused for a
    * reason no retry can fix.
@@ -1002,10 +1039,10 @@ function RegistrationCard({
     ? null
     : chosenAdult
       ? chosenAdult.corroborated
-        ? `joins ${chosenAdult.name}, whose number matches`
-        : `joins ${chosenAdult.name}, who the church already has`
+        ? t('clauseJoinsMatching', { adult: chosenAdult.name })
+        : t('clauseJoinsKnown', { adult: chosenAdult.name })
       : effectiveChoice === 'new'
-        ? 'is added as a new person'
+        ? t('clauseNewPerson')
         : null;
 
   /**
@@ -1019,8 +1056,12 @@ function RegistrationCard({
   const adultSentence = !row.guardian
     ? ''
     : guardianClause
-      ? `${nameOf(row.guardian)} ${guardianClause}, attached to ${named}.`
-      : `Adds ${nameOf(row.guardian)} to the church’s database, attached to ${named}.`;
+      ? t('adultSentenceWithClause', {
+          name: nameOf(row.guardian),
+          clause: guardianClause,
+          children: named,
+        })
+      : t('adultSentencePlain', { name: nameOf(row.guardian), children: named });
 
   /**
    * The families the selected adult already heads, when there is a choice.
@@ -1078,9 +1119,9 @@ function RegistrationCard({
         title={
           row.guardian
             ? nameOf(row.guardian)
-            : row.anchors.length > 0
-              ? `${row.anchors[0]!.lastName || 'A'} family`.trim()
-              : 'A family'
+            : row.anchors.length > 0 && row.anchors[0]!.lastName
+              ? t('namedFamily', { surname: row.anchors[0]!.lastName })
+              : t('aFamily')
         }
         description={[
           /*
@@ -1091,15 +1132,15 @@ function RegistrationCard({
           */
           row.source === 'counselor'
             ? when
-              ? `Taken at the door ${formatRelative(when)}`
-              : 'Taken at the door'
+              ? t('takenAtDoorWhen', { when: time.relative(when) })
+              : t('takenAtDoor')
             : when
-              ? `Registered ${formatRelative(when)}`
+              ? t('registeredWhen', { when: time.relative(when) })
               : null,
-          gatheringTitle ? `at ${gatheringTitle}` : null,
+          gatheringTitle ? t('atGathering', { title: gatheringTitle }) : null,
           // Legacy: the phone form was retired, but its records live 30 days
           // and a reviewer deciding one still deserves to know how it arrived.
-          row.source === 'qr' ? 'from their own phone' : null,
+          row.source === 'qr' ? t('fromTheirPhone') : null,
         ]
           .filter(Boolean)
           .join(' ')}
@@ -1111,23 +1152,21 @@ function RegistrationCard({
         */
         action={
           confirmingApprove ? (
-            <Badge tone="warn">Confirm to add</Badge>
+            <Badge tone="warn">{t('badgeConfirm')}</Badge>
           ) : row.lastError ? (
-            <Badge tone="danger">Push failed</Badge>
+            <Badge tone="danger">{t('badgePushFailed')}</Badge>
           ) : expiringSoon ? (
-            <Badge tone="warn">
-              {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
-            </Badge>
+            <Badge tone="warn">{t('badgeDaysLeft', { count: daysLeft })}</Badge>
           ) : unsettled.length > 0 ? (
-            <Badge tone="warn">Possible duplicate</Badge>
+            <Badge tone="warn">{t('badgeDuplicate')}</Badge>
           ) : /* Above "joins a family on file" and below a child collision: a
                 second card of the same household is a fact about which cards a
                 reviewer should read together, and it is worth less than a name
                 clash that could put a second child in for ever. */
           kin.length > 0 ? (
-            <Badge tone="warn">Also registered separately</Badge>
+            <Badge tone="warn">{t('badgeAlsoRegistered')}</Badge>
           ) : row.anchors.length > 0 ? (
-            <Badge tone="neutral">Joins a family on file</Badge>
+            <Badge tone="neutral">{t('badgeJoinsFamily')}</Badge>
           ) : undefined
         }
       />
@@ -1152,9 +1191,9 @@ function RegistrationCard({
         */}
         {expiringSoon ? (
           <p className={STRIP}>
-            When it clears, the phone number goes with it — and{' '}
-            {adultOnly && row.children.length === 1 ? `${named} stays` : 'the children stay'} on
-            Tally&rsquo;s roster with nobody attached to them.
+            {adultOnly && row.children.length === 1
+              ? t('expiringOne', { name: named })
+              : t('expiringMany')}
           </p>
         ) : null}
 
@@ -1169,11 +1208,9 @@ function RegistrationCard({
         */}
         {row.source === 'counselor' ? (
           <p className={STRIP}>
-            A counselor added {named} at the door and was given an adult&rsquo;s details.{' '}
             {held.length === 0
-              ? `${named} is already on the roster and already queued for the church’s database`
-              : `${named} is on the roster`}{' '}
-            — the adult below is the only thing waiting on you.
+              ? t('counselorQueued', { names: named })
+              : t('counselorOnRoster', { names: named })}
           </p>
         ) : null}
 
@@ -1183,8 +1220,10 @@ function RegistrationCard({
         */}
         {unsettled.length > 0 ? (
           <p className={STRIP}>
-            Nothing here can be added until {listNames(unsettled)}&rsquo;s row is settled below: a
-            second {unsettled[0]!.firstName} in the church&rsquo;s database could not be removed.
+            {t('unsettledStrip', {
+              names: names(unsettled),
+              first: unsettled[0]!.firstName,
+            })}
           </p>
         ) : null}
 
@@ -1197,7 +1236,9 @@ function RegistrationCard({
           inverts the severity the tokens exist to express. 400 is the rung
           `warn-400` already sits on, so hue is the only difference now.
         */}
-        {row.lastError ? <p className={STRIP}>Last attempt did not finish: {row.lastError}</p> : null}
+        {row.lastError ? (
+          <p className={STRIP}>{t('lastAttempt', { reason: row.lastError })}</p>
+        ) : null}
 
         {row.guardian && editing?.kind === 'guardian' ? (
           <GuardianEditor
@@ -1244,7 +1285,7 @@ function RegistrationCard({
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
-                <span className="text-ink-500">Phone</span>
+                <span className="text-ink-500">{t('phone')}</span>
                 <span className="tabular-nums text-ink-200">{formatPhone(row.guardian.phone)}</span>
               </p>
               {/*
@@ -1265,7 +1306,7 @@ function RegistrationCard({
               */}
               {row.lastErrorKind === 'children' ? null : (
                 <EditButton
-                  label={`Edit ${nameOf(row.guardian)}’s details`}
+                  label={t('editAria', { name: nameOf(row.guardian) })}
                   disabled={locked}
                   onClick={() => setEditing({ kind: 'guardian' })}
                 />
@@ -1281,10 +1322,10 @@ function RegistrationCard({
             {row.typedGuardianName || row.phoneCorrected ? (
               <p className={CAPTION}>
                 {row.typedGuardianName
-                  ? `Typed at the kiosk as ${nameOf(row.typedGuardianName)}.`
+                  ? t('typedAsGuardian', { name: nameOf(row.typedGuardianName) })
                   : ''}
                 {row.typedGuardianName && row.phoneCorrected ? ' ' : ''}
-                {row.phoneCorrected ? 'The number was corrected here.' : ''}
+                {row.phoneCorrected ? t('numberCorrected') : ''}
               </p>
             ) : null}
           </div>
@@ -1301,15 +1342,12 @@ function RegistrationCard({
                 children arrived with those roster members, and it inferred the
                 family from four phone digits. A reviewer deciding on a Tuesday
                 should be told what was established, not what was guessed. */}
-            Another child, added alongside somebody the church already has:{' '}
-            {row.anchors.map((anchor) => summaryLabel(anchor)).join(', ')}. Approving joins that
-            household rather than making a second one, and asks for no new adult.
+            {t('anchorsStrip', {
+              names: row.anchors.map((anchor) => summaryLabel(t, grades, anchor)).join(', '),
+            })}
           </p>
         ) : (
-          <p className="text-sm text-ink-500">
-            Nobody was recorded as bringing them, and no family was named — this registration did
-            not finish.
-          </p>
+          <p className="text-sm text-ink-500">{t('didNotFinish')}</p>
         )}
 
         {/*
@@ -1327,10 +1365,10 @@ function RegistrationCard({
         {kin.length > 0 ? (
           <div className={STRIP}>
             <p>
-              {kin.length === 1 ? 'Another registration' : `${kin.length} other registrations`} in
-              this queue typed {row.guardian ? formatPhone(row.guardian.phone) : 'this number'}.
-              Approving together adds every child to one family and asks the church&rsquo;s database
-              for one adult.
+              {t('kinIntro', {
+                count: kin.length,
+                number: row.guardian ? formatPhone(row.guardian.phone) : t('thisNumber'),
+              })}
             </p>
             <ul className="mt-2 flex flex-col gap-2">
               {kin.map((other) => {
@@ -1349,15 +1387,13 @@ function RegistrationCard({
                     className="flex flex-wrap items-center justify-between gap-2"
                   >
                     <span className="min-w-0 text-ink-200">
-                      {other.guardianName || 'A family'}
+                      {other.guardianName || t('aFamily')}
                       {other.childNames.length > 0 ? (
                         <span className="text-ink-400"> — {other.childNames.join(', ')}</span>
                       ) : null}
                       {waiting ? (
                         <span className="block text-ink-400">
-                          Settle their own card first — {other.unsettledChildren}{' '}
-                          {other.unsettledChildren === 1 ? 'child' : 'children'} there already share
-                          a name with somebody on the roster.
+                          {t('settleTheirCard', { count: other.unsettledChildren ?? 0 })}
                         </span>
                       ) : null}
                     </span>
@@ -1374,7 +1410,7 @@ function RegistrationCard({
                         )
                       }
                     >
-                      {together ? 'Approving together' : 'Same family'}
+                      {together ? t('approvingTogether') : t('sameFamily')}
                     </Button>
                   </li>
                 );
@@ -1401,10 +1437,7 @@ function RegistrationCard({
         */}
         {row.guardian && adults.length > 0 && (!row.settled || adultOnly) ? (
           <div className={STRIP}>
-            <p>
-              The church already has {adults.length === 1 ? 'somebody' : `${adults.length} people`}{' '}
-              called {nameOf(row.guardian)}.
-            </p>
+            <p>{t('churchHasName', { count: adults.length, name: nameOf(row.guardian) })}</p>
             <ul className="mt-2 flex flex-col gap-2">
               {adults.map((adult) => {
                 const picked = effectiveChoice === adult.personId;
@@ -1418,10 +1451,10 @@ function RegistrationCard({
                       <span className="text-ink-400">
                         {' — '}
                         {adult.corroborated
-                          ? 'their number matches'
+                          ? t('numberMatches')
                           : adult.reachable
-                            ? 'a different number on file'
-                            : 'no number on file'}
+                            ? t('differentNumber')
+                            : t('noNumber')}
                       </span>
                     </span>
                     <Button
@@ -1439,7 +1472,7 @@ function RegistrationCard({
                       */
                       onClick={() => setGuardianChoice(adult.personId)}
                     >
-                      {picked ? 'This is them' : 'Same person'}
+                      {picked ? t('thisIsThem') : t('samePerson')}
                     </Button>
                   </li>
                 );
@@ -1452,7 +1485,7 @@ function RegistrationCard({
                   — which is exactly what it now does whenever no candidate's
                   number matches.
                 */}
-                <span className="text-ink-400">Nobody on this list</span>
+                <span className="text-ink-400">{t('nobodyOnList')}</span>
                 <Button
                   variant={effectiveChoice === 'new' ? 'primary' : 'secondary'}
                   className="min-h-9 px-3 text-sm"
@@ -1460,7 +1493,7 @@ function RegistrationCard({
                   aria-pressed={effectiveChoice === 'new'}
                   onClick={() => setGuardianChoice('new')}
                 >
-                  {effectiveChoice === 'new' ? 'Adding as new' : 'Add as new'}
+                  {effectiveChoice === 'new' ? t('addingAsNew') : t('addAsNew')}
                 </Button>
               </li>
             </ul>
@@ -1483,8 +1516,12 @@ function RegistrationCard({
         {householdOptions.length > 1 ? (
           <div className={STRIP}>
             <p>
-              {chosenAdult?.name} is in {householdOptions.length} families in the church&rsquo;s
-              database. {listNames(held)} {held.length === 1 ? 'joins' : 'join'} this one:
+              {t('householdIntro', {
+                adult: chosenAdult?.name ?? '',
+                count: householdOptions.length,
+                names: names(held),
+                heldCount: held.length,
+              })}
             </p>
             <ul className="mt-2 flex flex-col gap-2">
               {householdOptions.map((household, index) => {
@@ -1498,10 +1535,10 @@ function RegistrationCard({
                       {household.name}
                       <span className="text-ink-400">
                         {' — '}
-                        {joinNames(household.memberNames)
-                          ? `with ${joinNames(household.memberNames)}`
-                          : 'nobody else on file'}
-                        {index === 0 ? ', the one we would pick' : ''}
+                        {joinNames(locale, household.memberNames)
+                          ? t('withMembers', { names: joinNames(locale, household.memberNames)! })
+                          : t('nobodyElse')}
+                        {index === 0 ? t('theOneWeWouldPick') : ''}
                       </span>
                     </span>
                     <Button
@@ -1511,13 +1548,13 @@ function RegistrationCard({
                       aria-pressed={picked}
                       onClick={() => setHouseholdChoice(household.id)}
                     >
-                      {picked ? 'This one' : 'This family'}
+                      {picked ? t('thisOne') : t('thisFamily')}
                     </Button>
                   </li>
                 );
               })}
               <li className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-ink-400">Neither — start a new family</span>
+                <span className="text-ink-400">{t('neitherNewFamily')}</span>
                 <Button
                   variant={effectiveHousehold === 'new' ? 'primary' : 'secondary'}
                   className="min-h-9 px-3 text-sm"
@@ -1525,7 +1562,7 @@ function RegistrationCard({
                   aria-pressed={effectiveHousehold === 'new'}
                   onClick={() => setHouseholdChoice('new')}
                 >
-                  {effectiveHousehold === 'new' ? 'Starting a new one' : 'New family'}
+                  {effectiveHousehold === 'new' ? t('startingNewOne') : t('newFamily')}
                 </Button>
               </li>
             </ul>
@@ -1546,8 +1583,7 @@ function RegistrationCard({
         */}
         {childLinkMayOverrideFamily ? (
           <p className={cn(STRIP, 'text-ink-400')}>
-            If the child already belongs to a family in the church&rsquo;s database, that family
-            stands and {row.guardian?.firstName} is not added to it.
+            {t('childLinkOverride', { name: row.guardian?.firstName ?? '' })}
           </p>
         ) : null}
 
@@ -1624,34 +1660,40 @@ function RegistrationCard({
         <div className="mt-1 flex flex-col gap-5 border-t border-ink-800 pt-4 lg:grid lg:grid-cols-2 lg:gap-6">
           {confirmingApprove ? (
             <>
-              <Decision caption="Leaves this family in the queue. Nothing is sent to the church’s database and nothing is lost.">
+              <Decision caption={t('approveCancelCaption')}>
                 <Button
                   variant="secondary"
                   className="mt-auto min-h-12 w-full lg:w-auto"
                   onClick={() => setConfirmingApprove(false)}
                 >
-                  Cancel
+                  {t('cancel')}
                 </Button>
               </Decision>
               <Decision
                 caption={
                   adultOnly ? (
                     <span className="text-warn-400">
-                      {adultSentence} Nothing added to the church&rsquo;s database can be deleted or
-                      taken back.
+                      {t('confirmAdultCaption', { sentence: adultSentence })}
                     </span>
                   ) : (
                     <span className="text-warn-400">
-                      {listNames(held)} {held.length === 1 ? 'goes' : 'go'} into the church&rsquo;s
-                      database now
-                      {sameFamily.length > 0
-                        ? `, with the ${sameFamily.length === 1 ? 'other registration' : `${sameFamily.length} other registrations`} as one family`
-                        : ''}
-                      {/* The adult, named, in the sentence they are agreeing to —
-                          it is the half of this press with no undo and the half
-                          the card was silent about. */}
-                      {guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}.
-                      Nothing added there can be deleted or taken back.
+                      {t('confirmChildrenCaption', {
+                        names: names(held),
+                        count: held.length,
+                        withFamily:
+                          sameFamily.length > 0
+                            ? t('withFamilyClause', { count: sameFamily.length })
+                            : '',
+                        /* The adult, named, in the sentence they are agreeing to —
+                           it is the half of this press with no undo and the half
+                           the card was silent about. */
+                        withAdult: guardianClause
+                          ? t('withAdultClause', {
+                              name: row.guardian!.firstName,
+                              clause: guardianClause,
+                            })
+                          : '',
+                      })}
                     </span>
                   )
                 }
@@ -1666,8 +1708,8 @@ function RegistrationCard({
                   aria-busy={busy || undefined}
                 >
                   {adultOnly
-                    ? `Yes — add ${row.guardian!.firstName}`
-                    : `Yes — add ${held.length === 1 ? listNames(held) : `${held.length} children`}`}
+                    ? t('yesAddAdult', { name: row.guardian!.firstName })
+                    : t('yesAddChildren', { count: held.length, names: names(held) })}
                 </Button>
               </Decision>
             </>
@@ -1676,7 +1718,7 @@ function RegistrationCard({
               <Decision
                 caption={
                   unsettled.length > 0
-                    ? `Waiting on ${listNames(unsettled)}’s row. Choose who they already are, or say they are new — then this adds ${listNames(held)} for good.`
+                    ? t('waitingCaption', { unsettled: names(unsettled), names: names(held) })
                     : guardianRefused
                       ? /*
                           An honest caption on the one card where the blue
@@ -1686,7 +1728,7 @@ function RegistrationCard({
                           so — and it stops being the primary, because the
                           instrument that ends the job is below it.
                         */
-                        `Tries ${row.guardian?.firstName ?? 'the adult'} again. The last attempt was refused, and nothing about the refusal has changed on its own.`
+                        t('retryCaption', { name: row.guardian?.firstName ?? t('theAdult') })
                       : adultOnly
                         ? /*
                             The narrow card's sentence. Nothing here is about the
@@ -1694,8 +1736,19 @@ function RegistrationCard({
                             promise is about the adult, and it still names the
                             household the press is about to build.
                           */
-                          `${adultSentence} Nothing added to the church’s database can be taken back.`
-                      : `Adds ${listNames(held)}${sameFamily.length > 0 ? ' and the family they were registered with' : ''} to the church’s database${guardianClause ? `, and ${row.guardian!.firstName} ${guardianClause}` : ''}. Nothing added there can be taken back.`
+                          t('adultOnlyCaption', { sentence: adultSentence })
+                      : t(
+                          sameFamily.length > 0 ? 'approveCaptionWithFamily' : 'approveCaption',
+                          {
+                            names: names(held),
+                            withAdult: guardianClause
+                              ? t('withAdultClause', {
+                                  name: row.guardian!.firstName,
+                                  clause: guardianClause,
+                                })
+                              : '',
+                          },
+                        )
                 }
               >
                 <Button
@@ -1706,12 +1759,12 @@ function RegistrationCard({
                   aria-busy={busy || undefined}
                 >
                   {guardianRefused
-                    ? `Try ${row.guardian?.firstName ?? 'the adult'} again`
+                    ? t('tryAdultAgain', { name: row.guardian?.firstName ?? t('theAdult') })
                     : adultOnly
-                      ? `Add ${row.guardian!.firstName}`
+                      ? t('addAdult', { name: row.guardian!.firstName })
                       : row.settled
-                        ? 'Finish adding them'
-                        : 'Approve and add'}
+                        ? t('finishAdding')
+                        : t('approveAndAdd')}
                 </Button>
               </Decision>
 
@@ -1720,16 +1773,19 @@ function RegistrationCard({
                   caption={
                     adultOnly ? (
                       <span className="text-warn-400">
-                        Forgets {formatPhone(row.guardian!.phone)} for good — it is the only copy.{' '}
-                        {named} stays on the roster exactly as they are, and nobody is added to the
-                        church&rsquo;s database.
+                        {t('discardAdultConfirm', {
+                          number: formatPhone(row.guardian!.phone),
+                          names: named,
+                        })}
                       </span>
                     ) : (
                       <span className="text-warn-400">
-                        Takes {listNames(held)} off the roster
-                        {row.guardian ? ` and forgets ${formatPhone(row.guardian.phone)}` : ''} for
-                        good. Their check-in history is kept, and only a new registration at the
-                        kiosk brings them back.
+                        {row.guardian
+                          ? t('discardChildrenConfirmWithPhone', {
+                              names: names(held),
+                              number: formatPhone(row.guardian.phone),
+                            })
+                          : t('discardChildrenConfirm', { names: names(held) })}
                       </span>
                     )
                   }
@@ -1741,14 +1797,14 @@ function RegistrationCard({
                       onClick={onDiscard}
                       disabled={locked}
                     >
-                      {adultOnly ? 'Yes, forget the number' : 'Yes, take them off'}
+                      {adultOnly ? t('yesForgetNumber') : t('yesTakeThemOff')}
                     </Button>
                     <Button
                       variant="ghost"
                       className="min-h-12 w-full lg:w-auto"
                       onClick={() => setConfirmingDiscard(false)}
                     >
-                      Cancel
+                      {t('cancel')}
                     </Button>
                   </div>
                 </Decision>
@@ -1760,10 +1816,16 @@ function RegistrationCard({
                         // off the roster": the discard leaves an unheld student
                         // alone, deliberately, and a leader who wants that child
                         // gone does it on the Students screen looking at them.
-                        `Forgets ${formatPhone(row.guardian!.phone)} for good. ${named} stays on the roster.`
+                        t('discardAdultCaption', {
+                          number: formatPhone(row.guardian!.phone),
+                          names: named,
+                        })
                       : row.guardian
-                        ? `Takes ${listNames(held)} off the roster and forgets ${formatPhone(row.guardian.phone)} for good.`
-                        : `Takes ${listNames(held)} off the roster. No number was given, so nothing else is lost.`
+                        ? t('discardWithPhoneCaption', {
+                            names: names(held),
+                            number: formatPhone(row.guardian.phone),
+                          })
+                        : t('discardNoPhoneCaption', { names: names(held) })
                   }
                 >
                   <Button
@@ -1772,7 +1834,7 @@ function RegistrationCard({
                     onClick={() => setConfirmingDiscard(true)}
                     disabled={locked}
                   >
-                    {adultOnly ? 'Forget the number' : 'Not ours'}
+                    {adultOnly ? t('forgetTheNumber') : t('notOurs')}
                   </Button>
                 </Decision>
               )}
@@ -1801,7 +1863,10 @@ function RegistrationCard({
         {guardianRefused && row.guardian ? (
           <div className="flex flex-col gap-5 border-t border-ink-800 pt-4">
             <Decision
-              caption={`Adds ${listNames(held)} with no adult attached, and forgets ${formatPhone(row.guardian.phone)}. Somebody has to join them to a household in the church’s database afterwards.`}
+              caption={t('withoutAdultCaption', {
+                names: names(held),
+                number: formatPhone(row.guardian.phone),
+              })}
             >
               <Button
                 className="min-h-12 w-full lg:w-auto"
@@ -1820,7 +1885,7 @@ function RegistrationCard({
                 }
                 disabled={locked}
               >
-                Add the children without {row.guardian.firstName}
+                {t('addWithoutAdult', { name: row.guardian.firstName })}
               </Button>
             </Decision>
           </div>
@@ -1868,6 +1933,8 @@ function ChildRow({
   onCancelEdit: () => void;
   onSaveChild: (fields: ChildFields) => Promise<AmendRegistrationResult>;
 }) {
+  const t = useTranslations('Review');
+  const grades = useGrades();
   const candidates = candidatesFor(child);
   const upstream = upstreamFor(child);
 
@@ -1908,7 +1975,7 @@ function ChildRow({
             )}
           </span>
           <span className="block truncate text-xs text-ink-500">
-            {gradeSentence(child) ?? 'No grade given'}
+            {gradeSentence(grades, child) ?? t('noGradeGiven')}
           </span>
           {/*
             The allergy on its own line, a rung up the ramp. Joined to the grade
@@ -1926,11 +1993,12 @@ function ChildRow({
           */}
           {child.typedAs ? (
             <span className={cn('mt-0.5 block', CAPTION)}>
-              Typed at the kiosk as {nameOf(child.typedAs)}
               {child.typedAs.grade !== child.grade
-                ? `, ${gradeSentence(child.typedAs) ?? 'no grade'}`
-                : ''}
-              .
+                ? t('typedAsChildWithGrade', {
+                    name: nameOf(child.typedAs),
+                    grade: gradeSentence(grades, child.typedAs) ?? t('noGradeLower'),
+                  })
+                : t('typedAsChild', { name: nameOf(child.typedAs) })}
             </span>
           ) : null}
         </span>
@@ -1941,11 +2009,11 @@ function ChildRow({
           difference.
         */}
         {child.mergedIntoStudentId ? null : child.pendingReview ? null : (
-          <span className="shrink-0 text-xs text-ink-400">Added</span>
+          <span className="shrink-0 text-xs text-ink-400">{t('added')}</span>
         )}
         {correctable ? (
           <EditButton
-            label={`Edit ${nameOf(child)}\u2019s details`}
+            label={t('editAria', { name: nameOf(child) })}
             disabled={disabled}
             onClick={onEdit}
           />
@@ -1971,14 +2039,12 @@ function ChildRow({
             applied to the absence of one.
           */}
           <span className={CAPTION}>
-            {keeperLabel(child) ? (
-              <>
-                Merged into <span className="text-ink-300">{keeperLabel(child)}</span>. Their
-                check-ins are kept together.
-              </>
-            ) : (
-              'Merged into another row on the roster. Their check-ins are kept together.'
-            )}
+            {keeperLabel(t, grades, child)
+              ? t.rich('mergedIntoNamed', {
+                  name: keeperLabel(t, grades, child)!,
+                  keeper: (chunks) => <span className="text-ink-300">{chunks}</span>,
+                })
+              : t('mergedIntoUnknown')}
           </span>
           {/*
             A real target, not an inline link: this is the control that
@@ -1993,7 +2059,7 @@ function ChildRow({
             onClick={() => onUnmerge(child.studentId!)}
             className="flex min-h-11 items-center rounded-lg px-3 text-sm text-brand-400 ring-1 ring-ink-800 transition-colors hover:bg-ink-900 disabled:opacity-60 pointer-fine:min-h-8"
           >
-            Undo
+            {t('undo')}
           </button>
         </div>
       ) : null}
@@ -2009,7 +2075,7 @@ function ChildRow({
       */}
       {child.linkedTo ? (
         <p className={cn('mt-2 ml-12', CAPTION)}>
-          Linked automatically to {child.linkedTo.name} in the church&rsquo;s database.
+          {t('linkedAutomatically', { name: child.linkedTo.name })}
         </p>
       ) : null}
 
@@ -2021,14 +2087,14 @@ function ChildRow({
         */
         <div className="mt-3 ml-12 border-t border-ink-800 pt-3">
           <p className="text-sm font-semibold text-ink-200 lg:text-xs">
-            Who is {child.firstName}?
+            {t('whoIs', { name: child.firstName })}
           </p>
           <p className={cn('mt-0.5', CAPTION)}>
             {candidates.length > 0 && upstream.length > 0
-              ? 'Merging a roster row can be undone. Adding to the church’s database cannot.'
+              ? t('bothUndoNote')
               : candidates.length > 0
-                ? 'Merging can be undone. A duplicate in the church’s database cannot.'
-                : 'Nothing added to the church’s database can be taken back.'}
+                ? t('rosterUndoNote')
+                : t('upstreamNote')}
           </p>
 
           {/*
@@ -2044,9 +2110,7 @@ function ChildRow({
           */}
           {candidates.length > 0 ? (
             <p className={cn('mt-3', CAPTION)}>
-              {candidates.length === 1
-                ? 'One student on the roster shares this name.'
-                : `${candidates.length} students on the roster share this name.`}
+              {t('rosterShareName', { count: candidates.length })}
             </p>
           ) : null}
           <ul
@@ -2089,9 +2153,7 @@ function ChildRow({
                 it is what this search matched on and the roster's did not.
               */}
               <p className={cn('mt-3', CAPTION)}>
-                {upstream.length === 1
-                  ? 'One person in the church’s database has this name and grade.'
-                  : `${upstream.length} people in the church’s database have this name and grade.`}
+                {t('upstreamShareName', { count: upstream.length })}
               </p>
               <ul
                 className={cn(
@@ -2131,7 +2193,7 @@ function ChildRow({
                           {candidate.name}
                           {' · '}
                           <span className="text-ink-400">
-                            {gradeSentence(candidate) ?? 'no grade on file'}
+                            {gradeSentence(grades, candidate) ?? t('noGradeOnFile')}
                           </span>
                         </span>
                         {/*
@@ -2142,7 +2204,7 @@ function ChildRow({
                         */}
                         {isDefault ? (
                           <span className="mt-0.5 text-sm text-ink-500 lg:text-xs">
-                            The one we would link by default.
+                            {t('wouldLinkByDefault')}
                           </span>
                         ) : null}
                       </button>
@@ -2179,7 +2241,7 @@ function ChildRow({
             )}
           >
             {resolution?.kind === 'new' ? '✓ ' : ''}
-            None of them — {child.firstName} is new
+            {t('noneOfThem', { name: child.firstName })}
           </button>
         </div>
       ) : null}
@@ -2211,6 +2273,8 @@ function CandidateButton({
   disabled: boolean;
   onChoose: () => void;
 }) {
+  const t = useTranslations('Review');
+  const grades = useGrades();
   const sameGrade = candidate.grade !== null && candidate.grade === child.grade;
   return (
     <button
@@ -2233,16 +2297,14 @@ function CandidateButton({
     >
       <span className="truncate text-sm">
         {chosen ? '✓ ' : ''}
-        {candidate.known ? nameOf(candidate) : 'A student on the roster'}
+        {candidate.known ? nameOf(candidate) : t('unknownStudent')}
         {' · '}
         <span className={sameGrade ? 'font-semibold text-ink-100' : 'text-ink-400'}>
-          {gradeSentence(candidate) ?? 'no grade on file'}
+          {gradeSentence(grades, candidate) ?? t('noGradeOnFile')}
         </span>
       </span>
       <span className={cn('mt-0.5', candidate.sharesFamilyDigits ? 'text-ink-300' : 'text-ink-500', 'text-sm lg:text-xs')}>
-        {candidate.sharesFamilyDigits
-          ? 'Same phone digits on file.'
-          : 'Different phone digits on file.'}
+        {candidate.sharesFamilyDigits ? t('samePhoneDigits') : t('differentPhoneDigits')}
       </span>
     </button>
   );
@@ -2258,14 +2320,18 @@ function CandidateButton({
  * whose next press bakes the association into a push with no delete. The hints
  * remain the fallback for a payload from an older callable.
  */
-function keeperLabel(child: PendingRegistrationChild): string | null {
+function keeperLabel(
+  t: ReviewTranslator,
+  grades: GradeStrings,
+  child: PendingRegistrationChild,
+): string | null {
   const keeper =
     child.mergedInto ??
     child.possibleDuplicates.find(
       (candidate) => candidate.studentId === child.mergedIntoStudentId,
     );
   if (!keeper || !keeper.known) return null;
-  return summaryLabel(keeper);
+  return summaryLabel(t, grades, keeper);
 }
 
 /**

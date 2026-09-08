@@ -24,8 +24,9 @@ import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
-import { formatEventWindow } from '@/lib/time';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LockedGatheringsProps {
   events: readonly TallyEvent[];
@@ -39,6 +40,8 @@ export interface LockedGatheringsProps {
 }
 
 export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
+  const time = useTimeFormats();
+  const t = useTranslations('Events');
   const { access } = useData();
   // Only now, and only on a screen that actually has one of these on it.
   const { byUid } = useTeam(events.length > 0);
@@ -52,7 +55,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
           {/* "Today" rather than "tonight": this list is the calendar day, and
               a nursery team's gathering is at half past nine in the morning. */}
           <span id="not-yours">
-            Not yours · {events.length} {hasOwn ? 'more ' : ''}today
+            {t(hasOwn ? 'notYoursCountMore' : 'notYoursCount', { count: events.length })}
           </span>
           {/* Turned about the arrowhead's ink, not its em box. `⌄` hangs low in
               its square, so a plain 180° flip throws the mark to cap height and
@@ -67,7 +70,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
 
         <ul className="flex flex-col gap-1 pt-2">
           {events.map((event) => {
-            const who = approvers(event, access, byUid);
+            const who = approvers(t, event, access, byUid);
 
             return (
               /*
@@ -90,7 +93,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
                     {event.title}
                   </span>
                   <span className="block truncate text-xs text-ink-500">
-                    {formatEventWindow(event)}
+                    {time.eventWindow(event)}
                     {who ? ` · ${who}` : ''}
                   </span>
                 </span>

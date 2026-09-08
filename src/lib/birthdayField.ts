@@ -36,7 +36,6 @@
  * shown the value is not evidence that somebody decided to empty it. An
  * untouched box means "leave it alone".
  */
-import { format } from 'date-fns';
 import {
   birthdayYear,
   composeBirthday,
@@ -84,6 +83,36 @@ export type BirthdayFieldRead =
   | { ok: true; value: string | undefined }
   | { ok: false; error: string };
 
+/**
+ * The sentences under the box, and the locale the date in them is written in.
+ *
+ * This module is shared by two screens and has no React in it, so a caller
+ * hands both in — the same arrangement `lib/time.ts` and `lib/grades.ts` use.
+ */
+export interface BirthdayStrings {
+  locale: string;
+  t: (
+    key:
+      | 'finishTheYear'
+      | 'halfADate'
+      | 'justTheNumbers'
+      | 'leftEmpty'
+      | 'keepGoingYear'
+      | 'keepGoing'
+      | 'leapDayNeedsYear'
+      | 'noSuchDay'
+      | 'notThatYear'
+      | 'futureYear'
+      | 'earlyYear'
+      | 'said'
+      | 'alreadyHeld'
+      | 'noYear'
+      | 'keepingHeldYear'
+      | 'keepingYear',
+    values?: Record<string, string | number>,
+  ) => string;
+}
+
 export interface BirthdayFieldOptions {
   /**
    * What Planning Center holds — `MM-DD` from a roster row, `YYYY-MM-DD` from
@@ -119,7 +148,11 @@ function alreadyOnFile(
  * see coming. The server checks again; it is the only thing that can, since
  * only it knows what is on file.
  */
-export function readBirthdayField(text: string, options: BirthdayFieldOptions): BirthdayFieldRead {
+export function readBirthdayField(
+  strings: BirthdayStrings,
+  text: string,
+  options: BirthdayFieldOptions,
+): BirthdayFieldRead {
   const reading = parseBirthdayInput(text, options.now ?? new Date());
 
   if (reading.state === 'empty') {
@@ -130,18 +163,16 @@ export function readBirthdayField(text: string, options: BirthdayFieldOptions): 
   if (reading.state === 'partial') {
     return {
       ok: false,
-      error: reading.year
-        ? 'Finish the year, or take it out — a birthday can go in without one.'
-        : 'That is half a date. Give a month and a day at least.',
+      error: reading.year ? strings.t('finishTheYear') : strings.t('halfADate'),
     };
   }
   if (reading.state === 'impossible') {
-    return { ok: false, error: refusal(reading.reason) };
+    return { ok: false, error: refusal(strings, reading.reason) };
   }
 
   const { month, day, year } = reading;
   if (year === null && needsYearForLeapDay(month, day, options.onFile)) {
-    return { ok: false, error: LEAP_DAY_NEEDS_YEAR };
+    return { ok: false, error: strings.t('leapDayNeedsYear') };
   }
 
   // Unchanged, as far as this form can tell — and it can tell rather more than
@@ -154,7 +185,7 @@ export function readBirthdayField(text: string, options: BirthdayFieldOptions): 
   // Stryker disable next-line all: every refusal `composeBirthday` has left is
   // one the parser above has already made, so nothing reaches this. It is here
   // because the two are separate modules and only one of them says so.
-  if (composed === null) return { ok: false, error: refusal('no-such-day') };
+  if (composed === null) return { ok: false, error: refusal(strings, 'no-such-day') };
 
   return { ok: true, value: composed };
 }
@@ -176,6 +207,7 @@ export interface BirthdayFieldNote {
  * optional without a sentence telling them so.
  */
 export function describeBirthdayField(
+  strings: BirthdayStrings,
   text: string,
   options: BirthdayFieldOptions,
 ): BirthdayFieldNote {
@@ -185,34 +217,35 @@ export function describeBirthdayField(
   if (reading.state === 'empty') {
     return {
       tone: 'quiet',
-      say:
-        onFile === null
-          ? 'Just the numbers — the year is optional.'
-          : 'Left empty, the birthday Planning Center holds stays as it is.',
+      say: onFile === null ? strings.t('justTheNumbers') : strings.t('leftEmpty'),
     };
   }
   if (reading.state === 'partial') {
     return {
       tone: 'quiet',
-      say: reading.year ? 'Keep going, or leave the year out.' : 'Keep going.',
+      say: reading.year ? strings.t('keepGoingYear') : strings.t('keepGoing'),
     };
   }
-  if (reading.state === 'impossible') return { tone: 'bad', say: refusal(reading.reason) };
+  if (reading.state === 'impossible') {
+    return { tone: 'bad', say: refusal(strings, reading.reason) };
+  }
 
   const { month, day, year } = reading;
   const unchanged = alreadyOnFile({ month, day, year }, onFile);
 
   if (year !== null) {
-    const said = format(new Date(year, month - 1, day), 'd MMMM yyyy');
+    const said = formatBirthdayLong(strings.locale, composeBirthday({ month, day, year }))!;
     return {
       tone: 'good',
-      say: unchanged ? `${said} — already what Planning Center holds.` : `${said}.`,
+      say: strings.t(unchanged ? 'alreadyHeld' : 'said', { date: said }),
     };
   }
-  if (needsYearForLeapDay(month, day, onFile)) return { tone: 'bad', say: LEAP_DAY_NEEDS_YEAR };
+  if (needsYearForLeapDay(month, day, onFile)) {
+    return { tone: 'bad', say: strings.t('leapDayNeedsYear') };
+  }
 
-  const said = formatBirthdayLong(composeBirthday({ month, day }));
-  if (unchanged) return { tone: 'good', say: `${said} — already what Planning Center holds.` };
+  const said = formatBirthdayLong(strings.locale, composeBirthday({ month, day }))!;
+  if (unchanged) return { tone: 'good', say: strings.t('alreadyHeld', { date: said }) };
 
   // Named rather than alluded to, wherever it is known. "The year Planning
   // Center holds" is the most that can be said to somebody who has never been
@@ -220,15 +253,13 @@ export function describeBirthdayField(
   // but a box that opened on 2011 and has had the year rubbed out of it can
   // simply say which year it is about to keep.
   const held = birthdayYear(onFile);
-  if (onFile === null) {
-    return { tone: 'good', say: `${said}, with no year. Planning Center will show no age.` };
-  }
+  if (onFile === null) return { tone: 'good', say: strings.t('noYear', { date: said }) };
   return {
     tone: 'good',
     say:
       held === null
-        ? `${said}, keeping the year Planning Center holds.`
-        : `${said}, keeping ${held}.`,
+        ? strings.t('keepingHeldYear', { date: said })
+        : strings.t('keepingYear', { date: said, year: held }),
   };
 }
 
@@ -249,18 +280,15 @@ function needsYearForLeapDay(month: number, day: number, onFile: string | null):
   return month === 2 && day === 29 && onFile === null;
 }
 
-const LEAP_DAY_NEEDS_YEAR =
-  'Planning Center cannot hold 29 February without a year, and it has none for them. Give the year too.';
-
-function refusal(reason: ImpossibleReason): string {
+function refusal(strings: BirthdayStrings, reason: ImpossibleReason): string {
   switch (reason) {
     case 'no-such-day':
-      return 'That day does not exist in that month.';
+      return strings.t('noSuchDay');
     case 'not-that-year':
-      return 'February had no 29th in that year.';
+      return strings.t('notThatYear');
     case 'future-year':
-      return 'That year has not happened yet.';
+      return strings.t('futureYear');
     case 'early-year':
-      return `Years run from ${EARLIEST_BIRTH_YEAR} to now.`;
+      return strings.t('earlyYear', { earliest: EARLIEST_BIRTH_YEAR });
   }
 }

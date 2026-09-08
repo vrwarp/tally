@@ -288,7 +288,7 @@ export function Kiosk() {
       <StaffScreen
         title={binding.title}
         iconPath={binding.iconPath}
-        window={eventWindow(binding)}
+        window={eventWindow('en', binding)}
         printer="ready"
         backdrop={params.get('backdrop') === '1'}
         onReprint={() => {}}

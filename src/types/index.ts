@@ -964,10 +964,16 @@ export interface EventAccess extends Omit<EventAccessDoc, 'updatedAt' | 'members
  */
 export type TransitionReason = 'moved-on' | 'departed';
 
-/** What each reason is called on screen. Storage keeps the short values. */
-export const TRANSITION_REASON_LABEL: Record<TransitionReason, string> = {
-  'moved-on': 'Moved on within the ministry',
-  departed: 'No longer with us',
+/**
+ * What each reason is called on screen, as a key into `Transitions.*`.
+ *
+ * A key rather than the sentence, for the reason `WARNING_META` names: this
+ * module is data shared by four screens and cannot call a hook, while the
+ * words differ per language. Storage keeps the short values either way.
+ */
+export const TRANSITION_REASON_LABEL: Record<TransitionReason, 'reasonMovedOn' | 'reasonDeparted'> = {
+  'moved-on': 'reasonMovedOn',
+  departed: 'reasonDeparted',
 };
 
 /**
@@ -1735,7 +1741,12 @@ export interface MiaStudent {
 export interface NewVisitor {
   student: Student;
   firstEventId: string;
-  firstEventTitle: string;
+  /**
+   * Null when the loaded window holds no event that can be named — the row
+   * renders `NewVisitors.unknownEvent` in its place. A sentence cannot live
+   * here: this shape is built by a pure module with no catalogue to read.
+   */
+  firstEventTitle: string | null;
   firstAttendedAt: Date;
   /**
    * The gathering they first walked into, or null when that was a one-off (or

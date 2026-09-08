@@ -10,7 +10,6 @@ import {
   differenceInCalendarDays,
   differenceInCalendarMonths,
   format,
-  formatDistanceToNowStrict,
   isSameDay,
 } from 'date-fns';
 import { chainKey } from '@/lib/materialize';
@@ -153,6 +152,42 @@ export function nextSeriesOccurrence(
 /* -------------------------------------------------------------------------- */
 
 /**
+ * The words and the locale the formatters below need.
+ *
+ * A date is not a string until somebody has said in which language. `Intl`
+ * answers most of it — the order of the parts, the month's abbreviation,
+ * whether there is an AM at all — and the rest is words this module does not
+ * own: "Today", "3 wks ago", and the two joins that hold a range and a
+ * date-and-time together. This module has no React in it, so a caller hands
+ * both in; `useTimeFormats()` in `hooks/useTimeFormats.ts` is that caller.
+ */
+export interface TimeStrings {
+  locale: string;
+  t: (
+    key: 'today' | 'tomorrow' | 'yesterday' | 'weeksAgo' | 'monthsAgo' | 'yearsAgo' | 'window' | 'dateTime',
+    values?: Record<string, string | number>,
+  ) => string;
+}
+
+/**
+ * `Intl.DateTimeFormat` is not cheap to construct and these run per row.
+ *
+ * Keyed on the locale and the option set, which between them are the whole of
+ * a formatter's identity. Bounded by the handful of shapes below times three
+ * locales, so there is no eviction to think about.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  const hit = formatters.get(key);
+  if (hit) return hit;
+  const made = new Intl.DateTimeFormat(locale, options);
+  formatters.set(key, made);
+  return made;
+}
+
+/**
  * "Today", "Tomorrow", or the day itself — relative to `now` and nothing else.
  *
  * Every caller passes the `now` its screen is rendering from, and this used to
@@ -163,10 +198,10 @@ export function nextSeriesOccurrence(
  * landed yet at midnight, and the result was this line saying "Today" beside a
  * header on the same screen that had already decided it was not.
  */
-export function formatEventDay(date: Date, now: Date = new Date()): string {
-  if (isSameDay(date, now)) return 'Today';
-  if (isSameDay(date, addDays(now, 1))) return 'Tomorrow';
-  return format(date, 'EEE, MMM d');
+export function formatEventDay(strings: TimeStrings, date: Date, now: Date = new Date()): string {
+  if (isSameDay(date, now)) return strings.t('today');
+  if (isSameDay(date, addDays(now, 1))) return strings.t('tomorrow');
+  return formatWeekdayDate(strings, date);
 }
 
 /**
@@ -191,31 +226,112 @@ export function formatEventDay(date: Date, now: Date = new Date()): string {
  * its start time alone rather than throwing on an invalid date, because a
  * missing field is not a reason for a calendar row to disappear.
  */
-export function formatEventWindow(event: { startAt: Date; endAt?: Date | null }): string {
-  const start = format(event.startAt, 'h:mm a');
+export function formatEventWindow(
+  strings: TimeStrings,
+  event: { startAt: Date; endAt?: Date | null },
+): string {
+  const start = formatClock(strings, event.startAt);
   if (!event.endAt) return start;
 
   const end = isSameDay(event.startAt, event.endAt)
-    ? format(event.endAt, 'h:mm a')
-    : format(event.endAt, 'EEE, MMM d, h:mm a');
+    ? formatClock(strings, event.endAt)
+    : dateFormat(strings.locale, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(event.endAt);
 
-  return `${start} – ${end}`;
+  return strings.t('window', { start, end });
 }
 
-export function formatDateTime(date: Date): string {
-  return format(date, 'MMM d, yyyy · h:mm a');
+export function formatDateTime(strings: TimeStrings, date: Date): string {
+  return strings.t('dateTime', {
+    date: dateFormat(strings.locale, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date),
+    time: formatClock(strings, date),
+  });
 }
 
-export function formatShortDate(date: Date): string {
-  return format(date, 'MMM d');
+/**
+ * "Sun, Feb 15" — the day, always, with no "Today" for the one that is.
+ *
+ * `formatEventDay`'s answer minus its relative branch. A ladder of dates under
+ * one heading is read as a column, and one row saying "Today" among nine
+ * saying dates breaks the scan rather than helping it.
+ */
+export function formatWeekdayDate(strings: TimeStrings, date: Date): string {
+  return dateFormat(strings.locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(
+    date,
+  );
 }
 
-export function formatClock(date: Date): string {
-  return format(date, 'h:mm a');
+/**
+ * "Sun 15" — a weekday and a day of the month, and nothing else.
+ *
+ * For a ladder whose head has already said which month it is in. `Intl` has no
+ * option set for exactly this pair, so it is composed from the parts rather
+ * than pattern-matched: `formatToParts` names them, and the separator is
+ * whatever that locale put between them.
+ */
+export function formatWeekdayDay(strings: TimeStrings, date: Date): string {
+  const parts = dateFormat(strings.locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).formatToParts(date);
+  const keep = new Set(['weekday', 'day']);
+  // Everything up to the last part worth keeping, minus the month and the
+  // literal that follows it — so "Sun, Feb 15" becomes "Sun, 15" in English and
+  // 2月15日周日 loses its 2月 in Chinese.
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i]!;
+    if (keep.has(part.type)) out.push(part.value);
+    else if (part.type === 'literal' && out.length > 0 && i + 1 < parts.length) {
+      const next = parts.slice(i + 1).find((p) => p.type !== 'literal');
+      if (next && keep.has(next.type)) out.push(part.value);
+    }
+  }
+  return out.join('').trim();
 }
 
-export function formatRelative(date: Date): string {
-  return `${formatDistanceToNowStrict(date)} ago`;
+export function formatShortDate(strings: TimeStrings, date: Date): string {
+  return dateFormat(strings.locale, { month: 'short', day: 'numeric' }).format(date);
+}
+
+export function formatClock(strings: TimeStrings, date: Date): string {
+  return dateFormat(strings.locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+/**
+ * How long ago, in whole units: "2 hours ago", "3 days ago".
+ *
+ * `Intl.RelativeTimeFormat` rather than date-fns, and the unit ladder is the
+ * one date-fns used, so the English is unchanged. What does change is a date in
+ * the *future* — a clock skew, or an event somebody typed wrong. It used to
+ * read "2 hours ago"; it now reads "in 2 hours", because the formatter is given
+ * a signed distance rather than a magnitude with a word stuck on the end.
+ */
+export function formatRelative(strings: TimeStrings, date: Date, now: Date = new Date()): string {
+  const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
+  const magnitude = Math.abs(seconds);
+  const relative = new Intl.RelativeTimeFormat(strings.locale, { numeric: 'always' });
+
+  if (magnitude < 60) return relative.format(seconds, 'second');
+  const minutes = Math.round(seconds / 60);
+  if (Math.abs(minutes) < 60) return relative.format(minutes, 'minute');
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return relative.format(hours, 'hour');
+  const days = Math.round(hours / 24);
+  if (Math.abs(days) < 30) return relative.format(days, 'day');
+  const months = Math.round(days / 30);
+  if (Math.abs(months) < 12) return relative.format(months, 'month');
+  return relative.format(Math.round(months / 12), 'year');
 }
 
 /**
@@ -235,17 +351,20 @@ export function formatRelative(date: Date): string {
  * ministry started using Tally, so "no sighting" is not the same claim as
  * "never came", and sixty rows of grey "Never" teach the eye to skip the lane.
  */
-export function formatSeenShort(date: Date, now: Date = new Date()): string {
+export function formatSeenShort(
+  strings: TimeStrings,
+  date: Date,
+  now: Date = new Date(),
+): string {
   const days = differenceInCalendarDays(now, date);
   // A future date is a clock skew or a hand-typed event, not a sighting to
   // describe in the past tense.
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return format(date, 'EEE');
+  if (days <= 0) return strings.t('today');
+  if (days === 1) return strings.t('yesterday');
+  if (days < 7) return dateFormat(strings.locale, { weekday: 'short' }).format(date);
 
   if (days < 30) {
-    const weeks = Math.floor(days / 7);
-    return weeks === 1 ? '1 wk ago' : `${weeks} wks ago`;
+    return strings.t('weeksAgo', { count: Math.floor(days / 7) });
   }
 
   /*
@@ -255,10 +374,9 @@ export function formatSeenShort(date: Date, now: Date = new Date()): string {
    * Weeks own everything under thirty days; months start at one.
    */
   const months = Math.max(1, differenceInCalendarMonths(now, date));
-  if (months < 12) return months === 1 ? '1 mth ago' : `${months} mths ago`;
+  if (months < 12) return strings.t('monthsAgo', { count: months });
 
-  const years = Math.floor(months / 12);
-  return years === 1 ? '1 yr ago' : `${years} yrs ago`;
+  return strings.t('yearsAgo', { count: Math.floor(months / 12) });
 }
 
 /** `<input type="datetime-local">` round-trips through these two. */

@@ -6,20 +6,7 @@
  * every keystroke.
  */
 import { describe, expect, it } from 'vitest';
-import {
-  createSearchMatcher,
-  formatPhone,
-  formatPhoneInput,
-  gradeDescription,
-  gradeLabel,
-  gradeName,
-  initials,
-  matchesQuery,
-  normalizeForSearch,
-  ordinalGrade,
-  partition,
-  sortByName,
-} from '@/lib/utils';
+import { createSearchMatcher, formatPhone, formatPhoneInput, initials, matchesQuery, nameSortKey, normalizeForSearch, partition, sortByName } from '@/lib/utils';
 
 describe('matchesQuery', () => {
   it('is case-insensitive in both directions', () => {
@@ -255,83 +242,6 @@ describe('normalizeForSearch', () => {
   });
 });
 
-describe('ordinalGrade', () => {
-  it('labels the grades the ministry actually serves', () => {
-    expect(ordinalGrade(6)).toBe('6th');
-    expect(ordinalGrade(7)).toBe('7th');
-    expect(ordinalGrade(8)).toBe('8th');
-    expect(ordinalGrade(9)).toBe('9th');
-    expect(ordinalGrade(10)).toBe('10th');
-    expect(ordinalGrade(11)).toBe('11th');
-    expect(ordinalGrade(12)).toBe('12th');
-  });
-
-  it('uses "th" for the 11/12/13 exceptions rather than st/nd/rd', () => {
-    expect(ordinalGrade(11)).toBe('11th');
-    expect(ordinalGrade(12)).toBe('12th');
-    expect(ordinalGrade(13)).toBe('13th');
-  });
-
-  it('still produces normal ordinals either side of the exception band', () => {
-    expect(ordinalGrade(1)).toBe('1st');
-    expect(ordinalGrade(2)).toBe('2nd');
-    expect(ordinalGrade(3)).toBe('3rd');
-    expect(ordinalGrade(21)).toBe('21st');
-    expect(ordinalGrade(22)).toBe('22nd');
-    expect(ordinalGrade(23)).toBe('23rd');
-  });
-});
-
-describe('gradeName and gradeDescription', () => {
-  it('names kindergarten rather than printing a zeroth grade', () => {
-    expect(gradeName(0)).toBe('K');
-    expect(gradeDescription(0)).toBe('Kindergarten');
-  });
-
-  it('names Pre-K rather than printing a minus-first grade', () => {
-    // Not hypothetical: Planning Center holds `-1` for a pre-schooler, and
-    // before Pre-K had a name here the lobby screen read "-1th grade" beside a
-    // four-year-old. "Pre-K grade" is not English either, same as "K grade".
-    expect(gradeName(-1)).toBe('Pre-K');
-    expect(gradeDescription(-1)).toBe('Pre-K');
-  });
-
-  it('keeps the ordinal for every grade that has one', () => {
-    expect(gradeName(1)).toBe('1st');
-    expect(gradeName(9)).toBe('9th');
-    expect(gradeDescription(1)).toBe('1st grade');
-    expect(gradeDescription(12)).toBe('12th grade');
-  });
-});
-
-describe('gradeLabel', () => {
-  it('uses the short token, so a chip reads "K" and not "Kindergarten"', () => {
-    expect(gradeLabel({ grade: 0 })).toBe('K');
-  });
-
-  it('prints the grade a backend holds', () => {
-    expect(gradeLabel({ grade: 9 })).toBe('9th');
-  });
-
-  it('says nothing for somebody nobody holds a grade for', () => {
-    // The bug this fixed: an adult volunteer on a hand-picked roster has no
-    // grade and no graduation year upstream, so the sync's clamp parked them
-    // on `minGrade` and every screen printed "6th grade" under their name.
-    // There is no clamp to consult now — the grade is simply absent.
-    expect(gradeLabel({ grade: null })).toBeNull();
-  });
-
-  it('reads Pre-K on a chip the same as anywhere else', () => {
-    expect(gradeLabel({ grade: -1 })).toBe('Pre-K');
-  });
-
-  it('trusts a grade with no flag beside it', () => {
-    // A Tally document: the grade was typed by a human at quick-add, and the
-    // field only exists on roster-sourced rows.
-    expect(gradeLabel({ grade: 7 })).toBe('7th');
-  });
-});
-
 describe('initials', () => {
   it('takes the first letter of each name, uppercased', () => {
     expect(initials('marcus', 'lee')).toBe('ML');
@@ -429,6 +339,52 @@ describe('sortByName', () => {
   it('compares without case sensitivity', () => {
     expect(sortByName(name('a', 'alvarez'), name('A', 'ALVAREZ'))).toBe(0);
     expect(sortByName(name('Ana', 'alvarez'), name('Ana', 'Bell'))).toBeLessThan(0);
+  });
+
+  /*
+   * A Chinese name files under the letter a reader would look for it under,
+   * and it can only do that because the server has already romanized it —
+   * see `nameSortKey` and `functions/src/names/pinyin.ts`. Left to
+   * `Intl.Collator`, every one of these ends up in a clump at one end of the
+   * list, which is not a list anybody can scan.
+   */
+  it('files a Chinese name under its pinyin, between the Latin ones', () => {
+    const people = [
+      { firstName: 'Bergman', lastName: 'Ruiz' },
+      { firstName: '秉洲', lastName: '蔡', searchName: '秉洲 蔡 caixiu bx cx' },
+      { firstName: 'Dana', lastName: 'Okafor' },
+    ];
+    expect([...people].sort(sortByName).map((p) => p.firstName)).toEqual([
+      'Bergman',
+      '秉洲',
+      'Dana',
+    ]);
+  });
+});
+
+describe('nameSortKey', () => {
+  it('is the name itself when the name is written in letters', () => {
+    expect(nameSortKey({ firstName: 'Ada', searchName: 'ada lovelace' })).toBe('Ada');
+  });
+
+  /*
+   * The contract with `withPinyin`: the canonical romanization is the token
+   * immediately after the Chinese, and everything after that is an alternative
+   * spelling.
+   */
+  it('is the romanization the server wrote after the Chinese', () => {
+    expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲 caibingzhou cbz tsaibingzhou' }))
+      .toBe('caibingzhou');
+  });
+
+  /*
+   * A student created a moment ago, whose `searchName` the client rebuilt and
+   * the trigger has not caught up with yet. They file under Han for a second,
+   * which is where they already were — never at an undefined.
+   */
+  it('falls back to the name when nothing has romanized it yet', () => {
+    expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲' })).toBe('蔡秉洲');
+    expect(nameSortKey({ firstName: '蔡秉洲' })).toBe('蔡秉洲');
   });
 });
 

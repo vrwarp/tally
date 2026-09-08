@@ -27,12 +27,15 @@
  * shipping search screen dropped the ring from its quiet control.
  */
 import { useEffect } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskStudent } from '../search';
 import { StaffMark } from '../components/StaffMark';
 import { useOverflowFade } from '../components/useOverflowFade';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 /**
  * Fewer than the parent screen's eight, and this screen's own number.
@@ -64,8 +67,8 @@ export interface ReprintOutcome {
  * only by the keystrokes this screen can see.
  */
 
-function gradeLabel(grade: number | null): string {
-  return grade === null ? '' : gradeDescription(grade);
+function gradeLabel(grades: GradeStrings, grade: number | null): string {
+  return grade === null ? '' : gradeDescription(grades, grade);
 }
 
 export function ReprintScreen({
@@ -105,6 +108,8 @@ export function ReprintScreen({
   onPick: (student: KioskStudent) => void;
   onDone: () => void;
 }) {
+  const t = useTranslations('Staff');
+  const grades = useGrades();
   const rowTap = useTapGuard(onPick);
   const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
@@ -159,7 +164,7 @@ export function ReprintScreen({
             * the last line on every phone frame.
             */}
           <div className="pt-2 text-base text-balance text-ink-500 kiosk:text-lg kiosk:text-ink-400 lg:pt-0">
-            Nobody is checked in or out from this screen.
+            {t('reprintNoRegisterChange')}
           </div>
         </div>
         {/*
@@ -175,7 +180,7 @@ export function ReprintScreen({
           */}
         {printerNeedsAttention && (
           <div className="pt-1 text-base text-warn-400 kiosk:text-lg">
-            Printer needs attention.
+            {t('reprintPrinterAttention')}
           </div>
         )}
       </div>
@@ -212,7 +217,7 @@ export function ReprintScreen({
               {!rows && (
                 <div className="pt-6 text-center">
                   <div className="text-2xl font-semibold text-ink-200 kiosk:text-3xl">
-                    Type the child&apos;s name
+                    {t('typeChildName')}
                   </div>
                   {/*
                     * What actually happens, rather than what used to be promised.
@@ -228,8 +233,7 @@ export function ReprintScreen({
                       "changes." alone on the last line — the invitation is the
                       only prose on an empty screen, so the rag is the frame. */}
                   <p className="mx-auto max-w-md pt-3 text-lg text-balance text-ink-400 kiosk:text-xl">
-                    Tap a name to see what will print, then confirm. Nothing about the register
-                    changes.
+                    {t('reprintInvitation')}
                   </p>
                 </div>
               )}
@@ -293,15 +297,15 @@ export function ReprintScreen({
                     <span className="truncate text-sm text-ink-400 kiosk:text-lg">
                       {justSent && (
                         <>
-                          <span className="font-semibold text-brand-300">Name tag sent</span>
+                          <span className="font-semibold text-brand-300">{t('nameTagSent')}</span>
                           {' · '}
                         </>
                       )}
-                      {gradeLabel(student.grade)}
+                      {gradeLabel(grades, student.grade)}
                       {present && !justSent && (
                         <>
                           {' · '}
-                          <span className="font-semibold text-present-400">✓ Checked in</span>
+                          <span className="font-semibold text-present-400">{t('checkedIn')}</span>
                         </>
                       )}
                     </span>
@@ -324,7 +328,7 @@ export function ReprintScreen({
             false. */}
         {truncated && (
           <div className="mx-auto w-full max-w-2xl shrink-0 px-6 pt-2 text-center text-base text-ink-400 kiosk:text-lg lg:max-w-5xl">
-            More names match — keep typing.
+            {t('moreNamesMatch')}
           </div>
         )}
       </div>
@@ -348,7 +352,7 @@ export function ReprintScreen({
           })}
           className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-6 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 tall:px-8 kiosk:text-lg"
         >
-          Done — back to check-in
+          {t('doneBackToCheckIn')}
         </button>
       </div>
 
@@ -377,8 +381,8 @@ export function ReprintScreen({
           {outcome.total > 0 && (
             <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base">
               {truncated
-                ? `${outcome.results.length} of ${outcome.total} names`
-                : `${outcome.total} ${outcome.total === 1 ? 'name' : 'names'}`}
+                ? t('someOfNames', { shown: outcome.results.length, total: outcome.total })
+                : t('nameCount', { count: outcome.total })}
             </span>
           )}
         </div>

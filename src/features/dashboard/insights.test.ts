@@ -1072,7 +1072,7 @@ describe('computeNewVisitors', () => {
     const [visitor] = computeNewVisitors([student], [makeSnapshot(events[0]!, [])], settings, NOW);
 
     expect(visitor!.firstEventId).toBe('');
-    expect(visitor!.firstEventTitle).toBe('Unknown event');
+    expect(visitor!.firstEventTitle).toBeNull();
   });
 
   /*
@@ -1181,7 +1181,7 @@ describe('computeNewVisitors', () => {
     const [visitor] = computeNewVisitors([student], [], settings, NOW, [tonight, alsoTonight]);
 
     expect(visitor!.firstEventId).toBe('');
-    expect(visitor!.firstEventTitle).toBe('Unknown event');
+    expect(visitor!.firstEventTitle).toBeNull();
     expect(visitor!.gatheringKey).toBeNull();
     expect(visitor!.viaOneOff).toBe(false);
   });
@@ -1205,7 +1205,7 @@ describe('computeNewVisitors', () => {
     );
 
     expect(visitor!.firstEventId).toBe('');
-    expect(visitor!.firstEventTitle).toBe('Unknown event');
+    expect(visitor!.firstEventTitle).toBeNull();
     expect(visitor!.gatheringKey).toBeNull();
   });
 });

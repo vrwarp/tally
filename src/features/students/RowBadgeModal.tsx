@@ -32,10 +32,11 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { formatShortDate } from '@/lib/time';
 import { pushStudentToPlanningCenter } from '@/services/functions';
 import { setStudentStatus, updateStudent } from '@/services/students';
 import { backendLabelOf, backendOfStudent, studentFullName, type Student } from '@/types';
+import { useLocale, useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /** Which fact was pressed. One per badge the roster can render. */
 export type RowBadgeAction =
@@ -54,18 +55,22 @@ export interface RowBadgeModalProps {
   now: Date;
 }
 
-const TITLES: Record<Exclude<RowBadgeAction, 'queued'>, string> = {
-  allergy: 'Allergies',
-  contact: 'Contact',
-  visitor: 'Still a visitor?',
-  birthday: 'Birthday',
-  inactive: 'No longer on the roster',
-};
+const TITLES = {
+  allergy: 'titleAllergy',
+  contact: 'titleContact',
+  visitor: 'titleVisitor',
+  birthday: 'titleBirthday',
+  inactive: 'titleInactive',
+} as const satisfies Record<Exclude<RowBadgeAction, 'queued'>, string>;
 
 export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalProps) {
+  const t = useTranslations('RowBadge');
   const name = studentFullName(student);
   // Queued names where the push is going, which depends on the student.
-  const title = action === 'queued' ? `Waiting for ${backendLabelOf(student)}` : TITLES[action];
+  const title =
+    action === 'queued'
+      ? t('titleQueued', { backend: backendLabelOf(student) })
+      : t(TITLES[action]);
 
   return (
     <Modal open onClose={onClose} title={title} description={name} size="sm">
@@ -105,14 +110,14 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
  * profile is where somebody is *reading* rather than counting.
  */
 function AllergyPanel({ student }: { student: Student }) {
+  const t = useTranslations('RowBadge');
   const { details, loading, loaded, error, unavailable, retry } = usePersonDetails(student);
   const label = backendLabelOf(student);
 
   if (unavailable) {
     return (
       <p className="text-sm text-ink-300">
-        {student.firstName} was added here and has not reached {label} yet, so there is no medical
-        note to read — whatever somebody typed at the door is on their profile.
+        {t('noMedicalYet', { name: student.firstName, backend: label })}
       </p>
     );
   }
@@ -123,7 +128,7 @@ function AllergyPanel({ student }: { student: Student }) {
         <ErrorBanner message={error} />
         <div className="flex justify-end">
           <Button variant="secondary" onClick={retry}>
-            Try again
+            {t('tryAgain')}
           </Button>
         </div>
       </div>
@@ -140,10 +145,9 @@ function AllergyPanel({ student }: { student: Student }) {
 
   return (
     <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
-      <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">On file</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-warn-400">{t('onFile')}</p>
       <p className="mt-0.5 whitespace-pre-line text-sm text-ink-100">
-        {details?.allergies ??
-          `${label} has the flag set but no note against it. Somebody upstream knows why.`}
+        {details?.allergies ?? t('flagNoNote', { backend: label })}
       </p>
     </div>
   );
@@ -173,6 +177,8 @@ function AllergyPanel({ student }: { student: Student }) {
  * list is built on the same flag.
  */
 function VisitorPanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const time = useTimeFormats();
+  const t = useTranslations('RowBadge');
   const { user } = useAuth();
   const { show } = useToast();
   const [busy, setBusy] = useState(false);
@@ -184,10 +190,10 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
     setProblem(null);
     try {
       await updateStudent(student.id, { isVisitor: false }, user.uid, student);
-      show(`${student.firstName} is on the roster as a regular.`);
+      show(t('promoted', { name: student.firstName }));
       onDone();
     } catch {
-      setProblem('That could not be saved. Check the connection and try again.');
+      setProblem(t('saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -196,18 +202,20 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-300">
-        {student.firstName} has been coming since{' '}
-        {student.firstAttendedAt ? formatShortDate(student.firstAttendedAt) : 'before Tally counted'}
-        . Clearing this takes them off the new-visitor list on the dashboard; nothing else about
-        them changes.
+        {t('visitorSince', {
+          name: student.firstName,
+          date: student.firstAttendedAt
+            ? time.shortDate(student.firstAttendedAt)
+            : t('beforeTallyCounted'),
+        })}
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone} disabled={busy}>
-          Leave it
+          {t('leaveIt')}
         </Button>
         <Button onClick={() => void promote()} disabled={busy || !user}>
-          {busy ? 'Saving…' : 'Not a visitor any more'}
+          {busy ? t('saving') : t('notAVisitor')}
         </Button>
       </div>
     </div>
@@ -246,6 +254,8 @@ function BirthdayPanel({
   now: Date;
   onDone: () => void;
 }) {
+  const t = useTranslations('RowBadge');
+  const locale = useLocale();
   const state = birthdayState(student.birthday, now);
   const backend = backendOfStudent(student);
   const label = backendLabelOf(student);
@@ -267,22 +277,21 @@ function BirthdayPanel({
   const onFile = details?.birthdate ?? student.birthday;
 
   const said: Record<Exclude<BirthdayState, 'missing'>, string> = {
-    today: 'Today.',
-    soon: 'Coming up this week.',
-    recent: 'Just gone — this past week.',
-    quiet: 'Not near today.',
+    today: t('birthdayToday'),
+    soon: t('birthdaySoon'),
+    recent: t('birthdayRecent'),
+    quiet: t('birthdayQuiet'),
   };
 
   return (
     <div className="flex flex-col gap-3">
       {state === 'missing' ? (
         <p className="text-sm text-ink-300">
-          {label} holds no birthdate for {student.firstName}, so Tally cannot tell you when to say
-          something.
+          {t('noBirthdateHeld', { backend: label, name: student.firstName })}
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(onFile)}</p>
+          <p className="text-2xl font-bold text-ink-50">{formatBirthdayLong(locale, onFile)}</p>
           <p className="text-sm text-ink-400">{said[state]}</p>
           {/*
             Only where the year is genuinely unknown, and it now says whose gap
@@ -292,7 +301,7 @@ function BirthdayPanel({
           */}
           {details && birthdayYear(onFile) === null ? (
             <p className="text-sm text-ink-500">
-              The day only — {label} holds no year for {student.firstName}, so it shows no age.
+              {t('dayOnly', { backend: label, name: student.firstName })}
             </p>
           ) : null}
         </div>
@@ -301,7 +310,7 @@ function BirthdayPanel({
       {writable ? (
         <EditBirthday student={student} onFile={onFile} onDone={onDone} />
       ) : loading && !loaded ? (
-        <p className="text-sm text-ink-500">Reading what {label} allows…</p>
+        <p className="text-sm text-ink-500">{t('readingPermissions', { backend: label })}</p>
       ) : upstream ? (
         <a
           href={upstream}
@@ -309,17 +318,15 @@ function BirthdayPanel({
           rel="noreferrer"
           className="text-sm text-brand-300 underline underline-offset-4"
         >
-          {state === 'missing' ? 'Add one in Planning Center' : 'Change it in Planning Center'}
+          {state === 'missing' ? t('addInPco') : t('changeInPco')}
         </a>
       ) : backend !== null ? (
         <p className="text-sm text-ink-400">
-          Birthdays are {label}'s field, and write-back is not on — add or correct it in {label}{' '}
-          itself.
+          {t('birthdayUpstreamOnly', { backend: label })}
         </p>
       ) : (
         <p className="text-sm text-ink-400">
-          {student.firstName} does not exist in {label} yet, so there is nowhere to put one until
-          their push lands.
+          {t('noRecordYet', { name: student.firstName, backend: label })}
         </p>
       )}
     </div>
@@ -331,6 +338,7 @@ function BirthdayPanel({
 /* -------------------------------------------------------------------------- */
 
 function InactivePanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const t = useTranslations('RowBadge');
   const { user } = useAuth();
   const { show } = useToast();
   const [busy, setBusy] = useState(false);
@@ -342,10 +350,10 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
     setProblem(null);
     try {
       await setStudentStatus(student.id, 'active', user.uid, student);
-      show(`${student.firstName} is back on the active roster.`);
+      show(t('reactivated', { name: student.firstName }));
       onDone();
     } catch {
-      setProblem('That could not be saved. Check the connection and try again.');
+      setProblem(t('saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -354,19 +362,18 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-300">
-        Inactive students are history rather than roster: they are hidden from the default view and
-        from check-in, and every attendance record they are in is kept.
+        {t('inactiveExplain')}
         {student.fromPlanningCenter
-          ? ` ${backendLabelOf(student)} may say inactive too, in which case the next roster read will set it back.`
+          ? t('inactiveUpstreamNote', { backend: backendLabelOf(student) })
           : ''}
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone} disabled={busy}>
-          Leave it
+          {t('leaveIt')}
         </Button>
         <Button onClick={() => void reactivate()} disabled={busy || !user}>
-          {busy ? 'Saving…' : 'Make active again'}
+          {busy ? t('saving') : t('makeActiveAgain')}
         </Button>
       </div>
     </div>
@@ -385,6 +392,7 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
  * a button is the right shape rather than a schedule.
  */
 function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const t = useTranslations('RowBadge');
   const { show } = useToast();
   const { refreshRoster } = useData();
   const [busy, setBusy] = useState(false);
@@ -406,11 +414,11 @@ function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void
       invalidateAdultContact();
       // The server's sentence, because only the server knows which backend a
       // queued student was just sent to.
-      show(result.data.message || `${student.firstName} is in ${backendLabelOf(student)}.`);
+      show(result.data.message || t('pushed', { name: student.firstName, backend: backendLabelOf(student) }));
       void refreshRoster(true);
       onDone();
     } catch {
-      setProblem('The push did not go through. Nothing was changed.');
+      setProblem(t('pushFailed'));
     } finally {
       setBusy(false);
     }
@@ -419,19 +427,19 @@ function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-300">
-        {student.firstName} exists in Tally only. Attendance is being recorded either way — this is
-        about the person record upstream, not about the counting.
+        {t('queuedExplain', { name: student.firstName })}
       </p>
       <p className="text-sm text-ink-400">
-        <Badge tone="neutral">Queued</Badge> clears itself as soon as the push lands.
+        <Badge tone="neutral">{t('queuedBadge')}</Badge>
+        {t('queuedClears')}
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone} disabled={busy}>
-          Later
+          {t('later')}
         </Button>
         <Button onClick={() => void push()} disabled={busy}>
-          {busy ? 'Pushing…' : 'Push now'}
+          {busy ? t('pushing') : t('pushNow')}
         </Button>
       </div>
     </div>

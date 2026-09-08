@@ -19,9 +19,10 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui';
-import { describeKind, pcoErrorMarkdown, prettyBody } from '@/lib/pcoErrors';
+import { pcoErrorMarkdown, pcoKindKey, prettyBody } from '@/lib/pcoErrors';
 import { cn } from '@/lib/utils';
 import type { PcoDebugRequest, PcoDebugResponse, PcoErrorReport } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Long enough to read "Copied", short enough that the button is a button. */
 const COPY_FEEDBACK_MS = 2000;
@@ -58,16 +59,17 @@ function headerText(headers: Record<string, string>): string {
 }
 
 function RequestSection({ request }: { request: PcoDebugRequest }) {
+  const t = useTranslations('Pco');
   const headers = headerText(request.headers);
   return (
-    <Section title="Request">
+    <Section title={t('request')}>
       <Block>
         {request.method} {request.url}
         {headers ? `\n${headers}` : ''}
       </Block>
       {request.attempts > 1 ? (
         <p className="text-xs text-ink-500">
-          Sent {request.attempts} times — Tally retried before giving up.
+          {t('sentTimes', { count: request.attempts })}
         </p>
       ) : null}
     </Section>
@@ -75,10 +77,11 @@ function RequestSection({ request }: { request: PcoDebugRequest }) {
 }
 
 function ResponseSection({ response }: { response: PcoDebugResponse }) {
+  const t = useTranslations('Pco');
   const headers = headerText(response.headers);
   const body = prettyBody(response.body).text;
   return (
-    <Section title="Response">
+    <Section title={t('response')}>
       <Block>
         HTTP {response.status}
         {response.statusText ? ` ${response.statusText}` : ''} — {response.durationMs} ms
@@ -90,7 +93,7 @@ function ResponseSection({ response }: { response: PcoDebugResponse }) {
           {response.bodyTruncated ? '\n… truncated by Tally.' : ''}
         </Block>
       ) : (
-        <p className="text-xs text-ink-500">Planning Center sent an empty body.</p>
+        <p className="text-xs text-ink-500">{t('emptyBody')}</p>
       )}
     </Section>
   );
@@ -102,6 +105,7 @@ export interface PlanningCenterErrorDetailsProps {
 }
 
 export function PlanningCenterErrorDetails({ report, className }: PlanningCenterErrorDetailsProps) {
+  const t = useTranslations('Pco');
   const [copied, setCopied] = useState<CopyState>('idle');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,32 +142,34 @@ export function PlanningCenterErrorDetails({ report, className }: PlanningCenter
   return (
     <details className={cn('group mt-2 border-t border-danger-500/20 pt-2', className)}>
       <summary className="cursor-pointer list-none text-xs font-semibold text-danger-400 underline underline-offset-4 [&::-webkit-details-marker]:hidden">
-        <span className="group-open:hidden">Show details</span>
-        <span className="hidden group-open:inline">Hide details</span>
+        <span className="group-open:hidden">{t('showDetails')}</span>
+        <span className="hidden group-open:inline">{t('hideDetails')}</span>
       </summary>
 
       <div className="mt-3 flex flex-col gap-3 text-ink-300">
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           {debug?.operation ? (
             <>
-              <dt className="text-ink-500">Trying to</dt>
+              <dt className="text-ink-500">{t('tryingTo')}</dt>
               <dd className="text-ink-200">{debug.operation}</dd>
             </>
           ) : null}
-          <dt className="text-ink-500">What happened</dt>
-          <dd className="text-ink-200">{debug ? describeKind(debug.kind) : 'The call never reached Planning Center.'}</dd>
+          <dt className="text-ink-500">{t('whatHappened')}</dt>
+          <dd className="text-ink-200">
+            {debug ? t(pcoKindKey(debug.kind)) : t('neverReached')}
+          </dd>
           {report.code ? (
             <>
-              <dt className="text-ink-500">Code</dt>
+              <dt className="text-ink-500">{t('code')}</dt>
               <dd className="font-mono text-ink-200">{report.code}</dd>
             </>
           ) : null}
-          <dt className="text-ink-500">When</dt>
+          <dt className="text-ink-500">{t('when')}</dt>
           <dd className="text-ink-200">{debug?.occurredAt || report.reportedAt}</dd>
         </dl>
 
         {debug && debug.message && debug.message !== report.message ? (
-          <Section title="Error">
+          <Section title={t('error')}>
             <Block>{debug.message}</Block>
           </Section>
         ) : null}
@@ -172,7 +178,7 @@ export function PlanningCenterErrorDetails({ report, className }: PlanningCenter
         {debug?.response ? <ResponseSection response={debug.response} /> : null}
 
         {debug && debug.errors.length > 0 ? (
-          <Section title="Planning Center said">
+          <Section title={t('saidThis')}>
             <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-ink-300">
               {debug.errors.map((line, index) => (
                 <li key={index}>{line}</li>
@@ -183,21 +189,21 @@ export function PlanningCenterErrorDetails({ report, className }: PlanningCenter
 
         {!debug ? (
           <p className="text-xs text-ink-500">
-            There is no request to show: this failed before Tally asked Planning Center anything.
+            {t('noRequest')}
           </p>
         ) : null}
 
         <div className="flex items-center gap-3">
           <Button variant="secondary" size="sm" onClick={() => void copy()}>
-            {copied === 'copied' ? 'Copied' : 'Copy debug details'}
+            {copied === 'copied' ? t('copiedShort') : t('copyDebug')}
           </Button>
           {copied === 'failed' ? (
             <span className="text-xs text-ink-500">
-              Copying is blocked on this device — select the text above instead.
+              {t('copyBlocked')}
             </span>
           ) : null}
           <span aria-live="polite" className="sr-only">
-            {copied === 'copied' ? 'Debug details copied to the clipboard' : ''}
+            {copied === 'copied' ? t('copied') : ''}
           </span>
         </div>
       </div>

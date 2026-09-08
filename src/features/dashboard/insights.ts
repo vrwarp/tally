@@ -803,7 +803,10 @@ export function computeNewVisitors(
     results.push({
       student,
       firstEventId: firstEvent?.id ?? '',
-      firstEventTitle: firstEvent?.title ?? 'Unknown event',
+      // Null rather than a sentence: this module is pure and has no catalogue.
+      // `NewVisitorRow` renders `NewVisitors.unknownEvent` in its place, which
+      // is where the words belong.
+      firstEventTitle: firstEvent?.title ?? null,
       firstAttendedAt,
       // Which gathering they arrived at, or null when they arrived at a one-off
       // — somebody met on the retreat bus is a different follow-up from a

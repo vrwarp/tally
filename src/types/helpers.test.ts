@@ -37,6 +37,7 @@ import {
   roleAtLeast,
   studentFullName,
 } from '@/types';
+import { testTranslator } from '@/test/translator';
 
 describe('grades', () => {
   it('runs Pre-K to 12, and Pre-K is the negative one', () => {
@@ -217,8 +218,11 @@ describe('the label maps a row prints from', () => {
   it('names both transition reasons', () => {
     // The stored values are short; these are the sentences a leader chooses
     // between, and the difference between them is what the pooled list reads.
-    expect(TRANSITION_REASON_LABEL['moved-on']).toBe('Moved on within the ministry');
-    expect(TRANSITION_REASON_LABEL.departed).toBe('No longer with us');
+    // Through the catalogue, because that is where the words live — the table
+    // names a key, and en.json says what it renders as.
+    const t = testTranslator('Transitions');
+    expect(t(TRANSITION_REASON_LABEL['moved-on'])).toBe('Moved on within the ministry');
+    expect(t(TRANSITION_REASON_LABEL.departed)).toBe('Left the ministry');
   });
 });
 

@@ -66,17 +66,18 @@ import {
 import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import { subscribeUsers, upsertUser } from '@/services/users';
 import type { Invitation, Role, UserProfile } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
-const ROLE_LABEL: Record<Role, string> = {
-  counselor: 'Counselor',
-  core: 'Core team',
-  admin: 'Admin',
-};
+const ROLE_LABEL = {
+  counselor: 'roleCounselor',
+  core: 'roleCore',
+  admin: 'roleAdmin',
+} as const satisfies Record<Role, string>;
 
 const ROLE_OPTIONS: readonly Role[] = ['counselor', 'core', 'admin'];
 
@@ -112,6 +113,7 @@ function AccessToggle({
   label: string;
   onChange: (next: boolean) => void;
 }) {
+  const tCommon = useTranslations('Common');
   return (
     <label className="-mr-2 flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl px-2 text-sm text-ink-400 pointer-fine:min-h-9 @2xl:mr-0">
       <input
@@ -125,7 +127,7 @@ function AccessToggle({
         aria-label={label}
         onChange={(event) => onChange(event.target.checked)}
       />
-      Active
+      {tCommon('active')}
     </label>
   );
 }
@@ -155,6 +157,9 @@ function Identity({
 }
 
 export function TeamPage() {
+  const tCommon = useTranslations('Common');
+  const time = useTimeFormats();
+  const t = useTranslations('Team');
   const { profile, can } = useAuth();
   const { show } = useToast();
 
@@ -234,9 +239,9 @@ export function TeamPage() {
         role: changes.role ?? member.role,
         active: changes.active ?? member.active,
       });
-      show(`${member.displayName || member.email} updated`, { tone: 'success' });
+      show(t('memberUpdated', { name: member.displayName || member.email }), { tone: 'success' });
     } catch {
-      show('Could not save that change.', { tone: 'error' });
+      show(t('saveChangeFailed'), { tone: 'error' });
     } finally {
       setBusyId(null);
     }
@@ -251,9 +256,9 @@ export function TeamPage() {
     try {
       await inviteToTally(address, inviteRole, profile.id);
       setInviteEmail('');
-      show(`${address} can now sign in`, { tone: 'success' });
+      show(t('canNowSignIn', { address }), { tone: 'success' });
     } catch {
-      show('Could not save that invitation.', { tone: 'error' });
+      show(t('saveInviteFailed'), { tone: 'error' });
     } finally {
       setInviting(false);
     }
@@ -272,9 +277,9 @@ export function TeamPage() {
     setBusyId(invitation.id);
     try {
       await inviteToTally(invitation.email, invitation.role, profile.id, invitation.note);
-      show(`${invitation.email} invited again`, { tone: 'success' });
+      show(t('invitedAgain', { email: invitation.email }), { tone: 'success' });
     } catch {
-      show('Could not restore that invitation.', { tone: 'error' });
+      show(t('restoreInviteFailed'), { tone: 'error' });
     } finally {
       setBusyId(null);
     }
@@ -286,12 +291,12 @@ export function TeamPage() {
       await withdrawInvitation(invitation.id);
       // The only way back from a `deleteDoc`. Without it the confirmation of an
       // irreversible act is the one toast in the app that offers nothing.
-      show(`${invitation.email} withdrawn`, {
+      show(t('withdrawn', { email: invitation.email }), {
         tone: 'success',
         action: { label: 'Undo', onPress: () => void restoreInvitation(invitation) },
       });
     } catch {
-      show('Could not withdraw that invitation.', { tone: 'error' });
+      show(t('withdrawInviteFailed'), { tone: 'error' });
     } finally {
       setBusyId(null);
     }
@@ -344,10 +349,9 @@ export function TeamPage() {
   return (
     <PageFrame>
       <header>
-        <h1 className="text-xl font-bold text-ink-50">Team</h1>
+        <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <p className="mt-0.5 max-w-2xl text-balance text-sm text-ink-400">
-          Who may sign in to Tally, and what they may do once they have. Changes apply to every
-          phone immediately.
+          {t('description')}
         </p>
 
         {/* Reference, not instruction. It was a boxed paragraph that owned half
@@ -361,13 +365,10 @@ export function TeamPage() {
             >
               ▸
             </span>
-            How Tally decides who may sign in
+            {t('howSummary')}
           </summary>
           <p className="pb-2 text-sm leading-snug text-ink-500">
-            Tally decides access by Google address. An admin invites somebody here, they sign in
-            with that Google account, and their profile appears beside this — from then on the
-            profile decides what they may do. Some admins are pinned by the deployment itself and
-            cannot be changed here; that is the way back in if access is ever lost.
+            {t('howBody')}
           </p>
         </details>
       </header>
@@ -380,18 +381,18 @@ export function TeamPage() {
       >
         <Card className="@container">
           <CardHeader
-            title="Signed-in team"
+            title={t('membersTitle')}
             count={users?.length}
             // A core member is told the category exists rather than shown it:
             // `invitations` is get/list admin-only in the rules, so a count here
             // would be invented. Without the line, eleven profiles read as the
             // complete list of who can sign in, and four addresses already can.
             description={
-              isAdmin ? 'People with a Tally profile.' : 'Outstanding invitations are not listed here.'
+              isAdmin ? t('membersDescriptionAdmin') : t('membersDescription')
             }
             descriptionClassName={isAdmin ? 'hidden lg:block' : 'text-sm text-ink-400'}
             columns={columns}
-            columnLabel="Last seen"
+            columnLabel={t('columnLastSeen')}
           />
 
           {usersError ? (
@@ -407,7 +408,7 @@ export function TeamPage() {
                itself, this region announces once, and says which region. */
             <>
               <span role="status" className="sr-only">
-                Loading the team
+                {t('loadingTeam')}
               </span>
               <div aria-hidden="true">
                 <SkeletonRows count={3} />
@@ -415,8 +416,8 @@ export function TeamPage() {
             </>
           ) : ordered.length === 0 ? (
             <EmptyState
-              title="Nobody has signed in yet."
-              description="Invite a Google address above, or sign in with one of the addresses named in TALLY_ADMIN_EMAILS."
+              title={t('membersEmptyTitle')}
+              description={t('membersEmptyBody')}
             />
           ) : (
             <ul className="divide-y divide-ink-800">
@@ -445,13 +446,13 @@ export function TeamPage() {
                 }
                 const recency = member.lastSeenAt ? (
                   <p className="min-h-5 truncate text-xs text-ink-300">
-                    <span className="@2xl:hidden">Last seen </span>
-                    {formatRelative(member.lastSeenAt)}
+                    <span className="@2xl:hidden">{t('lastSeenPrefix')}</span>
+                    {time.relative(member.lastSeenAt)}
                   </p>
                 ) : (
                   <p className="min-h-5 text-xs">
                     <Badge tone="warn" className="-mx-1.5">
-                      Never signed in
+                      {t('neverSignedIn')}
                     </Badge>
                   </p>
                 );
@@ -486,11 +487,11 @@ export function TeamPage() {
                             <div className="flex shrink-0 items-center gap-1.5">
                               {member.role === 'counselor' ? (
                                 <span className="text-xs text-ink-400">
-                                  {ROLE_LABEL[member.role]}
+                                  {t(ROLE_LABEL[member.role])}
                                 </span>
                               ) : (
                                 <Badge tone="brand" className="-mx-1.5">
-                                  {ROLE_LABEL[member.role]}
+                                  {t(ROLE_LABEL[member.role])}
                                 </Badge>
                               )}
                             </div>
@@ -502,7 +503,7 @@ export function TeamPage() {
                     {editable ? (
                       <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 @2xl:contents">
                         <select
-                          aria-label={`Role for ${name}`}
+                          aria-label={t('roleFor', { name })}
                           value={member.role}
                           disabled={busyId === member.id}
                           onChange={(changed) =>
@@ -522,7 +523,7 @@ export function TeamPage() {
                         >
                           {ROLE_OPTIONS.map((role) => (
                             <option key={role} value={role}>
-                              {ROLE_LABEL[role]}
+                              {t(ROLE_LABEL[role])}
                             </option>
                           ))}
                         </select>
@@ -530,7 +531,7 @@ export function TeamPage() {
                         <AccessToggle
                           checked={member.active}
                           disabled={busyId === member.id}
-                          label={`${name} may sign in`}
+                          label={t('maySignIn', { name })}
                           onChange={(active) => void patchMember(member, { active })}
                         />
                       </div>
@@ -542,10 +543,10 @@ export function TeamPage() {
                           tone={member.role === 'counselor' ? 'neutral' : 'brand'}
                           className="-ml-1.5"
                         >
-                          {ROLE_LABEL[member.role]}
+                          {t(ROLE_LABEL[member.role])}
                         </Badge>
                         <span className="text-xs text-ink-400">
-                          Another admin has to change this.
+                          {t('otherAdminOnly')}
                         </span>
                       </div>
                     ) : null}
@@ -577,7 +578,7 @@ export function TeamPage() {
                     >
                       ▸
                     </span>
-                    Invited
+                    {t('statusInvited')}
                     {/* No number at all when the read failed: a stale count is
                         the same false claim the empty state used to make. */}
                     {pending && !invitationsError ? (
@@ -591,19 +592,19 @@ export function TeamPage() {
                       "nobody is waiting". The banner itself is inside the card. */}
                   {invitationsError ? (
                     <p className="mt-0.5 group-open:hidden lg:hidden">
-                      <Badge tone="danger">Not loaded</Badge>
+                      <Badge tone="danger">{t('invitesNotLoaded')}</Badge>
                     </p>
                   ) : null}
                   <p className="mt-0.5 hidden text-sm text-ink-500 lg:block">
-                    Addresses that may sign in but have not yet.
+                    {t('invitesDescription')}
                   </p>
                 </div>
                 <span className="-mr-2 flex shrink-0 items-center lg:hidden">
                   <span className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-brand-300 group-open:hidden">
-                    <span aria-hidden="true">＋</span>Invite someone
+                    <span aria-hidden="true">＋</span>{t('inviteSomeone')}
                   </span>
                   <span className="hidden min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-ink-400 group-open:inline-flex">
-                    Close
+                    {tCommon('close')}
                   </span>
                 </span>
               </summary>
@@ -613,7 +614,7 @@ export function TeamPage() {
                 onSubmit={(event) => void handleInvite(event)}
               >
                 <TextField
-                  label="Google address"
+                  label={t('googleAddress')}
                   type="email"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
@@ -622,21 +623,21 @@ export function TeamPage() {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  hint="It has to be the Google account they will actually sign in with — Tally matches on the address."
+                  hint={t('googleAddressHint')}
                 />
                 <SelectField
-                  label="Role"
+                  label={tCommon('role')}
                   value={inviteRole}
                   onChange={(event) => setInviteRole(event.target.value as Role)}
                 >
                   {ROLE_OPTIONS.map((role) => (
                     <option key={role} value={role}>
-                      {ROLE_LABEL[role]}
+                      {t(ROLE_LABEL[role])}
                     </option>
                   ))}
                 </SelectField>
                 <Button type="submit" loading={inviting} disabled={!inviteEmail.trim()}>
-                  Invite
+                  {t('invite')}
                 </Button>
               </form>
 
@@ -647,7 +648,7 @@ export function TeamPage() {
               ) : !pending ? (
                 <>
                   <span role="status" className="sr-only">
-                    Loading invitations
+                    {t('loadingInvitations')}
                   </span>
                   <div aria-hidden="true">
                     <SkeletonRows count={2} />
@@ -655,8 +656,8 @@ export function TeamPage() {
                 </>
               ) : pending.length === 0 ? (
                 <EmptyState
-                  title="No pending invitations."
-                  description="Everybody who has been invited has signed in."
+                  title={t('invitesEmptyTitle')}
+                  description={t('invitesEmptyBody')}
                 />
               ) : (
                 <ul className="divide-y divide-ink-800">
@@ -673,14 +674,14 @@ export function TeamPage() {
                           // hide in the grey.
                           <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-400">
                             {invitation.role === 'counselor' ? (
-                              <span>{ROLE_LABEL[invitation.role]}</span>
+                              <span>{t(ROLE_LABEL[invitation.role])}</span>
                             ) : (
                               <Badge tone="brand" className="first:-ml-1.5">
-                                {ROLE_LABEL[invitation.role]}
+                                {t(ROLE_LABEL[invitation.role])}
                               </Badge>
                             )}
                             {invitation.invitedAt ? (
-                              <span>· invited {formatRelative(invitation.invitedAt)}</span>
+                              <span>· invited {time.relative(invitation.invitedAt)}</span>
                             ) : null}
                           </p>
                         }
@@ -708,7 +709,7 @@ export function TeamPage() {
                         {confirmingWithdrawal === invitation.id ? (
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" onClick={() => setConfirmingWithdrawal(null)}>
-                              Keep it
+                              {t('keepIt')}
                             </Button>
                             <Button
                               variant="danger"
@@ -718,7 +719,7 @@ export function TeamPage() {
                                 void dropInvitation(invitation);
                               }}
                             >
-                              Yes, withdraw
+                              {t('yesWithdraw')}
                             </Button>
                           </div>
                         ) : (
@@ -727,7 +728,7 @@ export function TeamPage() {
                             disabled={busyId === invitation.id}
                             onClick={() => setConfirmingWithdrawal(invitation.id)}
                           >
-                            Withdraw
+                            {t('withdraw')}
                           </Button>
                         )}
                         {/* `basis-full` drops the consequence onto its own line
@@ -737,7 +738,7 @@ export function TeamPage() {
                             shrink-to-fit and a long sentence sets its width. */}
                         {confirmingWithdrawal === invitation.id ? (
                           <p role="alert" className="basis-full text-xs text-ink-400">
-                            This deletes the invitation for good.
+                            {t('withdrawWarning')}
                           </p>
                         ) : null}
                       </div>

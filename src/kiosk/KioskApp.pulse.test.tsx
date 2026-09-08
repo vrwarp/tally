@@ -6,7 +6,7 @@
  * leaves the kiosk exactly where it was. The pulse itself is a mocked
  * services call — what is under test is the routing in KioskApp.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, PULSE_POLL_MS, type KioskServices } from '@/kiosk/KioskApp';

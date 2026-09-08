@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslations } from 'use-intl';
+import { LanguageChoice } from '@/components/LanguageChoice';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
@@ -33,17 +35,35 @@ const MENU_ITEM =
 
 interface NavItem {
   to: string;
-  label: string;
+  /**
+   * A key into `Nav.*`, not a word.
+   *
+   * This list is module-level — it is the same on every render and must not be
+   * rebuilt per paint — so it cannot call a hook. The label is looked up where
+   * it is drawn instead.
+   */
+  labelKey: 'checkIn' | 'insights' | 'events' | 'students' | 'review';
   icon: string;
   /** Core-team only. */
   core?: boolean;
 }
 
+/**
+ * A role's stored value is `counselor` / `core` / `admin`; what a person reads
+ * is a word in their language. Spelled out rather than built from the value, so
+ * the key set stays greppable and a new role is a compile error here.
+ */
+const ROLE_LABEL = {
+  counselor: 'Account.roleCounselor',
+  core: 'Account.roleCore',
+  admin: 'Account.roleAdmin',
+} as const;
+
 const NAV: NavItem[] = [
-  { to: '/', label: 'Check in', icon: '✓' },
-  { to: '/dashboard', label: 'Insights', icon: '◎', core: true },
-  { to: '/events', label: 'Events', icon: '▤', core: true },
-  { to: '/students', label: 'Students', icon: '☰', core: true },
+  { to: '/', labelKey: 'checkIn', icon: '✓' },
+  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true },
+  { to: '/events', labelKey: 'events', icon: '▤', core: true },
+  { to: '/students', labelKey: 'students', icon: '☰', core: true },
   /*
    * Review used to live only inside the account menu, on the argument that the
    * thumb bar is for the four things somebody does at a door. That argument
@@ -53,7 +73,7 @@ const NAV: NavItem[] = [
    * since a registration nobody looks at loses the family's phone number after
    * thirty days whether or not anyone knew it was waiting.
    */
-  { to: '/review', label: 'Review', icon: '▣', core: true },
+  { to: '/review', labelKey: 'review', icon: '▣', core: true },
 ];
 
 /**
@@ -71,6 +91,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { profile, signOut, can } = useAuth();
   const { error } = useData();
   const location = useLocation();
+  const t = useTranslations();
+  const tCommon = useTranslations('Common');
   const [menuOpen, setMenuOpen] = useState(false);
 
   /*
@@ -94,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const items = NAV.filter((item) => !item.core || can('core'));
   const showNav = items.length > 1;
 
-  const displayName = profile?.displayName || profile?.email || 'Signed in';
+  const displayName = profile?.displayName || profile?.email || t('Account.signedIn');
   const initial = displayName.charAt(0).toUpperCase();
 
   /*
@@ -120,7 +142,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex items-baseline gap-2">
           <p className="truncate text-xs text-ink-400">{profile?.email}</p>
           <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-500">
-            {profile?.role}
+            {/* `uppercase` above is a Latin-only effect and simply does
+                nothing to Chinese, which is the right outcome rather than
+                something to work around. */}
+            {profile ? t(ROLE_LABEL[profile.role]) : null}
           </span>
         </div>
         <button
@@ -132,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           }}
           className="-ml-2 mt-1 flex min-h-11 w-fit items-center rounded-lg px-2 text-sm font-medium text-danger-400 hover:bg-ink-800 pointer-fine:min-h-8"
         >
-          Sign out
+          {t('Account.signOut')}
         </button>
       </div>
       {/* Every active member, unlike the two below it.
@@ -142,7 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           existed there was no link to that screen for one. The kiosk's own
           screen sent them to Settings, which a counselor cannot open. */}
       <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-        Kiosk
+        {t('Nav.kiosk')}
       </NavLink>
       {can('core') ? (
         <>
@@ -152,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               to be the last card on that page, which put "who can see a roster
               of minors" below a colour picker and an API connection. */}
           <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-            Team
+            {t('Nav.team')}
           </NavLink>
           <NavLink
             to="/settings"
@@ -160,10 +185,24 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMenuOpen(false)}
             className={MENU_ITEM}
           >
-            Settings
+            {t('Nav.settings')}
           </NavLink>
         </>
       ) : null}
+      {/*
+        * The language, last and set apart from the rows above it.
+        *
+        * Those are destinations and this is a setting, so it is not a
+        * `menuitem`: a reader arrowing through the menu is looking for
+        * somewhere to go, and this changes the words under them and leaves them
+        * where they are. It stays open afterwards for the same reason —
+        * `setMenuOpen(false)` on every other row is because the row navigates,
+        * and closing the menu here would hide the only evidence that the tap
+        * did anything.
+        */}
+      <div className="mt-1 border-t border-ink-800 px-2 pb-1 pt-2 pointer-fine:px-1">
+        <LanguageChoice />
+      </div>
     </>
   );
 
@@ -267,7 +306,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span aria-hidden="true" className="text-base leading-none">
                   {item.icon}
                 </span>
-                {item.label}
+                {t(`Nav.${item.labelKey}`)}
               </NavLink>
             ))}
           </nav>
@@ -325,7 +364,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               message={error}
               action={
                 <Button variant="secondary" onClick={() => window.location.reload()}>
-                  Reload
+                  {tCommon('reload')}
                 </Button>
               }
             />
@@ -356,7 +395,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <span aria-hidden="true" className="text-base leading-none">
                       {item.icon}
                     </span>
-                    {item.label}
+                    {t(`Nav.${item.labelKey}`)}
                   </NavLink>
                 </li>
               ))}

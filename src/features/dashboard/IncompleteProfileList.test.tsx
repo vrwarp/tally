@@ -7,7 +7,7 @@
  * exactly like an empty list that is finished, which is how this section spent
  * a release looking as though every profile was in order.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { IncompleteProfileList } from '@/features/dashboard/IncompleteProfileList';

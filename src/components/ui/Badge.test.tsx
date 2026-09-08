@@ -14,7 +14,7 @@
  * pressable badge is the plain chip, above `lg` it is exactly the button it
  * was, and both forms are in the document with the breakpoint choosing one.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Badge, WarningBadge } from '@/components/ui';

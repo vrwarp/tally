@@ -11,7 +11,7 @@
  * for the student a leader has just navigated away from must not appear under
  * the one they are looking at now.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStudentHistory } from '@/hooks/useStudentHistory';
 import { makeAttendance, makeEvent } from '../../tests/factories';

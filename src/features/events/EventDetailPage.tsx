@@ -59,10 +59,16 @@ import { useNow } from '@/hooks/useNow';
 import { exportFilename } from '@/lib/csv';
 import { gatheringOptions } from '@/lib/gatherings';
 import { describeRecurrence } from '@/lib/recurrence';
-import { formatClock, formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
-import { cn, gradeLabel, NO_GRADE } from '@/lib/utils';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
+import { cn } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useRecurrenceStrings, useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -74,6 +80,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 export function EventDetailPage() {
+  const time = useTimeFormats();
+  const grades = useGrades();
+  const t = useTranslations('EventDetail');
+  const recurrenceStrings = useRecurrenceStrings();
   const { eventId } = useParams();
   const { events, series, students, loading, canWork, access, rosterBackends } = useData();
   const { user } = useAuth();
@@ -136,14 +146,14 @@ export function EventDetailPage() {
       <PageFrame width="lg">
         <EmptyState
           icon="🗓"
-          title="That event is not here"
-          description="It may have been deleted, or it may be older than the few months Tally keeps loaded."
+          title={t('notFoundTitle')}
+          description={t('notFoundBody')}
           action={
             <Link
               to="/events"
               className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700"
             >
-              Back to events
+              {t('backToEvents')}
             </Link>
           }
         />
@@ -205,7 +215,7 @@ export function EventDetailPage() {
   const registerExportRows = registerRows(event, attendance, exportRsvps, studentsById);
   const buildRegisterExport = () => ({
     filename: exportFilename({ kind: 'register', scope: event.title, at: event.startAt }),
-    contents: buildRegisterCsv(registerExportRows, {
+    contents: buildRegisterCsv(grades, registerExportRows, {
       event,
       // Resolved here rather than inside the builder, which has no business
       // holding a Firestore subscription.
@@ -227,11 +237,11 @@ export function EventDetailPage() {
       // it a document — there is nothing to set a status on until there is one.
       const eventId = await ensureMaterialized(event);
       await setEventStatus(eventId, cancelled ? 'scheduled' : 'cancelled', user.uid);
-      show(cancelled ? `${event.title} is back on` : `${event.title} cancelled`, {
+      show(cancelled ? t('backOn', { title: event.title }) : t('cancelled', { title: event.title }), {
         tone: 'success',
       });
     } catch {
-      show('Could not change this event. Try again.', { tone: 'error' });
+      show(t('changeFailed'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -242,7 +252,7 @@ export function EventDetailPage() {
   return (
     <PageFrame width="lg">
       <Link to="/events" className="text-sm font-semibold text-brand-300">
-        ‹ Events
+        {t('backLink')}
       </Link>
 
       {/*
@@ -271,7 +281,7 @@ export function EventDetailPage() {
                     {event.title}
                   </h1>
                   <p className="mt-1 text-sm text-ink-400">
-                    {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+                    {time.eventDay(event.startAt, now)} · {time.eventWindow(event)}
                   </p>
                 </div>
               </div>
@@ -282,29 +292,32 @@ export function EventDetailPage() {
 
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
-                  {event.mode === 'recurring' ? 'Recurring' : 'One-off'}
+                  {event.mode === 'recurring' ? t('badgeRecurring') : t('badgeOneOff')}
                 </Badge>
-                {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
+                {cancelled ? <Badge tone="danger">{t('badgeCancelled')}</Badge> : null}
                 {!cancelled && isCheckInOpen(event, now) ? (
-                  <Badge tone="success">Check-in open</Badge>
+                  <Badge tone="success">{t('badgeCheckInOpen')}</Badge>
                 ) : null}
-                {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-                {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
+                {event.requiresRsvp ? <Badge tone="warn">{t('badgeRsvpOnly')}</Badge> : null}
+                {event.requiresCheckOut ? <Badge tone="neutral">{t('badgeCheckOut')}</Badge> : null}
               </div>
 
               <dl className="divide-y divide-ink-800 border-t border-ink-800 pt-1">
-                {seriesTitle ? <DetailRow label="Series" value={seriesTitle} /> : null}
-                {predictedFrom ? <DetailRow label="Regulars from" value={predictedFrom} /> : null}
+                {seriesTitle ? <DetailRow label={t('rowSeries')} value={seriesTitle} /> : null}
+                {predictedFrom ? <DetailRow label={t('rowRegularsFrom')} value={predictedFrom} /> : null}
                 {event.recurrence ? (
                   <DetailRow
-                    label="Repeats"
-                    value={describeRecurrence(event.recurrence, event.startAt)}
+                    label={t('rowRepeats')}
+                    value={describeRecurrence(recurrenceStrings, event.recurrence, event.startAt)}
                   />
                 ) : null}
-                {event.location ? <DetailRow label="Location" value={event.location} /> : null}
+                {event.location ? <DetailRow label={t('rowLocation')} value={event.location} /> : null}
                 <DetailRow
-                  label="Check-in"
-                  value={`${formatClock(event.checkInOpensAt)} – ${formatClock(event.checkInClosesAt)}`}
+                  label={t('rowCheckIn')}
+                  value={t('checkInWindow', {
+                    opens: time.clock(event.checkInOpensAt),
+                    closes: time.clock(event.checkInClosesAt),
+                  })}
                 />
               </dl>
 
@@ -319,11 +332,11 @@ export function EventDetailPage() {
                   to={`/event/${event.id}`}
                   className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-brand-500 px-5 text-base font-semibold text-white active:bg-brand-600"
                 >
-                  Take attendance
+                  {t('takeAttendance')}
                 </Link>
                 <div className="flex gap-2">
                   <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
-                    Edit
+                    {t('edit')}
                   </Button>
 
                   {/*
@@ -339,12 +352,12 @@ export function EventDetailPage() {
                       loading={busy}
                       onClick={() => void toggleStatus()}
                     >
-                      Un-cancel
+                      {t('unCancel')}
                     </Button>
                   ) : confirmingCancel ? (
                     <div className="flex flex-1 gap-2">
                       <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
-                        Keep it
+                        {t('keepIt')}
                       </Button>
                       <Button
                         variant="danger"
@@ -355,19 +368,19 @@ export function EventDetailPage() {
                           void toggleStatus();
                         }}
                       >
-                        Yes, cancel
+                        {t('yesCancel')}
                       </Button>
                     </div>
                   ) : (
                     <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
-                      Cancel event
+                      {t('cancelEvent')}
                     </Button>
                   )}
                 </div>
 
                 {confirmingCancel ? (
                   <p role="alert" className="text-center text-xs text-ink-400">
-                    Cancelling hides {event.title} from check-in. Attendance already recorded is kept.
+                    {t('cancelWarning', { title: event.title })}
                   </p>
                 ) : null}
               </div>
@@ -380,7 +393,7 @@ export function EventDetailPage() {
 
           <Card>
             <CardHeader
-              title="Attendance"
+              title={t('attendance')}
               count={attendance.length}
               action={
                 // Not offered on a gathering nothing has been recorded against, and
@@ -402,17 +415,17 @@ export function EventDetailPage() {
               /* One line, where there used to be three ways of saying zero: the
                  header count, a 97px tile, and a sentence under it. */
               <p className="px-4 py-3 text-sm text-ink-500">
-                Nothing recorded yet — this event is still ahead.
+                {t('nothingYet')}
               </p>
             ) : (
               <div className="flex flex-col gap-3 p-3">
                 {attendanceError ? <ErrorBanner message={attendanceError} /> : null}
 
                 <StatTile
-                  label="Checked in"
+                  label={t('tileCheckedIn')}
                   value={attendance.length}
                   tone={attendance.length > 0 ? 'success' : 'neutral'}
-                  hint={readsAsCancelled ? 'Counted as a cancelled gathering.' : undefined}
+                  hint={readsAsCancelled ? t('readsAsCancelled') : undefined}
                 />
 
                 {/* Neutral whatever the number: a gathering where half the children
@@ -420,12 +433,12 @@ export function EventDetailPage() {
                     anybody is a normal morning, not a failure to report. */}
                 {event.requiresCheckOut ? (
                   <StatTile
-                    label="Checked out"
+                    label={t('tileCheckedOut')}
                     value={checkedOut.length}
                     tone="neutral"
                     hint={
                       attendance.length > 0
-                        ? `${checkedOut.length} of ${attendance.length} checked out.`
+                        ? t('checkedOutOf', { out: checkedOut.length, total: attendance.length })
                         : undefined
                     }
                   />
@@ -438,13 +451,10 @@ export function EventDetailPage() {
                   readsAsCancelled ? (
                     <div className="rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800">
                       <p className="text-sm text-ink-300">
-                        Nobody was checked in, so Tally reads this as a cancelled gathering: it is not
-                        counted as a miss for anybody, and it does not inform the predictive roster or the
-                        trend strip.
+                        {t('cancelledExplain')}
                       </p>
                       <p className="mt-1 text-xs text-ink-500">
-                        If it did go ahead and nobody took attendance, you can still take it now. If it
-                        was called off, cancelling the event says so on purpose.
+                        {t('cancelledAdvice')}
                       </p>
                     </div>
                   ) : null
@@ -456,21 +466,21 @@ export function EventDetailPage() {
                         className="flex min-h-12 items-center gap-3 rounded-xl bg-ink-950 px-3 py-2 ring-1 ring-ink-800"
                       >
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
-                          {student ? studentFullName(student) : 'Former student'}
+                          {student ? studentFullName(student) : t('formerStudent')}
                         </span>
                         {student ? (
                           <span className="shrink-0 text-xs text-ink-500">
-                            {gradeLabel(student) ?? NO_GRADE}
+                            {gradeLabel(grades, student) ?? grades('none')}
                           </span>
                         ) : null}
                         <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                          {formatClock(record.checkedInAt)}
+                          {time.clock(record.checkedInAt)}
                         </span>
                         {/* Only where there is one. A student with no pickup recorded
                             gets nothing here — no badge, no dash, no colour. */}
                         {event.requiresCheckOut && record.checkedOutAt ? (
                           <span className="shrink-0 text-xs tabular-nums text-ink-400">
-                            → {formatClock(record.checkedOutAt)}
+                            → {time.clock(record.checkedOutAt)}
                           </span>
                         ) : null}
                       </li>
@@ -493,15 +503,15 @@ export function EventDetailPage() {
           <Card>
             <div className="flex items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-ink-100">Who's on this gathering</h2>
+                <h2 className="text-sm font-semibold text-ink-100">{t('whoHeading')}</h2>
                 <p className="truncate text-xs text-ink-500">
                   {accessList?.restricted
-                    ? `${accessList.members.size} ${accessList.members.size === 1 ? 'person' : 'people'} — everyone else sees it locked`
-                    : 'Everyone on the team can take this register'}
+                    ? t('whoRestricted', { count: accessList.members.size })
+                    : t('whoOpen')}
                 </p>
               </div>
               <Button variant="secondary" onClick={() => setAccessOpen(true)}>
-                {accessList?.restricted ? 'Change' : 'Limit'}
+                {accessList?.restricted ? t('change') : t('limit')}
               </Button>
             </div>
           </Card>

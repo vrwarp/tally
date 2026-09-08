@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/services/events';
 import { subscribeEventAccess } from '@/services/eventAccess';
 import { subscribeStudents } from '@/services/students';
@@ -126,7 +127,9 @@ function rosterSignature(students: readonly Student[]): string {
   );
 }
 
-function describeRosterError(cause: unknown): string {
+type ErrorTranslator = ReturnType<typeof useTranslations<'Errors'>>;
+
+function describeRosterError(t: ErrorTranslator, cause: unknown): string {
   // Stryker disable next-line StringLiteral: the fallback is only ever
   // compared against the codes below, and no string that is not one of them
   // reads differently from any other. Empty is what "no code at all" looks
@@ -136,16 +139,12 @@ function describeRosterError(cause: unknown): string {
   // Center is rate-limiting us", "Could not reach Attendees to load the
   // roster" — which this side cannot know on its own.
   const said = (cause as { message?: string })?.message || null;
-  if (code.includes('unauthenticated')) return 'Your session expired. Sign in again.';
-  if (code.includes('permission-denied')) return 'Your access to Tally is not active.';
-  if (code.includes('resource-exhausted')) {
-    return said ?? 'The roster is being rate-limited upstream. It will refresh shortly.';
-  }
-  if (code.includes('failed-precondition')) {
-    return said ?? 'No people backend is configured.';
-  }
+  if (code.includes('unauthenticated')) return t('sessionExpired');
+  if (code.includes('permission-denied')) return t('accessNotActive');
+  if (code.includes('resource-exhausted')) return said ?? t('rosterRateLimited');
+  if (code.includes('failed-precondition')) return said ?? t('noPeopleBackend');
   if (code.includes('unavailable') && said) return said;
-  return 'Could not reach the people backend for the roster.';
+  return t('rosterUnreachable');
 }
 
 /**
@@ -157,13 +156,13 @@ function describeRosterError(cause: unknown): string {
  * is not lost — `pcoErrorReport` keeps it, and the details panel shows it under
  * "Underlying error".
  */
-function rosterErrorReport(cause: unknown): PcoErrorReport {
+function rosterErrorReport(t: ErrorTranslator, cause: unknown): PcoErrorReport {
   return {
     // Stryker disable next-line StringLiteral: `pcoErrorReport` uses this
     // fallback for `message` and nothing else, and `message` is overwritten on
     // the very next line. It is here so the call reads honestly on its own.
-    ...pcoErrorReport(cause, 'Could not reach the people backend for the roster.'),
-    message: describeRosterError(cause),
+    ...pcoErrorReport(cause, t('rosterUnreachable')),
+    message: describeRosterError(t, cause),
   };
 }
 
@@ -185,6 +184,7 @@ function backendReportSignature(entries: readonly RosterBackendStatus[]): string
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const tErrors = useTranslations('Errors');
   const { profile, can } = useAuth();
   /*
    * The rules refuse `upstreamEdits` to a counselor, so the listener is not
@@ -256,7 +256,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     const fail = (label: DataStream) => (cause: Error) => {
-      const sentence = `Could not load ${label}: ${cause.message}`;
+      const sentence = tErrors('couldNotLoadStream', { stream: label, reason: cause.message });
       setStreamErrors((current) =>
         current[label] === sentence ? current : { ...current, [label]: sentence },
       );
@@ -302,7 +302,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Stryker disable next-line ArrayDeclaration: any constant array is the same
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself.
-  []);
+  [tErrors]);
 
   /**
    * The aggregate sentence, for the banner that has always shown one.
@@ -387,7 +387,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (cause) {
       // Deliberately not clearing `roster`: whatever is already on screen is
       // more useful than nothing, and `rosterOffline` says where it came from.
-      setRosterError(rosterErrorReport(cause));
+      setRosterError(rosterErrorReport(tErrors, cause));
       setRosterOffline(true);
     } finally {
       inFlight.current = false;
@@ -403,7 +403,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // Stryker disable next-line ArrayDeclaration: any constant array is the same
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself.
-  []);
+  [tErrors]);
 
   /**
    * The roster as last committed, for `applyRosterPerson` to look somebody up

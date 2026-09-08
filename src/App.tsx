@@ -90,7 +90,7 @@ export default function App() {
                       <AppShell>
                         {/* Scoped per route: a lazy chunk that fails to load must
                           not take the app shell down with it. */}
-                        <ErrorBoundary what="this screen">
+                        <ErrorBoundary scoped>
                           <Suspense fallback={<LoadingScreen />}>
                             <Routes>
                               {/* Check-in is the home screen: a counselor at the door

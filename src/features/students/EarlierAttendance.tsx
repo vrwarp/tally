@@ -28,7 +28,8 @@
 import { useMemo } from 'react';
 import { Button, Card, CardHeader, ErrorBanner, SkeletonRows } from '@/components/ui';
 import { useStudentHistory } from '@/hooks/useStudentHistory';
-import { formatShortDate } from '@/lib/time';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface EarlierAttendanceProps {
   studentId: string;
@@ -37,6 +38,8 @@ export interface EarlierAttendanceProps {
 }
 
 export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendanceProps) {
+  const time = useTimeFormats();
+  const t = useTranslations('EarlierAttendance');
   const ids = useMemo(
     () => [studentId, ...(alsoStudentIds ?? [])],
     [studentId, alsoStudentIds],
@@ -46,19 +49,17 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
   return (
     <Card>
       <CardHeader
-        title="Every gathering they came to"
+        title={t('title')}
         {...(started && entries.length > 0 ? { count: entries.length } : {})}
       />
 
       <div className="flex flex-col gap-3 px-4 pb-4">
         <p className="text-xs text-ink-500">
-          Read from this student&rsquo;s own check-in records, so it reaches back as far as Tally
-          has them — further than the year the screens above keep loaded. Only nights they
-          were here; nothing is claimed about the ones in between.
+          {t('sourceNote')}
         </p>
 
         {error ? (
-          <ErrorBanner message="Could not read this student's attendance history." />
+          <ErrorBanner message={t('readFailed')} />
         ) : null}
 
         {started && entries.length > 0 ? (
@@ -71,10 +72,10 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
                 <span className="min-w-0 truncate text-sm text-ink-200">
                   {/* A record whose event document is gone still happened, and
                       saying so is more honest than dropping the row. */}
-                  {event?.title ?? 'A gathering no longer on record'}
+                  {event?.title ?? t('unknownGathering')}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {formatShortDate(event?.startAt ?? record.checkedInAt)}
+                  {time.shortDate(event?.startAt ?? record.checkedInAt)}
                 </span>
               </li>
             ))}
@@ -84,17 +85,17 @@ export function EarlierAttendance({ studentId, alsoStudentIds }: EarlierAttendan
         {loading ? <SkeletonRows count={3} /> : null}
 
         {started && !loading && entries.length === 0 && !error ? (
-          <p className="text-sm text-ink-400">Tally has no check-ins on record for them.</p>
+          <p className="text-sm text-ink-400">{t('noCheckIns')}</p>
         ) : null}
 
         {!loading && hasMore ? (
           <Button variant="secondary" fullWidth onClick={loadMore}>
-            {started ? 'Show more' : 'Show every gathering they came to'}
+            {started ? t('showMore') : t('showMoreAria')}
           </Button>
         ) : null}
 
         {started && !hasMore && entries.length > 0 ? (
-          <p className="text-center text-xs text-ink-600">That is everything on record.</p>
+          <p className="text-center text-xs text-ink-600">{t('allLoaded')}</p>
         ) : null}
       </div>
     </Card>

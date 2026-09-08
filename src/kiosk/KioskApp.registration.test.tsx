@@ -12,7 +12,7 @@
  *   - a kiosk mid-wizard not counting as idle, so the binding cannot expire
  *     under a parent halfway through typing their children in.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
@@ -423,7 +423,7 @@ describe('registering a family', () => {
     await commit('Check in Robin and Sam');
 
     expect(printing.printLabel).toHaveBeenCalledTimes(2);
-    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
+    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[2].firstName))
       .toEqual(['Robin', 'Sam']);
   });
 
@@ -516,7 +516,7 @@ describe('while the call is in the air', () => {
       await vi.advanceTimersByTimeAsync(PROCESSING_MS);
     });
 
-    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0].firstName))
+    expect((printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[2].firstName))
       .toEqual(['Robin', 'Sam']);
     // And the second meter is up, saying so.
     expect(screen.getByText('Name tags printing')).toBeTruthy();
@@ -540,7 +540,7 @@ describe('while the call is in the air', () => {
     });
 
     const queued = (printing.printLabel as ReturnType<typeof vi.fn>).mock.calls.map(
-      (call) => call[0].id,
+      (call) => call[2].id,
     );
     await act(async () => {
       releaseRegister();
@@ -903,7 +903,7 @@ describe('when it does not work', () => {
     await fillInTheFamily();
     await commit('Check in Robin and Sam');
 
-    expect(screen.getByText(/please see a leader/)).toBeTruthy();
+    expect(screen.getByText(/see a leader/)).toBeTruthy();
 
     registerFails = false;
     await tap('Try again');
@@ -931,8 +931,8 @@ describe('when it does not work', () => {
     await fillInTheFamily();
     await commit('Check in Robin and Sam');
 
-    expect(screen.getByText(/taking longer than expected/i)).toBeTruthy();
-    expect(screen.queryByText(/could not save that/i)).toBeNull();
+    expect(screen.getByText(/this is not finished/i)).toBeTruthy();
+    expect(screen.queryByText(/could not finish that/i)).toBeNull();
     // Still retryable, and still under the same id — the whole reason giving up
     // early is safe at all.
     registerFails = false;
@@ -947,7 +947,7 @@ describe('when it does not work', () => {
     await fillInTheFamily();
     await commit('Check in Robin and Sam');
 
-    expect(screen.getByText(/could not save that/i)).toBeTruthy();
+    expect(screen.getByText(/could not finish that/i)).toBeTruthy();
   });
 });
 
@@ -1006,7 +1006,7 @@ describe('the allergies question, where the backend can carry it', () => {
     await tap(/Register your child/);
     await enterChild('Robin', 'Fields', '4');
 
-    expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
+    expect(screen.getByText(/Any allergies the leaders should know about/i)).toBeTruthy();
 
     // One press, not a tick and then a Next: the commonest answer costs what
     // it is worth.
@@ -1026,7 +1026,7 @@ describe('the allergies question, where the backend can carry it', () => {
      */
     expect(button('Next').disabled).toBe(true);
     await tap('Next');
-    expect(screen.getByText(/Any allergies we should know about/i)).toBeTruthy();
+    expect(screen.getByText(/Any allergies the leaders should know about/i)).toBeTruthy();
 
     await type('Peanuts');
     expect(button('Next').disabled).toBe(false);

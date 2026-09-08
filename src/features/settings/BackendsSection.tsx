@@ -16,7 +16,6 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { Attendees32Editor } from '@/features/settings/Attendees32Editor';
-import { formatRelative } from '@/lib/time';
 import { refreshPlanningCenter } from '@/services/functions';
 import {
   fetchBackendStatuses,
@@ -32,14 +31,20 @@ import {
   type BackendStatuses,
   type PcoWriteBackMode,
 } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { useServerText } from '@/hooks/useServerText';
 
-const WRITE_BACK_LABEL: Record<PcoWriteBackMode, string> = {
-  off: 'Tally never writes to Attendees. Visitors stay queued until this is turned on.',
-  create: 'Tally creates attendees it has not seen before, but never edits an existing one.',
-  full: 'Tally creates attendees, and Edit profile saves a linked student’s name, grade, allergies and birthday straight to Attendees. It can also add an adult to the family and fill in their phone or email.',
-};
+const WRITE_BACK_LABEL = {
+  off: 'a32WriteOff',
+  create: 'a32WriteCreate',
+  full: 'a32WriteFull',
+} as const satisfies Record<PcoWriteBackMode, string>;
 
 export function BackendsSection() {
+  const serverText = useServerText();
+  const time = useTimeFormats();
+  const t = useTranslations('Backends');
   const { show } = useToast();
   const { profile, user } = useAuth();
   const { refreshRoster } = useData();
@@ -59,7 +64,7 @@ export function BackendsSection() {
       setStatuses(await fetchBackendStatuses(force));
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Could not ask Tally about the connections.',
+        serverText(cause, t('a32AskFailed')),
       );
     } finally {
       setLoading(false);
@@ -72,7 +77,7 @@ export function BackendsSection() {
     } catch {
       setStored(null);
     }
-  }, []);
+  }, [t, serverText]);
 
   useEffect(() => {
     void check();
@@ -87,9 +92,9 @@ export function BackendsSection() {
       // ever reaches one of them.
       await refreshPlanningCenter();
       await Promise.all([check(true), refreshRoster(true)]);
-      show('Read the roster again from every connected backend', { tone: 'success' });
+      show(t('a32Refreshed'), { tone: 'success' });
     } catch {
-      show('Could not refresh the connections.', { tone: 'error' });
+      show(t('a32RefreshFailed'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -97,7 +102,7 @@ export function BackendsSection() {
 
   const afterSave = async () => {
     await Promise.all([check(true), refreshRoster(true)]);
-    show('Attendees settings saved', { tone: 'success' });
+    show(t('a32Saved'), { tone: 'success' });
   };
 
   const pickDefault = async (backendId: BackendId) => {
@@ -106,9 +111,9 @@ export function BackendsSection() {
     try {
       await saveDefaultPushBackend(backendId, user.uid);
       await check();
-      show(`New students now go to ${BACKEND_LABELS[backendId]}`, { tone: 'success' });
+      show(t('defaultChanged', { backend: BACKEND_LABELS[backendId] }), { tone: 'success' });
     } catch {
-      show('Could not change where new students go.', { tone: 'error' });
+      show(t('defaultChangeFailed'), { tone: 'error' });
     } finally {
       setPicking(false);
     }
@@ -122,18 +127,18 @@ export function BackendsSection() {
     <>
       <Card>
         <CardHeader
-          title="Attendees"
-          description="A second place Tally can read people from, beside Planning Center."
+          title={t('a32Title')}
+          description={t('a32Description')}
           action={
             <div className="flex items-center gap-2">
               {/* Nothing to refresh until something is connected. */}
               {a32?.configured ? (
                 <Button variant="secondary" size="sm" onClick={() => void refresh()} loading={busy}>
-                  Refresh
+                  {t('refresh')}
                 </Button>
               ) : null}
               <Button size="sm" onClick={() => setEditing(true)} disabled={!a32}>
-                Change
+                {t('change')}
               </Button>
             </div>
           }
@@ -146,7 +151,7 @@ export function BackendsSection() {
             <>
               {/* Named, and said once — see the Planning Center card. */}
               <span role="status" className="sr-only">
-                Checking the Attendees connection
+                {t('a32Checking')}
               </span>
               <div aria-hidden="true">
                 <SkeletonRows count={2} />
@@ -156,9 +161,9 @@ export function BackendsSection() {
             <>
               <div className="flex flex-wrap items-center gap-2">
                 {!a32.configured ? (
-                  <Badge tone="warn">Not set up</Badge>
+                  <Badge tone="warn">{t('notSetUp')}</Badge>
                 ) : !a32.enabled ? (
-                  <Badge tone="neutral">Switched off</Badge>
+                  <Badge tone="neutral">{t('switchedOff')}</Badge>
                 ) : a32.reachable ? (
                   <Badge tone="success">Connected</Badge>
                 ) : (
@@ -194,40 +199,36 @@ export function BackendsSection() {
                 <dl className="grid gap-2 text-sm lg:grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] lg:gap-x-6">
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                      Roster
+                      {t('headingRoster')}
                     </dt>
                     <dd className="text-ink-300">
-                      Students added from Attendees keep their Attendees record as the source of
-                      their name, grade and family — exactly as Planning Center students do theirs.
+                      {t('a32RosterNote')}
                       {a32.unresolved > 0 ? (
                         <span className="block text-warn-400">
-                          {a32.unresolved} {a32.unresolved === 1 ? 'student is' : 'students are'} on
-                          the roster but can no longer be read from Attendees — removed upstream.
+                          {t('a32Unresolved', { count: a32.unresolved })}
                         </span>
                       ) : null}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                      Write-back
+                      {t('headingWriteBack')}
                     </dt>
-                    <dd className="text-ink-300">{WRITE_BACK_LABEL[settings.writeBack]}</dd>
+                    <dd className="text-ink-300">{t(WRITE_BACK_LABEL[settings.writeBack])}</dd>
                   </div>
                 </dl>
               ) : (
                 <p className="text-sm text-ink-300">
-                  Nothing is connected yet. Run the setup command on your Attendees server, put its
-                  token in Secret Manager, then enter the addresses and slugs it prints under
-                  Change.
+                  {t('a32NothingConnected')}
                 </p>
               )}
 
               <p className="text-xs text-ink-500">
                 {settings.managedInApp && stored?.updatedAt
-                  ? `Changed here ${formatRelative(stored.updatedAt)}.`
-                  : 'These settings came with the deploy. Changing any of them here takes over from it.'}
+                  ? t('changedHere', { when: time.relative(stored.updatedAt) })
+                  : t('fromDeploy')}
                 {profile?.role === 'admin'
-                  ? ' The token itself lives in Secret Manager and is not editable from the app.'
+                  ? t('tokenNote')
                   : ''}
               </p>
             </>
@@ -253,8 +254,8 @@ export function BackendsSection() {
       {statuses && enabledBackends.length >= 2 ? (
         <Card>
           <CardHeader
-            title="New students"
-            description="Which system a student created in Tally — a quick-add at the door — is pushed to."
+            title={t('headingNewStudents')}
+            description={t('newStudentsDescription')}
           />
           <div className="flex flex-col gap-3 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -276,13 +277,14 @@ export function BackendsSection() {
             </div>
             {statuses.queued > 0 ? (
               <p className="text-sm text-ink-300">
-                {statuses.queued} {statuses.queued === 1 ? 'student is' : 'students are'} queued and
-                will go to {BACKEND_LABELS[statuses.defaultPushBackend]} on the next push.
+                {t('queuedGoingTo', {
+                  count: statuses.queued,
+                  backend: BACKEND_LABELS[statuses.defaultPushBackend],
+                })}
               </p>
             ) : (
               <p className="text-sm text-ink-500">
-                Students already linked to a backend are not moved by this — it decides only where
-                a brand-new student's record is created.
+                {t('notMoved')}
               </p>
             )}
             {/*
@@ -293,12 +295,9 @@ export function BackendsSection() {
             */}
             {statuses.heldForReview > 0 ? (
               <p className="text-sm text-ink-300">
-                {statuses.heldForReview}{' '}
-                {statuses.heldForReview === 1 ? 'student registered' : 'students registered'}{' '}
-                themselves at the kiosk and{' '}
-                {statuses.heldForReview === 1 ? 'is' : 'are'} waiting for somebody to approve them.{' '}
+                {t('heldForReview', { count: statuses.heldForReview })}{' '}
                 <Link to="/review" className="text-brand-400 hover:underline">
-                  Review them
+                  {t('reviewThem')}
                 </Link>
                 .
               </p>

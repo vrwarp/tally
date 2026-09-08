@@ -94,7 +94,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
   // once rather than streamed. Waiting for it is the difference between
   // photographing the predictive roster and photographing a plain list.
   await page
-    .getByRole('region', { name: /^Recent,/ })
+    .getByRole('region', { name: /^Regulars,/ })
     .waitFor({ timeout: 30_000 })
     .catch(() => {
       throw new Error(
@@ -165,7 +165,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     journey: 'Journey 5 — pastoral follow-up',
     title: 'Insights, not a data table',
     caption:
-      'Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. “Missing in action” is students who missed three or more gatherings in a row.',
+      'Monday evening. The PRD asks for actionable insight rather than raw numbers, so every row leads somewhere: tap-to-call, tap-to-text, or through to the student. “Stopped coming” is students who missed three or more gatherings in a row.',
   });
 
   await page.mouse.wheel(0, 700);
@@ -341,7 +341,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
   await page.waitForTimeout(1200);
 
   await page
-    .getByRole('button', { name: /^(Limit|Change)$/ })
+    .getByRole('button', { name: /^(Limit who is on it|Change who is on it)$/ })
     .first()
     .click();
   await page.waitForTimeout(600);
@@ -403,7 +403,7 @@ test('capture the walkthrough', async ({ page, signedInAs }) => {
     .first()
     .click();
   await page.waitForTimeout(1200);
-  await page.getByRole('button', { name: /^Change$/ }).first().click();
+  await page.getByRole('button', { name: /^Change who is on it$/ }).first().click();
   await page.waitForTimeout(400);
   await page.getByRole('button', { name: /everyone on the team/i }).click();
   await page.waitForTimeout(1200);

@@ -24,7 +24,7 @@ import { useToast } from '@/context/toastContext';
 import { addRosterMember, importPlanningCenterList, searchPlanningCenterPeople } from '@/services/functions';
 import { fetchPlanningCenterLists } from '@/services/planningCenter';
 import { pcoErrorReport } from '@/lib/pcoErrors';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { cn } from '@/lib/utils';
 import {
   BACKEND_LABELS,
@@ -34,6 +34,8 @@ import {
   type PcoList,
   type PcoPersonSearchResult,
 } from '@/types';
+import { useLocale, useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
 
 /** Which backend a search row came from; every row can say. */
 function backendOf(person: PcoPersonSearchResult): BackendId {
@@ -55,6 +57,10 @@ export function AddFromPlanningCenterModal({
   onClose,
   onRoster,
 }: AddFromPlanningCenterModalProps) {
+  const t = useTranslations('AddStudent');
+  const tCommon = useTranslations('Common');
+  const locale = useLocale();
+  const grades = useGrades();
   const { show } = useToast();
   const { refreshRoster, rosterBackends } = useData();
 
@@ -130,7 +136,7 @@ export function AddFromPlanningCenterModal({
           if (cancelled) return;
           setResults([]);
           setSearchDown([]);
-          setError(pcoErrorReport(cause, 'Could not run that search.'));
+          setError(pcoErrorReport(cause, t('searchFailed')));
         });
     }, SEARCH_DEBOUNCE_MS);
 
@@ -138,7 +144,7 @@ export function AddFromPlanningCenterModal({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, query]);
+  }, [open, query, t]);
 
   const add = async (person: PcoPersonSearchResult) => {
     setAddingId(person.pcoPersonId);
@@ -151,14 +157,14 @@ export function AddFromPlanningCenterModal({
       setAdded((current) => new Set(current).add(person.id));
       show(
         response.data.status === 'restored'
-          ? `${person.firstName} ${person.lastName} is back on the roster`
-          : `${person.firstName} ${person.lastName} added`,
+          ? t('backOnRoster', { name: `${person.firstName} ${person.lastName}` })
+          : t('added', { name: `${person.firstName} ${person.lastName}` }),
         { tone: 'success' },
       );
       // The roster's cache key is the membership, so this comes back changed.
       await refreshRoster(true);
     } catch (cause) {
-      setError(pcoErrorReport(cause, 'Could not add that student.'));
+      setError(pcoErrorReport(cause, t('addFailed')));
     } finally {
       setAddingId(null);
     }
@@ -171,7 +177,7 @@ export function AddFromPlanningCenterModal({
       setLists(await fetchPlanningCenterLists());
     } catch (cause) {
       setLists([]);
-      setError(pcoErrorReport(cause, 'Could not read your Planning Center lists.'));
+      setError(pcoErrorReport(cause, t('listsFailed')));
     }
   };
 
@@ -182,13 +188,17 @@ export function AddFromPlanningCenterModal({
       const { data } = await importPlanningCenterList({ listId: list.id });
       show(
         data.added + data.restored === 0
-          ? `Everyone on “${list.name}” was already on the roster`
-          : `${data.added + data.restored} of ${data.total} from “${list.name}” added`,
+          ? t('allAlreadyOn', { list: list.name })
+          : t('importedCount', {
+              added: data.added + data.restored,
+              total: data.total,
+              list: list.name,
+            }),
         { tone: 'success' },
       );
       await refreshRoster(true);
     } catch (cause) {
-      setError(pcoErrorReport(cause, 'Could not import that list.'));
+      setError(pcoErrorReport(cause, t('importFailed')));
     } finally {
       setImportingId(null);
     }
@@ -198,15 +208,15 @@ export function AddFromPlanningCenterModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={multiBackend ? 'Add a student' : 'Add from Planning Center'}
+      title={multiBackend ? t('titleMulti') : t('titlePco')}
       description={
         multiBackend
-          ? 'Search every connected directory at once. Tally records that they are on the roster and nothing else about them.'
-          : 'Search your church directory. Tally records that they are on the roster and nothing else about them.'
+          ? t('descriptionMulti')
+          : t('descriptionPco')
       }
       footer={
         <Button variant="secondary" onClick={onClose}>
-          Done
+          {tCommon('done')}
         </Button>
       }
     >
@@ -219,11 +229,11 @@ export function AddFromPlanningCenterModal({
         ) : null}
 
         <TextField
-          label={multiBackend ? 'Search your directories' : 'Search Planning Center'}
+          label={multiBackend ? t('searchLabelMulti') : t('searchLabelPco')}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Name or email…"
+          placeholder={t('searchPlaceholder')}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
@@ -231,24 +241,25 @@ export function AddFromPlanningCenterModal({
 
         {searchDown.length > 0 && query.trim() ? (
           <p className="rounded-xl bg-warn-500/10 px-3 py-2 text-sm text-warn-400 ring-1 ring-warn-500/25">
-            {searchDown.join(' and ')} could not be searched just now — these results are from the
-            rest.
+            {t('searchDown', {
+              backends: new Intl.ListFormat(locale, { type: 'conjunction' }).format(searchDown),
+            })}
           </p>
         ) : null}
 
         {!query.trim() ? (
           <p className="px-1 text-sm text-ink-500">
             {multiBackend
-              ? 'Anyone in your directories can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.'
-              : 'Anyone in Planning Center can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.'}
+              ? t('anyoneMulti')
+              : t('anyonePco')}
           </p>
         ) : results === null ? (
           <SkeletonRows count={3} />
         ) : results.length === 0 ? (
           <p className="px-1 text-sm text-ink-400">
             {multiBackend
-              ? `Nobody matches “${query}”.`
-              : `Nobody in Planning Center matches “${query}”.`}
+              ? t('noMatchMulti', { query })
+              : t('noMatchPco', { query })}
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -278,22 +289,22 @@ export function AddFromPlanningCenterModal({
                       </span>
                       <span className="block text-xs text-ink-500">
                         {person.grade === null
-                          ? `No grade in ${backendName}`
-                          : gradeDescription(person.grade)}
+                          ? t('noGradeIn', { backend: backendName })
+                          : gradeDescription(grades, person.grade)}
                         {person.child ? '' : ' · not marked as a child'}
-                        {person.status === 'inactive' ? ` · inactive in ${backendName}` : ''}
+                        {person.status === 'inactive' ? t('inactiveIn', { backend: backendName }) : ''}
                       </span>
                     </span>
 
                     {already ? (
-                      <Badge tone="success">On the roster</Badge>
+                      <Badge tone="success">{t('onTheRoster')}</Badge>
                     ) : (
                       <Button
                         size="sm"
                         loading={addingId === person.pcoPersonId}
                         onClick={() => void add(person)}
                       >
-                        Add
+                        {t('add')}
                       </Button>
                     )}
                   </div>
@@ -318,19 +329,18 @@ export function AddFromPlanningCenterModal({
               onClick={() => void openImport()}
               className="text-sm font-medium text-brand-300 underline underline-offset-4"
             >
-              Adding a whole group? Import a Planning Center list →
+              {t('importListLink')}
             </button>
           ) : (
             <div className="flex flex-col gap-2">
               <p className="text-sm text-ink-300">
-                Import a list, once. Everyone on it today joins the roster; nothing stays linked, so
-                a rule change upstream will not quietly add or drop a student later.
+                {t('importOnceNote')}
               </p>
 
               {lists === null ? (
                 <SkeletonRows count={2} />
               ) : lists.length === 0 ? (
-                <p className="text-sm text-ink-400">Planning Center returned no lists.</p>
+                <p className="text-sm text-ink-400">{t('noLists')}</p>
               ) : (
                 <ul className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
                   {lists.map((list) => (
@@ -343,8 +353,10 @@ export function AddFromPlanningCenterModal({
                           {list.name}
                         </span>
                         <span className="block text-xs text-ink-500">
-                          {list.totalPeople === null ? 'No count' : `${list.totalPeople} people`}
-                          {list.invalid ? ' · rules no longer work' : ''}
+                          {list.totalPeople === null
+                            ? t('noCount')
+                            : t('peopleCount', { count: list.totalPeople })}
+                          {list.invalid ? t('rulesBroken') : ''}
                         </span>
                       </span>
                       <Button
@@ -353,7 +365,7 @@ export function AddFromPlanningCenterModal({
                         loading={importingId === list.id}
                         onClick={() => void runImport(list)}
                       >
-                        Import
+                        {t('importAction')}
                       </Button>
                     </li>
                   ))}

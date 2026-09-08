@@ -15,7 +15,7 @@
  * The developer-facing message is never lost either way: `pcoErrorReport` keeps
  * it under `debug`, and the details panel shows it as "Underlying error".
  */
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
@@ -123,7 +123,7 @@ describe('the sentence for a failed roster read', () => {
 
   it('has its own words for rate-limiting when the server had none', async () => {
     expect(await sentenceFor(callableError('functions/resource-exhausted'))).toBe(
-      'The roster is being rate-limited upstream. It will refresh shortly.',
+      'Your church directory asked Tally to slow down. The roster finishes loading on its own in a moment.',
     );
   });
 
@@ -137,7 +137,7 @@ describe('the sentence for a failed roster read', () => {
 
   it('has its own words for a missing backend when the server had none', async () => {
     expect(await sentenceFor(callableError('functions/failed-precondition'))).toBe(
-      'No people backend is configured.',
+      'Tally has not been told where to read your people from. An admin can connect it in Settings.',
     );
   });
 
@@ -153,18 +153,18 @@ describe('the sentence for a failed roster read', () => {
     // `unavailable` alone is not more informative than the general case, so it
     // is deliberately not a sentence of its own.
     expect(await sentenceFor(callableError('functions/unavailable'))).toBe(
-      'Could not reach the people backend for the roster.',
+      'Could not reach your church directory to load the roster. Check the wifi, then try again.',
     );
   });
 
   it('has a sentence for a failure with no code at all', async () => {
     expect(await sentenceFor(new Error('socket hang up'))).toBe(
-      'Could not reach the people backend for the roster.',
+      'Could not reach your church directory to load the roster. Check the wifi, then try again.',
     );
   });
 
   it('has a sentence for something thrown that was not an error', async () => {
-    expect(await sentenceFor('nope')).toBe('Could not reach the people backend for the roster.');
+    expect(await sentenceFor('nope')).toBe('Could not reach your church directory to load the roster. Check the wifi, then try again.');
   });
 
   it('keeps the underlying message for the details panel', async () => {
@@ -174,7 +174,7 @@ describe('the sentence for a failed roster read', () => {
 
     // The sentence a counselor reads is this side's; the one a developer needs
     // is still on the report.
-    expect(latest?.rosterError?.message).toBe('Could not reach the people backend for the roster.');
+    expect(latest?.rosterError?.message).toBe('Could not reach your church directory to load the roster. Check the wifi, then try again.');
     expect(latest?.rosterError?.code).toBe('functions/internal');
   });
 

@@ -17,7 +17,7 @@
  * window still writes, because a family checked out at nine from a gathering
  * whose doors shut at eight really did walk out of the building.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
@@ -258,7 +258,7 @@ describe('a gathering that is open', () => {
     await mount(DOORS_SHUT());
     // Said out loud, and then not acted on — the header advises, and the tap
     // still writes. Asserted before the tap because the tick covers the screen.
-    expect(screen.getByText(/window has closed/i)).toBeTruthy();
+    expect(screen.getByText(/the usual time has passed/i)).toBeTruthy();
 
     await checkInNoah();
 

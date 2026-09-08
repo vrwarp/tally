@@ -30,9 +30,12 @@ import {
 import { hasNoAdultContact, reachableFor } from '@/features/dashboard/insights';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
 import { exportFilename } from '@/lib/csv';
-import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeLabel, initials, NO_GRADE } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type NewVisitor } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface NewVisitorListProps {
   items: readonly NewVisitor[];
@@ -80,15 +83,17 @@ export function NewVisitorList({
   onContactAdded,
   exportContext = NO_EXPORT_CONTEXT,
 }: NewVisitorListProps) {
+  const t = useTranslations('NewVisitors');
+  const grades = useGrades();
   return (
     <Card>
       <CardHeader
-        title="New faces"
+        title={t('title')}
         count={loading ? undefined : items.length}
         description={
           gatheringTitle
-            ? `First seen at ${gatheringTitle} in the last ${windowDays} days.`
-            : `First time in the last ${windowDays} days.`
+            ? t('descriptionScoped', { gathering: gatheringTitle, days: windowDays })
+            : t('description', { days: windowDays })
         }
         action={
           // The real control, disabled at zero, so a loading header is the
@@ -99,10 +104,10 @@ export function NewVisitorList({
               build={() => ({
                 filename: exportFilename({
                   kind: 'follow-up',
-                  scope: gatheringTitle ? `${gatheringTitle} new` : 'new-faces',
+                  scope: gatheringTitle ? t('exportScopeScoped', { gathering: gatheringTitle }) : t('exportScope'),
                   at: new Date(),
                 }),
-                contents: buildNewVisitorCsv(items, exportContext),
+                contents: buildNewVisitorCsv(grades, items, exportContext),
               })}
               count={items.length}
               noun="students"
@@ -116,9 +121,9 @@ export function NewVisitorList({
       ) : items.length === 0 ? (
         <EmptyState
           title={
-            gatheringTitle ? `No first-timers at ${gatheringTitle}.` : 'No first-timers this week.'
+            gatheringTitle ? t('emptyTitleScoped', { gathering: gatheringTitle }) : t('emptyTitle')
           }
-          description="Anyone checked in for the first time shows up here while the visit is still fresh."
+          description={t('emptyBody')}
         />
       ) : (
         <ul className="divide-y divide-ink-800">
@@ -146,6 +151,9 @@ function NewVisitorRow({
   reachable: boolean | undefined;
   onContactAdded?: () => void;
 }) {
+  const time = useTimeFormats();
+  const grades = useGrades();
+  const t = useTranslations('NewVisitors');
   const { student, firstEventTitle, firstAttendedAt } = visitor;
 
   /*
@@ -176,11 +184,12 @@ function NewVisitorRow({
               {studentFullName(student)}
             </span>
             <span className="shrink-0 text-xs text-ink-500">
-              {gradeLabel(student) ?? NO_GRADE}
+              {gradeLabel(grades, student) ?? grades('none')}
             </span>
           </span>
           <span className="truncate text-xs text-ink-500">
-            {firstEventTitle} · {formatShortDate(firstAttendedAt)}, {formatRelative(firstAttendedAt)}
+            {firstEventTitle ?? t('unknownEvent')} · {time.shortDate(firstAttendedAt)},{' '}
+            {time.relative(firstAttendedAt)}
           </span>
         </Link>
 
@@ -188,15 +197,15 @@ function NewVisitorRow({
             walked into a Friday: there is no next instance of a bus trip for
             them to come back to, so the invitation has to name a gathering. */}
         {visitor.viaOneOff ? (
-          <Badge tone="neutral" title="Met at a one-off event, not at a regular gathering">
-            One-off
+          <Badge tone="neutral" title={t('badgeOneOffTitle')}>
+            {t('badgeOneOff')}
           </Badge>
         ) : null}
 
         {unreachable ? (
-          <Badge tone="warn" title="No contact on file">
+          <Badge tone="warn" title={t('badgeIncompleteTitle')}>
             <span aria-hidden="true">⚠</span>
-            Incomplete
+            {t('badgeIncomplete')}
           </Badge>
         ) : null}
       </div>

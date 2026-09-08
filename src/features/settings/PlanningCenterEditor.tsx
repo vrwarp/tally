@@ -20,15 +20,18 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { savePlanningCenterConfig, type PcoConfigDraft } from '@/services/planningCenter';
 import { GRADES, type PcoEffectiveSettings, type PcoWriteBackMode } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useServerText } from '@/hooks/useServerText';
 
-const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
-  off: 'Tally never writes to Planning Center. Visitors added at the door stay queued until this is turned on.',
-  create: 'Tally creates people it has not seen before, after searching for a match. It never edits an existing person.',
-  full: 'Tally creates people, and Edit profile becomes editable for students Planning Center already has — first name, last name, grade and medical notes are saved there. A leader can also add an adult, and the household if there is none. It offers anybody Planning Center already has by that name before creating a second record, and never overwrites a number on file.',
-};
+const WRITE_BACK_HINT = {
+  off: 'pcoWriteHintOff',
+  create: 'pcoWriteHintCreate',
+  full: 'pcoWriteHintFull',
+} as const satisfies Record<PcoWriteBackMode, string>;
 
 /** A cache measured in minutes stops being a cache and starts being a mirror. */
 const MAX_CACHE_TTL = 300;
@@ -71,6 +74,10 @@ export function PlanningCenterEditor({
   onClose,
   onSaved,
 }: PlanningCenterEditorProps) {
+  const serverText = useServerText();
+  const t = useTranslations('Backends');
+  const tCommon = useTranslations('Common');
+  const grades = useGrades();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
@@ -118,7 +125,7 @@ export function PlanningCenterEditor({
       await onSaved();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save these settings.');
+      setError(serverText(cause, t('editorSaveFailed')));
     } finally {
       setSaving(false);
     }
@@ -128,15 +135,15 @@ export function PlanningCenterEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title="Planning Center settings"
-      description="Everything except the credentials. Changes apply to every counselor's next read."
+      title={t('pcoEditorTitle')}
+      description={t('pcoEditorDescription')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button onClick={() => void handleSave()} loading={saving}>
-            Save settings
+            {t('saveSettings')}
           </Button>
         </>
       }
@@ -154,67 +161,65 @@ export function PlanningCenterEditor({
               construction, which the stepper's free-typed box did not.
             */}
             <SelectField
-              label="Lowest grade"
+              label={t('lowestGrade')}
               value={String(draft.minGrade)}
               onChange={(event) => set('minGrade', Number(event.target.value))}
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
             <SelectField
-              label="Highest grade"
+              label={t('highestGrade')}
               value={String(draft.maxGrade)}
               onChange={(event) => set('maxGrade', Number(event.target.value))}
-              error={draft.maxGrade < draft.minGrade ? 'Cannot end below where it starts.' : null}
+              error={draft.maxGrade < draft.minGrade ? t('gradeRangeError') : null}
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
-            Who is on the roster is decided on the Students screen, one student at a time. This band
-            only says where a student Planning Center has no grade for lands, and it is the range the
-            app understands at all.
+            {t('pcoGradeBandNote')}
           </p>
         </div>
 
         <SelectField
-          label="Write-back"
+          label={t('headingWriteBack')}
           value={draft.writeBack}
           onChange={(event) => set('writeBack', event.target.value as PcoWriteBackMode)}
-          hint={WRITE_BACK_HINT[draft.writeBack]}
+          hint={t(WRITE_BACK_HINT[draft.writeBack])}
         >
-          <option value="off">Off — never change anything</option>
-          <option value="create">Create new people only</option>
-          <option value="full">Create and update managed fields</option>
+          <option value="off">{t('writeBackOff')}</option>
+          <option value="create">{t('writeBackCreatePeople')}</option>
+          <option value="full">{t('writeBackFull')}</option>
         </SelectField>
 
         <NumberStepperField
-          label="Reuse an answer for (seconds)"
+          label={t('cacheLabel')}
           min={0}
           max={MAX_CACHE_TTL}
           value={draft.cacheTtlSeconds}
           onValueChange={(value) => set('cacheTtlSeconds', value)}
           hint={
             draft.cacheTtlSeconds === 0
-              ? 'Off. Every screen asks Planning Center directly — slower, and always current.'
-              : `Eight counselors opening Tally in the same minute cost one read instead of eight. A name corrected in Planning Center appears within ${draft.cacheTtlSeconds} seconds.`
+              ? t('pcoCacheHintOff')
+              : t('pcoCacheHintOn', { seconds: draft.cacheTtlSeconds })
           }
         />
 
         {isAdmin ? (
           <TextField
-            label="API address"
+            label={t('apiAddress')}
             value={draft.baseUrl}
             onChange={(event) => set('baseUrl', event.target.value)}
             placeholder={settings.baseUrl}
-            hint={`Leave empty to use whatever the deploy configured — currently ${settings.baseUrl}. Every request carries this church's credentials, so any other address sends them somewhere else: set this only for a proxy you run, or a test rig.`}
+            hint={t('pcoApiAddressHint', { url: settings.baseUrl })}
           />
         ) : null}
       </div>

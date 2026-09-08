@@ -19,9 +19,11 @@
  */
 import { Link } from 'react-router-dom';
 import { EmptyState } from '@/components/ui';
-import { formatClock, formatEventDay, formatEventWindow } from '@/lib/time';
-import { gradeLabel, NO_GRADE } from '@/lib/utils';
+import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type AttendanceRecord, type Student, type TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface ArchivedNightProps {
   event: TallyEvent;
@@ -32,6 +34,9 @@ export interface ArchivedNightProps {
 }
 
 export function ArchivedNight({ event, attendance, students, now }: ArchivedNightProps) {
+  const time = useTimeFormats();
+  const grades = useGrades();
+  const t = useTranslations('CheckIn');
   const byId = new Map(students.map((student) => [student.id, student]));
 
   const present = attendance
@@ -41,20 +46,19 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-4">
       <Link to="/" className="text-sm font-semibold text-brand-300">
-        ‹ Check-in
+        {t('backToCheckIn')}
       </Link>
 
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-bold text-ink-50">{event.title}</h1>
         <p className="text-sm text-ink-400">
-          {formatEventDay(event.startAt, now)} · {formatEventWindow(event)}
+          {time.eventDay(event.startAt, now)} · {time.eventWindow(event)}
         </p>
         {/* Said plainly, because the absence of the usual roster is the first
             thing somebody will notice and the last thing they should have to
             guess at. */}
         <p className="mt-1 text-xs text-ink-500">
-          This night is older than the few months Tally keeps loaded, so it opens as a record of
-          what happened rather than a roster.
+          {t('archivedNote')}
         </p>
       </header>
 
@@ -63,15 +67,15 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
           id="archived-present"
           className="flex items-baseline justify-between text-xs font-bold uppercase tracking-wider text-ink-400"
         >
-          <span>Checked in</span>
+          <span>{t('focusCheckedIn')}</span>
           <span className="tabular-nums text-ink-300">{present.length}</span>
         </h2>
 
         {present.length === 0 ? (
           <EmptyState
             icon="🗓"
-            title="Nobody was checked in"
-            description="Tally reads a finished gathering with no attendance as one that did not happen — it is not a miss for anybody."
+            title={t('archivedEmptyTitle')}
+            description={t('archivedEmptyBody')}
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -83,15 +87,15 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
                   {/* A student taken off the roster since keeps their history;
                       the row says so rather than rendering a blank name. */}
-                  {student ? studentFullName(student) : 'Former student'}
+                  {student ? studentFullName(student) : t('formerStudent')}
                 </span>
                 {student ? (
                   <span className="shrink-0 text-xs text-ink-500">
-                    {gradeLabel(student) ?? NO_GRADE}
+                    {gradeLabel(grades, student) ?? grades('none')}
                   </span>
                 ) : null}
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {formatClock(record.checkedInAt)}
+                  {time.clock(record.checkedInAt)}
                 </span>
               </li>
             ))}

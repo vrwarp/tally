@@ -102,7 +102,7 @@ export async function hold(
  */
 export async function leaveGathering(kiosk: Page): Promise<void> {
   await hold(kiosk, '[data-key="clear"]');
-  await kiosk.getByRole('button', { name: /Change event/i }).click();
+  await kiosk.getByRole('button', { name: /Change gathering/i }).click();
   await kiosk.getByRole('button', { name: /^Leave /i }).click();
 }
 
@@ -170,7 +170,17 @@ async function expectProgressShows(
  * is unauthenticated, `approveKioskPairing` takes any active member, and
  * `createCustomToken` needs no IAM grant against the Auth emulator.
  */
-export async function pairKiosk(kiosk: Page, staff: Page): Promise<string> {
+export async function pairKiosk(
+  kiosk: Page,
+  staff: Page,
+  /*
+   * What the chooser says once the kiosk is signed in. Defaults to the English
+   * `Chooser.question`, because every other spec runs pinned to `en-US`; the
+   * one spec that pairs a kiosk already switched to Chinese passes that
+   * catalogue's own value instead of a second hard-coded sentence.
+   */
+  chooserQuestion: string | RegExp = /which gathering/i,
+): Promise<string> {
   const code = await readPairingCode(kiosk);
 
   await staff.goto('/pair-kiosk');
@@ -182,7 +192,7 @@ export async function pairKiosk(kiosk: Page, staff: Page): Promise<string> {
 
   // The kiosk polls every couple of seconds, then signs in with the minted
   // token before the chooser appears.
-  await expect(kiosk.getByText(/which gathering/i)).toBeVisible({ timeout: 30_000 });
+  await expect(kiosk.getByText(chooserQuestion)).toBeVisible({ timeout: 30_000 });
   return code;
 }
 

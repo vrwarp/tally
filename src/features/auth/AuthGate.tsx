@@ -17,6 +17,7 @@ import { useAuth, type AuthStage } from '@/context/authContext';
 import { provisionAccess, type ProvisionAccessResult } from '@/services/functions';
 import { Button, ErrorBanner, LoadingScreen, Spinner } from '@/components/ui';
 import type { Role } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export function AuthGate({ children }: { children: ReactNode }): ReactNode {
   const { status, stage } = useAuth();
@@ -47,6 +48,7 @@ const SLOW_RESTORE_MS = 8000;
  * the door: nothing to read, nothing to press, no way to tell broken from slow.
  */
 function RestoringSession({ stage }: { stage: AuthStage }) {
+  const t = useTranslations('Auth');
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ function RestoringSession({ stage }: { stage: AuthStage }) {
     return () => clearTimeout(timer);
   }, []);
 
-  if (!slow) return <LoadingScreen message="Signing you in…" />;
+  if (!slow) return <LoadingScreen message={t('signingIn')} />;
 
   /*
    * Two different waits, two different pieces of advice.
@@ -76,21 +78,18 @@ function RestoringSession({ stage }: { stage: AuthStage }) {
     >
       <Spinner className="size-8" />
       <div>
-        <p className="font-medium text-ink-200">This is taking longer than usual.</p>
-        <p className="mt-1 max-w-sm text-sm text-ink-500">
-          Tally is still trying to restore your session. Check the wifi, then reload — or sign in
-          again to start fresh.
-        </p>
+        <p className="font-medium text-ink-200">{t('slowTitle')}</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-500">{t('slowBody')}</p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button variant="secondary" onClick={() => window.location.reload()}>
-          Reload
+          {t('reload')}
         </Button>
         <Link
           to="/login"
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white"
         >
-          Sign in again
+          {t('signInAgain')}
         </Link>
       </div>
     </div>
@@ -98,21 +97,20 @@ function RestoringSession({ stage }: { stage: AuthStage }) {
 }
 
 export function RequireRole({ role, children }: { role: Role; children: ReactNode }): ReactNode {
+  const t = useTranslations('Auth');
   const { can } = useAuth();
   if (can(role)) return children;
 
   return (
     <div className="px-4 py-10">
       <div className="mx-auto flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-ink-900 px-6 py-8 text-center ring-1 ring-ink-800">
-        <p className="text-base font-semibold text-ink-100">Core team only</p>
-        <p className="text-sm text-ink-500">
-          This part of Tally is for the core team. Checking students in is all yours.
-        </p>
+        <p className="text-base font-semibold text-ink-100">{t('coreOnlyTitle')}</p>
+        <p className="text-sm text-ink-500">{t('coreOnlyBody')}</p>
         <Link
           to="/"
           className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"
         >
-          Back to check-in
+          {t('backToCheckIn')}
         </Link>
       </div>
     </div>
@@ -123,26 +121,47 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
 /* Pending — the Planning Center handoff                                       */
 /* -------------------------------------------------------------------------- */
 
+/** A role's stored value against the word a person reads. */
+const ROLE_LABEL = {
+  counselor: 'roleCounselor',
+  core: 'roleCore',
+  admin: 'roleAdmin',
+} as const;
+
 type ProvisionPhase =
   | { kind: 'checking' }
   | { kind: 'result'; result: ProvisionAccessResult }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; error: ReturnType<typeof describeProvisionError> };
 
-function describeProvisionError(error: unknown): string {
+/**
+ * A callable's failure, as an `Errors.*` key rather than a sentence.
+ *
+ * The one case that is not a key is a server message we did not write: an
+ * `HttpsError` whose text came back from the function itself. That is passed
+ * through as-is — English, but true — which is the same fallback Numbers'
+ * `useApiErrorMessage` makes for a code it does not recognise.
+ */
+type ProvisionErrorKey =
+  | 'provisionUnauthenticated'
+  | 'provisionPermissionDenied'
+  | 'provisionUnavailable'
+  | 'provisionUnknown';
+
+function describeProvisionError(error: unknown): { key: ProvisionErrorKey; raw?: string } {
   const code = (error as { code?: string })?.code ?? '';
   switch (code) {
     case 'functions/unauthenticated':
-      return 'Your session ended before we could check the roster. Sign out and sign in again.';
+      return { key: 'provisionUnauthenticated' };
     case 'functions/permission-denied':
-      return 'Planning Center refused this account.';
+      return { key: 'provisionPermissionDenied' };
     case 'functions/not-found':
     case 'functions/internal':
     case 'functions/unavailable':
-      return 'Could not reach the access service. If you are running Tally locally, the Firebase emulators are probably not running — start them with `npm run dev:emulated`.';
-    default:
-      return (
-        (error as { message?: string })?.message ?? 'Could not check your access. Try again.'
-      );
+      return { key: 'provisionUnavailable' };
+    default: {
+      const raw = (error as { message?: string })?.message;
+      return raw ? { key: 'provisionUnknown', raw } : { key: 'provisionUnknown' };
+    }
   }
 }
 
@@ -154,6 +173,9 @@ function describeProvisionError(error: unknown): string {
 const OPENING_RETRIES = [300, 1200, 3000, 6000];
 
 function PendingScreen() {
+  const t = useTranslations('Auth');
+  const tErrors = useTranslations('Errors');
+  const tAccount = useTranslations('Account');
   const { user, signOut, refreshProfile } = useAuth();
   const [phase, setPhase] = useState<ProvisionPhase>({ kind: 'checking' });
   const [stuck, setStuck] = useState(false);
@@ -167,7 +189,7 @@ function PendingScreen() {
       const response = await provisionAccess();
       setPhase({ kind: 'result', result: response.data });
     } catch (cause) {
-      setPhase({ kind: 'error', message: describeProvisionError(cause) });
+      setPhase({ kind: 'error', error: describeProvisionError(cause) });
     }
   }, []);
 
@@ -211,25 +233,25 @@ function PendingScreen() {
   const email = user?.email ?? null;
   const signOutButton = (
     <Button variant="ghost" fullWidth onClick={() => void signOut()}>
-      Sign out
+      {tAccount('signOut')}
     </Button>
   );
 
-  let title = 'Checking your access';
+  let title = t('checkingTitle');
   let body: ReactNode = (
     <div className="flex items-center gap-3 text-sm text-ink-400">
-      <Spinner label="Checking access" />
-      <span>Looking for you on the team in Planning Center…</span>
+      <Spinner label={t('checkingAria')} />
+      <span>{t('checkingBody')}</span>
     </div>
   );
 
   if (phase.kind === 'error') {
-    title = 'Something went wrong';
+    title = t('errorTitle');
     body = (
       <>
-        <ErrorBanner message={phase.message} />
+        <ErrorBanner message={phase.error.raw ?? tErrors(phase.error.key)} />
         <Button fullWidth onClick={() => void check()}>
-          Try again
+          {tErrors('tryAgain')}
         </Button>
         {signOutButton}
       </>
@@ -238,74 +260,62 @@ function PendingScreen() {
     const { status, role, message } = phase.result;
 
     if (status === 'granted') {
-      title = "You're on the team";
+      title = t('grantedTitle');
       body = (
         <>
+          {/* Two whole sentences rather than one with a clause spliced into
+              it: the role sits in a different place in a Chinese clause, and a
+              fragment appended mid-sentence cannot be moved by a translator. */}
           <p className="text-sm text-ink-300">
-            Planning Center has you on the team
-            {role ? <> as {role}</> : null}. Your access is set up.
+            {role ? t('grantedBodyWithRole', { role: tAccount(ROLE_LABEL[role]) }) : t('grantedBody')}
           </p>
           {stuck ? (
             <>
               {/* Access exists; only this tab has failed to see it. Reloading
                   rebuilds the Firestore client from nothing, which is the one
                   thing a stuck stream reliably survives. */}
-              <p className="text-sm text-ink-500">
-                Tally is having trouble opening on this device. Your access is fine — reloading
-                normally sorts it out.
-              </p>
+              <p className="text-sm text-ink-500">{t('stuckBody')}</p>
               <Button fullWidth onClick={() => window.location.reload()}>
-                Reload Tally
+                {tErrors('reload')}
               </Button>
               {signOutButton}
             </>
           ) : (
             <div className="flex items-center gap-3 text-sm text-ink-400">
-              <Spinner label="Opening Tally" />
-              <span>Opening Tally…</span>
+              <Spinner label={t('openingAria')} />
+              <span>{t('opening')}</span>
             </div>
           )}
         </>
       );
     } else if (status === 'not-on-roster') {
-      title = "We couldn't find you";
+      title = t('notFoundTitle');
       body = (
         <>
-          <p className="text-sm text-ink-300">
-            That email is not on the team in Planning Center, so Tally cannot let you
-            in yet.
-          </p>
+          <p className="text-sm text-ink-300">{t('notFoundBody')}</p>
           {email ? (
             <p className="rounded-xl bg-ink-900 px-4 py-3 text-sm ring-1 ring-ink-800">
               <span className="block text-xs uppercase tracking-wide text-ink-500">
-                Signed in as
+                {t('signedInAs')}
               </span>
               <span className="mt-0.5 block break-all font-medium text-ink-100">{email}</span>
             </p>
           ) : null}
-          <p className="text-sm text-ink-500">
-            Ask a core team leader to add this address to the team in Planning Center,
-            then try again. If you normally use a different address, sign out and use that one.
-          </p>
+          <p className="text-sm text-ink-500">{t('notFoundHelp')}</p>
           {message ? <p className="text-xs text-ink-500">{message}</p> : null}
           <Button fullWidth onClick={() => void check()}>
-            Try again
+            {tErrors('tryAgain')}
           </Button>
           {signOutButton}
         </>
       );
     } else {
-      title = 'Access turned off';
+      title = t('inactiveTitle');
       body = (
         <>
-          <p className="text-sm text-ink-300">
-            Your Tally access has been turned off. Planning Center still lists you, but someone on
-            the core team has marked you inactive.
-          </p>
+          <p className="text-sm text-ink-300">{t('inactiveBody')}</p>
           {message ? <p className="text-xs text-ink-500">{message}</p> : null}
-          <p className="text-sm text-ink-500">
-            A core team leader can switch it back on from Settings.
-          </p>
+          <p className="text-sm text-ink-500">{t('inactiveHelp')}</p>
           {signOutButton}
         </>
       );

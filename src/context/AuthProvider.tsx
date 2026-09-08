@@ -13,6 +13,7 @@
  * takes effect without a reload.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import {
   GoogleAuthProvider,
   getRedirectResult,
@@ -74,15 +75,8 @@ function setRedirectPending(pending: boolean): void {
   }
 }
 
-/**
- * What to tell someone whose browser is the problem. Both end in the same
- * instruction because there is only one thing that fixes it.
- */
-const IN_APP_BROWSER_DEAD_END =
-  'This in-app browser cannot do Google sign-in. Open Tally in Safari or Chrome — ' +
-  'tap the menu (⋯ or the share icon) and choose “Open in browser”.';
-const INSTALLED_APP_DEAD_END =
-  'Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.';
+/** The sign-in catalogue, for the describer below. */
+type AuthTranslator = ReturnType<typeof useTranslations<'Auth'>>;
 
 /**
  * Failures that mean "the popup never opened", as opposed to "the person
@@ -95,7 +89,7 @@ const POPUP_NEVER_OPENED = new Set([
   'auth/operation-not-supported-in-this-environment',
 ]);
 
-function describeAuthError(error: unknown): string {
+function describeAuthError(t: AuthTranslator, error: unknown): string {
   // Stryker disable next-line StringLiteral: the fallback is only ever read by
   // a `switch` and a `Set.has`, neither of which any string could match — so
   // what it is does not matter, only that it is a string.
@@ -106,17 +100,13 @@ function describeAuthError(error: unknown): string {
   switch (code) {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
-      return 'Sign-in was cancelled.';
+      return t('signInCancelled');
     case 'auth/network-request-failed':
-      return 'No connection. Check the wifi and try again.';
+      return t('noConnection');
     case 'auth/popup-blocked':
-      return embedded
-        ? IN_APP_BROWSER_DEAD_END
-        : 'The sign-in window was blocked. Allow popups for this site, or try again.';
+      return embedded ? t('inAppBrowserDeadEnd') : t('popupBlocked');
     case 'auth/operation-not-supported-in-this-environment':
-      return embedded
-        ? IN_APP_BROWSER_DEAD_END
-        : 'This browser cannot do Google sign-in. Open Tally in Safari or Chrome.';
+      return embedded ? t('inAppBrowserDeadEnd') : t('browserUnsupported');
     // Stryker disable next-line ConditionalExpression: `break` and falling out
     // of the switch are the same thing here — the sentence is worked out below
     // either way. The case is what says the list above is not exhaustive.
@@ -136,17 +126,18 @@ function describeAuthError(error: unknown): string {
       '[tally] Google redirect lost its initial state. The auth handler is not first-party: ' +
         'add this host to VITE_AUTH_DOMAINS and register it with Google (docs/deployment-setup.md).',
     );
-    return 'Sign-in could not be completed in this browser. Try again in Safari or Chrome.';
+    return t('redirectLostState');
   }
 
   // In a webview an unrecognised failure is nearly always the webview, and the
   // raw Firebase text helps nobody standing at a door.
-  if (embedded) return IN_APP_BROWSER_DEAD_END;
+  if (embedded) return t('inAppBrowserDeadEnd');
 
-  return message || 'Sign-in failed. Try again.';
+  return message || t('signInFailed');
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const t = useTranslations('Auth');
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
@@ -304,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     popupRedirectResolver()
       .then((resolver) => getRedirectResult(auth, resolver))
       .catch((cause: unknown) => {
-        setError(describeAuthError(cause));
+        setError(describeAuthError(t, cause));
       })
       .finally(() => {
         // Cleared either way: a redirect that was abandoned must not make every
@@ -316,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself. What
   // an empty one *says* is that this closes over nothing.
-  []);
+  [t]);
 
   /**
    * Google sign-in, routed by what the current browser can actually do.
@@ -346,7 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const strategy = googleSignInStrategy(authDomain);
 
     if (strategy === 'unavailable') {
-      setError(isEmbeddedBrowser() ? IN_APP_BROWSER_DEAD_END : INSTALLED_APP_DEAD_END);
+      setError(isEmbeddedBrowser() ? t('inAppBrowserDeadEnd') : t('installedAppDeadEnd'));
       return;
     }
 
@@ -387,11 +378,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await startRedirect();
           return;
         } catch (redirectCause) {
-          setError(describeAuthError(redirectCause));
+          setError(describeAuthError(t, redirectCause));
           throw redirectCause;
         }
       }
-      setError(describeAuthError(cause));
+      setError(describeAuthError(t, cause));
       throw cause;
     }
   },
@@ -399,7 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself. What
   // an empty one *says* is that this closes over nothing.
-  []);
+  [t]);
 
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);

@@ -59,6 +59,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { buildSearchName, nameKey } from '../backends/mappingShared.js';
+import { withPinyin } from '../names/pinyin.js';
 import {
   PATHS,
   SILENT_LOGGER,
@@ -74,6 +75,10 @@ import {
   checkGrade,
   checkName,
   checkPhone,
+  FIELD_MESSAGES,
+  type FieldCheck,
+  type FieldCode,
+  type FieldSubject,
 } from '../generated/registrationFields.js';
 import { last4ForStudents, patchPhonesNow, recordPendingLast4 } from './phoneIndex.js';
 import { bumpPulse, type PulseChannel } from './pulse.js';
@@ -217,14 +222,25 @@ export interface RegisterFamilyResult {
  * The entry point turns them into `invalid-argument`.
  */
 export class RegistrationInputError extends Error {
-  constructor(message: string) {
+  /**
+   * Which refusal it is, where the rules could name one.
+   *
+   * The `message` beside it is the English the wire carries — a log line, and
+   * the fallback for a client older than this deploy. The code is what lets
+   * that client say it in its own language instead. See
+   * `generated/registrationFields.ts`.
+   */
+  readonly code: FieldCode | null;
+
+  constructor(message: string, code: FieldCode | null = null) {
     super(message);
     this.name = 'RegistrationInputError';
+    this.code = code;
   }
 }
 
-function refuse(message: string): never {
-  throw new RegistrationInputError(message);
+function refuse(message: string, code: FieldCode | null = null): never {
+  throw new RegistrationInputError(message, code);
 }
 
 /**
@@ -235,13 +251,13 @@ function refuse(message: string): never {
  * screen's form wants the same sentence painted under the box that caused it,
  * which is why the rule itself answers rather than throws.
  */
-function taken<T>(result: { ok: true; value: T } | { ok: false; error: string }): T {
-  if (!result.ok) refuse(result.error);
+function taken<T>(result: FieldCheck<T>): T {
+  if (!result.ok) refuse(FIELD_MESSAGES[result.code], result.code);
   return result.value;
 }
 
-export function parseName(raw: unknown, field: string): string {
-  return taken(checkName(raw, field));
+export function parseName(raw: unknown, subject: FieldSubject): string {
+  return taken(checkName(raw, subject));
 }
 
 export function parseGrade(raw: unknown): number | null {
@@ -291,8 +307,8 @@ export function parseRegisterFamilyRequest(data: unknown): ParsedRegistration {
   const children = rawChildren.map((entry): RegistrationChild => {
     const child = (entry ?? {}) as Record<string, unknown>;
     return {
-      firstName: parseName(child.firstName, "The child's first name"),
-      lastName: parseName(child.lastName, "The child's last name"),
+      firstName: parseName(child.firstName, 'childFirst'),
+      lastName: parseName(child.lastName, 'childLast'),
       grade: parseGrade(child.grade),
     };
   });
@@ -340,8 +356,8 @@ export function parseRegisterFamilyRequest(data: unknown): ParsedRegistration {
     rawGuardian === null && anchorStudentIds.length > 0
       ? null
       : {
-          firstName: parseName(rawGuardian?.firstName, "The adult's first name"),
-          lastName: parseName(rawGuardian?.lastName, "The adult's last name"),
+          firstName: parseName(rawGuardian?.firstName, 'adultFirst'),
+          lastName: parseName(rawGuardian?.lastName, 'adultLast'),
           phone: parseRegistrationPhone(rawGuardian?.phone),
         };
 
@@ -783,7 +799,7 @@ export async function registerFamily(
           firstName: child.firstName,
           lastName: child.lastName,
           grade: child.grade,
-          searchName: buildSearchName(child.firstName, child.lastName),
+          searchName: withPinyin(buildSearchName(child.firstName, child.lastName)),
           // From the record, not the request: the replay answers with what
           // was actually kept, and both were parsed from the same body.
           hasAllergies: (held.allergies[index] ?? null) !== null,
@@ -801,7 +817,7 @@ export async function registerFamily(
     firstName: child.firstName,
     lastName: child.lastName,
     grade: child.grade,
-    searchName: buildSearchName(child.firstName, child.lastName),
+    searchName: withPinyin(buildSearchName(child.firstName, child.lastName)),
     hasAllergies: (request.allergies[index] ?? null) !== null,
   }));
 

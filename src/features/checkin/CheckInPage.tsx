@@ -66,9 +66,13 @@ import {
   undoCheckIn,
   undoCheckOut,
 } from '@/services/attendance';
-import { formatClock, isCheckInOpen } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 /**
  * The one left edge this screen has.
@@ -122,26 +126,35 @@ const NO_ENTRIES: readonly RosterEntry[] = [];
  */
 const PREDICTION_GRACE_MS = 1500;
 
-/** What the one list is called, given the filter currently applied to it. */
-const FOCUS_TITLE: Record<RosterFocus, string> = {
-  all: "Roster",
-  recent: "Recent",
-  participated: "Participated",
-  checkedIn: "Checked in",
-  inRoom: "In room",
-  checkedOut: "Checked out",
-};
+/**
+ * What the one list is called, given the filter currently applied to it — and
+ * what it says when that filter matches nobody.
+ *
+ * Keys rather than words: these are module-level tables read at render, and a
+ * table cannot call a hook.
+ */
+const FOCUS_TITLE = {
+  all: "focusAll",
+  recent: "focusRecent",
+  participated: "focusParticipated",
+  checkedIn: "focusCheckedIn",
+  inRoom: "focusInRoom",
+  checkedOut: "focusCheckedOut",
+} as const satisfies Record<RosterFocus, string>;
 
-const FOCUS_EMPTY: Record<RosterFocus, string> = {
-  all: "Nobody matches these filters.",
-  recent: "No regulars on this roster yet.",
-  participated: "Nobody has been to this gathering yet.",
-  checkedIn: "Nobody is checked in yet.",
-  inRoom: "Nobody is in the room.",
-  checkedOut: "Nobody has been checked out yet.",
-};
+const FOCUS_EMPTY = {
+  all: "emptyAll",
+  recent: "emptyRecent",
+  participated: "emptyParticipated",
+  checkedIn: "emptyCheckedIn",
+  inRoom: "emptyInRoom",
+  checkedOut: "emptyCheckedOut",
+} as const satisfies Record<RosterFocus, string>;
 
 export function CheckInPage() {
+  const time = useTimeFormats();
+  const t = useTranslations('CheckIn');
+  const tCommon = useTranslations('Common');
   const { eventId } = useParams();
   const { event, eventLoading, fromArchive, now, selectableEvents } = useActiveEvent(
     eventId ?? null,
@@ -322,8 +335,8 @@ export function CheckInPage() {
   useEffect(() => {
     if (!swapForId || swapSource) return;
     setSwapForId(null);
-    show("That check-in is gone — there is nothing left to move.", { tone: "info" });
-  }, [swapForId, swapSource, show]);
+    show(t("swapGone"), { tone: "info" });
+  }, [swapForId, swapSource, show, t]);
 
   // The action strip is a check-in's own, so an undo — this counselor's or the
   // other phone's — takes it away with the check mark it was hanging off.
@@ -479,12 +492,12 @@ export function CheckInPage() {
   const refuseFrozen = useCallback(
     (entry: RosterEntry): boolean => {
       if (entry.student.upstreamRecordMissing !== true) return false;
-      const frozen = `${studentFullName(entry.student)} is frozen — their Planning Center record was deleted or merged away. Fix it from their student page first.`;
+      const frozen = t("frozen", { name: studentFullName(entry.student) });
       setAnnouncement(frozen);
       show(frozen, { tone: 'error' });
       return true;
     },
-    [show],
+    [show, t],
   );
 
   /**
@@ -526,12 +539,12 @@ export function CheckInPage() {
       const name = studentFullName(entry.student);
       const searched = query.trim() !== "";
 
-      await write([entry.student.id], `Could not check in ${name}. Try again.`, async () => {
+      await write([entry.student.id], t("errorCheckIn", { name }), async () => {
         // Paint and buzz first — the confirmation must land on the tap, not on
         // the round trip.
         haptic();
         flash(entry.student.id);
-        setAnnouncement(`${name} checked in`);
+        setAnnouncement(t("announceCheckedIn", { name }));
         // Attendance hangs off the event document, so the gathering has to be
         // one. Almost always already done by the effect above; this is what
         // makes it true for a counselor getting a head start on a gathering
@@ -561,7 +574,7 @@ export function CheckInPage() {
         }
       });
     },
-    [event, user, query, flash, write, refuseFrozen],
+    [event, user, query, flash, write, refuseFrozen, t],
   );
 
   const handleUndo = useCallback(
@@ -572,13 +585,13 @@ export function CheckInPage() {
       // No confirm dialog: a mistaken undo costs one more tap, whereas a modal
       // costs every counselor a beat on every correction.
       setExpandedId(null);
-      await write([entry.student.id], `Could not undo ${name}. Try again.`, async () => {
+      await write([entry.student.id], t("errorUndo", { name }), async () => {
         await undoCheckIn(event.id, entry.student.id);
-        setAnnouncement(`${name} removed`);
-        show(`Undid ${name}`, { tone: "info" });
+        setAnnouncement(t("announceRemoved", { name }));
+        show(t("toastUndid", { name }), { tone: "info" });
       });
     },
-    [event, show, write],
+    [event, show, write, t],
   );
 
   const handleCheckOut = useCallback(
@@ -590,15 +603,15 @@ export function CheckInPage() {
       const name = studentFullName(entry.student);
 
       setExpandedId(null);
-      await write([entry.student.id], `Could not check out ${name}. Try again.`, async () => {
+      await write([entry.student.id], t("errorCheckOut", { name }), async () => {
         // No `flash`: the green animation means "checked in", and saying that
         // as somebody leaves would be the wrong confirmation entirely.
         haptic();
-        setAnnouncement(`${name} checked out`);
+        setAnnouncement(t("announceCheckedOut", { name }));
         await checkOut(event.id, entry.student.id, user.uid);
       });
     },
-    [event, user, write, refuseFrozen],
+    [event, user, write, refuseFrozen, t],
   );
 
   const handleUndoCheckOut = useCallback(
@@ -608,13 +621,13 @@ export function CheckInPage() {
       const name = studentFullName(entry.student);
 
       setExpandedId(null);
-      await write([entry.student.id], `Could not undo the check-out for ${name}. Try again.`, async () => {
+      await write([entry.student.id], t("errorUndoCheckOut", { name }), async () => {
         haptic();
-        setAnnouncement(`${name} back in the room`);
+        setAnnouncement(t("announceBackInRoom", { name }));
         await undoCheckOut(event.id, entry.student.id);
       });
     },
-    [event, write, refuseFrozen],
+    [event, write, refuseFrozen, t],
   );
 
   /**
@@ -632,29 +645,29 @@ export function CheckInPage() {
       const from = swapSource;
       const wrong = studentFullName(from.student);
       const right = studentFullName(entry.student);
-      const when = formatClock(from.record.checkedInAt);
+      const when = time.clock(from.record.checkedInAt);
 
       setSwapForId(null);
       setQuery("");
 
       await write(
         [from.student.id, entry.student.id],
-        `Could not move the check-in to ${right}. Try again.`,
+        t("errorSwap", { name: right }),
         async () => {
           haptic();
           flash(entry.student.id);
-          setAnnouncement(`${when} check-in moved from ${wrong} to ${right}`);
+          setAnnouncement(t("announceSwapped", { when, wrong, right }));
           await swapCheckIn({
             event,
             from: from.record,
             to: entry.student,
             uid: user.uid,
           });
-          show(`${wrong} → ${right}, still ${when}`, { tone: "success" });
+          show(t("toastSwapped", { wrong, right, when }), { tone: "success" });
         },
       );
     },
-    [event, user, swapSource, flash, show, write, refuseFrozen],
+    [event, user, swapSource, flash, show, write, refuseFrozen, t, time],
   );
 
   /**
@@ -943,11 +956,13 @@ export function CheckInPage() {
                   keeps the minute the student actually arrived. */}
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-brand-200">
-                  Who should this be?
+                  {t("swapPrompt")}
                 </span>
                 <span className="block text-xs leading-snug text-ink-300">
-                  Tap the right student. {studentFullName(swapSource.student)}’s check-in moves
-                  across, still {formatClock(swapSource.record.checkedInAt)}.
+                  {t('swapBody', {
+                    name: studentFullName(swapSource.student),
+                    time: time.clock(swapSource.record.checkedInAt),
+                  })}
                 </span>
               </span>
               <button
@@ -955,7 +970,7 @@ export function CheckInPage() {
                 onClick={cancelSwap}
                 className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800"
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
             </div>
           ) : null}
@@ -971,7 +986,7 @@ export function CheckInPage() {
                 onChange={setQuery}
                 inputRef={searchInput}
                 onKeyDown={onSearchKeyDown}
-                placeholder={swapSource ? 'Search for the right student…' : undefined}
+                placeholder={swapSource ? t("swapSearchPlaceholder") : undefined}
                 /* Quick-add is stood down while a check-in is being moved: it
                    creates a *new* student and checks them in on the server clock,
                    which is the one thing this correction exists to avoid. */
@@ -1018,28 +1033,28 @@ export function CheckInPage() {
             icon={rosterError ? "⚠️" : "👋"}
             title={
               rosterError
-                ? "The roster could not be read"
+                ? t("emptyRosterError")
                 : event.requiresRsvp
-                  ? "Nobody has RSVP’d yet"
-                  : "Nobody on this roster yet"
+                  ? t("emptyNoRsvp")
+                  : t("emptyNoRoster")
             }
             description={
               rosterError
-                ? "Check-in still works: quick-add anyone who walks in, and they will be counted."
+                ? t("emptyRosterErrorBody")
                 : event.requiresRsvp
-                  ? "This trip is limited to students who RSVP’d. Add them from the event page, or quick-add someone who turned up anyway."
-                  : "Students appear here as soon as the roster syncs. You can still quick-add anyone who walks in."
+                  ? t("emptyNoRsvpBody")
+                  : t("emptyNoRosterBody")
             }
           />
         ) : roster.isFiltered && roster.entries.length === 0 ? (
           <EmptyState
             className="pt-10"
             icon="🔍"
-            title={`No match for “${query.trim()}”`}
+            title={t("noMatchTitle", { query: query.trim() })}
             description={
               swapSource
-                ? "Nobody by that name to move this check-in to. Leave it and add them as a visitor instead."
-                : "First time here? Add them as a visitor — it takes three fields."
+                ? t("noMatchSwapBody")
+                : t("noMatchBody")
             }
             action={
               /* A brand-new student is not somewhere a check-in can be *moved*
@@ -1052,7 +1067,7 @@ export function CheckInPage() {
                   onClick={cancelSwap}
                   className="min-h-11 rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800"
                 >
-                  Leave it where it is
+                  {t("swapLeave")}
                 </button>
               ) : (
                 <button
@@ -1060,7 +1075,7 @@ export function CheckInPage() {
                   onClick={() => setQuickAddOpen(true)}
                   className="min-h-11 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-400 active:bg-brand-600"
                 >
-                  Add as visitor
+                  {t("swapAddVisitor")}
                 </button>
               )
             }
@@ -1069,15 +1084,15 @@ export function CheckInPage() {
           <>
             {/* One list, always. A tap recolours a row; it never relocates it. */}
             <RosterList
-              title={roster.isFiltered ? "Results" : FOCUS_TITLE[appliedFocus]}
+              title={roster.isFiltered ? t("results") : t(FOCUS_TITLE[appliedFocus])}
               entries={roster.entries}
               description={
                 // While a check-in is being moved the list is a picker, and
                 // what it is filtered to matters less than what a tap now does.
                 swapSource
-                  ? "tap the right student"
+                  ? t("hintSwap")
                   : appliedFocus === "recent" && counts.historyWindow > 0
-                    ? `from the last ${counts.historyWindow} ${counts.historyWindow === 1 ? "gathering" : "gatherings"}`
+                    ? t("hintRecent", { count: counts.historyWindow })
                     : appliedFocus === "participated"
                       ? // Says which window, because "participated" is only ever
                         // true of what the app loaded — and says which
@@ -1085,17 +1100,17 @@ export function CheckInPage() {
                         // own is answering a weaker one. See
                         // `ParticipationSource`.
                         roster.participationSource === "gathering"
-                        ? `been here in the last ${counts.participationWindow} ${counts.participationWindow === 1 ? "gathering" : "gatherings"}`
-                        : "checked in at least once before"
+                        ? t("hintParticipatedHere", { count: counts.participationWindow })
+                        : t("hintParticipatedEver")
                       : appliedFocus === "checkedIn"
-                        ? "tap the check mark to undo"
+                        ? t("hintCheckedIn")
                         : appliedFocus === "inRoom"
-                          ? "tap Out when somebody checks them out"
+                          ? t("hintInRoom")
                           : appliedFocus === "checkedOut"
-                            ? "tap ↺ to put somebody back"
+                            ? t("hintCheckedOut")
                             : undefined
               }
-              emptyLabel={FOCUS_EMPTY[appliedFocus]}
+              emptyLabel={t(FOCUS_EMPTY[appliedFocus])}
               tone={
                 appliedFocus === "checkedIn" || appliedFocus === "inRoom" ? "present" : "default"
               }
@@ -1133,8 +1148,8 @@ export function CheckInPage() {
                   className="min-h-11 w-full rounded-xl bg-ink-900 px-4 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800 active:bg-ink-800 lg:w-auto lg:px-6"
                 >
                   {widenTo === "participated"
-                    ? `Show all ${counts.participated} who have participated`
-                    : `Show all ${counts.eligible} students`}
+                    ? t("showAllParticipated", { count: counts.participated })
+                    : t("showAllStudents", { count: counts.eligible })}
                 </button>
               </div>
             ) : null}
@@ -1154,7 +1169,7 @@ export function CheckInPage() {
             // arrive checked in, and every focus keeps checked-in students on
             // screen, so the filters need no nudging.
             setQuery("");
-            setAnnouncement(`${name} added and checked in`);
+            setAnnouncement(t("announceAdded", { name }));
             forgetCachedHistory();
           }}
         />

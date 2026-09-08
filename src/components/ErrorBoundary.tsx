@@ -1,14 +1,78 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { Button } from '@/components/ui';
 
 interface Props {
   children: ReactNode;
-  /** Shown above the message, e.g. "the dashboard". */
-  what?: string;
+  /**
+   * Whether this boundary wraps one screen rather than the whole app.
+   *
+   * A `what` string used to be interpolated into the heading. Two headings that
+   * differ by a noun cannot be translated as one — Chinese puts the noun
+   * somewhere else in the clause — so each is its own whole sentence now, and
+   * this picks between them. There has only ever been one caller.
+   */
+  scoped?: boolean;
 }
 
 interface State {
   error: Error | null;
+}
+
+/**
+ * The fallback, as a function component so it can read the catalogue.
+ *
+ * A class cannot call a hook, and this is deliberately the only class in the
+ * codebase — React offers no other way to catch a render error. The boundary
+ * sits below `TallyIntlProvider`, so the messages are there even when the
+ * subtree under it has thrown.
+ */
+function ErrorFallback({
+  error,
+  scoped,
+  isChunkFailure,
+  onReset,
+}: {
+  error: Error;
+  scoped: boolean;
+  isChunkFailure: boolean;
+  onReset: () => void;
+}) {
+  const t = useTranslations('Errors');
+  return (
+    <div
+      role="alert"
+      className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center"
+    >
+      <p className="text-3xl" aria-hidden="true">
+        ⚠
+      </p>
+      <div>
+        <h1 className="text-lg font-semibold text-ink-100">
+          {scoped ? t('boundaryTitleScreen') : t('boundaryTitle')}
+        </h1>
+        <p className="mt-1 max-w-sm text-sm text-ink-400">
+          {isChunkFailure ? t('boundaryChunk') : t('boundaryCarryOn')}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {!isChunkFailure ? (
+          <Button variant="secondary" onClick={onReset}>
+            {t('tryAgain')}
+          </Button>
+        ) : null}
+        <Button onClick={() => window.location.reload()}>{t('reload')}</Button>
+      </div>
+
+      <details className="mt-2 max-w-full text-left">
+        <summary className="cursor-pointer text-xs text-ink-500">{t('technicalDetails')}</summary>
+        <pre className="mt-2 max-w-sm select-text overflow-x-auto rounded-lg bg-ink-900 p-3 text-left text-xs text-ink-400">
+          {error.message}
+        </pre>
+      </details>
+    </div>
+  );
 }
 
 /**
@@ -51,40 +115,12 @@ export class ErrorBoundary extends Component<Props, State> {
     );
 
     return (
-      <div
-        role="alert"
-        className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center"
-      >
-        <p className="text-3xl" aria-hidden="true">
-          ⚠
-        </p>
-        <div>
-          <h1 className="text-lg font-semibold text-ink-100">
-            {this.props.what ? `Something went wrong loading ${this.props.what}.` : 'Something went wrong.'}
-          </h1>
-          <p className="mt-1 max-w-sm text-sm text-ink-400">
-            {isChunkFailure
-              ? 'Tally was updated while this page was open. Reloading will pick up the new version.'
-              : 'The rest of Tally is still working — you can go back and carry on.'}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {!isChunkFailure ? (
-            <Button variant="secondary" onClick={this.reset}>
-              Try again
-            </Button>
-          ) : null}
-          <Button onClick={() => window.location.reload()}>Reload Tally</Button>
-        </div>
-
-        <details className="mt-2 max-w-full text-left">
-          <summary className="cursor-pointer text-xs text-ink-500">Technical details</summary>
-          <pre className="mt-2 max-w-sm select-text overflow-x-auto rounded-lg bg-ink-900 p-3 text-left text-xs text-ink-400">
-            {error.message}
-          </pre>
-        </details>
-      </div>
+      <ErrorFallback
+        error={error}
+        scoped={Boolean(this.props.scoped)}
+        isChunkFailure={isChunkFailure}
+        onReset={this.reset}
+      />
     );
   }
 }

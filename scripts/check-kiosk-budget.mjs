@@ -13,9 +13,10 @@
  *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
  *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
  *      only) never downloads it, and one careless import anywhere under
- *      src/kiosk/ would quietly undo that. The same test is run twice more, for
- *      the two libraries the kiosk is deliberately handed the *answers* from
- *      rather than the code: the colour maths and the icon catalogue.
+ *      src/kiosk/ would quietly undo that. The same test is run three times
+ *      more, for the libraries the kiosk is deliberately handed the *answers*
+ *      from rather than the code: the colour maths, the icon catalogue, and
+ *      the ICU parser.
  *   2. The gzipped total of the reachable graph stays under the budget, and
  *      the *first-paint* subset (the statically referenced chunks) under its
  *      own smaller one.
@@ -188,6 +189,46 @@ if (withCatalogue.length > 0) {
       'Something under src/kiosk/ imports a value from lib/eventIcons. It may import ' +
       'the types and nothing else: a gathering\'s icon is looked up on the server and ' +
       'arrives on the chooser row as path data.',
+  );
+  process.exit(1);
+}
+
+/*
+ * The ICU parser must never reach the kiosk, on the same argument again.
+ *
+ * A message like `{count, plural, one {# child} other {# children}}` is a small
+ * grammar, and `intl-messageformat` is the 15.2 kB gzipped machine that reads
+ * it. None of that has to happen in a lobby. `scripts/vite-compile-messages.ts`
+ * compiles every catalogue as Vite reads it and `vite.config.ts` aliases
+ * `use-intl/format-message` to the package's `format-only` entry, which
+ * executes the compiled form and imports nothing — so the kiosk carries the
+ * formatter and not the grammar.
+ *
+ * Both halves of that are one line each, and losing either brings the parser
+ * back for the whole build rather than for one screen: an alias that stops
+ * matching after a `use-intl` upgrade, a `messages/` path the plugin's regexp
+ * no longer recognises, or somebody reaching for `intl-messageformat` directly
+ * to format one date. The bytes would land in a shared chunk, well inside the
+ * headroom below, and nothing else here would notice.
+ *
+ * Matched on literals from the two packages rather than on a chunk name — a
+ * minifier renames every identifier it can and cannot touch a string. The
+ * parser's own error kind is checked as well as the formatter's message,
+ * because the formatter can be imported through its `no-parser` entry and the
+ * parser can arrive without it.
+ */
+const ICU_PARSER = /The intl string context variable|EXPECT_ARGUMENT_CLOSING_BRACE/;
+
+const withParser = [...reachable].filter((name) =>
+  ICU_PARSER.test(readFileSync(join(DIST, `assets/${name}`), 'utf8')),
+);
+if (withParser.length > 0) {
+  console.error(
+    `The kiosk graph reaches the ICU parser: ${withParser.join(', ')}\n` +
+      'Messages are compiled at build time and formatted by use-intl\'s format-only ' +
+      'entry — see scripts/vite-compile-messages.ts and the resolve alias in ' +
+      'vite.config.ts. If one of those stopped applying, fix it there rather than ' +
+      'raising this budget.',
   );
   process.exit(1);
 }

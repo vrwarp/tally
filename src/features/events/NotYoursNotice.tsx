@@ -32,6 +32,7 @@ import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
+import { useLocale, useTranslations } from 'use-intl';
 
 export interface NotYoursNoticeProps {
   /**
@@ -42,13 +43,21 @@ export interface NotYoursNoticeProps {
   events: readonly TallyEvent[];
 }
 
-/** "Friday Fellowship or Sunday School", "A, B or C". */
-function join(names: readonly string[]): string {
+/**
+ * "Friday Fellowship or Sunday School", "A, B or C".
+ *
+ * A *disjunction* — these are alternatives, not a list of things all true —
+ * which `Intl.ListFormat` spells differently per language and, in English,
+ * differently from the "and" everywhere else in the app.
+ */
+function join(locale: string, names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} or ${names.at(-1)}`;
+  return new Intl.ListFormat(locale, { type: 'disjunction' }).format(names);
 }
 
 export function NotYoursNotice({ events }: NotYoursNoticeProps) {
+  const t = useTranslations('Events');
+  const locale = useLocale();
   const { access, canWork } = useData();
   const { can } = useAuth();
 
@@ -89,15 +98,14 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
         </span>
         <span className="min-w-0 flex-1">
           <span id="not-yours" className="block text-sm font-semibold text-ink-100">
-            You are not on {join(titles)}
+            {t('notOnGatherings', { titles: join(locale, titles) })}
           </span>
           {/* The phone gets the headline and the names and nothing else: the
               qualifier is the sentence that teaches the row language, and it is
               read once, on a viewport where the notice already costs half a
               fold. */}
           <span className="mt-0.5 hidden text-xs leading-relaxed text-ink-400 lg:block">
-            Their dates are below; their head counts are not, and nothing in them is yours to
-            open or edit.
+            {t('notYoursDates')}
           </span>
         </span>
       </span>
@@ -108,7 +116,7 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
           the demotion mark or with the column divider underneath. */}
       <ul className="flex shrink-0 flex-col gap-1 pl-7 pt-2 text-xs lg:pl-8 lg:pt-0">
         {chains.map(({ key, event }) => {
-          const who = approvers(event, access, byUid);
+          const who = approvers(t, event, access, byUid);
           return (
             <li key={key} className="flex min-w-0 items-baseline gap-2">
               <span className="shrink-0 font-semibold text-ink-400 lg:min-w-32">{event.title}</span>

@@ -13,7 +13,7 @@
  * covered by `functions/src/eventDeletion.test.ts`, against a real projection.
  */
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';

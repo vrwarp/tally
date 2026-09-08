@@ -37,13 +37,26 @@ import type { KioskPrinting } from '../KioskApp';
 // Type-only. Every value this screen needs from the library arrives through the
 // `printing` handle, because this component is referenced statically by KioskApp
 // and a direct import would put the transport into the first-paint graph.
+import type { AgeStrings } from '../printing';
 import type {
   Label,
   PrintedLabel,
   PrinterConfig,
   PrinterDetection,
+  PrinterNote,
   PrinterState,
 } from '../printing';
+import { useLocale, useTranslations } from 'use-intl';
+import { usePrinterNote } from '../printerNote';
+
+/**
+ * The printer screen's translator, as a type.
+ *
+ * The two describers below are pure functions of a state and a detection —
+ * that is how they stay readable beside the module they report on — so they
+ * take it as an argument rather than reaching for a hook.
+ */
+type PrinterTranslator = ReturnType<typeof useTranslations<'Printer'>>;
 
 /** The models this was built against, offered first. */
 const PREFERRED_MODELS = ['QL-810W', 'QL-800', 'QL-820NWB'];
@@ -70,28 +83,26 @@ function orderedModels(printing: KioskPrinting): string[] {
  * can no longer match to its grant, and only the chooser brings it back. See
  * docs/label-printing.md.
  */
-const UNPAIRED_ADVICE =
-  'Check its power and cable. A printer that lost power on an Android tablet has to be connected again from this screen.';
-
-function stateLine(state: PrinterState): { text: string; tone: string } {
+function stateLine(
+  t: PrinterTranslator,
+  note: (note: PrinterNote | null | undefined) => string,
+  state: PrinterState,
+): { text: string; tone: string } {
   switch (state.kind) {
     case 'ready':
-      return { text: 'Connected and ready.', tone: 'text-present-400' };
+      return { text: t('connectedReady'), tone: 'text-present-400' };
     case 'unpaired':
       // Set up with a printer, which is what makes this different from `idle`
       // below: the browser is not listing the one this kiosk was given.
       return state.searching
-        ? { text: 'Looking for the printer this kiosk was set up with…', tone: 'text-ink-400' }
-        : {
-            text: 'The printer this kiosk was set up with is not connected.',
-            tone: 'text-warn-400',
-          };
+        ? { text: t('looking'), tone: 'text-ink-400' }
+        : { text: t('notConnected'), tone: 'text-warn-400' };
     case 'unsupported':
-      return { text: state.message, tone: 'text-warn-400' };
+      return { text: note(state.message), tone: 'text-warn-400' };
     case 'trouble':
-      return { text: state.message, tone: 'text-warn-400' };
+      return { text: note(state.message), tone: 'text-warn-400' };
     default:
-      return { text: 'No printer set up on this kiosk.', tone: 'text-ink-400' };
+      return { text: t('noPrinter'), tone: 'text-ink-400' };
   }
 }
 
@@ -106,6 +117,7 @@ function stateLine(state: PrinterState): { text: string; tone: string } {
  * stays true after somebody takes the other chip.
  */
 function detectionNotice(
+  t: PrinterTranslator,
   detection: PrinterDetection,
   label: string,
   nameOf: (entry: Label) => string,
@@ -114,33 +126,30 @@ function detectionNotice(
   // already saying why, and saying it twice helps nobody.
   if (!detection.status) return null;
 
-  const media = `${detection.status.mediaWidthMm}mm ${
-    detection.status.mediaType === 'die-cut' ? 'die-cut' : 'continuous'
-  }`;
+  const media =
+    detection.status.mediaType === 'die-cut'
+      ? t('mediaDieCut', { width: detection.status.mediaWidthMm })
+      : t('mediaContinuous', { width: detection.status.mediaWidthMm });
   const lines: string[] = [];
   let tone = 'text-ink-400';
 
   if (!detection.modelFromPrinter) {
-    lines.push(
-      `The printer did not say which model it is — check that ${detection.config.model} is right.`,
-    );
+    lines.push(t('modelUnknown', { model: detection.config.model }));
     tone = 'text-warn-400';
   }
 
   const chosen = detection.matched.find((entry) => entry.identifier === label);
   if (detection.matched.length === 0) {
-    lines.push(`${media} is loaded, and no roll this printer takes is that size.`);
+    lines.push(t('mediaUnknown', { media }));
     tone = 'text-warn-400';
   } else if (detection.matched.length > 1) {
     lines.push(
-      `${media} is loaded, which is more than one roll. Set to ${nameOf(
-        chosen ?? detection.matched[0],
-      )} — change it below if that is not what is on the spindle.`,
+      t('mediaAmbiguous', { media, label: nameOf(chosen ?? detection.matched[0]) }),
     );
     tone = 'text-warn-400';
   } else {
     lines.push(
-      `Read off the printer: ${detection.config.model}, ${nameOf(detection.matched[0])}.`,
+      t('readOff', { model: detection.config.model, label: nameOf(detection.matched[0]) }),
     );
   }
 
@@ -148,8 +157,8 @@ function detectionNotice(
 }
 
 /** "6:41 PM", the way every other time on this device is written. */
-function clockTime(atMs: number): string {
-  return new Date(atMs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+function clockTime(locale: string, atMs: number): string {
+  return new Date(atMs).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
 export function PrinterScreen({
@@ -184,6 +193,12 @@ export function PrinterScreen({
   onReprintByName?: () => void;
   onDone: () => void;
 }) {
+  const t = useTranslations('Printer');
+  // The kiosk's language, for the log's clock times and the test label.
+  const locale = useLocale();
+  // The log's five ages, in the shape `describeAge` takes — see `AgeStrings`.
+  const ages = t as unknown as AgeStrings;
+  const printerNote = usePrinterNote();
   const [state, setState] = useState<PrinterState>(() => printing.currentState());
   const [model, setModel] = useState(config.model);
   const [label, setLabel] = useState(config.label);
@@ -314,8 +329,8 @@ export function PrinterScreen({
     state.kind === 'trouble' || (state.kind === 'unpaired' && !state.searching);
 
   const nameOf = (entry: Label) => printing.labelName(entry);
-  const notice = detection ? detectionNotice(detection, label, nameOf) : null;
-  const line = stateLine(state);
+  const notice = detection ? detectionNotice(t, detection, label, nameOf) : null;
+  const line = stateLine(t, printerNote, state);
   // Newest first, and read on every render rather than held in state: the
   // record moves whenever the state does, which is what re-renders this.
   const events = printing.printerLog().slice(-MAX_EVENTS_SHOWN).reverse();
@@ -324,13 +339,23 @@ export function PrinterScreen({
   return (
     <div className="flex h-full flex-col p-6">
       <div className="pb-4 text-center">
-        <div className="text-lg font-medium text-ink-400 kiosk:text-xl">Label printer</div>
+        <div className="text-lg font-medium text-ink-400 kiosk:text-xl">{t('title')}</div>
         <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>{line.text}</div>
         {state.kind === 'trouble' && state.advice && (
-          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{state.advice}</div>
+          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">
+            {printerNote(state.advice)}
+          </div>
         )}
         {state.kind === 'unpaired' && !state.searching && (
-          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">{UNPAIRED_ADVICE}</div>
+          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">
+            {/*
+              The Android sentence is there because on Android it is the whole
+              story: a printer that lost power or its cable, however briefly, is
+              one the browser can no longer match to its grant, and only the
+              chooser brings it back. See docs/label-printing.md.
+            */}
+            {t('checkPowerAndCable')}
+          </div>
         )}
       </div>
 
@@ -358,11 +383,11 @@ export function PrinterScreen({
               print* is an exception to its own heading, and that row is the one
               a volunteer is here for. */}
           <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
-            Name tags tonight
+            {t('tagsTonight')}
           </div>
           {printedTonight.length === 0 ? (
             <div className="px-4 text-sm text-ink-500 kiosk:text-base">
-              Nothing has printed on this kiosk tonight.
+              {t('nothingPrinted')}
             </div>
           ) : (
             /* The card's own padding is the dead gutter the list stops against,
@@ -398,7 +423,7 @@ export function PrinterScreen({
                         entry.failed ? 'font-semibold text-warn-400' : 'text-ink-500'
                       }`}
                     >
-                      {entry.failed ? 'Did not print' : clockTime(entry.atMs)}
+                      {entry.failed ? t('didNotPrint') : clockTime(locale, entry.atMs)}
                     </span>
                   </button>
                 ))}
@@ -447,9 +472,9 @@ export function PrinterScreen({
             </summary>
             <div className="flex flex-col gap-4 px-4 pb-4">
               <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400 kiosk:text-base">Printer model</span>
+                <span className="text-sm text-ink-400 kiosk:text-base">{t('model')}</span>
                 <select
-                  aria-label="Printer model"
+                  aria-label={t('model')}
                   value={model}
                   onChange={(event) => onModelChange(event.target.value)}
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
@@ -461,15 +486,14 @@ export function PrinterScreen({
                   ))}
                 </select>
                 <span className="text-xs text-ink-500 kiosk:text-sm">
-                  Filled in from the printer when it was connected. It has to match the machine on
-                  the shelf, so change it if it does not.
+                  {t('modelHint')}
                 </span>
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400 kiosk:text-base">Loaded label</span>
+                <span className="text-sm text-ink-400 kiosk:text-base">{t('loadedLabel')}</span>
                 <select
-                  aria-label="Loaded label"
+                  aria-label={t('loadedLabel')}
                   value={labelIsAvailable ? label : (available[0]?.identifier ?? label)}
                   onChange={(event) => onLabelChange(event.target.value)}
                   className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
@@ -481,8 +505,7 @@ export function PrinterScreen({
                   ))}
                 </select>
                 <span className="text-xs text-ink-500 kiosk:text-sm">
-                  What is in the printer now, sensed when it was connected. Events describe what the
-                  label says, never its size.
+                  {t('loadedLabelHint')}
                 </span>
               </label>
 
@@ -492,7 +515,7 @@ export function PrinterScreen({
               {detection && detection.matched.length > 1 && (
                 <div className="rounded-xl bg-ink-950 p-4">
                   <div className="pb-2 text-sm text-ink-400 kiosk:text-base">
-                    The printer cannot tell these two apart. Which is on the spindle?
+                    {t('whichOnSpindle')}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {detection.matched.map((entry) => (
@@ -541,7 +564,7 @@ export function PrinterScreen({
             onToggle={(event) => setEventsOpen((event.target as HTMLDetailsElement).open)}
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
-              <span className="min-w-0 truncate">Recent printer events</span>
+              <span className="min-w-0 truncate">{t('recentEvents')}</span>
               <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
                 {eventsOpen ? 'Hide' : 'Show'}
               </span>
@@ -549,7 +572,7 @@ export function PrinterScreen({
             <div className="flex flex-col gap-3 px-4 pb-4">
               {events.length === 0 ? (
                 <div className="text-sm text-ink-500 kiosk:text-base">
-                  Nothing has been written down yet.
+                  {t('nothingWritten')}
                 </div>
               ) : (
                 <div
@@ -559,7 +582,7 @@ export function PrinterScreen({
                   {events.map((entry, index) => (
                     <div key={`${entry.t}-${index}`} className="flex gap-3">
                       <span className="w-16 shrink-0 text-ink-500">
-                        {printing.describeAge(entry.t, now)}
+                        {printing.describeAge(ages, entry.t, now)}
                       </span>
                       <span className="min-w-0 break-all">{printing.describeEntry(entry)}</span>
                     </div>
@@ -577,17 +600,17 @@ export function PrinterScreen({
                 </button>
                 {copied === 'failed' && (
                   <span className="text-xs text-ink-500 kiosk:text-sm">
-                    Copying is blocked on this device — select the text below instead.
+                    {t('copyBlocked')}
                   </span>
                 )}
                 <span aria-live="polite" className="sr-only">
-                  {copied === 'copied' ? 'Printer events copied to the clipboard' : ''}
+                  {copied === 'copied' ? t('eventsCopied') : ''}
                 </span>
               </div>
               {copied === 'failed' && (
                 <textarea
                   readOnly
-                  aria-label="Printer events"
+                  aria-label={t('events')}
                   rows={6}
                   value={printing.printerLogText()}
                   className="w-full rounded-lg bg-ink-950 p-3 font-mono text-xs text-ink-300"
@@ -618,7 +641,7 @@ export function PrinterScreen({
               })}
               className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
             >
-              Reprint a name tag
+              {t('reprint')}
             </button>
           )}
 
@@ -636,16 +659,16 @@ export function PrinterScreen({
               {...tap(() => void check())}
               className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
-              Check the printer
+              {t('checkPrinter')}
             </button>
             <button
               type="button"
               tabIndex={-1}
               disabled={busy || state.kind !== 'ready'}
-              {...tap(() => printing.testPrint())}
+              {...tap(() => printing.testPrint(locale))}
               className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
-              Print a test label
+              {t('testPrint')}
             </button>
           </div>
 
@@ -677,7 +700,7 @@ export function PrinterScreen({
                 {...tap(() => void lookAgain())}
                 className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
               >
-                Look again
+                {t('lookAgain')}
               </button>
             )}
             <button
@@ -687,7 +710,7 @@ export function PrinterScreen({
               {...tap(() => void connect())}
               className="rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
             >
-              {state.kind === 'ready' ? 'Choose a different printer' : 'Connect a printer'}
+              {state.kind === 'ready' ? t('chooseDifferent') : t('connectPrinter')}
             </button>
           </div>
         </div>
@@ -709,7 +732,7 @@ export function PrinterScreen({
           {...tap(onDone)}
           className="flex h-14 items-center justify-center rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
         >
-          Done
+          {t('done')}
         </button>
       </div>
     </div>

@@ -226,23 +226,41 @@ export function windowHasOpened(binding: KioskBinding, nowMs: number): boolean {
  * must not compete with.
  */
 /**
- * Built once, not per call.
+ * Built once per locale, not per call.
  *
  * `toLocaleTimeString` resolves its options into a formatter every time, and
  * this line is drawn by the search screen's header — so it was being rebuilt
  * twice on every render, which on a screen that re-renders per keystroke put it
  * among the kiosk's ten most expensive functions for a string that changes only
  * when the binding does. See docs/kiosk-performance.md.
+ *
+ * Keyed by locale rather than built once outright, because the kiosk's language
+ * is a *setting* — `LOCALES` is three long and a lobby changes its mind about
+ * once a year, so the map is a cache with no eviction to think about.
  */
-const CLOCK = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
+const CLOCKS = new Map<string, Intl.DateTimeFormat>();
 
-function clock(ms: number): string {
-  return CLOCK.format(new Date(ms));
+function clock(locale: string, ms: number): string {
+  let format = CLOCKS.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
+    CLOCKS.set(locale, format);
+  }
+  return format.format(new Date(ms));
 }
 
-export function eventWindow(binding: KioskBinding): string {
-  const start = clock(binding.startAtMs);
-  const end = clock(binding.endAtMs);
+/*
+ * The locale is passed in, never read from the environment.
+ *
+ * `Intl` defaults to the *browser's* language, and the kiosk's is a setting on
+ * the tablet — a lobby set to Chinese on a device sold in English would have
+ * shown the hours in English under a Chinese title, which is the half-translated
+ * screen this whole exercise exists to prevent. This module has no React in it,
+ * so the caller supplies it, exactly as it supplies the sentence below.
+ */
+export function eventWindow(locale: string, binding: KioskBinding): string {
+  const start = clock(locale, binding.startAtMs);
+  const end = clock(locale, binding.endAtMs);
   /*
    * Anchored, and the space optional, for formats `Intl` produces in locales
    * this build does not ship strings for — a meridiem that is not at the end is
@@ -265,15 +283,27 @@ export function eventWindow(binding: KioskBinding): string {
  * after supper" rather than as "this tablet is set to next week". The date is
  * the fact that makes a misbinding obvious to the one person who can fix it.
  */
-export function opensAtLabel(binding: KioskBinding, nowMs: number): string {
+export function opensAtLabel(
+  locale: string,
+  /**
+   * "{day} at {time}", from the catalogue.
+   *
+   * The connector is a word, and not the same word everywhere — Chinese puts
+   * the date first and needs none at all. This module has no React in it, so
+   * the caller hands the sentence in.
+   */
+  dayAtTime: (values: { day: string; time: string }) => string,
+  binding: KioskBinding,
+  nowMs: number,
+): string {
   const opensAtMs = binding.checkInOpensAtMs ?? binding.startAtMs;
   const opens = new Date(opensAtMs);
-  const at = clock(opensAtMs);
+  const at = clock(locale, opensAtMs);
   if (opens.toDateString() === new Date(nowMs).toDateString()) return at;
-  const day = opens.toLocaleDateString(undefined, {
+  const day = opens.toLocaleDateString(locale, {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
   });
-  return `${day} at ${at}`;
+  return dayAtTime({ day, time: at });
 }

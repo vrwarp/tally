@@ -13,7 +13,7 @@
  * to say has to be said on the row itself and read out with the row's own
  * label.
  */
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';

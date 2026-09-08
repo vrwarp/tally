@@ -12,8 +12,11 @@
  * than the roster underneath it.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { cn, gradeDescription, gradeName } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { gradeDescription, gradeName, type GradeStrings } from '@/lib/grades';
+import { useGrades } from '@/hooks/usePureStrings';
 import { GRADES, type Grade } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** Breathing room between the bottom of the panel and the bottom of the screen. */
 const PANEL_MARGIN = 12;
@@ -36,16 +39,29 @@ export interface GradeFilterProps {
   available?: readonly Grade[];
 }
 
-function summarise(grades: readonly Grade[]): string {
-  if (grades.length === 0) return 'All grades';
-  if (grades.length === 1) return gradeDescription(grades[0]!);
+/** The three keys the chip's summary needs, as a narrow function type. */
+type GradeFilterTranslator = (
+  key: 'allGrades' | 'someGrades',
+  values?: Record<string, number>,
+) => string;
+
+function summarise(
+  t: GradeFilterTranslator,
+  names: GradeStrings,
+  grades: readonly Grade[],
+): string {
+  if (grades.length === 0) return t('allGrades');
+  if (grades.length === 1) return gradeDescription(names, grades[0]!);
   // Past two, the ordinals are longer than the chip and get truncated to
   // something unreadable ("6th, 7th, 9…"), so the count carries it instead.
-  if (grades.length === 2) return grades.map((grade) => gradeName(grade)).join(', ');
-  return `${grades.length} grades`;
+  if (grades.length === 2) return grades.map((grade) => gradeName(names, grade)).join(', ');
+  return t('someGrades', { count: grades.length });
 }
 
 export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
+  const tCommon = useTranslations('Common');
+  const t = useTranslations('CheckIn');
+  const names = useGrades();
   /*
    * Always in `GRADES` order, and always including anything already selected —
    * a chip that is on must stay switchable off even if the roster moved out
@@ -130,7 +146,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={`Filter by grade, ${summarise(grades).toLowerCase()}`}
+        aria-label={t('gradeFilterAria', { summary: summarise(t, names, grades).toLowerCase() })}
         /* Inset, like the chips beside it — the sticky search band ends flush
            with the top of this row and painted over an outside ring. */
         className={cn(
@@ -140,7 +156,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
             : 'bg-ink-900 text-ink-400 inset-ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
         )}
       >
-        {summarise(grades)}
+        {summarise(t, names, grades)}
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-3.5">
           <path
             d="m5 8 5 5 5-5"
@@ -156,7 +172,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         <div
           id={panelId}
           role="group"
-          aria-label="Grades"
+          aria-label={tCommon('grades')}
           style={{ maxHeight }}
           /* Anchored right: the chip is pinned to the right-hand end of the
              filter row, and a left-anchored panel would hang off a phone and
@@ -167,7 +183,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         >
           <Option
             checked={grades.length === 0}
-            label="All grades"
+            label={t('allGrades')}
             onToggle={() => onChange([])}
           />
           <span aria-hidden="true" className="my-1 block h-px bg-ink-800" />
@@ -175,7 +191,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
             <Option
               key={grade}
               checked={grades.includes(grade)}
-              label={gradeDescription(grade)}
+              label={gradeDescription(names, grade)}
               onToggle={() => toggle(grade)}
             />
           ))}

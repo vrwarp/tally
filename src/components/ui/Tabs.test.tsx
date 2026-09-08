@@ -8,7 +8,7 @@
  * above it hides horizontal overflow, so the *page* scrolled sideways and took
  * every card and every call row off the right edge of the phone with it.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { TabBar } from '@/components/ui/Tabs';

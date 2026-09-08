@@ -12,7 +12,7 @@
  * `sanitizeKioskTheme` already refuses it; this checks nobody is ever asked.
  */
 import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { KioskThemeField } from '@/features/events/KioskThemeField';

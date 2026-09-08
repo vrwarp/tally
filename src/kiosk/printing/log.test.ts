@@ -19,6 +19,11 @@ import {
   isNoise,
   sanitizeData,
 } from '@/kiosk/printing/log';
+import { testTranslator } from '@/test/translator';
+import type { AgeStrings } from './log';
+
+// The real English catalogue, so these still measure what a volunteer reads.
+const ages = testTranslator('Printer') as unknown as AgeStrings;
 
 function stored(): unknown {
   return JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printerLog) ?? 'null');
@@ -212,7 +217,7 @@ describe('reading it back', () => {
 
 describe('how long ago', () => {
   const now = 1_700_000_000_000;
-  const ago = (seconds: number) => describeAge(now - seconds * 1000, now);
+  const ago = (seconds: number) => describeAge(ages, now - seconds * 1000, now);
 
   it('is coarse on purpose', () => {
     expect(ago(0)).toBe('just now');

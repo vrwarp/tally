@@ -20,27 +20,32 @@ import {
 } from '@/features/dashboard/followUpCsv';
 import { exportFilename } from '@/lib/csv';
 import type { OneOffOnlyStudent, OneOffRecap } from '@/features/dashboard/insights';
-import { formatRelative, formatShortDate } from '@/lib/time';
-import { gradeSentence, initials } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { gradeSentence } from '@/lib/grades';
 import { studentFullName } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface OneOffRecapListProps {
   items: readonly OneOffRecap[];
 }
 
 export function OneOffRecapList({ items, className }: OneOffRecapListProps & { className?: string }) {
+  const time = useTimeFormats();
+  const t = useTranslations('OneOff');
   return (
     <Card className={className}>
       <CardHeader
-        title="One-off events"
+        title={t('recapTitle')}
         count={items.length}
-        description="Retreats and trips. Head count on the day — there is nothing to compare it against."
+        description={t('recapDescription')}
       />
 
       {items.length === 0 ? (
         <EmptyState
-          title="No one-off events recently."
-          description="A retreat or a trip shows up here once somebody has been checked into it."
+          title={t('recapEmptyTitle')}
+          description={t('recapEmptyBody')}
         />
       ) : (
         <ul className="divide-y divide-ink-800">
@@ -57,11 +62,11 @@ export function OneOffRecapList({ items, className }: OneOffRecapListProps & { c
                   {item.event.title}
                 </span>
                 <span className="truncate text-xs text-ink-500">
-                  {formatShortDate(item.event.startAt)}, {formatRelative(item.event.startAt)}
+                  {time.shortDate(item.event.startAt)}, {time.relative(item.event.startAt)}
                 </span>
               </Link>
               <span className="shrink-0 text-right">
-                <span className="sr-only">{item.count} students checked in.</span>
+                <span className="sr-only">{t('checkedInSpoken', { count: item.count })}</span>
                 <span
                   aria-hidden="true"
                   className="block text-lg font-bold leading-tight tabular-nums text-ink-100"
@@ -77,7 +82,7 @@ export function OneOffRecapList({ items, className }: OneOffRecapListProps & { c
                   aria-hidden="true"
                   className="block text-[10px] uppercase tracking-wide text-ink-400"
                 >
-                  checked in
+                  {t('checkedInUnit')}
                 </span>
               </span>
             </li>
@@ -106,6 +111,9 @@ export function OneOffOnlyList({
   className,
   exportContext = NO_EXPORT_CONTEXT,
 }: OneOffOnlyListProps & { className?: string; exportContext?: FollowUpCsvContext }) {
+  const time = useTimeFormats();
+  const grades = useGrades();
+  const t = useTranslations('OneOff');
   if (items.length === 0) return null;
 
   const students = items.map((item) => item.student);
@@ -113,9 +121,9 @@ export function OneOffOnlyList({
   return (
     <Card className={className}>
       <CardHeader
-        title="Met once, never since"
+        title={t('onlyTitle')}
         count={items.length}
-        description="Came to a one-off and has not been to a regular gathering since."
+        description={t('onlyDescription')}
         action={
           // The same pair as every other list card. Presence and absence in
           // this slot look like a decision, so it has to be one: any list of
@@ -124,12 +132,12 @@ export function OneOffOnlyList({
           <>
             <CopyContactsButton
               students={students}
-              title={`Invite — ${items.length} we met once:`}
+              title={t('onlyExportTitle', { count: items.length })}
             />
             <ExportCsvButton
               build={() => ({
                 filename: exportFilename({ kind: 'follow-up', scope: 'met-once', at: new Date() }),
-                contents: buildOneOffOnlyCsv(items, exportContext),
+                contents: buildOneOffOnlyCsv(grades, items, exportContext),
               })}
               count={items.length}
               noun="students"
@@ -140,7 +148,7 @@ export function OneOffOnlyList({
 
       <ul className="divide-y divide-ink-800">
         {items.map((item) => {
-          const grade = gradeSentence(item.student);
+          const grade = gradeSentence(grades, item.student);
 
           return (
             <li key={item.student.id} className="px-3 py-2">
@@ -162,16 +170,24 @@ export function OneOffOnlyList({
                   <span className="truncate text-xs text-ink-500">
                     {/* Dropped, not replaced, when Planning Center holds no grade
                         for them: where and when they were met is the line. */}
-                    {grade ? `${grade} · ` : ''}
-                    met at {item.events[0]?.title} · {formatShortDate(item.metAt)},{' '}
-                    {formatRelative(item.metAt)}
+                    {grade
+                      ? t('metAtWithGrade', {
+                          grade,
+                          event: item.events[0]?.title ?? '',
+                          date: time.shortDate(item.metAt),
+                          relative: time.relative(item.metAt),
+                        })
+                      : t('metAt', {
+                          event: item.events[0]?.title ?? '',
+                          date: time.shortDate(item.metAt),
+                          relative: time.relative(item.metAt),
+                        })}
                   </span>
                 </Link>
 
                 <span className="shrink-0 rounded-xl bg-warn-500/10 px-2.5 py-1 text-center ring-1 ring-warn-500/25">
                   <span className="sr-only">
-                    {item.missedSince} regular {item.missedSince === 1 ? 'gathering' : 'gatherings'}{' '}
-                    since, none of them with this student in it.
+                    {t('missedSinceAria', { count: item.missedSince })}
                   </span>
                   <span
                     aria-hidden="true"
@@ -199,7 +215,7 @@ export function OneOffOnlyList({
                     aria-hidden="true"
                     className="block text-[10px] uppercase tracking-wide text-ink-400"
                   >
-                    {item.missedSince === 1 ? 'gathering since' : 'gatherings since'}
+                    {t('gatheringsSinceUnit', { count: item.missedSince })}
                   </span>
                 </span>
               </div>

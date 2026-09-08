@@ -23,6 +23,8 @@ import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/l
 import { birthdayMaskGhost, formatBirthdayInput } from '@/lib/birthdayInput';
 import { enqueueUpstreamEdit } from '@/services/upstreamEdits';
 import { backendLabelOf, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useBirthdayStrings } from '@/hooks/useBirthdayStrings';
 
 export interface BirthdayFieldProps {
   value: string;
@@ -64,12 +66,14 @@ export function BirthdayField({
   disabled,
   now,
 }: BirthdayFieldProps) {
-  const note = describeBirthdayField(value, { onFile, now });
+  const tCommon = useTranslations('Common');
+  const birthdayStrings = useBirthdayStrings();
+  const note = describeBirthdayField(birthdayStrings, value, { onFile, now });
   const wrong = error ?? (note.tone === 'bad' ? note.say : null);
 
   return (
     <MaskedField
-      label="Birthday"
+      label={tCommon('birthday')}
       value={value}
       onValueChange={onChange}
       format={formatBirthdayInput}
@@ -119,6 +123,8 @@ export interface EditBirthdayProps {
  * hang this off.
  */
 export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayProps) {
+  const birthdayStrings = useBirthdayStrings();
+  const t = useTranslations('ParentContact');
   const { show } = useToast();
   const { user, profile } = useAuth();
   // `undefined` is "the host has no details", not "no birthdate": a host that
@@ -129,7 +135,7 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    const read = readBirthdayField(text, { onFile: held });
+    const read = readBirthdayField(birthdayStrings, text, { onFile: held });
     if (!read.ok) {
       setProblem(read.error);
       return;
@@ -169,11 +175,11 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
         authorName: profile?.displayName ?? user?.email ?? 'Somebody',
       });
       void written.catch(() => {
-        setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
+        setProblem(t('backendUnreachable', { backend: backendLabelOf(student) }));
       });
       invalidatePersonDetails(student.id);
       onSaved?.();
-      show(`Saving ${student.firstName}\u2019s birthday to ${backendLabelOf(student)}.`);
+      show(t('savingBirthday', { name: student.firstName, backend: backendLabelOf(student) }));
       onDone();
     } catch {
       setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
@@ -196,10 +202,10 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
       />
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onDone} disabled={busy}>
-          Cancel
+          {t('cancel')}
         </Button>
         <Button onClick={() => void save()} loading={busy}>
-          Save to {backendLabelOf(student)}
+          {t('saveTo', { backend: backendLabelOf(student) })}
         </Button>
       </div>
     </div>

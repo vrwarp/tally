@@ -19,6 +19,7 @@
 import { PlanningCenterErrorDetails } from '@/components/PlanningCenterErrorDetails';
 import { Button, ErrorBanner } from '@/components/ui';
 import { useData } from '@/context/dataContext';
+import { useLocale, useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
 export interface RosterErrorBannerProps {
@@ -27,6 +28,8 @@ export interface RosterErrorBannerProps {
 
 export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
   const { students, rosterError, rosterBackends, rosterLoading, refreshRoster } = useData();
+  const t = useTranslations();
+  const locale = useLocale();
 
   if (!rosterError) {
     /*
@@ -39,7 +42,14 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
     const down = (rosterBackends ?? []).filter((entry) => !entry.ok);
     if (down.length === 0) return null;
 
-    const names = down.map((entry) => entry.displayName).join(' and ');
+    /*
+     * `Intl.ListFormat` rather than `join(' and ')`: the conjunction and the
+     * separators are a property of the language — 和 and 、 in Chinese — and
+     * this list is one or two backend names, never a sentence to translate.
+     */
+    const names = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(
+      down.map((entry) => entry.displayName),
+    );
     return (
       <div
         role="status"
@@ -48,10 +58,7 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
           className,
         )}
       >
-        <p>
-          {names} could not be reached. Students from there may be missing or out of date until it
-          answers again; everything else on this roster is current.
-        </p>
+        <p>{t('Roster.backendDown', { names })}</p>
         <div className="flex items-center gap-2">
           <Button
             size="sm"
@@ -59,7 +66,7 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
             loading={rosterLoading}
             onClick={() => void refreshRoster(true)}
           >
-            Try again
+            {t('Errors.tryAgain')}
           </Button>
         </div>
       </div>
@@ -78,9 +85,7 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
       details={
         <>
           <p className="text-ink-400">
-            {showingSomething
-              ? 'These names are the roster this device saved earlier. Check-in still works, and anyone added since will be missing until the connection comes back.'
-              : 'Nobody can be shown until the roster source answers. Students already on the roster have not been lost — Tally simply cannot read their names right now.'}
+            {showingSomething ? t('Roster.staleShowing') : t('Roster.staleEmpty')}
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -89,7 +94,7 @@ export function RosterErrorBanner({ className }: RosterErrorBannerProps) {
               loading={rosterLoading}
               onClick={() => void refreshRoster(true)}
             >
-              Try again
+              {t('Errors.tryAgain')}
             </Button>
           </div>
           <PlanningCenterErrorDetails report={rosterError} />

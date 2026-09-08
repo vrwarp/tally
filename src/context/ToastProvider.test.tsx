@@ -16,7 +16,7 @@
  * unmount — or a toast dismissed by hand still fires its own dismissal later,
  * against whatever id has since been minted.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_DURATION_MS,

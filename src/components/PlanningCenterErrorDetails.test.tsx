@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@/test/rtl';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlanningCenterErrorDetails } from '@/components/PlanningCenterErrorDetails';
 import type { PcoErrorReport } from '@/types';

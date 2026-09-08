@@ -19,7 +19,7 @@
  * direction: a leader filling in a blank birthday can type the year, which goes
  * upstream and is never sent back.
  */
-import { differenceInCalendarDays, format } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 
 export type BirthdayState =
   /** Today. */
@@ -215,26 +215,47 @@ export function birthdayState(birthday: string | null | undefined, now: Date): B
   return days >= -BIRTHDAY_WINDOW_DAYS ? 'recent' : 'quiet';
 }
 
-/** "14 Mar" — the badge's own label, sized for a roster lane. */
-export function formatBirthdayShort(birthday: string | null | undefined, now: Date): string | null {
+/**
+ * "Mar 14" — the badge's own label, sized for a roster lane.
+ *
+ * Through `Intl` rather than a `d MMM` pattern, so a Chinese roster reads
+ * 3月14日 rather than an English day-then-month. English changes order with it:
+ * these used to be the only day-first dates in the app, and every other one —
+ * the calendar, the register, the last-seen column — has always been month
+ * first.
+ */
+export function formatBirthdayShort(
+  locale: string,
+  birthday: string | null | undefined,
+  now: Date,
+): string | null {
   const parsed = birthdayParts(birthday);
   if (!parsed) return null;
-  return format(nearestOccurrence(parsed, now), 'd MMM');
+  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
+    nearestOccurrence(parsed, now),
+  );
 }
 
 /**
- * "14 March" — for a sentence, where there is room to say it properly. With the
- * year, when the caller was given one: "14 March 2011".
+ * "March 14" — for a sentence, where there is room to say it properly. With the
+ * year, when the caller was given one: "March 14, 2011".
  *
  * The year is never invented and never dropped. A roster row has none to print,
  * and the details read only carries one where Planning Center holds a real one
  * — its 1885 for "nobody knows" arrives here as a bare `MM-DD`, so an unknown
  * year cannot come out of this as a date of birth.
  */
-export function formatBirthdayLong(birthday: string | null | undefined): string | null {
+export function formatBirthdayLong(
+  locale: string,
+  birthday: string | null | undefined,
+): string | null {
   const parsed = parseBirthday(birthday);
   if (!parsed) return null;
   // Any leap year, so 29 February is a real date to format rather than 1 March.
   const on = new Date(parsed.year ?? 2024, parsed.month - 1, parsed.day);
-  return format(on, parsed.year === null ? 'd MMMM' : 'd MMMM yyyy');
+  return new Intl.DateTimeFormat(locale, {
+    month: 'long',
+    day: 'numeric',
+    ...(parsed.year === null ? {} : { year: 'numeric' }),
+  }).format(on);
 }

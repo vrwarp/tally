@@ -24,6 +24,7 @@ import { Link } from 'react-router-dom';
 import { useParentContactHost } from '@/features/students/parentContactHostContext';
 import { cn } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** The warn-tinted pill these rows have always used. */
 const PILL =
@@ -46,6 +47,7 @@ export function AddParentContactButton({
   onAdded,
   className,
 }: AddParentContactButtonProps) {
+  const t = useTranslations('FollowUp');
   const host = useParentContactHost();
   const name = studentFullName(student);
 
@@ -59,11 +61,11 @@ export function AddParentContactButton({
     return (
       <Link
         to={`/students/${student.id}`}
-        aria-label={`Add a contact for ${name}`}
+        aria-label={t('addContactAria', { name })}
         className={cn(PILL, className)}
       >
         <span aria-hidden="true">＋</span>
-        Add a contact
+        {t('addContact')}
       </Link>
     );
   }
@@ -72,11 +74,11 @@ export function AddParentContactButton({
     <button
       type="button"
       onClick={() => host.open(student, onAdded)}
-      aria-label={`Add a contact for ${name}`}
+      aria-label={t('addContactAria', { name })}
       className={cn(PILL, className)}
     >
       <span aria-hidden="true">＋</span>
-      Add a contact
+      {t('addContact')}
     </button>
   );
 }

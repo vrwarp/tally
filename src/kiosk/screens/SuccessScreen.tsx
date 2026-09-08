@@ -13,16 +13,22 @@
  * them, and a sequence of screens is a sequence nobody watches to the end.
  */
 import { useEffect, useRef } from 'react';
+import { useLocale, useTranslations } from 'use-intl';
 import { useTap } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
 
 const AUTO_RETURN_MS = 4000;
 
-/** "Ada", "Ada and Marcus", "Ada, Marcus and Grace". */
-function joinNames(names: readonly string[]): string {
+/**
+ * "Ada", "Ada and Marcus", "Ada, Marcus and Grace".
+ *
+ * `Intl.ListFormat` rather than a join, because Chinese separates a list with
+ * 、 and joins the last with 和 — neither of which a comma-and-"and" can reach.
+ */
+function joinNames(locale: string, names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
 }
 
 export function SuccessScreen({
@@ -35,6 +41,9 @@ export function SuccessScreen({
   intent: KioskIntent;
   onDone: () => void;
 }) {
+  const t = useTranslations('Confirm');
+  const tDoor = useTranslations('Door');
+  const locale = useLocale();
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
   const tap = useTap();
@@ -46,7 +55,7 @@ export function SuccessScreen({
 
   const checkedOut = intent === 'check-out';
   const many = students.length > 1;
-  const names = joinNames(students.map((student) => student.firstName));
+  const names = joinNames(locale, students.map((student) => student.firstName));
 
   return (
     <div
@@ -68,13 +77,13 @@ export function SuccessScreen({
         <div className={`font-bold text-ink-50 ${many ? 'text-4xl' : 'text-5xl'}`}>{names}</div>
         <div className="pt-3 text-2xl text-ink-300">
           {checkedOut
-            ? `${many ? 'are' : 'is'} checked out. See you next time!`
+            ? t('checkedOutTick', { count: students.length })
             : intent === 'done'
-              ? `${many ? 'were' : 'was'} already checked in.`
-              : `${many ? 'are' : 'is'} checked in. Welcome!`}
+              ? t('alreadyTick', { count: students.length })
+              : t('checkedInTick', { count: students.length })}
         </div>
       </div>
-      <div className="text-lg text-ink-500">Tap anywhere to carry on</div>
+      <div className="text-lg text-ink-500">{tDoor('tapToCarryOn')}</div>
     </div>
   );
 }

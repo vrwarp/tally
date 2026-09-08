@@ -11,7 +11,7 @@
  * comes from the roster row and the binding — which is all the kiosk has, and
  * all it is meant to have.
  */
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import type { LabelTokenValues } from '@/lib/labelTemplate';
 import { splitFirstName } from '@/types';
 import type { KioskBinding } from '../binding';
@@ -27,7 +27,20 @@ import type { KioskStudent } from '../search';
  * kiosk that never looked prints the same tidy label as one for a child with
  * nothing on file.
  */
-export function tokenValuesFor(student: KioskStudent, binding: KioskBinding): LabelTokenValues {
+export function tokenValuesFor(
+  grades: GradeStrings,
+  /**
+   * The kiosk's language, for the two tokens `Intl` writes.
+   *
+   * Passed rather than defaulted, on the same argument as `grades`: a lobby set
+   * to Chinese on a tablet sold in English would otherwise print `Sep 7` under
+   * a name in Chinese, and the language of the sticker is the language of the
+   * room. See `eventWindow` in `../binding.ts`.
+   */
+  locale: string,
+  student: KioskStudent,
+  binding: KioskBinding,
+): LabelTokenValues {
   const now = new Date();
   // `student.firstName` is the composite the roster row displays — `Benson
   // “蔡秉洲”` — because that is what makes both spellings searchable. A sticker
@@ -45,9 +58,9 @@ export function tokenValuesFor(student: KioskStudent, binding: KioskBinding): La
     // child with no surname on the roster then gets nothing rather than a stray
     // dot. See `fillLabelTokens`.
     lastInitial: student.lastName ? student.lastName.slice(0, 1).toUpperCase() : '',
-    grade: student.grade === null ? '' : gradeDescription(student.grade),
+    grade: student.grade === null ? '' : gradeDescription(grades, student.grade),
     eventTitle: binding.title,
-    date: now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    time: now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+    date: now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+    time: now.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
   };
 }

@@ -101,7 +101,7 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   await change.waitFor({ timeout: 30_000 });
   await change.click();
 
-  const writeBack = page.getByLabel('Write-back');
+  const writeBack = page.getByLabel('What Tally may change');
   await writeBack.waitFor({ timeout: 30_000 });
   await writeBack.selectOption('full');
   await show(writeBack);
@@ -116,7 +116,7 @@ test('capture the parent flows', async ({ page, signedInAs }) => {
   await expect(page.getByRole('button', { name: 'Change' }).first()).toBeVisible({
     timeout: 30_000,
   });
-  await show(page.getByText(/^Write-back$/i).first());
+  await show(page.getByText(/^What Tally may change$/i).first());
   await capture(page, {
     flow: 'Setting up',
     title: 'What full write-back means',

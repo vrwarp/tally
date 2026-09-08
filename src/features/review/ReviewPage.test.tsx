@@ -7,7 +7,7 @@
  * asserted below is something somebody would otherwise get wrong at speed on a
  * Tuesday.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -109,7 +109,7 @@ describe('what a reviewer sees', () => {
     // record goes, two hours is not, and a reviewer can only weigh one of those.
     // The badge carries the number; the strip carries what it costs.
     expect(await screen.findByText(/2 days left/i)).toBeInTheDocument();
-    expect(screen.getByText(/the phone number goes with it/i)).toBeInTheDocument();
+    expect(screen.getByText(/this card and the phone number are deleted/i)).toBeInTheDocument();
   });
 
   it('puts the family closest to being swept first, whatever the server sorted by', async () => {
@@ -824,7 +824,7 @@ describe('choosing who a child is', () => {
      * naming the id is what turns a rule re-run at press time into an
      * instruction the backend verifies and refuses if it has gone stale.
      */
-    expect(await screen.findByText(/The one we would link by default/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Tally.s closest match/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Approve and add/i }));
     await user.click(screen.getByRole('button', { name: /^Yes — add/i }));
 
@@ -852,7 +852,7 @@ describe('choosing who a child is', () => {
     // The backend resolves this by taking the oldest, which is a coin toss it
     // should not make with somebody sitting here. Neither is pre-selected.
     expect(await screen.findByRole('button', { name: /Approve and add/i })).toBeDisabled();
-    expect(screen.queryByText(/The one we would link by default/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tally.s closest match/i)).not.toBeInTheDocument();
   });
 
   it('sends "none of them" as a decision that suppresses the backend’s own guess', async () => {
@@ -945,7 +945,7 @@ describe('choosing who a child is', () => {
     mount();
 
     expect(
-      await screen.findByText(/Linked automatically to Robin Fields/i),
+      await screen.findByText(/matched them to Robin Fields/i),
     ).toBeInTheDocument();
   });
 });

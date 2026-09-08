@@ -6,7 +6,7 @@
  * of what these assert is that it stays an exception — closed until asked for,
  * skippable once open, and never able to turn a check-in into a failure.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';
@@ -142,7 +142,7 @@ describe('the contact', () => {
     // The child is on the roster whatever happens next, so the sentence names
     // what actually did not land. "Could not save Robin" would send a counselor
     // back to add a student who is already there.
-    expect(await screen.findByText(/contact did not save/i)).toBeInTheDocument();
+    expect(await screen.findByText(/details did not save/i)).toBeInTheDocument();
     expect(screen.queryByText(/could not save Robin/i)).not.toBeInTheDocument();
   });
 

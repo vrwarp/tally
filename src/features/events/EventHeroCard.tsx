@@ -14,10 +14,14 @@
  */
 import { Link } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
-import { formatEventDay, formatEventWindow, isCheckInOpen } from '@/lib/time';
+import {
+  isCheckInOpen,
+} from '@/lib/time';
 import { eventStatusLine } from '@/features/events/eventStatus';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats, useTimeStrings } from '@/hooks/useTimeFormats';
 
 export interface EventHeroCardProps {
   event: TallyEvent;
@@ -60,6 +64,10 @@ export function EventHeroCard({
   density = 'full',
   className,
 }: EventHeroCardProps) {
+  const time = useTimeFormats();
+  const timeStrings = useTimeStrings();
+  const t = useTranslations('EventHero');
+  const tStatus = useTranslations('EventStatus');
   const cancelled = event.status === 'cancelled';
   const open = isCheckInOpen(event, now) && !cancelled;
   const compact = density === 'compact';
@@ -99,9 +107,19 @@ export function EventHeroCard({
             {event.title}
           </h3>
           <p className="mt-0.5 text-sm text-ink-400">
-            {showDay ? `${formatEventDay(event.startAt, now)} · ` : ''}
-            {formatEventWindow(event)}
-            {event.location ? ` · ${event.location}` : ''}
+            {(() => {
+              const day = time.eventDay(event.startAt, now);
+              const window = time.eventWindow(event);
+              const location = event.location;
+              if (showDay) {
+                return location
+                  ? t('whenDayWindowLocation', { day, window, location })
+                  : t('whenDayWindow', { day, window });
+              }
+              return location
+                ? t('whenWindowLocation', { window, location })
+                : t('whenWindow', { window });
+            })()}
           </p>
         </div>
       </div>
@@ -114,10 +132,10 @@ export function EventHeroCard({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {cancelled ? <Badge tone="danger">Cancelled</Badge> : null}
-        {open ? <Badge tone="success">Check-in open</Badge> : null}
-        {event.requiresRsvp ? <Badge tone="warn">RSVP only</Badge> : null}
-        {event.requiresCheckOut ? <Badge tone="neutral">Check-out</Badge> : null}
+        {cancelled ? <Badge tone="danger">{t('cancelled')}</Badge> : null}
+        {open ? <Badge tone="success">{t('checkInOpen')}</Badge> : null}
+        {event.requiresRsvp ? <Badge tone="warn">{t('rsvpOnly')}</Badge> : null}
+        {event.requiresCheckOut ? <Badge tone="neutral">{t('checkOut')}</Badge> : null}
         {/*
           Said once.
 
@@ -130,7 +148,7 @@ export function EventHeroCard({
           the same way.
         */}
         {open || cancelled ? null : (
-          <span className="text-xs text-ink-500">{eventStatusLine(event, now, present)}</span>
+          <span className="text-xs text-ink-500">{eventStatusLine(tStatus, timeStrings, event, now, present)}</span>
         )}
       </div>
 

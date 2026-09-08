@@ -14,7 +14,9 @@ import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { buildContactList } from '@/features/dashboard/contactList';
+import { useGrades } from '@/hooks/usePureStrings';
 import { backendLabelOf, studentFullName, type Student } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /** `tel:`/`sms:` want a dialable string, not "(555) 010-0100". */
 function dialable(phone: string): string {
@@ -80,6 +82,8 @@ function ContactAdultButton({
   student: Student;
   details: { contactName?: string | null; contactPhone?: string | null; contactEmail?: string | null };
 }) {
+  const t = useTranslations('FollowUp');
+  const tCommon = useTranslations('Common');
   const [open, setOpen] = useState(false);
   const { show } = useToast();
 
@@ -97,21 +101,21 @@ function ContactAdultButton({
    * neighbour who drives on Fridays, and the upstream read that finds them
    * accepts any family relation flagged as an emergency contact.
    */
-  const heading = contactName || `Contact for ${name}`;
-  const inSentence = contactName || 'the contact on file';
+  const heading = contactName || t('contactFor', { name });
+  const inSentence = contactName || t('theContactOnFile');
 
   /** The same guard `CopyContactsButton` uses: absent on http and in some
       in-app browsers, and saying so beats silently doing nothing. */
   const copyNumber = async () => {
     if (!navigator.clipboard) {
-      show('Copying is blocked on this device.', { tone: 'error' });
+      show(t('copyBlocked'), { tone: 'error' });
       return;
     }
     try {
       await navigator.clipboard.writeText(formatPhone(phone));
-      show(contactName ? `Copied ${contactName}'s number` : 'Copied the number');
+      show(contactName ? t('copiedNamedNumber', { contact: contactName }) : t('copiedNumber'));
     } catch {
-      show('Could not copy the number.', { tone: 'error' });
+      show(t('copyNumberFailed'), { tone: 'error' });
     }
   };
 
@@ -138,16 +142,16 @@ function ContactAdultButton({
         onClick={() => setOpen(true)}
         /* The row says which child this is; the button's own label must too, or
            a screen reader on a call list hears a run of identical controls. */
-        aria-label={`Contact the adult for ${name}`}
+        aria-label={t('contactAdultAria', { name })}
       >
-        Contact adult
+        {t('contactAdult')}
       </Button>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title={heading}
-        description={`About ${name}`}
+        description={t('about', { name })}
         size="sm"
         /*
           The way out is the quietest thing here, not the loudest.
@@ -160,7 +164,7 @@ function ContactAdultButton({
         */
         footer={
           <Button variant="ghost" onClick={() => setOpen(false)}>
-            Close
+            {tCommon('close')}
           </Button>
         }
       >
@@ -175,22 +179,22 @@ function ContactAdultButton({
                 {formatPhone(phone)}
               </p>
               <Button variant="ghost" size="sm" onClick={copyNumber}>
-                Copy number
+                {t('copyNumber')}
               </Button>
               <div className="flex gap-2 [&>*]:flex-1">
                 <ActionLink
                   href={`tel:${dialable(phone)}`}
-                  label={`Call ${inSentence} about ${name} at ${formatPhone(phone)}`}
+                  label={t('callAria', { contact: inSentence, name, phone: formatPhone(phone) })}
                   icon="📞"
                 >
-                  Call
+                  {tCommon('call')}
                 </ActionLink>
                 <ActionLink
                   href={`sms:${dialable(phone)}`}
-                  label={`Text ${inSentence} about ${name} at ${formatPhone(phone)}`}
+                  label={t('textAria', { contact: inSentence, name, phone: formatPhone(phone) })}
                   icon="💬"
                 >
-                  Text
+                  {tCommon('text')}
                 </ActionLink>
               </div>
             </div>
@@ -201,10 +205,10 @@ function ContactAdultButton({
               <p className="break-all text-center text-sm text-ink-200">{email}</p>
               <ActionLink
                 href={`mailto:${email}`}
-                label={`Email ${inSentence} about ${name} at ${email}`}
+                label={t('emailAria', { contact: inSentence, name, email })}
                 icon="✉"
               >
-                Email
+                {tCommon('email')}
               </ActionLink>
             </div>
           ) : null}
@@ -268,6 +272,8 @@ export interface FollowUpActionsProps {
  * in a sheet four lines tall.
  */
 export function FollowUpActions({ student, className, onContactAdded }: FollowUpActionsProps) {
+  const t = useTranslations('FollowUp');
+  const tErrors = useTranslations('Errors');
   const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
 
   const name = studentFullName(student);
@@ -280,7 +286,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   if (unavailable) {
     body = (
       <p className="text-xs text-warn-400">
-        Not in {label} yet, so there is nobody to call. Add them there to follow up.
+        {t('notInBackend', { backend: label })}
       </p>
     );
   } else if (error) {
@@ -288,7 +294,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs text-danger-400">{error}</p>
         <Button variant="ghost" size="sm" onClick={retry}>
-          Try again
+          {tErrors('tryAgain')}
         </Button>
       </div>
     );
@@ -306,7 +312,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
      */
     body = (
       <p className="flex items-center gap-2 text-xs text-ink-500">
-        <Spinner /> Looking up contact…
+        <Spinner /> {t('lookingUp')}
       </p>
     );
   } else if (!details) {
@@ -315,8 +321,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
     // fixed in a different place.
     body = (
       <p className="text-xs text-warn-400">
-        {label} no longer has a record for {name} — deleted or merged there. Nobody can follow up
-        until that is sorted out.
+        {t('recordGone', { backend: label, name })}
       </p>
     );
   } else if (!phone && !email) {
@@ -402,7 +407,7 @@ export function FollowUpActions({ student, className, onContactAdded }: FollowUp
   return (
     <div
       role="group"
-      aria-label={`Contact for ${name}`}
+      aria-label={t('contactFor', { name })}
       className={cn('flex min-h-12 min-w-0 items-center', className)}
     >
       {body}
@@ -417,13 +422,15 @@ export interface CopyContactsButtonProps {
 }
 
 export function CopyContactsButton({ students, title }: CopyContactsButtonProps) {
+  const t = useTranslations('FollowUp');
+  const grades = useGrades();
   const { show } = useToast();
 
   const copy = async () => {
     // Absent on http origins and in a few in-app browsers; say so rather than
     // silently doing nothing.
     if (!navigator.clipboard) {
-      show('Copying is blocked on this device.', { tone: 'error' });
+      show(t('copyBlocked'), { tone: 'error' });
       return;
     }
 
@@ -431,12 +438,12 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
       // Names and grades only. Pulling contact details for everybody would mean
       // one Planning Center read per student to build a list that mostly gets
       // skimmed — and would put a screenful of adults' numbers on a clipboard.
-      await navigator.clipboard.writeText(buildContactList(title, students));
-      show(`Copied ${students.length} ${students.length === 1 ? 'name' : 'names'}`, {
+      await navigator.clipboard.writeText(buildContactList(t, grades, title, students));
+      show(t('copiedNames', { count: students.length }), {
         tone: 'success',
       });
     } catch {
-      show('Could not copy to the clipboard.', { tone: 'error' });
+      show(t('copyListFailed'), { tone: 'error' });
     }
   };
 
@@ -458,7 +465,7 @@ export function CopyContactsButton({ students, title }: CopyContactsButtonProps)
       // The ring is the touch affordance `ghost` gives up; see `ExportCsvButton`.
       className="shrink-0 whitespace-nowrap ring-1 ring-ink-800"
     >
-      Copy list
+      {t('copyList')}
     </Button>
   );
 }

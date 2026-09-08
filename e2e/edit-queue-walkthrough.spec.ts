@@ -241,7 +241,7 @@ test.describe('the edit queue, photographed', () => {
     await expect(page.getByRole('main').getByRole('status')).toContainText('Queued for Planning Center');
     await capture(page, {
       journey: 'The ordinary edit',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'Save returns; the wait is somebody else’s',
       caption:
         'The record already shows what was typed, marked as not upstream yet. Nothing has reached ' +
@@ -274,12 +274,12 @@ test.describe('the edit queue, photographed', () => {
     // Filtered to the rows this frame is about: the roster is alphabetical and
     // forty-nine long, so an unfiltered shot of it says nothing about the
     // edits — which is the whole reason the count is a filter and not a label.
-    await page.getByRole('button', { name: /In flight/ }).click();
+    await page.getByRole('button', { name: /Still sending/ }).click();
     await expect(page.getByRole('link', { name: /Adebayo-Cole/ })).toBeVisible();
     await expect(page.getByRole('listitem')).toHaveCount(3);
     await capture(page, {
       journey: 'The ordinary edit',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'Three edits in flight, from one glance',
       caption:
         'The counts are filters. Job marks are unfilled and dashed against the filled badges the ' +
@@ -330,7 +330,7 @@ test.describe('the edit queue, photographed', () => {
     await takeEditLease(sofia);
     await openProfile(page, sofia);
     await renameTo(page, 'Ramirez-Bell');
-    await expect(strip(page)).toContainText('Queued');
+    await expect(strip(page)).toContainText('Not sent yet');
     await page.getByRole('button', { name: 'Cancel this edit' }).click();
     await expect(strip(page)).toBeHidden();
     await capture(page, {
@@ -350,7 +350,7 @@ test.describe('the edit queue, photographed', () => {
     await takeEditLease(noah);
     await openProfile(page, noah);
     await renameTo(page, 'Fitzgerald-Ruiz');
-    await expect(strip(page)).toContainText('Queued');
+    await expect(strip(page)).toContainText('Not sent yet');
 
     const second = await browser.newContext();
     try {
@@ -363,7 +363,7 @@ test.describe('the edit queue, photographed', () => {
       await expect(other.getByRole('main').getByRole('status')).toContainText('Queued for');
       await capture(other, {
         journey: 'When two leaders share a roster',
-        state: 'Queued',
+        state: 'Not sent yet',
         title: 'Somebody else is already on this record',
         caption:
           'Marcus opens a child Dana is halfway through correcting. He sees her typed value, ' +
@@ -388,7 +388,7 @@ test.describe('the edit queue, photographed', () => {
     await leilaDialog.getByLabel(/^Notes/).fill('Leads the Sunday worship team.');
     await leilaDialog.getByRole('button', { name: 'Save changes' }).click();
     await expect(leilaDialog).toBeHidden();
-    await expect(strip(page)).toContainText('Queued');
+    await expect(strip(page)).toContainText('Not sent yet');
     // By role: the editor keeps the typed note in its textarea after closing,
     // so a bare text match finds the record *and* the hidden form.
     await expect(
@@ -396,7 +396,7 @@ test.describe('the edit queue, photographed', () => {
     ).toBeVisible();
     await capture(page, {
       journey: 'When two leaders share a roster',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'The note is already saved; the surname is still on its way',
       caption:
         'One Save, two destinations. Notes and roster status are Tally’s own and land instantly; ' +
@@ -493,7 +493,7 @@ test.describe('the edit queue, photographed', () => {
     await expect(strip(page)).toContainText('Taking longer than it should');
     await capture(page, {
       journey: 'When the far end is busy',
-      state: 'Still sending',
+      state: 'Taking longer',
       title: 'Longer than it should, and still not a failure',
       caption:
         'Five minutes in a state that usually lasts one second. It has to say so — silence here ' +
@@ -605,7 +605,7 @@ test.describe('the edit queue, photographed', () => {
     await openProfile(page, amara);
     await capture(page, {
       journey: 'When two people disagree',
-      state: 'Changed upstream',
+      state: 'Changed elsewhere',
       title: 'Somebody changed the same field first',
       caption:
         'Nothing was written. The profile write is a compare-and-set, so an edit that arrives ' +
@@ -627,7 +627,7 @@ test.describe('the edit queue, photographed', () => {
     await openProfile(page, camila);
     await capture(page, {
       journey: 'When the person moves',
-      state: 'Merged upstream',
+      state: 'Merged in the directory',
       title: 'The edit landed on somebody else',
       caption:
         'Both cells hold the same surname, because this is the quiet case: the survivor already ' +
@@ -647,7 +647,7 @@ test.describe('the edit queue, photographed', () => {
     await openProfile(page, jonah);
     await capture(page, {
       journey: 'When the person moves',
-      state: 'No upstream record',
+      state: 'Not in the directory',
       title: 'Deleted, and not merged into anybody',
       caption:
         'Different from a refusal: there is nothing to try again against. Re-creating sends the ' +
@@ -662,11 +662,11 @@ test.describe('the edit queue, photographed', () => {
      * things going right and wrong.
      */
     await gotoReady(page, '/students');
-    await page.getByRole('button', { name: /Needs you/ }).click();
+    await page.getByRole('button', { name: /Stuck/ }).click();
     await expect(page.getByRole('listitem').first()).toBeVisible();
     await capture(page, {
       journey: 'Down a list of forty-nine',
-      state: 'Needs you',
+      state: 'Stuck',
       title: 'Which of them are waiting on a human',
       caption:
         'The second count, and the one that answers the Sunday-morning question. A leader who ' +
@@ -771,7 +771,7 @@ test.describe('the edit queue, photographed', () => {
         SHAPE === 'both'
           ? 'When a church runs both databases'
           : 'When a church runs Attendees and not Planning Center',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'The same strip, naming the database that actually holds her',
       caption:
         'One queue, one state machine, one set of words — and not one sentence that says ' +
@@ -819,11 +819,11 @@ test.describe('the edit queue, photographed', () => {
       await renameTo(page, 'Raghunathan-Bell');
 
       await gotoReady(page, '/students');
-      await page.getByRole('button', { name: /In flight/ }).click();
+      await page.getByRole('button', { name: /Still sending/ }).click();
       await expect(page.getByRole('link', { name: /Adebayo-Cole/ })).toBeVisible();
       await capture(page, {
         journey: 'When a church runs both databases',
-        state: 'Queued',
+        state: 'Not sent yet',
         title: 'Two edits in flight, in two different directories',
         caption:
           'The count does not care which database a job is going to, and neither does the queue: ' +
@@ -871,7 +871,7 @@ test.describe('the edit queue, photographed', () => {
     await expect(strip(page)).toContainText('Queued for Planning Center');
     await capture(page, {
       journey: 'On a phone, which is where this happens',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'The whole state, stacked',
       caption:
         'Everything the laptop says, in a column: what is changing, who asked for it, that ' +
@@ -882,11 +882,11 @@ test.describe('the edit queue, photographed', () => {
 
     /* ---- the row ---------------------------------------------------------- */
     await gotoReady(page, '/students');
-    await page.getByRole('button', { name: /In flight/ }).click();
+    await page.getByRole('button', { name: /Still sending/ }).click();
     await expect(page.getByRole('link', { name: /Adebayo-Cole/ })).toBeVisible();
     await capture(page, {
       journey: 'On a phone, which is where this happens',
-      state: 'Queued',
+      state: 'Not sent yet',
       title: 'The word alone, on a 64px card',
       caption:
         'The mark rides in the row’s second line beside the grade, and it is the word without ' +

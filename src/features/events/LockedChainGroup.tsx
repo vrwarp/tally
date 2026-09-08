@@ -33,9 +33,10 @@
  */
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
 import { LockedEventRow } from '@/features/events/LockedEventRow';
 import { sharedDetail, sharedWeekday, type LockedChain } from '@/features/events/lockedChains';
+import { useTranslations } from 'use-intl';
+import { useTimeFormats, useTimeStrings, type TimeFormats } from '@/hooks/useTimeFormats';
 
 export interface LockedChainGroupProps {
   chain: LockedChain;
@@ -58,6 +59,8 @@ export interface LockedChainGroupProps {
  * to line up.
  */
 function SoloLockedRow({ chain, detail }: { chain: LockedChain; detail: string | null }) {
+  const t = useTranslations('Events');
+  const time = useTimeFormats();
   const event = chain.events[0]!;
 
   return (
@@ -75,10 +78,10 @@ function SoloLockedRow({ chain, detail }: { chain: LockedChain; detail: string |
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-ink-200">
-            <span className="sr-only">Not yours · </span>
+            <span className="sr-only">{t('notYoursPrefix')}</span>
             {chain.label}
             <span className="font-normal text-ink-400"> ·</span>{' '}
-            {format(event.startAt, 'EEE, MMM d')}
+            {time.weekdayDate(event.startAt)}
           </span>
           {detail ? (
             <span className="mt-0.5 block text-xs leading-snug text-ink-400">{detail}</span>
@@ -94,13 +97,22 @@ function SoloLockedRow({ chain, detail }: { chain: LockedChain; detail: string |
 }
 
 /** How the head names its date. A chain on one weekday has already said it. */
-function headDate(chain: LockedChain): string {
+function headDate(time: TimeFormats, chain: LockedChain): string {
   const anchor = chain.events[0]!;
-  return format(anchor.startAt, sharedWeekday(chain.events) ? 'EEE d' : 'EEE, MMM d');
+  return sharedWeekday(chain.events)
+    ? time.weekdayDay(anchor.startAt)
+    : time.weekdayDate(anchor.startAt);
 }
 
 export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedChainGroupProps) {
-  const detail = sharedDetail(chain.events);
+  const t = useTranslations('Events');
+  const timeStrings = useTimeStrings();
+  const time = useTimeFormats();
+  const detail = sharedDetail(
+    timeStrings,
+    (values) => t('chainDetail', values),
+    chain.events,
+  );
   const weekday = sharedWeekday(chain.events);
   const listId = useId();
 
@@ -138,9 +150,9 @@ export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedCha
               <span className="min-w-0 truncate">
                 {/* The count, for a reader who cannot see the right margin. It
                     is the same fact the `lg:` span below carries, said once. */}
-                <span className="sr-only">{`Not yours · ${chain.events.length} gatherings · `}</span>
+                <span className="sr-only">{t('notYoursChain', { count: chain.events.length })}</span>
                 {chain.label}
-                <span className="font-normal text-ink-400">{` · ${lead}`}</span> {headDate(chain)}
+                <span className="font-normal text-ink-400">{t('leadSuffix', { lead })}</span> {headDate(time, chain)}
               </span>
 
               {/*

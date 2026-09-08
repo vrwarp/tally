@@ -10,7 +10,7 @@
  * success overlay closing is one `setOverlay(null)` away from leaving the buffer
  * behind, and nothing else on screen would look wrong.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
@@ -142,7 +142,7 @@ async function tap(text: RegExp | string): Promise<void> {
 
 /** Dismiss the success screen the way a parent does — a tap anywhere on it. */
 async function tapSuccess(): Promise<void> {
-  const anywhere = screen.getByText(/tap anywhere to carry on/i);
+  const anywhere = screen.getByText(/tap anywhere to continue/i);
   await act(async () => {
     fireEvent.pointerDown(anywhere);
     fireEvent.pointerUp(anywhere);

@@ -11,7 +11,7 @@
  * the switch had already committed.
  */
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
@@ -141,7 +141,7 @@ describe('which state looks like the current one', () => {
 describe('what the sheet says before it writes', () => {
   it('counts the team on the option that is currently true', () => {
     show();
-    expect(screen.getByText('5 people can take this register.')).toBeInTheDocument();
+    expect(screen.getByText('5 people can take attendance here.')).toBeInTheDocument();
   });
 
   it('names who a restriction would keep, and how many would lose it', async () => {

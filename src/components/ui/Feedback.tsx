@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
+import { useTranslations } from 'use-intl';
 import { cn } from '@/lib/utils';
 
-export function Spinner({ className, label = 'Loading' }: { className?: string; label?: string }) {
+export function Spinner({ className, label }: { className?: string; label?: string }) {
+  const t = useTranslations('Common');
   return (
     <span
       role="status"
-      aria-label={label}
+      aria-label={label ?? t('loadingAria')}
       className={cn(
         'inline-block size-5 animate-spin rounded-full border-2 border-ink-600 border-t-brand-400',
         className,
@@ -14,11 +16,12 @@ export function Spinner({ className, label = 'Loading' }: { className?: string; 
   );
 }
 
-export function LoadingScreen({ message = 'Loading…' }: { message?: string }) {
+export function LoadingScreen({ message }: { message?: string }) {
+  const t = useTranslations('Common');
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 text-ink-400">
       <Spinner className="size-8" />
-      <p className="text-sm">{message}</p>
+      <p className="text-sm">{message ?? t('loading')}</p>
     </div>
   );
 }

@@ -22,6 +22,7 @@
  * toast context, and the `ui/` primitives do not.
  */
 import { useState } from 'react';
+import { useTranslations } from 'use-intl';
 import { Button, type ButtonProps } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/context/toastContext';
@@ -36,8 +37,15 @@ export interface ExportCsvButtonProps {
   build: () => { filename: string; contents: string };
   /** Rows in the file. Drives the disable, the label and the toast. */
   count: number;
-  /** The noun the toast uses: `students`, `check-ins`, `names`. */
-  noun: string;
+  /**
+   * What is being exported.
+   *
+   * A closed union rather than the English noun it used to be: the toast and
+   * the aria-label both put a count beside it, and "1 student" / "22 students"
+   * is a plural rule, not a string somebody can append an "s" to in every
+   * language. Each member has its own ICU-plural key.
+   */
+  noun: 'students' | 'check-ins';
   /**
    * Blocks the press and explains why — a roster read that failed, so there is
    * nothing honest to export. A reason rather than a boolean, because a
@@ -63,7 +71,7 @@ export function ExportCsvButton({
   noun,
   blockedReason,
   confirm,
-  label = 'Export CSV',
+  label,
   // Ghost by default, and that is the scope showing.
   //
   // On Insights these sit in a card header, above a column of `Call`/`Text`
@@ -83,7 +91,9 @@ export function ExportCsvButton({
   className,
 }: ExportCsvButtonProps) {
   const { show } = useToast();
+  const t = useTranslations('Export');
   const [busy, setBusy] = useState(false);
+  const buttonLabel = label ?? t('csv');
 
   const empty = count === 0;
   const disabled = empty || Boolean(blockedReason);
@@ -104,12 +114,17 @@ export function ExportCsvButton({
       if (downloadOpensInViewer()) {
         // The file was handed over; whether this browser saved it is another
         // matter, and saying so beats a success message that may be a lie.
-        show('Exported — this browser may show the file instead of saving it.', { tone: 'info' });
+        show(t('viewerWarning'), { tone: 'info' });
       } else {
-        show(`Downloaded ${count} ${count === 1 ? singular(noun) : noun}`, { tone: 'success' });
+        show(
+          noun === 'students'
+            ? t('downloadedStudents', { count })
+            : t('downloadedCheckIns', { count }),
+          { tone: 'success' },
+        );
       }
     } catch {
-      show('Could not save the file on this device.', { tone: 'error' });
+      show(t('failed'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -141,16 +156,14 @@ export function ExportCsvButton({
       className={cn(variant === 'ghost' && 'ring-1 ring-ink-800', className)}
       title={blockedReason ?? undefined}
       aria-label={
-        empty ? `${label} — nothing to export` : `${label} — ${count} ${noun}`
+        empty
+          ? t('ariaEmpty', { label: buttonLabel })
+          : noun === 'students'
+            ? t('ariaStudents', { label: buttonLabel, count })
+            : t('ariaCheckIns', { label: buttonLabel, count })
       }
     >
-      {label}
+      {buttonLabel}
     </Button>
   );
-}
-
-/** "1 student", not "1 students". Enough for the four nouns this takes. */
-function singular(noun: string): string {
-  if (noun.endsWith('ies')) return `${noun.slice(0, -3)}y`;
-  return noun.endsWith('s') ? noun.slice(0, -1) : noun;
 }

@@ -74,7 +74,24 @@ export interface KioskHue {
   /** Stored on the event, so it must not change. */
   name: string;
   /** What the picker calls it. */
-  label: string;
+  /**
+   * A key into `KioskTheme.*`, not the colour's name.
+   *
+   * This module is copied verbatim into the functions package and imports
+   * nothing — the same constraint `registrationFields.ts` lives under — so it
+   * names what the picker says rather than saying it. The server reads only
+   * `h`; the label is the app's.
+   */
+  labelKey:
+    | 'hueSky'
+    | 'hueIndigo'
+    | 'hueViolet'
+    | 'hueMagenta'
+    | 'hueBerry'
+    | 'hueEmber'
+    | 'hueAmber'
+    | 'hueForest'
+    | 'hueTeal';
   /** Degrees on the OKLCH hue circle. */
   h: number;
 }
@@ -88,15 +105,15 @@ export interface KioskHue {
  * round-trip through the colour maths. See `rotate`.
  */
 export const KIOSK_HUES: readonly KioskHue[] = [
-  { name: 'sky', label: 'Sky', h: 237 },
-  { name: 'indigo', label: 'Indigo', h: 265 },
-  { name: 'violet', label: 'Violet', h: 295 },
-  { name: 'magenta', label: 'Magenta', h: 340 },
-  { name: 'berry', label: 'Berry', h: 5 },
-  { name: 'ember', label: 'Ember', h: 55 },
-  { name: 'amber', label: 'Amber', h: 75 },
-  { name: 'forest', label: 'Forest', h: 150 },
-  { name: 'teal', label: 'Teal', h: 195 },
+  { name: 'sky', labelKey: 'hueSky', h: 237 },
+  { name: 'indigo', labelKey: 'hueIndigo', h: 265 },
+  { name: 'violet', labelKey: 'hueViolet', h: 295 },
+  { name: 'magenta', labelKey: 'hueMagenta', h: 340 },
+  { name: 'berry', labelKey: 'hueBerry', h: 5 },
+  { name: 'ember', labelKey: 'hueEmber', h: 55 },
+  { name: 'amber', labelKey: 'hueAmber', h: 75 },
+  { name: 'forest', labelKey: 'hueForest', h: 150 },
+  { name: 'teal', labelKey: 'hueTeal', h: 195 },
 ];
 
 /**

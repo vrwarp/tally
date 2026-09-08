@@ -39,6 +39,7 @@ import { DEFAULT_KIOSK_THEME, type KioskTheme } from '@/lib/kioskTheme';
 import { fetchKioskBackdrop, type StoredKioskBackdrop } from '@/services/kioskBackdrops';
 import { cn } from '@/lib/utils';
 import { painted } from './kioskPreview';
+import { useLocale, useTranslations } from 'use-intl';
 
 /**
  * What the form holds: nothing, the photograph the event already points at,
@@ -64,8 +65,8 @@ export interface KioskBackdropFieldProps {
  * that is a fact to meet on Tuesday rather than at 8:55 on Sunday.
  */
 const CROPS = [
-  { label: 'On a shelf', width: 1280, height: 800, box: { width: 232, height: 145 } },
-  { label: 'Stood on end', width: 800, height: 1280, box: { width: 91, height: 145 } },
+  { label: 'onAShelf', width: 1280, height: 800, box: { width: 232, height: 145 } },
+  { label: 'stoodOnEnd', width: 800, height: 1280, box: { width: 91, height: 145 } },
 ] as const;
 
 /**
@@ -114,11 +115,14 @@ function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSP
 }
 
 /** "12 Oct", for the conscience line. */
-function uploadedOn(date: Date): string {
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+function uploadedOn(locale: string, date: Date): string {
+  // The reader's language, not the browser's.
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 }
 
 export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFieldProps) {
+  const t = useTranslations('KioskBackdrop');
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,12 +176,12 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
 
   const summary =
     value.kind === 'none'
-      ? 'None'
+      ? t('summaryNone')
       : value.kind === 'new'
-        ? `New photo · ${describePrepared(value.prepared)}`
+        ? t('newPhoto', { detail: describePrepared(value.prepared) })
         : stored?.id === value.id && stored.image?.updatedAt
-          ? `Photo · uploaded ${uploadedOn(stored.image.updatedAt)}`
-          : 'Photo';
+          ? t('storedPhoto', { when: uploadedOn(locale, stored.image.updatedAt) })
+          : t('summaryPhoto');
 
   const pick = async (file: File | null) => {
     if (!file) return;
@@ -189,7 +193,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
       setError(
         thrown instanceof BackdropImageError
           ? thrown.message
-          : 'Couldn’t read that photo — try a different one.',
+          : t('readFailed'),
       );
     } finally {
       setBusy(false);
@@ -199,7 +203,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
   return (
     <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
       <span id={labelId} className="text-sm font-medium text-ink-300 pointer-fine:text-xs">
-        Kiosk photo
+        {t('fieldLabel')}
       </span>
 
       <button
@@ -298,13 +302,13 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                             className="relative text-[10px] leading-tight font-semibold"
                             style={{ color: colours['--color-ink-100'] }}
                           >
-                            Type a name
+                            {t('previewTypeAName')}
                           </div>
                           <div
                             className="relative text-[6px] leading-tight"
                             style={{ color: colours['--color-ink-300'] }}
                           >
-                            or the last 4 digits of your phone
+                            {t('previewOrPhone')}
                           </div>
                         </div>
                       </div>
@@ -325,7 +329,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                         ))}
                       </div>
                     </div>
-                    <span className="text-[10px] text-ink-500">{crop.label}</span>
+                    <span className="text-[10px] text-ink-500">{t(crop.label)}</span>
                   </div>
                 );
               })}
@@ -365,19 +369,13 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
            */}
           <div className="flex flex-col gap-1.5">
             <p className="text-xs leading-snug text-ink-500">
-              Photographs, not posters: no words in the image — the kiosk&rsquo;s own
-              instructions must stay the loudest thing on the glass.
+              {t('guidanceNoWords')}
             </p>
             <p className="text-xs leading-snug text-ink-500">
-              A child&rsquo;s face on this screen needs their parent&rsquo;s yes — it stands in a
-              public lobby all morning. Rooms, decorations and seasons work better than people.
-              Use a photo the church owns or took.
+              {t('guidanceConsent')}
             </p>
             <p className="text-xs leading-snug text-ink-500">
-              The kiosk&rsquo;s own words hold the top of the glass — deepest on a screen
-              stood on end, and never a promise of cover: the wide shelf shows more of the
-              photo than the tall one. The previews show exactly how much of each crop
-              stays clear.
+              {t('guidanceCrop')}
             </p>
           </div>
 
@@ -390,15 +388,14 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
               }}
               className="min-h-11 rounded-lg text-xs font-semibold text-ink-400 active:bg-ink-900 pointer-fine:min-h-8"
             >
-              No photo — colours only
+              {t('noPhoto')}
             </button>
           )}
         </div>
       ) : null}
 
       <p className="text-xs leading-snug text-ink-500">
-        Behind the kiosk&rsquo;s idle screen while it is bound to this gathering, and gone the
-        moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.
+        {t('fieldHint')}
       </p>
     </div>
   );

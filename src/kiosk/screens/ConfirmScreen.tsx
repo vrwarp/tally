@@ -56,13 +56,16 @@
  * things a parent came to this screen to do.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
-import { gradeDescription, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { tallyRender } from '../renderTally';
 import { HoldButton } from '../components/HoldButton';
 import type { ReprintOffer } from '../reprintOffer';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import type { KioskIntent } from '../KioskApp';
 import type { KioskStudent } from '../search';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useTranslations } from 'use-intl';
 
 /** A sibling row and the gap under it — the pitch the list quantises to. */
 const ROW_HEIGHT = 64;
@@ -119,10 +122,12 @@ export function ConfirmScreen({
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
 }) {
+  const grades = useGrades();
   tallyRender('ConfirmScreen');
   // Whose ticks start off. Decided by the caller — see `skippedFor` — because
   // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);
+  const t = useTranslations('Confirm');
   const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
@@ -188,7 +193,7 @@ export function ConfirmScreen({
             whose nearest noun was the child's name — "not this child, show me a
             different one", to exactly the parent this exists for. */}
         <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
-          {intent === 'check-out' ? 'Checking out anyone else?' : 'Anyone else?'}
+          {intent === 'check-out' ? t('checkingOutAnyoneElse') : t('anyoneElse')}
         </div>
 
         {family.length > 0 && (
@@ -274,7 +279,7 @@ export function ConfirmScreen({
         */}
         {unread > 0 && (
           <div className="shrink-0 pt-1 text-left text-xl text-brand-300">
-            {unread === 1 ? '1 more below' : `${unread} more below`}
+            {t('moreBelow', { count: unread })}
           </div>
         )}
 
@@ -306,7 +311,7 @@ export function ConfirmScreen({
                 20px semibold cap, and the label read as indented from its own
                 list. */}
             <span className="-ml-7 w-7 shrink-0 font-normal">+</span>
-            Another child
+            {t('anotherChild')}
             <span className="ml-auto pl-3 text-2xl font-normal">›</span>
           </button>
         )}
@@ -347,7 +352,7 @@ export function ConfirmScreen({
             {student.firstName} {student.lastName}
           </div>
           {student.grade !== null && (
-            <div className="pt-3 text-2xl text-ink-400">{gradeDescription(student.grade)}</div>
+            <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
           )}
         </div>
 
@@ -395,10 +400,10 @@ export function ConfirmScreen({
                  * `navigator.vibrate`, which the iPads these kiosks are do not
                  * implement, so silence is all they got.
                  */
-                strayHint="Lift, then hold again"
+                strayHint={t('liftThenHold')}
                 className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:px-8 kiosk:py-5 kiosk:text-xl"
               >
-                Hold to print a name tag
+                {t('holdToPrint')}
               </HoldButton>
             ) : reprintOffer === 'ask' ? (
               /*
@@ -408,7 +413,7 @@ export function ConfirmScreen({
                * second copy was possible at all.
                */
               <div className="text-base text-balance text-ink-400 kiosk:text-lg">
-                Name tags come from the check-in desk.
+                {t('tagsFromDesk')}
               </div>
             ) : (
               /*
@@ -427,10 +432,10 @@ export function ConfirmScreen({
                */
               <div className="w-full">
                 <div className="text-lg font-semibold text-brand-300 kiosk:text-xl">
-                  Name tag sent for {student.firstName}.
+                  {t('tagSentFor', { name: student.firstName })}
                 </div>
                 <div className="pt-2 text-base text-ink-400 kiosk:text-lg">
-                  For another, ask at the check-in desk.
+                  {t('forAnotherAsk')}
                 </div>
               </div>
             )}
@@ -451,7 +456,7 @@ export function ConfirmScreen({
           * *because they think they still need to check in* is aiming.
           */
         <div className="flex min-h-23 w-full shrink-0 items-center justify-center text-2xl font-semibold text-present-400">
-          ✓ Already checked in
+          {t('alreadyCheckedIn')}
         </div>
       ) : (
         /*
@@ -490,11 +495,11 @@ export function ConfirmScreen({
         >
           {intent === 'check-out'
             ? others > 0
-              ? `Check out all ${chosen.length}`
-              : 'Check out'
+              ? t('checkOutAll', { count: chosen.length })
+              : t('checkOut')
             : others > 0
-              ? `Check in all ${chosen.length}`
-              : 'Check in'}
+              ? t('checkInAll', { count: chosen.length })
+              : t('checkIn')}
         </button>
       )}
 
@@ -505,7 +510,7 @@ export function ConfirmScreen({
         className="mt-8 shrink-0 rounded-xl px-8 py-4 text-xl text-ink-400 active:bg-ink-800"
         style={{ touchAction: 'manipulation' }}
       >
-        ← Back
+        {t('back')}
       </button>
     </div>
   );

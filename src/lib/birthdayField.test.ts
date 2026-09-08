@@ -12,13 +12,22 @@
  */
 import { describe, expect, it } from 'vitest';
 import { birthdayFieldFrom, describeBirthdayField, readBirthdayField } from '@/lib/birthdayField';
+import { testTranslator } from '@/test/translator';
+import { DEFAULT_LOCALE } from '@/lib/locales';
+import type { BirthdayStrings } from '@/lib/birthdayField';
+
+// The real English catalogue, so these still assert the sentence under the box.
+const strings: BirthdayStrings = {
+  locale: DEFAULT_LOCALE,
+  t: testTranslator('Birthday') as unknown as BirthdayStrings['t'],
+};
 
 /** Friday 31 July 2026 — the day these are read against. */
 const NOW = new Date(2026, 6, 31, 9, 0);
 
-const read = (text: string, onFile: string | null) => readBirthdayField(text, { onFile, now: NOW });
+const read = (text: string, onFile: string | null) => readBirthdayField(strings, text, { onFile, now: NOW });
 const note = (text: string, onFile: string | null) =>
-  describeBirthdayField(text, { onFile, now: NOW });
+  describeBirthdayField(strings, text, { onFile, now: NOW });
 
 describe('birthdayFieldFrom', () => {
   it('opens on the day on file, in the shape the box holds it in', () => {
@@ -116,9 +125,9 @@ describe('readBirthdayField', () => {
 
 describe('describeBirthdayField', () => {
   it('says the date back, so a greedy reading is one somebody can correct', () => {
-    expect(note('112', '03-14').say).toMatch(/^2 November/);
-    expect(note('1214', null).say).toMatch(/^14 December/);
-    expect(note('12 / 14 / 2011', null)).toEqual({ tone: 'good', say: '14 December 2011.' });
+    expect(note('112', '03-14').say).toMatch(/^November 2/);
+    expect(note('1214', null).say).toMatch(/^December 14/);
+    expect(note('12 / 14 / 2011', null)).toEqual({ tone: 'good', say: 'December 14, 2011.' });
   });
 
   it('says which year a day on its own will be stored against', () => {
@@ -136,7 +145,7 @@ describe('describeBirthdayField', () => {
   it('names the year it is keeping when the box was shown one', () => {
     expect(note('4/2', '2011-03-14').say).toMatch(/keeping 2011/);
     expect(note('3/14/2011', '2011-03-14').say).toMatch(/already what Planning Center holds/);
-    expect(note('3/14/2012', '2011-03-14')).toEqual({ tone: 'good', say: '14 March 2012.' });
+    expect(note('3/14/2012', '2011-03-14')).toEqual({ tone: 'good', say: 'March 14, 2012.' });
   });
 
   it('stays quiet while a date is still being typed', () => {
@@ -175,23 +184,23 @@ describe('describeBirthdayField', () => {
   it('spells out the sentence for a day with no year', () => {
     expect(note('4/2', null)).toEqual({
       tone: 'good',
-      say: '2 April, with no year. Planning Center will show no age.',
+      say: 'April 2, with no year. Planning Center will show no age.',
     });
     expect(note('4/2', '03-14')).toEqual({
       tone: 'good',
-      say: '2 April, keeping the year Planning Center holds.',
+      say: 'April 2, keeping the year Planning Center holds.',
     });
-    expect(note('4/2', '2011-03-14')).toEqual({ tone: 'good', say: '2 April, keeping 2011.' });
+    expect(note('4/2', '2011-03-14')).toEqual({ tone: 'good', say: 'April 2, keeping 2011.' });
   });
 
   it('spells out the unchanged sentence, with and without a year', () => {
     expect(note('3/14', '03-14')).toEqual({
       tone: 'good',
-      say: '14 March — already what Planning Center holds.',
+      say: 'March 14 — already what Planning Center holds.',
     });
     expect(note('3/14/2011', '2011-03-14')).toEqual({
       tone: 'good',
-      say: '14 March 2011 — already what Planning Center holds.',
+      say: 'March 14, 2011 — already what Planning Center holds.',
     });
   });
 
@@ -227,9 +236,9 @@ describe('describeBirthdayField', () => {
     // Every screen that draws this passes `now`, and a future year is decided
     // against it. Falling back to the real clock would make the test that
     // proves it pass for the wrong reason.
-    expect(describeBirthdayField('3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).tone)
+    expect(describeBirthdayField(strings, '3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).tone)
       .toBe('bad');
-    expect(describeBirthdayField('3/14/2026', { onFile: null, now: NOW }).tone).toBe('good');
+    expect(describeBirthdayField(strings, '3/14/2026', { onFile: null, now: NOW }).tone).toBe('good');
   });
 });
 
@@ -272,9 +281,9 @@ describe('the sentences a refusal gets', () => {
   });
 
   it('reads against the caller’s clock', () => {
-    expect(readBirthdayField('3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).ok).toBe(
+    expect(readBirthdayField(strings, '3/14/2026', { onFile: null, now: new Date(2025, 0, 1) }).ok).toBe(
       false,
     );
-    expect(readBirthdayField('3/14/2026', { onFile: null, now: NOW }).ok).toBe(true);
+    expect(readBirthdayField(strings, '3/14/2026', { onFile: null, now: NOW }).ok).toBe(true);
   });
 });

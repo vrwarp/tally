@@ -18,7 +18,6 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
 import { Badge, EmptyState, ErrorBanner } from '@/components/ui';
 import { EventIcon } from '@/components/ui/EventIcon';
 import { LockedChainGroup } from '@/features/events/LockedChainGroup';
@@ -26,12 +25,29 @@ import { partitionBand } from '@/features/events/lockedChains';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
-import { formatEventWindow } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
+import { useLocale, useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
 
-/** "July 2026" — the ruler the rows hang off, so each row only needs a day. */
-const MONTH = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+/**
+ * "July 2026" — the ruler the rows hang off, so each row only needs a day.
+ *
+ * Built per locale rather than once, because the reader's language is a setting
+ * and `Intl`'s default is the browser's: a page switched to Chinese would
+ * otherwise hang Chinese rows off English month headings. `LOCALES` is three
+ * long, so the map is a cache with nothing to evict.
+ */
+const MONTHS = new Map<string, Intl.DateTimeFormat>();
+
+function monthLabel(locale: string, date: Date): string {
+  let format = MONTHS.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+    MONTHS.set(locale, format);
+  }
+  return format.format(date);
+}
 
 interface MonthGroup {
   key: string;
@@ -50,14 +66,14 @@ interface MonthGroup {
  * A ruler that scrolls off the top of the screen is not a ruler, which is why
  * the heading below is `sticky` — see the note on it.
  */
-function groupByMonth(events: readonly TallyEvent[]): MonthGroup[] {
+function groupByMonth(locale: string, events: readonly TallyEvent[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
 
   for (const event of events) {
     const key = `${event.startAt.getFullYear()}-${event.startAt.getMonth()}`;
     const last = groups.at(-1);
     if (last?.key === key) last.events.push(event);
-    else groups.push({ key, label: MONTH.format(event.startAt), events: [event] });
+    else groups.push({ key, label: monthLabel(locale, event.startAt), events: [event] });
   }
 
   return groups;
@@ -89,6 +105,7 @@ function AttendanceStat({
   count: number | undefined;
   locked?: boolean;
 }) {
+  const t = useTranslations('PastGatherings');
   if (event.status === 'cancelled') {
     return <Badge tone="danger">Cancelled</Badge>;
   }
@@ -105,7 +122,7 @@ function AttendanceStat({
     return (
       <span className="block text-right text-[11px] leading-tight text-ink-500">
         <span aria-hidden>🔒</span>
-        <span className="block">not yours</span>
+        <span className="block">{t('notYours')}</span>
       </span>
     );
   }
@@ -122,8 +139,8 @@ function AttendanceStat({
   if (count === 0) {
     return (
       <span className="block text-right text-[11px] leading-tight text-ink-500">
-        Nobody
-        <span className="block">checked in</span>
+        {t('nobody')}
+        <span className="block">{t('checkedInUnit')}</span>
       </span>
     );
   }
@@ -151,9 +168,9 @@ function AttendanceStat({
       <span aria-hidden="true" className="text-base font-bold tabular-nums text-ink-100">
         {count}
       </span>
-      <span className="sr-only">{count} students checked in</span>
+      <span className="sr-only">{t('spokenCount', { count })}</span>
       <span aria-hidden="true" className="block text-[11px] leading-none text-ink-400">
-        checked in
+        {t('checkedInUnit')}
       </span>
     </span>
   );
@@ -207,6 +224,8 @@ export function PastEventRow({
    */
   destination?: PastEventDestination;
 }) {
+  const time = useTimeFormats();
+  const t = useTranslations('PastGatherings');
   return (
     <li>
       <Link
@@ -220,7 +239,7 @@ export function PastEventRow({
           {/* A step closer than it was: with two series alternating down this
               list, the date is the only thing telling one row from another. */}
           <span className="mt-0.5 block truncate text-xs text-ink-400">
-            {format(event.startAt, 'EEE d')} · {formatEventWindow(event)}
+            {t('when', { day: time.weekdayDay(event.startAt), window: time.eventWindow(event) })}
           </span>
         </span>
 
@@ -241,6 +260,9 @@ export interface PastGatheringsProps {
 }
 
 export function PastGatherings({ before }: PastGatheringsProps) {
+  const t = useTranslations('PastGatherings');
+  const tErrors = useTranslations('Errors');
+  const locale = useLocale();
   const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
   const { canWork } = useData();
   /*
@@ -260,7 +282,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
     () => new Map(snapshots.map((snapshot) => [snapshot.event.id, snapshot.presentStudentIds.size])),
     [snapshots],
   );
-  const groups = useMemo(() => groupByMonth(events), [events]);
+  const groups = useMemo(() => groupByMonth(locale, events), [locale, events]);
 
   /*
    * The scroll sentinel.
@@ -312,13 +334,13 @@ export function PastGatherings({ before }: PastGatheringsProps) {
       {/* A half of the calendar, at the same rank as "Upcoming" opposite it —
           not a group inside one. */}
       <h2 id="past-gatherings" className="pb-3 text-lg font-bold text-ink-50">
-        Past gatherings
+        {t('title')}
       </h2>
 
       {empty ? (
         <EmptyState
-          title="Nothing has happened yet"
-          description="Gatherings appear here once they are past."
+          title={t('emptyTitle')}
+          description={t('emptyBody')}
         />
       ) : null}
 
@@ -404,7 +426,7 @@ export function PastGatherings({ before }: PastGatheringsProps) {
               onClick={retry}
               className="mt-2 block min-h-11 font-semibold underline underline-offset-4"
             >
-              Try again
+              {tErrors('tryAgain')}
             </button>
           }
         />
@@ -437,14 +459,14 @@ export function PastGatherings({ before }: PastGatheringsProps) {
           onClick={loadMore}
           className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
         >
-          Load older gatherings
+          {t('loadOlder')}
         </button>
       ) : null}
 
       {/* Left-aligned, like everything else in this column. */}
       {!hasMore && !loading && events.length > 0 ? (
         <p className="pt-4 pb-1 text-xs text-ink-500">
-          That is every gathering Tally has a record of.
+          {t('allLoaded')}
         </p>
       ) : null}
     </section>

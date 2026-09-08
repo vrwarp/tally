@@ -12,6 +12,7 @@
  */
 import type { KeyboardEventHandler, RefObject } from 'react';
 import { TextField } from '@/components/ui/Field';
+import { useTranslations } from 'use-intl';
 
 export interface SearchBarProps {
   value: string;
@@ -39,11 +40,12 @@ export interface SearchBarProps {
 export function SearchBar({
   value,
   onChange,
-  placeholder = 'Search students…',
+  placeholder,
   onQuickAdd,
   inputRef,
   onKeyDown,
 }: SearchBarProps) {
+  const t = useTranslations('CheckIn');
   /*
     Quick-add lives in the search band rather than floating over the list.
 
@@ -69,7 +71,7 @@ export function SearchBar({
     <button
       type="button"
       onClick={onQuickAdd}
-      aria-label="Quick add a visitor"
+      aria-label={t('quickAddAria')}
       className={
         'flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 ' +
         'text-2xl leading-none font-semibold text-brand-300 ring-1 ring-brand-500/30 ' +
@@ -85,7 +87,7 @@ export function SearchBar({
       {quickAdd}
       <div className="min-w-0 flex-1">
         <TextField
-          label="Search students by name"
+          label={t('searchAria')}
           labelHidden
           type="search"
           inputMode="search"
@@ -94,7 +96,7 @@ export function SearchBar({
           autoCorrect="off"
           autoComplete="off"
           spellCheck={false}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('searchPlaceholder')}
           value={value}
           inputRef={inputRef}
           onKeyDown={onKeyDown}

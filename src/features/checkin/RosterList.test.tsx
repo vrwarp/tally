@@ -14,7 +14,7 @@
  */
 import { createRef } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render } from '@/test/rtl';
 import { describe, expect, it, vi } from 'vitest';
 import { RosterList } from '@/features/checkin/RosterList';
 import { makeAttendance, makeStudent } from '../../../tests/factories';

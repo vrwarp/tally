@@ -14,7 +14,7 @@
  * network failure that reads as an answer, or a second sweep for a queue of
  * latecomers the cooldown should have collapsed into one.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
@@ -261,7 +261,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
     await type('grace');
     await quiet();
 
-    expect(screen.getByText(/Couldn.t reach the network/)).toBeTruthy();
+    expect(screen.getByText(/No connection just now/)).toBeTruthy();
     // Emphatically not "still no match": nobody looked.
     expect(noMatchLine()).toBe('No match — first time here?');
   });

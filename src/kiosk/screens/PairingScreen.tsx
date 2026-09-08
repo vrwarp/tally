@@ -10,6 +10,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 import { InstallPrompt } from '../components/InstallPrompt';
+import { LanguagePicker } from '../components/LanguagePicker';
+import { useTranslations } from 'use-intl';
 
 /** Exported so tests can drive the poll loop rather than wait through it. */
 export const POLL_MS = 2000;
@@ -44,13 +46,10 @@ type PairingTrouble = 'no-code' | 'stuck';
  * hands off to the one screen that *can* name a cause, rather than guessing at
  * one here.
  */
-const TROUBLE_TEXT: Record<PairingTrouble, string> = {
-  'no-code': 'Can’t reach Tally right now. Trying again shortly…',
-  stuck:
-    'This kiosk has its code, but the pairing isn’t completing. If a leader has already ' +
-    'approved it, they should open Tally, tap their name and choose Check-in kiosk, which ' +
-    'will say whether anything needs fixing.',
-};
+const TROUBLE_KEYS = {
+  'no-code': 'noCode',
+  stuck: 'stuck',
+} as const satisfies Record<PairingTrouble, 'noCode' | 'stuck'>;
 
 export function PairingScreen({
   services,
@@ -59,6 +58,7 @@ export function PairingScreen({
   services: KioskServices;
   onPaired: (uid: string) => void;
 }) {
+  const t = useTranslations('Pairing');
   const [code, setCode] = useState<string | null>(null);
   const [trouble, setTrouble] = useState<PairingTrouble | null>(null);
   const pairedRef = useRef(onPaired);
@@ -126,7 +126,7 @@ export function PairingScreen({
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
-      <div className="text-lg font-medium text-ink-400">Pair this kiosk</div>
+      <div className="text-lg font-medium text-ink-400">{t('title')}</div>
       {code ? (
         <>
           {/*
@@ -168,22 +168,40 @@ export function PairingScreen({
             * every active member; see `docs/refinements.md`.
             */}
           <div className="max-w-md text-lg leading-relaxed text-ink-300">
-            In Tally, tap your name and choose{' '}
-            <span className="font-semibold text-ink-100">Kiosk</span>, then enter this code.
+            {t.rich('howTo', {
+              kiosk: (chunks) => <span className="font-semibold text-ink-100">{chunks}</span>,
+            })}
           </div>
           {/* The code stays up: it is still the right code, and a leader may be
               mid-approval. This only adds why nothing is happening. */}
           {trouble ? (
             <div className="max-w-md text-base leading-relaxed text-warn-400">
-              {TROUBLE_TEXT[trouble]}
+              {t(TROUBLE_KEYS[trouble])}
             </div>
           ) : null}
         </>
       ) : trouble ? (
-        <div className="max-w-md text-lg text-ink-300">{TROUBLE_TEXT[trouble]}</div>
+        <div className="max-w-md text-lg text-ink-300">{t(TROUBLE_KEYS[trouble])}</div>
       ) : (
-        <div className="text-lg text-ink-400">Getting a code…</div>
+        <div className="text-lg text-ink-400">{t('gettingCode')}</div>
       )}
+
+      {/*
+        * What this lobby speaks, chosen by the person setting the kiosk up.
+        *
+        * Here rather than in a setting somewhere, because this screen is the
+        * one moment a member of staff is standing at the device with a
+        * decision to make about it — and because the kiosk's language is a
+        * property of the room, not of whoever last touched the glass. The
+        * search screen carries the same control in its quiet weight for the
+        * family whose language is not the room's.
+        *
+        * Set before pairing, so the first screen a parent ever meets is
+        * already in the right language. It is kept under
+        * `KIOSK_LOCALE_STORAGE_KEY`, which survives pairing, unpairing and the
+        * ~4am reload alike.
+        */}
+      <LanguagePicker />
 
       {/*
         * The best moment to install, and the reason the offer is here rather

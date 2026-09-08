@@ -18,20 +18,22 @@ import {
   TextField,
 } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
-import { gradeDescription } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import {
   saveAttendees32Config,
   type A32ConfigDraft,
   type A32EffectiveSettings,
 } from '@/services/backends';
 import { GRADES, type PcoWriteBackMode } from '@/types';
+import { useTranslations } from 'use-intl';
+import { useGrades } from '@/hooks/usePureStrings';
+import { useServerText } from '@/hooks/useServerText';
 
-const WRITE_BACK_HINT: Record<PcoWriteBackMode, string> = {
-  off: 'Tally never writes to Attendees. Visitors added at the door stay queued until this is turned on.',
-  create:
-    'Tally creates attendees it has not seen before, after searching for a match. It never edits an existing one.',
-  full: 'Tally creates attendees, and Edit profile becomes editable for students Attendees already has — name, grade, allergies and birthday are saved there. A leader can also add an adult to the family, and fill in their phone or email when Attendees has none.',
-};
+const WRITE_BACK_HINT = {
+  off: 'a32WriteHintOff',
+  create: 'a32WriteHintCreate',
+  full: 'a32WriteHintFull',
+} as const satisfies Record<PcoWriteBackMode, string>;
 
 /** Same ceiling as the Planning Center editor, for the same reason. */
 const MAX_CACHE_TTL = 300;
@@ -75,6 +77,10 @@ export function Attendees32Editor({
   onClose,
   onSaved,
 }: Attendees32EditorProps) {
+  const serverText = useServerText();
+  const t = useTranslations('Backends');
+  const tCommon = useTranslations('Common');
+  const grades = useGrades();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
 
@@ -120,7 +126,7 @@ export function Attendees32Editor({
       await onSaved();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save these settings.');
+      setError(serverText(cause, t('editorSaveFailed')));
     } finally {
       setSaving(false);
     }
@@ -130,15 +136,15 @@ export function Attendees32Editor({
     <Modal
       open={open}
       onClose={onClose}
-      title="Attendees settings"
-      description="Everything except the token. Changes apply to every counselor's next read."
+      title={t('a32EditorTitle')}
+      description={t('a32EditorDescription')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button onClick={() => void handleSave()} loading={saving}>
-            Save settings
+            {t('saveSettings')}
           </Button>
         </>
       }
@@ -147,43 +153,41 @@ export function Attendees32Editor({
         {error ? <ErrorBanner message={error} /> : null}
 
         <CheckboxField
-          label="Connected"
+          label={t('connected')}
           checked={draft.enabled}
           onChange={(event) => set('enabled', event.target.checked)}
           hint={
             draft.enabled
-              ? 'Attendees serves the roster alongside any other connected backend.'
-              : 'Switched off. Students already linked to Attendees stay on the roster but their names cannot be read until this is turned back on.'
+              ? t('a32ConnectedHint')
+              : t('a32DisconnectedHint')
           }
         />
 
         <div>
           <div className="grid grid-cols-2 gap-3">
             <TextField
-              label="Division id"
+              label={t('a32DivisionId')}
               value={draft.divisionId}
               onChange={(event) => set('divisionId', event.target.value)}
             />
             <TextField
-              label="Meet slug"
+              label={t('a32MeetSlug')}
               value={draft.meetSlug}
               onChange={(event) => set('meetSlug', event.target.value)}
             />
             <TextField
-              label="Character slug"
+              label={t('a32CharacterSlug')}
               value={draft.characterSlug}
               onChange={(event) => set('characterSlug', event.target.value)}
             />
             <TextField
-              label="Assembly slug"
+              label={t('a32AssemblySlug')}
               value={draft.assemblySlug}
               onChange={(event) => set('assemblySlug', event.target.value)}
             />
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
-            Where your students live in Attendees. The setup command on the Attendees side prints
-            all four — they name the division and meet whose attendees are the roster, and the
-            character new students join.
+            {t('a32SlugsNote')}
           </p>
         </div>
 
@@ -192,66 +196,65 @@ export function Attendees32Editor({
             {/* Named rather than numbered, for the reason the same pair of
                 fields gives in PlanningCenterEditor: Pre-K is `-1`. */}
             <SelectField
-              label="Lowest grade"
+              label={t('lowestGrade')}
               value={String(draft.minGrade)}
               onChange={(event) => set('minGrade', Number(event.target.value))}
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
             <SelectField
-              label="Highest grade"
+              label={t('highestGrade')}
               value={String(draft.maxGrade)}
               onChange={(event) => set('maxGrade', Number(event.target.value))}
-              error={draft.maxGrade < draft.minGrade ? 'Cannot end below where it starts.' : null}
+              error={draft.maxGrade < draft.minGrade ? t('gradeRangeError') : null}
             >
               {GRADES.map((value) => (
                 <option key={value} value={value}>
-                  {gradeDescription(value)}
+                  {gradeDescription(grades, value)}
                 </option>
               ))}
             </SelectField>
           </div>
           <p className="mt-1.5 text-xs text-ink-500">
-            The band a student with no grade in Attendees lands in, and the range the app
-            understands at all.
+            {t('a32GradeBandNote')}
           </p>
         </div>
 
         <SelectField
-          label="Write-back"
+          label={t('headingWriteBack')}
           value={draft.writeBack}
           onChange={(event) => set('writeBack', event.target.value as PcoWriteBackMode)}
-          hint={WRITE_BACK_HINT[draft.writeBack]}
+          hint={t(WRITE_BACK_HINT[draft.writeBack])}
         >
-          <option value="off">Off — never change anything</option>
-          <option value="create">Create new people only</option>
-          <option value="full">Create and update managed fields</option>
+          <option value="off">{t('writeBackOff')}</option>
+          <option value="create">{t('writeBackCreatePeople')}</option>
+          <option value="full">{t('writeBackFull')}</option>
         </SelectField>
 
         <NumberStepperField
-          label="Reuse an answer for (seconds)"
+          label={t('cacheLabel')}
           min={0}
           max={MAX_CACHE_TTL}
           value={draft.cacheTtlSeconds}
           onValueChange={(value) => set('cacheTtlSeconds', value)}
           hint={
             draft.cacheTtlSeconds === 0
-              ? 'Off. Every screen asks Attendees directly — slower, and always current.'
-              : `Eight counselors opening Tally in the same minute cost one read instead of eight. A name corrected in Attendees appears within ${draft.cacheTtlSeconds} seconds.`
+              ? t('a32CacheHintOff')
+              : t('a32CacheHintOn', { seconds: draft.cacheTtlSeconds })
           }
         />
 
         {isAdmin ? (
           <TextField
-            label="API address"
+            label={t('apiAddress')}
             value={draft.baseUrl}
             onChange={(event) => set('baseUrl', event.target.value)}
             placeholder={settings.baseUrl || 'https://attendees.example.org'}
-            hint="Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run."
+            hint={t('a32ApiAddressHint')}
           />
         ) : null}
       </div>

@@ -10,7 +10,7 @@
  * is the warning this screen has always given and an error banner at a door is
  * noise.
  */
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateAllergyNotes, useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { makeStudent } from '../../tests/factories';

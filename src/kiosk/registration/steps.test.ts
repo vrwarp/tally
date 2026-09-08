@@ -28,6 +28,15 @@ import {
   answerNoAllergies,
   type RegistrationState,
 } from './steps';
+import { testTranslator, testGrades } from '@/test/translator';
+import type { QuestionStrings } from './steps';
+
+// The real English catalogue, so these still assert the words a parent reads —
+// and a malformed message now fails here rather than on a lobby screen.
+const strings: QuestionStrings = {
+  t: testTranslator('Register') as unknown as QuestionStrings['t'],
+  grades: testGrades(),
+};
 
 function start(requiresCheckOut = false): RegistrationState {
   return initialState({ registrationId: 'r-1', requiresCheckOut });
@@ -627,7 +636,7 @@ describe('the whole state, at each transition', () => {
  */
 describe('the list of questions', () => {
   const labels = (state: RegistrationState) =>
-    questionList(state).map((section) => [
+    questionList(strings, state).map((section) => [
       section.title,
       ...section.rows.map((row) => `${row.state} ${row.label} ${row.answer}`.trim()),
     ]);
@@ -648,7 +657,7 @@ describe('the list of questions', () => {
       allergiesSupported: true,
     });
 
-    expect(questionList(asking)[0]!.rows.map((row) => row.label)).toEqual([
+    expect(questionList(strings, asking)[0]!.rows.map((row) => row.label)).toEqual([
       'First name',
       'Last name',
       'Grade',
@@ -663,7 +672,7 @@ describe('the list of questions', () => {
      * tell a family they had answered a question nobody asked them.
      */
     const typing = typeText(start(), 'Ada');
-    const grade = questionList(typing)[0]!.rows[2]!;
+    const grade = questionList(strings, typing)[0]!.rows[2]!;
 
     expect(grade.state).toBe('todo');
     expect(grade.answer).toBe('');
@@ -685,8 +694,8 @@ describe('the list of questions', () => {
     const preK = addChild(start(true), 'Robin', 'Fields', PRE_K as Grade);
     const none = addChild(start(true), 'Robin', 'Fields', null);
 
-    expect(questionList(preK)[0]!.rows[2]!.answer).toBe('Pre-K');
-    expect(questionList(none)[0]!.rows[2]!.answer).toBe('No grade');
+    expect(questionList(strings, preK)[0]!.rows[2]!.answer).toBe('Pre-K');
+    expect(questionList(strings, none)[0]!.rows[2]!.answer).toBe('No grade');
   });
 
   it('puts a second child after the adult, because that is when they are added', () => {
@@ -699,27 +708,27 @@ describe('the list of questions', () => {
     held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
     held = advance(typeText(addAnotherChild(held), 'Byron'));
 
-    expect(questionList(held).map((section) => section.title)).toEqual([
+    expect(questionList(strings, held).map((section) => section.title)).toEqual([
       'Your child',
       'And you',
       'Child 2',
     ]);
     // And the adult reads as answered from the second child's questions, since
     // they were answered before this child existed.
-    expect(questionList(held)[1]!.rows.every((row) => row.state === 'done')).toBe(true);
+    expect(questionList(strings, held)[1]!.rows.every((row) => row.state === 'done')).toBe(true);
   });
 
   it('has no adult at all on a sibling run', () => {
     const held = initialState({ registrationId: 'r-1', requiresCheckOut: false, mode: 'sibling' });
 
-    expect(questionList(held).map((section) => section.title)).toEqual(['Your child']);
+    expect(questionList(strings, held).map((section) => section.title)).toEqual(['Your child']);
   });
 
   it('addresses each row to the step it would reopen', () => {
     // What makes a row tappable later: it carries the step and the child it is
     // about, so nothing has to be inferred from where it sits on the screen.
     const held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
-    const rows = questionList(held).flatMap((section) => section.rows);
+    const rows = questionList(strings, held).flatMap((section) => section.rows);
 
     expect(rows.slice(0, 3).map((row) => [row.step, row.child])).toEqual([
       ['child-first', 0],
@@ -765,7 +774,7 @@ describe('the answers the list prints', () => {
   }
 
   const rowsOf = (state: RegistrationState, title: string) =>
-    questionList(state).find((section) => section.title === title)!.rows;
+    questionList(strings, state).find((section) => section.title === title)!.rows;
 
   it('prints each child’s own answers under their own heading', () => {
     const held = answered();
@@ -931,7 +940,7 @@ describe('reopening a question', () => {
   });
 
   it('marks the question it will put them back on', () => {
-    const rows = questionList(reopen(atThePhone(), 'child-last', 0)).flatMap(
+    const rows = questionList(strings, reopen(atThePhone(), 'child-last', 0)).flatMap(
       (section) => section.rows,
     );
 
@@ -947,7 +956,7 @@ describe('reopening a question', () => {
      * Jumping forward to a question nobody has reached would leave a hole in
      * the run and a blank on the confirm, and there is nothing there to fix.
      */
-    const rows = questionList(atThePhone()).flatMap((section) => section.rows);
+    const rows = questionList(strings, atThePhone()).flatMap((section) => section.rows);
 
     expect(rows.filter((row) => row.canReopen).map((row) => row.step)).toEqual([
       'child-first',
@@ -968,7 +977,7 @@ describe('reopening a question', () => {
     expect(held.step).toBe('child-last');
 
     const open = reopen(held, 'child-first', 0);
-    const second = questionList(open).find((section) => section.title === 'Child 2')!;
+    const second = questionList(strings, open).find((section) => section.title === 'Child 2')!;
 
     expect(second.rows.map((row) => row.state)).toEqual(['done', 'todo', 'todo']);
     expect(second.rows[1]!.resumeHere).toBe(true);
@@ -1068,8 +1077,8 @@ describe('each question against its own field', () => {
   it('reads the phone back grouped, and every other answer verbatim', () => {
     const held = wholeFamily();
 
-    expect(readoutFor(reopen(held, 'guardian-phone', null))).toBe('555-010-3344');
-    expect(readoutFor(reopen(held, 'guardian-first', null))).toBe('Ngozi');
+    expect(readoutFor(strings, reopen(held, 'guardian-phone', null))).toBe('555-010-3344');
+    expect(readoutFor(strings, reopen(held, 'guardian-first', null))).toBe('Ngozi');
   });
 });
 
@@ -1234,10 +1243,10 @@ describe('the grade question', () => {
     let held = advance(typeText(start(), 'Robin'));
     held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Fields'));
 
-    expect(readoutFor(held)).toBe('');
-    expect(readoutFor(chooseGrade(held, 4 as Grade))).toBe('4th');
-    expect(readoutFor(chooseGrade(held, 0 as Grade))).toBe('Kindergarten');
-    expect(readoutFor(chooseGrade(held, null))).toBe('No grade');
+    expect(readoutFor(strings, held)).toBe('');
+    expect(readoutFor(strings, chooseGrade(held, 4 as Grade))).toBe('4th');
+    expect(readoutFor(strings, chooseGrade(held, 0 as Grade))).toBe('Kindergarten');
+    expect(readoutFor(strings, chooseGrade(held, null))).toBe('No grade');
   });
 
   it('takes "no grade" as an answer and moves on', () => {

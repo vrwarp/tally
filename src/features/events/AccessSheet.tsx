@@ -56,6 +56,7 @@ import {
   restrictChain,
 } from '@/services/eventAccess';
 import type { TallyEvent, UserProfile } from '@/types';
+import { useTranslations } from 'use-intl';
 
 /**
  * How many recent nights the pre-fill reads.
@@ -97,6 +98,7 @@ function AccessOption({
   busy: boolean;
   onPress: () => void;
 }) {
+  const t = useTranslations('Access');
   return (
     <button
       type="button"
@@ -130,7 +132,7 @@ function AccessOption({
           </span>
           {selected ? (
             <span className="rounded-full bg-brand-500/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-brand-200">
-              Now
+              {t('nowBadge')}
             </span>
           ) : null}
         </span>
@@ -141,16 +143,24 @@ function AccessOption({
 }
 
 /** "Miriam, Sam and Dana", or "Miriam, Sam, Dana and 6 more". */
-function nameList(names: readonly string[]): string {
-  if (names.length === 0) return 'nobody';
+function nameList(t: AccessTranslator, names: readonly string[]): string {
+  if (names.length === 0) return t('nobody');
   if (names.length === 1) return names[0]!;
   const head = names.slice(0, 3);
   const rest = names.length - head.length;
-  if (rest > 0) return `${head.join(', ')} and ${rest} more`;
-  return `${head.slice(0, -1).join(', ')} and ${head[head.length - 1]}`;
+  if (rest > 0) return t('nameListMore', { names: head.join(', '), count: rest });
+  return t('nameListLast', {
+    names: head.slice(0, -1).join(', '),
+    last: head[head.length - 1]!,
+  });
 }
 
+/** The sheet's translator, narrowed so `nameList` can take it as data. */
+type AccessTranslator = ReturnType<typeof useTranslations<'Access'>>;
+
 export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
+  const t = useTranslations('Access');
+  const tCommon = useTranslations('Common');
   const { access, events } = useData();
   const { profile, can } = useAuth();
   const { show } = useToast();
@@ -259,29 +269,29 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
   const openDetail =
     activeTeam.length > 0
-      ? `${activeTeam.length} ${activeTeam.length === 1 ? 'person' : 'people'} can take this register.`
+      ? t('openDetail', { count: activeTeam.length })
       : teamLoading
-        ? 'Counting the team…'
-        : 'Anybody with a Tally account can take this register.';
+        ? t('counting')
+        : t('openToAnyone');
 
   const restrictedDetail = (() => {
     if (restricted) {
       const size = list?.members.size ?? 0;
-      return `${size} ${size === 1 ? 'person' : 'people'} — everybody else sees it locked.`;
+      return t('restrictedDetail', { count: size });
     }
-    if (prefill.status !== 'ready') return 'Working out who has been taking this register…';
+    if (prefill.status !== 'ready') return t('workingOut');
 
     const kept = keep.length > 0 ? keep : null;
     const keeping = kept
-      ? nameList(kept.map((member) => shortName(member) ?? displayName(member)))
-      : 'just you';
+      ? nameList(t, kept.map((member) => shortName(member) ?? displayName(member)))
+      : t('justYou');
     const losing = Math.max(
       0,
       activeTeam.length - (kept?.filter((member) => member.active).length ?? 1),
     );
     return losing === 0
-      ? `Would keep ${keeping} — nobody else works this gathering.`
-      : `Would keep ${keeping} — ${losing} ${losing === 1 ? 'other would lose' : 'others would lose'} it.`;
+      ? t('wouldKeepOnly', { names: keeping })
+      : t('wouldKeep', { names: keeping, count: losing });
   })();
 
   /*
@@ -316,8 +326,8 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const failed = (cause: unknown) => {
     show(
       isPermissionDenied(cause)
-        ? 'You are not allowed to change who is on this gathering.'
-        : 'Could not save that. Try again.',
+        ? t('notAllowed')
+        : t('saveFailed'),
       { tone: 'error' },
     );
   };
@@ -345,7 +355,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
       await restrictChain(chain, people, uid);
       show(
-        `${event.title} is now limited to ${total} ${total === 1 ? 'person' : 'people'}.`,
+        t('nowLimited', { title: event.title, count: total }),
         { tone: 'success' },
       );
     } catch (cause) {
@@ -359,7 +369,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     setBusy(true);
     try {
       await reopenChain(chain, uid);
-      show(`${event.title} is open to the whole team again.`, { tone: 'success' });
+      show(t('nowOpen', { title: event.title }), { tone: 'success' });
     } catch (cause) {
       failed(cause);
     } finally {
@@ -372,7 +382,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     try {
       await addChainMembers(chain, [member.id], uid);
       setQuery('');
-      show(`${displayName(member)} can now take this register.`, { tone: 'success' });
+      show(t('memberAdded', { name: displayName(member) }), { tone: 'success' });
     } catch (cause) {
       failed(cause);
     } finally {
@@ -398,7 +408,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
       title={event.title}
       description={
         /* The gathering, not the night — this is what is about to change. */
-        event.mode === 'oneoff' ? 'This gathering' : 'Every gathering in this repeat'
+        event.mode === 'oneoff' ? t('scopeOneOff') : t('scopeSeries')
       }
     >
       <div className="flex flex-col gap-4">
@@ -407,14 +417,14 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             <div className="flex flex-col gap-2">
               <AccessOption
                 selected={!restricted}
-                label="Everyone on the team"
+                label={t('everyoneOnTeam')}
                 detail={openDetail}
                 busy={busy}
                 onPress={restricted ? () => void reopen() : () => {}}
               />
               <AccessOption
                 selected={restricted}
-                label="Only people I add"
+                label={t('onlyPeopleIAdd')}
                 detail={restrictedDetail}
                 busy={busy}
                 onPress={restricted ? () => {} : () => void close()}
@@ -425,8 +435,8 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                would be refused. Not a different screen — fewer verbs. */
             <p className="text-sm text-ink-400">
               {restricted
-                ? 'Only people added to this gathering can take its register.'
-                : 'Everyone on the team can take this register.'}
+                ? t('hintRestricted')
+                : t('hintOpen')}
             </p>
           )}
         </section>
@@ -436,10 +446,10 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             {mayAdd ? (
               <section>
                 <TextField
-                  label="Add somebody"
+                  label={t('addSomebody')}
                   value={query}
                   onChange={(next) => setQuery(next.target.value)}
-                  placeholder="Search the team…"
+                  placeholder={t('searchTeam')}
                   autoComplete="off"
                 />
                 {query.trim().length === 0 ? null : matches.length > 0 ? (
@@ -462,12 +472,14 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                   </ul>
                 ) : alreadyOn.length > 0 ? (
                   <p className="px-2 pt-2 text-sm text-ink-400">
-                    {nameList(alreadyOn.map((member) => displayName(member)))}{' '}
-                    {alreadyOn.length === 1 ? 'is' : 'are'} already on this gathering.
+                    {t('alreadyOn', {
+                      count: alreadyOn.length,
+                      names: nameList(t, alreadyOn.map((member) => displayName(member))),
+                    })}
                   </p>
                 ) : (
                   <p className="px-2 pt-2 text-sm text-ink-400">
-                    Nobody on the team matches “{query.trim()}”.
+                    {t('noTeamMatch', { query: query.trim() })}
                   </p>
                 )}
               </section>
@@ -475,10 +487,10 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
             <section>
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
-                On this gathering
+                {t('onThisGathering')}
               </h3>
               {teamLoading && current.length === 0 ? (
-                <p className="pt-2 text-sm text-ink-500">Loading the team…</p>
+                <p className="pt-2 text-sm text-ink-500">{t('loadingTeam')}</p>
               ) : (
                 <ul className="flex flex-col pt-1">
                   {current.map((member) => (
@@ -496,11 +508,11 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                         /* Admins pass the gate whatever this list says, so a
                            Remove here would be a control that does nothing. */
                         <span className="text-xs uppercase tracking-wider text-ink-600">
-                          Always
+                          {t('always')}
                         </span>
                       ) : mayRemove && member.id !== uid ? (
                         <Button variant="ghost" onClick={() => void remove(member)} disabled={busy}>
-                          Remove
+                          {tCommon('remove')}
                         </Button>
                       ) : (
                         <span className="text-xs uppercase tracking-wider text-ink-600">
@@ -517,8 +529,8 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
         <p className="text-xs text-ink-500">
           {event.mode === 'oneoff'
-            ? 'This applies to this gathering only.'
-            : `Changing this affects every ${event.title}, past and future.`}
+            ? t('appliesToThis')
+            : t('appliesToSeries', { title: event.title })}
         </p>
       </div>
     </Modal>

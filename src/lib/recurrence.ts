@@ -8,7 +8,6 @@
  * line. Core is re-exported below, so app code has one import site — nothing
  * outside this file and the sync script should reach for `recurrenceCore`.
  */
-import { format } from 'date-fns';
 import {
   EVERY_WEEKDAY,
   monthlyWeekdayPosition,
@@ -20,26 +19,48 @@ import {
   type RecurrenceFrequency,
   type RecurrenceRule,
 } from '@/lib/recurrenceCore';
-import { joinList } from '@/lib/utils';
 
 export * from '@/lib/recurrenceCore';
 
+/**
+ * Weekday names as `Recurrence.*` keys.
+ *
+ * Not `Intl.DateTimeFormat`: these are read out of a static table by index in
+ * a picker's aria-labels and inside a sentence, and routing them through a
+ * formatter would mean constructing a Date per render to name a day.
+ */
 export const WEEKDAY_NAMES = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
+  'weekdaySunday',
+  'weekdayMonday',
+  'weekdayTuesday',
+  'weekdayWednesday',
+  'weekdayThursday',
+  'weekdayFriday',
+  'weekdaySaturday',
 ] as const;
 
 /** Column headers for the weekday picker, Sunday-first to match `getDay()`. */
-export const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+export const WEEKDAY_INITIALS = [
+  'weekdayInitialSun',
+  'weekdayInitialMon',
+  'weekdayInitialTue',
+  'weekdayInitialWed',
+  'weekdayInitialThu',
+  'weekdayInitialFri',
+  'weekdayInitialSat',
+] as const;
 
-export const WEEKDAY_SHORT_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+export const WEEKDAY_SHORT_NAMES = [
+  'weekdayShortSun',
+  'weekdayShortMon',
+  'weekdayShortTue',
+  'weekdayShortWed',
+  'weekdayShortThu',
+  'weekdayShortFri',
+  'weekdayShortSat',
+] as const;
 
-const ORDINAL_NAMES = ['first', 'second', 'third', 'fourth'] as const;
+const ORDINAL_NAMES = ['ordinalFirst', 'ordinalSecond', 'ordinalThird', 'ordinalFourth'] as const;
 
 /**
  * Follows the rule along when the event's date moves.
@@ -65,14 +86,38 @@ export function retimeRecurrence(
 /* Describing                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** "the third Tuesday" / "the last Friday", phrased from the anchor. */
-export function describeMonthlyWeekday(anchor: Date): string {
-  const position = monthlyWeekdayPosition(anchor);
-  const ordinal = position === -1 ? 'last' : ORDINAL_NAMES[position - 1];
-  return `the ${ordinal} ${WEEKDAY_NAMES[anchor.getDay()]}`;
+/**
+ * Everything the describers need from the catalogue, handed in as data.
+ *
+ * This module is pure and cannot call a hook, and what it builds is a
+ * *sentence* — "Every 2 weeks on Fri and Sun, until Mar 5, 2027" — whose clause
+ * order and whose weekday list separator both differ per language. So each
+ * clause is its own key and the caller supplies the translator, the locale for
+ * `Intl.ListFormat` and `Intl.DateTimeFormat`, and nothing else.
+ */
+export interface RecurrenceStrings {
+  t: (key: string, values?: Record<string, string | number>) => string;
+  locale: string;
 }
 
-function describePattern(rule: RecurrenceRule, anchor: Date): string {
+/**
+ * A no-op translator, for the one caller that builds labels only to throw them
+ * away: `matchRecurrencePreset` compares rules, never words.
+ */
+const NO_STRINGS: RecurrenceStrings = { t: (key) => key, locale: 'en' };
+
+/** "the third Tuesday" / "the last Friday", phrased from the anchor. */
+export function describeMonthlyWeekday({ t }: RecurrenceStrings, anchor: Date): string {
+  const position = monthlyWeekdayPosition(anchor);
+  const ordinal = position === -1 ? 'ordinalLast' : ORDINAL_NAMES[position - 1]!;
+  return t('whichWeekday', {
+    ordinal: t(ordinal),
+    weekday: t(WEEKDAY_NAMES[anchor.getDay()]!),
+  });
+}
+
+function describePattern(strings: RecurrenceStrings, rule: RecurrenceRule, anchor: Date): string {
+  const { t, locale } = strings;
   const { frequency, interval, weekdays, monthlyMode } = rule;
 
   switch (frequency) {
@@ -80,44 +125,57 @@ function describePattern(rule: RecurrenceRule, anchor: Date): string {
       // All seven days every week is every day, and that is what it should be
       // called. Saying "Weekly on Sun, Mon, Tue, Wed, Thu, Fri and Sat" would
       // be accurate and useless.
-      if (interval === 1 && weekdays.length === 7) return 'Daily';
+      if (interval === 1 && weekdays.length === 7) return t('daily');
 
       // Three or more full weekday names is a sentence nobody reads to the end.
       const names = weekdays.map((day) =>
-        weekdays.length > 2 ? WEEKDAY_SHORT_NAMES[day] : WEEKDAY_NAMES[day],
+        t(weekdays.length > 2 ? WEEKDAY_SHORT_NAMES[day]! : WEEKDAY_NAMES[day]!),
       );
-      const on = joinList(names);
-      return interval === 1 ? `Weekly on ${on}` : `Every ${interval} weeks on ${on}`;
+      // `Intl.ListFormat` rather than a hand-rolled ", … and …": the separator
+      // and the conjunction are both properties of the language.
+      const days = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(names);
+      return interval === 1 ? t('weeklyOn', { days }) : t('everyNWeeksOn', { interval, days });
     }
 
     case 'monthly': {
       const which =
         monthlyMode === 'dayOfWeek'
-          ? `on ${describeMonthlyWeekday(anchor)}`
-          : `on day ${anchor.getDate()}`;
-      return interval === 1 ? `Monthly ${which}` : `Every ${interval} months ${which}`;
+          ? describeMonthlyWeekday(strings, anchor)
+          : t('whichDay', { day: anchor.getDate() });
+      return interval === 1 ? t('monthlyOn', { which }) : t('everyNMonthsOn', { interval, which });
     }
 
     case 'yearly': {
-      const when = format(anchor, 'MMMM d');
-      return interval === 1 ? `Annually on ${when}` : `Every ${interval} years on ${when}`;
+      const when = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(anchor);
+      return interval === 1 ? t('annuallyOn', { when }) : t('everyNYearsOn', { interval, when });
     }
   }
 }
 
 /** The sentence shown wherever a rule is displayed rather than edited. */
-export function describeRecurrence(rule: RecurrenceRule | null, anchor: Date): string {
-  if (!rule) return 'Does not repeat';
+export function describeRecurrence(
+  strings: RecurrenceStrings,
+  rule: RecurrenceRule | null,
+  anchor: Date,
+): string {
+  const { t, locale } = strings;
+  if (!rule) return t('doesNotRepeat');
 
   const normalized = normalizeRecurrence(rule, anchor);
-  const pattern = describePattern(normalized, anchor);
+  const pattern = describePattern(strings, normalized, anchor);
 
   if (normalized.count !== null) {
-    return `${pattern}, ${normalized.count} ${normalized.count === 1 ? 'time' : 'times'}`;
+    return t('withCount', { pattern, count: normalized.count });
   }
 
   const until = untilInstant(normalized);
-  return until ? `${pattern}, until ${format(until, 'MMM d, yyyy')}` : pattern;
+  if (!until) return pattern;
+  const date = new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(until);
+  return t('withUntil', { pattern, date });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -179,7 +237,7 @@ export function defaultRecurrence(anchor: Date): RecurrenceRule {
  * split every mainstream calendar makes: a handful of taps for the common case,
  * a full editor behind one more.
  */
-export function recurrencePresets(anchor: Date): RecurrencePreset[] {
+export function recurrencePresets(strings: RecurrenceStrings, anchor: Date): RecurrencePreset[] {
   const candidates: { id: RecurrencePresetId; rule: RecurrenceRule }[] = [
     { id: 'daily', rule: rule('weekly', { weekdays: [...EVERY_WEEKDAY] }) },
     { id: 'weekly', rule: defaultRecurrence(anchor) },
@@ -190,7 +248,7 @@ export function recurrencePresets(anchor: Date): RecurrencePreset[] {
 
   return candidates.map((candidate) => ({
     ...candidate,
-    label: describeRecurrence(candidate.rule, anchor),
+    label: describeRecurrence(strings, candidate.rule, anchor),
   }));
 }
 
@@ -204,7 +262,9 @@ export function matchRecurrencePreset(
   anchor: Date,
 ): RecurrencePresetId {
   const normalized = normalizeRecurrence(candidate, anchor);
-  const found = recurrencePresets(anchor).find((preset) =>
+  // Matching is on the *rule*, never on its wording, so this needs no
+  // catalogue — the labels it builds are thrown away.
+  const found = recurrencePresets(NO_STRINGS, anchor).find((preset) =>
     recurrenceEquals(preset.rule, normalized),
   );
 
@@ -226,17 +286,25 @@ export function matchRecurrencePreset(
  * repairs everything else, and repairing a *typed* end date silently would move
  * the last gathering without saying so.
  */
-export function validateRecurrence(rule: RecurrenceRule | null, anchor: Date): string | null {
+export type RecurrenceProblem =
+  | 'errRecurrenceWeekdays'
+  | 'errRecurrenceUntilMissing'
+  | 'errRecurrenceUntilBeforeStart';
+
+export function validateRecurrence(
+  rule: RecurrenceRule | null,
+  anchor: Date,
+): RecurrenceProblem | null {
   if (!rule) return null;
 
   if (rule.frequency === 'weekly' && rule.weekdays.length === 0) {
-    return 'Pick at least one day of the week.';
+    return 'errRecurrenceWeekdays';
   }
 
   if (rule.until !== null) {
     const end = untilInstant(rule);
-    if (!end) return 'Pick a date for the repeat to end on.';
-    if (end < anchor) return 'The repeat has to end on or after the first gathering.';
+    if (!end) return 'errRecurrenceUntilMissing';
+    if (end < anchor) return 'errRecurrenceUntilBeforeStart';
   }
 
   return null;

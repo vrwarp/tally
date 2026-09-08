@@ -25,81 +25,85 @@ import {
 
 describe('checkName', () => {
   it('keeps the name a parent typed', () => {
-    expect(checkName('Amara', "The child's first name")).toEqual({ ok: true, value: 'Amara' });
+    expect(checkName('Amara', 'childFirst')).toEqual({ ok: true, value: 'Amara' });
   });
 
   it('trims the edges and collapses runs of whitespace', () => {
     // A lobby keyboard produces both, and neither is a different name.
-    expect(checkName('  Mary   Jane  ', 'A name')).toEqual({ ok: true, value: 'Mary Jane' });
+    expect(checkName('  Mary   Jane  ', 'childFirst')).toEqual({ ok: true, value: 'Mary Jane' });
   });
 
   it('composes accents so two spellings of one name are one string', () => {
     // NFD "José" is six code points and NFC is five; they must not become two
     // different children.
     const decomposed = 'José';
-    expect(checkName(decomposed, 'A name')).toEqual({ ok: true, value: 'José'.normalize('NFC') });
+    expect(checkName(decomposed, 'childFirst')).toEqual({ ok: true, value: 'José'.normalize('NFC') });
   });
 
   it('keeps the apostrophes and hyphens that are in real names', () => {
     // The kiosk keyboard has both keys for exactly this reason.
-    expect(checkName("O'Brien", 'A name')).toEqual({ ok: true, value: "O'Brien" });
-    expect(checkName('Anne-Marie', 'A name')).toEqual({ ok: true, value: 'Anne-Marie' });
+    expect(checkName("O'Brien", 'childFirst')).toEqual({ ok: true, value: "O'Brien" });
+    expect(checkName('Anne-Marie', 'childFirst')).toEqual({ ok: true, value: 'Anne-Marie' });
   });
 
   it('names the field in every sentence it refuses with', () => {
     // The caller supplies the subject so one rule reads correctly from the
-    // door and from the reviewer's form.
-    expect(checkName('', "The child's first name")).toEqual({
+    // door and from the reviewer's form — and, since the subject is a token
+    // rather than the sentence's first four words, in either language.
+    expect(checkName('', 'childFirst')).toEqual({
       ok: false,
-      error: "The child's first name is required.",
+      code: 'field.childFirst.required',
     });
-    expect(checkName('   ', 'A surname')).toEqual({ ok: false, error: 'A surname is required.' });
-    expect(checkName(undefined, 'A surname')).toEqual({
+    expect(checkName('   ', 'childLast')).toEqual({
       ok: false,
-      error: 'A surname is required.',
+      code: 'field.childLast.required',
     });
-    expect(checkName(42, 'A surname')).toEqual({ ok: false, error: 'A surname is required.' });
+    expect(checkName(undefined, 'adultFirst')).toEqual({
+      ok: false,
+      code: 'field.adultFirst.required',
+    });
+    expect(checkName(42, 'adultLast')).toEqual({ ok: false, code: 'field.adultLast.required' });
   });
 
   it('accepts a name of exactly the limit and refuses one character more', () => {
     const atLimit = 'a'.repeat(NAME_MAX_LENGTH);
-    expect(checkName(atLimit, 'A name')).toEqual({ ok: true, value: atLimit });
-    expect(checkName(`${atLimit}a`, 'A name')).toEqual({ ok: false, error: 'A name is too long.' });
+    expect(checkName(atLimit, 'childFirst')).toEqual({ ok: true, value: atLimit });
+    expect(checkName(`${atLimit}a`, 'childFirst')).toEqual({ ok: false, code: 'field.childFirst.tooLong' });
   });
 
   it('measures the length after trimming, not before', () => {
     // Otherwise a name padded with spaces is refused for being a name it is not.
     const padded = `  ${'a'.repeat(NAME_MAX_LENGTH)}  `;
-    expect(checkName(padded, 'A name')).toEqual({ ok: true, value: 'a'.repeat(NAME_MAX_LENGTH) });
+    expect(checkName(padded, 'childFirst')).toEqual({ ok: true, value: 'a'.repeat(NAME_MAX_LENGTH) });
   });
 
   it('refuses digits rather than stripping them', () => {
     // "Room 3" and "555-0123" are somebody misreading the question, and
     // silently keeping "Room" would put that on a sticker.
-    expect(checkName('Room 3', 'A name')).toEqual({
+    expect(checkName('Room 3', 'childFirst')).toEqual({
       ok: false,
-      error: 'A name cannot contain numbers.',
+      code: 'field.childFirst.hasNumbers',
     });
-    expect(checkName('5550123', 'A name')).toEqual({
+    expect(checkName('5550123', 'childFirst')).toEqual({
       ok: false,
-      error: 'A name cannot contain numbers.',
+      code: 'field.childFirst.hasNumbers',
     });
   });
 
   it('refuses something with no letter in it at all', () => {
-    expect(checkName('---', 'A name')).toEqual({
+    expect(checkName('---', 'childFirst')).toEqual({
       ok: false,
-      error: 'A name needs at least one letter.',
+      code: 'field.childFirst.needsLetter',
     });
-    expect(checkName('🎈', 'A name')).toEqual({
+    expect(checkName('🎈', 'childFirst')).toEqual({
       ok: false,
-      error: 'A name needs at least one letter.',
+      code: 'field.childFirst.needsLetter',
     });
   });
 
   it('counts a letter from any script', () => {
     // `\p{L}`, not `[a-z]`: the ministry this was written for has both.
-    expect(checkName('蔡秉洲', 'A name')).toEqual({ ok: true, value: '蔡秉洲' });
+    expect(checkName('蔡秉洲', 'childFirst')).toEqual({ ok: true, value: '蔡秉洲' });
   });
 });
 
@@ -118,17 +122,17 @@ describe('checkGrade', () => {
   });
 
   it('refuses one step outside either end', () => {
-    const error = 'grade must be a whole number from -1 (Pre-K) to 12, or null.';
-    expect(checkGrade(MIN_GRADE - 1)).toEqual({ ok: false, error });
-    expect(checkGrade(MAX_GRADE + 1)).toEqual({ ok: false, error });
+    const code = 'field.gradeRange';
+    expect(checkGrade(MIN_GRADE - 1)).toEqual({ ok: false, code });
+    expect(checkGrade(MAX_GRADE + 1)).toEqual({ ok: false, code });
   });
 
   it('refuses anything that is not a whole number', () => {
-    const error = 'grade must be a whole number from -1 (Pre-K) to 12, or null.';
-    expect(checkGrade(7.5)).toEqual({ ok: false, error });
-    expect(checkGrade(Number.NaN)).toEqual({ ok: false, error });
-    expect(checkGrade(Number.POSITIVE_INFINITY)).toEqual({ ok: false, error });
-    expect(checkGrade('8')).toEqual({ ok: false, error });
+    const code = 'field.gradeRange';
+    expect(checkGrade(7.5)).toEqual({ ok: false, code });
+    expect(checkGrade(Number.NaN)).toEqual({ ok: false, code });
+    expect(checkGrade(Number.POSITIVE_INFINITY)).toEqual({ ok: false, code });
+    expect(checkGrade('8')).toEqual({ ok: false, code });
   });
 });
 
@@ -152,14 +156,14 @@ describe('checkPhone', () => {
   it('refuses eleven digits that do not start with a country code', () => {
     expect(checkPhone('25105550134')).toEqual({
       ok: false,
-      error: 'Enter a 10-digit phone number.',
+      code: 'field.phoneDigits',
     });
   });
 
   it('refuses nine and twelve digits', () => {
-    const error = 'Enter a 10-digit phone number.';
-    expect(checkPhone('510555013')).toEqual({ ok: false, error });
-    expect(checkPhone('510555013456')).toEqual({ ok: false, error });
+    const code = 'field.phoneDigits';
+    expect(checkPhone('510555013')).toEqual({ ok: false, code });
+    expect(checkPhone('510555013456')).toEqual({ ok: false, code });
   });
 
   it('refuses a repdigit, which is what somebody types to get past the field', () => {
@@ -167,11 +171,11 @@ describe('checkPhone', () => {
     // family will use next week.
     expect(checkPhone('0000000000')).toEqual({
       ok: false,
-      error: 'That does not look like a phone number.',
+      code: 'field.phoneShape',
     });
     expect(checkPhone('5555555555')).toEqual({
       ok: false,
-      error: 'That does not look like a phone number.',
+      code: 'field.phoneShape',
     });
   });
 
@@ -181,8 +185,8 @@ describe('checkPhone', () => {
   });
 
   it('refuses anything that is not text', () => {
-    expect(checkPhone(5105550134)).toEqual({ ok: false, error: 'A phone number is required.' });
-    expect(checkPhone(null)).toEqual({ ok: false, error: 'A phone number is required.' });
+    expect(checkPhone(5105550134)).toEqual({ ok: false, code: 'field.phoneRequired' });
+    expect(checkPhone(null)).toEqual({ ok: false, code: 'field.phoneRequired' });
   });
 });
 
@@ -205,11 +209,11 @@ describe('checkAllergyNote', () => {
     expect(checkAllergyNote(atLimit)).toEqual({ ok: true, value: atLimit });
     expect(checkAllergyNote(`${atLimit}a`)).toEqual({
       ok: false,
-      error: 'That allergy note is too long.',
+      code: 'field.allergyTooLong',
     });
   });
 
   it('refuses anything that is not text', () => {
-    expect(checkAllergyNote(12)).toEqual({ ok: false, error: 'allergies must be text.' });
+    expect(checkAllergyNote(12)).toEqual({ ok: false, code: 'field.allergyText' });
   });
 });

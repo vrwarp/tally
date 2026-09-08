@@ -5,7 +5,7 @@
  * a rule is only choosable if the dropdown says which Tuesday it means.
  */
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { RecurrenceField } from '@/features/events/RecurrenceField';
@@ -179,6 +179,6 @@ describe('RecurrenceField', () => {
     render(<Harness initial={{ ...WEEKLY_ON_TUESDAY, count: 1 }} />);
 
     expect(screen.queryByText(/^Then /)).not.toBeInTheDocument();
-    expect(screen.getByText(/only gathering the repeat covers/)).toBeInTheDocument();
+    expect(screen.getByText(/No more dates after this one/)).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@
  * honour is worse than no offer: it costs a leader a filled-in form and a
  * refusal, on the screen they opened because somebody could not be reached.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AddParentContact } from '@/features/students/AddParentContact';
@@ -181,7 +181,7 @@ describe('AddParentContact', () => {
       await userEvent.click(screen.getByRole('button', { name: /Add a contact/ }));
       await userEvent.type(screen.getByLabelText('Adult’s phone'), '4102');
 
-      expect(screen.getByText(/not a number anybody could ring/)).toBeInTheDocument();
+      expect(screen.getByText(/needs 10 digits/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeDisabled();
       expect(setParentContact).not.toHaveBeenCalled();
     });

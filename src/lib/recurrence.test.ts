@@ -21,13 +21,16 @@ import {
   nthWeekdayOfMonth,
   recurrenceOccurrences,
   recurrencePresets,
+  type RecurrenceStrings,
   retimeRecurrence,
   suggestedRecurrenceEnd,
   toDateOnlyValue,
   validateRecurrence,
+  type RecurrenceProblem,
   weekdayOrdinalInMonth,
 } from '@/lib/recurrence';
 import type { RecurrenceRule } from '@/types';
+import { testTranslator } from '@/test/translator';
 
 /** Fri 24 Jul 2026, 19:00 local — the fourth Friday of the month. */
 const FRIDAY = new Date(2026, 6, 24, 19, 0);
@@ -172,47 +175,61 @@ describe('normalizeRecurrence', () => {
   });
 });
 
+/*
+ * The real English catalogue and locale, so these assertions still measure the
+ * sentence a leader reads — and now also that every ICU key behind it renders.
+ *
+ * One English change is deliberate and visible here: the weekday list is built
+ * by `Intl.ListFormat` rather than a hand-rolled join, so en-US gains its
+ * standard serial comma ("Mon, Wed, and Fri"). No ListFormat style omits it,
+ * and nothing hand-rolled can produce the 、 a Chinese list needs.
+ */
+const strings: RecurrenceStrings = {
+  t: testTranslator('Recurrence') as unknown as RecurrenceStrings['t'],
+  locale: 'en',
+};
+
 describe('describeRecurrence', () => {
   it('names the presets the way a calendar does', () => {
-    expect(describeRecurrence(null, TUESDAY)).toBe('Does not repeat');
+    expect(describeRecurrence(strings, null, TUESDAY)).toBe('Does not repeat');
     // Every day of the week is every day, and says so.
-    expect(describeRecurrence(rule({ weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe('Daily');
-    expect(describeRecurrence(rule({ weekdays: [2] }), TUESDAY)).toBe('Weekly on Tuesday');
-    expect(describeRecurrence(rule({ frequency: 'monthly' }), TUESDAY)).toBe('Monthly on day 21');
+    expect(describeRecurrence(strings, rule({ weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe('Daily');
+    expect(describeRecurrence(strings, rule({ weekdays: [2] }), TUESDAY)).toBe('Weekly on Tuesday');
+    expect(describeRecurrence(strings, rule({ frequency: 'monthly' }), TUESDAY)).toBe('Monthly on day 21');
     expect(
-      describeRecurrence(rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' }), TUESDAY),
+      describeRecurrence(strings, rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' }), TUESDAY),
     ).toBe('Monthly on the third Tuesday');
-    expect(describeRecurrence(rule({ frequency: 'yearly' }), TUESDAY)).toBe('Annually on July 21');
+    expect(describeRecurrence(strings, rule({ frequency: 'yearly' }), TUESDAY)).toBe('Annually on July 21');
     // Monday to Friday is spelled out rather than given a name of its own.
-    expect(describeRecurrence(rule({ weekdays: [1, 2, 3, 4, 5] }), TUESDAY)).toBe(
-      'Weekly on Mon, Tue, Wed, Thu and Fri',
+    expect(describeRecurrence(strings, rule({ weekdays: [1, 2, 3, 4, 5] }), TUESDAY)).toBe(
+      'Weekly on Mon, Tue, Wed, Thu, and Fri',
     );
   });
 
   it('calls every day "Daily" only when it really is every day', () => {
     // A fortnightly rule that happens to name all seven days is not daily, and
     // saying so would hide half the schedule from whoever chose it.
-    expect(describeRecurrence(rule({ interval: 2, weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe(
-      'Every 2 weeks on Sun, Mon, Tue, Wed, Thu, Fri and Sat',
+    expect(describeRecurrence(strings, rule({ interval: 2, weekdays: [...EVERY_WEEKDAY] }), TUESDAY)).toBe(
+      'Every 2 weeks on Sun, Mon, Tue, Wed, Thu, Fri, and Sat',
     );
   });
 
   it('phrases a yearly rule that skips years', () => {
-    expect(describeRecurrence(rule({ frequency: 'yearly', interval: 2 }), TUESDAY)).toBe(
+    expect(describeRecurrence(strings, rule({ frequency: 'yearly', interval: 2 }), TUESDAY)).toBe(
       'Every 2 years on July 21',
     );
   });
 
   it('phrases intervals and multi-day weeks', () => {
-    expect(describeRecurrence(rule({ interval: 2, weekdays: [1, 3] }), TUESDAY)).toBe(
+    expect(describeRecurrence(strings, rule({ interval: 2, weekdays: [1, 3] }), TUESDAY)).toBe(
       'Every 2 weeks on Monday and Wednesday',
     );
     // Three or more days switch to short names so the line stays readable.
-    expect(describeRecurrence(rule({ weekdays: [1, 3, 5] }), TUESDAY)).toBe(
-      'Weekly on Mon, Wed and Fri',
+    expect(describeRecurrence(strings, rule({ weekdays: [1, 3, 5] }), TUESDAY)).toBe(
+      'Weekly on Mon, Wed, and Fri',
     );
     expect(
-      describeRecurrence(
+      describeRecurrence(strings, 
         rule({ frequency: 'monthly', interval: 3, monthlyMode: 'dayOfWeek' }),
         TUESDAY,
       ),
@@ -220,16 +237,16 @@ describe('describeRecurrence', () => {
   });
 
   it('appends the end condition', () => {
-    expect(describeRecurrence(rule({ until: '2026-10-20' }), FRIDAY)).toBe(
+    expect(describeRecurrence(strings, rule({ until: '2026-10-20' }), FRIDAY)).toBe(
       'Weekly on Friday, until Oct 20, 2026',
     );
-    expect(describeRecurrence(rule({ count: 13 }), FRIDAY)).toBe('Weekly on Friday, 13 times');
-    expect(describeRecurrence(rule({ count: 1 }), FRIDAY)).toBe('Weekly on Friday, 1 time');
+    expect(describeRecurrence(strings, rule({ count: 13 }), FRIDAY)).toBe('Weekly on Friday, 13 times');
+    expect(describeRecurrence(strings, rule({ count: 1 }), FRIDAY)).toBe('Weekly on Friday, 1 time');
   });
 
   it('says "last" for a weekday in the final week of its month', () => {
     const lastFriday = new Date(2026, 6, 31, 19, 0);
-    expect(describeMonthlyWeekday(lastFriday)).toBe('the last Friday');
+    expect(describeMonthlyWeekday(strings, lastFriday)).toBe('the last Friday');
   });
 });
 
@@ -237,7 +254,7 @@ describe('recurrencePresets', () => {
   it('phrases every option against the chosen date', () => {
     // No "does not repeat" — this list only describes an event already typed as
     // Recurring — and no "every weekday", which is the day picker's job.
-    expect(recurrencePresets(TUESDAY).map((preset) => preset.label)).toEqual([
+    expect(recurrencePresets(strings, TUESDAY).map((preset) => preset.label)).toEqual([
       'Daily',
       'Weekly on Tuesday',
       'Monthly on day 21',
@@ -250,7 +267,7 @@ describe('recurrencePresets', () => {
     // The label is what a leader reads; the id is what the form stores and what
     // `matchRecurrencePreset` has to hand back. Two options sharing one would
     // reopen the dropdown on the wrong entry.
-    expect(recurrencePresets(TUESDAY).map((preset) => preset.id)).toEqual([
+    expect(recurrencePresets(strings, TUESDAY).map((preset) => preset.id)).toEqual([
       'daily',
       'weekly',
       'monthlyDay',
@@ -260,10 +277,10 @@ describe('recurrencePresets', () => {
   });
 
   it('re-phrases when the date moves', () => {
-    expect(recurrencePresets(FRIDAY).map((preset) => preset.label)).toContain(
+    expect(recurrencePresets(strings, FRIDAY).map((preset) => preset.label)).toContain(
       'Monthly on the fourth Friday',
     );
-    expect(recurrencePresets(FRIDAY).map((preset) => preset.label)).toContain('Weekly on Friday');
+    expect(recurrencePresets(strings, FRIDAY).map((preset) => preset.label)).toContain('Weekly on Friday');
   });
 });
 
@@ -510,6 +527,10 @@ describe('retimeRecurrence', () => {
   });
 });
 
+/** A recurrence problem as the sentence a leader actually reads. */
+const t = testTranslator('EventEditor');
+const message = (key: RecurrenceProblem | null) => (key === null ? null : t(key));
+
 describe('validateRecurrence', () => {
   it('accepts what the form can produce', () => {
     expect(validateRecurrence(null, FRIDAY)).toBeNull();
@@ -517,8 +538,12 @@ describe('validateRecurrence', () => {
     expect(validateRecurrence(rule({ until: '2026-07-24' }), FRIDAY)).toBeNull();
   });
 
+  /*
+   * Through the catalogue, because that is where the sentences live now.
+   * `validateRecurrence` names a key; en.json says what a leader reads.
+   */
   it('rejects a weekly rule with every day unticked', () => {
-    expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toMatch(/at least one day/);
+    expect(message(validateRecurrence(rule({ weekdays: [] }), FRIDAY))).toMatch(/at least one day/);
   });
 
   it('accepts a gathering in the last instant of the day the repeat ends on', () => {
@@ -534,8 +559,8 @@ describe('validateRecurrence', () => {
   });
 
   it('rejects an end date before the gathering it repeats', () => {
-    expect(validateRecurrence(rule({ until: '2026-07-01' }), FRIDAY)).toMatch(/has to end on/);
-    expect(validateRecurrence(rule({ until: '' }), FRIDAY)).toMatch(/Pick a date/);
+    expect(message(validateRecurrence(rule({ until: '2026-07-01' }), FRIDAY))).toMatch(/has to end on/);
+    expect(message(validateRecurrence(rule({ until: '' }), FRIDAY))).toMatch(/Pick a date/);
   });
 });
 
@@ -601,7 +626,7 @@ describe('defaultRuleForFrequency', () => {
     // monthly one has no weekdays by construction, and telling somebody to
     // pick a day on a form with no day picker on it is a dead end.
     expect(validateRecurrence(rule({ frequency: 'monthly', weekdays: [] }), FRIDAY)).toBeNull();
-    expect(validateRecurrence(rule({ weekdays: [] }), FRIDAY)).toBe(
+    expect(message(validateRecurrence(rule({ weekdays: [] }), FRIDAY))).toBe(
       'Pick at least one day of the week.',
     );
   });

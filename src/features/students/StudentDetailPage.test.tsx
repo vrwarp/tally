@@ -19,7 +19,7 @@
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
@@ -262,13 +262,13 @@ describe('the birthday on a student profile', () => {
   it('says the date even when it is nowhere near today', () => {
     openProfile(linked({ birthday: '08-22' }));
 
-    expect(screen.getByText('22 August')).toBeInTheDocument();
+    expect(screen.getByText('August 22')).toBeInTheDocument();
   });
 
   it('marks the ones worth interrupting a read for', () => {
     openProfile(linked({ birthday: '03-14' }));
 
-    expect(screen.getByText('14 March')).toBeInTheDocument();
+    expect(screen.getByText('March 14')).toBeInTheDocument();
     expect(screen.getByText('Today')).toBeInTheDocument();
   });
 
@@ -282,7 +282,7 @@ describe('the birthday on a student profile', () => {
     personDetails.current = details({ birthdate: '2011-08-22' });
     openProfile(linked({ birthday: '08-22' }));
 
-    expect(await screen.findByText('22 August 2011')).toBeInTheDocument();
+    expect(await screen.findByText('August 22, 2011')).toBeInTheDocument();
   });
 
   /** And says whose gap it is when there is genuinely no year upstream. */

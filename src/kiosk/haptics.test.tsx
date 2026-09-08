@@ -19,7 +19,7 @@
  * kiosk that said it while the finger could still slide off and mean nothing
  * would be lying in the one channel a parent is not looking at.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HOLD_DELAY_MS, HoldButton, HOLD_MS } from '@/kiosk/components/HoldButton';

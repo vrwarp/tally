@@ -15,6 +15,7 @@ import { GradeFilter } from '@/features/checkin/GradeFilter';
 import type { RosterFocus } from '@/features/roster/predictiveRoster';
 import { cn } from '@/lib/utils';
 import type { Grade } from '@/types';
+import { useTranslations } from 'use-intl';
 
 export interface FilterBarProps {
   grades: readonly Grade[];
@@ -120,6 +121,7 @@ export function FilterBar({
   inRoomCount = 0,
   checkedOutCount = 0,
 }: FilterBarProps) {
+  const t = useTranslations('CheckIn');
   // Pressing the chip that is already on means "stop filtering", the same way
   // the grade checklist clears back to All grades. Deliberately all the way to
   // the whole roster rather than one rung down the Recent → Participated → all
@@ -139,14 +141,14 @@ export function FilterBar({
             search box and the grade chip should stay with the chips rather than
             being flung 600px away from them. It can still shrink and scroll. */}
         <div className="scroll-touch flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto lg:flex-initial">
-          <div role="group" aria-label="Show" className="flex shrink-0 items-center gap-1.5">
+          <div role="group" aria-label={t('filterGroup')} className="flex shrink-0 items-center gap-1.5">
             {showRecent ? (
               <Chip
                 active={focus === 'recent'}
-                label="Show likely regulars only"
+                label={t('chipRecentLabel')}
                 onPress={() => setFocus('recent')}
               >
-                Recent
+                {t('focusRecent')}
                 <Tally active={focus === 'recent'}>{recentCount}</Tally>
               </Chip>
             ) : null}
@@ -157,10 +159,10 @@ export function FilterBar({
             {showParticipated ? (
               <Chip
                 active={focus === 'participated'}
-                label="Show only students who have been here before"
+                label={t('chipParticipatedLabel')}
                 onPress={() => setFocus('participated')}
               >
-                Participated
+                {t('focusParticipated')}
                 <Tally active={focus === 'participated'}>{participatedCount}</Tally>
               </Chip>
             ) : null}
@@ -174,28 +176,28 @@ export function FilterBar({
               <>
                 <Chip
                   active={focus === 'inRoom'}
-                  label="Show students still in the room"
+                  label={t('chipInRoomLabel')}
                   onPress={() => setFocus('inRoom')}
                 >
-                  In room
+                  {t('focusInRoom')}
                   <Tally active={focus === 'inRoom'}>{inRoomCount}</Tally>
                 </Chip>
                 <Chip
                   active={focus === 'checkedOut'}
-                  label="Show students who have been checked out"
+                  label={t('chipCheckedOutLabel')}
                   onPress={() => setFocus('checkedOut')}
                 >
-                  Checked out
+                  {t('focusCheckedOut')}
                   <Tally active={focus === 'checkedOut'}>{checkedOutCount}</Tally>
                 </Chip>
               </>
             ) : (
               <Chip
                 active={focus === 'checkedIn'}
-                label="Show checked-in students only"
+                label={t('chipCheckedInLabel')}
                 onPress={() => setFocus('checkedIn')}
               >
-                Checked in
+                {t('focusCheckedIn')}
                 <Tally active={focus === 'checkedIn'}>{present}</Tally>
               </Chip>
             )}

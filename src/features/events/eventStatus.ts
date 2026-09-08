@@ -8,7 +8,11 @@
  * events list and the check-in chooser all have to agree about what "open"
  * means.
  */
-import { formatClock, isCheckInOpen } from '@/lib/time';
+import {
+  formatClock,
+  isCheckInOpen,
+  type TimeStrings,
+} from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
 /**
@@ -23,15 +27,31 @@ import type { TallyEvent } from '@/types';
  * progress would be however many had been tapped in when the screen opened,
  * frozen, beside a card inviting the reader to go and add more.
  */
+/** The six keys this line can be, as a narrow function type. */
+export type EventStatusTranslator = (
+  key:
+    | 'cancelled'
+    | 'checkInOpen'
+    | 'checkInOpensAt'
+    | 'checkInClosed'
+    | 'finishedWithCount'
+    | 'finishedEmpty',
+  values?: Record<string, string | number>,
+) => string;
+
 export function eventStatusLine(
+  t: EventStatusTranslator,
+  strings: TimeStrings,
   event: TallyEvent,
   now: Date,
   present: number | undefined,
 ): string {
-  if (event.status === 'cancelled') return 'Cancelled';
-  if (isCheckInOpen(event, now)) return 'Check-in is open';
-  if (event.checkInOpensAt > now) return `Check-in opens at ${formatClock(event.checkInOpensAt)}`;
-  if (present === undefined) return 'Check-in has closed';
-  return present > 0 ? `Finished · ${present} checked in` : 'Finished · nobody was checked in';
+  if (event.status === 'cancelled') return t('cancelled');
+  if (isCheckInOpen(event, now)) return t('checkInOpen');
+  if (event.checkInOpensAt > now) {
+    return t('checkInOpensAt', { time: formatClock(strings, event.checkInOpensAt) });
+  }
+  if (present === undefined) return t('checkInClosed');
+  return present > 0 ? t('finishedWithCount', { count: present }) : t('finishedEmpty');
 }
 

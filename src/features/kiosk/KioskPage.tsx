@@ -32,7 +32,6 @@ import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useNow } from '@/hooks/useNow';
-import { formatRelative } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import {
   approveKioskPairing,
@@ -40,6 +39,9 @@ import {
   refreshKioskPhoneIndex,
   type KioskStatus,
 } from '@/services/functions';
+import { useTranslations } from 'use-intl';
+import { useTimeStrings } from '@/hooks/useTimeFormats';
+import { formatRelative, type TimeStrings } from '@/lib/time';
 
 const COPY_FEEDBACK_MS = 2000;
 
@@ -63,27 +65,15 @@ type Outcome = 'approved' | 'not-found' | 'expired' | 'failed' | null;
  * deployment that cannot mint tokens — so a claim that the lobby screen is
  * working is not this screen's to make.
  */
-const OUTCOME_LINES: Record<Exclude<Outcome, null>, { tone: 'good' | 'bad'; line: string }> = {
-  approved: {
-    tone: 'good',
-    line: 'Approved — the kiosk signs itself in on its next poll, and every check-in it records will be under your name.',
-  },
-  'not-found': {
-    tone: 'bad',
-    line: 'No kiosk is showing that code. Codes last ten minutes; read the one on the kiosk screen now — the letters I, L, O and the digits 0 and 1 never appear.',
-  },
-  expired: {
-    tone: 'bad',
-    line: 'That code has expired. The kiosk is already showing a fresh one — read it off the screen and try again.',
-  },
-  failed: { tone: 'bad', line: 'Could not reach the server. Try again in a moment.' },
-};
-
-/** The standing hint, when there is no verdict to show instead. */
-const CODE_HINT =
-  'Codes last ten minutes. If this one is refused, read the code the kiosk is showing now and try again.';
+const OUTCOME_LINES = {
+  approved: { tone: 'good', line: 'outcomeApproved' },
+  'not-found': { tone: 'bad', line: 'outcomeNotFound' },
+  expired: { tone: 'bad', line: 'outcomeExpired' },
+  failed: { tone: 'bad', line: 'outcomeFailed' },
+} as const satisfies Record<Exclude<Outcome, null>, { tone: 'good' | 'bad'; line: string }>;
 
 export function KioskPage() {
+  const t = useTranslations('KioskPair');
   const { can } = useAuth();
   const core = can('core');
   const signing = useSigningStatus(core);
@@ -98,10 +88,11 @@ export function KioskPage() {
      */
     <PageFrame width="lg" widen={core} className={cn('gap-6', !core && 'lg:max-w-2xl')}>
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-ink-50">Pair a kiosk</h1>
+        <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
         <p className="max-w-prose text-sm text-ink-300">
-          On the kiosk device, open <span className="font-mono text-ink-100">/kiosk</span>. It shows
-          a six-character code — type it here to sign that kiosk in as you.
+          {t.rich('intro', {
+            mono: (chunks) => <span className="font-mono text-ink-100">{chunks}</span>,
+          })}
         </p>
       </header>
 
@@ -116,7 +107,7 @@ export function KioskPage() {
             to="/"
             className="inline-flex min-h-12 items-center gap-2 text-base font-medium text-brand-300 hover:text-brand-200 pointer-fine:min-h-9 pointer-fine:text-sm"
           >
-            <span aria-hidden="true">✓</span>Check in
+            <span aria-hidden="true">✓</span>{t('backToCheckIn')}
           </Link>
         </div>
       )}
@@ -135,13 +126,12 @@ export function KioskPage() {
 
       <div className="flex flex-col gap-2 border-t border-ink-800 pt-6">
         <p className="max-w-prose text-xs leading-relaxed text-ink-500">
-          <span className="font-mono text-ink-300">/kiosk</span> is a self-serve screen for a device
-          in the lobby, served on this same site: families check themselves in by name, or by the
-          last four digits of a household phone number.
+          {t.rich('whatIsKiosk', {
+            mono: (chunks) => <span className="font-mono text-ink-300">{chunks}</span>,
+          })}
         </p>
         <p className="max-w-prose text-xs leading-relaxed text-ink-500">
-          To retire a kiosk, clear the browser&apos;s site data on the device
-          {core ? ' — or deactivate and reactivate your account to cut every session loose' : ''}.
+          {core ? t('retireCore') : t('retire')}
         </p>
       </div>
     </PageFrame>
@@ -157,6 +147,7 @@ export function KioskPage() {
  * too — the thumb is the input device and the button is where the hand ends up.
  */
 function PairForm({ blocked }: { blocked: boolean }) {
+  const t = useTranslations('KioskPair');
   const id = useId();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -193,15 +184,14 @@ function PairForm({ blocked }: { blocked: boolean }) {
             none of them can work is a wasted trip to the lobby and back. */}
         {blocked ? (
           <p className="max-w-prose text-sm text-danger-400">
-            This deployment cannot sign a kiosk in. Approving a code still records it, but the lobby
-            screen keeps waiting until the role below is granted.
+            {t('blocked')}
           </p>
         ) : null}
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
           <div className="flex min-w-0 flex-col gap-1.5 pointer-fine:gap-1">
             <label htmlFor={id} className="text-sm font-medium text-ink-200">
-              Pairing code
+              {t('codeLabel')}
             </label>
             {/* `indent-[0.2em]` puts back what the tracking takes: letter-spacing
                 is applied after the last glyph too, so a centred six-character
@@ -234,7 +224,7 @@ function PairForm({ blocked }: { blocked: boolean }) {
             disabled={busy || code.trim().length < CODE_LENGTH}
             className="min-h-12 disabled:bg-brand-500/10 disabled:text-brand-300 lg:w-auto"
           >
-            {busy ? 'Approving…' : 'Approve this kiosk'}
+            {busy ? t('approving') : t('approve')}
           </Button>
         </div>
 
@@ -253,7 +243,7 @@ function PairForm({ blocked }: { blocked: boolean }) {
                 : 'text-ink-400',
           )}
         >
-          {verdict ? verdict.line : CODE_HINT}
+          {verdict ? t(verdict.line) : t('codeHint')}
         </p>
       </form>
     </section>
@@ -326,12 +316,18 @@ function useSigningStatus(enabled: boolean): SigningState {
  */
 const JUST_NOW_MS = 45_000;
 
-function describeCheck(at: Date): string {
-  return Date.now() - at.getTime() < JUST_NOW_MS ? 'just now' : formatRelative(at);
+function describeCheck(
+  t: (key: 'justNow') => string,
+  strings: TimeStrings,
+  at: Date,
+): string {
+  return Date.now() - at.getTime() < JUST_NOW_MS ? t('justNow') : formatRelative(strings, at);
 }
 
 /** The deployment's own answer, and the errand it hands over when it is no. */
 function SigningSection({ status, checkedAt, checking, check }: SigningState) {
+  const t = useTranslations('KioskPair');
+  const timeStrings = useTimeStrings();
   const [copied, setCopied] = useState<CopyState>('idle');
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // So "checked 20 seconds ago" becomes "2 minutes ago" while somebody is off
@@ -374,14 +370,14 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
 
   const verdict =
     status.state === 'ok'
-      ? { line: 'Ready to pair', tone: 'text-ink-100' }
+      ? { line: t('readyToPair'), tone: 'text-ink-100' }
       : status.state === 'denied'
-        ? { line: 'Cannot sign kiosk tokens', tone: 'text-danger-400' }
-        : { line: 'Signing unverified', tone: 'text-warn-400' };
+        ? { line: t('cannotSign'), tone: 'text-danger-400' }
+        : { line: t('signingUnverified'), tone: 'text-warn-400' };
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500">This deployment</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500">{t('deploymentHeading')}</h2>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <p className={cn('text-sm font-semibold', verdict.tone)}>{verdict.line}</p>
@@ -392,8 +388,10 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
             )}
           >
             {status.problem
-              ? `${status.problem}${status.remedy ? ` ${status.remedy}` : ''}`
-              : 'Tally can hand a kiosk a session. It says nothing about the screen in the lobby.'}
+              ? status.remedy
+                ? t('problemWithRemedy', { problem: status.problem, remedy: status.remedy })
+                : status.problem
+              : t('signingOk')}
           </p>
         </div>
 
@@ -405,7 +403,7 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {status.command ? (
               <Button variant="ghost" onClick={() => void copyCommand()} className="ring-1 ring-ink-700">
-                Copy command
+                {t('copyCommand')}
               </Button>
             ) : null}
             <Button
@@ -414,18 +412,18 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
               loading={checking}
               className="ring-1 ring-ink-700"
             >
-              Check again
+              {t('checkAgain')}
             </Button>
           </div>
           <p aria-live="polite" className="min-h-5 text-xs leading-relaxed text-ink-400">
             {copied === 'copied'
-              ? 'Command copied.'
+              ? t('commandCopied')
               : copied === 'failed'
-                ? 'Could not copy — select the command below instead.'
+                ? t('copyFailed')
                 : checking
-                  ? 'Checking…'
+                  ? t('checking')
                   : checkedAt
-                    ? `Checked ${describeCheck(checkedAt)}`
+                    ? t('checkedAt', { when: describeCheck(t, timeStrings, checkedAt) })
                     : ''}
           </p>
         </div>
@@ -447,12 +445,12 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
 
         <dl className="flex flex-col gap-2 text-xs lg:flex-row lg:gap-8">
           <div className="flex flex-col gap-0.5">
-            <dt className="text-ink-500">Project</dt>
-            <dd className="font-mono text-ink-200">{status.project ?? 'unknown'}</dd>
+            <dt className="text-ink-500">{t('project')}</dt>
+            <dd className="font-mono text-ink-200">{status.project ?? t('unknown')}</dd>
           </div>
           <div className="flex flex-col gap-0.5">
-            <dt className="text-ink-500">Service account</dt>
-            <dd className="break-all font-mono text-ink-200">{status.serviceAccount ?? 'unknown'}</dd>
+            <dt className="text-ink-500">{t('serviceAccount')}</dt>
+            <dd className="break-all font-mono text-ink-200">{status.serviceAccount ?? t('unknown')}</dd>
           </div>
         </dl>
       </div>
@@ -473,16 +471,17 @@ function SigningSection({ status, checkedAt, checking, check }: SigningState) {
  * field, at rest and on refusal.
  */
 function StuckKioskSection({ granted, className }: { granted: boolean; className?: string }) {
+  const t = useTranslations('KioskPair');
   return (
     <section className={cn('flex flex-col gap-2', className)}>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-        If the kiosk still waits
+        {t('stuckHeading')}
       </h2>
       {/* Sequenced behind the grant rather than withheld: after it propagates,
           these two are exactly what is left. */}
       {granted ? null : (
         <p className="max-w-prose text-xs leading-relaxed text-ink-300">
-          Once the role is granted, these are the remaining reasons a kiosk keeps waiting.
+          {t('stuckPending')}
         </p>
       )}
       <ul
@@ -492,12 +491,10 @@ function StuckKioskSection({ granted, className }: { granted: boolean; className
         )}
       >
         <li>
-          A kiosk installed to the device&apos;s home screen keeps its own storage, so it asks to be
-          paired a second time.
+          {t('stuckHomeScreen')}
         </li>
         <li>
-          A kiosk stops when its approver&apos;s access is deactivated. Pair it again from an active
-          account.
+          {t('stuckDeactivated')}
         </li>
       </ul>
     </section>
@@ -512,6 +509,7 @@ function StuckKioskSection({ granted, className }: { granted: boolean; className
  * they are standing at the kiosk now.
  */
 function PhoneSearchSection() {
+  const t = useTranslations('KioskPair');
   const { show } = useToast();
   const [rebuilding, setRebuilding] = useState(false);
 
@@ -520,11 +518,11 @@ function PhoneSearchSection() {
     setRebuilding(true);
     try {
       const { data } = await refreshKioskPhoneIndex({ force: true });
-      show(`Phone search rebuilt: ${data.students} students, ${data.entries} number endings.`, {
+      show(t('rebuilt', { students: data.students, entries: data.entries }), {
         tone: 'success',
       });
     } catch {
-      show('Could not rebuild the kiosk phone index. Is a people backend reachable?', {
+      show(t('rebuildFailed'), {
         tone: 'error',
       });
     } finally {
@@ -534,10 +532,9 @@ function PhoneSearchSection() {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500">Phone search</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500">{t('phoneSearchHeading')}</h2>
       <p className="max-w-prose text-xs leading-relaxed text-ink-400">
-        Only the last four digits of a household&apos;s numbers are ever stored in Tally. The index
-        rebuilds nightly on its own; use this when a family&apos;s number changed today.
+        {t('phoneSearchNote')}
       </p>
       <div>
         <Button
@@ -546,7 +543,7 @@ function PhoneSearchSection() {
           loading={rebuilding}
           className="ring-1 ring-ink-700"
         >
-          Rebuild phone search index
+          {t('rebuildIndex')}
         </Button>
       </div>
     </section>
