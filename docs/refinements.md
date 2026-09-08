@@ -339,6 +339,17 @@ its axis and both its columns. The apostrophe went back up to where it sits in a
 word, because levelled with the hyphen it read as a comma. The board's height
 is unchanged on every viewport.
 
+**After: the gutter, everywhere.** The owner, typing on the lobby tablet, said
+the keys were easy to miss between. They were: 6px of air between two 73px
+plates is a seam a thumb cannot feel for, and a mistype on this board is silent
+— every key buzzes the same whether or not it was the one aimed at. Round 3's
+move ran again over the whole board rather than one row: every key gives up
+another 2px of height and ~1.8 of width, the gutter goes to 8px, the Z row's to
+20, and the twenty-cell track absorbs the width change on its own. Measured on
+all three glass shapes, the board occupies the same box it did — 390×320,
+800×360, 1024×320 — the pitch is unchanged, and the bar's centre is still the
+board's. The keyboard now shares the phone pad's gutter, which was 8px already.
+
 Shipped: `centered-safe` — `Clear · space · ’ · -` on the twenty-cell track,
 Clear giving 8px to its bar side, every key 2px shorter, the punctuation legends
 one size larger. With it, the search buffer refuses a mark on digits the way it
