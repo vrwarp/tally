@@ -193,8 +193,15 @@ export function WarningBadge({
          * and `oneLine` is for a lane that cannot afford that, where the badge
          * ellipsises and the rest is one gesture away.
          */
-        note && 'min-w-0 max-w-full shrink px-2 py-1 text-left',
-        note && !oneLine && 'items-start whitespace-normal',
+        note && 'min-w-0 max-w-full shrink px-2 text-left',
+        /*
+         * `py-1` is for a note that wraps — several lines of text want more
+         * room above and below them than a two-word chip does. A note on one
+         * line keeps `SHAPE`'s `py-0.5`, and that is load-bearing rather than
+         * tidiness: it makes a badge with a note exactly as tall as the badge
+         * without one, so the row a note lands on does not grow by 4px.
+         */
+        note && !oneLine && 'items-start whitespace-normal py-1',
         className,
       )}
     >

@@ -202,14 +202,35 @@ describe('StudentRow', () => {
       pcoPersonId: '4200003',
     });
 
+    /** Flagged, and not here yet: the long list at the start of a night. */
     const flagged = (): RosterEntry => ({ ...entryFor(SOFIA), warnings: ['allergy'] });
 
-    it('prints what the allergy is, not just that there is one', () => {
-      const { container } = show(flagged(), {
+    /** Flagged and checked in — the row that just turned green. */
+    const flaggedAndHere = (): RosterEntry => ({
+      ...flagged(),
+      attendance: makeAttendance({ studentId: SOFIA.id }),
+    });
+
+    it('prints what the allergy is, not just that there is one, once she is here', () => {
+      const { container } = show(flaggedAndHere(), {
         allergyNote: 'Severe peanut allergy — EpiPen in her bag',
       });
 
       expect(container.textContent).toContain('Allergy: Severe peanut allergy — EpiPen in her bag');
+    });
+
+    /*
+     * The note is spelled out in step with what the counselor has done, never
+     * in step with the network. Before the check-in the row carries the flag
+     * and nothing else, so the long list everybody scrolls is one height per
+     * row whatever Planning Center is still holding — and the note lands on
+     * the row that just turned green, in front of the person at the door.
+     */
+    it('shows the flag alone until the student is checked in', () => {
+      const { container } = show(flagged(), { allergyNote: LONG_NOTE });
+
+      expect(screen.getByText('Allergy')).toBeInTheDocument();
+      expect(container.querySelector('[aria-hidden="true"].truncate')).toBeNull();
     });
 
     /*
@@ -221,7 +242,7 @@ describe('StudentRow', () => {
      * length costs nothing.
      */
     it('holds a long note to one line while the row is closed', () => {
-      const { container } = show(flagged(), { allergyNote: LONG_NOTE });
+      const { container } = show(flaggedAndHere(), { allergyNote: LONG_NOTE });
 
       // The badge, not the name beside it — both are held to one line, and
       // only one of them carries a `title`.
@@ -238,10 +259,7 @@ describe('StudentRow', () => {
       // note reads exactly like a whole one. So the tap that opens the row's
       // corrections is also the tap that spells the note out — an open row is
       // already changing its own height, and only one is open screen-wide.
-      const { container } = show(
-        { ...flagged(), attendance: makeAttendance({ studentId: SOFIA.id }) },
-        { allergyNote: LONG_NOTE, expanded: true },
-      );
+      const { container } = show(flaggedAndHere(), { allergyNote: LONG_NOTE, expanded: true });
 
       const badge = container.querySelector('.whitespace-normal');
       expect(badge).not.toBeNull();
@@ -250,10 +268,10 @@ describe('StudentRow', () => {
       expect(container.querySelector('.truncate')?.textContent).not.toContain('peanut');
     });
 
-    it('says the whole note out loud either way, clipped or not', () => {
+    it('says the whole note out loud, clipped or not', () => {
       // The ellipsis is for the eye. Nothing about the reservation is allowed
       // to cost a screen reader the half of the note it cannot see.
-      const { container } = show(flagged(), { allergyNote: LONG_NOTE });
+      const { container } = show(flaggedAndHere(), { allergyNote: LONG_NOTE });
 
       expect(within(container).getByText(`Has allergies on file: ${LONG_NOTE}`)).toHaveClass(
         'sr-only',
@@ -278,6 +296,12 @@ describe('StudentRow', () => {
       expect(screen.getAllByRole('button')).toHaveLength(1);
     });
 
+    /*
+     * And reads it out *before* the check-in, on the one row whose badge is
+     * deliberately still saying only `Allergy`. Holding the note back is a
+     * decision about the height of a scrolling list; a label costs no height,
+     * so there is no reason for it to keep the same secret.
+     */
     it('reads the note out with the row, since that label is where it belongs', () => {
       show(flagged(), { allergyNote: 'Severe peanut allergy' });
 
@@ -294,9 +318,7 @@ describe('StudentRow', () => {
      * both would read a medical note out twice on every flagged row.
      */
     it('says it once on a checked-in row, on the row and not the check mark', () => {
-      show({ ...flagged(), attendance: makeAttendance({ studentId: SOFIA.id }) }, {
-        allergyNote: 'Severe peanut allergy',
-      });
+      show(flaggedAndHere(), { allergyNote: 'Severe peanut allergy' });
 
       expect(
         screen.getByRole('button', { name: /^More actions for Sofia Delgado.*Allergy: Severe peanut allergy$/ }),

@@ -84,6 +84,9 @@ export interface StudentRowProps {
    * Absent — no answer yet, no note on file, or a read that failed — leaves the
    * badge saying `Allergy` on its own, which is what it always said. See
    * `useAllergyNotes`.
+   *
+   * Held to the row's own label until the student is checked in, and printed on
+   * the badge from then on; the badge below says why.
    */
   allergyNote?: string;
 }
@@ -354,32 +357,51 @@ export const StudentRow = memo(function StudentRow({
                   {warnings.map((warning) =>
                     warning === 'allergy' ? (
                       /*
-                        The allergy's lane, held open whether or not the note is in.
+                        The allergy's lane, and the three things it is allowed to say.
 
-                        The badge is the only thing on this row whose size is
-                        decided by an answer from Planning Center rather than by
-                        the roster — `useAllergyNotes` fetches it for the flagged
-                        rows alone, and it lands seconds after the names on church
-                        wifi. Wrapping, `⚠ Allergy` became three lines of note
-                        under a thumb already travelling down the list, and took
-                        every row below it with it. See `docs/layout-stability.md`.
+                        The note behind the badge is the only thing on this row
+                        sized by an answer from Planning Center rather than by the
+                        roster — `useAllergyNotes` fetches it for the flagged rows
+                        alone, and it lands seconds after the names on church wifi.
+                        Printed in full it was three lines where the row had
+                        budgeted one, arriving under a thumb already travelling
+                        down the list and taking every row below it along. See
+                        `docs/layout-stability.md`.
 
-                        So the lane is the reservation: `basis-0` means it never
-                        decides where the flex line breaks, `flex-1` gives it
-                        whatever width the chips before it left, and the badge
-                        inside is content-width up to that and ellipsised past it.
-                        Before and after the note lands the row is the same shape,
-                        and a note of any length costs the same nothing.
+                        So the note is spelled out in step with what the counselor
+                        has done, and never in step with the network:
 
-                        The rest of the note is a tap away rather than gone — the
-                        row opens, and an open row can afford the height. Which
-                        also means a student who is not checked in yet shows the
-                        clipped form: the ellipsis says there is more, the row's
-                        own label reads the whole note out, and a pointer gets it
-                        from the title.
+                        - **Not here yet — the flag alone.** The long list at the
+                          start of a night is the one being scrolled and searched,
+                          and every row in it is the same height whatever Planning
+                          Center is holding. `⚠ Allergy` is the true and urgent
+                          half; it says stop, and the stop is what the next tap is
+                          for.
+                        - **Checked in — the note, to one line.** Now it is on the
+                          row that just turned green, where somebody standing at
+                          the door reads it without leaving the queue.
+                        - **Open — the whole note, wrapped.** A row already giving
+                          up its height for Undo and Profile can afford the rest.
+
+                        The lane is what keeps each of those from moving the row:
+                        `basis-0` means it never decides where the badge line
+                        breaks, `flex-1` gives it whatever width the chips before
+                        it left, and the badge inside is content-width up to that
+                        and ellipsised past it. So the note appearing on check-in
+                        changes the badge and nothing else on the row — not its
+                        height, and not where the flags after it sit.
+
+                        Nothing is hidden while it is clipped: the ellipsis says
+                        there is more, the row's own label reads the note out in
+                        full at every step — before the check-in included — and a
+                        pointer gets it from the badge's title.
                       */
                       <span key={warning} className={cn('flex min-w-0', !open && 'flex-1 basis-0')}>
-                        <WarningBadge warning={warning} detail={allergyNote} oneLine={!open} />
+                        <WarningBadge
+                          warning={warning}
+                          detail={here ? allergyNote : undefined}
+                          oneLine={!open}
+                        />
                       </span>
                     ) : (
                       <WarningBadge key={warning} warning={warning} />
