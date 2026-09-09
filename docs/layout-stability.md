@@ -145,6 +145,25 @@ not a gathering this screen can say anything about.
   badge and the end of the student's name leftward. Both are reserved at their
   settled values for exactly the widths the cap applies to, and handed back at
   `2xl` where the number sits beside the pills again.
+- **The check-in row's allergy note is spelled out in step with the counselor,
+  never with the network.** The note behind `⚠ Allergy` is fetched per flagged
+  row (`useAllergyNotes`) and lands after the names; a badge allowed to wrap
+  turned one line into three under a thumb already travelling down the list,
+  taking every row below it along — 644px of list becoming 874px on a phone
+  while nobody touched anything. Three states now, and the network is not what
+  moves between them. A student who has not arrived gets the flag alone, so the
+  long list — the one that is scrolled and searched — is one height per row
+  whatever Planning Center is holding. A check-in puts the note on the row, held
+  to one line in a `flex-1 basis-0` lane: the lane never decides where the badge
+  line breaks and takes whatever width the chips before it left, and a
+  one-line note badge keeps `SHAPE`'s `py-0.5` so it is exactly as tall as the
+  badge it replaces. Opening the row spells the whole note out, which a row
+  already giving up its height for Undo and Profile can afford. Measured across
+  the answer landing and two check-ins, the list holds at 644px. Nothing is
+  hidden while it is clipped: the ellipsis says there is more, the row's own
+  label reads the note out in full from the first frame, and a pointer gets it
+  from the badge's title. The frames are in
+  [walkthrough/allergy](walkthrough/allergy/README.md).
 - **The directory's "No contact" badge** is a column now, like the grade and
   the last-seen date either side of it — always rendered, painted only when
   somebody is missing. The badge lane is packed against the right, so a chip

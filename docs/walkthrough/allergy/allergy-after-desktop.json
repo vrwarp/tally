@@ -1,0 +1,57 @@
+[
+  {
+    "journey": "The list at the start of a night",
+    "title": "The flag, and only the flag",
+    "caption": "The same moment, after the change: the roster is in and Planning Center has not answered. Identical to the frame above, and deliberately so — the badge before the answer was never the problem. *Measured here: the list is 644px tall on a phone and 355px on a laptop.*",
+    "file": "desktop-01-the-flag-and-only-the-flag.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 644,
+      "desktop": 355
+    }
+  },
+  {
+    "journey": "The list at the start of a night",
+    "title": "The answer lands, and nothing moves",
+    "caption": "The notes are in. Nothing on this screen is different, because a student who has not arrived is a student whose row says `⚠ Allergy` and stops there. The long list is the one that gets scrolled and searched, and it is now one height per row whatever the network is holding — which is the property the check-in screen is supposed to have and did not. *Measured here: the list is 644px tall on a phone and 355px on a laptop.*",
+    "file": "desktop-02-the-answer-lands-and-nothing-moves.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 644,
+      "desktop": 355
+    }
+  },
+  {
+    "journey": "A student arrives",
+    "title": "The note lands on the row that just turned green",
+    "caption": "**Noah Fitzgerald** is here. One tap checked him in, and the same tap spelled his allergy out on the row — in front of the person standing at the door, without leaving the queue to go and look it up. The note is held to one line and ellipsised, so the row is exactly the height it was a moment ago: the tap changed the badge and nothing else, and the rows below him did not move. *Measured here: the list is 644px tall on a phone and 355px on a laptop.*",
+    "file": "desktop-03-the-note-lands-on-the-row-that-just-turned-green.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 644,
+      "desktop": 355
+    }
+  },
+  {
+    "journey": "A student arrives",
+    "title": "The crowded row, and what it costs",
+    "caption": "**Naomi Tanaka** carries a red flag after her amber one, and this is the worst the rule looks. The lane the note sits in is whatever the chips before it left — `flex-1 basis-0`, so it never decides where the badge line breaks — and on a phone, on a checked-in row, after a hint and a second badge, that is about 110px. `Shellfish` becomes `Sh…`. The badge says so rather than pretending, the whole word is one tap away, and `Blocked` is where it was in the frame above and will be in the frame below: what a crowded row costs is characters, never position. Giving the note a line of its own here would buy eight more of them on every checked-in row with an allergy, which is a line of the queue for a word. *Measured here: the list is 644px tall on a phone and 355px on a laptop.*",
+    "file": "desktop-04-the-crowded-row-and-what-it-costs.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 644,
+      "desktop": 355
+    }
+  },
+  {
+    "journey": "Reading the whole note",
+    "title": "The row opens, and the note is spelled out",
+    "caption": "A second tap on **Noah**’s row opens the corrections strip — Undo, Profile, Move check-in — and the note comes with it, wrapped to as many lines as it takes. A row that is already giving up its height for three buttons can afford the rest of a sentence, and only one row on the screen is ever open. Nothing was hidden while it was clipped, either: the ellipsis says there is more, the row’s own label reads the whole note out to a screen reader from the first frame onwards, and a pointer gets it from the badge’s tooltip. *Measured here: the list is 845px tall on a phone and 474px on a laptop.*",
+    "file": "desktop-05-the-row-opens-and-the-note-is-spelled-out.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 845,
+      "desktop": 474
+    }
+  }
+]

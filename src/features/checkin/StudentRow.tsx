@@ -84,6 +84,9 @@ export interface StudentRowProps {
    * Absent — no answer yet, no note on file, or a read that failed — leaves the
    * badge saying `Allergy` on its own, which is what it always said. See
    * `useAllergyNotes`.
+   *
+   * Held to the row's own label until the student is checked in, and printed on
+   * the badge from then on; the badge below says why.
    */
   allergyNote?: string;
 }
@@ -317,9 +320,9 @@ export const StudentRow = memo(function StudentRow({
               </span>
 
               {warnings.length > 0 || showHint || unavailable || gone ? (
-                // `items-start`, because the allergy badge is allowed to be
-                // several lines tall when the note is long: everything beside it
-                // should sit at its first line rather than halfway down it.
+                // `items-start`, because an expanded row lets the allergy badge
+                // be several lines tall: everything beside it should sit at its
+                // first line rather than halfway down it.
                 <span className="mt-1 flex flex-wrap items-start gap-1">
                   {/*
                     The ratio leads, badges trail. It is set in tabular numerals —
@@ -351,13 +354,59 @@ export const StudentRow = memo(function StudentRow({
                       {recentHits} of {recentWindow}
                     </span>
                   ) : null}
-                  {warnings.map((warning) => (
-                    <WarningBadge
-                      key={warning}
-                      warning={warning}
-                      detail={warning === 'allergy' ? allergyNote : undefined}
-                    />
-                  ))}
+                  {warnings.map((warning) =>
+                    warning === 'allergy' ? (
+                      /*
+                        The allergy's lane, and the three things it is allowed to say.
+
+                        The note behind the badge is the only thing on this row
+                        sized by an answer from Planning Center rather than by the
+                        roster — `useAllergyNotes` fetches it for the flagged rows
+                        alone, and it lands seconds after the names on church wifi.
+                        Printed in full it was three lines where the row had
+                        budgeted one, arriving under a thumb already travelling
+                        down the list and taking every row below it along. See
+                        `docs/layout-stability.md`.
+
+                        So the note is spelled out in step with what the counselor
+                        has done, and never in step with the network:
+
+                        - **Not here yet — the flag alone.** The long list at the
+                          start of a night is the one being scrolled and searched,
+                          and every row in it is the same height whatever Planning
+                          Center is holding. `⚠ Allergy` is the true and urgent
+                          half; it says stop, and the stop is what the next tap is
+                          for.
+                        - **Checked in — the note, to one line.** Now it is on the
+                          row that just turned green, where somebody standing at
+                          the door reads it without leaving the queue.
+                        - **Open — the whole note, wrapped.** A row already giving
+                          up its height for Undo and Profile can afford the rest.
+
+                        The lane is what keeps each of those from moving the row:
+                        `basis-0` means it never decides where the badge line
+                        breaks, `flex-1` gives it whatever width the chips before
+                        it left, and the badge inside is content-width up to that
+                        and ellipsised past it. So the note appearing on check-in
+                        changes the badge and nothing else on the row — not its
+                        height, and not where the flags after it sit.
+
+                        Nothing is hidden while it is clipped: the ellipsis says
+                        there is more, the row's own label reads the note out in
+                        full at every step — before the check-in included — and a
+                        pointer gets it from the badge's title.
+                      */
+                      <span key={warning} className={cn('flex min-w-0', !open && 'flex-1 basis-0')}>
+                        <WarningBadge
+                          warning={warning}
+                          detail={here ? allergyNote : undefined}
+                          oneLine={!open}
+                        />
+                      </span>
+                    ) : (
+                      <WarningBadge key={warning} warning={warning} />
+                    ),
+                  )}
                 </span>
               ) : null}
             </span>

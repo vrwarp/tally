@@ -1,0 +1,24 @@
+[
+  {
+    "journey": "What it did before",
+    "title": "The roster, still waiting on Planning Center",
+    "caption": "A Friday queue as it stands a second after the screen paints. The names and the flags come from the roster, which the device already had; the notes behind the flags do not — `useAllergyNotes` asks Planning Center for the flagged rows only, and on a church’s wifi that answer is still in the air. Four amber badges, every row the same height, and a counselor already scrolling. *Measured here: the list is 644px tall on a phone and 355px on a laptop.*",
+    "file": "desktop-before-01-the-roster-still-waiting-on-planning-center.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 644,
+      "desktop": 355
+    }
+  },
+  {
+    "journey": "What it did before",
+    "title": "The answer lands, and the list is a different length",
+    "caption": "Nobody touched anything. The notes arrived, each badge grew to as many lines as its note needed — three, for **Noah Fitzgerald** — and every row underneath moved down the screen. This is the whole defect: the one thing on the row that is sized by the network rather than by the roster was also the one thing allowed to change the row’s height, so a list somebody had started reading rewrote itself under their thumb. *Measured here: the list is 874px tall on a phone and 425px on a laptop.*",
+    "file": "desktop-before-02-the-answer-lands-and-the-list-is-a-different-length.png",
+    "viewport": "desktop",
+    "heights": {
+      "phone": 874,
+      "desktop": 425
+    }
+  }
+]
