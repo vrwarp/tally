@@ -212,19 +212,56 @@ describe('StudentRow', () => {
       expect(container.textContent).toContain('Allergy: Severe peanut allergy — EpiPen in her bag');
     });
 
-    it('carries the whole note, however long, rather than a truncated one', () => {
-      // Clipping is the one failure mode that cannot be noticed: half a medical
-      // note reads exactly like a whole one. So the badge that holds it is the
-      // one badge in the app allowed to wrap and to take the row height with it.
+    /*
+     * The note arrives from Planning Center seconds after the names do, on a
+     * screen whose whole promise is that it does not move while somebody is
+     * reading it. A badge that wraps takes the row's height with it and every
+     * row below, so the lane the badge sits in is held open at one line — and
+     * a lane sized to what the chips before it left is a lane a note of any
+     * length costs nothing.
+     */
+    it('holds a long note to one line while the row is closed', () => {
       const { container } = show(flagged(), { allergyNote: LONG_NOTE });
 
-      expect(container.textContent).toContain(LONG_NOTE);
+      // The badge, not the name beside it — both are held to one line, and
+      // only one of them carries a `title`.
+      const badge = container.querySelector('[title]');
+      expect(badge?.querySelector('.truncate')?.textContent).toContain(LONG_NOTE);
+
+      // Not wrapping, and not deciding where the badge lane breaks either.
+      expect(container.querySelector('.whitespace-normal')).toBeNull();
+      expect(container.querySelector('.basis-0')).not.toBeNull();
+    });
+
+    it('gives the whole note the room to wrap once the row is open', async () => {
+      // Clipping is the one failure mode that cannot be noticed: half a medical
+      // note reads exactly like a whole one. So the tap that opens the row's
+      // corrections is also the tap that spells the note out — an open row is
+      // already changing its own height, and only one is open screen-wide.
+      const { container } = show(
+        { ...flagged(), attendance: makeAttendance({ studentId: SOFIA.id }) },
+        { allergyNote: LONG_NOTE, expanded: true },
+      );
 
       const badge = container.querySelector('.whitespace-normal');
       expect(badge).not.toBeNull();
       expect(badge?.textContent).toContain(LONG_NOTE);
       expect(badge?.querySelector('.break-words')).not.toBeNull();
       expect(container.querySelector('.truncate')?.textContent).not.toContain('peanut');
+    });
+
+    it('says the whole note out loud either way, clipped or not', () => {
+      // The ellipsis is for the eye. Nothing about the reservation is allowed
+      // to cost a screen reader the half of the note it cannot see.
+      const { container } = show(flagged(), { allergyNote: LONG_NOTE });
+
+      expect(within(container).getByText(`Has allergies on file: ${LONG_NOTE}`)).toHaveClass(
+        'sr-only',
+      );
+      expect(container.querySelector('[title]')).toHaveAttribute(
+        'title',
+        `Has allergies on file: ${LONG_NOTE}`,
+      );
     });
 
     it('falls back to the plain badge before the note has landed', () => {

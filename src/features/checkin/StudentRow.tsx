@@ -317,9 +317,9 @@ export const StudentRow = memo(function StudentRow({
               </span>
 
               {warnings.length > 0 || showHint || unavailable || gone ? (
-                // `items-start`, because the allergy badge is allowed to be
-                // several lines tall when the note is long: everything beside it
-                // should sit at its first line rather than halfway down it.
+                // `items-start`, because an expanded row lets the allergy badge
+                // be several lines tall: everything beside it should sit at its
+                // first line rather than halfway down it.
                 <span className="mt-1 flex flex-wrap items-start gap-1">
                   {/*
                     The ratio leads, badges trail. It is set in tabular numerals —
@@ -351,13 +351,40 @@ export const StudentRow = memo(function StudentRow({
                       {recentHits} of {recentWindow}
                     </span>
                   ) : null}
-                  {warnings.map((warning) => (
-                    <WarningBadge
-                      key={warning}
-                      warning={warning}
-                      detail={warning === 'allergy' ? allergyNote : undefined}
-                    />
-                  ))}
+                  {warnings.map((warning) =>
+                    warning === 'allergy' ? (
+                      /*
+                        The allergy's lane, held open whether or not the note is in.
+
+                        The badge is the only thing on this row whose size is
+                        decided by an answer from Planning Center rather than by
+                        the roster — `useAllergyNotes` fetches it for the flagged
+                        rows alone, and it lands seconds after the names on church
+                        wifi. Wrapping, `⚠ Allergy` became three lines of note
+                        under a thumb already travelling down the list, and took
+                        every row below it with it. See `docs/layout-stability.md`.
+
+                        So the lane is the reservation: `basis-0` means it never
+                        decides where the flex line breaks, `flex-1` gives it
+                        whatever width the chips before it left, and the badge
+                        inside is content-width up to that and ellipsised past it.
+                        Before and after the note lands the row is the same shape,
+                        and a note of any length costs the same nothing.
+
+                        The rest of the note is a tap away rather than gone — the
+                        row opens, and an open row can afford the height. Which
+                        also means a student who is not checked in yet shows the
+                        clipped form: the ellipsis says there is more, the row's
+                        own label reads the whole note out, and a pointer gets it
+                        from the title.
+                      */
+                      <span key={warning} className={cn('flex min-w-0', !open && 'flex-1 basis-0')}>
+                        <WarningBadge warning={warning} detail={allergyNote} oneLine={!open} />
+                      </span>
+                    ) : (
+                      <WarningBadge key={warning} warning={warning} />
+                    ),
+                  )}
                 </span>
               ) : null}
             </span>

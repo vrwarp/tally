@@ -145,6 +145,17 @@ not a gathering this screen can say anything about.
   badge and the end of the student's name leftward. Both are reserved at their
   settled values for exactly the widths the cap applies to, and handed back at
   `2xl` where the number sits beside the pills again.
+- **The check-in row's allergy badge has a lane of its own width.** The note
+  behind `⚠ Allergy` is fetched per flagged row (`useAllergyNotes`) and lands
+  after the names, and a badge allowed to wrap turned one line into three under
+  a thumb already travelling down the list — every row below it moving with the
+  one being read. The badge now sits in a `flex-1 basis-0` lane: it never
+  decides where the badge line breaks, it takes whatever width the chips before
+  it left, and a note longer than that is ellipsised rather than wrapped. So the
+  row is the same shape before and after the answer, and a note of any length
+  costs the same nothing. The rest of the note is one tap away — an open row
+  already changes its own height, and only one is open screen-wide — and the
+  whole of it is on the row's label and its `title` at every moment.
 - **The directory's "No contact" badge** is a column now, like the grade and
   the last-seen date either side of it — always rendered, painted only when
   somebody is missing. The badge lane is packed against the right, so a chip

@@ -125,10 +125,27 @@ export interface WarningBadgeProps {
    *
    * Only worth passing where the badge is the last thing somebody will read
    * before acting — the check-in row, where the alternative is leaving the
-   * screen mid-queue. A badge given a detail stops being a fixed-width chip and
-   * wraps to as many lines as the text needs; see below.
+   * screen mid-queue. A badge given a detail stops being a fixed-width chip: it
+   * shrinks to its lane and then either wraps or ellipsises — see `oneLine`.
    */
   detail?: string | null;
+  /**
+   * Hold the note to one line, ellipsised, instead of letting it wrap.
+   *
+   * A note is as long as whoever typed it upstream, and the rows that carry one
+   * sit in a list whose other rows do not. Left to wrap, the badge is the one
+   * thing on a check-in row whose height is decided by an answer that arrives
+   * from Planning Center seconds after the names do — so the row a counselor
+   * had started reading grows two lines under their thumb, and every row below
+   * it moves. See `docs/layout-stability.md`.
+   *
+   * Clipped, the note is still visibly clipped: the ellipsis is the badge
+   * saying there is more, the `title` carries the whole thing for a pointer,
+   * and nothing is taken from a screen reader — the spoken label below is the
+   * full note either way. The caller decides where the rest is read; on the
+   * check-in row it is the same tap that opens the row's actions.
+   */
+  oneLine?: boolean;
   /** See `BadgeProps.onPress`. Without it this is a plain, unpressable chip. */
   onPress?: () => void;
   /** The verb, for a screen reader: "Add a contact for Aaron Mensah". */
@@ -143,6 +160,7 @@ export interface WarningBadgeProps {
 export function WarningBadge({
   warning,
   detail,
+  oneLine = false,
   onPress,
   pressLabel,
   className,
@@ -166,19 +184,25 @@ export function WarningBadge({
          *
          * Everything that keeps a badge one line — no shrinking, no wrapping —
          * exists so a lane of fixed-width chips cannot change a row's height as
-         * the data changes. A medical note has the opposite requirement: it is
-         * the content, it is as long as somebody upstream typed, and a clipped
-         * one is worse than none because a counselor cannot tell it was cut.
-         * So this badge shrinks, wraps, and takes the row height with it.
+         * the data changes. A medical note is the other kind of content: it is
+         * as long as somebody upstream typed, so the badge that holds it has to
+         * be allowed to shrink to whatever room its lane has left.
+         *
+         * What it does with the overflow is the caller's call. Wrapping is the
+         * honest default — the whole note, at the cost of the row's height —
+         * and `oneLine` is for a lane that cannot afford that, where the badge
+         * ellipsises and the rest is one gesture away.
          */
-        note && 'min-w-0 shrink items-start whitespace-normal px-2 py-1 text-left',
+        note && 'min-w-0 max-w-full shrink px-2 py-1 text-left',
+        note && !oneLine && 'items-start whitespace-normal',
         className,
       )}
     >
       {meta.tone === 'warn' ? (
         // Held on the first line by `items-start` above, so a wrapped note reads
-        // as one block of text rather than around a centred glyph.
-        <span aria-hidden="true" className="leading-snug">
+        // as one block of text rather than around a centred glyph. A note on one
+        // line has no first line to be held to, and centres with the text.
+        <span aria-hidden="true" className="shrink-0 leading-snug">
           ⚠
         </span>
       ) : null}
@@ -196,7 +220,13 @@ export function WarningBadge({
         <span className="sr-only">{spoken}</span>
       )}
       {note ? (
-        <span aria-hidden="true" className="min-w-0 break-words text-xs leading-snug">
+        <span
+          aria-hidden="true"
+          className={cn(
+            'min-w-0 text-xs leading-snug',
+            oneLine ? 'truncate' : 'break-words',
+          )}
+        >
           {t('shortWithDetail', { short, detail: note })}
         </span>
       ) : (
