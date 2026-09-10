@@ -3,7 +3,8 @@
 **Status: proposal, for review.** Nothing in this document is built. It is the record of a design
 campaign run the way the ones in [refinements.md](refinements.md) were run, but at design time
 rather than against rendered frames: the journeys were walked, argued over by three consultants
-until a round produced nothing above `minor`, and the proposal below is what survived. Every claim
+until a round produced nothing above `minor`, and the proposal below is what survived — then
+revised once more after the owner's review (section 7). Every claim
 about today's behaviour was checked against `src/`, `firestore.rules` and `functions/src` rather
 than against the walkthrough, and three of them turned out to be worse than the walkthrough says.
 
@@ -203,7 +204,7 @@ rather than screens (`uxr-journey-critic`), the church staff pair — the direct
 coordinator at 9:05 on a Sunday (`church-staff-consultant`) — and a volunteer counselor speaking
 only from the door (the one voice `.claude/agents/` does not define; it was run as a persona
 prompt over the same code, and is worth adding there for the next campaign). Round 1 was
-discovery: every journey graded, the missing ones added. Rounds 2 to 5 were the loop: a proposal,
+discovery: every journey graded, the missing ones added. Rounds 2 to 5 were the loop, and round 6 the owner's review: a proposal,
 three critiques, a revision, until a round produced nothing above `minor` — the bar
 [refinements.md](refinements.md) uses. Each consultant kept its context across rounds, so every
 verdict below was checked against the consultant's own earlier findings, not re-derived.
@@ -215,13 +216,15 @@ verdict below was checked against the consultant's own earlier findings, not re-
 | 3 — v2 | 0 | 4 | 26 | two distinct problems: an ask strip that pushed the roster under a thumb; a trim control the rules would refuse for the person it served |
 | 4 — v3 | 0 | 2 | 13 | one problem, found by all three: the ask parked as a persistent two-button toast over the roster's most-tapped rows |
 | 5 — v4 | 0 | 0 | 3 | converged: three one-line guards on the rules and the undo, folded in below |
+| 6 — the owner's review | 0 | 2 | 14 | four questions from the owner (section 7): invite links must name the account before the token is spent; a retired kiosk must notice on the refused write, not a five-minute poll |
 
 Two principles came out of the arguing and every change below keeps them:
 
 - **A refusal is a question, not an answer.** Nothing here concludes anything about a person's
-  access from a `permission-denied` code. It asks, and when it cannot ask it does what the app does
-  today. Round 2 found the first draft breaking this rule in the one place it would have replaced a
-  live register on a guess.
+  access from a `permission-denied` code. The kiosk asks the register, which a frozen student can
+  never refuse; the check-in page says only what it saw; and where nothing can be asked, the app
+  does what it does today. Round 2 found the first draft breaking this rule in the one place it
+  would have replaced a live register on a guess.
 - **Nothing at the door depends on somebody else noticing.** Every rescue works when the other
   person's phone is in their bag and both hands are full of a toddler; anything that needs their
   attention is additive. The staff pair said they would quietly never enable a request-and-approve
@@ -257,7 +260,8 @@ written in `Login.footer`.
   and today its fix is a grey line under a "Try again" that repeats the same question. "Try again"
   stays, secondary, for the person who has just been added. The help line: "Ask the leader who set
   you up to add this exact address on Tally's Team page — an admin or a core member can do that"
-  (the second half only once P4 ships), and, with P3, "This attempt has been noted for them."
+  (the second half only once P4 ships). And one line for the one wrong-account case the link (P2)
+  leaves: "If a leader sent you a link, open that link instead of signing in here."
 - *Granted:* "You're on the team as Counselor." — and, from P5, which gatherings it just put them
   on.
 - *Suspended:* "Your access has been switched off." / "An admin switched off this account's
@@ -277,68 +281,69 @@ cannot read `users`; `provisionAccess` could return admin names, but that hands 
 church's safeguarding admins to anyone with a Google account who reaches the URL. The leader who
 told them to install it is the person they already know. The director's answer was no.
 
-### P2 — The invitation is a hand-off, not a database row (A1, A5, C10)
+### P2 — The invitation is a hand-off: a link, a QR, or an address (A1, A5, C1, C3, C10)
 
-Tally still sends no mail. What changes is that the screen composes the message once, correctly.
+The invitation used to be an address an admin typed, matched exactly against whichever Google
+account the volunteer happened to pick, with nothing sent to anybody. Two doors now share the form:
 
-- After **Invite**, the toast and the pending row offer **Copy the message**: the URL, "Continue
-  with Google", the exact address on its own line under "Sign in with **this** account:" (the
-  person receiving it has two Gmails too), and the gathering it is for (P5).
-- `Invitation.note` — already in the type and the rules, exposed on no screen — becomes an
-  optional "Note (for you)" on the form and the pending row: "nursery, Marie's daughter" is the
-  difference between a list readable in a year and forty addresses.
-- Inviting an address that already has a profile writes nothing and claims nothing: "Sam already
-  has access as Counselor", with the row linked. The screen already knows — the pending filter is
-  built on it. In practice an admin does this to fix somebody who "can't get in", and today the
-  toast tells her she has.
-- The address hint gains the one sentence about shared logins: "One address, one person. A
-  shared login makes every register anonymous — for a device several people use, pair a kiosk
-  instead." A soft, dismissible note — never a block — repeats it when an address looks like a
-  role mailbox (`nursery@`, `kids@`, `youth@`, `office@`, `info@`, `admin@`, `hello@`; one list, no
-  cleverness), on the form and again on that person's page (P10), because the shared address is
-  usually signed in before anybody thinks about it. Check-out is a custody record; that is the
-  whole reason the sentence exists, and nothing else is built for shared accounts.
-- Pending rows show **invited by Miriam**, from `invitedBy`, which the rules make **write-once**
-  (an update must keep it unchanged), so re-inviting to fix a note cannot take ownership of
-  somebody else's invitation; the attribution and P4's withdrawal right read the same field, and
-  `invitedBy` is the one word for "who let this person in" on both `invitations` and `users` (P9).
-  A write-once rule cannot see a delete-then-create, which is how Withdraw's **Undo** works — so
-  `restoreInvitation` carries `invitedBy` back across the way it already carries the role and the
-  note, for the reason its own docstring gives: an undo that returns somebody's invitation under
-  a different grantor is not an undo.
+- **Invite link.** The inviter chooses the gatherings it is for (P5) and types **who it is for** —
+  "Jo, nursery, Marie's daughter" — which is required, because a link row has no address to name
+  it and eight anonymous rows on a Tuesday is how the season roll goes back into a spreadsheet.
+  Tally mints a 128-bit token, stores only its hash on the invitation, and offers the link with
+  **Share** and **Copy**, or as a **QR** on the screen for the person standing beside you. A link
+  is single-use and lives fourteen days; a QR is the same invitation re-minted with a ten-minute
+  life, because its whole safety property is that both people are in the room. The row shows
+  "not used yet · expires Sunday 21st" and one tap **extends** it (re-minting, which invalidates
+  the old token). Every link grants **counselor and nothing else**, whoever mints it: a core-team
+  link that leaks in a screenshot would open Insights, Students and Settings, and promoting is one
+  tap on the row once there is a person to promote. At most twenty unredeemed links live at once.
+- **Invite by address**, for the case where the inviter knows the account — the church's
+  Workspace address. It keeps the optional note, and the address hint gains "For Gmail addresses,
+  dots and +tags don't matter" (P17).
 
-*Declined:* batch invite. The season roll is eight people who each need a different message; the
-copyable message is the cost that was real.
+**Redeeming.** `/join/<token>` opens on who invited you and for what — "Miriam Achebe invited you
+to Tally for Sunday School" — and one button, **Continue with Google — any account is fine**. The
+token survives the Google round trip (it is kept for the session, so a redirect sign-in lands
+back on it, never on "we couldn't find you" holding a spent link). After sign-in the page names
+the account **before anything is spent**: "Join as jo.smith84@gmail.com?" with **Join** and **Use
+a different account**. Round 6 found that without this step the link does not remove the
+wrong-account failure, it converts a loud refusal Jo fixes in ten seconds into a silent grant to
+the wrong identity that only an admin can undo — and a phone's default account is the one the
+chooser leads with. Only **Join** spends the token. The screen then says which account you are
+in as and to use that one next time, and names the gatherings you were put on (P5). A used or
+expired link says so and names the inviter to ask.
 
-### P3 — Keep the refused attempt as evidence, never as a candidate (A1, A5, C13)
+**Afterwards.** The redemption is written on the invitation — who, which address, when — and the
+row moves to **Arrived this week** (P5) reading "used by Jo Smith (jo.smith84@gmail.com) on
+Sunday", so the naming of the redeemer is something the inviter meets rather than looks for; a
+name the inviter does not recognise is one tap from Suspend on the profile. A redeemed row is a
+different object from an unredeemed one: it carries no Withdraw, because withdrawing would not
+evict anybody and would delete the only record of who redeemed the link. Withdraw stays on
+unredeemed rows only, and a redeemed invitation is kept as the audit.
 
-`provisionAccess` writes `signInAttempts/{emailKey}` when it answers `not-on-roster`: the address
-as Google reported it, the display name the account gave Google, first and last attempt, a count.
-Admin-only read, for the reason `invitations` is. Never written for a kiosk session or a suspended
-profile (that path returns `inactive`). At most one document per address and fifty live documents
-— the reasoning behind `MAX_LIVE_PAIRINGS`: "not a busy night, it is somebody's script" — and the
-card says when the cap has bitten ("Tally stopped recording attempts after 50", with **Clear
-all**), because a diagnostic that goes quiet in an unusual week is quiet in the week it was built
-for. Swept after thirty days; the sweep is built and tested in the same change.
+Also: inviting an address that already has a profile writes nothing and says "Sam already has
+access as Counselor" with the row linked; the one-address-one-person hint and the role-mailbox
+note (`nursery@`, `kids@`, `youth@`, `office@`, `info@`, `admin@`, `hello@`) stay, on the form and on
+the person's page; `invitedBy` is write-once in the rules and carried across an Undo.
 
-The Team screen's Invited card gains **Tried to sign in · 1**: "jo.smith84@gmail.com · signed in
-as Jo Smith · Sunday 9:05", with **Copy address** and **Not one of ours**. **No Invite button on
-the row.** Everything on it was typed by whoever signed in — a free Google account with any display
-name reaches this callable — so it is evidence for a diagnosis, not a candidate for admission;
-inviting is the ordinary form, with the role chosen deliberately. Where somebody on the team
-shares the display name, the line argues for a check rather than a tap: "Somebody on the team is
-also called Jo Smith (jo@church.org). Check with her before inviting a second address."
+*Honestly scoped:* the QR covers the volunteer who turns up beside a **core member**. A counselor
+cannot mint one — handing out the access you hold on one gathering is not the same act as granting
+sign-in to the ministry — so Jo beside Priya at 9:06 is still Priya texting a core member, who
+mints the link from wherever they are. P5's placement on the invitation is what closes the planned
+case; the QR closes the same-room case.
 
-That one card is the whole diagnosis for the wrong-account case, the Gmail-dots case and the
-address-change case (C13), each of which today takes a phone call and a guess. Addresses are never
-normalised: guessing that two addresses are one account is how the wrong person is granted a
-roster of minors, so both addresses are shown to a human. The refused person is told on the
-screen that the attempt was noted (P1).
+*Declined:* multi-use links, now and in writing (section 5) — a link that works twice is a password
+to the children's roster pasted in a group chat. Batch invite, as before.
 
-This is a privacy decision and is recorded as one: Tally would hold, for thirty days, the
-addresses of people who tried to sign in and were refused. The director's answer was yes, on
-three conditions now built in — the sweep ships with it, nothing is written for kiosk or suspended
-sessions, and it goes into the church's privacy notice.
+### P3 — Dropped: keeping refused sign-in attempts
+
+v1 to v4 kept a thirty-day record of every refused sign-in, admin-only, as the diagnosis for the
+wrong-account, mistyped-address and address-change cases. The owner's review removed the need:
+invite links (P2) mean nobody types an address for the common case, and the Gmail canonical key
+(P17) removes the largest class of "correct address that fails". Dropping it is also the better
+governance answer — Tally stops holding the addresses of people who never got in. What remains of
+the wrong-account case is one line on the refusal screen (P1): "If a leader sent you a link, open
+that link instead of signing in here."
 
 ### P4 — Core may invite counselors, see the pending list, and withdraw what they invited (B4, B8)
 
@@ -482,59 +487,36 @@ against a gathering the reader may never be put on, is the worst failure this ap
 different coat. The mid-shift case is prevented at the other end instead (P8), and the volunteer
 accepted the trade on that condition.
 
-### P8 — Taking a gathering away from somebody standing in it is a different act (C4, C12)
+### P8 — Taking a gathering away from somebody standing in it, kept plain (C4)
 
-- In the sheet, a member is **at the door now** when the check-in window is open **and** they have
-  checked anybody in on this gathering tonight — and only that. Remove on such a row arms first —
-  "Priya is checking people in right now. Remove anyway?" — and every other Remove stays one tap.
-  The guard cannot see somebody who has opened the register and not yet had a student reach them:
-  the app has no presence beyond writes, `lastSeenAt` is a once-per-session stamp by deliberate
-  design (a draft widened the guard onto it and would have missed the counselor who has had the
-  app open since four while admitting the one at home), and inventing a presence signal is a
-  listener on every phone on every screen. Said here so nobody agrees to more than ships; the
-  volunteer accepted the declined held queue on the condition that this guard fires when they are
-  at the door, and this is exactly when it does.
-- The page the removed person lands on loses "yet" and "nothing else has changed", and says what
-  happened: "You were taken off Friday Fellowship at 7:14. You had checked in 22 students before
-  that." The count is captured from memory **before** the register is dropped, and **omitted,
-  never zero**, when it is not in hand — a zero there tells somebody their morning vanished.
-- Who did it: `eventAccess.updatedBy` is the last writer of a document two people hold at once
-  (which is why the collection is written with `arrayUnion` and `arrayRemove`), so a sentence
-  built on it can name the wrong person. Every add, remove, close and reopen also writes
-  `lastChange: {kind, by, at, subject}`, pinned in `validAccess()` the way `validArrival()` pins
-  its own — `kind` from a closed set, `by` and `subject` uid-shaped strings or null, `at` a
-  timestamp — because that document is read on every gated request. The sentence names the actor
-  only when `subject` is the reader. A close has no subject and gets its own sentence, naming
-  nobody: "Friday Fellowship was narrowed at 6:58 — you're not on the list it kept." That is B5,
-  the mistake the whole feature is built around, and it needed a sentence of its own.
-- The additive case lands as a toast on the other person's device — "Priya added you to Friday
-  Fellowship — every Friday" / "— Sep 12 only" — from a diff over the access stream the app
-  already holds, **after its first snapshot**, never on boot, or a counselor opening Tally on a
-  Friday would be told she was just added to three gatherings she has worked since March.
-- Lost undo on the mis-tap of ten seconds ago is accepted and stated: the rule that gates deleting
-  attendance on the chain is the right rule; the guard above is what keeps it from mattering.
+The owner's review asked that mid-shift loss of access be "just not broken" rather than designed
+for, and round 6 walked every drop: none leaves a journey broken. Today the live access stream
+already replaces the roster with the LockedGathering page the moment somebody is removed; that is
+not broken. What changes is the copy: the page loses "yet" and "nothing else has changed", and —
+because the app knows it had a roster open a second ago without asking anybody — it says **"You've
+just been taken off this gathering"** in that case rather than a sentence that reads as though the
+reader was never on it. No guard on Remove, no `lastChange` map, no count, no dated actor, no
+toast. "Ask to be added" (P7) stays on the page.
 
 ### P9 — Suspension says what it takes and weighs what it costs (A3, A11)
 
 - The Active toggle becomes a **two-step**, inline, the shape Withdraw already has: arm, a
   sentence, confirm. The sentence is computed from what the app knows: "Ends Marcus's access now,
   on every device. He is on Sunday School and Nursery, and is the only person on Nursery who can
-  add others. A kiosk was paired as him on Sep 3 (last seen Sunday 11:40) and will stop." It counts
-  **live** pairings — bound now, or seen within fourteen days — and mentions older ones as a tail;
-  pairings before the change are unknown and it says so. The toast after confirming offers
-  **Undo**. Un-suspending is armed too, with the mirror sentence — "Restores Marcus as Core team,
-  on Sunday School and Nursery" — because membership survives suspension by design and one tap on
-  a folded row would otherwise return a former leader to Nursery with nothing on screen saying so.
+  add others." There is no kiosk clause any more: with P11 a kiosk holds its own identity and
+  suspending Marcus stops nothing. The toast after confirming offers **Undo**. Un-suspending is
+  armed too, with the mirror sentence — "Restores Marcus as Core team, on Sunday School and
+  Nursery" — because membership survives suspension by design and one tap on a folded row would
+  otherwise return a former leader to Nursery with nothing on screen saying so.
 - Role changes get a toast with **Undo**. No arm step: reversible and not destructive.
 - Suspension stamps `accessEndedAt` / `accessEndedBy`; un-suspending stamps `accessRestoredAt`;
-  `provisionAccess` stamps `invitedBy` onto the profile when it resolves an invitation, and "the
-  deployment" for a pinned address. With `createdAt`, that is the narrow safeguarding fact the
-  director asked for — **when access was granted, by whom, and when it ended** — and nothing more.
-  Per-gathering membership history is not recorded, and the person page says so, so an admin
-  answers "who could see the roster in October" honestly rather than wrongly. The stamp never lands
-  for anybody who already has a profile, so a one-off backfill copies `invitedBy` from every
-  surviving invitation document, and where none survives the page reads "Not recorded (before
-  <date>)". Rules already permit extra fields on `users`.
+  `provisionAccess` stamps `invitedBy` onto the profile when it resolves an invitation or a link,
+  and "the deployment" for a pinned address. With `createdAt`, that is the narrow safeguarding
+  fact the director asked for — **when access was granted, by whom, and when it ended** — and
+  nothing more. Per-gathering membership history is not recorded, and the person page says so. The
+  stamp never lands for anybody who already has a profile, so a one-off backfill copies
+  `invitedBy` from every surviving invitation document, and where none survives the page reads
+  "Not recorded (before <date>)". Rules already permit extra fields on `users`.
 - The season roll stays eighteen acts, deliberately: each is about a different adult.
 
 ### P10 — A person has a page (A8, A9, B8)
@@ -542,11 +524,14 @@ accepted the trade on that condition.
 Each Team row expands — a disclosure, not a route — into the facts about that person, gathered
 once: role; last seen; invited by whom, when and for what, with what happened (P5); **the
 gatherings they are on** — every narrowed chain, on or not on, from `eventAccess`, which everyone
-can read; the kiosks paired as them, with **Forget this kiosk**; the access dates (P9); the week's
-unanswered asks (P7); and the role-mailbox note (P2). Rights are drawn per chain the way the sheet
-draws them, not per rank: anybody on a chain sees Add beside it, core on the chain sees Remove,
-admins see both everywhere, and controls appear only for narrowed chains, where `onIt` and
-`writerStays()` agree. This is the 9:22 rescue — Team → Sam → Nursery → Add, on a phone.
+can read; **the kiosks paired by them**, from the device row (P11), each saying whether it is bound
+and live right now, with **Retire** — which arms when the kiosk is live, because retiring a working
+lobby screen mid-morning is an act that takes something away, and the duplicate rows an installed
+tablet leaves behind make the mis-tap likely; the access dates (P9); the week's unanswered asks
+(P7); and the role-mailbox note (P2). Rights are drawn per chain the way the sheet draws them, not
+per rank: anybody on a chain sees Add beside it, core on the chain sees Remove, admins see both
+everywhere, and controls appear only for narrowed chains, where `onIt` and `writerStays()` agree.
+This is the 9:22 rescue — Team → Sam → Nursery → Add, on a phone.
 
 A **find-by-name** field sits over the list, and it searches the fold (P12) too, opening it on a
 match: the person the director most often looks for by name is the leaver.
@@ -555,40 +540,60 @@ Admins stop being blind without ceasing to pass: a narrowed gathering on an admi
 calendar carries a quiet "🔒 narrowed · 3" on the card or row it already has. Nothing is demoted
 for an admin; the fact is drawn.
 
-### P11 — A kiosk knows when it has lost its identity; Team knows which kiosks exist (C6, B3)
+### P11 — A kiosk is a room, not a volunteer (C6, B3)
 
-The correctness fix, and the most important change here.
+The owner asked whether a kiosk's authorisation has to be tied to a person. It does not, and it
+should not: "the kiosk is Sam" was the root cause of the one finding in this campaign that loses
+data, and every earlier draft of this section was a bandage on it.
 
-- **`checkAccess({chain})`**, one small callable, **returns** `{status: 'ok' | 'inactive' |
-  'not-on-chain', role}` and never throws for an access answer; it throws only for transport
-  failures. Its client is one module with one burst rule for both callers below: one in-flight
-  check per chain, a sixty-second floor, and while a check is in flight refusals are held silently
-  and resolved together when the answer lands.
-- **The kiosk asks when a write is refused.** On `permission-denied` from a check-in, a check-out
-  or the register poll it calls `checkAccess` for its bound chain. `inactive` or `not-on-chain` is
-  **lost identity**; a throw is "could not ask, carry on" — a network fact is not an identity fact,
-  and a basement nursery must never blank mid-queue on a bad thirty seconds. The
-  permission-denied-means-frozen-student branch stays for the case where the answer is `ok`. Two
-  states that were one: "this child's record is frozen" and "this device is nobody". The same
-  check runs at bind time and on the boot/wake sweep that already exists; firing at 9:15 to an
-  empty lobby beats 9:35 to a queue.
-- **The dead state is the pairing phase** — a code on the glass, the shortest path from "this
-  device is nobody" to "somebody" — with a banner for the greeter, not the parent: "This kiosk lost
-  its access at 9:12. Check-ins since then may not have been recorded — keep checking children in
-  from a leader's phone (Check-in → Nursery), and pair this kiosk again: tap your name, choose
-  Kiosk, enter this code." The hole already dug is named, and the register on a phone is declared
-  the source of truth. No recovery queue, and it replays nothing.
-- **The pairing is the record; liveness is the soft fact.** `claimKioskToken` writes
-  `kioskDevices/{deviceId}` — approver, paired at — server-side, so the fact Team reads cannot go
-  quiet. The kiosk updates only `lastSeenAt` and what it is bound to, every five minutes, only
-  while bound and the window is open, silently on failure, and never as evidence about identity.
-  Core+ read. Duplicates are expected — the kiosk's own module documents that installing after
-  pairing makes a fresh storage container — so rows can be forgotten (P10) and are swept after
-  sixty days unseen.
-- Recorded direction, not built, at the director's request: **a kiosk is a room, not a
-  volunteer**. "The kiosk is Sam" is the root cause of every finding in this section, and it should
-  eventually hold a service identity no personal suspension can take down. Written into
-  [data-model.md](data-model.md)'s kiosk section for whoever inherits this.
+- **Its own identity.** `claimKioskToken` mints a token for a synthetic uid `kiosk_<deviceId>`
+  with claims `{kiosk: true, deviceId}`, where the device id is one the kiosk mints for itself and
+  keeps in its own storage. The claim writes `kioskDevices/{deviceId}` — who approved it, their
+  name as of that moment, when — and that row is the kiosk's standing: rules and callables gate a
+  kiosk session on **the row existing and not being retired**, never on the approver's profile.
+  Suspending or removing the approver touches nothing.
+- **Its reach is the room it stands in.** On bind the kiosk writes onto its own row what it is
+  bound to — the gathering's title and chain — and the attendance rules let a kiosk session write
+  only to that chain. Today a lobby session's reach is bounded by the approver's chains; under a
+  service identity it would otherwise pass every chain, and the device row is being written
+  anyway. The kiosk may update only `lastSeenAt`, `boundTo` and `boundChain` on its own row, on a
+  timer while bound and the window is open, silently on failure.
+- **The rules.** `isLiveKiosk()` — the claim, plus the row exists and `retiredAt` is null — is the
+  alternative to `isCounselor()` on exactly what a kiosk touches today: an attendance record, a
+  first pickup, the eight-key student date patch, the register poll, the active-student list, the
+  three index documents, a backdrop. The kiosk claim keeps narrowing what it may do exactly as now
+  (no undo, no profiles). Callables the kiosk calls take the same gate.
+- **Attribution, honestly.** `checkedInBy` becomes the kiosk uid, which carries the device id;
+  `method: 'kiosk'` already marks these rows; the register export writes "Lobby kiosk" in the
+  name column and the device id beside it. A pickup from the lobby is the parent's act and never
+  was the approver's, so this is the truer custody record. Who paired the device, and their name
+  at the time, live on the device row — which is why **retiring a kiosk marks the row
+  (`retiredAt`, `retiredBy`) and never deletes it**, and why there is no sweep: the row is the
+  provenance of every morning that kiosk recorded, and a device row costs nothing to keep.
+- **Retiring, and noticing.** Retire from the person page (P10) or the pair-kiosk page; the row
+  says whether the kiosk is bound and live, and the act arms when it is. The kiosk notices on its
+  next refused write, not on a five-minute poll: a refused check-in **re-reads the register** — the
+  read a frozen student can never refuse, since `attendanceFrozen()` gates writes only — and the
+  answer collapses the ambiguity. Read succeeds: it was the student, today's behaviour stands and
+  the child standing there stays green. Read refused: this device is nobody, the binding is put
+  down and the screen goes to **pairing**, with the greeter's sentence: "This kiosk stopped being
+  able to record at 9:12 — keep checking children in from a leader's phone, and pair it again:
+  tap your name, choose Kiosk, enter this code." No callable, no debounce, one round trip. The
+  register poll keeps its own refusal branch for the idle case.
+- **The chooser keeps the app's grammar.** `getKioskEvents` offers every gathering — a leader
+  binding a lobby screen chooses the room — with the ones the pairer works as the answer and the
+  rest below a divider marked as the chooser marks them, because the old narrowing to the
+  approver's chains was quietly keeping a greeter from binding the nursery tablet to the youth
+  night one tap away.
+- **Migration.** A token minted before this change carries no `deviceId` claim. The kiosk reads
+  its own claims at boot and, finding none, goes to pairing once — with its own sentence, because
+  a bare pairing screen at 9:15 reads as "somebody unpaired us": "Tally was updated — this kiosk
+  needs pairing once. Any leader: tap your name, choose Kiosk, enter this code." The re-pair goes
+  in the deploy notes so it can be done on a weekday, and pairing stays open to any active member,
+  as today, so migration morning does not depend on a core member being in the lobby.
+
+The identity this replaces was documented as the kiosk's design; the docs that say "every
+check-in it records will be under your name" change with it.
 
 ### P12 — The list folds its leavers (A12)
 
@@ -643,29 +648,27 @@ the stale invitation at whatever rank it carries.
   load-bearing; pressing past it should not be free), and an unreadable register says "Couldn't
   read recent registers — would keep just you" rather than posing as "nobody has taken them".
 
-### P15 — Failing open, asking before concluding, and demoting in the select (C9, C8)
+### P15 — Failing open, staying plain, and demoting in the select (C9, C8)
 
 - The access stream keeps failing open — an app that is refusing must never look empty. The
   stream-error banner the app already shows gains one sentence, once, when the access stream is
-  the one that failed: "Who's on tonight's gatherings couldn't be checked — if one refuses you,
-  Tally will say so." No per-card hedge: a per-device flag would suppress it on the new phone with
-  a cold, failed stream it was written for and strand it for ever on a phone that saw one
-  restriction in March.
-- **On the first refused write the check-in page asks, never infers.** It calls `checkAccess`
-  (P11). Only `not-on-chain` switches to the LockedGathering page — after taking the green back
-  off the refused row where it stands, never re-sorting, and after capturing the count for P8's
-  sentence. `inactive` is the profile stream's business; `ok`, and any failure to get an answer,
-  is today's toast. A register with students in it is never replaced on a guess: the first draft
-  inferred from the refusal code, and a frozen student, a stale suspension and an out-of-range
-  grade all produce the same code.
+  the one that failed, and it promises only what happens: "Who's on tonight's gatherings couldn't
+  be checked — if one refuses you, ask a leader to add you." (An earlier draft promised "Tally
+  will say so" on the strength of machinery this revision removed; a banner that promises an
+  explanation nothing delivers is worse than none.)
+- **No inference from a refusal code, and no callable either.** v2 to v4 asked a `checkAccess`
+  callable before concluding anything; the owner's review judged the whole mid-shift class too
+  rare for that, and round 6 agreed nothing is left broken by dropping it — the live stream
+  already flips the page for the ordinary case. What remains is the cheap, honest version: the
+  page counts refused check-ins per gathering, and at the third — three refusals cannot be three
+  frozen students — replaces the third toast with one banner, "This gathering isn't letting you
+  check in — see Who's on", with the sheet one tap away. It says what it knows and nothing more.
 - **The header select demotes, never hides**: locked gatherings sit in an `<optgroup>` labelled
   "Not yours" at the foot, with a lock, and choosing one opens the "Who's on" sheet in place
   (P6) — who can add you, and the ask — rather than a page, so the night being worked is never
-  unmounted and the Recent stickiness, which is deliberately written nowhere, is never lost. A
-  demoted option **never changes the select's value**: it fires the sheet and the select goes on
-  reading the night being worked, because a select reading "Sunday School" over a Friday roster
-  for even a moment is the one mistake the app is built around. The first draft filtered the
-  options out, which contradicted the principle it cited.
+  unmounted. A demoted option **never changes the select's value**: it fires the sheet and the
+  select goes on reading the night being worked, because a select reading "Sunday School" over a
+  Friday roster for even a moment is the one mistake the app is built around.
 
 ### P16 — Housekeeping the seams
 
@@ -675,59 +678,99 @@ came to take last Friday's register; you are not on this gathering"); the core m
 mid-edit reads "This was open to you a minute ago — your role changed" when the profile stream
 just changed it, not "Core team only".
 
+### P17 — One mailbox, one key (A1, C1)
+
+Gmail ignores dots in the local part, treats a `+tag` as an alias of the same mailbox, and treats
+`googlemail.com` as `gmail.com`. Google's token carries the address as the account registered it,
+and `emailKey` matched exactly, so `josmith@gmail.com` typed on Tuesday failed `jo.smith@gmail.com`
+signing in on Sunday. That is a documented property of consumer Gmail, not a guess; for every other
+domain — Google Workspace included — dots are significant, and a rule that merged them would merge
+two real staff.
+
+So `emailKey` gains a canonical form **for `gmail.com` and `googlemail.com` only**: lowercase,
+dots and `+tag` stripped from the local part, the domain mapped to `gmail.com`; every other domain
+is lowercased and nothing else. It applies everywhere the app asks "is this address already on the
+team", which round 6 found is more than two call sites — the invitation's document id, the sign-in
+lookup, the Team screen's pending filter, the "already has access" guard, and the Arrived tail —
+because a plain `toLowerCase()` compare anywhere would re-open the exact bug the pending filter's
+own docstring was written about. The Team screen shows the address as typed. For invitations
+written before the change, the sign-in lookup tries the legacy exact key and, on a hit, moves the
+document to its canonical key, and the pending list dedupes on the canonical form so one mailbox
+never shows as two live rows.
+
 ---
 
 ## 5. What this proposal will not build, and why
 
 - **Delete a person.** Orphans attribution on every register; re-provisions from the stale
   invitation at the old rank. Fold instead (P12).
+- **Delete a kiosk's device row.** Same argument, for a custody record: retiring marks the row
+  (P11), and there is no sweep.
+- **Multi-use invite links, or links that grant more than counselor.** A link that works twice is
+  a password to the children's roster pasted in a group chat; a link that grants core opens the
+  register and Settings to whoever a screenshot reaches. Written down here so neither is added
+  later as a convenience.
+- **Keeping refused sign-in attempts.** Dropped (P3); the link and the canonical key remove the
+  need, and Tally holds nothing about people who never got in.
 - **An `eventAccess` cleanup job, or orphan-ACL tidying.** Read-time filtering (P6, P7) is the
   fix; membership survives suspension so un-suspending restores it.
 - **Shared-account support.** One sentence where the mistake is made (P2); the supported answer
   to "a device several people use" is the kiosk.
-- **Email or push from Tally.** A copyable message (P2); an ask that is a row on a screen the
-  right people already hold (P7), never a notification.
+- **Email or push from Tally.** A link the inviter shares however they already share things
+  (P2); an ask that is a row on a screen the right people already hold (P7), never a notification.
 - **A held check-in queue for locked gatherings.** P7, declined, with the volunteer's agreement.
+- **Machinery for losing access mid-shift.** The guard on Remove, the `lastChange` map, the
+  captured count, the `checkAccess` callable and its burst rule, the kiosk's lost-identity phase
+  (P8, P11, P15): the owner judged the class too rare to design for, and round 6 found nothing
+  broken by leaving it plain.
 - **A general activity feed.** Three stamps on the profile (P9) answer the safeguarding question
   that can honestly be answered.
 - **Per-gathering membership history.** The claim is narrowed instead (P9).
-- **Address normalisation.** P3 shows both addresses to a human.
-- **Batch invite.** P2.
+- **Address normalisation beyond Gmail's own rules.** P17 canonicalises only what Gmail itself
+  treats as one mailbox.
 - **Naming admins on the refusal screen.** P1; the director's decision.
 - **A presence signal beyond `lastSeenAt`.** P8; a listener on every phone on every screen.
-- **A permanent lane on the roster for the ask, or a sticky toast kind in the provider.** P7; a
-  rare event should not cost every roster a row of height, and the provider's limits are the
-  reason the ask cannot live there — widening it would keep the ask on the one surface that
-  documents why it should not be.
+- **A permanent lane on the roster for the ask, or a sticky toast kind in the provider.** P7.
 
 ---
 
 ## 6. Sequencing
 
-1. **Correctness and copy, no new surfaces.** P1; P11 (the `checkAccess` client and its burst
-   rule, the kiosk's lost-identity phase, the pairing record); P13; P14; the filtering of suspended
-   members in P6 and P7; P15's ask-before-concluding and the select's optgroup.
-2. **The invitation as a hand-off.** P2, P3, P4, P5.
+1. **Correctness and copy, no new surfaces.** P1; P11 (the kiosk's own identity, the device row,
+   the refused-write re-read, the migration sentence, the demoted chooser); P13; P14; P17; the
+   filtering of suspended members in P6 and P7; P15's optgroup, sheet-in-place, banner sentence and
+   three-refusals banner.
+2. **The invitation as a hand-off.** P2 (links, QR, the join page), P4, P5.
 3. **The Team screen answers for people.** P9 with its backfill, P10, P12, the find field, the
    only-admin line.
-4. **The door.** P7's ask, P8, P15's banner sentence, P16.
+4. **The door.** P7's ask, P8's copy, P16.
 
 ---
 
-## 7. Decisions for the owner
+## 7. The owner's review, and what it changed
 
-Four were put to the director during the loop and answered in character; they are recorded here
-for the owner's own answer.
+After the loop converged the owner read the proposal and asked four things. They were put to the
+same three consultants as a sixth round, with the proposed answers; the round returned two majors
+(both in the new shapes, both folded in above) and fourteen minors, and nothing that reopened the
+sixteen changes.
 
-1. **P3** keeps refused sign-in attempts for thirty days, admin-only. *Director: yes*, on the three
-   conditions now built in.
-2. **P4** lets core invite counselors, read the pending list, and withdraw what they invited.
-   *Director: yes*, with attribution.
-3. **P1** does not name admins on the refusal screen. *Director: keep it that way.*
-4. **P11** records "a kiosk is a room, not a volunteer" as a direction and does not build it.
-   *Director: record, do not build.*
+| question | answer, in one sentence | what it changed |
+| --- | --- | --- |
+| Losing access mid-shift is unlikely; keep it just-not-broken | The live stream already flips the page; keep the copy honest and drop the machinery | P8 reduced to copy; `checkAccess`, held refusals, the kiosk's lost-identity phase and its debounce dropped (P15, P11); a three-refusals banner is the cheap remainder |
+| Gmail ignores dots — how should Tally handle that? | Canonicalise for `gmail.com`/`googlemail.com` only, everywhere the app compares addresses | New P17; P3 no longer needed |
+| How can onboarding be easier — link, QR? | Single-use links and same-room QRs, counselor-only, named on the row, with the account confirmed before the token is spent | P2 rewritten; P3 dropped; P5 gains the redemption |
+| Must kiosk authorisation be tied to a person? | No — a kiosk is a room; it holds its own identity, its reach is the room it stands in, retiring marks the row | P11 rewritten; P9 loses its kiosk clause; P10's kiosk list gains live state and an armed Retire |
+
+The director's four earlier decisions stand where they still apply: core may invite counselors
+(P4); the refusal screen does not name admins (P1); the kiosk service identity, recorded then as a
+direction, is now built (P11). The one on keeping refused attempts is moot (P3).
+
+Two things the round asked for that are worth repeating to whoever implements this: the invite
+link's safety rests on the redeemer being named to the minter, so a redeemed invitation is an
+audit record and never deletable; and a kiosk must notice retirement on the refused write, not on
+a timer, or five minutes of a nursery morning go green with nothing recorded.
 
 And one the loop could not settle because it is a matter of taste rather than journey: the chip's
-exact words (**Who's on · 3**) and the ask toast's exact shape are the two things here that a
-rendered-frame round — `uxr-visual-critic` and `uxr-design-critic` over the real header and the
-real roster — should look at before they are built.
+exact words (**Who's on · 3**), the join page, and the ask toast's shape are the things here that a
+rendered-frame round — `uxr-visual-critic` and `uxr-design-critic` over the real screens — should
+look at as they are built.
