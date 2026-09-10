@@ -99,11 +99,6 @@ export function splitFirstName(value: string): { firstName: string; nickname: st
 /* Keys and identity                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** Must stay identical to `emailKey` in src/types/index.ts. */
-export function emailKey(email: string): string {
-  return email.trim().toLowerCase().replace(/\./g, ',');
-}
-
 /** Must stay identical to `computeProfileComplete` in src/types/index.ts. */
 export function computeProfileComplete(input: {
   contactPhone?: string | null;

@@ -86,7 +86,7 @@ afterEach(() => {
 
 /* The wiring, mocked down to what a boot touches. */
 vi.mock('@/kiosk/services', () => ({
-  restoredUid: vi.fn(async () => null),
+  restoredSession: vi.fn(async () => ({ uid: null, reason: 'unpaired' })),
   beginPairing: vi.fn(async () => ({ code: 'HJ4K2P', secret: 's3cret', expiresInSeconds: 600 })),
   pollPairing: vi.fn(async () => null),
   replayQueue: vi.fn(async () => 0),

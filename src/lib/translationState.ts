@@ -192,8 +192,12 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
    * before it was unfollowable in Chinese, and it stayed that way until a
    * Simplified reviewer read the two strings side by side. One entry here would
    * have failed the build the day the badge moved.
+   *
+   * Quoted via the canonical of its same-value group: `Students.badgeQueued`
+   * is pinned identical to `RowBadge.queuedBadge` above, and a member is never
+   * drafted on its own — which the sanity check in the script enforces.
    */
-  { message: 'Backends.pcoQueued', quotes: 'Students.badgeQueued' },
+  { message: 'Backends.pcoQueued', quotes: 'RowBadge.queuedBadge' },
 ];
 
 /**

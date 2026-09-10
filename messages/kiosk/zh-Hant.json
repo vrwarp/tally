@@ -14,7 +14,8 @@
     "printerNeedsAttention": "名牌印表機需要處理",
     "settingUp": "正在設定…",
     "setKiosk": "設定簽到台",
-    "pickAGathering": "選一場聚會"
+    "pickAGathering": "選一場聚會",
+    "notYours": "Not yours"
   },
   "Common": {
     "language": "語言",
@@ -114,7 +115,9 @@
     "howTo": "在 Tally 裡點你的名字，選擇 <kiosk>簽到台</kiosk>，然後輸入這個代碼。",
     "gettingCode": "正在取得代碼…",
     "noCode": "現在連不上 Tally。稍後會再試…",
-    "stuck": "這台簽到台已經拿到代碼，但配對沒有完成。如果同工已經批准過了，請對方開啟 Tally，點自己的名字選擇「簽到台」，那裡會說明還有什麼需要處理。"
+    "stuck": "這台簽到台已經拿到代碼，但配對沒有完成。如果同工已經批准過了，請對方開啟 Tally，點自己的名字選擇「簽到台」，那裡會說明還有什麼需要處理。",
+    "updated": "Tally was updated, so this kiosk needs pairing once more. Any leader can do it.",
+    "retired": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again."
   },
   "Printer": {
     "troubleReported": "印表機回報了一個問題。",

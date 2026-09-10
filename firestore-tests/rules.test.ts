@@ -29,19 +29,23 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { kioskUid } from '@/lib/kioskDevice';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { COLLECTIONS, paths } from '@/lib/paths';
 import {
+  DEVICE,
   ID,
   UID,
   a32ConfigDoc,
   asAnonymous,
   asKiosk,
+  asKioskDevice,
   asUser,
   attendanceDoc,
   eventDoc,
   initTestEnv,
   invitationDoc,
+  kioskDeviceDoc,
   pcoConfigDoc,
   rsvpDoc,
   seedAll,
@@ -2269,16 +2273,20 @@ describe('working a restricted gathering', () => {
 
 describe('kiosk', () => {
   /*
-   * A kiosk session is a real member's uid carrying `kiosk: true` — minted by
-   * the pairing flow, operated by the public in a lobby. These tests pin the
-   * narrowing: it may create a check-in and write the date patch that rides on
-   * one, and nothing else a full session of the same person could do.
+   * A kiosk session is the kiosk's own: a uid minted for its device id,
+   * carrying `kiosk: true` and that id, operated by the public in a lobby.
+   * Its standing is its `kioskDevices` row — see `src/lib/kioskDevice.ts` —
+   * and its reach is the chain that row says it is bound to. These tests pin
+   * the narrowing: it may create a check-in and write the date patch that
+   * rides on one, for the gathering it stands at, and nothing else.
    */
+  const KIOSK = kioskUid(DEVICE.live);
+
 
   describe('kioskIndex', () => {
     it('is readable by active members, kiosk sessions included', async () => {
       await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), 'kioskIndex/phones')));
-      await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones')));
+      await assertSucceeds(getDoc(doc(asKioskDevice(env, DEVICE.live), 'kioskIndex/phones')));
     });
 
     it('is denied to strangers and signed-out callers', async () => {
@@ -2291,7 +2299,7 @@ describe('kiosk', () => {
         setDoc(doc(asUser(env, UID.admin), 'kioskIndex/phones'), { last4: { '0134': ['x'] } }),
       );
       await assertFails(
-        setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/phones'), { last4: {} }),
+        setDoc(doc(asKioskDevice(env, DEVICE.live), 'kioskIndex/phones'), { last4: {} }),
       );
     });
 
@@ -2301,7 +2309,7 @@ describe('kiosk', () => {
      * onto every lobby screen and drive every kiosk into refetch loops.
      */
     it('covers the pulse: kiosk sessions read it, nobody writes it', async () => {
-      await assertSucceeds(getDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse')));
+      await assertSucceeds(getDoc(doc(asKioskDevice(env, DEVICE.live), 'kioskIndex/pulse')));
       await assertSucceeds(getDoc(doc(asUser(env, UID.counselor), 'kioskIndex/pulse')));
       await assertFails(getDoc(doc(asUser(env, UID.stranger), 'kioskIndex/pulse')));
       await assertFails(getDoc(doc(asAnonymous(env), 'kioskIndex/pulse')));
@@ -2309,7 +2317,7 @@ describe('kiosk', () => {
         setDoc(doc(asUser(env, UID.admin), 'kioskIndex/pulse'), { roster: { rev: 999 } }),
       );
       await assertFails(
-        setDoc(doc(asKiosk(env, UID.counselor), 'kioskIndex/pulse'), {
+        setDoc(doc(asKioskDevice(env, DEVICE.live), 'kioskIndex/pulse'), {
           roster: { rev: 999 },
         }),
       );
@@ -2330,7 +2338,7 @@ describe('kiosk', () => {
 
     it('is readable by active members, kiosk sessions included', async () => {
       await assertSucceeds(getDoc(at(asUser(env, UID.counselor))));
-      await assertSucceeds(getDoc(at(asKiosk(env, UID.counselor))));
+      await assertSucceeds(getDoc(at(asKioskDevice(env, DEVICE.live))));
       await assertFails(getDoc(at(asUser(env, UID.stranger))));
       await assertFails(getDoc(at(asAnonymous(env))));
     });
@@ -2342,10 +2350,10 @@ describe('kiosk', () => {
     it('is created by core with a well-formed image, and by nobody below', async () => {
       await assertSucceeds(setDoc(at(asUser(env, UID.core)), backdropDoc(UID.core)));
       await assertFails(
-        setDoc(at(asUser(env, UID.counselor), 'b89abcdef0123456'), backdropDoc(UID.counselor)),
+        setDoc(at(asUser(env, UID.counselor), 'b89abcdef0123456'), backdropDoc(KIOSK)),
       );
       await assertFails(
-        setDoc(at(asKiosk(env, UID.counselor), 'b89abcdef0123456'), backdropDoc(UID.counselor)),
+        setDoc(at(asKioskDevice(env, DEVICE.live), 'b89abcdef0123456'), backdropDoc(KIOSK)),
       );
     });
 
@@ -2403,7 +2411,7 @@ describe('kiosk', () => {
       // Readable, it would say which families registered today and how many
       // children each brought. Writable, somebody could pre-claim an id and
       // make a family's registration hand them a stranger's students.
-      for (const db of [asUser(env, UID.admin), asKiosk(env, UID.counselor), asAnonymous(env)]) {
+      for (const db of [asUser(env, UID.admin), asKioskDevice(env, DEVICE.live), asAnonymous(env)]) {
         await assertFails(getDoc(doc(db, 'kioskRegistrations/reg-1')));
         await assertFails(setDoc(doc(db, 'kioskRegistrations/reg-1'), { status: 'complete' }));
       }
@@ -2422,14 +2430,14 @@ describe('kiosk', () => {
      * "make registration simpler", the thing to widen instead is the callable.
      */
     it('may not create a student carrying the fields a registration needs', async () => {
-      const db = asKiosk(env, UID.counselor);
+      const db = asKioskDevice(env, DEVICE.live);
       const base = {
         firstName: 'Robin',
         lastName: 'Fields',
         grade: 4,
         searchName: 'robin fields',
         updatedAt: serverTimestamp(),
-        updatedBy: UID.counselor,
+        updatedBy: KIOSK,
       };
 
       await assertFails(setDoc(doc(db, paths.student('lobby-invented')), { ...base, status: 'active' }));
@@ -2447,8 +2455,8 @@ describe('kiosk', () => {
     it('may create a check-in under its own uid', async () => {
       await assertSucceeds(
         setDoc(
-          doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.otherStudent)),
-          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.counselor }),
+          doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: KIOSK }),
         ),
       );
     });
@@ -2460,17 +2468,17 @@ describe('kiosk', () => {
       // this is still not it.
       await assertFails(
         setDoc(
-          doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)),
-          attendanceDoc({ studentId: ID.student, checkedInBy: UID.counselor }),
+          doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.student)),
+          attendanceDoc({ studentId: ID.student, checkedInBy: KIOSK }),
         ),
       );
     });
 
     it('may record a pickup that has not been recorded yet', async () => {
       await assertSucceeds(
-        updateDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)), {
+        updateDoc(doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.student)), {
           checkedOutAt: serverTimestamp(),
-          checkedOutBy: UID.counselor,
+          checkedOutBy: KIOSK,
         }),
       );
     });
@@ -2478,27 +2486,27 @@ describe('kiosk', () => {
     it('may not move a pickup already standing', async () => {
       // Correcting a recorded collection is a staff decision made on the
       // roster, not something an unattended lobby screen does.
-      const kiosk = asKiosk(env, UID.counselor);
+      const kiosk = asKioskDevice(env, DEVICE.live);
       await assertSucceeds(
         updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
           checkedOutAt: serverTimestamp(),
-          checkedOutBy: UID.counselor,
+          checkedOutBy: KIOSK,
         }),
       );
       await assertFails(
         updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
           checkedOutAt: serverTimestamp(),
-          checkedOutBy: UID.counselor,
+          checkedOutBy: KIOSK,
         }),
       );
     });
 
     it('may not undo a pickup either — the kiosk offers no undo at all', async () => {
-      const kiosk = asKiosk(env, UID.counselor);
+      const kiosk = asKioskDevice(env, DEVICE.live);
       await assertSucceeds(
         updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
           checkedOutAt: serverTimestamp(),
-          checkedOutBy: UID.counselor,
+          checkedOutBy: KIOSK,
         }),
       );
       await assertFails(
@@ -2511,9 +2519,9 @@ describe('kiosk', () => {
 
     it('may not smuggle a check-in rewrite in beside a pickup', async () => {
       await assertFails(
-        updateDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student)), {
+        updateDoc(doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.student)), {
           checkedOutAt: serverTimestamp(),
-          checkedOutBy: UID.counselor,
+          checkedOutBy: KIOSK,
           method: 'manual',
         }),
       );
@@ -2521,7 +2529,7 @@ describe('kiosk', () => {
 
     it('may not undo anything', async () => {
       await assertFails(
-        deleteDoc(doc(asKiosk(env, UID.counselor), paths.attendance(ID.event, ID.student))),
+        deleteDoc(doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.student))),
       );
     });
   });
@@ -2535,12 +2543,12 @@ describe('kiosk', () => {
       grade: 8,
       searchName: 'jamie rivera',
       updatedAt: serverTimestamp(),
-      updatedBy: UID.counselor,
+      updatedBy: KIOSK,
     });
 
     it('may merge the check-in date patch onto an existing document', async () => {
       await assertSucceeds(
-        setDoc(doc(asKiosk(env, UID.counselor), paths.student(ID.student)), datePatch(), {
+        setDoc(doc(asKioskDevice(env, DEVICE.live), paths.student(ID.student)), datePatch(), {
           merge: true,
         }),
       );
@@ -2548,7 +2556,7 @@ describe('kiosk', () => {
 
     it('may create the document the patch usually creates', async () => {
       await assertSucceeds(
-        setDoc(doc(asKiosk(env, UID.counselor), paths.student('kiosk-new-student')), datePatch()),
+        setDoc(doc(asKioskDevice(env, DEVICE.live), paths.student('kiosk-new-student')), datePatch()),
       );
     });
 
@@ -2563,7 +2571,7 @@ describe('kiosk', () => {
      */
     it('may check in a Pre-K child, whose grade rides on the patch', async () => {
       await assertSucceeds(
-        setDoc(doc(asKiosk(env, UID.counselor), paths.student('kiosk-prek-student')), {
+        setDoc(doc(asKioskDevice(env, DEVICE.live), paths.student('kiosk-prek-student')), {
           ...datePatch(),
           grade: -1,
         }),
@@ -2571,7 +2579,7 @@ describe('kiosk', () => {
     });
 
     it('may not touch anything beyond the patch — notes, status, linkage', async () => {
-      const db = asKiosk(env, UID.counselor);
+      const db = asKioskDevice(env, DEVICE.live);
       await assertFails(
         setDoc(
           doc(db, paths.student(ID.student)),
@@ -2582,7 +2590,7 @@ describe('kiosk', () => {
       await assertFails(
         setDoc(doc(db, paths.student(ID.student)), { status: 'inactive' }, { merge: true }),
       );
-      // The same writes from the same person's full session are legal.
+      // The same writes from a counselor's full session are legal.
       await assertSucceeds(
         setDoc(
           doc(asUser(env, UID.counselor), paths.student(ID.student)),
@@ -2594,10 +2602,234 @@ describe('kiosk', () => {
   });
 
   describe('users, from a kiosk session', () => {
-    it('may not read profiles — not even its own', async () => {
-      const db = asKiosk(env, UID.counselor);
+    it('may not read profiles — not even the approver\'s', async () => {
+      const db = asKioskDevice(env, DEVICE.live);
       await assertFails(getDoc(doc(db, paths.user(UID.counselor))));
       await assertFails(getDocs(collection(db, COLLECTIONS.users)));
+    });
+  });
+
+  describe('the session itself', () => {
+    /*
+     * The row is the standing. Everything a kiosk may do above is gated on
+     * `isLiveKiosk()` — the claim, a device id, the uid the server mints for
+     * that id, and a `kioskDevices` row that exists and is not retired — and
+     * each test here is one way of failing that.
+     */
+    const lobbyReads = async (db: Firestore) => {
+      await assertFails(getDoc(doc(db, 'kioskIndex/phones')));
+      await assertFails(
+        getDocs(query(collection(db, paths.students()), where('status', '==', 'active'))),
+      );
+      await assertFails(getDocs(collection(db, paths.attendanceCollection(ID.event))));
+    };
+
+    it('admits a live device to the lobby reads', async () => {
+      const db = asKioskDevice(env, DEVICE.live);
+      await assertSucceeds(getDoc(doc(db, 'kioskIndex/phones')));
+      await assertSucceeds(
+        getDocs(query(collection(db, paths.students()), where('status', '==', 'active'))),
+      );
+      await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(ID.event))));
+    });
+
+    it('admits nothing to a session minted before kiosks had identities — a member\'s uid with the claim', async () => {
+      // Signed out by the kiosk itself at boot; the rules make sure of it too.
+      const db = asKiosk(env, UID.counselor);
+      await lobbyReads(db);
+      await assertFails(
+        setDoc(
+          doc(db, paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.counselor }),
+        ),
+      );
+    });
+
+    it('admits nothing to a retired device, however well-formed its session', async () => {
+      const db = asKioskDevice(env, DEVICE.retired);
+      await lobbyReads(db);
+      await assertFails(
+        setDoc(
+          doc(db, paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: kioskUid(DEVICE.retired) }),
+        ),
+      );
+    });
+
+    it('admits nothing to a device with no row — a token is not a standing', async () => {
+      const db = asKioskDevice(env, DEVICE.unknown);
+      await lobbyReads(db);
+      await assertFails(
+        setDoc(
+          doc(db, paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: kioskUid(DEVICE.unknown) }),
+        ),
+      );
+    });
+
+    it('admits nothing to a uid that is not the one minted for its device id', async () => {
+      // The claim names a live device and the uid names another: nobody's.
+      await lobbyReads(asKioskDevice(env, DEVICE.live, kioskUid(DEVICE.elsewhere)));
+      await lobbyReads(asKioskDevice(env, DEVICE.live, UID.counselor));
+    });
+  });
+
+  describe('its reach', () => {
+    it('is the chain on its row, and no other — a fence on that chain included', async () => {
+      const elsewhere = asKioskDevice(env, DEVICE.elsewhere);
+      // Bound to Sunday School: the Friday register is not its business.
+      await assertFails(getDocs(collection(elsewhere, paths.attendanceCollection(ID.event))));
+      await assertFails(
+        setDoc(
+          doc(elsewhere, paths.attendance(ID.event, ID.otherStudent)),
+          attendanceDoc({ studentId: ID.otherStudent, checkedInBy: kioskUid(DEVICE.elsewhere) }),
+        ),
+      );
+      // The locked Sunday gathering *is* its business: a kiosk stands in
+      // whichever room a leader pointed it at, and `eventAccess` is about
+      // people. The pairer being on the list or off it changes nothing here.
+      await assertSucceeds(
+        getDocs(collection(elsewhere, paths.attendanceCollection(ID.restrictedEvent))),
+      );
+      await assertSucceeds(
+        setDoc(
+          doc(elsewhere, paths.attendance(ID.restrictedEvent, ID.otherStudent)),
+          attendanceDoc({
+            studentId: ID.otherStudent,
+            eventId: ID.restrictedEvent,
+            seriesId: ID.restrictedSeries,
+            checkedInBy: kioskUid(DEVICE.elsewhere),
+          }),
+        ),
+      );
+    });
+
+    it('is nothing at all between gatherings', async () => {
+      const kiosk = asKioskDevice(env, DEVICE.live);
+      await assertSucceeds(
+        updateDoc(doc(kiosk, paths.kioskDevice(DEVICE.live)), {
+          lastSeenAt: serverTimestamp(),
+          boundTo: null,
+          boundChain: null,
+        }),
+      );
+      await assertFails(getDocs(collection(kiosk, paths.attendanceCollection(ID.event))));
+    });
+  });
+
+  describe('kioskDevices', () => {
+    const own = () => doc(asKioskDevice(env, DEVICE.live), paths.kioskDevice(DEVICE.live));
+
+    it('takes the kiosk\'s own report: when it was seen, and what it is bound to', async () => {
+      await assertSucceeds(
+        updateDoc(own(), {
+          lastSeenAt: serverTimestamp(),
+          boundTo: 'Sunday School',
+          boundChain: ID.restrictedSeries,
+        }),
+      );
+      await assertSucceeds(updateDoc(own(), { lastSeenAt: serverTimestamp() }));
+    });
+
+    it('refuses a report that is not one — the wrong keys, a malformed moment, an oversize title, a self-retirement', async () => {
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), approvedBy: UID.admin }));
+      await assertFails(updateDoc(own(), { lastSeenAt: 'now' }));
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), boundTo: 'x'.repeat(121) }),
+      );
+      await assertFails(updateDoc(own(), { retiredAt: serverTimestamp(), retiredBy: KIOSK }));
+    });
+
+    it('refuses a kiosk touching any row but its own', async () => {
+      const kiosk = asKioskDevice(env, DEVICE.live);
+      await assertFails(
+        updateDoc(doc(kiosk, paths.kioskDevice(DEVICE.elsewhere)), { lastSeenAt: serverTimestamp() }),
+      );
+    });
+
+    it('refuses a retired kiosk\'s report, so a retired tablet cannot report itself back', async () => {
+      await assertFails(
+        updateDoc(doc(asKioskDevice(env, DEVICE.retired), paths.kioskDevice(DEVICE.retired)), {
+          lastSeenAt: serverTimestamp(),
+        }),
+      );
+    });
+
+    it('lets a kiosk read nothing about kiosks, its own row included', async () => {
+      const kiosk = asKioskDevice(env, DEVICE.live);
+      await assertFails(getDoc(doc(kiosk, paths.kioskDevice(DEVICE.live))));
+      await assertFails(getDocs(collection(kiosk, paths.kioskDevicesCollection())));
+    });
+
+    it('is read by core and up, and not below', async () => {
+      await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.kioskDevice(DEVICE.live))));
+      await assertSucceeds(
+        getDocs(collection(asUser(env, UID.admin), paths.kioskDevicesCollection())),
+      );
+      await assertFails(getDoc(doc(asUser(env, UID.counselor), paths.kioskDevice(DEVICE.live))));
+      await assertFails(getDoc(doc(asUser(env, UID.inactive), paths.kioskDevice(DEVICE.live))));
+    });
+
+    it('is retired by core and up, in their own name', async () => {
+      await assertSucceeds(
+        updateDoc(doc(asUser(env, UID.core), paths.kioskDevice(DEVICE.live)), {
+          retiredAt: serverTimestamp(),
+          retiredBy: UID.core,
+        }),
+      );
+      await assertSucceeds(
+        updateDoc(doc(asUser(env, UID.admin), paths.kioskDevice(DEVICE.elsewhere)), {
+          retiredAt: serverTimestamp(),
+          retiredBy: UID.admin,
+        }),
+      );
+    });
+
+    it('refuses a retirement in somebody else\'s name, by a counselor, or carrying anything else', async () => {
+      const core = asUser(env, UID.core);
+      await assertFails(
+        updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), {
+          retiredAt: serverTimestamp(),
+          retiredBy: UID.admin,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.counselor), paths.kioskDevice(DEVICE.live)), {
+          retiredAt: serverTimestamp(),
+          retiredBy: UID.counselor,
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), {
+          retiredAt: serverTimestamp(),
+          retiredBy: UID.core,
+          boundChain: null,
+        }),
+      );
+      // The kiosk's own three keys are the kiosk's.
+      await assertFails(updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { boundTo: 'Nursery' }));
+    });
+
+    it('stays retired: nobody un-retires from a client — pairing again is the server\'s to do', async () => {
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.admin), paths.kioskDevice(DEVICE.retired)), {
+          retiredAt: null,
+          retiredBy: null,
+        }),
+      );
+    });
+
+    it('is created and deleted by nobody from a client — the claim writes it, and the row is provenance', async () => {
+      await assertFails(
+        setDoc(doc(asUser(env, UID.admin), paths.kioskDevice('kiosk-minted-00000005')), kioskDeviceDoc()),
+      );
+      await assertFails(
+        setDoc(
+          doc(asKioskDevice(env, DEVICE.unknown), paths.kioskDevice(DEVICE.unknown)),
+          kioskDeviceDoc(),
+        ),
+      );
+      await assertFails(deleteDoc(doc(asUser(env, UID.admin), paths.kioskDevice(DEVICE.retired))));
     });
   });
 });

@@ -9,12 +9,12 @@
  *
  * `checkedInBy` is a uid — except when it is not. A row imported from Planning
  * Center Check-Ins carries the literal `planning-center`, and a row written at
- * the lobby kiosk carries the uid of whoever *paired the device*, not whoever
- * touched the screen. So the file carries both the resolved name and the raw
- * value, beside `method`: a reader can then see that a `kiosk` row's name is a
- * paired session rather than an eyewitness, which is exactly the distinction
- * somebody reconstructing a morning needs. A bare uid never appears in the name
- * column on its own.
+ * the lobby kiosk carries the kiosk's own uid, `kiosk_<deviceId>`, because a
+ * lobby tap is nobody's eyewitness account (see `src/lib/kioskDevice.ts`). So
+ * the file carries both the resolved name and the raw value, beside `method`:
+ * a `kiosk` row says "Lobby kiosk" in the name column and which device beside
+ * it, which is exactly the distinction somebody reconstructing a morning
+ * needs. A bare uid never appears in the name column on its own.
  *
  * ## Conditional columns rather than a stable header
  *
@@ -31,6 +31,7 @@
  */
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isoDate, isoDateTime, toCsv, type CsvColumn } from '@/lib/csv';
+import { deviceIdOfUid } from '@/lib/kioskDevice';
 import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
 import type { AttendanceRecord, Rsvp, Student, TallyEvent } from '@/types';
@@ -126,6 +127,10 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
         // The one value that is not a uid, and saying so beats resolving it to
         // nothing.
         if (by === 'planning-center') return 'planning-center';
+        // A lobby screen is not on the team, so it has no name to resolve —
+        // and "Lobby kiosk" is the truer custody record than the volunteer
+        // who happened to pair it. The device id is in the column beside.
+        if (deviceIdOfUid(by)) return 'Lobby kiosk';
         // Blank rather than the raw uid: a uid in a name column reads as a
         // person's name to whoever opens this next, and the value is already in
         // its own column beside it.
@@ -144,7 +149,9 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
         header: 'checked_out_by',
         value: (row) => {
           const by = row.attendance?.checkedOutBy;
-          return by ? (namesByUid.get(by) ?? '') : '';
+          if (!by) return '';
+          if (deviceIdOfUid(by)) return 'Lobby kiosk';
+          return namesByUid.get(by) ?? '';
         },
       },
       { header: 'checked_out_by_uid', value: (row) => row.attendance?.checkedOutBy ?? '' },

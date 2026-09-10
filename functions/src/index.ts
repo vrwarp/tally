@@ -70,7 +70,8 @@ import {
   type StudentProfilePatch,
   type UpdateStudentProfileResult,
 } from './backends/types.js';
-import { BACKEND_SECRETS, resolveConfig, type PcoConfig } from './config.js';
+import { BACKEND_SECRETS, resolveConfig, seededAdminEmails, type PcoConfig } from './config.js';
+import { isDeviceId, kioskUid, readLiveDevice, recordPairedDevice } from './kiosk/devices.js';
 import type { ServerCode } from './generated/serverCodes.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { ChainAccessReader } from './eventAccess.js';
@@ -415,6 +416,51 @@ async function requireAdmin(uid: string | undefined): Promise<void> {
 }
 
 /**
+ * Who is calling: a person with a profile, or a lobby kiosk with a device row.
+ *
+ * A kiosk session carries `kiosk: true` and its `deviceId` claim, and its
+ * standing is the row `claimKioskToken` wrote — the same test the rules make
+ * in `isLiveKiosk()`. It reads no profile: the whole point of the kiosk's own
+ * identity is that nothing about any person's access can stop a lobby screen.
+ * A kiosk whose row has been retired, or a token from before device rows
+ * existed, is refused with the same code a suspended member gets — the kiosk
+ * reads it as "pair again", which is the right answer to both.
+ */
+type CallerIdentity =
+  | { kind: 'member'; uid: string }
+  | { kind: 'kiosk'; uid: string; deviceId: string; approvedBy: string; boundChain: string | null };
+
+async function requireMemberOrKiosk(
+  auth: { uid: string; token: Record<string, unknown> } | undefined,
+): Promise<CallerIdentity> {
+  if (!auth) throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
+  if (auth.token.kiosk === true) return requireLiveKiosk(auth);
+  await requireMember(auth.uid);
+  return { kind: 'member', uid: auth.uid };
+}
+
+async function requireLiveKiosk(
+  auth: { uid: string; token: Record<string, unknown> } | undefined,
+): Promise<Extract<CallerIdentity, { kind: 'kiosk' }>> {
+  if (!auth) throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');
+  const deviceId = auth.token.deviceId;
+  if (auth.token.kiosk !== true || !isDeviceId(deviceId) || auth.uid !== kioskUid(deviceId)) {
+    throw refuse('permission-denied', 'auth.notActive', 'This kiosk needs to be paired again.');
+  }
+  const device = await readLiveDevice(db(), deviceId);
+  if (!device) {
+    throw refuse('permission-denied', 'auth.notActive', 'This kiosk has been retired.');
+  }
+  return {
+    kind: 'kiosk',
+    uid: auth.uid,
+    deviceId,
+    approvedBy: device.approvedBy,
+    boundChain: device.boundChain,
+  };
+}
+
+/**
  * Turns a backend failure into something a counselor can act on.
  *
  * The distinction that matters is "Tally is broken" versus "the backend is
@@ -564,7 +610,7 @@ interface RosterResponse {
 export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterResponse>>(
   { secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '512MiB' },
   async (request): Promise<RosterResponse> => {
-    await requireMember(request.auth?.uid);
+    await requireMemberOrKiosk(request.auth);
 
     const database = db();
     const registry = await createRegistry(database);
@@ -1055,7 +1101,7 @@ export const getAllergyNotes = onCall<
 >(
   { secrets: BACKEND_SECRETS, timeoutSeconds: 60, memory: '256MiB' },
   async (request): Promise<AllergyNotesResponse> => {
-    await requireMember(request.auth?.uid);
+    await requireMemberOrKiosk(request.auth);
 
     const asked = request.data?.pcoPersonIds;
     const keys = request.data?.personKeys;
@@ -2751,7 +2797,7 @@ export const materializeOccurrence = onCall<
   { chain: string; startAt: number },
   Promise<{ id: string; created: boolean }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  await requireMemberOrKiosk(request.auth);
 
   // Safe to set globally because a v2 function is its own service — nothing
   // else shares this container.
@@ -3094,9 +3140,9 @@ export const startKioskPairing = onCall<void, Promise<StartPairingResult>>(
 
 /**
  * A staff member vouching for the code on a kiosk's screen. Any active member:
- * the identity the kiosk inherits is the approver's own, and the attendance
- * rules already require that identity to be at least a counselor for its
- * writes to land.
+ * the kiosk gets an identity of its own, not the approver's, so nothing about
+ * the approver's role reaches the rules — what they vouch for is that the
+ * tablet showing this code is the church's, which any member can say.
  */
 export const approveKioskPairing = onCall<
   { code?: unknown },
@@ -3122,7 +3168,7 @@ export const approveKioskPairing = onCall<
  * kiosk section. The Auth emulator mints unsigned tokens and needs nothing.
  */
 export const claimKioskToken = onCall<
-  { code?: unknown; secret?: unknown },
+  { code?: unknown; secret?: unknown; deviceId?: unknown },
   Promise<{ status: 'pending' | 'not-found' | 'expired' } | { status: 'ready'; token: string }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   const code = request.data?.code;
@@ -3131,24 +3177,73 @@ export const claimKioskToken = onCall<
     throw new HttpsError('invalid-argument', 'code and secret are required.');
   }
 
-  const result = await claimPairing(db(), code, secret, new Date());
+  const deviceId = request.data?.deviceId;
+  if (!isDeviceId(deviceId)) {
+    throw new HttpsError('invalid-argument', 'deviceId is required.');
+  }
+
+  const now = new Date();
+  const result = await claimPairing(db(), code, secret, now);
   if (result.status !== 'ready') return { status: result.status };
 
-  const token = await getAuth().createCustomToken(result.uid, { kiosk: true });
+  /*
+   * The kiosk's own identity, not the approver's.
+   *
+   * The token used to be minted for the approver's uid, so every rule the
+   * kiosk passed read the approver's profile — and suspending the volunteer
+   * who paired the lobby tablet in September stopped the tablet in silence.
+   * Now the uid is `kiosk_<deviceId>` and the device row written here is the
+   * kiosk's standing; see `isLiveKiosk()` in firestore.rules. The approver's
+   * name is denormalised onto the row at this moment, the way `transitions`
+   * carries `releasedByName`, because the row is the provenance of every
+   * morning the kiosk records and profiles come and go.
+   */
+  const approverSnapshot = await db().doc(`${PATHS.users}/${result.uid}`).get();
+  const approverData = approverSnapshot.exists ? (approverSnapshot.data() ?? {}) : {};
+  const approverName =
+    typeof approverData.displayName === 'string' && approverData.displayName.trim()
+      ? approverData.displayName.trim()
+      : null;
+  await recordPairedDevice(db(), deviceId, { uid: result.uid, name: approverName }, now);
+
+  const token = await getAuth().createCustomToken(kioskUid(deviceId), { kiosk: true, deviceId });
   return { status: 'ready', token };
 });
+
+/* -------------------------------------------------------------------------- */
+/* Access, asked rather than inferred                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The addresses the deployment pins as admins, read where the truth lives.
+ *
+ * The Team screen asks this when it draws, so a pinned row can lose its role
+ * select and its toggle. The first design stamped a `pinned` flag onto the
+ * profile instead, and nothing could ever clear it: an address that left
+ * `TALLY_ADMIN_EMAILS` would have become an admin account no screen in the app
+ * could end. A deploy-time fact is not cached on a document that outlives the
+ * deploy. Admin-only: it is a list of the people who control access to a
+ * roster of minors.
+ */
+export const listPinnedAdmins = onCall<void, Promise<{ emails: string[] }>>(
+  { timeoutSeconds: 30, memory: '256MiB' },
+  async (request) => {
+    await requireAdmin(request.auth?.uid);
+    return { emails: [...seededAdminEmails()] };
+  },
+);
 
 /**
  * The kiosk's event chooser: every gathering in the window, materialised or
  * merely described by a recurrence rule. Same projection the app renders, run
- * on the server so the kiosk bundle carries none of it. Any active member —
- * which a paired kiosk is, as its approver.
+ * on the server so the kiosk bundle carries none of it. Any active member, or
+ * a live kiosk.
  */
 export const getKioskEvents = onCall<
   { days?: unknown } | undefined,
   Promise<{ events: KioskEventEntry[] }>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  const identity = await requireMemberOrKiosk(request.auth);
 
   process.env.TZ = MINISTRY_TIME_ZONE;
 
@@ -3170,21 +3265,31 @@ export const getKioskEvents = onCall<
   const events = await listKioskEvents(database, new Date(), logger, { days, allergiesSupported });
 
   /*
-   * Filtered at bind time, which is the only moment this can be refused kindly.
+   * Everything, with the pairer's own gatherings first.
    *
-   * A kiosk keeps its binding and nothing else. Bound to a gathering its
-   * approver cannot work, it looks perfectly healthy in the lobby and then
-   * fails on the *first check-in* — in front of a family, with a queue behind
-   * them — and afterwards queues up to fifty more writes that will never land.
-   * The list a kiosk is offered is therefore narrowed to what the person
-   * approving the pairing may actually work.
+   * A kiosk holds its own identity and may stand in any room, so nothing is
+   * withheld — the narrowing that used to filter this list to the approver's
+   * chains was a side effect of the kiosk *being* the approver. But that
+   * narrowing was quietly doing good: a greeter binding the nursery tablet on
+   * a Sunday with three things on should find the nursery as the answer and
+   * the youth night below a divider, in the grammar the app's chooser keeps.
+   * So each row says whether the person who paired this kiosk works it, and
+   * the kiosk draws the rest demoted. An approver who has since been suspended
+   * or removed simply works nothing; the kiosk itself is unaffected.
    */
-  const uid = request.auth!.uid;
-  const caller = await readCaller(uid);
-  const reader = new ChainAccessReader(getFirestore(), uid, caller.role === 'admin');
-  const { allowed } = await reader.partition(events.map((entry) => entry.chain));
+  const pairer = identity.kind === 'kiosk' ? identity.approvedBy : identity.uid;
+  const caller = await readCaller(pairer);
+  const allowed = caller.active
+    ? (
+        await new ChainAccessReader(getFirestore(), pairer, caller.role === 'admin').partition(
+          events.map((entry) => entry.chain),
+        )
+      ).allowed
+    : new Set<string>();
 
-  return { events: events.filter((entry) => allowed.has(entry.chain)) };
+  const marked = events.map((entry) => ({ ...entry, yours: allowed.has(entry.chain) }));
+  marked.sort((a, b) => Number(b.yours) - Number(a.yours));
+  return { events: marked };
 });
 
 /**
@@ -3195,12 +3300,11 @@ export const getKioskEvents = onCall<
  * writes is decided here rather than sent: the caller says who their children
  * are, and the server says what that means.
  *
- * The gate is the kiosk claim *plus* the approver still being active — the same
- * pair the shelf's check-ins already depend on, so deactivating the person who
- * paired a kiosk stops its registrations at the same moment it stops everything
- * else. `requireMember` rather than `requireCoreTeam` for the same reason
- * `getKioskEvents` uses it: the identity is the approver's, and a counselor who
- * may quick-add a visitor at a door may certainly let a family do it themselves.
+ * The gate is the kiosk claim *plus* a live device row — the same pair the
+ * shelf's check-ins depend on in the rules, so retiring a kiosk stops its
+ * registrations at the same moment it stops everything else. Nobody's profile
+ * is read: a kiosk is a room, not a volunteer, and the person who approved its
+ * code leaving the team changes nothing about the tablet in the lobby.
  *
  * Kiosk-token-only since the phone form was retired. The anonymous-with-a-code
  * way in went with it, which closed the one semi-open door Tally had: the
@@ -3213,7 +3317,7 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
     if (request.auth?.token?.kiosk !== true) {
       throw refuse('permission-denied', 'auth.kioskOnly', 'Registration happens at a kiosk.');
     }
-    await requireMember(request.auth?.uid);
+    await requireLiveKiosk(request.auth);
 
     const eventId = request.data?.eventId;
     if (typeof eventId !== 'string' || eventId.trim().length === 0) {
@@ -3547,7 +3651,7 @@ export const refreshKioskPhoneIndex = onCall<
   { force?: unknown } | undefined,
   Promise<PhoneIndexSummary>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  await requireMemberOrKiosk(request.auth);
 
   const database = db();
   const registry = await createRegistry(database);
@@ -3618,7 +3722,7 @@ export const rebuildKioskPhoneIndex = onSchedule(
 export const refreshKioskParticipation = onCall<undefined, Promise<ParticipationSummary>>(
   { timeoutSeconds: 300, memory: '512MiB' },
   async (request) => {
-    await requireMember(request.auth?.uid);
+    await requireMemberOrKiosk(request.auth);
     return buildParticipationIndex(db(), { builtBy: request.auth!.uid, logger: logger });
   },
 );

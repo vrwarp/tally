@@ -174,3 +174,45 @@ describe('PairingScreen', () => {
     expect(screen.queryByText('HJ4K2P')).not.toBeInTheDocument();
   });
 });
+
+describe('the reason a paired kiosk is here again', () => {
+  it('says nothing above the code for a kiosk that was never paired', async () => {
+    const poll = vi.fn(async () => 'pending' as const);
+    render(<PairingScreen services={servicesWith(poll)} onPaired={vi.fn()} />);
+    await tick();
+
+    expect(screen.queryByTestId('kiosk-pairing-reason')).not.toBeInTheDocument();
+  });
+
+  it('says Tally was updated, so nobody reads a bare code as "somebody unpaired us"', async () => {
+    const poll = vi.fn(async () => 'pending' as const);
+    render(
+      <PairingScreen
+        services={servicesWith(poll)}
+        reason={{ kind: 'updated' }}
+        onPaired={vi.fn()}
+      />,
+    );
+    await tick();
+
+    expect(screen.getByTestId('kiosk-pairing-reason')).toHaveTextContent(/Tally was updated/);
+    expect(screen.getByText('HJ4K2P')).toBeInTheDocument();
+  });
+
+  it('says when a retired kiosk stopped recording, so the register can be checked from then', async () => {
+    const poll = vi.fn(async () => 'pending' as const);
+    render(
+      <PairingScreen
+        services={servicesWith(poll)}
+        reason={{ kind: 'retired', atMs: new Date('2026-09-06T09:12:00').getTime() }}
+        onPaired={vi.fn()}
+      />,
+    );
+    await tick();
+
+    const reason = screen.getByTestId('kiosk-pairing-reason');
+    expect(reason).toHaveTextContent(/retired/);
+    expect(reason).toHaveTextContent(/9:12/);
+    expect(reason).toHaveTextContent(/leader’s phone/);
+  });
+});

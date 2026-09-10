@@ -14,7 +14,8 @@
     "printerNeedsAttention": "Label printer needs attention",
     "settingUp": "Setting up…",
     "setKiosk": "Set kiosk",
-    "pickAGathering": "Pick a gathering"
+    "pickAGathering": "Pick a gathering",
+    "notYours": "Not yours"
   },
   "Common": {
     "language": "Language",
@@ -114,7 +115,9 @@
     "howTo": "In Tally, tap your name and choose <kiosk>Kiosk</kiosk>, then enter this code.",
     "gettingCode": "Getting a code…",
     "noCode": "Can’t reach Tally right now. Trying again shortly…",
-    "stuck": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing."
+    "stuck": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing.",
+    "updated": "Tally was updated, so this kiosk needs pairing once more. Any leader can do it.",
+    "retired": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again."
   },
   "Printer": {
     "troubleReported": "The printer reported a problem.",

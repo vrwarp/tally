@@ -292,16 +292,20 @@ describe('a stream that fails', () => {
     expect(renders).toBe(after);
   });
 
-  it('names the access stream when that is the one refused', async () => {
+  it('names the access stream when that is the one refused, and says what that means', async () => {
     // Every label is written out by hand at its own call site, so each one is
-    // its own chance to name the wrong collection in a banner.
+    // its own chance to name the wrong collection in a banner. This one also
+    // carries the sentence the others do not: `canWork` fails open when the
+    // access lists cannot be read, so the banner is the only warning a
+    // counselor gets before a gathering refuses them.
     mount();
     await waitFor(() => expect(latest).not.toBeNull());
 
     act(() => streams.access.fail(new Error('Missing or insufficient permissions.')));
 
     expect(latest?.streamErrors?.access).toBe(
-      'Could not load access: Missing or insufficient permissions.',
+      'Could not load access: Missing or insufficient permissions. ' +
+        "Who's on tonight's gatherings couldn't be checked — if one refuses you, ask a leader to add you.",
     );
   });
 

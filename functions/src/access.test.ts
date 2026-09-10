@@ -145,6 +145,100 @@ describe('provisionAccessForCaller', () => {
     expect(db.get(userPath())?.email).toBe(CALLER.email);
   });
 
+  describe('one mailbox, one key', () => {
+    /*
+     * Gmail ignores dots in the local part, treats `+tag` as an alias, and
+     * answers to googlemail.com. Google's token carries the address as the
+     * account registered it, so an invitation typed `josmith` used to fail the
+     * `jo.smith` signing in on Sunday. Every other domain keeps its dots: a
+     * rule that merged them on a Workspace domain would merge two real staff.
+     */
+    const GMAIL_CALLER = { ...CALLER, email: 'jo.smith@gmail.com' };
+
+    it('matches a dotted Gmail sign-in to an invitation typed without dots', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'core' });
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result).toMatchObject({ status: 'granted', role: 'core' });
+      // The profile carries the address the token did, not the one typed.
+      expect(db.get(userPath())?.email).toBe('jo.smith@gmail.com');
+    });
+
+    it('matches a googlemail.com sign-in to a gmail.com invitation', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'counselor' });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: 'Jo.Smith+tally@googlemail.com' },
+        NOW,
+        [],
+      );
+
+      expect(result.status).toBe('granted');
+    });
+
+    it('does not match a Workspace address with dots to one without', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@church.org'), { role: 'core' });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: 'jo.smith@church.org' },
+        NOW,
+        [],
+      );
+
+      expect(result.status).toBe('not-on-roster');
+      expect(db.get(userPath())).toBeUndefined();
+    });
+
+    it('finds an invitation written under the exact key, and moves it to the canonical one', async () => {
+      // Written by the app before dots stopped counting: lowercased, dots to
+      // commas, nothing else. It has to keep working, and it has to stop being
+      // a second document the pending list would show beside the real one.
+      const db = new FakeFirestore();
+      const legacyPath = `${PATHS.invitations}/jo,smith@gmail,com`;
+      const written = { email: 'jo.smith@gmail.com', role: 'core', invitedBy: 'uid-dana' };
+      db.seed(legacyPath, written);
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result).toMatchObject({ status: 'granted', role: 'core' });
+      expect(db.get(`${PATHS.invitations}/josmith@gmail,com`)).toEqual(written);
+      expect(db.get(legacyPath)).toBeUndefined();
+    });
+
+    it('reads the canonical invitation when both spellings exist', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'core' });
+      db.seed(`${PATHS.invitations}/jo,smith@gmail,com`, { role: 'counselor' });
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result.role).toBe('core');
+      expect(db.writtenPaths(PATHS.invitations)).toEqual([]);
+    });
+
+    it('does not move a non-Gmail invitation, whose two keys are the same', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath(CALLER.email), { role: 'core' });
+
+      await provisionAccessForCaller(db, CALLER, NOW, []);
+
+      expect(db.writtenPaths(PATHS.invitations)).toEqual([]);
+    });
+
+    it('pins a Gmail admin however the variable spelled it', async () => {
+      const db = new FakeFirestore();
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, ['josmith@gmail.com']);
+
+      expect(result.role).toBe('admin');
+    });
+  });
+
   describe('the seeded admin', () => {
     it('is an admin without an invitation, because nobody could have sent one', async () => {
       // The bootstrap: on a fresh install there is no admin to grant the first

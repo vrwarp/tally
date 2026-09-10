@@ -69,3 +69,16 @@ export function shortName(profile: UserProfile | undefined): string | null {
   const local = profile.email.split('@')[0];
   return local && local.length > 0 ? local : null;
 }
+
+/**
+ * What to call somebody when the screen has room for the whole name.
+ *
+ * The locked page and the sheet: a forename is the app's entire answer to
+ * somebody who has never met Miriam, in a lobby of two hundred, so where a
+ * line can hold "Miriam Achebe" it does. The address is the fallback for a
+ * profile that never got a display name, and it is the whole address rather
+ * than its local part because here it is the only thing identifying a person.
+ */
+export function fullName(profile: UserProfile): string {
+  return profile.displayName?.trim() || profile.email;
+}

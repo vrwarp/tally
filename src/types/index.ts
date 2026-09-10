@@ -815,14 +815,39 @@ export interface TallyEvent
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Stored at `kioskDevices/{deviceId}`: a lobby kiosk's standing.
+ *
+ * Written by `claimKioskToken` when a pairing is approved, and the row *is*
+ * the kiosk's standing — the rules admit a kiosk session while its row exists
+ * and `retiredAt` is null, and read nobody's profile. The kiosk itself may
+ * update only `lastSeenAt`, `boundTo` and `boundChain`; core and up may set
+ * `retiredAt`/`retiredBy`, and nobody deletes one: the row is the provenance
+ * of every morning that kiosk recorded. See `src/lib/kioskDevice.ts`.
+ */
+export interface KioskDeviceDoc {
+  approvedBy: string;
+  /** The approver's display name as of the pairing, like `transitions.releasedByName`. */
+  approvedByName: string | null;
+  pairedAt: Timestamp;
+  /** Updated by the kiosk while bound; null until it first reports in. */
+  lastSeenAt: Timestamp | null;
+  /** The title of the gathering the kiosk is bound to, or null between gatherings. */
+  boundTo: string | null;
+  /** The chain it is bound to — the whole of its reach in the rules. */
+  boundChain: string | null;
+  retiredAt: Timestamp | null;
+  retiredBy: string | null;
+}
+
+/**
  * How the counselor found the student. Purely diagnostic — it tells the core
  * team whether the predictive roster is actually earning its keep.
  *
  * `import` marks a row that came from Planning Center Check-Ins history
  * rather than from anybody's thumb; those rows also carry
  * `checkedInBy: 'planning-center'` instead of a uid. `kiosk` marks a
- * self-serve check-in from the lobby kiosk, written under the staff session
- * that paired the device.
+ * self-serve check-in from the lobby kiosk, written under the kiosk's own
+ * uid, `kiosk_<deviceId>` — see `src/lib/kioskDevice.ts`.
  */
 export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual' | 'import' | 'kiosk';
 
@@ -1054,15 +1079,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The `invitations/{emailKey}` document id.
+ * The `invitations/{emailKey}` document id, and the canonical address behind it.
  *
- * Dots become commas because the address is the key and the key is a path
- * segment. Must stay identical to `emailKey` in functions/src/pco/mapping.ts,
- * or an invitation an admin wrote would not be the one a sign-in looks up.
+ * Defined in `@/lib/emailKey` — where the Gmail rule (dots and `+tags` do not
+ * make a different mailbox) is written down once — and re-exported here because
+ * this is where every caller has always found it. Must stay identical to the
+ * copy in functions/src/pco/mapping.ts, or an invitation an admin wrote would
+ * not be the one a sign-in looks up.
  */
-export function emailKey(email: string): string {
-  return email.trim().toLowerCase().replace(/\./g, ',');
-}
+export { canonicalEmail, emailKey, sameAccount } from '@/lib/emailKey';
 
 /** How much Tally is allowed to write back to Planning Center. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';

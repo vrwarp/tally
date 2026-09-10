@@ -12,13 +12,31 @@
  * built from, `ensureMaterialized` — would each be refused, once a minute,
  * forever, filling the console with failures on a screen that already knows the
  * answer. The caller short-circuits before any of it; see `CheckInPage`.
+ *
+ * ## Who it names
+ *
+ * Full names, ranked the way `approvers()` ranks them — whoever opened Tally
+ * today first, then the core team, then admins — and never a suspended
+ * profile, whose membership survives suspension by design. Then, whatever the
+ * list said, one admin by name: an admin passes every gate, and the person the
+ * list names may be on leave since June, which the app cannot know and the
+ * reader can.
+ *
+ * ## "You've just been taken off"
+ *
+ * The live access stream replaces the roster with this page the moment
+ * somebody is removed, and a page that then reads as though the reader was
+ * never on it is a lie the app knows it is telling — it had a roster open a
+ * second ago. `justRemoved` is that fact, decided by the caller, which is the
+ * only thing that knows what was mounted before.
  */
 import { Link } from 'react-router-dom';
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { shortName, useTeam } from '@/features/events/useTeam';
+import { approversFallback, rankApprovers } from '@/features/events/approvers';
+import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
-import type { TallyEvent } from '@/types';
+import type { Role, TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -27,33 +45,44 @@ export interface LockedGatheringProps {
   now: Date;
   /** Where "back" goes. The chooser from check-in, the calendar from events. */
   backTo?: string;
+  /** The word after the chevron. Without one, "Check-in" — the chooser. */
   backLabel?: string;
+  /**
+   * The reader had this gathering's roster open and was taken off it just now.
+   *
+   * Swaps the lead sentence for one that says so. See the note above.
+   */
+  justRemoved?: boolean;
 }
+
+const ROLE_LABEL = {
+  counselor: 'roleCounselor',
+  core: 'roleCore',
+  admin: 'roleAdmin',
+} as const satisfies Record<Role, string>;
 
 export function LockedGathering({
   event,
   now,
   backTo = '/',
-  backLabel = 'Check-in',
+  backLabel,
+  justRemoved = false,
 }: LockedGatheringProps) {
   const time = useTimeFormats();
   const t = useTranslations('Events');
+  const tCheckIn = useTranslations('CheckIn');
+  const tTeam = useTranslations('Team');
   const { access } = useData();
-  const { byUid } = useTeam(true);
+  const { members: team, byUid } = useTeam(true);
 
   const list = access.get(chainKey(event));
-  const people = [...(list?.members ?? [])]
-    .map((uid) => byUid.get(uid))
-    .filter((profile): profile is NonNullable<typeof profile> => profile !== undefined)
-    .sort((a, b) => {
-      const rank = (role: string) => (role === 'admin' ? 0 : role === 'core' ? 1 : 2);
-      return rank(a.role) - rank(b.role);
-    });
+  const people = rankApprovers(list?.members ?? [], byUid, now);
+  const fallback = approversFallback(t, team);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-4">
       <Link to={backTo} className="text-sm font-semibold text-brand-300">
-        ‹ {backLabel}
+        {backLabel ? `‹ ${backLabel}` : tCheckIn('backToCheckIn')}
       </Link>
 
       <header className="flex items-start gap-3">
@@ -74,7 +103,7 @@ export function LockedGathering({
           <span aria-hidden>🔒</span> {t('lockedRestricted')}
         </p>
         <p className="pt-1 text-sm text-ink-500">
-          {t('lockedExplain')}
+          {justRemoved ? t('justTakenOff') : t('lockedExplain')}
         </p>
 
         {people.length > 0 ? (
@@ -85,24 +114,28 @@ export function LockedGathering({
             <ul className="flex flex-col pt-1">
               {people.map((profile) => (
                 <li key={profile.id} className="flex min-h-11 items-center gap-2 text-sm">
-                  <span className="text-ink-200">
-                    {profile.displayName ?? shortName(profile) ?? profile.email}
-                  </span>
+                  <span className="text-ink-200">{fullName(profile)}</span>
                   <span className="text-xs uppercase tracking-wider text-ink-600">
-                    {profile.role}
+                    {tTeam(ROLE_LABEL[profile.role])}
                   </span>
                 </li>
               ))}
             </ul>
+            {/* Unconditionally, and after the names: the list may name
+                somebody who is away, and an admin is always a way in. */}
+            {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
           </>
         ) : (
           /*
            * No names is a real state, not a rendering failure: the directory may
-           * not have loaded, or an admin may have restricted the gathering to
-           * nobody at all. Either way "find an admin" is the true next step and
-           * a blank space is not.
+           * not have loaded, an admin may have restricted the gathering to
+           * nobody at all, or everybody on it may be suspended. Either way "find
+           * an admin" is the true next step and a blank space is not.
            */
-          <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
+          <>
+            <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
+            {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
+          </>
         )}
       </div>
     </div>

@@ -66,6 +66,16 @@ export const provisionAccess = httpsCallable<void, ProvisionAccessResult>(
   'provisionAccess',
 );
 
+/**
+ * The addresses the deployment pins as admins. Admin-only, read when the Team
+ * screen draws rather than cached anywhere — a deploy-time fact must not
+ * outlive the deploy on a document.
+ */
+export const listPinnedAdmins = httpsCallable<void, { emails: string[] }>(
+  functions,
+  'listPinnedAdmins',
+);
+
 /* -------------------------------------------------------------------------- */
 /* Reading people                                                              */
 /* -------------------------------------------------------------------------- */

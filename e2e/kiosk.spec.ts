@@ -128,8 +128,8 @@ test.describe('the kiosk', () => {
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await expect(kiosk.getByText(/welcome/i)).toBeVisible();
 
-      // Written by the kiosk, under the approver's uid, and marked as such —
-      // `method: 'kiosk'` is what tells a lobby tap from a counselor's.
+      // Written by the kiosk, under its own `kiosk_<deviceId>` uid, and marked
+      // as such — `method: 'kiosk'` is what tells a lobby tap from a counselor's.
       await firestore.until(
         `events/${nursery.id}/attendance`,
         (docs) => docs.some((doc) => doc.data.method === 'kiosk'),

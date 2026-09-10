@@ -50,6 +50,16 @@
  * **The exceptions are drawn, the normal state is quiet.** Suspension used to
  * be signalled by the *absence* of a blue tick — ten rows shouting "fine" and
  * one saying nothing.
+ *
+ * **A pinned row is read, not remembered.** The deployment pins some addresses
+ * as admins no matter what the database says, and this screen asks the server
+ * which ones every time it draws rather than stamping a flag on the profile.
+ * The first draft stamped one, and nothing could ever clear it: an address
+ * that left the variable would have become an admin account no screen in the
+ * app could end — the original defect with its sign flipped. When the question
+ * cannot be answered the failure is drawn as a failure, in this file's own
+ * idiom: the roster draws, the controls stay, and a line says what could not
+ * be checked.
  */
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
@@ -68,8 +78,9 @@ import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { cn } from '@/lib/utils';
 import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
+import { listPinnedAdmins } from '@/services/functions';
 import { subscribeUsers, upsertUser } from '@/services/users';
-import type { Invitation, Role, UserProfile } from '@/types';
+import { canonicalEmail, type Invitation, type Role, type UserProfile } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -80,6 +91,25 @@ const ROLE_LABEL = {
 } as const satisfies Record<Role, string>;
 
 const ROLE_OPTIONS: readonly Role[] = ['counselor', 'core', 'admin'];
+
+/**
+ * The addresses the deployment pins as admins, as this screen knows them.
+ *
+ * `loading` and `failed` both come with an empty set, and both draw every row
+ * with its controls: a slow answer must not withhold the team, and a failed one
+ * is said out loud beside the roster rather than guessed at. Only `ready`
+ * takes a select and a toggle off a row.
+ */
+interface PinnedAdmins {
+  status: 'loading' | 'ready' | 'failed';
+  /**
+   * Canonical addresses — see `canonicalEmail` — so a pinned Gmail address
+   * matches the profile however the variable spelled it.
+   */
+  emails: ReadonlySet<string>;
+}
+
+const NO_PINNED: ReadonlySet<string> = new Set();
 
 /**
  * The row, as columns, once there is room for columns.
@@ -228,6 +258,46 @@ export function TeamPage() {
     return subscribeInvitations(setInvitations, (cause) => setInvitationsError(cause.message));
   }, [isAdmin]);
 
+  const [pinned, setPinned] = useState<PinnedAdmins>({ status: 'loading', emails: NO_PINNED });
+  /** Bumped by Retry, so a failed answer can be asked for again. */
+  const [pinnedEpoch, setPinnedEpoch] = useState(0);
+
+  /*
+   * Which rows the deployment pins, read where the truth lives.
+   *
+   * Asked once when the screen draws, and never cached on a profile — a
+   * deploy-time fact must not outlive the deploy on a document (see the file
+   * comment). Admin-only on the server as well as here, and a core member's
+   * read-only view has no controls to take off a row, so it never asks.
+   *
+   * A failure keeps its empty set: the rows keep their controls, the line at
+   * the top of the card says what could not be checked, and a change to a
+   * pinned admin made in the meantime reverts at their next sign-in — which
+   * is the truth the line states.
+   */
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    setPinned((current) =>
+      current.status === 'loading' ? current : { ...current, status: 'loading' },
+    );
+    listPinnedAdmins()
+      .then((response) => {
+        if (cancelled) return;
+        setPinned({
+          status: 'ready',
+          emails: new Set(response.data.emails.map(canonicalEmail)),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPinned({ status: 'failed', emails: NO_PINNED });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, pinnedEpoch]);
+
   const patchMember = async (member: UserProfile, changes: { role?: Role; active?: boolean }) => {
     setBusyId(member.id);
     try {
@@ -337,13 +407,17 @@ export function TeamPage() {
    * failed outright is the one case it lists them unfiltered — the card beside
    * this one is already carrying that error, and a list with a stale row in it
    * is a better answer there than a card that says nothing.
+   *
+   * Compared on the canonical address rather than lowercased: an invitation
+   * typed `josmith@gmail.com` is the profile that signed in as
+   * `jo.smith@gmail.com`, and a plain `toLowerCase()` here would keep that
+   * mailbox under "have not yet" for as long as the deployment lived — the
+   * same bug this filter was written about, one spelling over.
    */
-  const signedIn = users
-    ? new Set(users.map((member) => member.email.trim().toLowerCase()))
-    : null;
+  const signedIn = users ? new Set(users.map((member) => canonicalEmail(member.email))) : null;
   const pending =
     invitations && (signedIn || usersError)
-      ? invitations.filter((invitation) => !signedIn?.has(invitation.email.trim().toLowerCase()))
+      ? invitations.filter((invitation) => !signedIn?.has(canonicalEmail(invitation.email)))
       : null;
 
   return (
@@ -395,6 +469,26 @@ export function TeamPage() {
             columnLabel={t('columnLastSeen')}
           />
 
+          {/* The failure, rendered as a failure: the roster below keeps every
+              control, and this says which of them might not hold. Under the
+              header rather than in place of the list, because the list is
+              not what failed. */}
+          {isAdmin && pinned.status === 'failed' ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-ink-800 px-4 py-2">
+              <p role="status" className="text-xs text-warn-400">
+                {t('pinnedNotLoaded')}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-mr-2 ring-1 ring-ink-700"
+                onClick={() => setPinnedEpoch((epoch) => epoch + 1)}
+              >
+                {t('retry')}
+              </Button>
+            </div>
+          ) : null}
+
           {usersError ? (
             <div className="px-4 py-3">
               <ErrorBanner message={usersError} />
@@ -423,7 +517,13 @@ export function TeamPage() {
             <ul className="divide-y divide-ink-800">
               {ordered.map((member) => {
                 const isSelf = member.id === profile?.id;
-                const editable = isAdmin && !isSelf;
+                const isPinned = isAdmin && pinned.emails.has(canonicalEmail(member.email));
+                // A row whose controls are an explanation rather than a
+                // select and a toggle: the admin's own, and one the
+                // deployment pins. Neither can be changed from here, and each
+                // says by whom.
+                const explained = isAdmin && (isSelf || isPinned);
+                const editable = isAdmin && !explained;
                 const name = member.displayName || member.email;
 
                 const identity = (
@@ -479,11 +579,11 @@ export function TeamPage() {
                       ) : (
                         <div className="flex min-w-0 items-center justify-between gap-3 @2xl:contents">
                           {recency}
-                          {/* Nothing at all for the self row rather than an
-                              empty cell: `contents` makes this a grid item, and
-                              an empty one took column three and pushed the role
-                              and its explanation onto a second line. */}
-                          {isSelf && isAdmin ? null : (
+                          {/* Nothing at all for an explained row rather than
+                              an empty cell: `contents` makes this a grid item,
+                              and an empty one took column three and pushed the
+                              role and its explanation onto a second line. */}
+                          {explained ? null : (
                             <div className="flex shrink-0 items-center gap-1.5">
                               {member.role === 'counselor' ? (
                                 <span className="text-xs text-ink-400">
@@ -535,19 +635,42 @@ export function TeamPage() {
                           onChange={(active) => void patchMember(member, { active })}
                         />
                       </div>
-                    ) : isSelf && isAdmin ? (
-                      /* Changing your own role is how an admin locks the team
-                         out of user management entirely. */
+                    ) : explained ? (
                       <div className="flex flex-wrap items-center gap-1.5 @2xl:col-span-2 @2xl:flex-col @2xl:items-start @2xl:gap-0 @2xl:pl-3">
-                        <Badge
-                          tone={member.role === 'counselor' ? 'neutral' : 'brand'}
-                          className="-ml-1.5"
-                        >
-                          {t(ROLE_LABEL[member.role])}
-                        </Badge>
-                        <span className="text-xs text-ink-400">
-                          {t('otherAdminOnly')}
-                        </span>
+                        {isPinned ? (
+                          /* Pinned by the deployment: no select and no toggle,
+                             because a change made here would revert at their
+                             next sign-in, and a control that reverts is worse
+                             than none. The role still reads — between a deploy
+                             and the next sign-in it can be something other
+                             than admin, and the row says what it is. */
+                          <>
+                            <span className="flex items-center gap-1.5">
+                              <Badge
+                                tone={member.role === 'counselor' ? 'neutral' : 'brand'}
+                                className="-ml-1.5"
+                              >
+                                {t(ROLE_LABEL[member.role])}
+                              </Badge>
+                              <Badge tone="neutral">{t('pinnedBadge')}</Badge>
+                            </span>
+                            <span className="text-xs text-ink-400">{t('pinnedExplain')}</span>
+                          </>
+                        ) : (
+                          /* Changing your own role is how an admin locks the
+                             team out of user management entirely. */
+                          <>
+                            <Badge
+                              tone={member.role === 'counselor' ? 'neutral' : 'brand'}
+                              className="-ml-1.5"
+                            >
+                              {t(ROLE_LABEL[member.role])}
+                            </Badge>
+                            <span className="text-xs text-ink-400">
+                              {t('otherAdminOnly')}
+                            </span>
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </li>

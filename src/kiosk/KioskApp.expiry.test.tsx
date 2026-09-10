@@ -79,7 +79,9 @@ const printing = {
 } as unknown as KioskPrinting;
 
 const services = {
-  restoredUid: vi.fn(async () => 'staff-uid'),
+  restoredSession: vi.fn(async () => ({ uid: 'kiosk_kiosk-test-device', reason: null })),
+  reportStanding: vi.fn(async () => 'live' as const),
+  unpair: vi.fn(async () => {}),
   listEvents: vi.fn(async () => []),
   loadRoster: vi.fn(async () => [ADA]),
   loadPhoneIndex: vi.fn(async () => ({})),

@@ -1,51 +1,51 @@
 {
   "Common.language": {
     "source": "Language",
+    "context": "Accessible name of the language switcher, a row of three chips. The languages inside it wear their own untranslated names.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Accessible name of the language switcher, a row of three chips. The languages inside it wear their own untranslated names."
+    "zh-Hant": "machine"
   },
   "Common.loadingRoster": {
     "source": "Loading the roster",
+    "context": "Status line while the list of students is still being read. Shown on the dashboard and the check-in screen.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Status line while the list of students is still being read. Shown on the dashboard and the check-in screen."
+    "zh-Hant": "machine"
   },
   "Common.loadingHistory": {
     "source": "Loading attendance history",
+    "context": "Status line while past attendance is still being read. \"History\" here is the record of who came, not a browser history.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Status line while past attendance is still being read. \"History\" here is the record of who came, not a browser history."
+    "zh-Hant": "machine"
   },
   "Common.loading": {
     "source": "Loading…",
+    "context": "Generic in-progress line with a trailing ellipsis. Keep the ellipsis.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Generic in-progress line with a trailing ellipsis. Keep the ellipsis."
+    "zh-Hant": "machine"
   },
   "Common.loadingAria": {
     "source": "Loading",
+    "context": "Screen-reader-only version of the loading line. No ellipsis — a screen reader would read it aloud.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Screen-reader-only version of the loading line. No ellipsis — a screen reader would read it aloud."
+    "zh-Hant": "machine"
   },
   "Common.required": {
     "source": "Required",
+    "context": "Validation message under an empty form field that must be filled in. Not a label saying a field is required.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message under an empty form field that must be filled in. Not a label saying a field is required."
+    "zh-Hant": "machine"
   },
   "Common.cancel": {
     "source": "Cancel",
+    "context": "Button that abandons whatever dialog is open, changing nothing. Never a button that cancels a gathering — that is EventDetail.yesCancel.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Button that abandons whatever dialog is open, changing nothing. Never a button that cancels a gathering — that is EventDetail.yesCancel."
+    "zh-Hant": "machine"
   },
   "Common.remove": {
     "source": "Remove",
+    "context": "Button that takes one row out of a list being edited, e.g. a child from a quick-add form. Not a delete.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Button that takes one row out of a list being edited, e.g. a child from a quick-add form. Not a delete."
+    "zh-Hant": "machine"
   },
   "Common.delete": {
     "source": "Delete",
@@ -55,33 +55,33 @@
   },
   "Common.grade": {
     "source": "Grade",
+    "context": "Field label for a school year. The values are Pre-K, K, then 1st–12th.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for a school year. The values are Pre-K, K, then 1st–12th."
+    "zh-Hant": "machine"
   },
   "Common.noGrade": {
     "source": "No grade",
+    "context": "The option meaning this student has no school year on file. An answer, not a blank.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The option meaning this student has no school year on file. An answer, not a blank."
+    "zh-Hant": "machine"
   },
   "Common.firstName": {
     "source": "First name",
+    "context": "Field label. Given name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label. Given name."
+    "zh-Hant": "machine"
   },
   "Common.lastName": {
     "source": "Last name",
+    "context": "Field label. Family name. In Chinese this is the surname, which comes first in a written name — the label still means the family name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label. Family name. In Chinese this is the surname, which comes first in a written name — the label still means the family name."
+    "zh-Hant": "machine"
   },
   "Common.close": {
     "source": "Close",
+    "context": "Accessible name of the × that dismisses a modal.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Accessible name of the × that dismisses a modal."
+    "zh-Hant": "machine"
   },
   "Common.done": {
     "source": "Done",
@@ -103,9 +103,9 @@
   },
   "Common.dismiss": {
     "source": "Dismiss",
+    "context": "Accessible name of the × on a toast — the small message that slides in after an action.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Accessible name of the × on a toast — the small message that slides in after an action."
+    "zh-Hant": "machine"
   },
   "Common.undo": {
     "source": "Undo",
@@ -115,57 +115,57 @@
   },
   "Common.status": {
     "source": "Status",
+    "context": "Field label for whether a person is active or inactive. Not a sync status, not an event status.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for whether a person is active or inactive. Not a sync status, not an event status."
+    "zh-Hant": "machine"
   },
   "Common.active": {
     "source": "Active",
+    "context": "Status value: this person is on the roster and appears at check-in.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Status value: this person is on the roster and appears at check-in."
+    "zh-Hant": "machine"
   },
   "Common.inactive": {
     "source": "Inactive",
+    "context": "Status value: this person is kept in history but appears on no roster.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Status value: this person is kept in history but appears on no roster."
+    "zh-Hant": "machine"
   },
   "Common.search": {
     "source": "Search",
+    "context": "Accessible name and placeholder for a search input.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Accessible name and placeholder for a search input."
+    "zh-Hant": "machine"
   },
   "Common.role": {
     "source": "Role",
+    "context": "Field label for what a team member is allowed to do (counselor, core team, admin).",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for what a team member is allowed to do (counselor, core team, admin)."
+    "zh-Hant": "machine"
   },
   "Common.theme": {
     "source": "Theme",
+    "context": "Accessible name of the light/dark appearance control. Visual theme, not a topic.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Accessible name of the light/dark appearance control. Visual theme, not a topic."
+    "zh-Hant": "machine"
   },
   "Common.birthday": {
     "source": "Birthday",
+    "context": "Field label for a date of birth.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for a date of birth."
+    "zh-Hant": "machine"
   },
   "Common.profile": {
     "source": "Profile",
+    "context": "Card heading over a student's own details — name, grade, birthday. Not an account profile.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Card heading over a student's own details — name, grade, birthday. Not an account profile."
+    "zh-Hant": "machine"
   },
   "Common.attendance": {
     "source": "Attendance",
+    "context": "Card heading over the list of gatherings a student came to.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Card heading over the list of gatherings a student came to."
+    "zh-Hant": "machine"
   },
   "Common.call": {
     "source": "Call",
@@ -187,99 +187,99 @@
   },
   "Common.later": {
     "source": "Later",
+    "context": "Section heading on the events list, over gatherings further out than the next few. A time, not a \"do this later\" button.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Section heading on the events list, over gatherings further out than the next few. A time, not a \"do this later\" button."
+    "zh-Hant": "machine"
   },
   "Common.grades": {
     "source": "Grades",
+    "context": "Field label for a range of school years, e.g. which grades a gathering is for. Plural of Common.grade.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for a range of school years, e.g. which grades a gathering is for. Plural of Common.grade."
+    "zh-Hant": "machine"
   },
   "Common.gathering": {
     "source": "Gathering",
+    "context": "Field label for which gathering a thing belongs to. The recurring meeting, not a one-off trip.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for which gathering a thing belongs to. The recurring meeting, not a one-off trip."
+    "zh-Hant": "machine"
   },
   "Common.unit": {
     "source": "Unit",
+    "context": "Field label beside a number in the custom-repeat editor: the number is \"every N\", this picks weeks, months or years.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label beside a number in the custom-repeat editor: the number is \"every N\", this picks weeks, months or years."
+    "zh-Hant": "machine"
   },
   "Common.size": {
     "source": "Size",
+    "context": "Field label in the name-tag designer: how big this line of text prints. Font size, not paper size.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label in the name-tag designer: how big this line of text prints. Font size, not paper size."
+    "zh-Hant": "machine"
   },
   "Common.align": {
     "source": "Align",
+    "context": "Field label in the name-tag designer: left, centre or right on the label.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label in the name-tag designer: left, centre or right on the label."
+    "zh-Hant": "machine"
   },
   "Common.bold": {
     "source": "Bold",
+    "context": "Toggle in the name-tag designer: print this line in bold.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Toggle in the name-tag designer: print this line in bold."
+    "zh-Hant": "machine"
   },
   "Common.copies": {
     "source": "Copies",
+    "context": "Field label in the name-tag designer: how many identical labels to print per child.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label in the name-tag designer: how many identical labels to print per child."
+    "zh-Hant": "machine"
   },
   "Nav.checkIn": {
     "source": "Check in",
+    "context": "Nav item. Opens the screen where a counselor marks who is here. A verb phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the screen where a counselor marks who is here. A verb phrase."
+    "zh-Hant": "machine"
   },
   "Nav.insights": {
     "source": "Insights",
+    "context": "Nav item. Opens the dashboard of counts and trends. Pinned identical to Dashboard.title.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the dashboard of counts and trends. Pinned identical to Dashboard.title."
+    "zh-Hant": "machine"
   },
   "Nav.events": {
     "source": "Events",
+    "context": "Nav item. Opens the calendar of gatherings and one-off trips. The umbrella term covering both.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the calendar of gatherings and one-off trips. The umbrella term covering both."
+    "zh-Hant": "machine"
   },
   "Nav.students": {
     "source": "Students",
+    "context": "Nav item. Opens the roster.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the roster."
+    "zh-Hant": "machine"
   },
   "Nav.review": {
     "source": "Review",
+    "context": "Nav item. Opens the queue of families who registered themselves and are waiting for a person to approve them.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the queue of families who registered themselves and are waiting for a person to approve them."
+    "zh-Hant": "machine"
   },
   "Nav.kiosk": {
     "source": "Kiosk",
+    "context": "Nav item. Opens the lobby self-service screen. Named for the tablet on the wall.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the lobby self-service screen. Named for the tablet on the wall."
+    "zh-Hant": "machine"
   },
   "Nav.team": {
     "source": "Team",
+    "context": "Nav item. Opens the list of counselors and admins. Pinned identical to Team.title.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Opens the list of counselors and admins. Pinned identical to Team.title."
+    "zh-Hant": "machine"
   },
   "Nav.settings": {
     "source": "Settings",
+    "context": "Nav item. Pinned identical to Settings.title.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Nav item. Pinned identical to Settings.title."
+    "zh-Hant": "machine"
   },
   "Dashboard.title": {
     "source": "Insights",
@@ -492,7 +492,7 @@
     "zh-Hant": "machine"
   },
   "Errors.provisionPermissionDenied": {
-    "source": "Planning Center refused this account.",
+    "source": "Tally refused this account.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -536,6 +536,11 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Errors.accessStreamHint": {
+    "source": "Who's on tonight's gatherings couldn't be checked — if one refuses you, ask a leader to add you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Errors.theBackend": {
     "source": "your church directory",
     "zh-Hans": "machine",
@@ -568,87 +573,87 @@
   },
   "Errors.auth.signIn": {
     "source": "Sign in first.",
+    "context": "Refusal shown when an action needs a signed-in person and nobody is. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal shown when an action needs a signed-in person and nobody is. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.signInToRequest": {
     "source": "Sign in before requesting access.",
+    "context": "Refusal on the access-request path specifically: you must sign in before you can ask for access. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal on the access-request path specifically: you must sign in before you can ask for access. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.notActive": {
     "source": "Your access to Tally is not active.",
+    "context": "Refusal: this person is known to Tally but somebody switched their access off. Not a wrong password. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: this person is known to Tally but somebody switched their access off. Not a wrong password. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.googleOnly": {
     "source": "Tally only accepts Google sign-in.",
+    "context": "Refusal: Tally has no password sign-in at all, only Google. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: Tally has no password sign-in at all, only Google. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.coreOnly": {
     "source": "Only the core team can do that.",
+    "context": "Refusal: this action needs the core team, and the reader is a counselor. \"Core team\" is the app's own role name. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: this action needs the core team, and the reader is a counselor. \"Core team\" is the app's own role name. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.adminOnly": {
     "source": "Only an admin can do that.",
+    "context": "Refusal: this action needs an admin, a narrower role than core team. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: this action needs an admin, a narrower role than core team. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.notOnGathering": {
     "source": "Only people added to that gathering can work it.",
+    "context": "Refusal: this gathering was limited to a named set of people and the reader is not among them. \"Work it\" means take attendance for it. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: this gathering was limited to a named set of people and the reader is not among them. \"Work it\" means take attendance for it. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.auth.kioskOnly": {
     "source": "Registration happens at a kiosk.",
+    "context": "Refusal: self-registration is only possible from the lobby tablet, not from the staff app. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: self-registration is only possible from the lobby tablet, not from the staff app. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.student": {
     "source": "No such student.",
+    "context": "Refusal: no student with that id. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: no student with that id. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.studentUnlinked": {
     "source": "That student is not matched to anybody in your church directory.",
+    "context": "Refusal: the student exists in Tally but has no matching person in the church directory yet, so an action needing that person cannot run. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: the student exists in Tally but has no matching person in the church directory yet, so an action needing that person cannot run. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.gathering": {
     "source": "That is not a gathering the schedule describes.",
+    "context": "Refusal: the requested date is not one the repeat rule produces — e.g. a Tuesday for a Friday gathering. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: the requested date is not one the repeat rule produces — e.g. a Tuesday for a Friday gathering. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.gatheringGone": {
     "source": "That gathering is no longer here.",
+    "context": "Refusal: the gathering existed and has been deleted. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: the gathering existed and has been deleted. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.personInBackend": {
     "source": "{backend} has no person with that id.",
+    "context": "Refusal: the church directory has no person with that id. {backend} renders a product name — \"Planning Center\" or \"Attendees\". Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: the church directory has no person with that id. {backend} renders a product name — \"Planning Center\" or \"Attendees\". Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.notFound.registration": {
     "source": "That registration has already been dealt with.",
+    "context": "Refusal: this kiosk registration was already approved or discarded by somebody else. Usually two people reviewing the same queue at once. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Refusal: this kiosk registration was already approved or discarded by somebody else. Usually two people reviewing the same queue at once. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.backend.notConfigured": {
     "source": "Not configured.",
@@ -762,135 +767,135 @@
   },
   "Errors.field.childFirst.required": {
     "source": "The child's first name is required.",
+    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childFirst.tooLong": {
     "source": "The child's first name is too long.",
+    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childFirst.hasNumbers": {
     "source": "The child's first name cannot contain numbers.",
+    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childFirst.needsLetter": {
     "source": "The child's first name needs at least one letter.",
+    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childLast.required": {
     "source": "The child's last name is required.",
+    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childLast.tooLong": {
     "source": "The child's last name is too long.",
+    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childLast.hasNumbers": {
     "source": "The child's last name cannot contain numbers.",
+    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.childLast.needsLetter": {
     "source": "The child's last name needs at least one letter.",
+    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the child's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultFirst.required": {
     "source": "The adult's first name is required.",
+    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultFirst.tooLong": {
     "source": "The adult's first name is too long.",
+    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultFirst.hasNumbers": {
     "source": "The adult's first name cannot contain numbers.",
+    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultFirst.needsLetter": {
     "source": "The adult's first name needs at least one letter.",
+    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultLast.required": {
     "source": "The adult's last name is required.",
+    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultLast.tooLong": {
     "source": "The adult's last name is too long.",
+    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultLast.hasNumbers": {
     "source": "The adult's last name cannot contain numbers.",
+    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.adultLast.needsLetter": {
     "source": "The adult's last name needs at least one letter.",
+    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the adult's last name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the parent or guardian being recorded, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.gradeRange": {
     "source": "Choose a grade from Pre-K to 12th grade, or “No grade”.",
+    "context": "Validation message painted directly under the grade box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The -1 is Tally's internal encoding for Pre-K and appears on no screen; the picker offers a \"No grade\" option rather than a blank. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the grade box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The -1 is Tally's internal encoding for Pre-K and appears on no screen; the picker offers a \"No grade\" option rather than a blank. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.phoneRequired": {
     "source": "A phone number is required.",
+    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The number is how the family finds themselves at the kiosk next time. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The number is how the family finds themselves at the kiosk next time. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.phoneDigits": {
     "source": "Enter a 10-digit phone number.",
+    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Ten digits is the rule the code enforces. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Ten digits is the rule the code enforces. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.phoneShape": {
     "source": "That does not look like a phone number.",
+    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Right number of digits, wrong shape. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the phone box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Right number of digits, wrong shape. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.allergyText": {
     "source": "allergies must be text.",
+    "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Reachable only from a malformed request, not from anything a person can type. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Reachable only from a malformed request, not from anything a person can type. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Errors.field.allergyTooLong": {
     "source": "That allergy note is too long.",
+    "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The note is free text and there is a length cap. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. The note is free text and there is a length cap. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does."
+    "zh-Hant": "machine"
   },
   "Export.csv": {
     "source": "Export CSV",
@@ -934,51 +939,51 @@
   },
   "Warnings.allergyLabel": {
     "source": "Has allergies on file",
+    "context": "Full label on the amber badge warning that this child has allergies recorded. The only badge with a physical consequence.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Full label on the amber badge warning that this child has allergies recorded. The only badge with a physical consequence."
+    "zh-Hant": "machine"
   },
   "Warnings.allergyShort": {
     "source": "Allergy",
+    "context": "The same badge where the row is too narrow for the full label. One or two characters is ideal.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The same badge where the row is too narrow for the full label. One or two characters is ideal."
+    "zh-Hant": "machine"
   },
   "Warnings.recordMissingLabel": {
     "source": "Planning Center no longer has them — check-in blocked",
+    "context": "Full label: this student exists in Tally but no longer in Planning Center, so check-in refuses them.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Full label: this student exists in Tally but no longer in Planning Center, so check-in refuses them."
+    "zh-Hant": "machine"
   },
   "Warnings.recordMissingShort": {
     "source": "Blocked",
+    "context": "The same badge, abbreviated for a narrow row.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The same badge, abbreviated for a narrow row."
+    "zh-Hant": "machine"
   },
   "Warnings.incompleteLabel": {
     "source": "No contact on file",
+    "context": "Full label: nobody is recorded as reachable for this child in an emergency.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Full label: nobody is recorded as reachable for this child in an emergency."
+    "zh-Hant": "machine"
   },
   "Warnings.incompleteShort": {
     "source": "No contact",
+    "context": "The same badge, abbreviated for a narrow row.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The same badge, abbreviated for a narrow row."
+    "zh-Hant": "machine"
   },
   "Warnings.withDetail": {
     "source": "{label}: {detail}",
+    "context": "Joins a badge label to its specifics, e.g. \"Has allergies on file: peanuts\". Only the punctuation is translatable.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Joins a badge label to its specifics, e.g. \"Has allergies on file: peanuts\". Only the punctuation is translatable."
+    "zh-Hant": "machine"
   },
   "Warnings.shortWithDetail": {
     "source": "{short}: {detail}",
+    "context": "The same join for the abbreviated badge.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The same join for the abbreviated badge."
+    "zh-Hant": "machine"
   },
   "Roster.backendDown": {
     "source": "{names} could not be reached. Students from there may be missing or out of date until it answers again; everything else on this roster is current.",
@@ -1196,7 +1201,7 @@
     "zh-Hant": "machine"
   },
   "Auth.checkingBody": {
-    "source": "Looking for you on the team in Planning Center…",
+    "source": "Checking whether this Google address has been added to Tally…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1211,12 +1216,12 @@
     "zh-Hant": "machine"
   },
   "Auth.grantedBody": {
-    "source": "Planning Center has you on the team. Your access is set up.",
+    "source": "Your access is set up.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Auth.grantedBodyWithRole": {
-    "source": "Planning Center has you on the team as {role}. Your access is set up.",
+    "source": "You're on the team as {role}. Your access is set up.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1236,12 +1241,12 @@
     "zh-Hant": "machine"
   },
   "Auth.notFoundTitle": {
-    "source": "We couldn't find you",
+    "source": "This address isn't on the team yet",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Auth.notFoundBody": {
-    "source": "That email is not on the team in Planning Center, so Tally cannot let you in yet.",
+    "source": "Tally lets people in by Google address, and nobody has added this one.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1250,23 +1255,48 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Auth.copy": {
+    "source": "Copy",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.copied": {
+    "source": "Copied",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Auth.notFoundHelp": {
-    "source": "Ask a core team leader to add this address to the team in Planning Center, then try again. If you normally use a different address, sign out and use that one.",
+    "source": "Ask the leader who set you up to add this exact address on Tally's Team page — an admin or a core member can do that.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Auth.notFoundLinkHint": {
+    "source": "If a leader sent you a link, open that link instead of signing in here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.useDifferentAccount": {
+    "source": "Use a different Google account",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.notFoundPinned": {
+    "source": "If nobody at the church can get in any more, the addresses pinned when Tally was set up always can.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Auth.inactiveTitle": {
-    "source": "Access turned off",
+    "source": "Your access has been switched off",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Auth.inactiveBody": {
-    "source": "Your Tally access has been turned off. Planning Center still lists you, but someone on the core team has marked you inactive.",
+    "source": "An admin switched off this account's access.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Auth.inactiveHelp": {
-    "source": "A core team leader can switch it back on from Settings.",
+    "source": "Any admin can switch it back on from Team, and this screen lets you straight back in when they do.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1329,6 +1359,11 @@
     "source": "Try Google sign-in anyway",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Login.pickOtherAccount": {
+    "source": "Pick a different Google account this time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Login.googleUnavailable": {
     "source": "Google sign-in is not available in the installed app. Open Tally in Safari or Chrome.",
@@ -2285,6 +2320,16 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "CheckIn.refusedBanner": {
+    "source": "This gathering isn't letting you check in — see Who's on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "CheckIn.refusedSee": {
+    "source": "See",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "StudentRow.whoWithGrade": {
     "source": "{name}, {grade}",
     "zh-Hans": "machine",
@@ -2565,10 +2610,25 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventHeader.whosOnCount": {
+    "source": "Who's on · {count, number}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.whosOnEveryone": {
+    "source": "Who's on · everyone",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "EventHeader.switchEvent": {
     "source": "Switch event",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "EventHeader.notYoursGroup": {
+    "source": "Not yours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "EventHeader.windowClosed": {
     "source": "Check-in window is closed — you can still record attendance.",
@@ -2668,9 +2728,9 @@
   },
   "Settings.miaAfterMissesHint": {
     "source": "{count, plural, one {Flag a student after # missed gathering in a row.} other {Flag a student after # missed gatherings in a row.}}",
+    "context": "Hint under the \"Misses in a row\" stepper on Settings. Restates the number as the behaviour it causes. Was a hardcoded English template literal in SettingsPage.tsx and rendered English on both Chinese locales.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Hint under the \"Misses in a row\" stepper on Settings. Restates the number as the behaviour it causes. Was a hardcoded English template literal in SettingsPage.tsx and rendered English on both Chinese locales."
+    "zh-Hant": "machine"
   },
   "Settings.newVisitorWindow": {
     "source": "Days on the “New faces” list",
@@ -3361,9 +3421,29 @@
     "zh-Hant": "machine"
   },
   "Team.membersEmptyBody": {
-    "source": "Invite a Google address above, or sign in with one of the addresses named in TALLY_ADMIN_EMAILS.",
+    "source": "Invite a Google address above, or sign in with one of the addresses pinned when Tally was deployed.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Team.pinnedBadge": {
+    "source": "Pinned by the deployment",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.pinnedExplain": {
+    "source": "Changed by whoever deploys Tally, not here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.pinnedNotLoaded": {
+    "source": "Couldn't check which admins are pinned by the deployment — a change to a pinned admin reverts at their next sign-in.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.retry": {
+    "source": "Retry",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Team.lastSeenPrefix": {
     "source": "Last seen ",
@@ -3411,7 +3491,7 @@
     "zh-Hant": "machine"
   },
   "Team.googleAddressHint": {
-    "source": "It has to be the Google account they will actually sign in with — Tally matches on the address.",
+    "source": "It has to be the Google account they will actually sign in with — Tally matches on the address. For Gmail addresses, dots and +tags don't matter.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3491,7 +3571,7 @@
     "zh-Hant": "machine"
   },
   "KioskPair.intro": {
-    "source": "On the kiosk device, open <mono>/kiosk</mono>. It shows a six-character code — type it here to sign that kiosk in as you.",
+    "source": "On the kiosk device, open <mono>/kiosk</mono>. It shows a six-character code — type it here to let that kiosk in.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3506,12 +3586,12 @@
     "zh-Hant": "machine"
   },
   "KioskPair.retire": {
-    "source": "To retire a kiosk, clear the browser's site data on the device.",
+    "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "KioskPair.retireCore": {
-    "source": "To retire a kiosk, clear the browser’s site data on the device. An admin can also switch your access off and on again, which stops every kiosk you paired.",
+    "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3541,7 +3621,7 @@
     "zh-Hant": "machine"
   },
   "KioskPair.outcomeApproved": {
-    "source": "Approved — the kiosk signs itself in on its next poll, and every check-in it records will be under your name.",
+    "source": "Approved — the kiosk signs itself in on its next poll. What it records is the kiosk’s own, not under your name.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3656,7 +3736,7 @@
     "zh-Hant": "machine"
   },
   "KioskPair.stuckDeactivated": {
-    "source": "A kiosk stops when its approver's access is deactivated. Pair it again from an active account.",
+    "source": "A kiosk that was retired, or one paired before kiosks got sign-ins of their own, goes back to its pairing screen by itself. Read the new code off it and approve it again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4473,20 +4553,50 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Access.justYou": {
-    "source": "just you",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+  "Access.wouldKeepGroups": {
+    "source": "Would keep {kept, plural, one {# person} other {# people}} from last time and {takers, plural, one {# person} other {# people}} who have taken the register since — {count, plural, =0 {nobody} other {#}} would lose it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
-  "Access.wouldKeepOnly": {
-    "source": "Would keep {names} — nobody else works this gathering.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+  "Access.wouldKeepTakers": {
+    "source": "Would keep {takers, plural, one {# person} other {# people}} who have taken the register recently — {count, plural, =0 {nobody} other {#}} would lose it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
-  "Access.wouldKeep": {
-    "source": "Would keep {names} — {count, plural, one {# other would lose} other {# others would lose}} it.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+  "Access.couldNotReadRegisters": {
+    "source": "Couldn't read recent registers — would keep just you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.couldNotReadRegistersKept": {
+    "source": "Couldn't read recent registers — would keep {kept, plural, one {# person} other {# people}} from last time and you",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.keptHeading": {
+    "source": "Kept when you narrow it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.keptExplain": {
+    "source": "These are kept when you narrow it — nobody's access changes until you press <em>{option}</em>.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.addedJustNow": {
+    "source": "added just now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.you": {
+    "source": "You",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.suspended": {
+    "source": "Suspended",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Access.notAllowed": {
     "source": "You are not allowed to change who is on this gathering.",
@@ -5381,15 +5491,25 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Events.orAnyAdmin": {
+    "source": "or any admin: {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Events.lockedRestricted": {
     "source": "Only people added to this gathering can take attendance for it.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Events.lockedExplain": {
-    "source": "You have not been added to this gathering yet — it has been narrowed to a set of people. Nothing else has changed, and you are still signed in to Tally.",
+    "source": "You have not been added to this gathering — it has been narrowed to a set of people. You are still signed in to Tally.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Events.justTakenOff": {
+    "source": "You've just been taken off this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Events.askOneOfThese": {
     "source": "Ask one of these to add you",
@@ -6244,381 +6364,381 @@
   },
   "Recurrence.repeatOn": {
     "source": "Repeat on",
+    "context": "Label above the seven day-of-week toggles.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Label above the seven day-of-week toggles."
+    "zh-Hant": "machine"
   },
   "Recurrence.custom": {
     "source": "Custom…",
+    "context": "Last option in the \"Repeats\" picker; opens the custom-repeat editor. Keep the trailing ellipsis — it signals that more is coming.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Last option in the \"Repeats\" picker; opens the custom-repeat editor. Keep the trailing ellipsis — it signals that more is coming."
+    "zh-Hant": "machine"
   },
   "Recurrence.customTitle": {
     "source": "Custom repeat",
+    "context": "Heading of the custom-repeat editor.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Heading of the custom-repeat editor."
+    "zh-Hant": "machine"
   },
   "Recurrence.endOnDate": {
     "source": "On a date",
+    "context": "Option in the \"Ends\" picker: the repeat stops on a date you choose.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option in the \"Ends\" picker: the repeat stops on a date you choose."
+    "zh-Hant": "machine"
   },
   "Recurrence.endAfterCount": {
     "source": "After a number of times",
+    "context": "Option in the \"Ends\" picker: the repeat stops after a number of occurrences. The field it reveals is labelled Recurrence.numberOfGatherings — keep the two consistent about what is being counted.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option in the \"Ends\" picker: the repeat stops after a number of occurrences. The field it reveals is labelled Recurrence.numberOfGatherings — keep the two consistent about what is being counted."
+    "zh-Hant": "machine"
   },
   "Recurrence.onlyGathering": {
     "source": "No more dates after this one.",
+    "context": "Shown where the list of upcoming dates would be, when the rule produces exactly one.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Shown where the list of upcoming dates would be, when the rule produces exactly one."
+    "zh-Hant": "machine"
   },
   "Recurrence.pickStartFirst": {
     "source": "Pick a start date first.",
+    "context": "Shown instead of a repeat preview when no start date has been chosen yet.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Shown instead of a repeat preview when no start date has been chosen yet."
+    "zh-Hant": "machine"
   },
   "Recurrence.repeatEvery": {
     "source": "Repeat every",
+    "context": "Label before a number and a unit: \"Repeat every [2] [weeks]\". Common.unit labels the second half.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Label before a number and a unit: \"Repeat every [2] [weeks]\". Common.unit labels the second half."
+    "zh-Hant": "machine"
   },
   "Recurrence.monthlyPattern": {
     "source": "Monthly pattern",
+    "context": "Label for the choice between \"on day 15\" and \"on the third Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Label for the choice between \"on day 15\" and \"on the third Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.lastDate": {
     "source": "Last date",
+    "context": "Field label for the date a repeat stops on.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for the date a repeat stops on."
+    "zh-Hant": "machine"
   },
   "Recurrence.numberOfGatherings": {
     "source": "Number of gatherings",
+    "context": "Field label for how many occurrences a repeat produces.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Field label for how many occurrences a repeat produces."
+    "zh-Hant": "machine"
   },
   "Recurrence.countingFirst": {
     "source": "Counting the one above as the first.",
+    "context": "Hint under that field: the gathering being edited counts as number one.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Hint under that field: the gathering being edited counts as number one."
+    "zh-Hant": "machine"
   },
   "Recurrence.monthSkipped": {
     "source": "A month too short for day {day} is skipped rather than moved.",
+    "context": "Hint shown only when the monthly anchor is the 29th, 30th or 31st: months without that day are skipped, not moved to the nearest day. The English glues an ordinal suffix outside the argument and renders \"31th\"; Chinese takes 号/號 and is unaffected.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Hint shown only when the monthly anchor is the 29th, 30th or 31st: months without that day are skipped, not moved to the nearest day. The English glues an ordinal suffix outside the argument and renders \"31th\"; Chinese takes 号/號 and is unaffected."
+    "zh-Hant": "machine"
   },
   "Recurrence.doesNotRepeat": {
     "source": "Does not repeat",
+    "context": "First option in the \"Repeats\" picker. The grammatical answer to a field labelled \"Repeats\" — not the same idea as a one-off trip, which is EventEditor.typeOneOff.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "First option in the \"Repeats\" picker. The grammatical answer to a field labelled \"Repeats\" — not the same idea as a one-off trip, which is EventEditor.typeOneOff."
+    "zh-Hant": "machine"
   },
   "Recurrence.daily": {
     "source": "Daily",
+    "context": "Option in the \"Repeats\" picker.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option in the \"Repeats\" picker."
+    "zh-Hant": "machine"
   },
   "Recurrence.weeklyOn": {
     "source": "Weekly on {days}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {days} is a list of day names.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {days} is a list of day names."
+    "zh-Hant": "machine"
   },
   "Recurrence.everyNWeeksOn": {
     "source": "Every {interval} weeks on {days}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {interval} is 2 or more.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {interval} is 2 or more."
+    "zh-Hant": "machine"
   },
   "Recurrence.monthlyOn": {
     "source": "Monthly on {which}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {which} is either Recurrence.whichDay or Recurrence.whichWeekday. This is the summary sentence; the identical English also exists as monthlyOnWeekdayOption, a dropdown option, and the two are deliberately free to differ in translation.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {which} is either Recurrence.whichDay or Recurrence.whichWeekday. This is the summary sentence; the identical English also exists as monthlyOnWeekdayOption, a dropdown option, and the two are deliberately free to differ in translation."
+    "zh-Hant": "machine"
   },
   "Recurrence.everyNMonthsOn": {
     "source": "Every {interval} months on {which}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested."
+    "zh-Hant": "machine"
   },
   "Recurrence.whichWeekday": {
     "source": "the {ordinal} {weekday}",
+    "context": "Fragment fed into monthlyOn: \"the third Friday\". {ordinal} comes from the ordinalFirst…ordinalLast keys.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fragment fed into monthlyOn: \"the third Friday\". {ordinal} comes from the ordinalFirst…ordinalLast keys."
+    "zh-Hant": "machine"
   },
   "Recurrence.whichDay": {
     "source": "day {day}",
+    "context": "Fragment fed into monthlyOn: \"day 15\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fragment fed into monthlyOn: \"day 15\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.annuallyOn": {
     "source": "Annually on {when}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {when} is a month and day.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested. {when} is a month and day."
+    "zh-Hant": "machine"
   },
   "Recurrence.everyNYearsOn": {
     "source": "Every {interval} years on {when}",
+    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Part of the human-readable summary of a repeat rule, assembled from these keys. {pattern} is itself another string from this namespace, so word order has to survive being nested."
+    "zh-Hant": "machine"
   },
   "Recurrence.withCount": {
     "source": "{pattern}, {count, plural, one {# time} other {# times}}",
+    "context": "Wraps a pattern with how many times it runs. {pattern} is another string from this namespace; Chinese needs only the `other` plural branch.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Wraps a pattern with how many times it runs. {pattern} is another string from this namespace; Chinese needs only the `other` plural branch."
+    "zh-Hant": "machine"
   },
   "Recurrence.withUntil": {
     "source": "{pattern}, until {date}",
+    "context": "Wraps a pattern with the date it stops.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Wraps a pattern with the date it stops."
+    "zh-Hant": "machine"
   },
   "Recurrence.ordinalFirst": {
     "source": "first",
+    "context": "Fed into whichWeekday: \"the first Friday\". A position within the month, not a rank.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fed into whichWeekday: \"the first Friday\". A position within the month, not a rank."
+    "zh-Hant": "machine"
   },
   "Recurrence.ordinalSecond": {
     "source": "second",
+    "context": "Fed into whichWeekday: \"the second Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fed into whichWeekday: \"the second Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.ordinalThird": {
     "source": "third",
+    "context": "Fed into whichWeekday: \"the third Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fed into whichWeekday: \"the third Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.ordinalFourth": {
     "source": "fourth",
+    "context": "Fed into whichWeekday: \"the fourth Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fed into whichWeekday: \"the fourth Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.ordinalLast": {
     "source": "last",
+    "context": "Fed into whichWeekday: \"the last Friday\" — the final one in the month, whether that is the fourth or the fifth.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Fed into whichWeekday: \"the last Friday\" — the final one in the month, whether that is the fourth or the fifth."
+    "zh-Hant": "machine"
   },
   "Recurrence.monthlyOnWeekdayOption": {
     "source": "Monthly on {which}",
+    "context": "Option inside the monthly-pattern dropdown. Identical in English to Recurrence.monthlyOn, which is a summary sentence — deliberately NOT pinned, because a dropdown may want a shorter form.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option inside the monthly-pattern dropdown. Identical in English to Recurrence.monthlyOn, which is a summary sentence — deliberately NOT pinned, because a dropdown may want a shorter form."
+    "zh-Hant": "machine"
   },
   "Recurrence.repeats": {
     "source": "Repeats",
+    "context": "Label of the picker that chooses how often a gathering happens.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Label of the picker that chooses how often a gathering happens."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekly": {
     "source": "Weekly",
+    "context": "Option in the \"Repeats\" picker.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option in the \"Repeats\" picker."
+    "zh-Hant": "machine"
   },
   "Recurrence.ends": {
     "source": "Ends",
+    "context": "Label of the picker that chooses when a repeat stops.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Label of the picker that chooses when a repeat stops."
+    "zh-Hant": "machine"
   },
   "Recurrence.never": {
     "source": "Never",
+    "context": "Option in the \"Ends\" picker: the repeat has no end date.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option in the \"Ends\" picker: the repeat has no end date."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdaySunday": {
     "source": "Sunday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayMonday": {
     "source": "Monday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayTuesday": {
     "source": "Tuesday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayWednesday": {
     "source": "Wednesday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayThursday": {
     "source": "Thursday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayFriday": {
     "source": "Friday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdaySaturday": {
     "source": "Saturday",
+    "context": "Day name in full, for a sentence like \"Weekly on Friday\".",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Day name in full, for a sentence like \"Weekly on Friday\"."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortSun": {
     "source": "Sun",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortMon": {
     "source": "Mon",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortTue": {
     "source": "Tue",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortWed": {
     "source": "Wed",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortThu": {
     "source": "Thu",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortFri": {
     "source": "Fri",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayShortSat": {
     "source": "Sat",
+    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Three-letter abbreviation, for the compact schedule summary. Chinese uses 周一…周日 (or 週一…週日) rather than an abbreviation of the full name."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialSun": {
     "source": "S",
+    "context": "Single character for Sunday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Sunday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialMon": {
     "source": "M",
+    "context": "Single character for Monday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Monday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialTue": {
     "source": "T",
+    "context": "Single character for Tuesday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Tuesday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialWed": {
     "source": "W",
+    "context": "Single character for Wednesday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Wednesday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialThu": {
     "source": "T",
+    "context": "Single character for Thursday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Thursday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialFri": {
     "source": "F",
+    "context": "Single character for Friday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Friday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.weekdayInitialSat": {
     "source": "S",
+    "context": "Single character for Saturday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Single character for Saturday on the day-of-week picker — seven narrow toggles in a row. The English initials collide on purpose (Sunday and Saturday are both \"S\", Tuesday and Thursday both \"T\") because the picker is read positionally; Chinese has no such collision — use 日 一 二 三 四 五 六 — so do NOT reproduce the ambiguity."
+    "zh-Hant": "machine"
   },
   "Recurrence.monthlyOnDayOption": {
     "source": "Monthly on day {day}",
+    "context": "Option inside the monthly-pattern dropdown: repeat on a numbered day of the month.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Option inside the monthly-pattern dropdown: repeat on a numbered day of the month."
+    "zh-Hant": "machine"
   },
   "EventStatus.cancelled": {
     "source": "Cancelled",
+    "context": "Badge: this gathering was called off. Nobody is counted absent for it.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge: this gathering was called off. Nobody is counted absent for it."
+    "zh-Hant": "machine"
   },
   "EventStatus.checkInOpen": {
     "source": "Check-in is open",
+    "context": "Badge: the window for marking people present is open now.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge: the window for marking people present is open now."
+    "zh-Hant": "machine"
   },
   "EventStatus.checkInOpensAt": {
     "source": "Check-in opens at {time}",
+    "context": "Badge: the window has not opened yet. {time} is a clock time.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge: the window has not opened yet. {time} is a clock time."
+    "zh-Hant": "machine"
   },
   "EventStatus.checkInClosed": {
     "source": "Check-in has closed",
+    "context": "Badge: the window has shut. Attendance can still be recorded — it is not a refusal.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge: the window has shut. Attendance can still be recorded — it is not a refusal."
+    "zh-Hant": "machine"
   },
   "EventStatus.finishedWithCount": {
     "source": "Finished · {count} checked in",
+    "context": "Badge on a gathering that has happened. The · is a separator; keep it or use a local equivalent.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge on a gathering that has happened. The · is a separator; keep it or use a local equivalent."
+    "zh-Hant": "machine"
   },
   "EventStatus.finishedEmpty": {
     "source": "Finished · nobody was checked in",
+    "context": "Badge on a gathering that happened with nobody marked present.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Badge on a gathering that happened with nobody marked present."
+    "zh-Hant": "machine"
   },
   "EventHero.whenDayWindowLocation": {
     "source": "{day} · {window} · {location}",
@@ -7042,183 +7162,183 @@
   },
   "JobChip.queuedLong": {
     "source": "Queued",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Written down, not sent yet, and the only state a person can still cancel. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Written down, not sent yet, and the only state a person can still cancel. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.queuedShort": {
     "source": "Queued",
+    "context": "Chip form of \"queued\": written down, not sent, still cancellable. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form of \"queued\": written down, not sent, still cancellable. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.queuedTitle": {
     "source": "Written down and not sent yet — you can still cancel it.",
+    "context": "Tooltip explaining the queued chip. The cancellability is the point — it is the one state a person can still take back.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip explaining the queued chip. The cancellability is the point — it is the one state a person can still take back."
+    "zh-Hant": "machine"
   },
   "JobChip.sendingLong": {
     "source": "Sending",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The request is in the air right now. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The request is in the air right now. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.sendingShort": {
     "source": "Sending",
+    "context": "Chip form of \"sending\": in the air right now. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form of \"sending\": in the air right now. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.sendingTitle": {
     "source": "Tally is sending this change now.",
+    "context": "Tooltip on the sending chip. Says only that it is moving, not stuck.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the sending chip. Says only that it is moving, not stuck."
+    "zh-Hant": "machine"
   },
   "JobChip.waitingLong": {
     "source": "Waiting",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The directory asked Tally to slow down; it starts again by itself. Must NOT read the same as queued — a reader who confuses them tries to cancel something uncancellable. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The directory asked Tally to slow down; it starts again by itself. Must NOT read the same as queued — a reader who confuses them tries to cancel something uncancellable. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.waitingShort": {
     "source": "Waiting",
+    "context": "Chip form of \"waiting\": throttled, resumes by itself. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form of \"waiting\": throttled, resumes by itself. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.waitingTitle": {
     "source": "Your church directory asked Tally to slow down. It resumes on its own — nothing is stuck.",
+    "context": "Tooltip on the waiting chip. \"Nothing is stuck\" is the reassurance that stops somebody re-sending.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the waiting chip. \"Nothing is stuck\" is the reassurance that stops somebody re-sending."
+    "zh-Hant": "machine"
   },
   "JobChip.landedLong": {
     "source": "Saved",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Done: the edit is in the church directory. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Done: the edit is in the church directory. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.landedShort": {
     "source": "Saved",
+    "context": "Chip form: done, the edit is in the directory. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: done, the edit is in the directory. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.landedTitle": {
     "source": "Saved in your church directory.",
+    "context": "Tooltip on the saved chip.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the saved chip."
+    "zh-Hant": "machine"
   },
   "JobChip.differsLong": {
     "source": "Changed elsewhere",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A conflict: somebody changed the same field on the other side, so the value now stored is one nobody typed. Needs a person — it will not resolve itself. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A conflict: somebody changed the same field on the other side, so the value now stored is one nobody typed. Needs a person — it will not resolve itself. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.differsShort": {
     "source": "Changed",
+    "context": "Chip form: a conflicting change on the other side. Needs a person. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: a conflicting change on the other side. Needs a person. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.differsTitle": {
     "source": "It landed on a value nobody typed — somebody changed the same field in your church directory. It will not resolve itself.",
+    "context": "Tooltip on the conflict chip. \"It will not resolve itself\" is what separates this from waiting and stalled.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the conflict chip. \"It will not resolve itself\" is what separates this from waiting and stalled."
+    "zh-Hant": "machine"
   },
   "JobChip.mergedLong": {
     "source": "Merged in the directory",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person being edited was merged into somebody else in the directory; the correction landed on the survivor under a different id. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person being edited was merged into somebody else in the directory; the correction landed on the survivor under a different id. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.mergedShort": {
     "source": "Merged",
+    "context": "Chip form: the person was merged into another in the directory. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: the person was merged into another in the directory. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.mergedTitle": {
     "source": "The person you edited was merged into somebody else in your church directory. Your correction landed on them, under a different id.",
+    "context": "Tooltip on the merged chip. The edit did land — on a different record than the one the reader picked.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the merged chip. The edit did land — on a different record than the one the reader picked."
+    "zh-Hant": "machine"
   },
   "JobChip.failedLong": {
     "source": "Save failed",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The directory refused the edit outright. Needs a person. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The directory refused the edit outright. Needs a person. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.failedShort": {
     "source": "Failed",
+    "context": "Chip form: refused. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: refused. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.failedTitle": {
     "source": "Your church directory refused this edit. Open it to see why.",
+    "context": "Tooltip on the failed chip.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the failed chip."
+    "zh-Hant": "machine"
   },
   "JobChip.orphanedLong": {
     "source": "Not in the directory",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person this edit names no longer exists in the directory — deleted there. Needs a person. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person this edit names no longer exists in the directory — deleted there. Needs a person. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.orphanedShort": {
     "source": "No record",
+    "context": "Chip form: the person no longer exists in the directory. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: the person no longer exists in the directory. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.orphanedTitle": {
     "source": "The person this edit names no longer exists in your church directory.",
+    "context": "Tooltip on the orphaned chip.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the orphaned chip."
+    "zh-Hant": "machine"
   },
   "JobChip.cancelledLong": {
     "source": "Cancelled",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A person cancelled this edit while it was still queued. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A person cancelled this edit while it was still queued. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.cancelledShort": {
     "source": "Cancelled",
+    "context": "Chip form: cancelled by a person. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: cancelled by a person. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.stalledLong": {
     "source": "Taking longer",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Sent, and taking longer than it should. Nothing has failed and it may still land, so this must not read like an error. *Long* is the row form and may be a phrase.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). Sent, and taking longer than it should. Nothing has failed and it may still land, so this must not read like an error. *Long* is the row form and may be a phrase."
+    "zh-Hant": "machine"
   },
   "JobChip.stalledShort": {
     "source": "Sending",
+    "context": "Chip form: sent, taking longer than expected. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Chip form: sent, taking longer than expected. *Short* must fit inside a chip a few characters wide."
+    "zh-Hant": "machine"
   },
   "JobChip.stalledTitle": {
     "source": "Taking longer than it should. It may still land — nothing has failed.",
+    "context": "Tooltip on the stalled chip. \"Nothing has failed\" is the load-bearing half.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Tooltip on the stalled chip. \"Nothing has failed\" is the load-bearing half."
+    "zh-Hant": "machine"
   },
   "JobChip.withAge": {
     "source": "{words} · {age}",
+    "context": "Joins a chip's words to how long it has been in that state, e.g. \"Sending · 4m\". Only the separator is translatable.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Joins a chip's words to how long it has been in that state, e.g. \"Sending · 4m\". Only the separator is translatable."
+    "zh-Hant": "machine"
   },
   "Students.title": {
     "source": "Students",
@@ -8744,39 +8864,39 @@
   },
   "Grades.preK": {
     "source": "Pre-K",
+    "context": "The school year before kindergarten. Use the local equivalent.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The school year before kindergarten. Use the local equivalent."
+    "zh-Hant": "machine"
   },
   "Grades.shortK": {
     "source": "K",
+    "context": "One-character abbreviation for kindergarten, for a chip too narrow for the word.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "One-character abbreviation for kindergarten, for a chip too narrow for the word."
+    "zh-Hant": "machine"
   },
   "Grades.kindergarten": {
     "source": "Kindergarten",
+    "context": "The school year before 1st grade.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The school year before 1st grade."
+    "zh-Hant": "machine"
   },
   "Grades.ordinal": {
     "source": "{grade, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}",
+    "context": "Turns a number into a school year on its own: 1st, 2nd, 3rd, 4th… Chinese takes no ordinal suffix, so every branch is the bare number plus 年级.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Turns a number into a school year on its own: 1st, 2nd, 3rd, 4th… Chinese takes no ordinal suffix, so every branch is the bare number plus 年级."
+    "zh-Hant": "machine"
   },
   "Grades.ordinalWithNoun": {
     "source": "{grade, selectordinal, one {#st grade} two {#nd grade} few {#rd grade} other {#th grade}}",
+    "context": "The same with the word \"grade\" after it. Same note on ordinals.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "The same with the word \"grade\" after it. Same note on ordinals."
+    "zh-Hant": "machine"
   },
   "Grades.none": {
     "source": "No grade",
+    "context": "Shown where a student has no school year on file. Pinned in meaning to Common.noGrade.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "Shown where a student has no school year on file. Pinned in meaning to Common.noGrade."
+    "zh-Hant": "machine"
   },
   "Review.title": {
     "source": "Families to review",
@@ -9817,9 +9937,9 @@
   },
   "Search.thenTapName": {
     "source": "Then tap your child’s name.",
+    "context": "On the lobby kiosk, under \"Type a name\". The one sentence telling a parent that the name rows below are pressable. \"Tap\" is the same gesture as in Search.tapToCheckOut and should use the same verb. Addresses the parent as 您.",
     "zh-Hans": "machine",
-    "zh-Hant": "machine",
-    "context": "On the lobby kiosk, under \"Type a name\". The one sentence telling a parent that the name rows below are pressable. \"Tap\" is the same gesture as in Search.tapToCheckOut and should use the same verb. Addresses the parent as 您."
+    "zh-Hant": "machine"
   },
   "Search.checkedIn": {
     "source": "✓ Checked in",
@@ -9976,6 +10096,11 @@
     "source": "Pick a gathering",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Chooser.notYours": {
+    "source": "Not yours",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Register.couldNotSave": {
     "source": "Tally could not finish that just now. Try again, or see a leader.",
@@ -10532,6 +10657,16 @@
     "source": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Pairing.updated": {
+    "source": "Tally was updated, so this kiosk needs pairing once more. Any leader can do it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Pairing.retired": {
+    "source": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Time.today": {
     "source": "Today",

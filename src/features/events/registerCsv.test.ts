@@ -141,6 +141,32 @@ describe('buildRegisterCsv — who recorded it', () => {
   });
 });
 
+describe('buildRegisterCsv — a lobby kiosk', () => {
+  function rowFor(record: ReturnType<typeof makeAttendance>) {
+    const event = makeEvent({ requiresCheckOut: true });
+    const rows = registerRows(event, [record], [], byId(AMARA));
+    return cells(buildRegisterCsv(grades, rows, context(event)), 0);
+  }
+
+  it('says "Lobby kiosk" for a row the kiosk wrote, with the device beside it', () => {
+    // A kiosk signs in as `kiosk_<deviceId>` (see `src/lib/kioskDevice.ts`):
+    // not on the team, so no name to resolve — and the truer custody record
+    // than the volunteer who happened to pair it.
+    const row = rowFor(
+      makeAttendance({
+        studentId: 'pco_1',
+        checkedInBy: 'kiosk_kiosk-3f9a1c2e7b4d5e6f7a8b9c0d',
+        checkedOutBy: 'kiosk_kiosk-3f9a1c2e7b4d5e6f7a8b9c0d',
+        method: 'kiosk',
+      }),
+    );
+    expect(row.checked_in_by).toBe('Lobby kiosk');
+    expect(row.checked_in_by_uid).toBe('kiosk_kiosk-3f9a1c2e7b4d5e6f7a8b9c0d');
+    expect(row.checked_out_by).toBe('Lobby kiosk');
+    expect(row.method).toBe('kiosk');
+  });
+});
+
 describe('buildRegisterCsv — a student the roster no longer names', () => {
   it('keeps the id and the times, and leaves the name blank', () => {
     const event = makeEvent();

@@ -501,6 +501,13 @@ because reopening requires being on it. Admins pass regardless — that is the b
 refused, because deleting the document reopens the gathering; the way to reopen is `restricted:
 false`, which keeps the list.
 
+**Restricting is a union, in a transaction.** `restrictChain` in `src/services/eventAccess.ts` reads
+the document inside `runTransaction` and writes `members` as the sheet's ticks ∪ the writer ∪
+whoever is on the document now and was not on it when the sheet opened. It used to be a merge that
+overwrote the array with the ticks, which is how a volunteer added at the door on Friday was taken
+off again by a core member's Tuesday decision that never saw them. Removing somebody is still a
+deliberate untick of a name the sheet showed; only the names it never showed are kept.
+
 **One `get()` note that is not a detail.** Every rule reading this collection asks `exists()` before
 `get()`. A `get()` at a path with no document *raises* rather than returning null, and a raised
 lookup denies — so the natural `a == null || …` form would have denied every gathering nobody had
@@ -572,8 +579,12 @@ The self-serve kiosk's pairing handshake — how a browser on a lobby shelf acqu
 without anybody signing in to Google on it. The kiosk (served at `/kiosk`) calls an
 unauthenticated callable and puts the returned six-character code on screen; a staff member
 approves that code from `/pair-kiosk` under their real session; the kiosk then redeems the code
-*plus a secret only it holds* for a custom token minted for the **approver's uid**, carrying a
-`kiosk: true` claim. Every check-in the kiosk writes is attributed to the person who approved it.
+*plus a secret only it holds* — and the device id it minted for itself — for a custom token minted
+for **the kiosk's own uid**, `kiosk_<deviceId>`, carrying `{ kiosk: true, deviceId }`. The claim
+also writes the kiosk's [`kioskDevices/{deviceId}`](#kioskdevicesdeviceid) row, which is its
+standing from then on. Every check-in the kiosk writes is attributed to the kiosk, not to the
+person who approved it: a lobby tap is nobody's eyewitness account, and the register export says
+"Lobby kiosk" with the device id beside it.
 
 **How long a kiosk stays on one gathering.** The binding lasts until
 `max(endAt, checkInClosesAt)`. It used to end at `endAt`, which on a nursery Sunday is the moment
@@ -609,7 +620,7 @@ chooser rather than a gathering that finished last week.
 | --- | --- | --- |
 | `secretHash` | string | SHA-256 of the kiosk-held secret. The plaintext never touches Firestore — the code is public by design (it is on a screen in a lobby), and the secret is what stops a bystander who saw it from racing the kiosk for the token. |
 | `status` | `'pending' \| 'approved'` | |
-| `approvedBy`, `approvedAt` | — | The staff member whose identity the kiosk inherits. |
+| `approvedBy`, `approvedAt` | — | The staff member who vouched for the code. Copied onto the device row at claim time; nothing about the kiosk's session reads their profile afterwards. |
 | `createdAt`, `expiresAt`, `claimedAt` | — | Ten-minute lifetime; expired documents are swept opportunistically by the next `startKioskPairing` call. |
 
 **Who writes: nobody, from a client.** The rules deny every read and write; the three pairing
@@ -619,10 +630,49 @@ the unauthenticated ends are a cap on live pairings, the expiry, and the fact th
 until an authenticated approval does.
 
 The `kiosk: true` claim narrows the session rather than widening it: a kiosk may *create* an
-attendance record and write the date patch a check-in makes (a pinned key set on `students`), and
-may not update or delete attendance, read `users`, or touch anything else a full counselor session
-can. The kill switch is the approver's `users/{uid}` document — deactivating it cuts the kiosk off
-on its next request, like any other session.
+attendance record, record a first pickup, and write the date patch a check-in makes (a pinned key
+set on `students`); it may not undo or delete attendance, read `users`, or touch anything else a
+full counselor session can. The kill switch is the device row below — retiring it cuts the kiosk
+off on its next write, and the kiosk goes back to its pairing screen from there. It used to be the
+approver's `users/{uid}` document, which is the one finding in the team-access work that lost
+data: the tablet a suspended volunteer had paired in September ticked children green all morning
+with every write refused, because nothing anywhere said a kiosk *was* that person.
+
+### `kioskDevices/{deviceId}`
+
+One document per paired lobby kiosk, keyed by the id the kiosk minted for itself and keeps in its
+own storage (`src/kiosk/storage.ts`). **The row is the kiosk's standing**: `isLiveKiosk()` in the
+rules admits a kiosk session while the claim carries a device id, the uid is `'kiosk_' + deviceId`,
+the row exists and `retiredAt` is null — and reads no profile at all. Suspending or removing the
+person who approved the pairing touches nothing.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `approvedBy`, `approvedByName` | — | Who vouched for the code, and their name as of that moment — denormalised the way `transitions.releasedByName` is, because the row outlives the profile. |
+| `pairedAt` | timestamp | |
+| `lastSeenAt` | timestamp or null | Written by the kiosk on every register poll while bound. Null until it first reports in. |
+| `boundTo`, `boundChain` | string or null | The title and chain of the gathering the kiosk is bound to, written by the kiosk at bind time and null between gatherings. `boundChain` is **the whole of the kiosk's reach**: the attendance rules let a kiosk session read and write the register of that chain and no other — a fence on the chain included, since `eventAccess` is about people and a kiosk stands in whichever room a leader pointed it at. |
+| `retiredAt`, `retiredBy` | — | Set by core and up, in their own name. Never cleared from a client: pairing again is how a retired tablet comes back, and the claim replaces the row wholesale. |
+
+**Who writes: the server, at claim time, wholesale.** The kiosk may update only `lastSeenAt`,
+`boundTo` and `boundChain` on its own row, and only while the row is not retired. Core and up may
+set `retiredAt`/`retiredBy` and nothing else. Nobody creates or deletes one from a client, and
+there is no sweep: the row is the provenance of every morning that kiosk recorded, and a device row
+costs nothing to keep. Core and up read them; a kiosk cannot read even its own.
+
+**The report is the oracle.** The kiosk writes its row the moment a gathering is bound and again
+on every register poll — so a report the lobby wifi dropped at bind time lands on the next one —
+and after any refused write. The rules let a kiosk touch its own row only while it stands, so a
+refusal *there* is the one refusal that cannot be about a frozen student, a pickup already
+recorded or a gathering's fence. A refused check-in asks the row before it concludes anything:
+row live, it was the child, and the row on the glass stays green as today; row refused, this
+device is nobody, the binding is put down, the session signed out, and the pairing screen says
+from when the register may be short. No callable, no debounce, one round trip.
+
+**Migration.** A token minted before kiosks had identities is the approver's uid with no device
+claim. The kiosk compares its restored session's uid against `kiosk_<its own id>` at boot, signs a
+mismatch out once, and pairs again with its own sentence ("Tally was updated…") — see
+[deployment-setup.md](./deployment-setup.md#after-the-kiosk-identity-update-every-kiosk-pairs-once).
 
 ### `kioskIndex/phones`
 

@@ -407,8 +407,10 @@ describe('a gathering somebody else owns', () => {
 
     const notice = screen.getByRole('region', { name: /you are not on/i });
     expect(within(notice).getByText(/you are not on friday fellowship/i)).toBeInTheDocument();
-    // The move the reader actually has. `approvers()` ranks admins first.
-    expect(within(notice).getByText('Miriam or Dana can add you')).toBeInTheDocument();
+    // The move the reader actually has. `approvers()` ranks whoever opened
+    // Tally today first, then core, then admins — the person likeliest to be
+    // in the building before the person likeliest to be on the list.
+    expect(within(notice).getByText('Dana or Miriam can add you')).toBeInTheDocument();
 
     await settle();
   });

@@ -19,11 +19,19 @@
  *      role is whatever an admin has since made it, so this path deliberately
  *      does *not* reset it from the invitation they arrived on.
  *   3. `invitations/{emailKey}` — an admin said this address may sign in, and
- *      with what starting role. Read on first sign-in and never again.
+ *      with what starting role. Read on first sign-in and never again. Keyed by
+ *      the canonical address — one id for every spelling of a Gmail mailbox,
+ *      see `canonicalEmail` — with a fallback to the exact key invitations were
+ *      written under before that rule, which is moved on the way past.
  *
  * Anything else is "not on the roster", which is reported as a refusal rather
  * than an error: a volunteer who has not been added yet is a normal thing to
  * be, not a failure.
+ *
+ * Every address comparison here goes through the canonical form, the seeded
+ * list included: `jo.smith@gmail.com` in the deployment's variable is the
+ * mailbox that signs in as `josmith@gmail.com`, and a plain lowercase compare
+ * anywhere in this file would re-open the exact bug the canonical key closes.
  *
  * ## Why this no longer asks Planning Center
  *
@@ -36,7 +44,7 @@
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { seededAdminEmails } from './config.js';
-import { emailKey, type Role } from './pco/mapping.js';
+import { emailKey, sameAccount, type Role } from './pco/mapping.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import type { ServerCode } from './generated/serverCodes.js';
 
@@ -92,7 +100,10 @@ export async function provisionAccessForCaller(
   seededAdmins: readonly string[],
 ): Promise<ProvisionAccessResult> {
   const email = caller.email.trim().toLowerCase();
-  const seeded = seededAdmins.includes(email);
+  // Canonical on both sides, so a pinned Gmail address matches however the
+  // variable spelled it — dots, a `+tag`, `googlemail.com` — not only when the
+  // deployer typed it the way Google's token happens to carry it.
+  const seeded = seededAdmins.some((admin) => sameAccount(admin, email));
 
   const userRef = db.doc(`${PATHS.users}/${caller.uid}`);
   const existingSnapshot = await userRef.get();
@@ -128,8 +139,8 @@ export async function provisionAccessForCaller(
     return { status: 'granted', role, message: 'Welcome back to Tally.' };
   }
 
-  const inviteSnapshot = await db.doc(`${PATHS.invitations}/${emailKey(email)}`).get();
-  if (!inviteSnapshot.exists) {
+  const invitation = await findInvitation(db, email);
+  if (!invitation) {
     return {
       status: 'not-on-roster',
       role: null,
@@ -152,10 +163,55 @@ export async function provisionAccessForCaller(
    * deliberately not read: treating a stale `active: false` as a refusal would
    * turn a flag nobody can see any more into a locked door nobody can explain.
    */
-  const invitation = inviteSnapshot.data() ?? {};
   const role = readRole(invitation.role) ?? 'counselor';
   await writeProfile(userRef, caller, email, role, existing, now);
   return { status: 'granted', role, message: 'Welcome to Tally.' };
+}
+
+/**
+ * The invitation id as it was spelled before the canonical form: lowercased,
+ * trimmed, dots to commas, and nothing else. Every invitation written before
+ * dots and `+tags` stopped counting on Gmail is keyed by this.
+ */
+function legacyEmailKey(email: string): string {
+  return email.trim().toLowerCase().replace(/\./g, ',');
+}
+
+/**
+ * The invitation for an address, under whichever key it was written.
+ *
+ * The canonical key first. When nothing is there, the exact key the app used
+ * before the Gmail rule — and, on a hit, the document is *moved* to the
+ * canonical key rather than read where it lies: the same data under the new
+ * id, the old id deleted, in one batch. Moving rather than copying is what
+ * keeps the pending list from ever showing one mailbox as two rows, and what
+ * makes the next sign-in find it on the first read.
+ *
+ * For an address whose two keys are the same — every non-Gmail address, and a
+ * Gmail one with no dots or tag — the second read is skipped rather than made
+ * and ignored.
+ */
+async function findInvitation(
+  db: FirestoreLike,
+  email: string,
+): Promise<Record<string, unknown> | null> {
+  const canonicalRef = db.doc(`${PATHS.invitations}/${emailKey(email)}`);
+  const canonical = await canonicalRef.get();
+  if (canonical.exists) return canonical.data() ?? {};
+
+  const legacyKey = legacyEmailKey(email);
+  if (legacyKey === canonicalRef.id) return null;
+
+  const legacyRef = db.doc(`${PATHS.invitations}/${legacyKey}`);
+  const legacy = await legacyRef.get();
+  if (!legacy.exists) return null;
+
+  const data = legacy.data() ?? {};
+  const batch = db.batch();
+  batch.set(canonicalRef, data);
+  batch.delete(legacyRef);
+  await batch.commit();
+  return data;
 }
 
 /**

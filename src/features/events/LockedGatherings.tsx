@@ -19,6 +19,10 @@
  * five gets one card rather than one card and four rejections. Open when
  * nothing tonight is theirs, because that is the moment somebody needs to
  * understand what they are looking at.
+ *
+ * One name on the row, and the lock. The row is one line on a phone, and a
+ * second name or the admin fallback is the part that truncates; the page the
+ * gathering opens to carries both, in full.
  */
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
@@ -37,9 +41,14 @@ export interface LockedGatheringsProps {
    * note above.
    */
   hasOwn: boolean;
+  /**
+   * The clock "opened Tally today" is measured against when the row picks
+   * whom to name. The wall clock when the caller has none to pass.
+   */
+  now?: Date;
 }
 
-export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
+export function LockedGatherings({ events, hasOwn, now = new Date() }: LockedGatheringsProps) {
   const time = useTimeFormats();
   const t = useTranslations('Events');
   const { access } = useData();
@@ -70,7 +79,7 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
 
         <ul className="flex flex-col gap-1 pt-2">
           {events.map((event) => {
-            const who = approvers(t, event, access, byUid);
+            const who = approvers(t, event, access, byUid, { now, limit: 1 });
 
             return (
               /*

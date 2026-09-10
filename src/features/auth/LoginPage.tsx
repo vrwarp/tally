@@ -12,7 +12,7 @@
  * left signed in on a shared phone.
  */
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/authContext';
 import { Button, ErrorBanner, LoadingScreen } from '@/components/ui';
 import { googleSignInStrategy, isEmbeddedBrowser } from '@/lib/embeddedBrowser';
@@ -33,6 +33,19 @@ export function LoginPage() {
   const [inAppBrowser] = useState(() => isEmbeddedBrowser());
   const [strategy] = useState(() => googleSignInStrategy(firebaseApp.options.authDomain));
   const [googlePending, setGooglePending] = useState(false);
+
+  /*
+   * Sent here by the refusal screen's "Use a different Google account".
+   *
+   * The button there signs out and lands on this page, and the chooser will
+   * open on the next press because the provider asks for `select_account` and
+   * there is no session left for Google to silently re-use. What the flag
+   * changes is one line under the button: without it this screen looks exactly
+   * like the one that just led to the wrong account, and a volunteer who has
+   * been refused once reads "Continue with Google" as the same door.
+   */
+  const [searchParams] = useSearchParams();
+  const switching = searchParams.has('switch');
 
   /*
    * Only a genuine dead end disables the button. An in-app browser gets a
@@ -86,6 +99,12 @@ export function LoginPage() {
           >
             {inAppBrowser && !googleUnavailable ? t('tryGoogleAnyway') : t('continueWithGoogle')}
           </Button>
+
+          {switching ? (
+            <p className="text-center text-xs leading-relaxed text-ink-300">
+              {t('pickOtherAccount')}
+            </p>
+          ) : null}
 
           {googleUnavailable || inAppBrowser ? (
             <p className="text-center text-xs leading-relaxed text-warn-400">

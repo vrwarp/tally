@@ -71,6 +71,16 @@ export const COLLECTIONS = {
    */
   eventAccess: 'eventAccess',
   /**
+   * One document per paired lobby kiosk, and the kiosk's standing: who approved
+   * its pairing and when, when it last reported in, what it is bound to, and
+   * whether somebody has retired it. The pairing half is written by the server
+   * at claim time; the kiosk itself only ever updates its own liveness and
+   * binding; core and up read it and may mark it retired. Never deleted — the
+   * row is the provenance of every morning that kiosk recorded. See
+   * `src/lib/kioskDevice.ts`.
+   */
+  kioskDevices: 'kioskDevices',
+  /**
    * One document per (chain, student) pair: this gathering no longer expects
    * this student, and why. The aging-out record — see docs/aging-out.md.
    *
@@ -140,6 +150,9 @@ export const paths = {
 
   eventAccessCollection: () => COLLECTIONS.eventAccess,
   eventAccess: (chainKey: string) => `${COLLECTIONS.eventAccess}/${chainKey}`,
+
+  kioskDevicesCollection: () => COLLECTIONS.kioskDevices,
+  kioskDevice: (deviceId: string) => `${COLLECTIONS.kioskDevices}/${deviceId}`,
 
   transitionsCollection: () => COLLECTIONS.transitions,
   transition: (chainKey: string, studentId: string) =>

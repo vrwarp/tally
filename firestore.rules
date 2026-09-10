@@ -39,8 +39,20 @@ service cloud.firestore {
       return get(profilePath()).data;
     }
 
+    /**
+     * An active member, and never a kiosk.
+     *
+     * A kiosk session is the kiosk's own — see `isLiveKiosk()` — and passes
+     * only the rules that name it. The clause here is what makes that true
+     * for a token minted before kiosks had identities: a member's uid with
+     * the claim, which would otherwise still read as that member. The kiosk
+     * signs such a session out at boot; the rules make sure of it too.
+     */
     function isActive() {
-      return isSignedIn() && exists(profilePath()) && profile().get('active', false) == true;
+      return isSignedIn()
+        && request.auth.token.get('kiosk', false) != true
+        && exists(profilePath())
+        && profile().get('active', false) == true;
     }
 
     function rank(role) {
@@ -118,18 +130,60 @@ service cloud.firestore {
     }
 
     /**
-     * A session minted by the kiosk pairing flow: a real staff member's uid,
-     * carrying a `kiosk: true` custom claim.
+     * A session minted by the kiosk pairing flow, carrying a `kiosk: true`
+     * custom claim.
      *
      * The kiosk stands in a lobby and is operated by the public, so its
-     * session is the approver's *narrowed*: it may add an attendance record
-     * and write the date patch a check-in makes, and nothing else — no
-     * undo, no edits, no reading other people's profiles. Everything a kiosk
+     * session is *narrow*: it may add an attendance record, record a first
+     * pickup and write the date patch a check-in makes, and nothing else —
+     * no undo, no edits, no reading anybody's profile. Everything a kiosk
      * screen shows beyond that comes through callables, which gate
-     * themselves.
+     * themselves. Whether the session stands at all is `isLiveKiosk()`.
      */
     function isKioskSession() {
       return isSignedIn() && request.auth.token.get('kiosk', false) == true;
+    }
+
+    /**
+     * A kiosk is a room, not a volunteer.
+     *
+     * A lobby session used to be minted for the *approver's* uid, so every
+     * rule it passed read the approver's profile — and suspending the
+     * volunteer who paired the tablet in September stopped the tablet in
+     * silence. Now the token is minted for `kiosk_<deviceId>` with the device
+     * id as a claim, and its standing is the device row `claimKioskToken`
+     * wrote: the row exists and nobody has retired it. Nothing about any
+     * person's profile is read for a kiosk's own writes.
+     *
+     * `exists()` before `get()`, for the reason `eventAccess` gives: a `get()`
+     * at a missing path raises, and a raised lookup denies.
+     */
+    function kioskDevicePath() {
+      return /databases/$(database)/documents/kioskDevices/$(request.auth.token.deviceId);
+    }
+
+    function kioskDevice() {
+      return get(kioskDevicePath()).data;
+    }
+
+    function isLiveKiosk() {
+      return isKioskSession()
+        && request.auth.token.get('deviceId', '') is string
+        && request.auth.token.get('deviceId', '') != ''
+        && request.auth.uid == 'kiosk_' + request.auth.token.deviceId
+        && exists(kioskDevicePath())
+        && kioskDevice().get('retiredAt', null) == null;
+    }
+
+    /**
+     * A kiosk's reach is the room it stands in. On bind the kiosk writes the
+     * chain it is bound to onto its own row, and attendance writes are
+     * admitted only for that chain — a lobby session can no longer read or
+     * write any gathering in the ministry, which is what it could do the
+     * moment its identity stopped being a person's.
+     */
+    function kioskBoundTo(key) {
+      return isLiveKiosk() && kioskDevice().get('boundChain', '') == key;
     }
 
     /*
@@ -387,11 +441,15 @@ service cloud.firestore {
           || touchesOnly(kioskDatePatchKeys());
       }
 
-      allow get, list: if isActive();
+      // A live kiosk reads the roster for the lobby search; the kiosk claim
+      // never reaches a profile, so the membership half is the device row.
+      allow get, list: if isLiveKiosk() || isActive();
 
       // Quick-add happens at the door, and check-in itself writes
       // firstAttendedAt/lastAttendedAt, so counselors need create and update.
-      allow create: if isCounselor()
+      // A kiosk is admitted on the same terms, and `kioskWriteAllowed` pins
+      // it to the eight keys a check-in's date patch touches.
+      allow create: if (isCounselor() || isLiveKiosk())
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnclaimed()
@@ -399,7 +457,7 @@ service cloud.firestore {
                     && kioskWriteAllowed()
                     && reviewHoldUnchanged()
                     && request.resource.data.get('upstreamRecordMissing', false) == false;
-      allow update: if isCounselor()
+      allow update: if (isCounselor() || isLiveKiosk())
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnchanged()
@@ -699,9 +757,18 @@ service cloud.firestore {
          * exactly what the collection-group wildcard does not have, which is
          * why the rule down there had to be denied outright instead.
          */
-        allow get, list: if isActive() && onChain(eventChain(eventId));
-        allow create: if isCounselor() && validAttendance() && !attendanceFrozen()
-                      && onChain(eventChain(eventId));
+        /*
+         * A kiosk reads and writes the one register it is bound to, and no
+         * other: `kioskBoundTo` is its whole gate, where a person's is their
+         * profile plus the chain. The read is also the kiosk's way of noticing
+         * it has been retired — a refused *read* can never be a frozen student,
+         * because `attendanceFrozen()` guards writes alone.
+         */
+        allow get, list: if kioskBoundTo(eventChain(eventId))
+                         || (isActive() && onChain(eventChain(eventId)));
+        allow create: if validAttendance() && !attendanceFrozen()
+                      && (kioskBoundTo(eventChain(eventId))
+                          || (isCounselor() && onChain(eventChain(eventId))));
         /**
          * A kiosk may add a record, and may record a first pickup. It may not
          * overwrite the moment and method a counselor recorded, and it may not
@@ -709,11 +776,11 @@ service cloud.firestore {
          * this and renders an already-collected student as done rather than
          * re-writing them.
          */
-        allow update: if isCounselor() && !attendanceFrozen()
-                      && onChain(eventChain(eventId))
+        allow update: if !attendanceFrozen()
                       && (isKioskSession()
-                            ? kioskCheckOutAllowed()
-                            : (validAttendance() || validCheckOut()));
+                            ? (kioskBoundTo(eventChain(eventId)) && kioskCheckOutAllowed())
+                            : (isCounselor() && onChain(eventChain(eventId))
+                               && (validAttendance() || validCheckOut())));
         allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession()
                       && onChain(eventChain(eventId));
       }
@@ -1140,7 +1207,7 @@ service cloud.firestore {
      * digits answer any student.
      */
     match /kioskIndex/{docId} {
-      allow get: if isActive();
+      allow get: if isLiveKiosk() || isActive();
       allow list, write: if false;
     }
 
@@ -1177,9 +1244,9 @@ service cloud.firestore {
           && d.updatedBy == request.auth.uid;
       }
 
-      // The kiosk session is the approving staff member's own uid, so the
-      // membership test the rest of the kiosk's reads pass covers this one.
-      allow get: if isActive();
+      // A live kiosk reads the photograph it stands behind; a person reads it
+      // to preview one in the editor.
+      allow get: if isLiveKiosk() || isActive();
       // Core and up, exactly like the events that point at these.
       allow create: if isCore()
         && backdropId.matches('^b[0-9a-f]{16,64}$')
@@ -1195,6 +1262,55 @@ service cloud.firestore {
      */
     match /kioskPairings/{code} {
       allow read, write: if false;
+    }
+
+    /**
+     * One row per paired lobby kiosk: who approved it and when, what it is
+     * bound to, when it last reported in, and whether it has been retired.
+     *
+     * The row *is* the kiosk's standing (see `isLiveKiosk`). It is written by
+     * `claimKioskToken` through the Admin SDK at the moment the token is
+     * minted, so it cannot go quiet. The kiosk itself may update only its own
+     * row — the document named by its `deviceId` claim — and only the three
+     * facts that are its to report: when it was last seen, and the title and
+     * chain it is bound to. It may not create a row (a stale token could then
+     * invent a kiosk), may not read one (nothing on the glass needs it), and
+     * may not touch who approved it or whether it is retired.
+     *
+     * Core team and up read the collection and may **retire** a row by
+     * marking it, from the person page or the pair-kiosk screen. Never a
+     * delete: the row is the provenance of every morning that kiosk recorded
+     * — a pickup from last March carries `kiosk_<deviceId>` and this is the
+     * document that says who stood the device up — and the same argument
+     * refuses to delete a person.
+     */
+    match /kioskDevices/{deviceId} {
+      function validKioskReport() {
+        let d = request.resource.data;
+        return d.lastSeenAt is timestamp
+          && (d.get('boundTo', null) == null
+              || (d.boundTo is string && d.boundTo.size() <= 120))
+          && (d.get('boundChain', null) == null
+              || (d.boundChain is string && d.boundChain.size() <= 200));
+      }
+
+      function validRetirement() {
+        let d = request.resource.data;
+        return d.retiredAt is timestamp && d.retiredBy == request.auth.uid;
+      }
+
+      allow get, list: if isCore() && !isKioskSession();
+      allow create: if false;
+      allow update: if (isKioskSession()
+                        && request.auth.token.get('deviceId', '') == deviceId
+                        && request.auth.uid == 'kiosk_' + deviceId
+                        && resource.data.get('retiredAt', null) == null
+                        && touchesOnly(['lastSeenAt', 'boundTo', 'boundChain'])
+                        && validKioskReport())
+                    || (isCore() && !isKioskSession()
+                        && touchesOnly(['retiredAt', 'retiredBy'])
+                        && validRetirement());
+      allow delete: if false;
     }
 
     /**

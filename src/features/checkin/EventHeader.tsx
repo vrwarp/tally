@@ -6,12 +6,28 @@
  * now chosen by hand rather than by the clock — so the screen has to keep
  * saying which night it is filing against, loudly, for as long as somebody is
  * tapping. "Today" is reassurance; anything else is a warning.
+ *
+ * ## The select demotes, never hides
+ *
+ * A gathering the reader is not on stays in the picker, under "Not yours" at
+ * the foot, with a lock — hiding it is how a counselor concludes the app is
+ * broken. Choosing one does not navigate: it opens the "Who's on" sheet in
+ * place, for that gathering, so the night being worked is never unmounted, and
+ * the select goes on reading the night being worked. It is a controlled select
+ * whose value is always the current event for exactly that reason: a select
+ * reading "Sunday School" over a Friday roster for even a moment is the one
+ * mistake the app is built around.
+ *
+ * The sheet's state lives in `CheckInPage`, because the page has one more
+ * reason to open the same sheet — a gathering that has refused three check-ins
+ * — and two sheets for one question would be two answers.
  */
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { AccessSheet } from '@/features/events/AccessSheet';
+import { useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import {
   isCheckInOpen,
@@ -38,6 +54,14 @@ export interface EventHeaderProps {
    */
   inRoom?: number;
   tracksCheckOut?: boolean;
+  /**
+   * Which gathering the "Who's on" sheet is open for — `null` when it is shut.
+   *
+   * Usually this event, opened from the chip; a locked gathering when it was
+   * chosen from the select's "Not yours" group. Owned by the page, see above.
+   */
+  accessSheet: TallyEvent | null;
+  onAccessSheetChange: (event: TallyEvent | null) => void;
 }
 
 export function EventHeader({
@@ -48,17 +72,29 @@ export function EventHeader({
   eligible,
   inRoom = 0,
   tracksCheckOut = false,
+  accessSheet,
+  onAccessSheetChange,
 }: EventHeaderProps) {
   const time = useTimeFormats();
   const t = useTranslations('EventHeader');
   const navigate = useNavigate();
-  const { access } = useData();
-  const [accessOpen, setAccessOpen] = useState(false);
+  const { access, canWork } = useData();
   const open = isCheckInOpen(event, now);
 
   const list = access.get(chainKey(event));
   const restricted = list?.restricted === true;
-  const onGathering = list?.members.size ?? 0;
+  /*
+   * The directory, only for a restricted gathering, and only to leave the
+   * suspended out of the count: a chip reading "3" over two people who can
+   * take attendance is a number the counselor will act on. Until the directory
+   * lands the raw size stands in, rather than a "0" that reads as nobody.
+   */
+  const { byUid, loading: teamLoading } = useTeam(restricted);
+  const onGathering = useMemo(() => {
+    const members = [...(list?.members ?? [])];
+    if (teamLoading && byUid.size === 0) return members.length;
+    return members.filter((uid) => byUid.get(uid)?.active === true).length;
+  }, [list, byUid, teamLoading]);
   const isToday = startOfDay(event.startAt).getTime() === startOfDay(now).getTime();
 
   // The picker only offers the last month plus everything upcoming, so an event
@@ -67,6 +103,14 @@ export function EventHeader({
   const options = selectableEvents.some((candidate) => candidate.id === event.id)
     ? selectableEvents
     : [event, ...selectableEvents];
+
+  /*
+   * The current night is always in the top group whatever `canWork` says:
+   * this header only mounts over a roster the reader may work, and the select
+   * has to be able to show its own value.
+   */
+  const own = options.filter((candidate) => candidate.id === event.id || canWork(candidate));
+  const locked = options.filter((candidate) => candidate.id !== event.id && !canWork(candidate));
 
   return (
     <div>
@@ -157,25 +201,28 @@ export function EventHeader({
 
           They never reach the Events tab — it is core-team only — so without
           this chip the volunteer standing next to them at the door could not be
-          added by the one person who is allowed to add them. It reads as a
-          count rather than a verb because most of the time it is information;
-          the sheet behind it is where the verbs are.
+          added by the one person who is allowed to add them. It names the sheet
+          it opens — a noun, no verb: the volunteer quick-adds visitors most
+          weeks and read "Add" beside a roster as "add a child" — and carries
+          the count, because most of the time it is information; the sheet
+          behind it is where the verbs are. Nothing else is ever added to it:
+          everything beside the select holds its size.
 
-          Short, because it shares a row with the select. The full sentence
-          lives in the label, where a screen reader gets it and the layout does
-          not pay for it.
+          Brand-coloured like the Change pill beside it, because it opens
+          something too. The full sentence lives in the label, where a screen
+          reader gets it and the layout does not pay for it.
         */}
         <button
           type="button"
-          onClick={() => setAccessOpen(true)}
+          onClick={() => onAccessSheetChange(event)}
           aria-label={
             restricted
               ? t('whoCount', { count: onGathering })
               : t('whoEveryone')
           }
-          className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-ink-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
+          className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
-          {restricted ? `🔒 ${onGathering}` : 'Everyone'}
+          {restricted ? t('whosOnCount', { count: onGathering }) : t('whosOnEveryone')}
         </button>
 
         {/* The way back to the chooser. It is a link rather than a "back to
@@ -192,18 +239,36 @@ export function EventHeader({
         <select
           aria-label={t('switchEvent')}
           value={event.id}
-          onChange={(changed) => navigate(`/event/${changed.target.value}`)}
+          onChange={(changed) => {
+            // A demoted option fires the sheet and nothing else; the value
+            // stays the night being worked. See the note at the top.
+            const chosen = locked.find((candidate) => candidate.id === changed.target.value);
+            if (chosen) {
+              onAccessSheetChange(chosen);
+              return;
+            }
+            navigate(`/event/${changed.target.value}`);
+          }}
           /* It flexes because on a phone it is the widest control here and the
              one most likely to be reached for on the wrong night. On a laptop
              band the same rule made it a 900px pill: past the width of the
              longest option there is nothing left to reveal, so it stops. */
           className="min-h-11 min-w-0 flex-1 truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9 lg:max-w-sm"
         >
-          {options.map((candidate) => (
+          {own.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {time.shortDate(candidate.startAt)} · {candidate.title}
             </option>
           ))}
+          {locked.length > 0 ? (
+            <optgroup label={t('notYoursGroup')}>
+              {locked.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  🔒 {time.shortDate(candidate.startAt)} · {candidate.title}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
       </div>
 
@@ -214,9 +279,9 @@ export function EventHeader({
       ) : null}
 
       <AccessSheet
-        open={accessOpen}
-        onClose={() => setAccessOpen(false)}
-        event={event}
+        open={accessSheet !== null}
+        onClose={() => onAccessSheetChange(null)}
+        event={accessSheet ?? event}
         now={now}
       />
     </div>

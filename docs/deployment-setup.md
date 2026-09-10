@@ -386,6 +386,21 @@ approves the code. They are also the **only** intentionally-unauthenticated call
 QR/phone registration was retired: `registerFamily` requires the kiosk's own token outright, so
 nothing app-level accepts an anonymous caller any more.
 
+### After the kiosk-identity update, every kiosk pairs once
+
+Kiosks used to sign in as the person who approved their pairing code. They now sign in as
+themselves — a uid minted for a device id each kiosk keeps in its own storage, with a
+[`kioskDevices/{deviceId}`](./data-model.md#kioskdevicesdeviceid) row as its standing. A session
+minted the old way carries no device id, and the first deploy that includes this change signs
+every such kiosk out at its next boot (the nightly reload, or the first wake). The kiosk then shows
+its pairing code under the sentence *Tally was updated, so this kiosk needs pairing once more*,
+and any active member pairs it again from **Kiosk** in the account menu, exactly as the first time.
+
+Do the deploy on a weekday and walk the lobby afterwards, so that no tablet is discovered asking
+to be paired at a quarter past nine on a Sunday. Nothing else changes for the room: the printer
+pairing, the language and the installed app all survive, and the kiosk's queue of dropped writes
+lands under its new identity once it is back.
+
 ### The artifact cleanup policy
 
 Every functions deploy builds a container image and leaves it in Artifact Registry, so without a

@@ -89,6 +89,11 @@ export const PATHS = {
    * only the record of how they got in.
    */
   invitations: 'invitations',
+  /**
+   * One document per paired lobby kiosk: which uid it is signed in as, and
+   * when it last reported in. Written by `claimKioskToken`; see kiosk/devices.ts.
+   */
+  kioskDevices: 'kioskDevices',
   /** Connection health for the Settings screen. Written only by functions. */
   pcoStatus: 'config/pcoStatus',
   /**

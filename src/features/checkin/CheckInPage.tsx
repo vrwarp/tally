@@ -57,6 +57,7 @@ import { useAttendance, useRsvps } from '@/hooks/useAttendance';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { chainKey } from '@/lib/materialize';
+import { isPermissionDenied } from '@/lib/permissionDenied';
 import { clearSkippedNight } from '@/services/skippedNights';
 import { cn, haptic } from '@/lib/utils';
 import {
@@ -70,7 +71,7 @@ import {
   isCheckInOpen,
 } from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
-import { studentFullName, type Grade, type RosterEntry } from '@/types';
+import { studentFullName, type Grade, type RosterEntry, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -95,6 +96,18 @@ import { useTimeFormats } from '@/hooks/useTimeFormats';
  * screens of one tab.
  */
 const BAND = pageFrameWidth({ width: '3xl' });
+
+/**
+ * How many refused check-ins on one gathering before the page says so.
+ *
+ * Three, because three refusals cannot be three frozen students. One is a
+ * toast, as it always was; the third replaces its toast with a line above the
+ * roster that says what the page has seen and nothing more — no reason is
+ * inferred from a refusal code, and no callable is asked. The live access
+ * stream flips the page for the ordinary case; this is the cheap, honest
+ * remainder for the one it has not caught up with.
+ */
+const REFUSALS_BEFORE_BANNER = 3;
 
 /**
  * Whether this is the laptop layout — asked at the moment of a check-in rather
@@ -237,6 +250,35 @@ export function CheckInPage() {
   const searchInput = useRef<HTMLInputElement | null>(null);
   const rosterList = useRef<HTMLUListElement | null>(null);
 
+  /**
+   * The "Who's on" sheet, and which gathering it is open for.
+   *
+   * Lifted out of `EventHeader` because the page opens the same sheet from two
+   * places — the header's chip and select, and the refusal line below — and a
+   * gathering chosen from the select's "Not yours" group is not this one.
+   */
+  const [accessSheet, setAccessSheet] = useState<TallyEvent | null>(null);
+
+  /**
+   * Refused check-ins, counted per gathering — see `REFUSALS_BEFORE_BANNER`.
+   *
+   * A ref keyed by chain, so it starts again when the event changes and never
+   * re-renders anything on its own; `refusedOn` is the chain the line is up
+   * for, compared against the current one at render rather than cleared.
+   */
+  const refusals = useRef({ chain: '', count: 0 });
+  const [refusedOn, setRefusedOn] = useState<string | null>(null);
+
+  /**
+   * The last event this page had a roster mounted for.
+   *
+   * What lets the locked page say "you've just been taken off" rather than a
+   * sentence that reads as though the reader was never on it: the live access
+   * stream swaps the roster for that page the moment somebody is removed, and
+   * only this component knows what was on screen a second before.
+   */
+  const hadRoster = useRef<string | null>(null);
+
   /*
    * The gathering in front of the counselor becomes a document, if it was not
    * one already.
@@ -378,6 +420,10 @@ export function CheckInPage() {
     });
   }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus, pinned]);
 
+  useEffect(() => {
+    if (event && !locked && roster) hadRoster.current = event.id;
+  }, [event, locked, roster]);
+
   /*
    * What the flagged rows are actually allergic to.
    *
@@ -509,7 +555,17 @@ export function CheckInPage() {
    * React has re-rendered anything.
    */
   const write = useCallback(
-    async (ids: readonly string[], failure: string, work: () => Promise<void>) => {
+    async (
+      ids: readonly string[],
+      /*
+       * What to say when it fails: a sentence, or a function of the cause that
+       * may answer `null` — "already said, by something other than a toast" —
+       * which is how the third refused check-in becomes a line rather than a
+       * third toast.
+       */
+      failure: string | ((cause: unknown) => string | null),
+      work: () => Promise<void>,
+    ) => {
       if (ids.some((id) => inFlight.current.has(id))) return;
       for (const id of ids) {
         inFlight.current.add(id);
@@ -518,9 +574,12 @@ export function CheckInPage() {
 
       try {
         await work();
-      } catch {
-        setAnnouncement(failure);
-        show(failure, { tone: "error" });
+      } catch (cause) {
+        const sentence = typeof failure === 'function' ? failure(cause) : failure;
+        if (sentence !== null) {
+          setAnnouncement(sentence);
+          show(sentence, { tone: "error" });
+        }
       } finally {
         forgetCachedHistory();
         for (const id of ids) {
@@ -532,6 +591,27 @@ export function CheckInPage() {
     [setBusy, show, forgetCachedHistory],
   );
 
+  /**
+   * A check-in the rules refused. True on the third for this gathering, at
+   * which point the line above the roster says so and the toast is skipped.
+   *
+   * It infers nothing from the code beyond "refused": not why, not whether the
+   * reader was removed or the gathering narrowed. It says what it saw.
+   */
+  const noteRefusal = useCallback(
+    (cause: unknown): boolean => {
+      if (!event || !isPermissionDenied(cause)) return false;
+      const chain = chainKey(event);
+      if (refusals.current.chain !== chain) refusals.current = { chain, count: 0 };
+      refusals.current.count += 1;
+      if (refusals.current.count !== REFUSALS_BEFORE_BANNER) return false;
+      setRefusedOn(chain);
+      setAnnouncement(t("refusedBanner"));
+      return true;
+    },
+    [event, t],
+  );
+
   const handleCheckIn = useCallback(
     async (entry: RosterEntry) => {
       if (!event || !user) return;
@@ -539,42 +619,46 @@ export function CheckInPage() {
       const name = studentFullName(entry.student);
       const searched = query.trim() !== "";
 
-      await write([entry.student.id], t("errorCheckIn", { name }), async () => {
-        // Paint and buzz first — the confirmation must land on the tap, not on
-        // the round trip.
-        haptic();
-        flash(entry.student.id);
-        setAnnouncement(t("announceCheckedIn", { name }));
-        // Attendance hangs off the event document, so the gathering has to be
-        // one. Almost always already done by the effect above; this is what
-        // makes it true for a counselor getting a head start on a gathering
-        // whose check-in has not opened yet.
-        await ensureMaterialized(event);
-        await checkIn({
-          event,
-          student: entry.student,
-          uid: user.uid,
-          method: searched ? "search" : "tap",
-        });
+      await write(
+        [entry.student.id],
+        (cause) => (noteRefusal(cause) ? null : t("errorCheckIn", { name })),
+        async () => {
+          // Paint and buzz first — the confirmation must land on the tap, not on
+          // the round trip.
+          haptic();
+          flash(entry.student.id);
+          setAnnouncement(t("announceCheckedIn", { name }));
+          // Attendance hangs off the event document, so the gathering has to be
+          // one. Almost always already done by the effect above; this is what
+          // makes it true for a counselor getting a head start on a gathering
+          // whose check-in has not opened yet.
+          await ensureMaterialized(event);
+          await checkIn({
+            event,
+            student: entry.student,
+            uid: user.uid,
+            method: searched ? "search" : "tap",
+          });
 
-        /*
-         * An empty box and a caret, ready for the next name.
-         *
-         * Only after the write actually lands — `write` swallows the failure,
-         * so anything past the await is a check-in that happened — and only
-         * for a check-in that came out of a search, on a laptop. That is the
-         * back-fill loop: a core member with a paper register types three
-         * letters, arrows down, presses Enter, and types the next three. The
-         * alternative was select-all-and-retype thirty times, or two device
-         * switches per student.
-         */
-        if (searched && onLaptop()) {
-          setQuery("");
-          searchInput.current?.focus();
-        }
-      });
+          /*
+           * An empty box and a caret, ready for the next name.
+           *
+           * Only after the write actually lands — `write` swallows the failure,
+           * so anything past the await is a check-in that happened — and only
+           * for a check-in that came out of a search, on a laptop. That is the
+           * back-fill loop: a core member with a paper register types three
+           * letters, arrows down, presses Enter, and types the next three. The
+           * alternative was select-all-and-retype thirty times, or two device
+           * switches per student.
+           */
+          if (searched && onLaptop()) {
+            setQuery("");
+            searchInput.current?.focus();
+          }
+        },
+      );
     },
-    [event, user, query, flash, write, refuseFrozen, t],
+    [event, user, query, flash, write, refuseFrozen, noteRefusal, t],
   );
 
   const handleUndo = useCallback(
@@ -785,7 +869,7 @@ export function CheckInPage() {
    * whose every tap is refused.
    */
   if (event && locked) {
-    return <LockedGathering event={event} now={now} />;
+    return <LockedGathering event={event} now={now} justRemoved={hadRoster.current === event.id} />;
   }
 
   if (!event || !roster) {
@@ -920,7 +1004,30 @@ export function CheckInPage() {
           eligible={counts.eligible}
           inRoom={counts.inRoom}
           tracksCheckOut={event.requiresCheckOut}
+          accessSheet={accessSheet}
+          onAccessSheetChange={setAccessSheet}
         />
+
+        {/* The third refused check-in, said once, above the roster rather than
+            as a third toast — see `REFUSALS_BEFORE_BANNER`. It reflows the
+            roster by one line, which is fine here: it lands in the header
+            band, not under a thumb already descending on a row. The one
+            action opens the same sheet the chip does. */}
+        {refusedOn === chainKey(event) ? (
+          <div
+            role="status"
+            className="mt-2 flex items-center gap-3 rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/30"
+          >
+            <span className="min-w-0 flex-1 text-sm text-ink-200">{t("refusedBanner")}</span>
+            <button
+              type="button"
+              onClick={() => setAccessSheet(event)}
+              className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
+            >
+              {t("refusedSee")}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* The one thing that stays. Search is how a counselor finds the student

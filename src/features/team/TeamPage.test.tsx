@@ -21,8 +21,16 @@
  * The read-only screen — a core member checking who is on the team — is
  * asserted on directly: every fix above adds something to the admin's view and
  * none of them may leak into theirs.
+ *
+ * Two later additions, both about where the truth lives. A row the deployment
+ * pins as admin loses its role select and its toggle, because a change made
+ * here would revert at their next sign-in — and that fact is *read* from the
+ * server when the screen draws, never remembered on a profile, so the failure
+ * to read it has to be drawn as a failure. And "already on the team" is asked
+ * on the canonical address: an invitation typed `josmith@gmail.com` is the
+ * profile that signed in as `jo.smith@gmail.com`.
  */
-import { act, render, screen, waitFor } from '@/test/rtl';
+import { act, render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';
@@ -36,6 +44,7 @@ const upsertUser = vi.hoisted(() => vi.fn());
 const subscribeInvitations = vi.hoisted(() => vi.fn());
 const inviteToTally = vi.hoisted(() => vi.fn());
 const withdrawInvitation = vi.hoisted(() => vi.fn());
+const listPinnedAdmins = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/authContext', () => ({ useAuth }));
 vi.mock('@/services/users', () => ({ subscribeUsers, upsertUser }));
@@ -44,6 +53,7 @@ vi.mock('@/services/access', () => ({
   inviteToTally,
   withdrawInvitation,
 }));
+vi.mock('@/services/functions', () => ({ listPinnedAdmins }));
 
 type UsersListener = (users: UserProfile[]) => void;
 type InvitationsListener = (invitations: Invitation[]) => void;
@@ -112,6 +122,7 @@ beforeEach(() => {
   upsertUser.mockResolvedValue(undefined);
   inviteToTally.mockResolvedValue(undefined);
   withdrawInvitation.mockResolvedValue(undefined);
+  listPinnedAdmins.mockResolvedValue({ data: { emails: [] } });
 
   useAuth.mockReturnValue({ profile: ADMIN, can: () => true });
 });
@@ -233,6 +244,132 @@ describe('TeamPage — invited means invited, not arrived', () => {
     deliverInvitations([arrived]);
 
     expect(screen.getByText(MATE.email)).toBeInTheDocument();
+  });
+
+  it('matches a Gmail invitation to the mailbox however Google spelled it', () => {
+    // Gmail ignores dots and `+tags`; Google's token carries the address the
+    // account registered. Typed without dots on Tuesday, signed in with them
+    // on Sunday — one mailbox, and it has arrived.
+    const jo = makeUser({ id: 'user-3', email: 'jo.smith@gmail.com', displayName: 'Jo Smith' });
+    renderTeam();
+    act(() => usersListener([ADMIN, MATE, jo]));
+    deliverInvitations([
+      makeInvitation({ id: 'josmith@gmail,com', email: 'josmith+tally@googlemail.com' }),
+    ]);
+
+    expect(screen.getByText('No pending invitations.')).toBeInTheDocument();
+  });
+
+  it('does not merge two Workspace addresses that differ by a dot', () => {
+    // Everywhere but consumer Gmail the dot is significant; a filter that
+    // dropped it would hide a real outstanding invitation behind a colleague.
+    renderTeam();
+    settleUsers();
+    deliverInvitations([makeInvitation({ id: 'sa,m@example,org', email: 'sa.m@example.org' })]);
+
+    expect(screen.getByText('sa.m@example.org')).toBeInTheDocument();
+  });
+});
+
+describe('TeamPage — the rows the deployment pins', () => {
+  const JO = makeUser({
+    id: 'user-3',
+    email: 'jo.smith@gmail.com',
+    displayName: 'Jo Smith',
+    role: 'admin',
+  });
+
+  function row(name: string) {
+    const item = screen.getByText(name).closest('li');
+    if (!item) throw new Error(`no row for ${name}`);
+    return within(item);
+  }
+
+  it('takes the select and the toggle off a pinned row, and says why', async () => {
+    listPinnedAdmins.mockResolvedValue({ data: { emails: ['jo.smith@gmail.com'] } });
+    renderTeam();
+    act(() => usersListener([ADMIN, MATE, JO]));
+
+    expect(await screen.findByText('Pinned by the deployment')).toBeInTheDocument();
+    expect(screen.getByText('Changed by whoever deploys Tally, not here.')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Role for Jo Smith' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Jo Smith may sign in' }),
+    ).not.toBeInTheDocument();
+    // The role still reads: between a deploy and the next sign-in it can be
+    // something other than admin, and the row says what it is.
+    expect(row('Jo Smith').getByText('Admin')).toBeInTheDocument();
+  });
+
+  it('leaves every other row editable', async () => {
+    listPinnedAdmins.mockResolvedValue({ data: { emails: ['jo.smith@gmail.com'] } });
+    renderTeam();
+    act(() => usersListener([ADMIN, MATE, JO]));
+    await screen.findByText('Pinned by the deployment');
+
+    expect(screen.getByRole('combobox', { name: 'Role for Sam Counselor' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Sam Counselor may sign in' })).toBeInTheDocument();
+  });
+
+  it('matches a pinned Gmail address however the variable spelled it', async () => {
+    listPinnedAdmins.mockResolvedValue({ data: { emails: ['JoSmith+admin@googlemail.com'] } });
+    renderTeam();
+    act(() => usersListener([ADMIN, JO]));
+
+    expect(await screen.findByText('Pinned by the deployment')).toBeInTheDocument();
+  });
+
+  it('does not merge a Workspace address that differs by a dot', async () => {
+    listPinnedAdmins.mockResolvedValue({ data: { emails: ['s.am@example.org'] } });
+    renderTeam();
+    settleUsers();
+    await waitFor(() => expect(listPinnedAdmins).toHaveBeenCalled());
+
+    expect(screen.getByRole('combobox', { name: 'Role for Sam Counselor' })).toBeInTheDocument();
+    expect(screen.queryByText('Pinned by the deployment')).not.toBeInTheDocument();
+  });
+
+  it('draws the controls while the answer is still in flight', () => {
+    // A slow callable must not withhold the team.
+    listPinnedAdmins.mockReturnValue(new Promise(() => {}));
+    renderTeam();
+    act(() => usersListener([ADMIN, JO]));
+
+    expect(screen.getByRole('combobox', { name: 'Role for Jo Smith' })).toBeInTheDocument();
+    expect(screen.queryByText('Pinned by the deployment')).not.toBeInTheDocument();
+  });
+
+  it('says what it could not check, keeps the controls, and offers Retry', async () => {
+    listPinnedAdmins.mockRejectedValue(new Error('unavailable'));
+    const user = userEvent.setup();
+    renderTeam();
+    act(() => usersListener([ADMIN, JO]));
+
+    expect(
+      await screen.findByText(
+        "Couldn't check which admins are pinned by the deployment — a change to a pinned admin reverts at their next sign-in.",
+      ),
+    ).toBeInTheDocument();
+    // The failure is the line, not a missing row or a missing control.
+    expect(screen.getByRole('combobox', { name: 'Role for Jo Smith' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Jo Smith may sign in' })).toBeInTheDocument();
+
+    listPinnedAdmins.mockResolvedValue({ data: { emails: ['jo.smith@gmail.com'] } });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('Pinned by the deployment')).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't check which admins are pinned/)).not.toBeInTheDocument();
+    expect(listPinnedAdmins).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks once when the screen draws', async () => {
+    renderTeam();
+    settleUsers();
+    await waitFor(() => expect(listPinnedAdmins).toHaveBeenCalled());
+
+    deliverInvitations([makeInvitation()]);
+
+    expect(listPinnedAdmins).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -384,6 +521,10 @@ describe('TeamPage — the read-only screen', () => {
 
     expect(screen.getByText('Sam Counselor')).toBeInTheDocument();
     expect(subscribeInvitations).not.toHaveBeenCalled();
+    // A list of the people who control access to a roster of minors, and a
+    // question the server would refuse: the read-only view never asks it.
+    expect(listPinnedAdmins).not.toHaveBeenCalled();
+    expect(screen.queryByText('Pinned by the deployment')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Yes, withdraw' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Keep it' })).not.toBeInTheDocument();

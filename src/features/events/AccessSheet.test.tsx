@@ -1,19 +1,26 @@
 /**
  * What the sheet says before it writes, and which of the two states looks on.
  *
- * The write itself is one line over a service that `firestore-tests` covers.
- * What these assert is everything around it, because that is where the harm
- * was: the current setting used to be the greyed-out one, so the state that
- * *would* fire — a restriction across every past and future occurrence — was
- * the bright, bold, borderless one, and the only sighted difference between
- * them was invisible. And the sheet decided without saying what it was deciding
- * about: no names, no count, no statement of who would lose access until after
- * the switch had already committed.
+ * The write itself is one line over a service that `eventAccess.test.ts` and
+ * `firestore-tests` cover. What these assert is everything around it, because
+ * that is where the harm was: the current setting used to be the greyed-out
+ * one, so the state that *would* fire — a restriction across every past and
+ * future occurrence — was the bright, bold, borderless one, and the only
+ * sighted difference between them was invisible. And the sheet decided without
+ * saying what it was deciding about: no names, no count, no statement of who
+ * would lose access until after the switch had already committed.
+ *
+ * The second half is the kept list. While a gathering is open the sheet draws
+ * who a narrowing would keep as ticks, and the claims are about what those
+ * ticks mean: an untick is local and stays off the write, the reader's own row
+ * is a fact rather than a tick, somebody added while the sheet is open is kept
+ * whatever the ticks say, and the switch cannot be pressed past a preview that
+ * has not finished.
  */
-import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@/test/rtl';
+import type { ReactElement } from 'react';
+import { render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type ToastContextValue } from '@/context/toastContext';
@@ -52,9 +59,12 @@ const team: UserProfile[] = [
   makeUser({ id: 'priya', displayName: 'Priya Raman' }),
 ];
 
+/** The directory the sheet is handed. Tests that need a variation swap it in. */
+let roster: UserProfile[] = team;
+
 vi.mock('@/services/users', () => ({
   subscribeUsers: (onChange: (members: UserProfile[]) => void) => {
-    onChange(team);
+    onChange(roster);
     return () => {};
   },
 }));
@@ -66,43 +76,55 @@ const sunday: TallyEvent = makeEvent({
   mode: 'recurring',
 });
 
-function show(access: Map<string, EventAccess> = new Map()) {
-  const data = {
-    access,
-    events: [sunday],
-  } as unknown as DataContextValue;
-
-  const auth = {
-    user: { uid: 'miriam' },
-    profile: team[0]!,
-    can: () => true,
-  } as unknown as AuthContextValue;
-
-  const toast: ToastContextValue = { toasts: [], show: vi.fn(), dismiss: vi.fn() };
-
-  const tree: ReactNode = (
-    <AuthContext.Provider value={auth}>
-      <DataContext.Provider value={data}>
-        <ToastContext.Provider value={toast}>
-          <AccessSheet open onClose={() => {}} event={sunday} now={NOW} />
-        </ToastContext.Provider>
-      </DataContext.Provider>
-    </AuthContext.Provider>
-  );
-
-  return { toast, ...render(tree) };
+/** A reader: who they are, and what their role lets them do. */
+interface Reader {
+  profile: UserProfile;
+  can: (role: string) => boolean;
 }
 
-/** The gathering closed to Miriam and Sam. */
-function restricted(): Map<string, EventAccess> {
+const miriam: Reader = { profile: team[0]!, can: () => true };
+
+function show(access: Map<string, EventAccess> = new Map(), reader: Reader = miriam) {
+  const toast: ToastContextValue = { toasts: [], show: vi.fn(), dismiss: vi.fn() };
+
+  const tree = (current: Map<string, EventAccess>): ReactElement => {
+    const data = { access: current, events: [sunday] } as unknown as DataContextValue;
+    const auth = {
+      user: { uid: reader.profile.id },
+      profile: reader.profile,
+      can: reader.can,
+    } as unknown as AuthContextValue;
+
+    return (
+      <AuthContext.Provider value={auth}>
+        <DataContext.Provider value={data}>
+          <ToastContext.Provider value={toast}>
+            <AccessSheet open onClose={() => {}} event={sunday} now={NOW} />
+          </ToastContext.Provider>
+        </DataContext.Provider>
+      </AuthContext.Provider>
+    );
+  };
+
+  const rendered = render(tree(access));
+  return {
+    toast,
+    ...rendered,
+    /** The live access map changing under an open sheet. */
+    update: (next: Map<string, EventAccess>) => rendered.rerender(tree(next)),
+  };
+}
+
+/** An access document for Sunday School, closed or reopened. */
+function document(members: string[], restricted = true): Map<string, EventAccess> {
   return new Map<string, EventAccess>([
     [
       'sunday-school',
       {
         id: 'sunday-school',
         chainKey: 'sunday-school',
-        restricted: true,
-        members: new Set(['miriam', 'sam']),
+        restricted,
+        members: new Set(members),
         updatedAt: NOW,
         updatedBy: 'miriam',
       },
@@ -110,11 +132,32 @@ function restricted(): Map<string, EventAccess> {
   ]);
 }
 
+/** The gathering closed to Miriam and Sam. */
+const restricted = () => document(['miriam', 'sam']);
+
 const option = (name: string) => screen.getByRole('button', { name: new RegExp(name) });
+const tick = (name: string) => screen.getByRole('checkbox', { name: new RegExp(name) });
+
+/** The list the last `restrictChain` call was handed, and the members it saw at open. */
+function lastWrite() {
+  const call = restrictChain.mock.calls.at(-1) as unknown[] | undefined;
+  return {
+    chain: call?.[0],
+    members: call?.[1] as string[],
+    uid: call?.[2],
+    seenAtOpen: [...(call?.[3] as Iterable<string>)],
+  };
+}
+
+beforeEach(() => {
+  roster = team;
+});
 
 describe('which state looks like the current one', () => {
-  it('marks the live setting as pressed and leaves both options pressable', () => {
+  it('marks the live setting as pressed and leaves both options pressable', async () => {
     show();
+    // Once the preview has worked out what the press would do — see below.
+    await screen.findByText(/Would keep/);
 
     expect(option('Everyone on the team')).toHaveAttribute('aria-pressed', 'true');
     // The whole bug: "current" used to mean `disabled`, which reads as
@@ -144,14 +187,43 @@ describe('what the sheet says before it writes', () => {
     expect(screen.getByText('5 people can take attendance here.')).toBeInTheDocument();
   });
 
-  it('names who a restriction would keep, and how many would lose it', async () => {
+  it('cannot be pressed while it is still working out what the press would do', () => {
+    // The sentence is load-bearing, so pressing past it is not free.
+    recentRegisterTakers.mockImplementationOnce(() => new Promise(() => {}));
+    show();
+
+    expect(screen.getAllByText('Working out who has been taking attendance here…').length)
+      .toBeGreaterThan(0);
+    expect(option('Only people I add')).toBeDisabled();
+    expect(option('Everyone on the team')).toBeEnabled();
+  });
+
+  it('counts who a restriction would keep, and how many would lose it', async () => {
     show();
 
     // Read when the sheet opened, not when the switch is pressed — this is on
     // screen with nothing pressed.
     await waitFor(() => expect(recentRegisterTakers).toHaveBeenCalled());
-    await screen.findByText(/Would keep Dana, Miriam and Sam — 2 others would lose it\./);
+    // Dana and Sam took the register; Miriam is written regardless. Jo and
+    // Priya are the two who would lose it.
+    await screen.findByText(
+      /Would keep 3 people who have taken the register recently — 2 would lose it\./,
+    );
     expect(restrictChain).not.toHaveBeenCalled();
+  });
+
+  it('says when the registers could not be read, rather than posing as "nobody"', async () => {
+    recentRegisterTakers.mockRejectedValueOnce(new Error('refused'));
+    const user = userEvent.setup();
+    show();
+
+    await screen.findByText("Couldn't read recent registers — would keep just you");
+    expect(option('Only people I add')).toBeEnabled();
+
+    await user.click(option('Only people I add'));
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().members).toEqual([]);
+    expect(lastWrite().uid).toBe('miriam');
   });
 
   it('restricts to the people it named, and says how many that was', async () => {
@@ -161,18 +233,182 @@ describe('what the sheet says before it writes', () => {
     await screen.findByText(/Would keep/);
     await user.click(option('Only people I add'));
 
-    await waitFor(() =>
-      expect(restrictChain).toHaveBeenCalledWith(
-        'sunday-school',
-        // `planning-center` is not a person and is not on the list.
-        expect.arrayContaining(['sam', 'dana']),
-        'miriam',
-      ),
-    );
-    expect(restrictChain.mock.calls[0]![1]).toHaveLength(2);
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    // `planning-center` is not a person and is not on the list; nobody was on
+    // the document when the sheet opened.
+    expect(lastWrite().chain).toBe('sunday-school');
+    expect(lastWrite().members).toHaveLength(2);
+    expect(lastWrite().members).toEqual(expect.arrayContaining(['sam', 'dana']));
+    expect(lastWrite().uid).toBe('miriam');
+    expect(lastWrite().seenAtOpen).toEqual([]);
     expect(toast.show).toHaveBeenCalledWith('Sunday School is now limited to 3 people.', {
       tone: 'success',
     });
+  });
+});
+
+describe('the kept list, while the gathering is open', () => {
+  it('draws the register-takers as ticks, all on, and the reader as a fact', async () => {
+    show();
+    await screen.findByText(/Would keep/);
+
+    expect(screen.getByText('Kept when you narrow it')).toBeInTheDocument();
+    expect(tick('Dana Brooks')).toBeChecked();
+    expect(tick('Sam Okafor')).toBeChecked();
+    // Her row has no box: `restrictChain` adds the writer whatever the ticks
+    // say, so a box would be a control that does nothing.
+    expect(screen.queryByRole('checkbox', { name: /Miriam/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Miriam Achebe')).toBeInTheDocument();
+    expect(screen.getByText('You')).toBeInTheDocument();
+  });
+
+  it('names the option the sentence points at, rather than spelling it twice', async () => {
+    show();
+    await screen.findByText(/Would keep/);
+
+    expect(
+      screen.getByText(/nobody's access changes until you press/).textContent,
+    ).toContain('Only people I add');
+  });
+
+  it('leaves an unticked name off the list, and counts it as lost', async () => {
+    const user = userEvent.setup();
+    show();
+    await screen.findByText(/Would keep/);
+
+    await user.click(tick('Sam Okafor'));
+
+    expect(tick('Sam Okafor')).not.toBeChecked();
+    expect(
+      screen.getByText(
+        /Would keep 2 people who have taken the register recently — 3 would lose it\./,
+      ),
+    ).toBeInTheDocument();
+    // Nothing written yet: unticking is local until the press.
+    expect(restrictChain).not.toHaveBeenCalled();
+
+    await user.click(option('Only people I add'));
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().members).toEqual(['dana']);
+  });
+
+  it('writes the reader whatever the ticks say', async () => {
+    const user = userEvent.setup();
+    const { toast } = show();
+    await screen.findByText(/Would keep/);
+
+    await user.click(tick('Sam Okafor'));
+    await user.click(tick('Dana Brooks'));
+    await user.click(option('Only people I add'));
+
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().members).toEqual([]);
+    expect(lastWrite().uid).toBe('miriam');
+    expect(toast.show).toHaveBeenCalledWith('Sunday School is now limited to 1 person.', {
+      tone: 'success',
+    });
+  });
+
+  it('shows the kept list of a reopened gathering beside the register-takers', async () => {
+    const user = userEvent.setup();
+    // Narrowed once to Miriam and Jo, then reopened: the document is still there.
+    show(document(['miriam', 'jo'], false));
+
+    await screen.findByText(
+      /Would keep 2 people from last time and 2 people who have taken the register since — 1 would lose it\./,
+    );
+    expect(tick('Jo Whitfield')).toBeChecked();
+    expect(tick('Dana Brooks')).toBeChecked();
+    expect(tick('Sam Okafor')).toBeChecked();
+
+    await user.click(option('Only people I add'));
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().members).toHaveLength(3);
+    expect(lastWrite().members).toEqual(expect.arrayContaining(['jo', 'dana', 'sam']));
+    // What the sheet saw at open, so the write can tell an untick from a
+    // name it was never shown.
+    expect(lastWrite().seenAtOpen.sort()).toEqual(['jo', 'miriam']);
+  });
+
+  it('keeps somebody added while the sheet was open, and says so', async () => {
+    const user = userEvent.setup();
+    const { update } = show(document(['miriam', 'jo'], false));
+    await screen.findByText(/Would keep/);
+
+    // Priya, at the door, added by somebody else sixty seconds later.
+    update(document(['miriam', 'jo', 'priya'], false));
+
+    const row = tick('Priya Raman');
+    expect(row).toBeChecked();
+    // A fixed tick: the write keeps her whatever this box said, so the box
+    // does not pretend otherwise.
+    expect(row).toBeDisabled();
+    expect(screen.getByText('added just now')).toBeInTheDocument();
+    expect(screen.getByText(/Would keep 3 people from last time/)).toBeInTheDocument();
+
+    await user.click(option('Only people I add'));
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().seenAtOpen.sort()).toEqual(['jo', 'miriam']);
+  });
+});
+
+describe('suspended members', () => {
+  beforeEach(() => {
+    roster = team.map((member) => (member.id === 'sam' ? { ...member, active: false } : member));
+  });
+
+  it('are marked on the list, not hidden from it', () => {
+    show(restricted());
+
+    const row = screen.getByText('Sam Okafor').closest('li')!;
+    expect(within(row).getByText('Suspended')).toBeInTheDocument();
+  });
+
+  it('are left out of every count', () => {
+    show(restricted());
+
+    // Two on the list, one of whom cannot take attendance.
+    expect(
+      screen.getByText('1 person — everybody else sees it locked.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('4 people can take attendance here.')).toBeInTheDocument();
+  });
+});
+
+describe('a reader the gathering refuses', () => {
+  const jo: Reader = { profile: team[3]!, can: (role) => role === 'counselor' };
+
+  it('opens on who can add them, in full, with an admin whatever the list says', () => {
+    roster = team.map((member) =>
+      member.id === 'dana' ? { ...member, role: 'admin' as const } : member,
+    );
+    show(restricted(), jo);
+
+    expect(screen.getByText('Ask one of these to add you')).toBeInTheDocument();
+    // Full names and translated roles, core before counselor.
+    const names = screen.getAllByRole('listitem').map((item) => item.textContent);
+    expect(names[0]).toContain('Miriam Achebe');
+    expect(names[0]).toContain('Core team');
+    expect(names[1]).toContain('Sam Okafor');
+    expect(names[1]).toContain('Counselor');
+    expect(screen.getByText('or any admin: Dana Brooks')).toBeInTheDocument();
+    // No verbs: nothing to search, nothing to remove.
+    expect(screen.queryByLabelText('Add somebody')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Only people I add/ })).not.toBeInTheDocument();
+  });
+
+  it('never names a suspended member as the way in', () => {
+    roster = team.map((member) => (member.id === 'sam' ? { ...member, active: false } : member));
+    show(restricted(), jo);
+
+    expect(screen.getByText('Miriam Achebe')).toBeInTheDocument();
+    expect(screen.queryByText('Sam Okafor')).not.toBeInTheDocument();
+  });
+
+  it('says to find an admin when the list names nobody it can', () => {
+    show(document(['ghost']), jo);
+
+    expect(screen.getByText('Ask an admin to add you to this gathering.')).toBeInTheDocument();
   });
 });
 
@@ -198,15 +434,26 @@ describe('searching the team for somebody to add', () => {
     expect(screen.queryByText(/Nobody on the team matches/)).not.toBeInTheDocument();
   });
 
-  it('offers the people who are not on it yet', async () => {
+  it('offers the people who are not on it yet, with their role in words', async () => {
     const user = userEvent.setup();
     show(restricted());
 
     await user.type(screen.getByLabelText('Add somebody'), 'Jo');
 
-    await user.click(screen.getByRole('button', { name: /Jo Whitfield/ }));
+    const match = screen.getByRole('button', { name: /Jo Whitfield/ });
+    expect(match).toHaveTextContent('Counselor');
+    await user.click(match);
     await waitFor(() =>
       expect(addChainMembers).toHaveBeenCalledWith('sunday-school', ['jo'], 'miriam'),
     );
+  });
+
+  it('prints the role as a word on the list too, and marks the reader', () => {
+    show(restricted());
+
+    const row = screen.getByText('Miriam Achebe').closest('li')!;
+    expect(within(row).getByText('You')).toBeInTheDocument();
+    expect(within(row).getByText('Core team')).toBeInTheDocument();
+    expect(within(row).queryByText('core')).not.toBeInTheDocument();
   });
 });

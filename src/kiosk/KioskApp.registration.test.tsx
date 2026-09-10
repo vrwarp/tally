@@ -135,7 +135,9 @@ let refreshedStudents: KioskStudent[] = [];
 let refreshedLast4: Record<string, string[]> = {};
 
 const services = {
-  restoredUid: vi.fn(async () => 'staff-uid'),
+  restoredSession: vi.fn(async () => ({ uid: 'kiosk_kiosk-test-device', reason: null })),
+  reportStanding: vi.fn(async () => 'live' as const),
+  unpair: vi.fn(async () => {}),
   // Only reached if a test lets the kiosk fall back to the chooser, which is
   // the failure these tests are about — so it answers rather than throwing.
   listEvents: vi.fn(async () => []),

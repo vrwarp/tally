@@ -35,6 +35,7 @@ const firebaseSignOut = vi.hoisted(() => vi.fn(async () => undefined));
 const subscribeUserProfile = vi.hoisted(() => vi.fn());
 const getUserProfileFromServer = vi.hoisted(() => vi.fn());
 const touchLastSeen = vi.hoisted(() => vi.fn(async () => undefined));
+const provisionAccess = vi.hoisted(() => vi.fn());
 
 const browser = vi.hoisted(() => ({
   embedded: false,
@@ -77,6 +78,7 @@ vi.mock('@/services/users', () => ({
   getUserProfileFromServer,
   touchLastSeen,
 }));
+vi.mock('@/services/functions', () => ({ provisionAccess }));
 
 const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
 
@@ -160,6 +162,9 @@ beforeEach(() => {
   firebaseSignOut.mockReset().mockResolvedValue(undefined);
   getUserProfileFromServer.mockReset();
   touchLastSeen.mockReset().mockResolvedValue(undefined);
+  provisionAccess
+    .mockReset()
+    .mockResolvedValue({ data: { status: 'granted', role: 'core', message: 'Welcome back to Tally.' } });
 });
 
 afterEach(() => {
@@ -316,6 +321,79 @@ describe('the sign-in heartbeat', () => {
     await signedIn(makeProfile({ active: false }));
 
     expect(touchLastSeen).not.toHaveBeenCalled();
+  });
+});
+
+describe('the standing grant, re-asserted', () => {
+  /*
+   * `provisionAccess` is what makes the deployment's pinned addresses admins
+   * no matter what the database says, and the app used to ask it only from the
+   * refusal screen — so a pinned admin demoted inside Tally stayed demoted
+   * until somebody switched them off entirely. Every sign-in that lands on an
+   * active profile now asks once.
+   */
+  it('asks once when an active profile arrives from the server', async () => {
+    await signedIn();
+
+    expect(provisionAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask again when the profile document changes', async () => {
+    // The grant rewrites the profile, and the listener sees the rewrite. A
+    // call per snapshot would be a write loop through the server.
+    await signedIn();
+
+    act(() => profileStream.deliver(makeProfile({ role: 'admin' }), { fromCache: false }));
+    act(() => profileStream.deliver(makeProfile({ role: 'core' }), { fromCache: false }));
+
+    expect(provisionAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask for an inactive profile, which is the holding screen\'s question', async () => {
+    await signedIn(makeProfile({ active: false }));
+
+    expect(provisionAccess).not.toHaveBeenCalled();
+  });
+
+  it('does not ask when there is no profile at all', async () => {
+    await signedIn(null);
+
+    expect(provisionAccess).not.toHaveBeenCalled();
+  });
+
+  it('does not take a cached profile for a sign-in', async () => {
+    mount();
+    act(() => announce({ uid: 'uid-miriam' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-miriam'));
+
+    act(() => profileStream.deliver(makeProfile(), { fromCache: true }));
+    expect(provisionAccess).not.toHaveBeenCalled();
+
+    act(() => profileStream.deliver(makeProfile(), { fromCache: false }));
+    expect(provisionAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for each person who signs in, not only the first', async () => {
+    await signedIn();
+    act(() => announce(null));
+
+    act(() => announce({ uid: 'uid-dana' }));
+    await waitFor(() => expect(profileStream.uid).toBe('uid-dana'));
+    act(() => profileStream.deliver(makeProfile({ id: 'uid-dana' }), { fromCache: false }));
+
+    expect(provisionAccess).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the session alone when the call fails', async () => {
+    provisionAccess.mockRejectedValue(new Error('offline'));
+
+    await signedIn();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(latest?.status).toBe('ready');
+    expect(latest?.error).toBeNull();
   });
 });
 

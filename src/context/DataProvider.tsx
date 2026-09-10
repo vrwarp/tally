@@ -256,7 +256,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     const fail = (label: DataStream) => (cause: Error) => {
-      const sentence = tErrors('couldNotLoadStream', { stream: label, reason: cause.message });
+      const said = tErrors('couldNotLoadStream', { stream: label, reason: cause.message });
+      /*
+       * One more sentence, once, for the one stream whose failure looks like
+       * nothing: `canWork` fails open when this collection cannot be read, so
+       * every gathering draws as the reader's and the first sign is a refused
+       * check-in. The sentence promises only what happens next — a leader can
+       * add them — and not an explanation nothing delivers.
+       */
+      const sentence = label === 'access' ? `${said} ${tErrors('accessStreamHint')}` : said;
       setStreamErrors((current) =>
         current[label] === sentence ? current : { ...current, [label]: sentence },
       );

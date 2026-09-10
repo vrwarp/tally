@@ -415,3 +415,67 @@ describe('the list the chooser narrows to', () => {
     expect(screen.getByText(/Nothing on today/)).toBeInTheDocument();
   });
 });
+
+describe('the gatherings the pairer does not work', () => {
+  const services = (events: KioskEventEntry[]) =>
+    ({
+      listEvents: vi.fn(async () => events),
+      bindEntry: vi.fn(async (entry: KioskEventEntry) => bindingFor(entry)),
+    }) as unknown as KioskServices;
+
+  it('draws them below a divider, still bindable', async () => {
+    const onBound = vi.fn();
+    render(
+      <EventChooser
+        services={services([
+          { ...NURSERY, yours: true },
+          { ...YOUTH, yours: false },
+        ])}
+        printerState={null}
+        onSetUpPrinter={vi.fn()}
+        onBound={onBound}
+      />,
+    );
+    await tick();
+
+    expect(screen.getByText('Not yours')).toBeInTheDocument();
+    // The divider sits between the two, not above the first.
+    const rows = screen.getAllByText(/Nursery|Youth group/);
+    expect(rows.map((row) => row.textContent)).toEqual(['Nursery', 'Youth group']);
+
+    // A kiosk stands in whichever room a leader points it at.
+    down(row('Youth group'));
+    up(row('Youth group'));
+    await tapButton(screen.getByText('Set kiosk').closest('button')!);
+    await tick();
+    expect(onBound).toHaveBeenCalledWith(expect.objectContaining({ title: 'Youth group' }));
+  });
+
+  it('draws no divider on a list that is all one kind, or from a server that does not say', async () => {
+    const { unmount } = render(
+      <EventChooser
+        services={services([
+          { ...NURSERY, yours: false },
+          { ...YOUTH, yours: false },
+        ])}
+        printerState={null}
+        onSetUpPrinter={vi.fn()}
+        onBound={vi.fn()}
+      />,
+    );
+    await tick();
+    expect(screen.queryByText('Not yours')).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <EventChooser
+        services={services([NURSERY, YOUTH])}
+        printerState={null}
+        onSetUpPrinter={vi.fn()}
+        onBound={vi.fn()}
+      />,
+    );
+    await tick();
+    expect(screen.queryByText('Not yours')).not.toBeInTheDocument();
+  });
+});
