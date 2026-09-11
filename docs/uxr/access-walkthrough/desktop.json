@@ -1,0 +1,96 @@
+{
+  "viewport": "desktop",
+  "shots": [
+    {
+      "journey": "The way in",
+      "title": "A link that no longer opens anything",
+      "caption": "Used, expired and never-existed are three different problems with three different next acts, so the screen says which one it is. This is the third: a link that came through a message cut in half.",
+      "file": "desktop-01-a-link-that-no-longer-opens-anything.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "The Team screen",
+      "caption": "Who is already here, and who is on their way. The invite card offers two doors: a link for the volunteer whose Google account nobody knows, and an address for the one the church issued.",
+      "file": "desktop-02-the-team-screen.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "Naming who a link is for",
+      "caption": "Required, because a link row has no address to name it — and eight anonymous rows on a Tuesday is how a season roll goes back into a spreadsheet.",
+      "file": "desktop-03-naming-who-a-link-is-for.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "The link, shown once",
+      "caption": "Tally keeps only the hash, so this is the only time it can show the link. Copy, Share, or hold up a QR for the person standing beside you.",
+      "file": "desktop-04-the-link-shown-once.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "What the link opens",
+      "caption": "Jo, signed out, on her own phone. The name of the person who invited her and the gathering it is for, before anything asks her for an account — being asked to sign in first is how a volunteer decides a link is phishing, and they are right to.",
+      "file": "desktop-05-what-the-link-opens.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "The QR, for the person in the room",
+      "caption": "Ten minutes, because its whole safety property is that both people are there. A photograph of it taken over somebody’s shoulder is worth nothing by lunchtime.",
+      "file": "desktop-06-the-qr-for-the-person-in-the-room.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "Bringing somebody in",
+      "title": "Who is on their way, and what is still to do",
+      "caption": "A link says when it stops working and offers Extend. An arrival says who spent it. A gathering the redemption could not add them to waits here until somebody resolves it — the only place that fact is ever said.",
+      "file": "desktop-07-who-is-on-their-way-and-what-is-still-to-do.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The person",
+      "title": "A person, gathered in one place",
+      "caption": "Role, when they were let in and by whom, the gatherings they are on, the kiosks they paired. The 9:22 rescue is here: Team → Sam → Nursery → Add, on a phone.",
+      "file": "desktop-08-a-person-gathered-in-one-place.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The person",
+      "title": "Ending somebody’s access",
+      "caption": "The toggle arms rather than writes, and the sentence is computed rather than generic: which gatherings they are on, and whether they are the last person left on any of them. A confirmation that only asked \"are you sure\" would be answered yes.",
+      "file": "desktop-09-ending-somebody-s-access.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The fence",
+      "title": "Tonight’s gatherings, and the ones that are not yours",
+      "caption": "Locked, not hidden. A counselor at a door at 6:59 who sees an empty screen concludes the app is broken; one who sees a lock and a name knows what to do.",
+      "file": "desktop-10-tonight-s-gatherings-and-the-ones-that-are-not-yours.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The fence",
+      "title": "A gathering you are not on",
+      "caption": "Full names, whoever opened Tally today first, and an admin unconditionally — the person the list names may have been on leave since June. Under them, one button, which puts your name on the Add list and never claims to be a queue.",
+      "file": "desktop-11-a-gathering-you-are-not-on.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The fence",
+      "title": "The roster, and who is on it",
+      "caption": "The chip says how many people can work this gathering. The dot beside it says somebody is asking to be added — eight pixels, no word, no target of its own, because a strip above the first row would push every name under a descending thumb.",
+      "file": "desktop-12-the-roster-and-who-is-on-it.png",
+      "viewport": "desktop"
+    },
+    {
+      "journey": "The fence",
+      "title": "Who’s on, and who is asking",
+      "caption": "The sheet leads with the ask, because it is the only thing here that is somebody’s to do. Add puts them on; Clear says it was answered — and marks it, so the person who asked can tell that from nobody having looked.",
+      "file": "desktop-13-who-s-on-and-who-is-asking.png",
+      "viewport": "desktop"
+    }
+  ]
+}

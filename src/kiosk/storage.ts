@@ -7,6 +7,7 @@
  * throws on a corrupt cache entry is a kiosk somebody has to drive out and
  * reboot.
  */
+import { isDeviceId } from '@/lib/kioskDevice';
 import { asGrade } from '@/types';
 import type { KioskStudent } from './search';
 
@@ -30,6 +31,16 @@ export const KIOSK_KEYS = {
   pulse: 'tally:kiosk:pulse',
   pending: 'tally:kiosk:pending',
   pairing: 'tally:kiosk:pairing',
+  /**
+   * Who this device is, to the server: the id its session is minted for.
+   *
+   * Minted once by the kiosk and kept for the life of the storage container.
+   * It is the key of the device row `claimKioskToken` writes, which is the
+   * kiosk's standing in the rules — so a wiped tablet is a new kiosk, which is
+   * the honest answer, and an installed copy of a browser-paired one is too
+   * (see `install.ts`).
+   */
+  deviceId: 'tally:kiosk:deviceId',
   /**
    * The label printer attached to *this* device: model and loaded media.
    *
@@ -90,6 +101,44 @@ export function removeKey(key: string): void {
   } catch {
     // Same posture as writeJson.
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The device id                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * This kiosk's own id — read off the disk, or minted now and kept.
+ *
+ * Minted here rather than by the server so that a device has its id *before*
+ * it has a session: the pairing claim sends it up, and the uid the token is
+ * minted for is derived from it. The shape is `kiosk-` and 24 hex characters,
+ * which `DEVICE_ID_PATTERN` admits with room to spare; anything on the disk
+ * that does not fit the pattern is treated as absent rather than sent, since
+ * it is about to become a document path.
+ *
+ * Kept for the life of the storage container. A wiped tablet is a new kiosk —
+ * the honest answer — and so is an installed copy of a browser-paired one,
+ * which is why `install.ts` asks for the install before the pairing.
+ */
+export function ensureDeviceId(): string {
+  const held = readJson<unknown>(KIOSK_KEYS.deviceId);
+  if (isDeviceId(held)) return held;
+  const minted = mintDeviceId();
+  writeJson(KIOSK_KEYS.deviceId, minted);
+  return minted;
+}
+
+function mintDeviceId(): string {
+  const bytes = new Uint8Array(12);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    // No WebCrypto — an old WebView. Uniqueness is all the id needs, not
+    // secrecy: the secret in the pairing handshake is a separate thing.
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return `kiosk-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /* -------------------------------------------------------------------------- */

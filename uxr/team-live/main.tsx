@@ -14,10 +14,12 @@
  *   ?users=N            how many profiles exist   (default all eleven)
  *   ?invites=N          how many are waiting      (default four)
  */
-import { createRoot } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
-import '@/index.css';
-import { TeamPage } from '@/features/team/TeamPage';
+import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
+import { IntlProvider } from "use-intl";
+import "@/index.css";
+import { TeamPage } from "@/features/team/TeamPage";
+import messages from "../../messages/en.json";
 
 /*
  * The app frame, minus everything on it that needs Firebase.
@@ -30,78 +32,94 @@ import { TeamPage } from '@/features/team/TeamPage';
  * same story vertically: they are what a phone frame's fold is measured
  * against.
  */
-createRoot(document.getElementById('root')!).render(
-  <MemoryRouter>
-    <div data-rail="" className="group/shell flex min-h-dvh flex-col bg-ink-950 lg:flex-row">
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:self-start lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
-        <span className="px-2 pb-4 text-sm font-bold uppercase tracking-widest text-brand-400">
-          Tally
-        </span>
-        <nav className="flex min-h-0 flex-col gap-1 overflow-y-auto">
-          {[
-            ['✓', 'Check in'],
-            ['◎', 'Insights'],
-            ['▤', 'Events'],
-            ['☰', 'Students'],
-            ['▣', 'Review'],
-          ].map(([icon, label]) => (
-            <span
-              key={label}
-              className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400"
-            >
-              <span aria-hidden="true" className="text-base leading-none">
-                {icon}
-              </span>
-              {label}
-            </span>
-          ))}
-        </nav>
-        <div className="mt-auto pt-4">
-          <span className="flex w-full items-center gap-2 rounded-xl bg-ink-900 px-3 py-2 text-xs text-ink-300 ring-1 ring-ink-800">
-            <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
-              D
-            </span>
-            <span className="flex-1 truncate text-left">Dana Ruiz</span>
+/*
+ * The catalogue, straight from the file the app ships.
+ *
+ * Not decoration either: every string on this screen comes through `use-intl`,
+ * so without a provider the page throws on its first `useTranslations` — and
+ * the whole point of freezing the real component is that the words the critics
+ * read are the words that ship. `America/Los_Angeles` matches `uxr/shoot.ts`,
+ * so "last seen 3 days ago" resolves the same way in every frame of the loop.
+ */
+createRoot(document.getElementById("root")!).render(
+  <IntlProvider locale="en" messages={messages} timeZone="America/Los_Angeles">
+    <MemoryRouter>
+      <div
+        data-rail=""
+        className="group/shell flex min-h-dvh flex-col bg-ink-950 lg:flex-row"
+      >
+        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:self-start lg:border-r lg:border-ink-800 lg:px-3 lg:py-4">
+          <span className="px-2 pb-4 text-sm font-bold uppercase tracking-widest text-brand-400">
+            Tally
           </span>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur lg:hidden">
-          <span className="text-sm font-bold uppercase tracking-widest text-brand-400">Tally</span>
-          <span className="flex items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800">
-            <span className="max-w-32 truncate">Dana Ruiz</span>
-            <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
-              D
-            </span>
-          </span>
-        </header>
-
-        <main className="flex-1 pb-24 lg:pb-8">
-          <TeamPage />
-        </main>
-
-        <nav className="sticky bottom-0 z-30 border-t border-ink-800 bg-ink-950/95 pb-safe backdrop-blur lg:hidden">
-          <ul className="mx-auto flex max-w-lg">
+          <nav className="flex min-h-0 flex-col gap-1 overflow-y-auto">
             {[
-              ['✓', 'Check in'],
-              ['◎', 'Insights'],
-              ['▤', 'Events'],
-              ['☰', 'Students'],
-              ['▣', 'Review'],
+              ["✓", "Check in"],
+              ["◎", "Insights"],
+              ["▤", "Events"],
+              ["☰", "Students"],
+              ["▣", "Review"],
             ].map(([icon, label]) => (
-              <li key={label} className="flex-1">
-                <span className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500">
-                  <span aria-hidden="true" className="text-base leading-none">
-                    {icon}
-                  </span>
-                  {label}
+              <span
+                key={label}
+                className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-400"
+              >
+                <span aria-hidden="true" className="text-base leading-none">
+                  {icon}
                 </span>
-              </li>
+                {label}
+              </span>
             ))}
-          </ul>
-        </nav>
+          </nav>
+          <div className="mt-auto pt-4">
+            <span className="flex w-full items-center gap-2 rounded-xl bg-ink-900 px-3 py-2 text-xs text-ink-300 ring-1 ring-ink-800">
+              <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+                D
+              </span>
+              <span className="flex-1 truncate text-left">Dana Ruiz</span>
+            </span>
+          </div>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-ink-800 bg-ink-950/95 px-4 py-2 pt-safe backdrop-blur lg:hidden">
+            <span className="text-sm font-bold uppercase tracking-widest text-brand-400">
+              Tally
+            </span>
+            <span className="flex items-center gap-2 rounded-full bg-ink-900 py-1 pl-3 pr-1 text-xs text-ink-300 ring-1 ring-ink-800">
+              <span className="max-w-32 truncate">Dana Ruiz</span>
+              <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">
+                D
+              </span>
+            </span>
+          </header>
+
+          <main className="flex-1 pb-24 lg:pb-8">
+            <TeamPage />
+          </main>
+
+          <nav className="sticky bottom-0 z-30 border-t border-ink-800 bg-ink-950/95 pb-safe backdrop-blur lg:hidden">
+            <ul className="mx-auto flex max-w-lg">
+              {[
+                ["✓", "Check in"],
+                ["◎", "Insights"],
+                ["▤", "Events"],
+                ["☰", "Students"],
+                ["▣", "Review"],
+              ].map(([icon, label]) => (
+                <li key={label} className="flex-1">
+                  <span className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-ink-500">
+                    <span aria-hidden="true" className="text-base leading-none">
+                      {icon}
+                    </span>
+                    {label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
       </div>
-    </div>
-  </MemoryRouter>,
+    </MemoryRouter>
+  </IntlProvider>,
 );

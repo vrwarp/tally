@@ -63,7 +63,9 @@ function binding(): KioskBinding {
 }
 
 const services = {
-  restoredUid: vi.fn(async () => 'staff-uid'),
+  restoredSession: vi.fn(async () => ({ uid: 'kiosk_kiosk-test-device', reason: null })),
+  reportStanding: vi.fn(async () => 'live' as const),
+  unpair: vi.fn(async () => {}),
   // Reached only once the gate has fired and the kiosk is back on the chooser.
   listEvents: vi.fn(async () => []),
   loadRoster: vi.fn(async () => [ADA]),

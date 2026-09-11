@@ -44,6 +44,8 @@ export const SHARED_FILES = [
   'registrationFields.ts',
   'participation.ts',
   'eventAccess.ts',
+  'kioskDevice.ts',
+  'emailKey.ts',
 ];
 
 const BANNER = `/*

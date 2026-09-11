@@ -2,12 +2,20 @@
  * Who may work each gathering, and how that list is edited without two phones
  * undoing each other.
  *
- * Every write here except the one that creates the document is a Firestore
+ * Every write here except the one that closes a gathering is a Firestore
  * transform — `arrayUnion`, `arrayRemove` — and that is the claim most worth
  * pinning. Two people plausibly hold this sheet at once: Miriam trimming the
  * list on the event page while Priya adds a volunteer at the door. A wholesale
  * rewrite of `members` means whichever phone saves second silently undoes the
  * other, and nobody sees it happen.
+ *
+ * The one that closes a gathering, `restrictChain`, is the write that cannot
+ * be a transform — the person may have unticked somebody, and a union would put
+ * them back — so it is a transaction, and the claim pinned here is the one that
+ * matters: it reads the document first and never erases anybody it was not
+ * shown. It used to be a merged `setDoc`, and a merge replaces an array
+ * wholesale, so re-closing a reopened gathering silently threw away the kept
+ * list. That is the bug these tests exist to keep dead.
  *
  * The other half is `recentRegisterTakers`, which is the safety net under the
  * one mistake this feature makes easiest: restricting *Friday Fellowship*, the
@@ -29,10 +37,35 @@ import {
 } from '@/services/eventAccess';
 import type { EventAccess } from '@/types';
 
-const setDoc = vi.hoisted(() => vi.fn(async () => {}));
 const updateDoc = vi.hoisted(() => vi.fn(async () => {}));
 const onSnapshot = vi.hoisted(() => vi.fn(() => () => {}));
 const fetchAttendance = vi.hoisted(() => vi.fn());
+
+/**
+ * The transaction, as the three calls `restrictChain` makes on it.
+ *
+ * `stored` is what the document holds when the transaction reads it —
+ * `undefined` for a gathering nobody has restricted before. The fake runs the
+ * body once and records what it wrote; there is no retry, because the claims
+ * here are about what is written, not about contention.
+ */
+const transaction = vi.hoisted(() => ({
+  stored: undefined as Record<string, unknown> | undefined,
+  set: vi.fn(),
+  update: vi.fn(),
+}));
+const runTransaction = vi.hoisted(() =>
+  vi.fn(async (_db: unknown, body: (tx: unknown) => Promise<void>) => {
+    await body({
+      get: async () => ({
+        exists: () => transaction.stored !== undefined,
+        data: () => transaction.stored,
+      }),
+      set: transaction.set,
+      update: transaction.update,
+    });
+  }),
+);
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('@/services/attendance', () => ({ fetchAttendance }));
@@ -47,7 +80,7 @@ vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, path: string) => ({ path }),
   onSnapshot,
   serverTimestamp: () => 'server-timestamp',
-  setDoc,
+  runTransaction,
   updateDoc,
   arrayUnion: (...values: string[]) => ({ union: values }),
   arrayRemove: (...values: string[]) => ({ remove: values }),
@@ -67,15 +100,25 @@ function published(docs: { id: string; data: Record<string, unknown> | undefined
   return held;
 }
 
-function written() {
-  const call = setDoc.mock.calls.at(-1) as unknown[] | undefined;
+/** What the transaction created, when it created rather than updated. */
+function created() {
+  const call = transaction.set.mock.calls.at(-1) as unknown[] | undefined;
   const ref = call?.[0];
   const data = call?.[1];
-  const options = call?.[2];
   return {
     path: (ref as { path: string } | undefined)?.path,
     data: data as Record<string, unknown>,
-    options: options as Record<string, unknown>,
+  };
+}
+
+/** What the transaction wrote over a document that already existed. */
+function amended() {
+  const call = transaction.update.mock.calls.at(-1) as unknown[] | undefined;
+  const ref = call?.[0];
+  const data = call?.[1];
+  return {
+    path: (ref as { path: string } | undefined)?.path,
+    data: data as Record<string, unknown>,
   };
 }
 
@@ -90,7 +133,10 @@ function updated() {
 }
 
 beforeEach(() => {
-  setDoc.mockClear();
+  transaction.stored = undefined;
+  transaction.set.mockClear();
+  transaction.update.mockClear();
+  runTransaction.mockClear();
   updateDoc.mockClear();
   onSnapshot.mockClear();
   fetchAttendance.mockReset();
@@ -245,8 +291,8 @@ describe('restrictChain', () => {
   it('writes the document that closes a gathering', async () => {
     await restrictChain('friday-fellowship', ['uid-priya'], 'uid-miriam');
 
-    expect(written().path).toBe('eventAccess/friday-fellowship');
-    expect(written().data).toMatchObject({
+    expect(created().path).toBe('eventAccess/friday-fellowship');
+    expect(created().data).toMatchObject({
       chainKey: 'friday-fellowship',
       restricted: true,
       updatedAt: 'server-timestamp',
@@ -259,19 +305,75 @@ describe('restrictChain', () => {
     // nobody below an admin could then reopen it.
     await restrictChain('friday', ['uid-priya'], 'uid-miriam');
 
-    expect(written().data.members).toEqual(['uid-priya', 'uid-miriam']);
+    expect(created().data.members).toEqual(['uid-priya', 'uid-miriam']);
   });
 
   it('does not name them twice when they were already on it', async () => {
     await restrictChain('friday', ['uid-priya', 'uid-miriam'], 'uid-miriam');
 
-    expect(written().data.members).toEqual(['uid-priya', 'uid-miriam']);
+    expect(created().data.members).toEqual(['uid-priya', 'uid-miriam']);
   });
 
-  it('merges, so closing a gathering again does not lose an earlier round', async () => {
+  it('runs as a transaction that reads the document before writing it', async () => {
     await restrictChain('friday', ['uid-priya'], 'uid-miriam');
 
-    expect(written().options).toEqual({ merge: true });
+    expect(runTransaction).toHaveBeenCalledTimes(1);
+    // A gathering nobody has restricted before is written whole, as chosen.
+    expect(transaction.set).toHaveBeenCalledTimes(1);
+    expect(transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('closes a reopened gathering with an update, not a fresh document', async () => {
+    transaction.stored = { chainKey: 'friday', restricted: false, members: ['uid-priya'] };
+
+    await restrictChain('friday', ['uid-priya'], 'uid-miriam', ['uid-priya']);
+
+    expect(transaction.set).not.toHaveBeenCalled();
+    expect(amended().path).toBe('eventAccess/friday');
+    expect(amended().data).toEqual({
+      restricted: true,
+      members: ['uid-priya', 'uid-miriam'],
+      updatedAt: 'server-timestamp',
+      updatedBy: 'uid-miriam',
+    });
+  });
+
+  it('keeps whoever was added while the sheet was open', async () => {
+    // Priya added Jo at the door sixty seconds ago; Miriam's sheet, opened
+    // before that, never showed Jo. A Tuesday decision must not erase her.
+    transaction.stored = { restricted: false, members: ['uid-priya', 'uid-jo'] };
+
+    await restrictChain('friday', ['uid-priya'], 'uid-miriam', ['uid-priya']);
+
+    expect(amended().data.members).toEqual(['uid-priya', 'uid-miriam', 'uid-jo']);
+  });
+
+  it('lets a deliberate untick stand', async () => {
+    // Sam was on the kept list when the sheet opened and Miriam unticked him.
+    // He was seen, so leaving him off is the trim she asked for.
+    transaction.stored = { restricted: false, members: ['uid-priya', 'uid-sam'] };
+
+    await restrictChain('friday', ['uid-priya'], 'uid-miriam', ['uid-priya', 'uid-sam']);
+
+    expect(amended().data.members).toEqual(['uid-priya', 'uid-miriam']);
+  });
+
+  it('keeps everybody on a document the sheet never saw at all', async () => {
+    // Opened on an open gathering with no document; somebody else restricted
+    // it in the meantime. Nothing in `seenAtOpen`, so every name is kept.
+    transaction.stored = { restricted: true, members: ['uid-dana'] };
+
+    await restrictChain('friday', ['uid-priya'], 'uid-miriam');
+
+    expect(amended().data.members).toEqual(['uid-priya', 'uid-miriam', 'uid-dana']);
+  });
+
+  it('ignores a stored list that is not a list of uids', async () => {
+    transaction.stored = { restricted: false, members: ['uid-jo', 42, null] };
+
+    await restrictChain('friday', [], 'uid-miriam');
+
+    expect(amended().data.members).toEqual(['uid-miriam', 'uid-jo']);
   });
 });
 

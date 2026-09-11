@@ -44,6 +44,17 @@ export interface KioskEventEntry {
   predictsFrom: string | null;
   /** The document id, or null for a projected occurrence nothing stands for. */
   id: string | null;
+  /**
+   * Whether the person who paired this kiosk works this gathering.
+   *
+   * A kiosk holds its own identity and may be bound to any room, so the
+   * chooser offers everything — but a greeter binding the nursery tablet on
+   * a Sunday with three things on should find the nursery as the answer and
+   * the youth night below a divider, in the grammar the app's own chooser
+   * uses. Set by the callable from the approver's chain access; absent when
+   * the caller is not a kiosk.
+   */
+  yours?: boolean;
   title: string;
   startAt: number;
   endAt: number;

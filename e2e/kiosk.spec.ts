@@ -27,6 +27,13 @@ import {
   typeOnKiosk,
 } from './support/kiosk';
 
+/**
+ * `PULSE_DEBOUNCE_MS` from `functions/src/kiosk/pulse.ts`, restated rather than
+ * imported: this file runs against the built functions in an emulator, not
+ * against their source, and the e2e project does not compile `functions/`.
+ */
+const PULSE_DEBOUNCE_MS = 30_000;
+
 /** A seeded gathering by title, with its document id. */
 async function eventNamed(title: string): Promise<{ id: string; title: string }> {
   const events = await readCollection('events');
@@ -128,8 +135,8 @@ test.describe('the kiosk', () => {
       await kiosk.getByRole('button', { name: /^Check in$/ }).click();
       await expect(kiosk.getByText(/welcome/i)).toBeVisible();
 
-      // Written by the kiosk, under the approver's uid, and marked as such —
-      // `method: 'kiosk'` is what tells a lobby tap from a counselor's.
+      // Written by the kiosk, under its own `kiosk_<deviceId>` uid, and marked
+      // as such — `method: 'kiosk'` is what tells a lobby tap from a counselor's.
       await firestore.until(
         `events/${nursery.id}/attendance`,
         (docs) => docs.some((doc) => doc.data.method === 'kiosk'),
@@ -343,6 +350,36 @@ test.describe('the kiosk', () => {
         return held?.rev ?? 0;
       };
       const before = await rosterRev();
+
+      /*
+       * Wait out the trigger's debounce before writing, or this asserts
+       * something the product does not promise.
+       *
+       * `onStudentCreated` bumps the roster channel with
+       * `debounceMs: PULSE_DEBOUNCE_MS` (30s, `functions/src/kiosk/pulse.ts`):
+       * if the channel was already marked changed inside that window it skips
+       * the write, because every kiosk is going to refetch on the *existing*
+       * rev anyway and a list import must not cost four hundred pulse writes.
+       * So a strictly-greater rev is only owed when the channel is stale — and
+       * whether it is depends on whatever ran before this test. Earlier specs
+       * in this file rebuild the phone index, which bumps `roster` with no
+       * debounce at all, and that is what made this pass alone and fail in the
+       * file.
+       *
+       * Usually zero. When it is not, it is the honest wait.
+       */
+      const rosterMarkedAt = async (): Promise<Date | null> => {
+        const docs = await firestore.collection('kioskIndex');
+        const held = docs.find((doc) => doc.id === 'pulse')?.data.roster as
+          | { at?: string }
+          | undefined;
+        return held?.at ? new Date(held.at) : null;
+      };
+      const markedAt = await rosterMarkedAt();
+      if (markedAt) {
+        const remaining = PULSE_DEBOUNCE_MS - (Date.now() - markedAt.getTime());
+        if (remaining > 0) await page.waitForTimeout(remaining + 500);
+      }
 
       const now = new Date();
       await writeDocument(`students/${studentId}`, {

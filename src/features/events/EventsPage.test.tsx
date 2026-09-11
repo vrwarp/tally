@@ -142,6 +142,48 @@ function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
   return render(tree);
 }
 
+describe('what an admin can see that nobody else needs to', () => {
+  const FRIDAY = 'friday-fellowship';
+
+  /*
+   * An admin passes every fence, so a narrowed gathering looked exactly like an
+   * open one on their calendar — and the one person who can fix a fence was the
+   * one person who could not see it. Everybody else already learns it the way
+   * the app has always said it, under "Not yours", so the tag is theirs alone.
+   */
+  it('tags a narrowed gathering with how many people are on it', async () => {
+    show(
+      [event({ id: 'next-friday', title: 'Friday Fellowship', seriesId: FRIDAY, startAt: at(31, 19), endAt: at(31, 21) })],
+      {
+        admin: true,
+        access: new Map([[FRIDAY, restricted(FRIDAY, ['miriam', 'dana'])]]),
+      },
+    );
+    await settle();
+
+    expect(screen.getByText('🔒 narrowed · 2')).toBeInTheDocument();
+  });
+
+  it('says nothing of the kind to anybody else', async () => {
+    show(
+      [event({ id: 'next-friday', title: 'Friday Fellowship', seriesId: FRIDAY, startAt: at(31, 19), endAt: at(31, 21) })],
+      { access: new Map([[FRIDAY, restricted(FRIDAY, ['miriam', 'dana'])]]) },
+    );
+    await settle();
+
+    expect(screen.queryByText(/narrowed/)).not.toBeInTheDocument();
+  });
+
+  it('tags nothing on a gathering nobody has narrowed', async () => {
+    show([event({ id: 'next-friday', title: 'Friday Fellowship', seriesId: FRIDAY, startAt: at(31, 19), endAt: at(31, 21) })], {
+      admin: true,
+    });
+    await settle();
+
+    expect(screen.queryByText(/narrowed/)).not.toBeInTheDocument();
+  });
+});
+
 /** The `<section>` a heading names, so assertions can be scoped to one band. */
 function band(name: RegExp) {
   return screen.getByRole('region', { name });
@@ -407,8 +449,10 @@ describe('a gathering somebody else owns', () => {
 
     const notice = screen.getByRole('region', { name: /you are not on/i });
     expect(within(notice).getByText(/you are not on friday fellowship/i)).toBeInTheDocument();
-    // The move the reader actually has. `approvers()` ranks admins first.
-    expect(within(notice).getByText('Miriam or Dana can add you')).toBeInTheDocument();
+    // The move the reader actually has. `approvers()` ranks whoever opened
+    // Tally today first, then core, then admins — the person likeliest to be
+    // in the building before the person likeliest to be on the list.
+    expect(within(notice).getByText('Dana or Miriam can add you')).toBeInTheDocument();
 
     await settle();
   });

@@ -54,6 +54,21 @@ export default tseslint.config(
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      /*
+       * A `/* … *\/` in JSX *children* position is not a comment — it is text,
+       * and React renders it. It shipped once: twelve lines of rationale about
+       * why a locked gathering row deserves a chevron were drawn on the screen
+       * a stranded volunteer lands on, in a rail whose whole job is to say who
+       * can add them. The comment has to be `{/* … *\/}` there.
+       */
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXText[value=/\\/\\*/]',
+          message:
+            'A block comment in JSX children renders as text. Wrap it as {/* … */}.',
+        },
+      ],
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },

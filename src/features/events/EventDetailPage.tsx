@@ -83,6 +83,7 @@ export function EventDetailPage() {
   const time = useTimeFormats();
   const grades = useGrades();
   const t = useTranslations('EventDetail');
+  const tEvents = useTranslations('Events');
   const recurrenceStrings = useRecurrenceStrings();
   const { eventId } = useParams();
   const { events, series, students, loading, canWork, access, rosterBackends } = useData();
@@ -171,7 +172,7 @@ export function EventDetailPage() {
    * with an empty register underneath it presented as fact.
    */
   if (locked) {
-    return <LockedGathering event={event} now={now} backTo="/events" backLabel="Events" />;
+    return <LockedGathering event={event} now={now} backTo="/events" backLabel={tEvents('title')} />;
   }
 
   const accessList = access.get(chainKey(event));

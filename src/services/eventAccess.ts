@@ -17,9 +17,13 @@
  * phone saves second silently undoes the other. The rules cannot express
  * "transform only", so they check the shape and leave the atomicity here.
  *
- * The one write that is not a transform is `restrictChain`, which creates the
- * document. There is nothing to clobber when the document does not exist yet,
- * and the initial list is a deliberate choice the person just made on screen.
+ * The one write that is not a transform is `restrictChain`. It used to be a
+ * merged `setDoc`, on the theory that it only ever created the document — but
+ * a merge replaces an array field wholesale, and the document does exist the
+ * second time round: a gathering that was narrowed in March, reopened for the
+ * summer and narrowed again in September. So it runs as a transaction instead,
+ * which reads what is there and unions rather than overwrites; see the
+ * function for what exactly it keeps.
  */
 import {
   arrayRemove,
@@ -27,8 +31,8 @@ import {
   collection,
   doc,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
-  setDoc,
   updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -129,33 +133,75 @@ export async function recentRegisterTakers(
 }
 
 /**
- * Closes a gathering to everybody but `members`.
+ * Closes a gathering to everybody but `members` — and never erases anybody.
  *
  * `members` must include the caller — the rules refuse a write that closes a
- * door from outside it, because nobody below an admin could then reopen it.
- * The UI pre-fills this list from whoever has recently taken the register, so
- * the default outcome of a mis-tap is "no change" rather than "the ministry is
- * locked out of Friday".
+ * door from outside it, because nobody below an admin could then reopen it —
+ * so the caller is added here whatever the list says. The UI pre-fills the
+ * list from whoever has recently taken the register and lets the person trim
+ * it before the press, so the default outcome of a mis-tap is "no change"
+ * rather than "the ministry is locked out of Friday".
+ *
+ * ## Why a transaction, and what `seenAtOpen` is for
+ *
+ * The list is a decision made on a sheet that has been open for a while, over
+ * a document other phones can still write to. The sheet shows the kept list
+ * and the ticks the person is trimming — but the volunteer Priya added at the
+ * door sixty seconds ago, after the sheet last drew, is on the document and
+ * not on the screen, and a write that replaced `members` with what was on the
+ * screen would erase her without anybody seeing it happen. That is the one
+ * case `arrayUnion` cannot express either: the person may also have *unticked*
+ * somebody, which a union would put straight back.
+ *
+ * So the write reads the document first. Anybody on it who was not there when
+ * the sheet opened (`seenAtOpen`) was added by somebody else in the meantime,
+ * and is kept whatever the ticks say; anybody who *was* there and is unticked
+ * is a deliberate trim and stays off. A document that does not exist yet is
+ * written whole, exactly as chosen. The rules allow this shape — a core member
+ * on the chain may rewrite the list — and the transaction is what makes the
+ * decision made on a Tuesday unable to undo what happened at the door.
  */
 export async function restrictChain(
   chainKey: string,
   members: readonly string[],
   uid: string,
+  seenAtOpen: Iterable<string> = [],
 ): Promise<void> {
-  await setDoc(
-    doc(db, paths.eventAccess(chainKey)),
-    {
-      chainKey,
+  const ref = doc(db, paths.eventAccess(chainKey));
+  const seen = new Set(seenAtOpen);
+
+  await runTransaction(db, async (transaction) => {
+    const current = await transaction.get(ref);
+    // Order matters only for the reader of the document: the chosen list
+    // first, then the writer, then whoever arrived while the sheet was open.
+    const next = new Set([...members, uid]);
+
+    if (!current.exists()) {
+      transaction.set(ref, {
+        chainKey,
+        restricted: true,
+        members: [...next],
+        updatedAt: serverTimestamp(),
+        updatedBy: uid,
+      });
+      return;
+    }
+
+    const stored = current.data()?.members;
+    const live = Array.isArray(stored)
+      ? stored.filter((member): member is string => typeof member === 'string')
+      : [];
+    for (const member of live) {
+      if (!seen.has(member)) next.add(member);
+    }
+
+    transaction.update(ref, {
       restricted: true,
-      members: [...new Set([...members, uid])],
+      members: [...next],
       updatedAt: serverTimestamp(),
       updatedBy: uid,
-    },
-    // Merge, because the chain may have been restricted and reopened before:
-    // reopening keeps the list, and closing again should not lose whatever a
-    // previous round added.
-    { merge: true },
-  );
+    });
+  });
 }
 
 /**

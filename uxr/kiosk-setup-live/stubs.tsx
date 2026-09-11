@@ -40,6 +40,10 @@ const PROFILE: UserProfile = {
   pcoPersonId: null,
   createdAt: new Date(),
   lastSeenAt: new Date(),
+  // Nobody here has ever been suspended, which is the ordinary state of a
+  // profile and the one this screen is drawn against.
+  accessEndedAt: null,
+  accessRestoredAt: null,
 };
 
 const RANK: Record<Role, number> = { counselor: 0, core: 1, admin: 2 };

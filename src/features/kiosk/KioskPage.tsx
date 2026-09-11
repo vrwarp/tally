@@ -18,9 +18,10 @@
  * Who sees what:
  *
  * - **Anybody active** gets the code field, the reasons a paired kiosk might
- *   still be waiting, and the footnotes. The identity a kiosk inherits is the
- *   approver's own, and the person setting up the lobby screen on a Friday
- *   evening is usually a counselor.
+ *   still be waiting, and the footnotes. A kiosk gets an identity of its own
+ *   rather than the approver's, so approving asks nothing of the approver's
+ *   rank — and the person setting up the lobby screen on a Friday evening is
+ *   usually a counselor.
  * - **Core team** also gets the deployment's signing status and the phone-index
  *   rebuild. `getKioskStatus` is guarded by `requireCoreTeam` on the server, so
  *   asking as a counselor would be putting a question whose answer is known.

@@ -21,12 +21,14 @@ import {
   type RulesTestContext,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import { kioskUid } from '@/lib/kioskDevice';
 import { paths } from '@/lib/paths';
 import type {
   AppSettingsDoc,
   AttendanceRecordDoc,
   EventAccessDoc,
   InvitationDoc,
+  KioskDeviceDoc,
   PcoRuntimeConfigDoc,
   RsvpDoc,
   StudentDoc,
@@ -59,6 +61,22 @@ export const UID = {
   outsider: 'uid-outsider',
   /** Core, and deliberately not on the restricted chain either. */
   outsiderCore: 'uid-outsider-core',
+} as const;
+
+/**
+ * Paired lobby kiosks, by the device id each minted for itself.
+ *
+ * A kiosk's uid is `kioskUid(deviceId)` and its standing is its
+ * `kioskDevices/{deviceId}` row — see `src/lib/kioskDevice.ts`. `live` stands
+ * in the Friday lobby, bound to `ID.series`; `elsewhere` is bound to the
+ * locked Sunday gathering; `retired` was marked retired by core; `unknown`
+ * has a well-formed session and no row at all.
+ */
+export const DEVICE = {
+  live: 'kiosk-lobby-00000001',
+  elsewhere: 'kiosk-sunday-0000002',
+  retired: 'kiosk-drawer-0000003',
+  unknown: 'kiosk-never-00000004',
 } as const;
 
 export const ID = {
@@ -109,11 +127,26 @@ export function asAnonymous(env: RulesTestEnvironment): Firestore {
 }
 
 /**
- * A kiosk session: a real member's uid narrowed by the `kiosk: true` custom
- * claim the pairing flow mints. Same person, less allowed.
+ * A kiosk session from before kiosks had identities of their own: a real
+ * member's uid carrying `kiosk: true` and no device claim. The rules admit it
+ * nowhere now — the pairing flow mints `asKioskDevice` sessions — and the
+ * suite keeps it to say so.
  */
 export function asKiosk(env: RulesTestEnvironment, uid: string): Firestore {
   return firestoreOf(env.authenticatedContext(uid, { kiosk: true }));
+}
+
+/**
+ * A kiosk session as the pairing flow mints it: the kiosk's own uid, carrying
+ * `kiosk: true` and the device id. Whether it stands is the device row's say.
+ */
+export function asKioskDevice(
+  env: RulesTestEnvironment,
+  deviceId: string,
+  /** Overridable only to prove that a uid not minted for the device is nobody's. */
+  uid: string = kioskUid(deviceId),
+): Firestore {
+  return firestoreOf(env.authenticatedContext(uid, { kiosk: true, deviceId }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -292,6 +325,20 @@ export function invitationDoc(overrides: Partial<InvitationDoc> = {}): Invitatio
  * not exist: absence is how a gathering says it is open, and the rules refuse
  * to create a document that claims nothing.
  */
+export function kioskDeviceDoc(overrides: Partial<KioskDeviceDoc> = {}): KioskDeviceDoc {
+  return {
+    approvedBy: UID.counselor,
+    approvedByName: 'Casey Counselor',
+    pairedAt: T0,
+    lastSeenAt: null,
+    boundTo: 'Friday Fellowship',
+    boundChain: ID.series,
+    retiredAt: null,
+    retiredBy: null,
+    ...overrides,
+  };
+}
+
 export function eventAccessDoc(overrides: Partial<EventAccessDoc> = {}): EventAccessDoc {
   return {
     chainKey: ID.restrictedSeries,
@@ -367,6 +414,20 @@ export async function seedContent(env: RulesTestEnvironment): Promise<void> {
       rsvpDoc({ eventId: ID.restrictedEvent }),
     );
     await setDoc(doc(db, paths.eventAccess(ID.restrictedSeries)), eventAccessDoc());
+
+    /*
+     * The lobby kiosks. The row is the session's standing, so each one the
+     * kiosk tests reach for is seeded here rather than minted by a test.
+     */
+    await setDoc(doc(db, paths.kioskDevice(DEVICE.live)), kioskDeviceDoc());
+    await setDoc(
+      doc(db, paths.kioskDevice(DEVICE.elsewhere)),
+      kioskDeviceDoc({ boundTo: 'Sunday School', boundChain: ID.restrictedSeries }),
+    );
+    await setDoc(
+      doc(db, paths.kioskDevice(DEVICE.retired)),
+      kioskDeviceDoc({ retiredAt: T1, retiredBy: UID.core }),
+    );
   });
 }
 

@@ -27,6 +27,30 @@
  * That last clause is why the register read happens when the sheet *opens*
  * rather than when the switch is pressed. A number that arrives with the
  * confirmation is a receipt; the same number one press earlier is a decision.
+ * And it is why the switch cannot be pressed while the sentence still reads
+ * "Working out…": the sentence is load-bearing, and pressing past it should
+ * not be free.
+ *
+ * ## The kept list is on screen while the gathering is open
+ *
+ * A gathering that was narrowed in March and reopened for the summer still
+ * holds its list, and narrowing it again keeps that list — `restrictChain`
+ * unions rather than overwrites. That used not to be visible: the list about to
+ * be kept was on no screen while the gathering was open. So while it is open
+ * the sheet draws the kept list and the recent register-takers as ticks under
+ * one heading, and unticking is local: nothing is written until "Only people I
+ * add" is pressed, and that press is the single write. No per-name write ever
+ * happens on an open gathering — `writerStays()` in the rules would refuse a
+ * Remove for exactly the core member trimming a March list she is not on.
+ *
+ * Two things the ticks must not imply. The reader's own row is a fact, not a
+ * tick: the rules require the writer on the list and `restrictChain` adds her
+ * regardless, so her row is drawn fixed and the preview counts what will
+ * actually be written. And somebody added to the document while the sheet is
+ * open — Priya, at the door, sixty seconds ago — is kept whatever the ticks say,
+ * because the write reads the document first and unions anybody it was not
+ * shown; the sheet, already subscribed, draws that person as a ticked row with
+ * a note rather than pretending the tick could clear them.
  *
  * ## Why "current" is not `disabled`
  *
@@ -37,13 +61,31 @@
  * pressable now, and the selected one carries a tick, a ring and the word
  * "Now". Pressing what is already true is a harmless no-op, and safer than a
  * control that looks broken.
+ *
+ * ## The reader who is not on it
+ *
+ * Opened by somebody a restricted gathering refuses — from the header select's
+ * demoted option, or the chip on a night they were just taken off — the sheet
+ * has no verbs to offer, so it opens on the thing the locked page carries: who
+ * can add them, by full name, and an admin by name whatever the list says.
+ * Same component, different order.
+ *
+ * ## Suspended members
+ *
+ * Marked, never hidden, and never counted. Membership survives suspension by
+ * design — un-suspending somebody restores them to every gathering they were
+ * on — so a suspended member stays on the list with a badge, is left out of
+ * every count of who can take attendance, and is never named as the way in.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Modal, TextField } from '@/components/ui';
+import { Badge, Button, CheckboxField, Modal, TextField } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
-import { shortName, useTeam } from '@/features/events/useTeam';
+import { approversFallback, rankApprovers } from '@/features/events/approvers';
+import { AskToBeAdded } from '@/features/events/AskToBeAdded';
+import { useChainRequests } from '@/features/events/useAccessRequests';
+import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import { isPermissionDenied } from '@/lib/permissionDenied';
 import { cn } from '@/lib/utils';
@@ -55,7 +97,9 @@ import {
   reopenChain,
   restrictChain,
 } from '@/services/eventAccess';
-import type { TallyEvent, UserProfile } from '@/types';
+import { clearAccessRequest } from '@/services/accessRequests';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
+import type { AccessRequest, Role, TallyEvent, UserProfile } from '@/types';
 import { useTranslations } from 'use-intl';
 
 /**
@@ -66,6 +110,12 @@ import { useTranslations } from 'use-intl';
  */
 const PREFILL_NIGHTS = 3;
 
+const ROLE_LABEL = {
+  counselor: 'roleCounselor',
+  core: 'roleCore',
+  admin: 'roleAdmin',
+} as const satisfies Record<Role, string>;
+
 export interface AccessSheetProps {
   open: boolean;
   onClose: () => void;
@@ -73,29 +123,42 @@ export interface AccessSheetProps {
   now: Date;
 }
 
-function displayName(profile: UserProfile): string {
-  return profile.displayName?.trim() || profile.email;
+/**
+ * Who has recently taken this register — read on open, not on press.
+ *
+ * `idle` is a sheet that has no question to answer (shut, or already
+ * restricted); `loading` is the second or so the three register reads take,
+ * during which the preview says so and the switch is not pressable; `failed`
+ * is a register that could not be read, which the preview says outright rather
+ * than posing as "nobody has taken them".
+ */
+interface Prefill {
+  status: 'idle' | 'loading' | 'ready' | 'failed';
+  uids: string[];
 }
+
+const byName = (a: UserProfile, b: UserProfile) => fullName(a).localeCompare(fullName(b));
 
 /**
  * One of the two states, drawn as a choice rather than as an availability.
  *
  * The selected one is the loud one — tick, brand ring, the word "Now" — because
  * that is the only convention a person brings to a pair of boxes in a dim room.
- * Nothing here is `disabled` for being current; `busy` is the only thing that
- * takes a press away, and only while a write is in the air.
+ * Nothing here is `disabled` for being current; a write in the air takes the
+ * press away, and so does a preview that has not finished working out what the
+ * press would do.
  */
 function AccessOption({
   selected,
   label,
   detail,
-  busy,
+  disabled,
   onPress,
 }: {
   selected: boolean;
   label: string;
   detail: string;
-  busy: boolean;
+  disabled: boolean;
   onPress: () => void;
 }) {
   const t = useTranslations('Access');
@@ -103,7 +166,7 @@ function AccessOption({
     <button
       type="button"
       aria-pressed={selected}
-      disabled={busy}
+      disabled={disabled}
       onClick={onPress}
       className={cn(
         'flex min-h-14 w-full items-start gap-3 rounded-xl px-3 py-3 text-left',
@@ -158,9 +221,18 @@ function nameList(t: AccessTranslator, names: readonly string[]): string {
 /** The sheet's translator, narrowed so `nameList` can take it as data. */
 type AccessTranslator = ReturnType<typeof useTranslations<'Access'>>;
 
+/** The badge a suspended member wears wherever the sheet lists them. */
+function SuspendedBadge() {
+  const t = useTranslations('Access');
+  return <Badge tone="danger">{t('suspended')}</Badge>;
+}
+
 export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const t = useTranslations('Access');
   const tCommon = useTranslations('Common');
+  const tEvents = useTranslations('Events');
+  const tTeam = useTranslations('Team');
+  const time = useTimeFormats();
   const { access, events } = useData();
   const { profile, can } = useAuth();
   const { show } = useToast();
@@ -168,16 +240,23 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  /* Which ask's Clear has been pressed once. One at a time, like the
+     suspension on the Team screen: arming a second disarms the first. */
+  const [clearing, setClearing] = useState<string | null>(null);
+  /** Whether the press that widens the gathering has been made once. */
+  const [reopening, setReopening] = useState(false);
+  const [prefill, setPrefill] = useState<Prefill>(() => ({ status: 'idle', uids: [] }));
   /**
-   * Who has recently taken this register — read on open, not on press.
+   * Who was on the document when the sheet opened — `null` until it has.
    *
-   * `idle` is a sheet that has no question to answer (shut, or already
-   * restricted); `loading` is the second or so the three register reads take,
-   * and the preview says so rather than showing a number it does not have yet.
+   * Two jobs. Anybody on the document who is not in here arrived while the
+   * sheet was open, and is drawn as a fixed tick with a note; and it is what
+   * the press hands `restrictChain`, so the write can tell a deliberate untick
+   * from a name it was never shown.
    */
-  const [prefill, setPrefill] = useState<{ status: 'idle' | 'loading' | 'ready'; uids: string[] }>(
-    () => ({ status: 'idle', uids: [] }),
-  );
+  const [seenAtOpen, setSeenAtOpen] = useState<ReadonlySet<string> | null>(null);
+  /** The rows the person has unticked. Local until the press; see above. */
+  const [unticked, setUnticked] = useState<ReadonlySet<string>>(() => new Set());
 
   const chain = chainKey(event);
   const list = access.get(chain);
@@ -206,18 +285,29 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
       [...(list?.members ?? [])]
         .map((memberUid) => byUid.get(memberUid))
         .filter((member): member is UserProfile => member !== undefined)
-        .sort((a, b) => displayName(a).localeCompare(displayName(b))),
+        .sort(byName),
     [list, byUid],
   );
 
   /*
-   * The calendar and the clock the read uses, held in a ref rather than in the
-   * effect's dependencies. `now` ticks once a minute on the event page, and a
-   * sheet that re-read three nights of registers every minute it stayed open
-   * would be paying for a sentence that has not changed.
+   * The calendar, the clock and the access map the effects below read, held
+   * in a ref rather than in their dependencies. `now` ticks once a minute on
+   * the event page, and a sheet that re-read three nights of registers every
+   * minute it stayed open would be paying for a sentence that has not changed;
+   * `access` changes whenever anybody anywhere is added, and the moment the
+   * sheet *opened* must not move with it.
    */
-  const source = useRef({ events, now });
-  source.current = { events, now };
+  const source = useRef({ events, now, access });
+  source.current = { events, now, access };
+
+  useEffect(() => {
+    if (!open) {
+      setSeenAtOpen(null);
+      setUnticked(new Set());
+      return;
+    }
+    setSeenAtOpen(new Set(source.current.access.get(chain)?.members ?? []));
+  }, [open, chain]);
 
   useEffect(() => {
     // Not for a counselor: they see the state as a sentence and have no switch
@@ -237,8 +327,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
       })
       .catch(() => {
         // A register that cannot be read is not a reason to hold the sheet
-        // shut; the sentence falls back to "just you" and stays honest.
-        if (live) setPrefill({ status: 'ready', uids: [] });
+        // shut — but the sentence says so, rather than posing as "nobody has
+        // taken them".
+        if (live) setPrefill({ status: 'failed', uids: [] });
       });
 
     return () => {
@@ -250,22 +341,59 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const activeTeam = useMemo(() => team.filter((member) => member.active), [team]);
 
   /*
-   * Who the restriction would keep, resolved against the directory.
+   * The two groups the ticks are drawn from.
    *
-   * Intersected here rather than where the uids were read, because a register
-   * also carries `planning-center` and anything else a non-human route wrote —
-   * and because the directory usually lands after the registers do.
+   * `kept` is whoever the existing document holds — the March list a reopened
+   * gathering still carries — and `takers` is whoever has taken the register
+   * lately and is not already on it. Both resolved against the directory,
+   * because a register also carries `planning-center` and anything else a
+   * non-human route wrote, and neither includes the reader, whose row is a
+   * fact rather than a tick.
    */
-  const keep = useMemo(() => {
-    const ids = new Set(prefill.uids.filter((taker) => byUid.has(taker)));
-    // `restrictChain` adds the caller whatever this list says; the sentence
-    // should not claim otherwise.
-    if (uid) ids.add(uid);
-    return [...ids]
-      .map((memberUid) => byUid.get(memberUid))
-      .filter((member): member is UserProfile => member !== undefined)
-      .sort((a, b) => displayName(a).localeCompare(displayName(b)));
-  }, [prefill, byUid, uid]);
+  const kept = useMemo(() => current.filter((member) => member.id !== uid), [current, uid]);
+  const takers = useMemo(
+    () =>
+      [...new Set(prefill.uids)]
+        .filter((taker) => taker !== uid && list?.members.has(taker) !== true)
+        .map((taker) => byUid.get(taker))
+        .filter((member): member is UserProfile => member !== undefined)
+        .sort(byName),
+    [prefill.uids, byUid, uid, list],
+  );
+  const you = uid ? byUid.get(uid) : undefined;
+
+  /**
+   * On the document, and not there when the sheet opened: somebody else added
+   * them while it was open, and the write keeps them whatever the ticks say.
+   * Only the document counts — a register-taker is a suggestion, not a fact.
+   */
+  const arrived = (member: UserProfile) =>
+    list?.members.has(member.id) === true && seenAtOpen !== null && !seenAtOpen.has(member.id);
+  const ticked = (member: UserProfile) => arrived(member) || !unticked.has(member.id);
+
+  const willKeep = useMemo(
+    () => ({ kept: kept.filter(ticked), takers: takers.filter(ticked) }),
+    // `ticked` closes over the list and the two sets; listing them is listing it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kept, takers, unticked, seenAtOpen, list],
+  );
+
+  /*
+   * What the press would write, counted the way every count here is counted:
+   * the reader is on the list whatever the ticks say, and a suspended member
+   * is on it too but cannot take attendance, so is not a person who "can".
+   */
+  const youOnDocument = list?.members.has(uid) === true;
+  const youCounts = you !== undefined && you.active ? 1 : 0;
+  const keptCount = willKeep.kept.filter((member) => member.active).length + (youOnDocument ? youCounts : 0);
+  const takersCount =
+    willKeep.takers.filter((member) => member.active).length + (youOnDocument ? 0 : youCounts);
+  const written = keptCount + takersCount;
+
+  /** Active people on the list, once the directory can say who is active. */
+  const onList = teamLoading && current.length === 0
+    ? (list?.members.size ?? 0)
+    : current.filter((member) => member.active).length;
 
   const openDetail =
     activeTeam.length > 0
@@ -274,24 +402,20 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
         ? t('counting')
         : t('openToAnyone');
 
-  const restrictedDetail = (() => {
-    if (restricted) {
-      const size = list?.members.size ?? 0;
-      return t('restrictedDetail', { count: size });
-    }
-    if (prefill.status !== 'ready') return t('workingOut');
+  const workingOut = !restricted && (prefill.status === 'idle' || prefill.status === 'loading');
 
-    const kept = keep.length > 0 ? keep : null;
-    const keeping = kept
-      ? nameList(t, kept.map((member) => shortName(member) ?? displayName(member)))
-      : t('justYou');
-    const losing = Math.max(
-      0,
-      activeTeam.length - (kept?.filter((member) => member.active).length ?? 1),
-    );
-    return losing === 0
-      ? t('wouldKeepOnly', { names: keeping })
-      : t('wouldKeep', { names: keeping, count: losing });
+  const restrictedDetail = (() => {
+    if (restricted) return t('restrictedDetail', { count: onList });
+    if (workingOut) return t('workingOut');
+    if (prefill.status === 'failed') {
+      return keptCount > 0
+        ? t('couldNotReadRegistersKept', { kept: keptCount })
+        : t('couldNotReadRegisters');
+    }
+    const losing = Math.max(0, activeTeam.length - written);
+    return list
+      ? t('wouldKeepGroups', { kept: keptCount, takers: takersCount, count: losing })
+      : t('wouldKeepTakers', { takers: takersCount, count: losing });
   })();
 
   /*
@@ -306,7 +430,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     if (needle.length === 0) return [];
     return team
       .filter((member) => list?.members.has(member.id) === true)
-      .filter((member) => displayName(member).toLowerCase().includes(needle))
+      .filter((member) => fullName(member).toLowerCase().includes(needle))
       .slice(0, 6);
   }, [team, query, list]);
 
@@ -315,7 +439,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     if (needle.length === 0) return [];
     return team
       .filter((member) => member.active && !list?.members.has(member.id))
-      .filter((member) => displayName(member).toLowerCase().includes(needle))
+      .filter((member) => fullName(member).toLowerCase().includes(needle))
       .slice(0, 6);
   }, [team, query, list]);
 
@@ -332,30 +456,30 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     );
   };
 
+  function toggle(memberUid: string) {
+    setUnticked((previous) => {
+      const next = new Set(previous);
+      if (next.has(memberUid)) next.delete(memberUid);
+      else next.add(memberUid);
+      return next;
+    });
+  }
+
   async function close() {
+    // The option is disabled while this is true; belt and braces for a press
+    // that raced the state.
+    if (workingOut) return;
     setBusy(true);
     try {
       /*
-       * Normally already in hand — the sheet read this when it opened, which is
-       * what lets the preview state the count before the press. The await is
-       * the case where somebody was faster than three register reads.
+       * Exactly the ticked names. `restrictChain` adds the writer itself, and
+       * keeps anybody who reached the document after the sheet opened — the
+       * reason `seenAtOpen` travels with the list.
        */
-      const takers =
-        prefill.status === 'ready'
-          ? prefill.uids
-          : [
-              ...(await recentRegisterTakers(
-                recentChainInstances(events, chain, now, PREFILL_NIGHTS),
-              )),
-            ];
-      // Intersected with the directory, because a register also carries
-      // `planning-center` and anything else a non-human route wrote.
-      const people = [...new Set(takers.filter((taker) => byUid.has(taker)))];
-      const total = new Set([...people, uid]).size;
-
-      await restrictChain(chain, people, uid);
+      const chosen = [...willKeep.kept, ...willKeep.takers].map((member) => member.id);
+      await restrictChain(chain, chosen, uid, seenAtOpen ?? []);
       show(
-        t('nowLimited', { title: event.title, count: total }),
+        t('nowLimited', { title: event.title, count: written }),
         { tone: 'success' },
       );
     } catch (cause) {
@@ -377,12 +501,39 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     }
   }
 
+  /**
+   * Somebody on the gathering answering an ask — by adding them, or by saying
+   * they have dealt with it.
+   *
+   * Both clear the row, and clearing *marks* rather than deletes, which is the
+   * whole mechanism: the asker's own screen reads the mark back as "Miriam
+   * cleared this at 7:01 — ask her in person", so they can tell being answered
+   * from being unread. A delete would leave those two indistinguishable.
+   */
+  async function answerAsk(request: AccessRequest, alsoAdd: boolean) {
+    setBusy(true);
+    try {
+      if (alsoAdd) await addChainMembers(chain, [request.uid], uid);
+      await clearAccessRequest(chain, request.uid, uid);
+      show(
+        alsoAdd
+          ? t('addedFromAsk', { name: request.name })
+          : t('cleared', { name: request.name }),
+        { tone: 'success' },
+      );
+    } catch (cause) {
+      failed(cause);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function add(member: UserProfile) {
     setBusy(true);
     try {
       await addChainMembers(chain, [member.id], uid);
       setQuery('');
-      show(t('memberAdded', { name: displayName(member) }), { tone: 'success' });
+      show(t('memberAdded', { name: fullName(member) }), { tone: 'success' });
     } catch (cause) {
       failed(cause);
     } finally {
@@ -401,17 +552,140 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     }
   }
 
+  /** One row of the kept list: a tick, or a fixed fact with the reason beside it. */
+  const tickRow = (member: UserProfile) => {
+    const fixed = arrived(member);
+    return (
+      <li
+        key={member.id}
+        className="flex min-h-11 items-center gap-3 pointer-fine:min-h-9"
+      >
+        <CheckboxField
+          label={fullName(member)}
+          hint={fixed ? t('addedJustNow') : undefined}
+          checked={ticked(member)}
+          disabled={busy || fixed}
+          onChange={() => toggle(member.id)}
+        />
+        {!member.active ? <SuspendedBadge /> : null}
+      </li>
+    );
+  };
+
+  /** Who could add a reader the gathering refuses, and the admin fallback. */
+  const asks = useChainRequests(restricted ? chain : null, open);
+  const canAdd = !onIt ? rankApprovers(list?.members ?? [], byUid, now) : [];
+  const fallback = !onIt ? approversFallback(tEvents, team) : null;
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={event.title}
+      /* Not into the directory search while somebody is waiting to be
+         answered: the ring is brighter than the primary action beside the
+         ask, and it put an empty text box at the top of the reader's eye. */
+      autoFocusField={asks.outstanding.length === 0}
       description={
         /* The gathering, not the night — this is what is about to change. */
         event.mode === 'oneoff' ? t('scopeOneOff') : t('scopeSeries')
       }
     >
       <div className="flex flex-col gap-4">
+        {/*
+          * The durable home for an ask, and the first thing on the sheet when
+          * there is one.
+          *
+          * First because it is the only item here that is somebody's to do:
+          * everything below is a list to read. It is *here*, rather than on the
+          * roster, because a strip inserted above the first roster row would
+          * push every name down under a thumb already descending — the
+          * mechanism Journey 1 was rebuilt to prevent, on the screen
+          * `e2e/layout-shift.spec.ts` holds to a landing budget of zero. What
+          * the roster carries instead is a dot on the chip that opens this.
+          */}
+        {restricted && onIt && asks.outstanding.length > 0 ? (
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {t('askHeading')}
+            </h3>
+            {/*
+              * One card per asker, not one row.
+              *
+              * Three things a row could not do. The name gets a line of its
+              * own, because it is the decision — it was truncating to "Sam
+              * Whi…" so that "asked 21 minutes ago" could be spelled out, and
+              * on a lobby phone the identity of the adult is the last thing
+              * that should give way. The two answers are a thumb's width
+              * apart on separate rows rather than thirteen pixels apart on
+              * one, where a low tap on the first card's Add put the *second*
+              * asker on a gathering of minors. And Clear is armed: it is a
+              * write the asker reads as "somebody looked and said no", which
+              * is precisely the wrong thing to say by accident.
+              */}
+            <ul className="flex flex-col gap-2 pt-1.5">
+              {asks.outstanding.map((request) => (
+                <li
+                  key={request.id}
+                  className="rounded-xl px-3 py-2.5 ring-1 ring-ink-800"
+                >
+                  <p className="text-sm text-ink-100">{request.name}</p>
+                  {request.askedAt ? (
+                    <p className="text-xs text-ink-500">
+                      {t('askRowWhen', { when: time.relative(request.askedAt) })}
+                    </p>
+                  ) : null}
+                  {clearing === request.id ? (
+                    <>
+                      <p role="alert" className="mt-1.5 text-xs leading-snug text-ink-300">
+                        {t('clearAsk', { name: request.name })}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <Button variant="ghost" onClick={() => setClearing(null)}>
+                          {t('leaveIt')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            setClearing(null);
+                            void answerAsk(request, false);
+                          }}
+                        >
+                          {t('clearAskYes')}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    /* Add at one edge, Clear at the other. A `gap-2` put seven
+                       pixels between the press that grants an adult access to a
+                       roster of minors and the press that tells them somebody
+                       said no — both in the middle of thumb territory on an
+                       844px screen. */
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                      {mayAdd ? (
+                        <Button disabled={busy} onClick={() => void answerAsk(request, true)}>
+                          {t('addThem')}
+                        </Button>
+                      ) : null}
+                      {/* Secondary, not ghost: an unbordered Clear beside a
+                          filled Add is a hit box nobody can see the edge of. */}
+                      <Button
+                        variant="secondary"
+                        className="ml-auto"
+                        disabled={busy}
+                        onClick={() => setClearing(request.id)}
+                      >
+                        {t('clear')}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section>
           {mayFlip ? (
             <div className="flex flex-col gap-2">
@@ -419,16 +693,50 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                 selected={!restricted}
                 label={t('everyoneOnTeam')}
                 detail={openDetail}
-                busy={busy}
-                onPress={restricted ? () => void reopen() : () => {}}
+                disabled={busy}
+                onPress={restricted ? () => setReopening(true) : () => {}}
               />
               <AccessOption
                 selected={restricted}
                 label={t('onlyPeopleIAdd')}
                 detail={restrictedDetail}
-                busy={busy}
+                /* Not pressable while the preview still reads "Working out…":
+                   the sentence is what the press decides on. */
+                disabled={busy || workingOut}
                 onPress={restricted ? () => {} : () => void close()}
               />
+              {/*
+                * Armed, because the two directions are not symmetrical.
+                * Narrowing shows a kept list before it writes anything and can
+                * be undone by adding somebody back; widening throws the list
+                * away, on every gathering in the repeat, and there is no undo
+                * for a list. It sat eight pixels above the option a thumb aims
+                * at to leave things as they are — and it renders under both
+                * options rather than between them, so the safe one does not
+                * move sixty pixels while a thumb is already travelling to it.
+                */}
+              {reopening ? (
+                <div className="px-1">
+                  <p role="alert" className="text-xs leading-snug text-ink-300">
+                    {t('armReopen', { title: event.title, count: list?.members.size ?? 0 })}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <Button variant="ghost" onClick={() => setReopening(false)}>
+                      {t('leaveIt')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        setReopening(false);
+                        void reopen();
+                      }}
+                    >
+                      {t('armReopenYes')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             /* A counselor sees the state as a fact rather than a control they
@@ -441,7 +749,70 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
           )}
         </section>
 
-        {restricted ? (
+        {!restricted && mayFlip ? (
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {t('keptHeading')}
+            </h3>
+            <p className="pt-1 text-xs text-ink-500">
+              {t.rich('keptExplain', {
+                option: t('onlyPeopleIAdd'),
+                em: (chunks) => (
+                  <em className="font-semibold not-italic text-ink-300">{chunks}</em>
+                ),
+              })}
+            </p>
+            {workingOut ? (
+              <p className="pt-2 text-sm text-ink-500">{t('workingOut')}</p>
+            ) : (
+              <ul className="flex flex-col pt-1">
+                {you ? (
+                  /* A fact, not a tick — the rules keep the writer on the list
+                     and `restrictChain` adds her regardless, so a box here
+                     would be a control that does nothing. */
+                  <li className="flex min-h-11 items-center gap-3 text-sm pointer-fine:min-h-9">
+                    <span className="text-ink-200">{fullName(you)}</span>
+                    <span className="text-xs text-ink-500">{t('you')}</span>
+                  </li>
+                ) : null}
+                {kept.map(tickRow)}
+                {takers.map(tickRow)}
+              </ul>
+            )}
+          </section>
+        ) : null}
+
+        {restricted && !onIt ? (
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {tEvents('askOneOfThese')}
+            </h3>
+            {canAdd.length > 0 ? (
+              <ul className="flex flex-col pt-1">
+                {canAdd.map((member) => (
+                  <li key={member.id} className="flex min-h-11 items-center gap-2 text-sm">
+                    <span className="text-ink-200">{fullName(member)}</span>
+                    <span className="text-xs uppercase tracking-wider text-ink-600">
+                      {tTeam(ROLE_LABEL[member.role])}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              /* The directory may not have loaded, or everybody on the list
+                 may be suspended. "Find an admin" is true either way. */
+              <p className="pt-2 text-sm text-ink-500">{tEvents('askAnAdmin')}</p>
+            )}
+            {/* Unconditionally, after the names: an admin is always a way in,
+                and the person the list names may be on leave since June. */}
+            {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
+            {/* Under the names, because the names are the answer and this is
+                only the shortcut to them. */}
+            <AskToBeAdded chain={chain} approvers={canAdd} enabled={open} />
+          </section>
+        ) : null}
+
+        {restricted && onIt ? (
           <>
             {mayAdd ? (
               <section>
@@ -462,9 +833,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                           disabled={busy}
                           className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-left text-sm text-ink-200 hover:bg-ink-800"
                         >
-                          <span className="truncate">{displayName(member)}</span>
+                          <span className="truncate">{fullName(member)}</span>
                           <span className="text-xs uppercase tracking-wider text-ink-600">
-                            {member.role}
+                            {tTeam(ROLE_LABEL[member.role])}
                           </span>
                         </button>
                       </li>
@@ -474,7 +845,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                   <p className="px-2 pt-2 text-sm text-ink-400">
                     {t('alreadyOn', {
                       count: alreadyOn.length,
-                      names: nameList(t, alreadyOn.map((member) => displayName(member))),
+                      names: nameList(t, alreadyOn.map((member) => fullName(member))),
                     })}
                   </p>
                 ) : (
@@ -498,11 +869,14 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                       key={member.id}
                       className="flex min-h-11 items-center justify-between gap-2 text-sm"
                     >
-                      <span className="min-w-0 truncate text-ink-200">
-                        {displayName(member)}
+                      <span className="flex min-w-0 items-center gap-2 text-ink-200">
+                        <span className="truncate">{fullName(member)}</span>
                         {member.id === uid ? (
-                          <span className="pl-2 text-xs text-ink-500">You</span>
+                          <span className="text-xs text-ink-500">{t('you')}</span>
                         ) : null}
+                        {/* Marked, not hidden: the membership is real and
+                            survives the suspension. */}
+                        {!member.active ? <SuspendedBadge /> : null}
                       </span>
                       {member.role === 'admin' ? (
                         /* Admins pass the gate whatever this list says, so a
@@ -516,7 +890,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                         </Button>
                       ) : (
                         <span className="text-xs uppercase tracking-wider text-ink-600">
-                          {member.role}
+                          {tTeam(ROLE_LABEL[member.role])}
                         </span>
                       )}
                     </li>
@@ -527,11 +901,15 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
           </>
         ) : null}
 
-        <p className="text-xs text-ink-500">
-          {event.mode === 'oneoff'
-            ? t('appliesToThis')
-            : t('appliesToSeries', { title: event.title })}
-        </p>
+        {/* Only for somebody who can change it — the sentence is about a
+            change, and a reader the gathering refuses is not making one. */}
+        {onIt ? (
+          <p className="text-xs text-ink-500">
+            {event.mode === 'oneoff'
+              ? t('appliesToThis')
+              : t('appliesToSeries', { title: event.title })}
+          </p>
+        ) : null}
       </div>
     </Modal>
   );

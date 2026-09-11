@@ -19,6 +19,7 @@ import {
   initializeAuth,
   connectAuthEmulator,
   signInWithCustomToken,
+  signOut,
   type Auth,
 } from 'firebase/auth';
 import {
@@ -40,6 +41,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
+import { kioskUid } from '@/lib/kioskDevice';
 import {
   KIOSK_BACKDROPS_COLLECTION,
   KIOSK_BACKDROP_MAX_BYTES,
@@ -65,10 +67,12 @@ import {
 import type { KioskBinding } from './binding';
 import { sanitizeIconPath } from './icon';
 import { joinKioskRoster } from './roster';
+import { isRefusal, type RestoredSession, type StandingOutcome } from './session';
 import { sanitizeKioskPalette } from './theme';
 import type { KioskStudent } from './search';
 import {
   KIOSK_KEYS,
+  ensureDeviceId,
   participationScope,
   readCachedRoster,
   readCachedRosterOfAnyVersion,
@@ -121,7 +125,7 @@ const app: FirebaseApp = initializeApp(readConfig(), 'kiosk');
 /**
  * No popup/redirect resolver, same reasoning as src/lib/firebase.ts — and
  * doubly so here, where nothing can ever open a popup. Persistence keeps the
- * paired session across reboots until the approver's account is deactivated.
+ * paired session across reboots until the kiosk is retired.
  */
 const auth: Auth = initializeAuth(app, {
   persistence: [indexedDBLocalPersistence, browserLocalPersistence],
@@ -184,6 +188,16 @@ export interface KioskEventEntry {
    * `functions/src/kiosk/events.ts`.
    */
   iconPath?: string;
+  /**
+   * Whether the person who paired this kiosk works this gathering.
+   *
+   * The chooser offers everything — a leader binding a lobby screen chooses
+   * the room — and draws the rest below a divider, in the grammar the app's
+   * own chooser keeps. Optional on the wire so a new bundle against old
+   * functions reads `undefined`, which the chooser treats as "nothing to
+   * divide".
+   */
+  yours?: boolean;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
@@ -191,7 +205,7 @@ const startKioskPairing = httpsCallable<void, { code: string; secret: string; ex
   'startKioskPairing',
 );
 const claimKioskToken = httpsCallable<
-  { code: string; secret: string },
+  { code: string; secret: string; deviceId: string },
   { status: 'pending' | 'not-found' | 'expired' } | { status: 'ready'; token: string }
 >(functions, 'claimKioskToken');
 const getKioskEvents = httpsCallable<{ days?: number } | void, { events: KioskEventEntry[] }>(
@@ -235,10 +249,25 @@ const registerFamilyCallable = httpsCallable<RegisterFamilyRequest, RegisterFami
 /* Auth & pairing                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** The signed-in staff uid this kiosk writes as, or null before pairing. */
-export async function restoredUid(): Promise<string | null> {
+/**
+ * The session this kiosk booted with, if it is the kiosk's own.
+ *
+ * A kiosk signs in as `kiosk_<deviceId>` — see `src/lib/kioskDevice.ts` — so
+ * the one check that matters is whether the persisted session is that uid for
+ * *this* device's id. A session under any other uid is one minted before
+ * kiosks had identities of their own (the approver's uid, no device claim),
+ * which the rules no longer admit; it is signed out here, once, and the
+ * pairing screen says why. Nothing is read off the network for this: the
+ * answer is on the disk, and a kiosk booting with the hallway switch unplugged
+ * still gets it.
+ */
+export async function restoredSession(): Promise<RestoredSession> {
   await auth.authStateReady();
-  return auth.currentUser?.uid ?? null;
+  const user = auth.currentUser;
+  if (!user) return { uid: null, reason: 'unpaired' };
+  if (user.uid === kioskUid(ensureDeviceId())) return { uid: user.uid, reason: null };
+  await signOut(auth).catch(() => {});
+  return { uid: null, reason: 'updated' };
 }
 
 export async function beginPairing(): Promise<{ code: string; secret: string; expiresInSeconds: number }> {
@@ -246,18 +275,74 @@ export async function beginPairing(): Promise<{ code: string; secret: string; ex
   return data;
 }
 
-/** One poll. Returns the uid once the token has been redeemed. */
+/**
+ * One poll. Returns the uid once the token has been redeemed.
+ *
+ * The device id goes up with the claim: it is what the server mints the token
+ * for and the key of the device row it writes, so the uid that comes back is
+ * `kioskUid(ensureDeviceId())` — the same one `restoredSession` will look for
+ * on every boot after this.
+ */
 export async function pollPairing(
   code: string,
   secret: string,
 ): Promise<'pending' | 'gone' | { uid: string }> {
-  const { data } = await claimKioskToken({ code, secret });
+  const { data } = await claimKioskToken({ code, secret, deviceId: ensureDeviceId() });
   if (data.status === 'ready') {
     const credential = await signInWithCustomToken(auth, data.token);
     return { uid: credential.user.uid };
   }
   if (data.status === 'pending') return 'pending';
   return 'gone';
+}
+
+/**
+ * Puts the session down. The next screen is the pairing code, and the device
+ * id stays: a retired kiosk paired again is the same kiosk, under the same uid,
+ * with the same queue of dropped writes waiting to land.
+ */
+export async function unpair(): Promise<void> {
+  await signOut(auth);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Standing                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Reports to this kiosk's own device row: still here, and bound to this.
+ *
+ * Two jobs in one write. The row's `boundChain` is the whole of a kiosk's
+ * reach in the rules — a kiosk session may write attendance for that chain
+ * and no other — so a binding that has not been reported is a binding that
+ * cannot record, which is why the report goes up the moment a gathering is
+ * bound and again on every register poll: a report the lobby wifi dropped at
+ * bind time lands on the next one. And the write is the oracle for whether
+ * this device still stands. The rules let a kiosk touch its own row only while
+ * the row exists and nobody has retired it, so a refusal here is the one
+ * refusal that cannot be about a student, a frozen record or a gathering's
+ * fence — see `StandingOutcome`. A refused check-in asks this before it
+ * concludes anything: the answer collapses "was it the child, or was it us?"
+ * in one round trip, with no callable.
+ *
+ * `null` between gatherings, so the row says the kiosk is standing idle
+ * rather than still on last Sunday.
+ */
+export async function reportStanding(
+  bound: Pick<KioskBinding, 'title' | 'chain'> | null,
+): Promise<StandingOutcome> {
+  const deviceId = ensureDeviceId();
+  try {
+    await updateDoc(doc(db, paths.kioskDevice(deviceId)), {
+      lastSeenAt: serverTimestamp(),
+      boundTo: bound?.title ?? null,
+      boundChain: bound?.chain ?? null,
+    });
+    return 'live';
+  } catch (error) {
+    if (!isRefusal(error)) return 'unknown';
+    return auth.currentUser?.uid === kioskUid(deviceId) ? 'retired' : 'updated';
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -282,6 +367,8 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
   return {
     eventId,
     seriesId: entry.seriesId,
+    // What the kiosk reports as its reach — see `reportStanding`.
+    chain: entry.chain,
     // Carried, not derived: the roster's notion of which chain predicts for a
     // gathering lives in the app's bundle and the kiosk does not download it.
     predictsFrom: entry.predictsFrom ?? null,
@@ -1116,8 +1203,9 @@ export async function replayQueue(): Promise<number> {
       // permission-denied is not "try later", it is "this write will never be
       // accepted" — the student is frozen, the kiosk may only create a
       // check-in, or a pickup is already recorded and only staff may move one.
-      // Either way retrying forever helps nobody.
-      if ((error as { code?: string }).code?.includes('permission-denied')) continue;
+      // Either way retrying forever helps nobody. (A retired kiosk is refused
+      // here too; the next report to its device row is what notices that.)
+      if (isRefusal(error)) continue;
       stuck.push(entry);
     }
   }

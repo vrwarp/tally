@@ -34,6 +34,17 @@ export interface KioskBinding {
   eventId: string;
   seriesId: string | null;
   /**
+   * The gathering's chain key — the whole of this kiosk's reach in the rules.
+   *
+   * Written onto the kiosk's own device row at bind time (see
+   * `reportStanding` in services), which is what lets a kiosk session write
+   * attendance for this gathering and no other. Optional for the same reason
+   * `requiresCheckOut` is: a binding written before kiosks had identities of
+   * their own has no such key. Such a binding is never used — the session it
+   * was made under is signed out at boot, and pairing again puts it down.
+   */
+  chain?: string;
+  /**
    * The chain whose past instances say who comes to this, or null when nothing
    * does. What `kioskIndex/participation` is keyed by.
    *

@@ -47,11 +47,21 @@ export {
   compareIds,
   composeFirstName,
   computeProfileComplete,
-  emailKey,
   nameGradeKey,
   splitFirstName,
   type GradeRange,
 } from '../backends/mappingShared.js';
+
+/* -------------------------------------------------------------------------- */
+/* One mailbox, one key                                                        */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The app's own module, copied in by `scripts/sync-functions-shared.mjs` (this
+ * package cannot import from src/): the invitation an admin writes in the app
+ * has to be the one a sign-in looks up here, and one source is how.
+ */
+export { canonicalEmail, emailKey, sameAccount } from '../generated/emailKey.js';
 
 /* -------------------------------------------------------------------------- */
 /* Tally-side shapes                                                           */

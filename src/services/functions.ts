@@ -45,11 +45,31 @@ if (USE_EMULATORS) {
   connectFunctionsEmulator(functions, host, port);
 }
 
+/**
+ * A gathering as the person being added to it would name it.
+ *
+ * `oneOffAt` is epoch millis on a one-off and null on a chain, because "the
+ * retreat" and "the retreat on the 12th" are different grants and the
+ * difference is invisible to whoever was given one. Formatted on this side:
+ * the server has no idea what language the reader reads.
+ */
+export interface GatheringName {
+  title: string;
+  oneOffAt: number | null;
+}
+
 export interface ProvisionAccessResult {
   /** `granted` — a `users/{uid}` document now exists and is active. */
   status: 'granted' | 'not-on-roster' | 'inactive';
   role: 'counselor' | 'core' | 'admin' | null;
   message: string;
+  /**
+   * The gatherings the invitation asked for, as titles, and what became of
+   * them. Both absent on every sign-in that redeemed nothing, which is every
+   * sign-in after the first.
+   */
+  placed?: GatheringName[];
+  skipped?: GatheringName[];
 }
 
 /**
@@ -65,6 +85,85 @@ export const provisionAccess = httpsCallable<void, ProvisionAccessResult>(
   functions,
   'provisionAccess',
 );
+
+/**
+ * The addresses the deployment pins as admins. Admin-only, read when the Team
+ * screen draws rather than cached anywhere — a deploy-time fact must not
+ * outlive the deploy on a document.
+ */
+export const listPinnedAdmins = httpsCallable<void, { emails: string[] }>(
+  functions,
+  'listPinnedAdmins',
+);
+
+/* -------------------------------------------------------------------------- */
+/* Invitations                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** What a token is worth: a long life to send, or ten minutes on a screen. */
+export type InviteLife = 'link' | 'qr';
+
+export interface MintedInvitation {
+  /** `link_<hash>` — the row's id, which changes every time it is re-minted. */
+  id: string;
+  /** The half that is never stored. Shown once, then gone for good. */
+  token: string;
+  /** Epoch millis. */
+  expiresAt: number;
+}
+
+/**
+ * Mints an invite link. Core and up; every link grants counselor.
+ *
+ * The token comes back exactly once and is never recoverable — Tally keeps
+ * only its hash — so a screen that has it must use it before it navigates.
+ */
+export const createInvitationLink = httpsCallable<
+  { label: string; gatherings?: string[]; life?: InviteLife },
+  MintedInvitation
+>(functions, 'createInvitationLink');
+
+/**
+ * Extends a link, or mints the short-lived token behind a QR.
+ *
+ * The same act either way: a new token, and the previous one stops working.
+ * The row's id changes with it, which is what the returned `id` is for.
+ */
+export const refreshInvitationLink = httpsCallable<
+  { id: string; life: InviteLife },
+  MintedInvitation
+>(functions, 'refreshInvitationLink');
+
+/**
+ * What a link says before anybody signs in. Unauthenticated: the person
+ * holding it has no account yet, and being asked to sign in before being told
+ * what for is how a volunteer decides a link is phishing.
+ */
+/** What a link opens, as much of it as somebody signed out may be told. */
+export interface InvitationPreview {
+  status: 'ok' | 'expired' | 'spent' | 'not-found';
+  /** The inviter's display name, or null when Tally has no name for them. */
+  invitedByName: string | null;
+  /** The gatherings it is for — never keys, and only while the link opens. */
+  gatherings: GatheringName[];
+}
+
+export const readInvitation = httpsCallable<{ token: string }, InvitationPreview>(
+  functions,
+  'readInvitation',
+);
+
+/**
+ * Spends a link, after the join screen has named the account out loud.
+ *
+ * Never called on arrival: a phone's default Google account is not always the
+ * one its owner meant, and a link that granted silently would turn a refusal
+ * fixed in ten seconds into a wrong identity only an admin can undo.
+ */
+export const redeemInvitation = httpsCallable<
+  { token: string },
+  ProvisionAccessResult & { linkStatus: 'ok' | 'expired' | 'spent' | 'not-found' }
+>(functions, 'redeemInvitation');
 
 /* -------------------------------------------------------------------------- */
 /* Reading people                                                              */

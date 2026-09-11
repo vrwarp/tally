@@ -150,6 +150,39 @@ describe('inviteToTally', () => {
   });
 });
 
+describe('the gatherings an invitation carries', () => {
+  it('writes the ticked chains whole, so unticking one on a re-invite takes it off', () => {
+    void inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, [
+      'sunday-school',
+      'nursery',
+    ]);
+
+    expect(written().data?.gatherings).toEqual(['sunday-school', 'nursery']);
+  });
+
+  it('copies the list rather than storing the caller’s array', () => {
+    // The caller owns a `Set`'s spread or a piece of component state; handing
+    // the same reference to Firestore lets a later mutation change what was
+    // written.
+    const chosen = ['sunday-school'];
+    void inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, chosen);
+    chosen.push('nursery');
+
+    expect(written().data?.gatherings).toEqual(['sunday-school']);
+  });
+
+  it('writes an empty list when nothing was ticked, rather than leaving the field off', () => {
+    /*
+     * The write merges, so an absent key keeps whatever a previous invitation
+     * put there — and "I unticked everything" would silently mean "leave it as
+     * it was".
+     */
+    void inviteToTally('jo@example.org', 'counselor', 'uid-admin');
+
+    expect(written().data?.gatherings).toEqual([]);
+  });
+});
+
 describe('withdrawing', () => {
   it('withdraws by deleting the document', async () => {
     await withdrawInvitation('miriam@example,org');
@@ -159,14 +192,190 @@ describe('withdrawing', () => {
 });
 
 describe('subscribeInvitations', () => {
-  it('reads the collection in address order', () => {
+  it('reads the whole collection unordered, because an order is also a filter', () => {
+    /*
+     * It used to `orderBy('email')`. Firestore drops from an ordered query every
+     * document that lacks the field — and a link invitation has no address until
+     * somebody redeems it, so the day links arrived every one of them would have
+     * been missing from the list that exists to show them. The sort is on this
+     * side now; the collection is small enough to carry it.
+     */
     subscribeInvitations(() => {});
 
-    const [source] = onSnapshot.mock.calls.at(-1) as unknown as [
-      { path: string; constraints: unknown[] },
-    ];
+    const [source] = onSnapshot.mock.calls.at(-1) as unknown as [{ path: string }];
     expect(source.path).toBe('invitations');
-    expect(orderBy).toHaveBeenCalledWith('email');
+    expect(orderBy).not.toHaveBeenCalled();
+  });
+
+  it('publishes a link, which has a label instead of an address', () => {
+    const [invitation] = published([
+      {
+        id: 'link_abc123',
+        data: {
+          kind: 'link',
+          role: 'counselor',
+          label: 'Jo, nursery, Marie’s daughter',
+          invitedBy: 'uid-miriam',
+          tokenExpiresAt: new Timestamp(1_767_607_200, 0),
+          gatherings: ['sunday-school'],
+        },
+      },
+    ]);
+
+    expect(invitation).toMatchObject({
+      id: 'link_abc123',
+      kind: 'link',
+      label: 'Jo, nursery, Marie’s daughter',
+      gatherings: ['sunday-school'],
+      tokenExpiresAt: new Date(1_767_607_200_000),
+    });
+    // And no address is invented for it: the id is a hash, not a mailbox.
+    expect(invitation?.email).toBeUndefined();
+  });
+
+  it('publishes what a redemption left behind, which is what Arrived this week reads', () => {
+    const [invitation] = published([
+      {
+        id: 'link_abc123',
+        data: {
+          kind: 'link',
+          label: 'Jo, nursery',
+          resolvedAt: new Timestamp(1_767_607_200, 0),
+          redeemedBy: 'uid-jo',
+          redeemedEmail: 'jo.smith84@gmail.com',
+          redeemedName: 'Jo Smith',
+          placed: ['nursery'],
+          skipped: ['sunday-school'],
+        },
+      },
+    ]);
+
+    expect(invitation).toMatchObject({
+      resolvedAt: new Date(1_767_607_200_000),
+      redeemedEmail: 'jo.smith84@gmail.com',
+      redeemedName: 'Jo Smith',
+      placed: ['nursery'],
+      skipped: ['sunday-school'],
+    });
+  });
+
+  it('puts the newest first, so the row somebody just made is the one they see', () => {
+    /*
+     * Alphabetical order and date order disagree on purpose. With 'new' and
+     * 'old' as the addresses they agree, and a sort that ignored the date
+     * entirely would have passed.
+     */
+    const rows = published([
+      { id: 'aaron@x,org', data: { email: 'aaron@x.org', invitedAt: new Timestamp(1_000, 0) } },
+      { id: 'zoe@x,org', data: { email: 'zoe@x.org', invitedAt: new Timestamp(2_000, 0) } },
+    ]);
+
+    expect(rows.map((row) => row.email)).toEqual(['zoe@x.org', 'aaron@x.org']);
+  });
+
+  it('falls back to the name only when two rows were invited at the same moment', () => {
+    const same = new Timestamp(1_767_607_200, 0);
+    const rows = published([
+      { id: 'zoe@x,org', data: { email: 'zoe@x.org', invitedAt: same } },
+      { id: 'aaron@x,org', data: { email: 'aaron@x.org', invitedAt: same } },
+    ]);
+
+    expect(rows.map((row) => row.email)).toEqual(['aaron@x.org', 'zoe@x.org']);
+  });
+
+  it('sorts a link by its label and a bare row by its id, because neither has an address', () => {
+    /*
+     * The tie-break reads `email ?? label ?? id`, and each rung has to be the
+     * one that answers for its own kind of row: an address invitation has an
+     * address, a link has only the label its inviter typed, and a row that has
+     * neither still has to land somewhere rather than throw.
+     */
+    const same = new Timestamp(1_767_607_200, 0);
+    const rows = published([
+      { id: 'zzz-bare-row', data: { invitedAt: same } },
+      { id: 'link_b', data: { kind: 'link', label: 'Moira, Fridays', invitedAt: same } },
+      { id: 'aaron@x,org', data: { email: 'aaron@x.org', invitedAt: same } },
+    ]);
+
+    expect(rows.map((row) => row.email ?? row.label ?? row.id)).toEqual([
+      'aaron@x.org',
+      'Moira, Fridays',
+      'zzz-bare-row',
+    ]);
+  });
+
+  it('sorts a row that has no date under the ones that have one', () => {
+    // `?? 0` is what makes an undated row oldest rather than newest.
+    const rows = published([
+      { id: 'undated@x,org', data: { email: 'undated@x.org' } },
+      { id: 'dated@x,org', data: { email: 'dated@x.org', invitedAt: new Timestamp(1_000, 0) } },
+    ]);
+
+    expect(rows.map((row) => row.email)).toEqual(['dated@x.org', 'undated@x.org']);
+  });
+
+  it('gives a link the address a redemption stored on it', () => {
+    // The `kind: 'link'` branch supplies no address, so this is the only way a
+    // link row ever carries one — and the row is the audit record of who spent
+    // the token, so dropping it would lose the answer.
+    const [invitation] = published([
+      { id: 'link_abc', data: { kind: 'link', email: 'jo@example.org', label: 'Jo' } },
+    ]);
+
+    expect(invitation?.email).toBe('jo@example.org');
+  });
+
+  it('ignores a stored address that is not a string, on either kind of row', () => {
+    const [link] = published([{ id: 'link_abc', data: { kind: 'link', email: 42 } }]);
+    expect(link?.email).toBeUndefined();
+
+    // An address row falls back to its own id, which is the address with its
+    // dots swapped for commas.
+    const [addressed] = published([{ id: 'a,b@x,org', data: { email: 42 } }]);
+    expect(addressed?.email).toBe('a.b@x.org');
+  });
+
+  it('carries no label at all when the stored one is empty or not a string', () => {
+    const [blank] = published([{ id: 'link_a', data: { kind: 'link', label: '' } }]);
+    expect(Object.keys(blank ?? {})).not.toContain('label');
+
+    const [wrong] = published([{ id: 'link_b', data: { kind: 'link', label: 7 } }]);
+    expect(Object.keys(wrong ?? {})).not.toContain('label');
+  });
+
+  it('carries no redemption keys at all until there is a redemption', () => {
+    /*
+     * Absent, not undefined. `toEqual` treats a key holding `undefined` as
+     * absent, so asserting the whole shape cannot tell the two apart — and the
+     * difference matters: `redeemedBy` present-and-undefined would make a row
+     * that nobody has spent read as one somebody has.
+     */
+    const [fresh] = published([{ id: 'link_a', data: { kind: 'link' } }]);
+    const keys = Object.keys(fresh ?? {});
+    expect(keys).not.toContain('redeemedBy');
+    expect(keys).not.toContain('redeemedEmail');
+    expect(keys).not.toContain('redeemedName');
+
+    const [wrong] = published([
+      { id: 'link_b', data: { kind: 'link', redeemedBy: 1, redeemedEmail: 2, redeemedName: 3 } },
+    ]);
+    expect(Object.keys(wrong ?? {})).not.toContain('redeemedBy');
+  });
+
+  it('keeps only the strings out of a stored list, and answers [] for anything else', () => {
+    const [mixed] = published([
+      {
+        id: 'link_a',
+        data: { kind: 'link', gatherings: ['sunday-school', 7, null, 'nursery'] },
+      },
+    ]);
+    expect(mixed?.gatherings).toEqual(['sunday-school', 'nursery']);
+
+    const [wrong] = published([
+      { id: 'link_b', data: { kind: 'link', gatherings: 'sunday-school', placed: 3 } },
+    ]);
+    expect(wrong?.gatherings).toEqual([]);
+    expect(wrong?.placed).toEqual([]);
   });
 
   it('maps a stored invitation', () => {
@@ -190,6 +399,13 @@ describe('subscribeInvitations', () => {
       invitedAt: new Date(1_767_607_200_000),
       invitedBy: 'uid-admin',
       note: 'Wednesday volunteer',
+      // The link half of the shape, empty on an address invitation that
+      // nobody has redeemed — the state every row starts in.
+      tokenExpiresAt: null,
+      resolvedAt: null,
+      gatherings: [],
+      placed: [],
+      skipped: [],
     });
   });
 

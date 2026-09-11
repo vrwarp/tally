@@ -9,7 +9,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase-admin/firestore';
-import { isGoogleSignIn, provisionAccessForCaller } from './access.js';
+import { isGoogleSignIn, provisionAccessForCaller, redeemLinkForCaller } from './access.js';
+import { createLink, mintToken } from './invitations.js';
 import { PATHS } from './firestore.js';
 import { emailKey } from './pco/mapping.js';
 import { FakeFirestore } from './testing/fakeFirestore.js';
@@ -143,6 +144,112 @@ describe('provisionAccessForCaller', () => {
 
     expect(result.status).toBe('granted');
     expect(db.get(userPath())?.email).toBe(CALLER.email);
+  });
+
+  describe('one mailbox, one key', () => {
+    /*
+     * Gmail ignores dots in the local part, treats `+tag` as an alias, and
+     * answers to googlemail.com. Google's token carries the address as the
+     * account registered it, so an invitation typed `josmith` used to fail the
+     * `jo.smith` signing in on Sunday. Every other domain keeps its dots: a
+     * rule that merged them on a Workspace domain would merge two real staff.
+     */
+    const GMAIL_CALLER = { ...CALLER, email: 'jo.smith@gmail.com' };
+
+    it('matches a dotted Gmail sign-in to an invitation typed without dots', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'core' });
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result).toMatchObject({ status: 'granted', role: 'core' });
+      // The profile carries the address the token did, not the one typed.
+      expect(db.get(userPath())?.email).toBe('jo.smith@gmail.com');
+    });
+
+    it('matches a googlemail.com sign-in to a gmail.com invitation', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'counselor' });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: 'Jo.Smith+tally@googlemail.com' },
+        NOW,
+        [],
+      );
+
+      expect(result.status).toBe('granted');
+    });
+
+    it('does not match a Workspace address with dots to one without', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@church.org'), { role: 'core' });
+
+      const result = await provisionAccessForCaller(
+        db,
+        { ...CALLER, email: 'jo.smith@church.org' },
+        NOW,
+        [],
+      );
+
+      expect(result.status).toBe('not-on-roster');
+      expect(db.get(userPath())).toBeUndefined();
+    });
+
+    it('finds an invitation written under the exact key, and moves it to the canonical one', async () => {
+      // Written by the app before dots stopped counting: lowercased, dots to
+      // commas, nothing else. It has to keep working, and it has to stop being
+      // a second document the pending list would show beside the real one.
+      const db = new FakeFirestore();
+      const legacyPath = `${PATHS.invitations}/jo,smith@gmail,com`;
+      const written = { email: 'jo.smith@gmail.com', role: 'core', invitedBy: 'uid-dana' };
+      db.seed(legacyPath, written);
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result).toMatchObject({ status: 'granted', role: 'core' });
+      // The same invitation, under the canonical id — plus the stamp every
+      // redemption leaves, which is what the pending list reads back as
+      // "arrived this week".
+      expect(db.get(`${PATHS.invitations}/josmith@gmail,com`)).toMatchObject(written);
+      expect(db.get(`${PATHS.invitations}/josmith@gmail,com`)).toMatchObject({
+        redeemedBy: GMAIL_CALLER.uid,
+      });
+      expect(db.get(legacyPath)).toBeUndefined();
+    });
+
+    it('reads the canonical invitation when both spellings exist', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath('josmith@gmail.com'), { role: 'core' });
+      db.seed(`${PATHS.invitations}/jo,smith@gmail,com`, { role: 'counselor' });
+
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, []);
+
+      expect(result.role).toBe('core');
+      // The canonical one is stamped as redeemed; the legacy one is left where
+      // it lies rather than moved onto it, which is what would merge two
+      // invitations that disagree.
+      expect(db.writtenPaths(PATHS.invitations)).toEqual([
+        `${PATHS.invitations}/josmith@gmail,com`,
+      ]);
+    });
+
+    it('does not move a non-Gmail invitation, whose two keys are the same', async () => {
+      const db = new FakeFirestore();
+      db.seed(invitationPath(CALLER.email), { role: 'core' });
+
+      await provisionAccessForCaller(db, CALLER, NOW, []);
+
+      // One write, and it is the redemption stamp rather than a move.
+      expect(db.writtenPaths(PATHS.invitations)).toEqual([invitationPath(CALLER.email)]);
+    });
+
+    it('pins a Gmail admin however the variable spelled it', async () => {
+      const db = new FakeFirestore();
+      const result = await provisionAccessForCaller(db, GMAIL_CALLER, NOW, ['josmith@gmail.com']);
+
+      expect(result.role).toBe('admin');
+    });
   });
 
   describe('the seeded admin', () => {
@@ -285,3 +392,249 @@ describe('provisionAccessForCaller', () => {
     });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* What an invitation is for, and what it did                                  */
+/* -------------------------------------------------------------------------- */
+
+const JO = { uid: 'uid-jo', email: 'jo.smith84@gmail.com', displayName: 'Jo Smith' };
+
+/** Miriam, core, on Sunday School, having invited somebody to it. */
+function ministry(): FakeFirestore {
+  const db = new FakeFirestore();
+  db.seed(userPath('uid-miriam'), {
+    email: 'miriam.achebe@example.org',
+    displayName: 'Miriam Achebe',
+    role: 'core',
+    active: true,
+  });
+  db.seed('eventSeries/sunday-school', { title: 'Sunday School' });
+  db.seed('eventAccess/sunday-school', {
+    chainKey: 'sunday-school',
+    restricted: true,
+    members: ['uid-miriam'],
+  });
+  return db;
+}
+
+describe('an invitation that says what it is for', () => {
+  it('puts a new member on it, and says so in titles the grant screen can print', async () => {
+    const db = ministry();
+    db.seed(invitationPath(JO.email), {
+      email: JO.email,
+      role: 'counselor',
+      invitedBy: 'uid-miriam',
+      gatherings: ['sunday-school'],
+    });
+
+    const result = await provisionAccessForCaller(db, JO, NOW, []);
+
+    expect(result.status).toBe('granted');
+    expect(result.placed).toEqual([{ title: 'Sunday School', oneOffAt: null }]);
+    expect(result.skipped).toEqual([]);
+    expect(db.get('eventAccess/sunday-school')!.members).toEqual(['uid-miriam', 'uid-jo']);
+  });
+
+  it('stamps the invitation with who arrived, so the inviter meets the name rather than hunting it', async () => {
+    const db = ministry();
+    db.seed(invitationPath(JO.email), {
+      email: JO.email,
+      role: 'counselor',
+      invitedBy: 'uid-miriam',
+      gatherings: ['sunday-school'],
+    });
+
+    await provisionAccessForCaller(db, JO, NOW, []);
+
+    expect(db.get(invitationPath(JO.email))).toMatchObject({
+      resolvedAt: Timestamp.fromDate(NOW),
+      redeemedBy: 'uid-jo',
+      redeemedEmail: JO.email,
+      redeemedName: 'Jo Smith',
+      placed: ['sunday-school'],
+      skipped: [],
+    });
+  });
+
+  it('reports the skip rather than swallowing it, when the inviter is no longer on the gathering', async () => {
+    const db = ministry();
+    db.seed('eventAccess/sunday-school', {
+      chainKey: 'sunday-school',
+      restricted: true,
+      members: ['uid-dana'],
+    });
+    db.seed(invitationPath(JO.email), {
+      email: JO.email,
+      role: 'counselor',
+      invitedBy: 'uid-miriam',
+      gatherings: ['sunday-school'],
+    });
+
+    const result = await provisionAccessForCaller(db, JO, NOW, []);
+
+    expect(result.status).toBe('granted');
+    expect(result.placed).toEqual([]);
+    expect(result.skipped).toEqual([{ title: 'Sunday School', oneOffAt: null }]);
+    // And it stays on the record, because somebody has to receive it.
+    expect(db.get(invitationPath(JO.email))!.skipped).toEqual(['sunday-school']);
+  });
+
+  it('says nothing about gatherings on an invitation that named none', async () => {
+    const db = ministry();
+    db.seed(invitationPath(JO.email), { email: JO.email, role: 'counselor', invitedBy: 'uid-miriam' });
+
+    const result = await provisionAccessForCaller(db, JO, NOW, []);
+    expect(result.placed).toEqual([]);
+    expect(result.skipped).toEqual([]);
+  });
+});
+
+describe('redeemLinkForCaller', () => {
+  async function linkFor(db: FakeFirestore, gatherings: string[] = ['sunday-school']) {
+    return createLink(db, {
+      invitedBy: 'uid-miriam',
+      label: 'Jo, nursery',
+      gatherings,
+      life: 'link',
+      now: NOW,
+    });
+  }
+
+  it('grants counselor, places, and spends the link once', async () => {
+    const db = ministry();
+    const { token, id } = await linkFor(db);
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'counselor', linkStatus: 'ok' });
+    expect(result.placed).toEqual([{ title: 'Sunday School', oneOffAt: null }]);
+    expect(db.get(userPath('uid-jo'))).toMatchObject({ role: 'counselor', active: true });
+    expect(db.get(`invitations/${id}`)!.redeemedEmail).toBe(JO.email);
+
+    // A second person following the same link finds it spent, which is the
+    // whole of "single-use" — a link that works twice is a password.
+    const again = await redeemLinkForCaller(
+      db,
+      { uid: 'uid-sam', email: 'sam@example.org', displayName: 'Sam' },
+      token,
+      NOW,
+      [],
+    );
+    expect(again.linkStatus).toBe('spent');
+    expect(db.get(userPath('uid-sam'))).toBeUndefined();
+  });
+
+  it('refuses an expired link, and a token that opens nothing at all', async () => {
+    const db = ministry();
+    const { token } = await createLink(db, {
+      invitedBy: 'uid-miriam',
+      label: 'Jo at the door',
+      gatherings: [],
+      life: 'qr',
+      now: NOW,
+    });
+
+    const late = new Date(NOW.getTime() + 3_600_000);
+    expect((await redeemLinkForCaller(db, JO, token, late, [])).linkStatus).toBe('expired');
+    expect((await redeemLinkForCaller(db, JO, mintToken(), NOW, [])).linkStatus).toBe('not-found');
+    expect((await redeemLinkForCaller(db, JO, 'a/b', NOW, [])).linkStatus).toBe('not-found');
+    expect(db.get(userPath('uid-jo'))).toBeUndefined();
+  });
+
+  it('leaves a member who follows a link where they were, and still puts them on the gathering', async () => {
+    // "Miriam sent me a link for Sunday School" is a counselor being added to a
+    // gathering. A link grants counselor; it does not demote an admin who
+    // followed one.
+    const db = ministry();
+    db.seed(userPath('uid-jo'), {
+      email: JO.email,
+      role: 'admin',
+      active: true,
+      createdAt: Timestamp.fromDate(new Date('2025-01-01T00:00:00Z')),
+    });
+    const { token } = await linkFor(db);
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'admin' });
+    expect(result.placed).toEqual([{ title: 'Sunday School', oneOffAt: null }]);
+    expect(db.get('eventAccess/sunday-school')!.members).toContain('uid-jo');
+  });
+
+  it('refuses a suspended account, so a link is not a way back in', async () => {
+    const db = ministry();
+    db.seed(userPath('uid-jo'), { email: JO.email, role: 'counselor', active: false });
+    const { token, id } = await linkFor(db);
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result.status).toBe('inactive');
+    // And the link is not burnt by the attempt: whoever it was for can use it.
+    expect(db.get(`invitations/${id}`)!.resolvedAt).toBeUndefined();
+  });
+
+  it('still provisions a seeded admin as an admin', async () => {
+    const db = ministry();
+    const { token } = await linkFor(db, []);
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, ['josmith84@gmail.com']);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'admin' });
+  });
+});
+
+describe('who let somebody in, stamped once', () => {
+  it('records the inviter on the sign-in that admitted them', async () => {
+    const db = ministry();
+    db.seed(invitationPath(JO.email), {
+      email: JO.email,
+      role: 'counselor',
+      invitedBy: 'uid-miriam',
+    });
+
+    await provisionAccessForCaller(db, JO, NOW, []);
+
+    expect(db.get(userPath('uid-jo'))).toMatchObject({ invitedBy: 'uid-miriam' });
+  });
+
+  it('records the deployment for a pinned address, whom nobody could have invited', async () => {
+    const db = new FakeFirestore();
+    await provisionAccessForCaller(db, { ...CALLER, email: ADMIN_EMAIL }, NOW, [ADMIN_EMAIL]);
+
+    expect(db.get(userPath())).toMatchObject({ invitedBy: 'deployment' });
+  });
+
+  it('never re-decides it: a later sign-in leaves the stamp alone', async () => {
+    // A fact about a moment. Re-deciding it every time would let a withdrawn
+    // invitation quietly rewrite how somebody arrived.
+    const db = ministry();
+    db.seed(userPath('uid-jo'), {
+      email: JO.email,
+      role: 'counselor',
+      active: true,
+      invitedBy: 'uid-dana',
+      createdAt: Timestamp.fromDate(new Date('2025-01-01T00:00:00Z')),
+    });
+    const { token } = await createLink(db, {
+      invitedBy: 'uid-miriam',
+      label: 'Jo',
+      gatherings: [],
+      life: 'link',
+      now: NOW,
+    });
+
+    await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(db.get(userPath('uid-jo'))).toMatchObject({ invitedBy: 'uid-dana' });
+  });
+
+  it('leaves it absent for somebody who was already here, rather than guessing', async () => {
+    const db = new FakeFirestore();
+    db.seed(userPath(), { email: CALLER.email, role: 'core', active: true });
+
+    await provisionAccessForCaller(db, CALLER, NOW, []);
+
+    expect(db.get(userPath())).not.toHaveProperty('invitedBy');
+  });
+});
+

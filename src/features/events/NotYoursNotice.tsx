@@ -28,7 +28,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
-import { approvers } from '@/features/events/approvers';
+import { approvers, approversFallback } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import type { TallyEvent } from '@/types';
@@ -78,7 +78,7 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
   }, [events, canWork]);
 
   // Only ask for the directory when a name is actually going to be printed.
-  const { byUid } = useTeam(chains.length > 0);
+  const { members: team, byUid } = useTeam(chains.length > 0);
 
   // An admin passes `canWorkChain` unconditionally, so this is already empty for
   // them; the guard is for the ordinary case, which is a ministry with nothing
@@ -86,6 +86,10 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
   if (chains.length === 0 || can('admin')) return null;
 
   const titles = [...new Set(chains.map(({ event }) => event.title))];
+  // Once for the notice rather than once per chain: an admin passes every
+  // gate, so the same person is the fallback for all of them.
+  const fallback = approversFallback(t, team);
+  const now = new Date();
 
   return (
     <section
@@ -116,12 +120,16 @@ export function NotYoursNotice({ events }: NotYoursNoticeProps) {
           the demotion mark or with the column divider underneath. */}
       <ul className="flex shrink-0 flex-col gap-1 pl-7 pt-2 text-xs lg:pl-8 lg:pt-0">
         {chains.map(({ key, event }) => {
-          const who = approvers(t, event, access, byUid);
+          const who = approvers(t, event, access, byUid, { now });
           return (
             <li key={key} className="flex min-w-0 items-baseline gap-2">
               <span className="shrink-0 font-semibold text-ink-400 lg:min-w-32">{event.title}</span>
               <span className="min-w-0 truncate text-ink-200">
-                {who ?? 'Ask an admin to add you'}
+                {who ?? t('askAnAdmin')}
+                {/* Always, after the names — see `approversFallback`. Its own
+                    span, quieter, so the person on the list stays the bright
+                    half and the fallback reads as the alternative it is. */}
+                {fallback ? <span className="text-ink-400"> · {fallback}</span> : null}
               </span>
             </li>
           );

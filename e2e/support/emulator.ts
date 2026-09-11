@@ -227,6 +227,31 @@ export async function writeDocument(
 }
 
 /**
+ * Writes named fields of one document, leaving the rest of it alone.
+ *
+ * `writeDocument` replaces; this merges, which is what a spec needs when the
+ * document it wants to adjust was written by the app itself and re-creating it
+ * by hand would mean re-deriving every field the app put there. The mask is
+ * the keys of `data`, so a field is only touched if it is named.
+ */
+export async function patchDocument(
+  path: string,
+  data: Record<string, WritableValue>,
+): Promise<void> {
+  const mask = Object.keys(data)
+    .map((key) => `updateMask.fieldPaths=${encodeURIComponent(key)}`)
+    .join('&');
+  const response = await fetch(`${FIRESTORE_ROOT}/${path}?${mask}`, {
+    method: 'PATCH',
+    headers: { ...ADMIN, 'content-type': 'application/json' },
+    body: JSON.stringify({ fields: encodeFields(data) }),
+  });
+  if (!response.ok) {
+    throw new Error(`Patching ${path} failed: HTTP ${response.status} ${await response.text()}.`);
+  }
+}
+
+/**
  * Writes many documents in one round trip, for state measured in hundreds.
  *
  * `writeDocument` is right for the two or three documents a test arranges by

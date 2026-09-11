@@ -323,6 +323,32 @@ for the core team — its numbers come from registers, so a gathering you are no
 them, and the screen names what it left out rather than quietly showing a shorter MIA list that reads
 as good news.
 
+**Asking to be added, which is deliberately not a request queue.** A counselor looking at a
+gathering they are not on sees who can add them — full names, whoever opened Tally today first,
+and an admin unconditionally, because the person the list names may have been on leave since June.
+Under those names is one button. Pressing it puts their name on the Add list, and the sentence
+afterwards says so and says what to do with their feet: the people named will see it under
+**Who's on** when they open that roster, and if they are not here, go and find them. Nothing is
+notified, nothing waits on it, and nobody is obliged to answer — the words never say "request" or
+"pending", because a status is a promise this design does not make.
+
+On the other side it is one dot. While somebody is asking, the **Who's on · 3** chip on the roster
+carries an eight-pixel mark, and the sheet behind it leads with the ask and its two verbs, Add and
+Clear. The dot costs the chip no width and cannot push a roster row under a descending thumb,
+which is what ruled out every louder version. Clearing *marks* rather than deletes, so the asker's
+own screen can say "Miriam cleared this at 7:01 — ask her in person": without that they cannot tell
+being answered from being unread, and press again next week instead of walking over. Asks live a
+week.
+
+If nobody looks, the counselor walks over exactly as they do today and the ask has cost nothing.
+That is the point of it: on most Friday evenings the real path is still saying "can you add me" out
+loud, and the ask only makes the last step one tap instead of a search.
+
+**An admin sees the fences they pass.** A narrowed gathering looks exactly like an open one to
+somebody who passes every one of them — so the one person who can fix a fence was the one person
+who could not see it. Their chooser cards and calendar rows carry a quiet `🔒 narrowed · 3`.
+Nothing is demoted and nothing moves; the fact is simply drawn.
+
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
 still deactivating them on the Team screen.
 
@@ -334,10 +360,32 @@ Planning Center People is the system of record for *people*: names, grades, cont
 medical notes originate there, are read on demand, and are stored nowhere in Tally.
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
-put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
-writes on the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+put there from **Students → Add from Planning Center**; who may sign in is an invitation written on
+the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
 forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
+
+An invitation comes through one of two doors, because the thing being invited is a *person* and what
+Tally can check is an *account*. **By address**, when the inviter knows which one they will use —
+the church's Workspace address, usually. **By link**, when they do not, which is the ordinary case
+for a volunteer whose Google account is a personal Gmail they have never spelled out loud: Tally
+mints a single-use link, good for a fortnight, that the inviter sends — or holds up as a QR, good
+for ten minutes, for the person standing beside them. A link grants counselor and nothing more,
+whoever mints it, and the screen it opens names the account before it spends anything: a phone's
+default Google account is not always the one its owner meant, and a link that granted silently would
+turn a refusal fixed in ten seconds into a wrong identity only an admin can undo.
+
+Either door can say what the invitation is *for* — the gatherings to put somebody on when they
+arrive — so the Tuesday decision finishes on Tuesday rather than at 9:05 on Sunday with a volunteer
+standing at a door. It is carried out at the one moment Tally can confirm it, and re-checked then:
+somebody who has since come off a gathering cannot still be seeding people onto it. Where that
+happens the invitation says so, and the skip waits on the Team screen as an outstanding item rather
+than being discovered at a door.
+
+**Core team may invite counselors.** The line used to be admin-only, which meant a children's
+director who needed to add one nineteen-year-old to the nursery had to be made an admin over
+everyone's access to a roster of minors. Admin- and core-role invitations are still an admin's
+alone.
 
 Team is its own route rather than the last card on Settings, which is where it lived until it was
 the one thing on that page anybody came back to and the only one below a colour picker. Four rounds

@@ -29,6 +29,7 @@ import {
   isEmbeddedBrowser,
   isFirstPartyAuthDomain,
 } from '@/lib/embeddedBrowser';
+import { provisionAccess } from '@/services/functions';
 import { getUserProfileFromServer, subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
 import {
@@ -152,6 +153,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const uid = useRef<string | null>(null);
   /** Whose "last seen" has already been stamped in this tab. */
   const heartbeat = useRef<string | null>(null);
+  /** Whose standing grant has already been re-asserted in this tab. */
+  const reasserted = useRef<string | null>(null);
 
   /* Track the Firebase session. */
   useEffect(() => {
@@ -201,6 +204,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!next && source.fromCache) return;
         setProfile(next);
         setProfileResolved(true);
+
+        /*
+         * The deployment's grant, re-asserted on every fresh sign-in.
+         *
+         * `provisionAccess` is what makes the addresses pinned in
+         * `TALLY_ADMIN_EMAILS` admins no matter what the database says — and
+         * for a long time the app only asked it from the refusal screen, so a
+         * pinned admin who had been demoted or switched off inside Tally got
+         * their standing back only if they were refused outright. Now every
+         * sign-in that lands on an active profile asks once, which is what
+         * the deployment docs already claimed happened. Idempotent on the
+         * server; for everybody who is not pinned it rewrites the profile
+         * they already have.
+         *
+         * Once per uid per tab, like the heartbeat, and only on a snapshot
+         * the server confirmed: a cached profile is not a sign-in. No profile
+         * and an inactive one are `PendingScreen`'s to ask about, and it does.
+         * The result is not read — the listener is what notices the write.
+         */
+        if (next?.active === true && !source.fromCache && reasserted.current !== user.uid) {
+          reasserted.current = user.uid;
+          void provisionAccess().catch(() => {
+            /* Offline, or the callable is having a bad night. The profile the
+               listener delivered is still the truth about this session. */
+          });
+        }
       },
       () => {
         // A rules denial here means "not a member" — surface it as pending

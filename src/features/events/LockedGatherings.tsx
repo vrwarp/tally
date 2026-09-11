@@ -19,8 +19,12 @@
  * five gets one card rather than one card and four rejections. Open when
  * nothing tonight is theirs, because that is the moment somebody needs to
  * understand what they are looking at.
+ *
+ * One name on the row, and the lock. The row is one line on a phone, and a
+ * second name or the admin fallback is the part that truncates; the page the
+ * gathering opens to carries both, in full.
  */
-import { EventIcon } from '@/components/ui';
+import { Link } from 'react-router-dom';
 import { useData } from '@/context/dataContext';
 import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
@@ -37,9 +41,14 @@ export interface LockedGatheringsProps {
    * note above.
    */
   hasOwn: boolean;
+  /**
+   * The clock "opened Tally today" is measured against when the row picks
+   * whom to name. The wall clock when the caller has none to pass.
+   */
+  now?: Date;
 }
 
-export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
+export function LockedGatherings({ events, hasOwn, now = new Date() }: LockedGatheringsProps) {
   const time = useTimeFormats();
   const t = useTranslations('Events');
   const { access } = useData();
@@ -70,33 +79,59 @@ export function LockedGatherings({ events, hasOwn }: LockedGatheringsProps) {
 
         <ul className="flex flex-col gap-1 pt-2">
           {events.map((event) => {
-            const who = approvers(t, event, access, byUid);
+            const who = approvers(t, event, access, byUid, { now, limit: 1 });
 
             return (
               /*
                * A row, not a hero card, and deliberately less appealing than
-               * the thing the counselor came for. Not a link either: there is
-               * nowhere useful to go — the gathering's own page would refuse
-               * them too — so the row states the situation instead of
-               * promising a screen that cannot help.
+               * the thing the counselor came for — but it does go somewhere.
+               *
+               * It was inert for a round, on the argument that there is nowhere
+               * useful to go. Two things overturned that. The page it opens is
+               * not a refusal but the one screen that can help: full names of
+               * who can add you, an admin unconditionally, and the button that
+               * puts your name on their list. And on a touch screen a tap with
+               * no response is indistinguishable from a tap that missed — the
+               * inert-row argument was made about a disclosure the reader chose
+               * to open, and this section opens by itself precisely when they
+               * have chosen nothing.
+               *
+               * The phone row still prints one name, so the part that truncates
+               * is never the way out; the second name and the admin are on the
+               * page this leads to.
                */
-              <li
-                key={event.id}
-                className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left"
-              >
-                <span aria-hidden className="text-ink-600">
-                  🔒
-                </span>
-                <EventIcon name={event.icon} size="sm" tone="muted" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-ink-300">
-                    {event.title}
+              <li key={event.id}>
+                {/*
+                  * A surface and a chevron, because a row with neither was the
+                  * least interactive-looking thing on a rail of carded history
+                  * rows — the one item on the screen that opens the page that
+                  * can actually help read as the footnote explaining why you
+                  * are stuck. The lock carries the meaning, so it takes the
+                  * icon slot the catch-up rows use and the event's own icon
+                  * goes; two glyphs at equal size and equal spacing made "you
+                  * cannot work this" and "it is in the morning" look like a
+                  * matched pair of ornaments.
+                  */}
+                <Link
+                  to={`/event/${event.id}`}
+                  className="flex min-h-11 items-center gap-3 rounded-xl bg-ink-900/60 px-3 py-2 text-left ring-1 ring-ink-800 hover:bg-ink-900 active:bg-ink-900"
+                >
+                  <span aria-hidden className="text-base text-ink-500">
+                    🔒
                   </span>
-                  <span className="block truncate text-xs text-ink-500">
-                    {time.eventWindow(event)}
-                    {who ? ` · ${who}` : ''}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink-300">
+                      {event.title}
+                    </span>
+                    <span className="block truncate text-xs text-ink-500">
+                      {time.eventWindow(event)}
+                      {who ? ` · ${who}` : ''}
+                    </span>
                   </span>
-                </span>
+                  <span aria-hidden className="shrink-0 text-ink-500">
+                    ›
+                  </span>
+                </Link>
               </li>
             );
           })}

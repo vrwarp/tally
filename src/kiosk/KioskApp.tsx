@@ -23,6 +23,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 // below is dynamic, and that boundary is the whole startup strategy.
 import type * as ServicesModule from './services';
 import type { KioskParticipation } from './services';
+import { isRefusal, type PairingReason } from './session';
 // The same arrangement for printing, with one extra condition: the value import
 // only happens if this device has a printer configured, so a kiosk without one
 // never parses the rasteriser, the worker or the WebUSB transport.
@@ -385,6 +386,11 @@ export function KioskApp() {
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig | null>(() => readPrinterConfig());
   const [printerState, setPrinterState] = useState<PrinterState | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  /**
+   * Why a paired kiosk is showing its code again, for the pairing screen to
+   * say. Null for a kiosk that has never been paired, which needs no reason.
+   */
+  const [pairingReason, setPairingReason] = useState<PairingReason | null>(null);
   const [binding, setBinding] = useState<KioskBinding | null>(() => readBinding());
   const [students, setStudents] = useState<KioskStudent[]>(
     () => readCachedRoster()?.students ?? [],
@@ -672,10 +678,19 @@ export function KioskApp() {
     void import('./services').then(async (loaded) => {
       if (cancelled) return;
       setServices(loaded);
-      const restored = await loaded.restoredUid();
+      const restored = await loaded.restoredSession();
       if (cancelled) return;
-      setUid(restored);
-      if (!restored) {
+      setUid(restored.uid);
+      if (!restored.uid) {
+        /*
+         * No session, or one from before kiosks had identities of their own,
+         * signed out just now. Either way the gathering goes with it: pairing
+         * leads to the chooser, and a binding made under a session that no
+         * longer exists must not be what the next session wakes up bound to.
+         */
+        clearBinding();
+        setBinding(null);
+        setPairingReason(restored.reason === 'updated' ? { kind: 'updated' } : null);
         setPhase('pairing');
         return;
       }
@@ -878,78 +893,6 @@ export function KioskApp() {
     }
   }, [services, binding, landStudents, landLast4, landScope]);
 
-  useEffect(() => {
-    if (phase !== 'ready' || !services || !binding) return;
-    hydrate(services, binding);
-    // Seed (or catch up) within a tick of binding rather than a poll later.
-    void onPulse();
-
-    const present = setInterval(() => {
-      void services
-        .fetchAttendance(binding.eventId)
-        .then((register) => {
-          // A poll landing, so it lands as a transition like the rest of the
-          // background reads — a lobby mid-queue must not stutter for it.
-          startTransition(() => {
-            // Never un-green a row this kiosk itself marked: the union keeps an
-            // optimistic tick standing until the server copy includes it. The
-            // same argument applies to a pickup — both are one-way here, and a
-            // staff undo on the main app is picked up on the next rebind.
-            setPresentIds((held) => new Set([...register.present, ...held]));
-            setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
-            // Same union, same reason: an arrival this kiosk recorded a second
-            // ago must not vanish because the server copy has not caught up.
-            setArrivals((held) => new Map([...register.arrivals, ...held]));
-          });
-        })
-        .catch(() => {});
-    }, PRESENT_REFRESH_MS);
-    const replay = setInterval(() => void services.replayQueue().catch(() => {}), QUEUE_REPLAY_MS);
-    const pulse = setInterval(() => void onPulse(), PULSE_POLL_MS);
-    const online = () => void services.replayQueue().catch(() => {});
-    window.addEventListener('online', online);
-
-    return () => {
-      clearInterval(present);
-      clearInterval(replay);
-      clearInterval(pulse);
-      window.removeEventListener('online', online);
-    };
-  }, [phase, services, binding, hydrate, onPulse]);
-
-  /* ---- The screen: awake for as long as this page is on it ---------------- */
-
-  /*
-   * Every phase, not just `ready`. A kiosk showing its pairing code is a kiosk
-   * somebody is walking back and forth to a laptop to approve, and a screen that
-   * sleeps between the two trips is the one that loses the code. Unconditional
-   * for the same reason it is unconditional in wakeLock.ts: there is no state
-   * this app can be in where a lobby screen going dark is what anybody wanted.
-   */
-  useEffect(() => keepScreenAwake(), []);
-
-  /* ---- The gathering's colours ------------------------------------------ */
-
-  /*
-   * Worn while bound, and taken off the moment the binding goes.
-   *
-   * Keyed on the binding rather than on `phase` on purpose. src/kiosk/main.tsx
-   * has already put a live binding's colours on the document before this
-   * component first rendered — that is what stops a themed kiosk booting navy —
-   * and `phase` spends the first few hundred milliseconds on `booting` while
-   * the Firebase chunk loads. Reacting to the phase would strip the theme for
-   * exactly that window and paint it back, which is the flash the pre-paint
-   * apply exists to avoid.
-   *
-   * The liveness test is the same one main.tsx makes: an expired binding is
-   * still in state until the clock below clears it, and a kiosk on its way to
-   * the chooser is not at any gathering.
-   */
-  useEffect(() => {
-    const wearing = binding && bindingIsLive(binding, Date.now()) ? binding : null;
-    applyKioskTheme(wearing?.kioskGround, wearing?.kioskPalette);
-  }, [binding]);
-
   /* ---- Leaving a gathering ----------------------------------------------- */
 
   /**
@@ -983,7 +926,127 @@ export function KioskApp() {
     setReprintedIds(new Set());
     setSentId(null);
     setPhase((current) => (current === 'ready' ? 'choosing' : current));
-  }, [printing]);
+    // The row says idle rather than last Sunday. Fire and forget: a kiosk
+    // being put down is not a kiosk anybody is waiting on.
+    void services?.reportStanding(null);
+  }, [printing, services]);
+
+  /**
+   * This device is nobody any more: put the gathering down, sign out, and show
+   * the code with the reason above it.
+   *
+   * Reached from `checkStanding` only — the one place that can tell a refusal
+   * about this kiosk from a refusal about a child. The queue of dropped writes
+   * is deliberately kept: the device id survives, so a kiosk paired again is
+   * the same uid, and what it could not record then lands when it is back.
+   */
+  const retire = useCallback(
+    (reason: PairingReason) => {
+      leaveGathering();
+      setUid(null);
+      setPairingReason(reason);
+      setPhase('pairing');
+      void services?.unpair().catch(() => {});
+    },
+    [leaveGathering, services],
+  );
+
+  /**
+   * Reports to the device row, and acts on what the row says back.
+   *
+   * On a timer while bound (the register poll's own tick), at the moment of
+   * binding, and after any refused write — see `reportStanding` in services
+   * for why the report is the oracle. `unknown` is the network, and means
+   * nothing; the next tick tries again.
+   */
+  const checkStanding = useCallback(
+    (bound: KioskBinding | null) => {
+      if (!services) return;
+      void services.reportStanding(bound).then((outcome) => {
+        if (outcome === 'retired') retire({ kind: 'retired', atMs: Date.now() });
+        else if (outcome === 'updated') retire({ kind: 'updated' });
+      });
+    },
+    [services, retire],
+  );
+
+  /* ---- The bound kiosk: register, queue, pulse, standing ------------------ */
+
+  useEffect(() => {
+    if (phase !== 'ready' || !services || !binding) return;
+    hydrate(services, binding);
+    // Seed (or catch up) within a tick of binding rather than a poll later.
+    void onPulse();
+    // The binding, reported: what this kiosk may now record, and that it is
+    // still standing. Before the first register read, which depends on it.
+    checkStanding(binding);
+
+    const present = setInterval(() => {
+      checkStanding(binding);
+      void services
+        .fetchAttendance(binding.eventId)
+        .then((register) => {
+          // A poll landing, so it lands as a transition like the rest of the
+          // background reads — a lobby mid-queue must not stutter for it.
+          startTransition(() => {
+            // Never un-green a row this kiosk itself marked: the union keeps an
+            // optimistic tick standing until the server copy includes it. The
+            // same argument applies to a pickup — both are one-way here, and a
+            // staff undo on the main app is picked up on the next rebind.
+            setPresentIds((held) => new Set([...register.present, ...held]));
+            setCheckedOutIds((held) => new Set([...register.checkedOut, ...held]));
+            // Same union, same reason: an arrival this kiosk recorded a second
+            // ago must not vanish because the server copy has not caught up.
+            setArrivals((held) => new Map([...register.arrivals, ...held]));
+          });
+        })
+        .catch(() => {});
+    }, PRESENT_REFRESH_MS);
+    const replay = setInterval(() => void services.replayQueue().catch(() => {}), QUEUE_REPLAY_MS);
+    const pulse = setInterval(() => void onPulse(), PULSE_POLL_MS);
+    const online = () => void services.replayQueue().catch(() => {});
+    window.addEventListener('online', online);
+
+    return () => {
+      clearInterval(present);
+      clearInterval(replay);
+      clearInterval(pulse);
+      window.removeEventListener('online', online);
+    };
+  }, [phase, services, binding, hydrate, onPulse, checkStanding]);
+
+  /* ---- The screen: awake for as long as this page is on it ---------------- */
+
+  /*
+   * Every phase, not just `ready`. A kiosk showing its pairing code is a kiosk
+   * somebody is walking back and forth to a laptop to approve, and a screen that
+   * sleeps between the two trips is the one that loses the code. Unconditional
+   * for the same reason it is unconditional in wakeLock.ts: there is no state
+   * this app can be in where a lobby screen going dark is what anybody wanted.
+   */
+  useEffect(() => keepScreenAwake(), []);
+
+  /* ---- The gathering's colours ------------------------------------------ */
+
+  /*
+   * Worn while bound, and taken off the moment the binding goes.
+   *
+   * Keyed on the binding rather than on `phase` on purpose. src/kiosk/main.tsx
+   * has already put a live binding's colours on the document before this
+   * component first rendered — that is what stops a themed kiosk booting navy —
+   * and `phase` spends the first few hundred milliseconds on `booting` while
+   * the Firebase chunk loads. Reacting to the phase would strip the theme for
+   * exactly that window and paint it back, which is the flash the pre-paint
+   * apply exists to avoid.
+   *
+   * The liveness test is the same one main.tsx makes: an expired binding is
+   * still in state until the clock below clears it, and a kiosk on its way to
+   * the chooser is not at any gathering.
+   */
+  useEffect(() => {
+    const wearing = binding && bindingIsLive(binding, Date.now()) ? binding : null;
+    applyKioskTheme(wearing?.kioskGround, wearing?.kioskPalette);
+  }, [binding]);
 
   /* ---- The clock: binding expiry and the nightly reload ------------------ */
 
@@ -1540,10 +1603,14 @@ export function KioskApp() {
         for (const student of chosen) {
           void services
             .performCheckOut({ eventId: binding.eventId, studentId: student.id, uid })
-            .catch((error: { code?: string }) => {
+            .catch((error: unknown) => {
               // Refused outright — a pickup already stands, and only staff may
-              // move one. The row stays checked out because it is.
-              if (error.code?.includes('permission-denied')) return;
+              // move one. The row stays checked out because it is. Or this
+              // kiosk has been retired, which only its device row can say.
+              if (isRefusal(error)) {
+                checkStanding(binding);
+                return;
+              }
               services.enqueueCheckOut({ binding, student, uid });
             });
         }
@@ -1590,11 +1657,17 @@ export function KioskApp() {
         void services
           .performCheckIn({ binding, student, uid, arrivalId })
           .then(() => services.forgetStudentDates(student.id))
-          .catch((error: { code?: string }) => {
+          .catch((error: unknown) => {
             // Refused outright — frozen student, or a record the kiosk may not
             // touch. Not retryable; the row stays green because they are, in
-            // every way that matters at a door, here.
-            if (error.code?.includes('permission-denied')) return;
+            // every way that matters at a door, here. Unless the refusal is
+            // about this kiosk rather than this child: the device row is the
+            // one read that can tell, and a retired kiosk goes to its pairing
+            // code from there rather than ticking a lobby green all morning.
+            if (isRefusal(error)) {
+              checkStanding(binding);
+              return;
+            }
             services.enqueueCheckIn({ binding, student, uid, arrivalId });
           });
 
@@ -1631,7 +1704,7 @@ export function KioskApp() {
         }
       }
     },
-    [services, printing, prints, binding, uid, grades, dayAtTime, locale],
+    [services, printing, prints, binding, uid, grades, dayAtTime, locale, checkStanding],
   );
 
   /**
@@ -2032,8 +2105,10 @@ export function KioskApp() {
     return (
       <PairingScreen
         services={services}
+        reason={pairingReason}
         onPaired={(paired) => {
           setUid(paired);
+          setPairingReason(null);
           setPhase('choosing');
         }}
       />

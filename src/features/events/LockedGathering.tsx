@@ -12,13 +12,32 @@
  * built from, `ensureMaterialized` — would each be refused, once a minute,
  * forever, filling the console with failures on a screen that already knows the
  * answer. The caller short-circuits before any of it; see `CheckInPage`.
+ *
+ * ## Who it names
+ *
+ * Full names, ranked the way `approvers()` ranks them — whoever opened Tally
+ * today first, then the core team, then admins — and never a suspended
+ * profile, whose membership survives suspension by design. Then, whatever the
+ * list said, one admin by name: an admin passes every gate, and the person the
+ * list names may be on leave since June, which the app cannot know and the
+ * reader can.
+ *
+ * ## "You've just been taken off"
+ *
+ * The live access stream replaces the roster with this page the moment
+ * somebody is removed, and a page that then reads as though the reader was
+ * never on it is a lie the app knows it is telling — it had a roster open a
+ * second ago. `justRemoved` is that fact, decided by the caller, which is the
+ * only thing that knows what was mounted before.
  */
 import { Link } from 'react-router-dom';
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { shortName, useTeam } from '@/features/events/useTeam';
+import { fallbackAdmin, rankApprovers } from '@/features/events/approvers';
+import { AskToBeAdded } from '@/features/events/AskToBeAdded';
+import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
-import type { TallyEvent } from '@/types';
+import type { Role, TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -27,33 +46,63 @@ export interface LockedGatheringProps {
   now: Date;
   /** Where "back" goes. The chooser from check-in, the calendar from events. */
   backTo?: string;
+  /** The word after the chevron. Without one, "Check-in" — the chooser. */
   backLabel?: string;
+  /**
+   * The reader had this gathering's roster open and was taken off it just now.
+   *
+   * Swaps the lead sentence for one that says so. See the note above.
+   */
+  justRemoved?: boolean;
 }
+
+const ROLE_LABEL = {
+  counselor: 'roleCounselor',
+  core: 'roleCore',
+  admin: 'roleAdmin',
+} as const satisfies Record<Role, string>;
 
 export function LockedGathering({
   event,
   now,
   backTo = '/',
-  backLabel = 'Check-in',
+  backLabel,
+  justRemoved = false,
 }: LockedGatheringProps) {
   const time = useTimeFormats();
   const t = useTranslations('Events');
+  const tCheckIn = useTranslations('CheckIn');
+  const tTeam = useTranslations('Team');
   const { access } = useData();
-  const { byUid } = useTeam(true);
+  const { members: team, byUid } = useTeam(true);
 
-  const list = access.get(chainKey(event));
-  const people = [...(list?.members ?? [])]
-    .map((uid) => byUid.get(uid))
-    .filter((profile): profile is NonNullable<typeof profile> => profile !== undefined)
-    .sort((a, b) => {
-      const rank = (role: string) => (role === 'admin' ? 0 : role === 'core' ? 1 : 2);
-      return rank(a.role) - rank(b.role);
-    });
+  /*
+   * The errand, read off the clock rather than plumbed through the route.
+   *
+   * A locked past row on the catch-up tail and a locked row for tonight go to
+   * the same URL, so nothing in the link says which errand brought somebody
+   * here — but a gathering that has already finished can only have been
+   * reached for its register.
+   */
+  const finished = (event.endAt ?? event.startAt).getTime() < now.getTime();
+  const chain = chainKey(event);
+  const list = access.get(chain);
+  const people = rankApprovers(list?.members ?? [], byUid, now);
+  /*
+   * The admin, as a row rather than as a sentence after the list.
+   *
+   * They are unconditionally a way in — the point of naming them at all — and
+   * under the list as prose that read as the afterthought instead of as the
+   * answer. Skipped when the ranking already named them, or the same person
+   * would appear twice.
+   */
+  const admin = fallbackAdmin(team);
+  const askable = admin && !people.some((one) => one.id === admin.id) ? [...people, admin] : people;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-4">
       <Link to={backTo} className="text-sm font-semibold text-brand-300">
-        ‹ {backLabel}
+        {backLabel ? `‹ ${backLabel}` : tCheckIn('backToCheckIn')}
       </Link>
 
       <header className="flex items-start gap-3">
@@ -73,36 +122,62 @@ export function LockedGathering({
         <p className="flex items-center gap-2 text-sm font-semibold text-ink-200">
           <span aria-hidden>🔒</span> {t('lockedRestricted')}
         </p>
-        <p className="pt-1 text-sm text-ink-500">
-          {t('lockedExplain')}
+        {/*
+          * Three sentences, and which one is true is something the app knows
+          * without asking. Taken off just now: it had the roster open a second
+          * ago, so saying "you are not on this" would be a lie it knows it is
+          * telling. A gathering that has finished: the reader came here to take
+          * a register for a night that is over — the catch-up errand — and a
+          * sentence about tonight would not answer them. Otherwise, the plain
+          * one.
+          */}
+        {/* The measure, not the card. Two sentences do the whole work of this
+            screen and they were set to 97 characters a line in a 737px card on
+            a 1440px window — a width nothing forced. `ch` is the digit's
+            width, which against lowercase running text is generous: 52 of them
+            lands near the 65 characters the brief asks for, where 62 landed
+            at 79. */}
+        <p className="max-w-[52ch] pt-1 text-sm text-ink-500">
+          {justRemoved
+            ? t('justTakenOff')
+            : finished
+              ? t('lockedCatchUp')
+              : t('lockedExplain')}
         </p>
 
-        {people.length > 0 ? (
+        {askable.length > 0 ? (
           <>
             <h2 className="pt-4 text-xs font-bold uppercase tracking-wider text-ink-400">
               {t('askOneOfThese')}
             </h2>
             <ul className="flex flex-col pt-1">
-              {people.map((profile) => (
+              {askable.map((profile) => (
                 <li key={profile.id} className="flex min-h-11 items-center gap-2 text-sm">
-                  <span className="text-ink-200">
-                    {profile.displayName ?? shortName(profile) ?? profile.email}
-                  </span>
+                  <span className="text-ink-200">{fullName(profile)}</span>
                   <span className="text-xs uppercase tracking-wider text-ink-600">
-                    {profile.role}
+                    {tTeam(ROLE_LABEL[profile.role])}
                   </span>
                 </li>
               ))}
             </ul>
+            {/* Under the names, because the names are the answer and this is
+                the shortcut to them — not a substitute for walking over. */}
+            <AskToBeAdded chain={chain} approvers={askable} />
           </>
         ) : (
           /*
            * No names is a real state, not a rendering failure: the directory may
-           * not have loaded, or an admin may have restricted the gathering to
-           * nobody at all. Either way "find an admin" is the true next step and
-           * a blank space is not.
+           * not have loaded, an admin may have restricted the gathering to
+           * nobody at all, or everybody on it may be suspended. Either way "find
+           * an admin" is the true next step and a blank space is not.
            */
-          <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
+          /* `askable` being empty means there is no active admin in the
+             directory either, so there is no name to print — the sentence is
+             all there is to say, and the button is still worth offering. */
+          <>
+            <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
+            <AskToBeAdded chain={chain} approvers={askable} />
+          </>
         )}
       </div>
     </div>

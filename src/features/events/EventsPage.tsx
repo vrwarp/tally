@@ -39,6 +39,7 @@ import { Badge, Button, EmptyState, EventIcon, SkeletonRows } from '@/components
 import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
+import { chainKey } from '@/lib/materialize';
 import { useToast } from '@/context/toastContext';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
@@ -89,9 +90,24 @@ function EventRow({
 }) {
   const time = useTimeFormats();
   const t = useTranslations('Events');
+  const { can } = useAuth();
+  const { access } = useData();
   const cancelled = event.status === 'cancelled';
 
+  /*
+   * An admin passes every fence, so a narrowed gathering looks exactly like an
+   * open one on their calendar — and the one person who can fix a fence is the
+   * one person who cannot see it. Drawn as a tag among the tags this row
+   * already carries; nothing about the row moves. Everybody else already
+   * learns it the way the app has always said it, under "Not yours".
+   */
+  const list = access.get(chainKey(event));
+  const narrowed = can('admin') && list?.restricted === true ? list.members.size : null;
+
   const badges = [
+    narrowed !== null ? (
+      <Badge key="narrowed" tone="neutral">{t('narrowedTag', { count: narrowed })}</Badge>
+    ) : null,
     event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">{t('badgeOneOff')}</Badge> : null,
     cancelled ? <Badge key="cancelled" tone="danger">{t('badgeCancelled')}</Badge> : null,
     // Neutral, not `warn`. Amber is the token for something the reader has to

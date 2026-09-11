@@ -382,9 +382,33 @@ gcloud projects add-iam-policy-binding tally-76406 \
 until pairing gives it one — and are covered by the same `allUsers` invoker binding as every other
 callable above. What keeps them harmless is in the handlers: a cap on live pairings, a ten-minute
 expiry, a hashed device secret, and the fact that no token exists until a signed-in staff member
-approves the code. They are also the **only** intentionally-unauthenticated callables since the
-QR/phone registration was retired: `registerFamily` requires the kiosk's own token outright, so
-nothing app-level accepts an anonymous caller any more.
+approves the code.
+
+`readInvitation` is the third, and it is unauthenticated for a reason of the same shape: the person
+holding an invite link has no account yet, and being asked to sign in before being told what they
+are signing in *to* is how a volunteer decides a link is phishing. It answers an inviter's display
+name and some gathering titles for a token that opens something, and nothing at all for one that
+does not — no addresses, no roster, and one `get()` at a path derived from the token's hash, so
+there is no query for a caller to turn into a scan. Redeeming is a different callable and requires
+a Google sign-in.
+
+`registerFamily` requires the kiosk's own token outright, so nothing else app-level accepts an
+anonymous caller.
+
+### After the kiosk-identity update, every kiosk pairs once
+
+Kiosks used to sign in as the person who approved their pairing code. They now sign in as
+themselves — a uid minted for a device id each kiosk keeps in its own storage, with a
+[`kioskDevices/{deviceId}`](./data-model.md#kioskdevicesdeviceid) row as its standing. A session
+minted the old way carries no device id, and the first deploy that includes this change signs
+every such kiosk out at its next boot (the nightly reload, or the first wake). The kiosk then shows
+its pairing code under the sentence *Tally was updated, so this kiosk needs pairing once more*,
+and any active member pairs it again from **Kiosk** in the account menu, exactly as the first time.
+
+Do the deploy on a weekday and walk the lobby afterwards, so that no tablet is discovered asking
+to be paired at a quarter past nine on a Sunday. Nothing else changes for the room: the printer
+pairing, the language and the installed app all survive, and the kiosk's queue of dropped writes
+lands under its new identity once it is back.
 
 ### The artifact cleanup policy
 

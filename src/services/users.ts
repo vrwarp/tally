@@ -119,3 +119,47 @@ export async function upsertUser(
 
   await setDoc(ref, payload, { merge: true });
 }
+
+/**
+ * Ends somebody's access, or gives it back — and records which happened.
+ *
+ * The pair of stamps is the point. `createdAt` says when somebody joined and
+ * `invitedBy` who let them in; these say when it ended and who ended it, which
+ * together are the whole of what a children's director asked to be able to
+ * answer about an adult who worked with children. Nothing here records what
+ * they could work while they were here: Tally keeps no per-gathering
+ * membership history, and pretending otherwise on a safeguarding question
+ * would be worse than the gap.
+ *
+ * `accessRestoredAt` sits *beside* the ending rather than clearing it. A
+ * suspension that vanishes when it is lifted leaves a record that says a
+ * person was never suspended, which is exactly the question somebody would be
+ * asking the record.
+ *
+ * Membership of gatherings is deliberately untouched: suspension is about the
+ * front door, and `eventAccess` is about rooms. Un-suspending therefore hands
+ * back exactly what was held before, which is why the screen has to say so
+ * before it happens — see the armed confirm on the Team screen.
+ */
+export async function setAccessActive(
+  uid: string,
+  active: boolean,
+  byUid: string,
+): Promise<void> {
+  await updateDoc(doc(db, paths.user(uid)), {
+    active,
+    ...(active
+      ? { accessRestoredAt: serverTimestamp() }
+      : { accessEndedAt: serverTimestamp(), accessEndedBy: byUid }),
+  });
+}
+
+/**
+ * Changes what somebody may do. No stamp, and no arm step on the screen: a
+ * role is reversible and takes nothing away that a second tap cannot return,
+ * which is what the toast's Undo is for.
+ */
+export async function setRole(uid: string, role: Role): Promise<void> {
+  await updateDoc(doc(db, paths.user(uid)), { role });
+}
+

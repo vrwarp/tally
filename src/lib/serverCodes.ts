@@ -46,6 +46,13 @@ export const SERVER_CODES = [
   'auth.adminOnly',
   'auth.notOnGathering',
   'auth.kioskOnly',
+  'auth.linkNotYours',
+
+  /* ---- Invitations ------------------------------------------------------ */
+  'invite.labelRequired',
+  'invite.tooManyLive',
+  'invite.gatheringNotYours',
+  'invite.gone',
 
   /* ---- What was asked for ----------------------------------------------- */
   'notFound.student',

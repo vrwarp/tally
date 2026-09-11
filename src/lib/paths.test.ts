@@ -37,6 +37,8 @@ describe('the collection names', () => {
       skippedNights: 'skippedNights',
       upstreamEdits: 'upstreamEdits',
       eventAccess: 'eventAccess',
+      accessRequests: 'accessRequests',
+      kioskDevices: 'kioskDevices',
       transitions: 'transitions',
       attendance: 'attendance',
       rsvps: 'rsvps',

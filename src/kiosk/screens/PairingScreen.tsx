@@ -11,7 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 import { InstallPrompt } from '../components/InstallPrompt';
 import { LanguagePicker } from '../components/LanguagePicker';
-import { useTranslations } from 'use-intl';
+import type { PairingReason } from '../session';
+import { useLocale, useTranslations } from 'use-intl';
 
 /** Exported so tests can drive the poll loop rather than wait through it. */
 export const POLL_MS = 2000;
@@ -53,12 +54,20 @@ const TROUBLE_KEYS = {
 
 export function PairingScreen({
   services,
+  reason = null,
   onPaired,
 }: {
   services: KioskServices;
+  /**
+   * Why a kiosk that was paired is showing this screen again, or null for one
+   * that never was. Said above the code, because a bare code at a quarter
+   * past nine reads as "somebody unpaired us" — see `PairingReason`.
+   */
+  reason?: PairingReason | null;
   onPaired: (uid: string) => void;
 }) {
   const t = useTranslations('Pairing');
+  const locale = useLocale();
   const [code, setCode] = useState<string | null>(null);
   const [trouble, setTrouble] = useState<PairingTrouble | null>(null);
   const pairedRef = useRef(onPaired);
@@ -127,6 +136,31 @@ export function PairingScreen({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8 p-8 text-center">
       <div className="text-lg font-medium text-ink-400">{t('title')}</div>
+      {/*
+        * The reason, before the code. Addressed to whoever walked over to see
+        * why the lobby screen is asking to be paired: a leader who did not
+        * retire it, or a greeter on the morning after an update. The retired
+        * sentence carries the moment, so the register can be checked from
+        * then; both end in the same instruction, which the line under the
+        * code already gives.
+        */}
+      {reason ? (
+        <div
+          data-testid="kiosk-pairing-reason"
+          className={`max-w-md text-lg leading-relaxed ${
+            reason.kind === 'retired' ? 'text-warn-400' : 'text-ink-200'
+          }`}
+        >
+          {reason.kind === 'retired'
+            ? t('retired', {
+                time: new Date(reason.atMs).toLocaleTimeString(locale, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                }),
+              })
+            : t('updated')}
+        </div>
+      ) : null}
       {code ? (
         <>
           {/*

@@ -103,13 +103,38 @@ export interface UserProfileDoc {
   lastSeenAt: Timestamp | null;
   /** The Planning Center person this counselor was matched to, by email. */
   pcoPersonId: string | null;
+
+  /* ---- How access began and ended --------------------------------------- */
+  /**
+   * Who let this person in, stamped by `provisionAccess` when it resolves an
+   * invitation or a link — or the literal `'deployment'` for an address pinned
+   * in `TALLY_ADMIN_EMAILS`, which nobody invited because nobody could have.
+   *
+   * With `createdAt`, `accessEndedAt` and `accessEndedBy` this is the narrow
+   * safeguarding fact a children's director asked for: **when access was
+   * granted, by whom, and when it ended.** Deliberately nothing more — Tally
+   * records no per-gathering membership history, and the person page says so
+   * rather than letting a reader assume otherwise.
+   *
+   * Absent for everybody who already had a profile when the stamp arrived. A
+   * one-off backfill copies it from surviving invitations; where none survives
+   * the page reads "Not recorded (before <date>)" rather than inventing one.
+   */
+  invitedBy?: string | null;
+  accessEndedAt?: Timestamp | null;
+  accessEndedBy?: string | null;
+  /** Set when somebody is let back in. Kept beside the ending, not instead of it. */
+  accessRestoredAt?: Timestamp | null;
 }
 
-export interface UserProfile extends Omit<UserProfileDoc, 'createdAt' | 'lastSeenAt'> {
+export interface UserProfile
+  extends Omit<UserProfileDoc, 'createdAt' | 'lastSeenAt' | 'accessEndedAt' | 'accessRestoredAt'> {
   /** Firebase Auth uid. */
   id: string;
   createdAt: Date;
   lastSeenAt: Date | null;
+  accessEndedAt: Date | null;
+  accessRestoredAt: Date | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -138,19 +163,69 @@ export interface UserProfile extends Omit<UserProfileDoc, 'createdAt' | 'lastSee
  * it, and `inviteToTally` deletes it from any document it rewrites.
  */
 export interface InvitationDoc {
-  /** The address as typed, for display. The document id is its `emailKey`. */
-  email: string;
+  /**
+   * The address as typed, for display. The document id is its `emailKey`.
+   *
+   * Absent on a **link** invitation, which is the whole reason links exist:
+   * nobody knew which Google account the person would use. The address is
+   * written on it as `redeemedEmail` when somebody arrives.
+   */
+  email?: string;
   role: Role;
   invitedAt: Timestamp;
   invitedBy: string | null;
   /** Free text, for "Wednesday night volunteer" and the like. */
   note?: string;
+
+  /* ---- Links ------------------------------------------------------------ */
+  /**
+   * `'link'` for an invitation redeemed by a token rather than by address;
+   * absent for the address kind, which is what every invitation used to be.
+   * The document id of a link is `link_<sha256(token)>` — see
+   * `functions/src/invitations.ts`; the token itself is never stored.
+   */
+  kind?: 'link';
+  /**
+   * Who the link is for, in the inviter's own words: "Jo, nursery, Marie's
+   * daughter". Required when minting one, because a link row has no address
+   * to name it and eight anonymous rows on a Tuesday is how a season roll
+   * goes back into a spreadsheet.
+   */
+  label?: string;
+  /** When the token stops opening it. Links only. */
+  tokenExpiresAt?: Timestamp;
+
+  /* ---- What it is for --------------------------------------------------- */
+  /**
+   * The chains the new member should be put on at first sign-in, at most
+   * twenty. Written by the inviter; carried out by `provisionAccess` or
+   * `redeemInvitation`, which re-check that the inviter may still offer each
+   * one. Absent means "nothing narrowed", which is most invitations.
+   */
+  gatherings?: string[];
+
+  /* ---- What it did ------------------------------------------------------ */
+  /**
+   * When somebody arrived on it. Written by the server and refused to clients
+   * by the rules: an invitation that could be marked spent from a browser is
+   * an invitation somebody can quietly cancel.
+   */
+  resolvedAt?: Timestamp;
+  redeemedBy?: string;
+  redeemedEmail?: string;
+  redeemedName?: string | null;
+  /** The chains the redemption put them on, and the ones it could not. */
+  placed?: string[];
+  skipped?: string[];
 }
 
-export interface Invitation extends Omit<InvitationDoc, 'invitedAt'> {
-  /** The `emailKey` document id. */
+export interface Invitation
+  extends Omit<InvitationDoc, 'invitedAt' | 'tokenExpiresAt' | 'resolvedAt'> {
+  /** The `emailKey` of an address invitation, or `link_<hash>` for a link. */
   id: string;
   invitedAt: Date | null;
+  tokenExpiresAt: Date | null;
+  resolvedAt: Date | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -815,14 +890,83 @@ export interface TallyEvent
 /* -------------------------------------------------------------------------- */
 
 /**
+ * A kiosk device as a screen reads one.
+ *
+ * `pairedAt` widens to nullable on the way out, unlike its stored counterpart:
+ * a locally pending `serverTimestamp()` reads back as null until the server
+ * acknowledges it, and the Team screen has to draw the row either way.
+ */
+export interface KioskDevice
+  extends Omit<KioskDeviceDoc, 'pairedAt' | 'lastSeenAt' | 'retiredAt'> {
+  /** The device id the kiosk minted for itself; the document id. */
+  id: string;
+  pairedAt: Date | null;
+  lastSeenAt: Date | null;
+  retiredAt: Date | null;
+}
+
+/**
+ * Stored at `accessRequests/{chainKey}__{uid}`: somebody asking to be put on a
+ * gathering they are not on.
+ *
+ * Deliberately not a workflow — see `docs/team-access.md`. Nothing is notified
+ * and nothing waits on it: a counselor who presses this still walks over and
+ * asks out loud, and what the row buys is that their name is one tap on the
+ * roster instead of a search. Clearing *marks* rather than deletes, so the
+ * asker can tell "nobody looked" from "somebody said no" and does not press
+ * again.
+ */
+export interface AccessRequestDoc {
+  chainKey: string;
+  uid: string;
+  /** Denormalised so the roster can name the asker without reading `users`. */
+  name: string;
+  askedAt: Timestamp;
+  clearedBy?: string | null;
+  clearedAt?: Timestamp | null;
+}
+
+export interface AccessRequest extends Omit<AccessRequestDoc, 'askedAt' | 'clearedAt'> {
+  /** `{chainKey}__{uid}`. */
+  id: string;
+  askedAt: Date | null;
+  clearedAt: Date | null;
+}
+
+/**
+ * Stored at `kioskDevices/{deviceId}`: a lobby kiosk's standing.
+ *
+ * Written by `claimKioskToken` when a pairing is approved, and the row *is*
+ * the kiosk's standing — the rules admit a kiosk session while its row exists
+ * and `retiredAt` is null, and read nobody's profile. The kiosk itself may
+ * update only `lastSeenAt`, `boundTo` and `boundChain`; core and up may set
+ * `retiredAt`/`retiredBy`, and nobody deletes one: the row is the provenance
+ * of every morning that kiosk recorded. See `src/lib/kioskDevice.ts`.
+ */
+export interface KioskDeviceDoc {
+  approvedBy: string;
+  /** The approver's display name as of the pairing, like `transitions.releasedByName`. */
+  approvedByName: string | null;
+  pairedAt: Timestamp;
+  /** Updated by the kiosk while bound; null until it first reports in. */
+  lastSeenAt: Timestamp | null;
+  /** The title of the gathering the kiosk is bound to, or null between gatherings. */
+  boundTo: string | null;
+  /** The chain it is bound to — the whole of its reach in the rules. */
+  boundChain: string | null;
+  retiredAt: Timestamp | null;
+  retiredBy: string | null;
+}
+
+/**
  * How the counselor found the student. Purely diagnostic — it tells the core
  * team whether the predictive roster is actually earning its keep.
  *
  * `import` marks a row that came from Planning Center Check-Ins history
  * rather than from anybody's thumb; those rows also carry
  * `checkedInBy: 'planning-center'` instead of a uid. `kiosk` marks a
- * self-serve check-in from the lobby kiosk, written under the staff session
- * that paired the device.
+ * self-serve check-in from the lobby kiosk, written under the kiosk's own
+ * uid, `kiosk_<deviceId>` — see `src/lib/kioskDevice.ts`.
  */
 export type CheckInMethod = 'tap' | 'search' | 'quick-add' | 'manual' | 'import' | 'kiosk';
 
@@ -1054,15 +1198,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The `invitations/{emailKey}` document id.
+ * The `invitations/{emailKey}` document id, and the canonical address behind it.
  *
- * Dots become commas because the address is the key and the key is a path
- * segment. Must stay identical to `emailKey` in functions/src/pco/mapping.ts,
- * or an invitation an admin wrote would not be the one a sign-in looks up.
+ * Defined in `@/lib/emailKey` — where the Gmail rule (dots and `+tags` do not
+ * make a different mailbox) is written down once — and re-exported here because
+ * this is where every caller has always found it. Must stay identical to the
+ * copy in functions/src/pco/mapping.ts, or an invitation an admin wrote would
+ * not be the one a sign-in looks up.
  */
-export function emailKey(email: string): string {
-  return email.trim().toLowerCase().replace(/\./g, ',');
-}
+export { canonicalEmail, emailKey, sameAccount } from '@/lib/emailKey';
 
 /** How much Tally is allowed to write back to Planning Center. */
 export type PcoWriteBackMode = 'off' | 'create' | 'full';

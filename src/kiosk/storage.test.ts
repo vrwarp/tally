@@ -16,10 +16,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isDeviceId } from '@/lib/kioskDevice';
 import {
   KIOSK_KEYS,
   KIOSK_ROSTER_VERSION,
   NO_PARTICIPATION,
+  ensureDeviceId,
   participationScope,
   readCachedParticipation,
   readCachedPulse,
@@ -268,5 +270,32 @@ describe('the pulse cache', () => {
     );
 
     expect(readCachedPulse()).toEqual({ roster: 1, phones: 2, participation: 3 });
+  });
+});
+
+describe('ensureDeviceId', () => {
+  it('mints an id the server would accept and keeps it', () => {
+    localStorage.clear();
+    const minted = ensureDeviceId();
+    expect(isDeviceId(minted)).toBe(true);
+    expect(minted.startsWith('kiosk-')).toBe(true);
+    expect(readJson<string>(KIOSK_KEYS.deviceId)).toBe(minted);
+    // The same kiosk on the next boot, not a new one.
+    expect(ensureDeviceId()).toBe(minted);
+  });
+
+  it('treats anything on the disk that is not an id as absent — it is about to become a path', () => {
+    localStorage.clear();
+    writeJson(KIOSK_KEYS.deviceId, 'a/b');
+    const minted = ensureDeviceId();
+    expect(minted).not.toBe('a/b');
+    expect(isDeviceId(minted)).toBe(true);
+  });
+
+  it('mints a different id for a different storage container', () => {
+    localStorage.clear();
+    const first = ensureDeviceId();
+    localStorage.clear();
+    expect(ensureDeviceId()).not.toBe(first);
   });
 });

@@ -36,12 +36,13 @@ erDiagram
 
 ```
 users/{uid}                              counselor & core team profiles
-invitations/{emailKey}                   who an admin has said may sign in
+invitations/{emailKey | link_hash}       who may sign in: an address, or a link
 eventSeries/{seriesId}                   recurring templates (friday-fellowship, sunday-school)
 students/{studentId}                     the roster itself — a document is a membership
 events/{eventId}                         a single dated gathering
 events/{eventId}/attendance/{studentId}  who showed up
 events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
+accessRequests/{chainKey}__{uid}         somebody asking to be put on a gathering
 transitions/{chainKey}__{studentId}      this gathering no longer expects this student
 config/settings                          tunable thresholds
 config/planningCenter                    the non-secret Planning Center settings
@@ -501,11 +502,47 @@ because reopening requires being on it. Admins pass regardless — that is the b
 refused, because deleting the document reopens the gathering; the way to reopen is `restricted:
 false`, which keeps the list.
 
+**Restricting is a union, in a transaction.** `restrictChain` in `src/services/eventAccess.ts` reads
+the document inside `runTransaction` and writes `members` as the sheet's ticks ∪ the writer ∪
+whoever is on the document now and was not on it when the sheet opened. It used to be a merge that
+overwrote the array with the ticks, which is how a volunteer added at the door on Friday was taken
+off again by a core member's Tuesday decision that never saw them. Removing somebody is still a
+deliberate untick of a name the sheet showed; only the names it never showed are kept.
+
 **One `get()` note that is not a detail.** Every rule reading this collection asks `exists()` before
 `get()`. A `get()` at a path with no document *raises* rather than returning null, and a raised
 lookup denies — so the natural `a == null || …` form would have denied every gathering nobody had
 restricted, which is all of them on the day it deployed. `firestore-tests/getSemantics.test.ts` pins
 that fact.
+
+### `accessRequests/{chainKey}__{uid}`
+
+Somebody asking to be put on a gathering they are not on — and **deliberately not a workflow**.
+Nothing is notified, nothing waits on one, and pressing it obliges nobody. A counselor who asks
+still walks over and asks out loud, exactly as today; what the row buys them is that their name is
+one tap on the roster instead of a search through it. Every surface that reads this avoids
+"request", "pending" and "asked" for that reason: anything shaped like a queue would be a promise
+the design does not make.
+
+| Field | Meaning |
+| --- | --- |
+| `chainKey`, `uid` | The pair. The document id is `{chainKey}__{uid}`, so pressing twice addresses the row that already exists rather than stacking a second claim on somebody else's screen. |
+| `name` | Denormalised, so a roster can name the asker without reading `users`. |
+| `askedAt` | Re-stamped by a second press, which is the honest reading of pressing again: the same ask, today. |
+| `clearedBy`, `clearedAt` | Set when somebody answers it. |
+
+**Clearing marks; it does not delete.** Without the mark the asker cannot tell "nobody has looked"
+from "somebody has said no", and presses again next week — so their own screen reads it back as
+"Miriam cleared this at 7:01 — ask her in person". The rules therefore refuse every client delete,
+and the ageing-out is a nightly job (`sweepOldAccessRequests`, 03:10) that removes anything older
+than seven days, cleared or not: an ask is about tonight.
+
+**Who writes:** the asker, as themselves, and only about a gathering they cannot already work — a
+row from somebody who can work it is noise on somebody else's screen. Clearing is anybody on the
+gathering (admins included, as everywhere) or the asker taking it back, and may touch only the two
+clearing fields, so a clear can never quietly rewrite who asked. **Who reads:** any active member.
+That is wider than who may act on one, on purpose: the asker has to be able to read their own row
+back to learn it was answered.
 
 ### What restriction does not protect
 
@@ -572,8 +609,12 @@ The self-serve kiosk's pairing handshake — how a browser on a lobby shelf acqu
 without anybody signing in to Google on it. The kiosk (served at `/kiosk`) calls an
 unauthenticated callable and puts the returned six-character code on screen; a staff member
 approves that code from `/pair-kiosk` under their real session; the kiosk then redeems the code
-*plus a secret only it holds* for a custom token minted for the **approver's uid**, carrying a
-`kiosk: true` claim. Every check-in the kiosk writes is attributed to the person who approved it.
+*plus a secret only it holds* — and the device id it minted for itself — for a custom token minted
+for **the kiosk's own uid**, `kiosk_<deviceId>`, carrying `{ kiosk: true, deviceId }`. The claim
+also writes the kiosk's [`kioskDevices/{deviceId}`](#kioskdevicesdeviceid) row, which is its
+standing from then on. Every check-in the kiosk writes is attributed to the kiosk, not to the
+person who approved it: a lobby tap is nobody's eyewitness account, and the register export says
+"Lobby kiosk" with the device id beside it.
 
 **How long a kiosk stays on one gathering.** The binding lasts until
 `max(endAt, checkInClosesAt)`. It used to end at `endAt`, which on a nursery Sunday is the moment
@@ -609,7 +650,7 @@ chooser rather than a gathering that finished last week.
 | --- | --- | --- |
 | `secretHash` | string | SHA-256 of the kiosk-held secret. The plaintext never touches Firestore — the code is public by design (it is on a screen in a lobby), and the secret is what stops a bystander who saw it from racing the kiosk for the token. |
 | `status` | `'pending' \| 'approved'` | |
-| `approvedBy`, `approvedAt` | — | The staff member whose identity the kiosk inherits. |
+| `approvedBy`, `approvedAt` | — | The staff member who vouched for the code. Copied onto the device row at claim time; nothing about the kiosk's session reads their profile afterwards. |
 | `createdAt`, `expiresAt`, `claimedAt` | — | Ten-minute lifetime; expired documents are swept opportunistically by the next `startKioskPairing` call. |
 
 **Who writes: nobody, from a client.** The rules deny every read and write; the three pairing
@@ -619,10 +660,49 @@ the unauthenticated ends are a cap on live pairings, the expiry, and the fact th
 until an authenticated approval does.
 
 The `kiosk: true` claim narrows the session rather than widening it: a kiosk may *create* an
-attendance record and write the date patch a check-in makes (a pinned key set on `students`), and
-may not update or delete attendance, read `users`, or touch anything else a full counselor session
-can. The kill switch is the approver's `users/{uid}` document — deactivating it cuts the kiosk off
-on its next request, like any other session.
+attendance record, record a first pickup, and write the date patch a check-in makes (a pinned key
+set on `students`); it may not undo or delete attendance, read `users`, or touch anything else a
+full counselor session can. The kill switch is the device row below — retiring it cuts the kiosk
+off on its next write, and the kiosk goes back to its pairing screen from there. It used to be the
+approver's `users/{uid}` document, which is the one finding in the team-access work that lost
+data: the tablet a suspended volunteer had paired in September ticked children green all morning
+with every write refused, because nothing anywhere said a kiosk *was* that person.
+
+### `kioskDevices/{deviceId}`
+
+One document per paired lobby kiosk, keyed by the id the kiosk minted for itself and keeps in its
+own storage (`src/kiosk/storage.ts`). **The row is the kiosk's standing**: `isLiveKiosk()` in the
+rules admits a kiosk session while the claim carries a device id, the uid is `'kiosk_' + deviceId`,
+the row exists and `retiredAt` is null — and reads no profile at all. Suspending or removing the
+person who approved the pairing touches nothing.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `approvedBy`, `approvedByName` | — | Who vouched for the code, and their name as of that moment — denormalised the way `transitions.releasedByName` is, because the row outlives the profile. |
+| `pairedAt` | timestamp | |
+| `lastSeenAt` | timestamp or null | Written by the kiosk on every register poll while bound. Null until it first reports in. |
+| `boundTo`, `boundChain` | string or null | The title and chain of the gathering the kiosk is bound to, written by the kiosk at bind time and null between gatherings. `boundChain` is **the whole of the kiosk's reach**: the attendance rules let a kiosk session read and write the register of that chain and no other — a fence on the chain included, since `eventAccess` is about people and a kiosk stands in whichever room a leader pointed it at. |
+| `retiredAt`, `retiredBy` | — | Set by core and up, in their own name. Never cleared from a client: pairing again is how a retired tablet comes back, and the claim replaces the row wholesale. |
+
+**Who writes: the server, at claim time, wholesale.** The kiosk may update only `lastSeenAt`,
+`boundTo` and `boundChain` on its own row, and only while the row is not retired. Core and up may
+set `retiredAt`/`retiredBy` and nothing else. Nobody creates or deletes one from a client, and
+there is no sweep: the row is the provenance of every morning that kiosk recorded, and a device row
+costs nothing to keep. Core and up read them; a kiosk cannot read even its own.
+
+**The report is the oracle.** The kiosk writes its row the moment a gathering is bound and again
+on every register poll — so a report the lobby wifi dropped at bind time lands on the next one —
+and after any refused write. The rules let a kiosk touch its own row only while it stands, so a
+refusal *there* is the one refusal that cannot be about a frozen student, a pickup already
+recorded or a gathering's fence. A refused check-in asks the row before it concludes anything:
+row live, it was the child, and the row on the glass stays green as today; row refused, this
+device is nobody, the binding is put down, the session signed out, and the pairing screen says
+from when the register may be short. No callable, no debounce, one round trip.
+
+**Migration.** A token minted before kiosks had identities is the approver's uid with no device
+claim. The kiosk compares its restored session's uid against `kiosk_<its own id>` at boot, signs a
+mismatch out once, and pairs again with its own sentence ("Tally was updated…") — see
+[deployment-setup.md](./deployment-setup.md#after-the-kiosk-identity-update-every-kiosk-pairs-once).
 
 ### `kioskIndex/phones`
 
@@ -955,11 +1035,47 @@ Tally creates gets pushed. Absent means Planning Center, which is what keeps eve
 before this document existed behaving identically. Core-writable, closed shape, enum-checked. A
 student already linked ignores it — writes dispatch to the backend that holds them.
 
-The allowlist: an admin saying "this Google address may sign in, as this". `emailKey` is the
-lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`) —
-Firestore ids may not contain `/`, and `.` is legal but awkward to read.
+The allowlist, in two kinds — an address, and a link.
 
-Fields: `email`, `role`, `invitedAt`, `invitedBy`, and an optional `note`.
+**An address invitation** is somebody saying "this Google address may sign in, as this", keyed by
+`emailKey`: the *canonical* address with `.` replaced by `,` (`sam.smith@example.org` →
+`sam,smith@example,org`), where canonical folds dots, `+tags` and `googlemail.com` for the two Gmail
+domains and lowercases everything else — see `src/lib/emailKey.ts`. Firestore ids may not contain
+`/`, and `.` is legal but awkward to read. A sign-in looks up the canonical key first and, on a
+miss, the exact key invitations were written under before that rule, moving the document as it goes.
+
+**A link invitation** is for the ordinary case the address one never covered: the inviter knows the
+person but not which Google account they will use. Tally mints a 128-bit token, keeps only its
+SHA-256 — *as the document id*, `link_<hash>`, so redeeming is one `get()` at a known path rather
+than a scan an unauthenticated caller could provoke — and hands over `/join/<token>` as a link to
+send or a QR to hold up. A link is **single-use**, lives fourteen days (ten minutes when re-minted
+as a QR, whose whole safety property is that both people are in the room), and grants **counselor**
+whoever minted it: a core-team link that leaked in a screenshot would open Insights, Students and
+Settings. Minting is core and up. **Extend** and **QR** are the same act — a new token, the old one
+dead, the row moved to the new id with `label`, `gatherings`, `invitedBy` and `invitedAt` carried
+across. At most twenty unredeemed links exist at once.
+
+| Field | Meaning |
+| --- | --- |
+| `email` | The address as typed. Absent on a link until somebody redeems it. |
+| `role` | What they arrive as. A link is always `counselor`. |
+| `invitedAt`, `invitedBy` | Who invited them, and when. `invitedBy` is write-once in the rules, and is who may withdraw the row. |
+| `note` | Free text on an address invitation. |
+| `kind` | `'link'`, or absent for the address kind. |
+| `label` | Who a link is for, in the inviter's words — required, because a link row has no address to name it and eight anonymous rows on a Tuesday is how a season roll goes back into a spreadsheet. |
+| `tokenExpiresAt` | When the token stops opening it. |
+| `gatherings` | Chain keys to put them on at first sign-in, at most twenty. |
+| `resolvedAt`, `redeemedBy`, `redeemedEmail`, `redeemedName` | Who arrived on it, under which address, and when. |
+| `placed`, `skipped` | Which of `gatherings` the redemption managed, and which it could not. |
+
+**What an invitation is for, and what it did.** `gatherings` is the inviter's decision on Tuesday;
+carrying it out happens at the one moment Tally can confirm it, which is when the person signs in.
+`provisionAccess` (address) and `redeemInvitation` (link) both re-check that the inviter is *still*
+an admin or *still* on each chain — handing out access you no longer hold is the one way this could
+become an escalation — and add the new uid to `eventAccess.members`. A chain nobody has restricted
+counts as placed, because "you're on Sunday School" is true. Then the outcome is stamped back onto
+the invitation, which stops being a credential and becomes the record: the pending card reads it as
+**Arrived this week**, and a skip sits there as an outstanding item until somebody resolves it.
 
 There is no `active` flag any more. There was one, drawn on the Team screen as a checkbox reading
 "may sign in", and it could only ever refuse a *first* sign-in — `provisionAccess` returns on the
@@ -973,9 +1089,22 @@ a uid does not exist until they do. Once they have, `users/{uid}` is the live au
 is only the record of how they arrived — which is why withdrawing an invitation stops somebody
 arriving but does not evict anybody who already has.
 
-**Who writes:** admins, through the app. **Who reads:** admins only — this is a list of church staff
-email addresses, and a counselor's phone has no reason to hold one. The shape is closed (`hasOnly`),
-so nothing unvalidated can be smuggled into an access decision.
+**Who writes:** an admin, for any role; a **core member**, for `counselor` invitations only — the
+governance change a children's director asked for in these words, that the only way to let her
+recruit her own nursery team was to make her an admin over everyone's access to a roster of minors,
+because she had one nineteen-year-old to add. Withdrawing is an admin for anything, and a core
+member for the unredeemed counselor rows they created. A redeemed row is never withdrawn by a core
+member: it would evict nobody and would delete the only account of who arrived.
+
+**Who reads:** core and up. The line used to be admin-only on the argument that a counselor's phone
+has no business holding staff addresses; `users` is already listable by every active member, so that
+was only ever true of *pending* invitations, and core-yes-counselor-no is where it belongs.
+
+The shape is closed (`hasOnly`), so nothing unvalidated can be smuggled into an access decision —
+and it is closed twice. Every field a link or a redemption owns (`kind`, `label`, `tokenExpiresAt`,
+`resolvedAt`, `placed`, `skipped`, `redeemed*`) is refused on a client create and unchangeable on a
+client update: a browser that could write `resolvedAt` could quietly cancel an invitation, and one
+that could write `tokenExpiresAt` could extend somebody else's link.
 
 This collection used to be a Planning Center List. A List is generated from filter rules, so "these
 particular twelve adults" was only expressible by inventing a custom field on every person in the
