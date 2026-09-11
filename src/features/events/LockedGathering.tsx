@@ -131,7 +131,10 @@ export function LockedGathering({
           * sentence about tonight would not answer them. Otherwise, the plain
           * one.
           */}
-        <p className="pt-1 text-sm text-ink-500">
+        {/* The measure, not the card. Two sentences do the whole work of this
+            screen and they were set to 97 characters a line in a 737px card
+            on a 1440px window — a width nothing forced. */}
+        <p className="max-w-[62ch] pt-1 text-sm text-ink-500">
           {justRemoved
             ? t('justTakenOff')
             : finished

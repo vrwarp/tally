@@ -39,6 +39,14 @@ export interface ModalProps {
   /** Buttons, unwrapped. The footer lays them out — see `ACTIONS`. */
   footer?: ReactNode;
   size?: ModalSize;
+  /**
+   * Whether opening puts the caret in the first field. Default true, which is
+   * right for a dialog that exists to be typed into. Pass `false` where the
+   * first thing on the sheet is something to *answer* rather than something to
+   * fill in — a focus ring is the loudest object a dialog can draw, and on the
+   * wrong control it reorders the sheet visually whatever the DOM says.
+   */
+  autoFocusField?: boolean;
 }
 
 /**
@@ -72,6 +80,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  autoFocusField = true,
 }: ModalProps) {
   const tCommon = useTranslations('Common');
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -114,12 +123,22 @@ export function Modal({
     dirtyRef.current = false;
     pressRef.current = null;
     if (!dialog.open) dialog.showModal();
-    // Put the caret in the first field so a counselor can start typing
-    // immediately instead of aiming at a text box.
-    const firstField = dialog.querySelector<HTMLElement>(
-      'input:not([type="hidden"]):not([disabled]), select, textarea',
-    );
-    firstField?.focus();
+    /*
+     * Put the caret in the first field so a counselor can start typing
+     * immediately instead of aiming at a text box.
+     *
+     * A caller can refuse it. A focus ring is the brightest, most saturated
+     * thing a dialog can draw, and on a sheet whose first item is somebody
+     * waiting to be answered it landed on an empty directory search below
+     * them — out-shouting the primary action and inverting the order the
+     * sheet was built to state.
+     */
+    if (autoFocusField) {
+      const firstField = dialog.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), select, textarea',
+      );
+      firstField?.focus();
+    }
 
     const remember = (event: PointerEvent) => {
       pressRef.current = { x: event.clientX, y: event.clientY, at: Date.now() };
@@ -168,7 +187,7 @@ export function Modal({
       swallowTrailingClick(pressRef.current);
       pressRef.current = null;
     };
-  }, [open]);
+  }, [open, autoFocusField]);
 
   /*
    * Watch the whole dialog for a first edit.

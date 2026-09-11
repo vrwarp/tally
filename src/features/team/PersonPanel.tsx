@@ -446,12 +446,11 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
 
                   {device.retiredAt ? null : armedRetire === device.id ? (
                     <span className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => setArmedRetire(null)}>
+                      <Button variant="ghost" onClick={() => setArmedRetire(null)}>
                         {t('keepItRunning')}
                       </Button>
                       <Button
                         variant="danger"
-                        size="sm"
                         loading={busy === device.id}
                         onClick={() => void retire(device)}
                       >
@@ -461,7 +460,6 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                   ) : (
                     <Button
                       variant="secondary"
-                      size="sm"
                       disabled={busy === device.id}
                       onClick={() => (live ? setArmedRetire(device.id) : void retire(device))}
                     >

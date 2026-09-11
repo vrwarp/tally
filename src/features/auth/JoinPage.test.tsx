@@ -114,7 +114,7 @@ describe('JoinPage — before signing in', () => {
     // The reassurance is the point of the screen: a volunteer's Tally account
     // is their personal Gmail, and they do not know that is allowed.
     expect(
-      screen.getByRole('button', { name: 'Continue with Google — any account is fine' }),
+      screen.getByRole('button', { name: 'Continue with Google' }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/a personal Gmail is fine/),
@@ -149,7 +149,7 @@ describe('JoinPage — before signing in', () => {
     renderJoin();
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Continue with Google — any account is fine' }),
+      await screen.findByRole('button', { name: 'Continue with Google' }),
     );
 
     expect(signInWithGoogle).toHaveBeenCalledTimes(1);

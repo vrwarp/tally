@@ -378,6 +378,11 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
     if (browser) {
       const guestContext = await browser.newContext({
         viewport: page.viewportSize() ?? undefined,
+        // The same theme as every other frame. A fresh context has no stored
+        // preference and falls back to the OS, which in headless Chromium is
+        // light — so this one page arrived in the walkthrough looking like a
+        // different product rather than like one screen in two states.
+        colorScheme: 'dark',
       });
       const guest = await guestContext.newPage();
       await guest.goto(url);

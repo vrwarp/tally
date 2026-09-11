@@ -218,6 +218,13 @@ function AccessToggle({
  * nothing, and the sentence that used to say otherwise was frightening people
  * out of a correct act.
  *
+ * Which is why the opening clause says *phones they have signed in on* rather
+ * than "on every device". "Every device" is the sentence that used to be wrong
+ * in the other direction: read beside a panel saying the hall tablet is
+ * recording right now, it tells an admin they have just stopped it, and they
+ * walk away from a kiosk that is still filing attendance. The tablet's own
+ * Retire is on the same open panel, a few rows below.
+ *
  * Written without "he" or "she": a display name has no gender, and guessing one
  * from it is wrong often enough to be worth never doing.
  */
@@ -614,16 +621,17 @@ export function TeamPage() {
               value={member.role}
               disabled={busyId === member.id}
               onChange={(changed) => void changeRole(member, changed.target.value as Role)}
-              // Brand marks the elevated values rather than dimming
-              // the nine plain ones: a select stripped of its ring
-              // *and* its contrast reads as inert text.
+              // Elevation reads on the ink ramp, not in brand. Brand means
+              // "you can press this" everywhere else on the screen, and
+              // spending it on a value made one of four identical selects
+              // look like the live one and the other three like text.
               className={cn(
                 'min-h-11 rounded-xl bg-ink-950 px-2 text-sm ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 pointer-fine:min-h-9',
                 // Quiet at rest where there is a pointer to firm it
                 // up; a phone keeps the field, because a control
                 // with no resting affordance is one nobody finds.
                 '@2xl:bg-transparent @2xl:ring-transparent @2xl:hover:bg-ink-950 @2xl:hover:ring-ink-700',
-                member.role === 'counselor' ? 'text-ink-100' : 'text-brand-300',
+                member.role === 'counselor' ? 'text-ink-100' : 'font-semibold text-ink-50',
               )}
             >
               {ROLE_OPTIONS.map((role) => (

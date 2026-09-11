@@ -107,7 +107,14 @@ export function InviteForm({
       });
       setLabel('');
       clear();
-      onMinted({ ...data, label: named, life: 'link' });
+      onMinted({
+        ...data,
+        label: named,
+        life: 'link',
+        // Titles rather than keys: the panel says this back to the person who
+        // ticked them, and a chain key is not a gathering anybody recognises.
+        gatherings: gatherings.filter((one) => chosen.has(one.key)).map((one) => one.title),
+      });
     } catch (cause) {
       // Inline rather than a toast: "there are already twenty links waiting"
       // is answered by withdrawing one on the list below, which takes longer

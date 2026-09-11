@@ -863,7 +863,12 @@ describe('TeamPage — ending and restoring access', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
 
     expect(setAccessActive).not.toHaveBeenCalled();
-    expect(screen.getByText(/Ends Marcus Webb’s access now, on every device\./)).toBeInTheDocument();
+    // "On every phone they have signed in on", not "on every device": a kiosk
+    // holds its own identity, and the wider claim told an admin they had just
+    // stopped a tablet that goes on recording.
+    expect(
+      screen.getByText(/Ends Marcus Webb’s access now, on every phone they have signed in on\./),
+    ).toBeInTheDocument();
     expect(screen.getByText(/They are on Nursery and Sunday School\./)).toBeInTheDocument();
     // The consequence nobody holds in their head: after this, only an admin can
     // put anybody on Nursery.

@@ -109,7 +109,7 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
             ? t('askedAlready', { when: time.relative(mine.askedAt) })
             : t('askedAlreadyUndated')}
         </p>
-        <p className="pt-0.5 text-sm leading-snug text-ink-400">
+        <p className="max-w-[62ch] pt-0.5 text-sm leading-snug text-ink-400">
           {approvers.length > 0 ? t('askedWaitingNamed', { names }) : t('askedWaitingNobody')}
         </p>
       </Standing>

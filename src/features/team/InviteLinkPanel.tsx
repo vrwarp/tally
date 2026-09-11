@@ -20,11 +20,11 @@
  * turned into a QR — because they are the same object with different lifetimes,
  * and a person who has learned to read one has learned to read all three.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import type { InviteLife } from '@/services/functions';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 /** How long "Copied" stays up. Long enough to read, short enough not to lie. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -39,6 +39,8 @@ export interface MintedLink {
   label: string;
   /** `qr` is the ten-minute token, minted because both people are in the room. */
   life: InviteLife;
+  /** The gatherings the link will place them on, by title. Often empty. */
+  gatherings: readonly string[];
 }
 
 /**
@@ -92,6 +94,11 @@ export function InviteLinkPanel({
   const t = useTranslations('Team');
   const tCommon = useTranslations('Common');
   const time = useTimeFormats();
+  const locale = useLocale();
+  const names = useMemo(
+    () => new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }),
+    [locale],
+  );
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [qr, setQr] = useState<QrState>({ status: 'idle' });
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,6 +201,20 @@ export function InviteLinkPanel({
             ? t('linkLifeQr', { when: time.relative(expiresAt) })
             : t('linkLifeLink', { when: time.weekdayDate(expiresAt) })}
         </p>
+        {/*
+          * What the link puts them on, restated after the press.
+          *
+          * The form says this before the press, in a line that on a phone sits
+          * under the keyboard while the form's one field has focus — and the
+          * keyboard's own Go key is that form's submit. So the person who
+          * needs the sentence most is the one who never sees it there. Here it
+          * cannot be missed, and the link has not been sent yet.
+          */}
+        <p className="mt-0.5 text-xs text-ink-400">
+          {minted.gatherings.length > 0
+            ? t('linkPutsOn', { gatherings: names.format([...minted.gatherings]) })
+            : t('linkPutsOnNothing')}
+        </p>
       </div>
 
       {/*
@@ -264,19 +285,24 @@ export function InviteLinkPanel({
         </p>
       ) : null}
       {qr.status === 'ready' ? (
+        /*
+         * The sentence goes above the square, and the square sits on the
+         * card's own left edge.
+         *
+         * Both for the same reason. On a phone the code's bottom edge lands on
+         * the tab bar, so anything under it is below the fold — and what was
+         * under it was the line distinguishing a square that is safe to hold
+         * up from a fortnight-long credential drawn as a picture. The admin
+         * was holding the phone out with that sentence off screen. Two
+         * lifetimes, two sentences: **Show QR** on a fourteen-day link draws
+         * that link, and saying "ten minutes" over it would be a security
+         * claim the token does not honour.
+         */
         <div className="flex flex-col items-start gap-2">
-          {/* The square centres itself; its explanation does not. Every other
-              string in this panel is flush left, and a centred paragraph under
-              a centred image lands on an edge the card does not use. */}
-          <div className="self-center">
-            <QrSquare modules={qr.modules} label={t('qrAlt', { label: minted.label })} />
-          </div>
-          {/* Two lifetimes, two sentences. **Show QR** on a fourteen-day link
-              draws that link; saying "ten minutes" under it would be a
-              security claim the token does not honour. */}
           <p className="text-xs leading-snug text-ink-400">
             {minted.life === 'qr' ? t('qrExplain') : t('qrExplainLink')}
           </p>
+          <QrSquare modules={qr.modules} label={t('qrAlt', { label: minted.label })} />
         </div>
       ) : null}
 

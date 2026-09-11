@@ -304,9 +304,13 @@ export function EventHeader({
             now" jump because there is no longer a "now" the app has picked —
             somebody who is on the wrong night wants the question again, not a
             second guess at the answer. */}
+        {/* `ml-1` on top of the row's gap: this is the only control in the
+            strip that *leaves* the roster, and at six pixels from the chip
+            that opens a sheet a thumb reaching for one lost its place in the
+            queue with the other. */}
         <Link
           to="/"
-          className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
+          className="ml-1 flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
           {t('change')}
         </Link>

@@ -582,12 +582,110 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
       open={open}
       onClose={onClose}
       title={event.title}
+      /* Not into the directory search while somebody is waiting to be
+         answered: the ring is brighter than the primary action beside the
+         ask, and it put an empty text box at the top of the reader's eye. */
+      autoFocusField={asks.outstanding.length === 0}
       description={
         /* The gathering, not the night — this is what is about to change. */
         event.mode === 'oneoff' ? t('scopeOneOff') : t('scopeSeries')
       }
     >
       <div className="flex flex-col gap-4">
+        {/*
+          * The durable home for an ask, and the first thing on the sheet when
+          * there is one.
+          *
+          * First because it is the only item here that is somebody's to do:
+          * everything below is a list to read. It is *here*, rather than on the
+          * roster, because a strip inserted above the first roster row would
+          * push every name down under a thumb already descending — the
+          * mechanism Journey 1 was rebuilt to prevent, on the screen
+          * `e2e/layout-shift.spec.ts` holds to a landing budget of zero. What
+          * the roster carries instead is a dot on the chip that opens this.
+          */}
+        {restricted && onIt && asks.outstanding.length > 0 ? (
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {t('askHeading')}
+            </h3>
+            {/*
+              * One card per asker, not one row.
+              *
+              * Three things a row could not do. The name gets a line of its
+              * own, because it is the decision — it was truncating to "Sam
+              * Whi…" so that "asked 21 minutes ago" could be spelled out, and
+              * on a lobby phone the identity of the adult is the last thing
+              * that should give way. The two answers are a thumb's width
+              * apart on separate rows rather than thirteen pixels apart on
+              * one, where a low tap on the first card's Add put the *second*
+              * asker on a gathering of minors. And Clear is armed: it is a
+              * write the asker reads as "somebody looked and said no", which
+              * is precisely the wrong thing to say by accident.
+              */}
+            <ul className="flex flex-col gap-2 pt-1.5">
+              {asks.outstanding.map((request) => (
+                <li
+                  key={request.id}
+                  className="rounded-xl px-3 py-2.5 ring-1 ring-ink-800"
+                >
+                  <p className="text-sm text-ink-100">{request.name}</p>
+                  {request.askedAt ? (
+                    <p className="text-xs text-ink-500">
+                      {t('askRowWhen', { when: time.relative(request.askedAt) })}
+                    </p>
+                  ) : null}
+                  {clearing === request.id ? (
+                    <>
+                      <p role="alert" className="mt-1.5 text-xs leading-snug text-ink-300">
+                        {t('clearAsk', { name: request.name })}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <Button variant="ghost" onClick={() => setClearing(null)}>
+                          {t('leaveIt')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            setClearing(null);
+                            void answerAsk(request, false);
+                          }}
+                        >
+                          {t('clearAskYes')}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    /* Add at one edge, Clear at the other. A `gap-2` put seven
+                       pixels between the press that grants an adult access to a
+                       roster of minors and the press that tells them somebody
+                       said no — both in the middle of thumb territory on an
+                       844px screen. */
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                      {mayAdd ? (
+                        <Button disabled={busy} onClick={() => void answerAsk(request, true)}>
+                          {t('addThem')}
+                        </Button>
+                      ) : null}
+                      {/* Secondary, not ghost: an unbordered Clear beside a
+                          filled Add is a hit box nobody can see the edge of. */}
+                      <Button
+                        variant="secondary"
+                        className="ml-auto"
+                        disabled={busy}
+                        onClick={() => setClearing(request.id)}
+                      >
+                        {t('clear')}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section>
           {mayFlip ? (
             <div className="flex flex-col gap-2">
@@ -598,13 +696,24 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                 disabled={busy}
                 onPress={restricted ? () => setReopening(true) : () => {}}
               />
+              <AccessOption
+                selected={restricted}
+                label={t('onlyPeopleIAdd')}
+                detail={restrictedDetail}
+                /* Not pressable while the preview still reads "Working out…":
+                   the sentence is what the press decides on. */
+                disabled={busy || workingOut}
+                onPress={restricted ? () => {} : () => void close()}
+              />
               {/*
                 * Armed, because the two directions are not symmetrical.
                 * Narrowing shows a kept list before it writes anything and can
                 * be undone by adding somebody back; widening throws the list
                 * away, on every gathering in the repeat, and there is no undo
                 * for a list. It sat eight pixels above the option a thumb aims
-                * at to leave things as they are.
+                * at to leave things as they are — and it renders under both
+                * options rather than between them, so the safe one does not
+                * move sixty pixels while a thumb is already travelling to it.
                 */}
               {reopening ? (
                 <div className="px-1">
@@ -628,15 +737,6 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                   </div>
                 </div>
               ) : null}
-              <AccessOption
-                selected={restricted}
-                label={t('onlyPeopleIAdd')}
-                detail={restrictedDetail}
-                /* Not pressable while the preview still reads "Working out…":
-                   the sentence is what the press decides on. */
-                disabled={busy || workingOut}
-                onPress={restricted ? () => {} : () => void close()}
-              />
             </div>
           ) : (
             /* A counselor sees the state as a fact rather than a control they
@@ -709,94 +809,6 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             {/* Under the names, because the names are the answer and this is
                 only the shortcut to them. */}
             <AskToBeAdded chain={chain} approvers={canAdd} enabled={open} />
-          </section>
-        ) : null}
-
-        {/*
-          * The durable home for an ask, and the first thing on the sheet when
-          * there is one.
-          *
-          * First because it is the only item here that is somebody's to do:
-          * everything below is a list to read. It is *here*, rather than on the
-          * roster, because a strip inserted above the first roster row would
-          * push every name down under a thumb already descending — the
-          * mechanism Journey 1 was rebuilt to prevent, on the screen
-          * `e2e/layout-shift.spec.ts` holds to a landing budget of zero. What
-          * the roster carries instead is a dot on the chip that opens this.
-          */}
-        {restricted && onIt && asks.outstanding.length > 0 ? (
-          <section>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
-              {t('askHeading')}
-            </h3>
-            {/*
-              * One card per asker, not one row.
-              *
-              * Three things a row could not do. The name gets a line of its
-              * own, because it is the decision — it was truncating to "Sam
-              * Whi…" so that "asked 21 minutes ago" could be spelled out, and
-              * on a lobby phone the identity of the adult is the last thing
-              * that should give way. The two answers are a thumb's width
-              * apart on separate rows rather than thirteen pixels apart on
-              * one, where a low tap on the first card's Add put the *second*
-              * asker on a gathering of minors. And Clear is armed: it is a
-              * write the asker reads as "somebody looked and said no", which
-              * is precisely the wrong thing to say by accident.
-              */}
-            <ul className="flex flex-col gap-2 pt-1.5">
-              {asks.outstanding.map((request) => (
-                <li
-                  key={request.id}
-                  className="rounded-xl px-3 py-2.5 ring-1 ring-ink-800"
-                >
-                  <p className="text-sm text-ink-100">{request.name}</p>
-                  {request.askedAt ? (
-                    <p className="text-xs text-ink-500">
-                      {t('askRowWhen', { when: time.relative(request.askedAt) })}
-                    </p>
-                  ) : null}
-                  {clearing === request.id ? (
-                    <>
-                      <p role="alert" className="mt-1.5 text-xs leading-snug text-ink-300">
-                        {t('clearAsk', { name: request.name })}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <Button variant="ghost" onClick={() => setClearing(null)}>
-                          {t('leaveIt')}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          disabled={busy}
-                          onClick={() => {
-                            setClearing(null);
-                            void answerAsk(request, false);
-                          }}
-                        >
-                          {t('clearAskYes')}
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      {mayAdd ? (
-                        <Button disabled={busy} onClick={() => void answerAsk(request, true)}>
-                          {t('addThem')}
-                        </Button>
-                      ) : null}
-                      {/* Secondary, not ghost: an unbordered Clear beside a
-                          filled Add is a hit box nobody can see the edge of. */}
-                      <Button
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => setClearing(request.id)}
-                      >
-                        {t('clear')}
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
           </section>
         ) : null}
 

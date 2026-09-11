@@ -287,7 +287,15 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
     setBusyId(invitation.id);
     try {
       const { data } = await refreshInvitationLink({ id: invitation.id, life });
-      setMinted({ ...data, label: invitation.label ?? '', life });
+      setMinted({
+        ...data,
+        label: invitation.label ?? '',
+        life,
+        // A re-mint keeps the row's placement; the server carries it across.
+        gatherings: (invitation.gatherings ?? []).map(
+          (chain) => chainTitles.get(chain) ?? chain,
+        ),
+      });
     } catch (cause) {
       show(serverText(cause, t('extendFailed')), { tone: 'error' });
     } finally {
@@ -380,7 +388,7 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
                   thing here somebody has to act on. Hidden at `lg`, where the
                   band it stands for is already open below. */}
               {outstandingCount > 0 ? (
-                <span className="rounded-full bg-warn-500/10 px-2 py-0.5 text-xs font-semibold text-warn-300 lg:hidden">
+                <span className="whitespace-nowrap rounded-full bg-warn-500/10 px-2 py-0.5 text-xs font-semibold text-warn-300 lg:hidden">
                   {t('outstandingBadge', { count: outstandingCount })}
                 </span>
               ) : null}

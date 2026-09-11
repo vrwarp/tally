@@ -1466,7 +1466,7 @@
     "zh-Hant": "todo"
   },
   "Join.continueWithGoogle": {
-    "source": "Continue with Google — any account is fine",
+    "source": "Continue with Google",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3800,6 +3800,16 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Team.linkPutsOn": {
+    "source": "Puts them on {gatherings}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkPutsOnNothing": {
+    "source": "Puts them on no narrowed gathering — they will be able to work every gathering nobody has narrowed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Team.linkShownOnce": {
     "source": "This is the only time Tally can show it. Send it now — if you lose it, make a new one from the row below, which stops the old one working.",
     "zh-Hans": "todo",
@@ -4011,7 +4021,7 @@
     "zh-Hant": "todo"
   },
   "Team.outstandingBadge": {
-    "source": "{count, plural, one {# still to do} other {# still to do}}",
+    "source": "{count, plural, one {# to do} other {# to do}}",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4076,7 +4086,7 @@
     "zh-Hant": "todo"
   },
   "Team.armSuspend": {
-    "source": "Ends {name}’s access now, on every device.",
+    "source": "Ends {name}’s access now, on every phone they have signed in on.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
