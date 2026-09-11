@@ -1331,9 +1331,28 @@ const SEED_COUNSELOR_UID = 'seed-sam';
  * asking to be let in. Without these the Team screen seeds empty and the
  * screens that took a campaign to design have nothing on them.
  *
- * Sunday School is the one that is restricted, deliberately: Friday Fellowship
- * is what nearly every other spec and walkthrough exercises, and locking it
- * would quietly change what those screens show.
+ * ## Why nothing here is actually locked
+ *
+ * A fence is a list of uids, and this script runs before anybody has signed
+ * in — so every uid it can write is a placeholder that will never match the
+ * one the auth emulator mints. `restricted: true` against `seed-miriam` is
+ * therefore not "locked to Miriam", it is *locked to nobody*: the only way
+ * past it is the admin bypass, and every counselor and core member on the
+ * seeded team is refused.
+ *
+ * That is not a hypothetical. Sunday School is the chain the seeded nursery
+ * belongs to (`seriesId: SERIES_IDS.sundaySchool`, see `eventWrites`), so
+ * fencing it took the check-out roster, the dashboard's gathering tabs and the
+ * per-gathering attendance headings away from every spec that works them, and
+ * would have taken them away from anybody who ran `npm run seed` to look at
+ * the app.
+ *
+ * So the document is seeded *reopened*: `restricted: false` with the kept list
+ * a narrowing leaves behind, which is a true state, is the one the sheet draws
+ * under "Kept when you narrow it", and fences out nobody. The locked state
+ * needs real uids and is arranged after sign-in by
+ * `e2e/access-walkthrough.spec.ts`, which is the only place that can honestly
+ * produce it.
  */
 function accessWrites(now: Date): PendingWrite[] {
   const writes: PendingWrite[] = [];
@@ -1342,7 +1361,7 @@ function accessWrites(now: Date): PendingWrite[] {
     path: paths.eventAccess(SERIES_IDS.sundaySchool),
     data: {
       chainKey: SERIES_IDS.sundaySchool,
-      restricted: true,
+      restricted: false,
       members: [SEED_CORE_UID],
       updatedAt: addDays(now, -21),
       updatedBy: SEED_CORE_UID,
