@@ -159,14 +159,80 @@ describe('withdrawing', () => {
 });
 
 describe('subscribeInvitations', () => {
-  it('reads the collection in address order', () => {
+  it('reads the whole collection unordered, because an order is also a filter', () => {
+    /*
+     * It used to `orderBy('email')`. Firestore drops from an ordered query every
+     * document that lacks the field — and a link invitation has no address until
+     * somebody redeems it, so the day links arrived every one of them would have
+     * been missing from the list that exists to show them. The sort is on this
+     * side now; the collection is small enough to carry it.
+     */
     subscribeInvitations(() => {});
 
-    const [source] = onSnapshot.mock.calls.at(-1) as unknown as [
-      { path: string; constraints: unknown[] },
-    ];
+    const [source] = onSnapshot.mock.calls.at(-1) as unknown as [{ path: string }];
     expect(source.path).toBe('invitations');
-    expect(orderBy).toHaveBeenCalledWith('email');
+    expect(orderBy).not.toHaveBeenCalled();
+  });
+
+  it('publishes a link, which has a label instead of an address', () => {
+    const [invitation] = published([
+      {
+        id: 'link_abc123',
+        data: {
+          kind: 'link',
+          role: 'counselor',
+          label: 'Jo, nursery, Marie’s daughter',
+          invitedBy: 'uid-miriam',
+          tokenExpiresAt: new Timestamp(1_767_607_200, 0),
+          gatherings: ['sunday-school'],
+        },
+      },
+    ]);
+
+    expect(invitation).toMatchObject({
+      id: 'link_abc123',
+      kind: 'link',
+      label: 'Jo, nursery, Marie’s daughter',
+      gatherings: ['sunday-school'],
+      tokenExpiresAt: new Date(1_767_607_200_000),
+    });
+    // And no address is invented for it: the id is a hash, not a mailbox.
+    expect(invitation?.email).toBeUndefined();
+  });
+
+  it('publishes what a redemption left behind, which is what Arrived this week reads', () => {
+    const [invitation] = published([
+      {
+        id: 'link_abc123',
+        data: {
+          kind: 'link',
+          label: 'Jo, nursery',
+          resolvedAt: new Timestamp(1_767_607_200, 0),
+          redeemedBy: 'uid-jo',
+          redeemedEmail: 'jo.smith84@gmail.com',
+          redeemedName: 'Jo Smith',
+          placed: ['nursery'],
+          skipped: ['sunday-school'],
+        },
+      },
+    ]);
+
+    expect(invitation).toMatchObject({
+      resolvedAt: new Date(1_767_607_200_000),
+      redeemedEmail: 'jo.smith84@gmail.com',
+      redeemedName: 'Jo Smith',
+      placed: ['nursery'],
+      skipped: ['sunday-school'],
+    });
+  });
+
+  it('puts the newest first, so the row somebody just made is the one they see', () => {
+    const rows = published([
+      { id: 'old@x,org', data: { email: 'old@x.org', invitedAt: new Timestamp(1_000, 0) } },
+      { id: 'new@x,org', data: { email: 'new@x.org', invitedAt: new Timestamp(2_000, 0) } },
+    ]);
+
+    expect(rows.map((row) => row.email)).toEqual(['new@x.org', 'old@x.org']);
   });
 
   it('maps a stored invitation', () => {
@@ -190,6 +256,13 @@ describe('subscribeInvitations', () => {
       invitedAt: new Date(1_767_607_200_000),
       invitedBy: 'uid-admin',
       note: 'Wednesday volunteer',
+      // The link half of the shape, empty on an address invitation that
+      // nobody has redeemed — the state every row starts in.
+      tokenExpiresAt: null,
+      resolvedAt: null,
+      gatherings: [],
+      placed: [],
+      skipped: [],
     });
   });
 

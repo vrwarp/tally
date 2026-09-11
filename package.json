@@ -32,6 +32,7 @@
     "prune:occurrences": "npm --prefix functions run build && node functions/lib/prune.js",
     "repair:chains": "npm --prefix functions run build && node functions/lib/repair.js",
     "pinyin:backfill": "npm --prefix functions run build && node functions/lib/pinyinBackfill.js",
+    "invitedby:backfill": "npm --prefix functions run build && node functions/lib/invitedByBackfill.js",
     "functions:install": "npm --prefix functions install",
     "emulators": "firebase emulators:start --project demo-tally --export-on-exit=./.emulator-data",
     "emulators:resume": "firebase emulators:start --project demo-tally --import=./.emulator-data --export-on-exit=./.emulator-data",

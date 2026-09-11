@@ -46,6 +46,16 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { seededAdminEmails } from './config.js';
 import { emailKey, sameAccount, type Role } from './pco/mapping.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
+import {
+  asToken,
+  placeOnGatherings,
+  readLink,
+  recordRedemption,
+  resolveChainNames,
+  type GatheringName,
+  type InvitationRecord,
+  type Placement,
+} from './invitations.js';
 import type { ServerCode } from './generated/serverCodes.js';
 
 /** Mirrors `ProvisionAccessResult` in src/services/functions.ts. */
@@ -53,6 +63,54 @@ export interface ProvisionAccessResult {
   status: 'granted' | 'not-on-roster' | 'inactive';
   role: Role | null;
   message: string;
+  /**
+   * The gatherings the invitation asked for, and what became of them. Both
+   * absent on a sign-in that redeemed no invitation, which is every sign-in
+   * after the first.
+   *
+   * Named rather than keyed because the only reader is a sentence on a grant
+   * screen — "You've been put on Sunday School" — and that screen renders
+   * before any of the app's data is subscribed. A one-off carries its date,
+   * because "the retreat" and "the retreat on the 12th" are different grants
+   * and the difference is invisible to the person who was given one.
+   */
+  placed?: GatheringName[];
+  skipped?: GatheringName[];
+}
+
+/** What an invitation asked for, carried out at the one moment it can be. */
+async function carryOutInvitation(
+  db: FirestoreLike,
+  invitation: { id: string; data: InvitationRecord },
+  caller: VerifiedCaller,
+  email: string,
+  now: Date,
+): Promise<{ placed: GatheringName[]; skipped: GatheringName[] }> {
+  const gatherings = Array.isArray(invitation.data.gatherings)
+    ? invitation.data.gatherings.filter((key): key is string => typeof key === 'string')
+    : [];
+  const invitedBy = typeof invitation.data.invitedBy === 'string' ? invitation.data.invitedBy : '';
+
+  const placement: Placement =
+    gatherings.length > 0 && invitedBy
+      ? await placeOnGatherings(db, { uid: caller.uid, invitedBy, gatherings, now })
+      : { placed: [], skipped: gatherings };
+
+  await recordRedemption(db, {
+    id: invitation.id,
+    uid: caller.uid,
+    email,
+    name: caller.displayName,
+    placement,
+    now,
+  });
+
+  const names = await resolveChainNames(db, gatherings);
+  const named = (key: string): GatheringName => names[key] ?? { title: key, oneOffAt: null };
+  return {
+    placed: placement.placed.map(named),
+    skipped: placement.skipped.map(named),
+  };
 }
 
 export interface VerifiedCaller {
@@ -119,7 +177,7 @@ export async function provisionAccessForCaller(
    * else.
    */
   if (seeded) {
-    await writeProfile(userRef, caller, email, 'admin', existing, now);
+    await writeProfile(userRef, caller, email, 'admin', existing, now, 'deployment');
     return { status: 'granted', role: 'admin', message: 'Welcome to Tally.' };
   }
 
@@ -163,9 +221,109 @@ export async function provisionAccessForCaller(
    * deliberately not read: treating a stale `active: false` as a refusal would
    * turn a flag nobody can see any more into a locked door nobody can explain.
    */
-  const role = readRole(invitation.role) ?? 'counselor';
-  await writeProfile(userRef, caller, email, role, existing, now);
-  return { status: 'granted', role, message: 'Welcome to Tally.' };
+  const role = readRole(invitation.data.role) ?? 'counselor';
+  await writeProfile(
+    userRef,
+    caller,
+    email,
+    role,
+    existing,
+    now,
+    typeof invitation.data.invitedBy === 'string' ? invitation.data.invitedBy : null,
+  );
+  const outcome = await carryOutInvitation(db, invitation, caller, email, now);
+  return { status: 'granted', role, message: 'Welcome to Tally.', ...outcome };
+}
+
+/**
+ * The other door: a link, redeemed.
+ *
+ * Everything above decides by *address*, which is the case where the inviter
+ * knew which account the person would use. This one decides by the token in
+ * the URL, which is the case where nobody knew — and it is why the link exists
+ * at all. See `functions/src/invitations.ts` for what the token is and why the
+ * document is keyed by its hash.
+ *
+ * A link is spent here and nowhere else. The screen names the account *before*
+ * calling this — a phone's default Google account is not always the one its
+ * owner meant, and a link that silently granted the wrong identity would turn
+ * a refusal the person fixes in ten seconds into a grant only an admin can
+ * undo. So by the time this runs, somebody has read their own address on the
+ * glass and pressed **Join**.
+ */
+export async function redeemLinkForCaller(
+  db: FirestoreLike,
+  caller: VerifiedCaller,
+  rawToken: unknown,
+  now: Date,
+  seededAdmins: readonly string[],
+): Promise<ProvisionAccessResult & { linkStatus: 'ok' | 'expired' | 'spent' | 'not-found' }> {
+  const token = asToken(rawToken);
+  if (!token) {
+    return { status: 'not-on-roster', role: null, message: 'That link is not valid.', linkStatus: 'not-found' };
+  }
+
+  const lookup = await readLink(db, token, now);
+  if (lookup.status !== 'ok' || !lookup.record) {
+    return {
+      status: 'not-on-roster',
+      role: null,
+      message:
+        lookup.status === 'spent'
+          ? 'That invitation has already been used.'
+          : 'That invitation link has expired.',
+      linkStatus: lookup.status,
+    };
+  }
+
+  const email = caller.email.trim().toLowerCase();
+  const userRef = db.doc(`${PATHS.users}/${caller.uid}`);
+  const existingSnapshot = await userRef.get();
+  const existing = existingSnapshot.exists ? (existingSnapshot.data() ?? {}) : {};
+
+  /*
+   * Somebody already on the team may redeem a link, and it is not a mistake:
+   * "Miriam sent me a link for Sunday School" is a counselor being put on a
+   * gathering, which is exactly what the invitation carries. Their role is
+   * left alone — a link grants counselor, and demoting an admin who followed
+   * one would be the link deciding something it has no business deciding.
+   */
+  const seeded = seededAdmins.some((admin) => sameAccount(admin, email));
+  const existingRole = readRole(existing.role);
+  if (existingSnapshot.exists && existing.active !== true && !seeded) {
+    return {
+      status: 'inactive',
+      role: null,
+      message: 'Your access to Tally has been paused. Ask an admin to turn it back on.',
+      linkStatus: 'ok',
+    };
+  }
+
+  const role: Role = seeded ? 'admin' : (existingRole ?? 'counselor');
+  await writeProfile(
+    userRef,
+    caller,
+    email,
+    role,
+    existing,
+    now,
+    seeded ? 'deployment' : (lookup.record.invitedBy ?? null),
+  );
+  const outcome = await carryOutInvitation(
+    db,
+    { id: lookup.id, data: lookup.record },
+    caller,
+    email,
+    now,
+  );
+
+  return {
+    status: 'granted',
+    role,
+    message: existingSnapshot.exists ? 'Welcome back to Tally.' : 'Welcome to Tally.',
+    linkStatus: 'ok',
+    ...outcome,
+  };
 }
 
 /**
@@ -194,10 +352,10 @@ function legacyEmailKey(email: string): string {
 async function findInvitation(
   db: FirestoreLike,
   email: string,
-): Promise<Record<string, unknown> | null> {
+): Promise<{ id: string; data: InvitationRecord } | null> {
   const canonicalRef = db.doc(`${PATHS.invitations}/${emailKey(email)}`);
   const canonical = await canonicalRef.get();
-  if (canonical.exists) return canonical.data() ?? {};
+  if (canonical.exists) return { id: canonicalRef.id, data: (canonical.data() ?? {}) as InvitationRecord };
 
   const legacyKey = legacyEmailKey(email);
   if (legacyKey === canonicalRef.id) return null;
@@ -211,7 +369,7 @@ async function findInvitation(
   batch.set(canonicalRef, data);
   batch.delete(legacyRef);
   await batch.commit();
-  return data;
+  return { id: canonicalRef.id, data: data as InvitationRecord };
 }
 
 /**
@@ -228,6 +386,18 @@ async function writeProfile(
   role: Role,
   existing: Record<string, unknown>,
   now: Date,
+  /**
+   * Who let them in, on the sign-in that first admitted them: the inviter's
+   * uid, or the literal `'deployment'` for an address pinned in
+   * `TALLY_ADMIN_EMAILS`, whom nobody invited because nobody could have.
+   *
+   * Stamped once and never again — `existing.invitedBy` wins — because it is a
+   * fact about a moment, and re-deciding it on every sign-in would let a
+   * withdrawn invitation quietly rewrite how somebody arrived. Absent for
+   * everybody who already had a profile when this arrived; the person page
+   * says "Not recorded" rather than guessing.
+   */
+  invitedBy?: string | null,
 ): Promise<void> {
   await userRef.set(
     {
@@ -237,6 +407,7 @@ async function writeProfile(
       active: true,
       createdAt: existing.createdAt ?? Timestamp.fromDate(now),
       lastSeenAt: Timestamp.fromDate(now),
+      ...(existing.invitedBy == null && invitedBy != null ? { invitedBy } : {}),
     },
     { merge: true },
   );

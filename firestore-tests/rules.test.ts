@@ -219,25 +219,14 @@ describe('users', () => {
  */
 describe('invitations', () => {
   const key = 'newcomer@example,org';
+  /** A link's id is the hash of its token; the token itself is never stored. */
+  const linkKey = 'link_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd';
 
   it('lets an admin invite somebody', async () => {
     const db = asUser(env, UID.admin);
     await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
     await assertSucceeds(getDoc(doc(db, paths.invitation(key))));
     await assertSucceeds(deleteDoc(doc(db, paths.invitation(key))));
-  });
-
-  it('keeps the list away from the core team, let alone counselors', async () => {
-    /*
-     * Not a hierarchy oversight. This is a list of church staff email
-     * addresses and who may do what with a roster of minors; the core team runs
-     * the ministry, and granting access is a different job from running it.
-     */
-    for (const uid of [UID.core, UID.counselor]) {
-      const db = asUser(env, uid);
-      await assertFails(getDocs(collection(db, paths.invitations())));
-      await assertFails(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
-    }
   });
 
   it('rejects a role nobody wrote code for', async () => {
@@ -283,6 +272,177 @@ describe('invitations', () => {
     await assertSucceeds(
       setDoc(doc(db, paths.invitation(key)), { ...invitationDoc(), active: false }),
     );
+  });
+
+  /*
+   * The governance change, and the reason for it in one sentence: a children's
+   * director recruiting her own nursery team needed to be made an admin over
+   * everyone's access to a roster of minors, because she had one
+   * nineteen-year-old to add.
+   */
+  describe('a core member', () => {
+    it('may invite a counselor, and see the pending list', async () => {
+      const db = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(db, paths.invitation(key)), invitationDoc({ invitedBy: UID.core })),
+      );
+      await assertSucceeds(getDoc(doc(db, paths.invitation(key))));
+      await assertSucceeds(getDocs(collection(db, paths.invitations())));
+    });
+
+    it('may not invite core or admin, in either direction', async () => {
+      const core = asUser(env, UID.core);
+      for (const role of ['core', 'admin'] as const) {
+        await assertFails(
+          setDoc(doc(core, paths.invitation(key)), invitationDoc({ role, invitedBy: UID.core })),
+        );
+      }
+
+      // Nor edit one that already says so — the row an admin wrote is not a
+      // counselor invitation to be re-pointed.
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ role: 'admin' })),
+      );
+      await assertFails(
+        setDoc(doc(core, paths.invitation(key)), invitationDoc({ role: 'counselor' })),
+      );
+    });
+
+    it('may withdraw what they invited, and nobody else’s', async () => {
+      const core = asUser(env, UID.core);
+      await assertSucceeds(
+        setDoc(doc(core, paths.invitation(key)), invitationDoc({ invitedBy: UID.core })),
+      );
+      await assertSucceeds(deleteDoc(doc(core, paths.invitation(key))));
+
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc()),
+      );
+      await assertFails(deleteDoc(doc(core, paths.invitation(key))));
+      // The admin who wrote it still can.
+      await assertSucceeds(deleteDoc(doc(asUser(env, UID.admin), paths.invitation(key))));
+    });
+  });
+
+  it('keeps the whole collection away from counselors', async () => {
+    /*
+     * The line moved from admin-only to core, and this is where it stopped.
+     * `users` is already listable by every active member, so the argument for
+     * hiding it — a counselor's phone has no business holding staff addresses —
+     * was only ever true of *pending* invitations, which is exactly this.
+     */
+    const db = asUser(env, UID.counselor);
+    await assertFails(getDocs(collection(db, paths.invitations())));
+    await assertFails(getDoc(doc(db, paths.invitation(key))));
+    await assertFails(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+  });
+
+  describe('who invited whom', () => {
+    it('is write-once: an update may not re-point it', async () => {
+      const db = asUser(env, UID.admin);
+      await assertSucceeds(setDoc(doc(db, paths.invitation(key)), invitationDoc()));
+      await assertFails(
+        setDoc(doc(db, paths.invitation(key)), invitationDoc({ invitedBy: UID.core })),
+      );
+    });
+
+    it('must be somebody on a create, so no row arrives unattributed', async () => {
+      await assertFails(
+        setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ invitedBy: '' })),
+      );
+    });
+  });
+
+  describe('the gatherings an invitation is for', () => {
+    it('are the inviter’s to set', async () => {
+      await assertSucceeds(
+        setDoc(
+          doc(asUser(env, UID.core), paths.invitation(key)),
+          invitationDoc({ invitedBy: UID.core, gatherings: [ID.restrictedSeries] }),
+        ),
+      );
+    });
+
+    it('are capped, so one invitation cannot name the whole calendar', async () => {
+      await assertFails(
+        setDoc(
+          doc(asUser(env, UID.admin), paths.invitation(key)),
+          invitationDoc({ gatherings: Array.from({ length: 21 }, (_, i) => `chain-${i}`) }),
+        ),
+      );
+    });
+  });
+
+  describe('what a redemption wrote', () => {
+    /*
+     * The server's half of the document. A client that could write `resolvedAt`
+     * could quietly cancel an invitation; one that could write `label` or
+     * `tokenExpiresAt` could extend somebody else's link. So the whole set is
+     * refused on a create and unchangeable on an update — which is also what
+     * stops a browser minting a link at all.
+     */
+    const serverHalf = {
+      kind: 'link',
+      label: 'Jo, nursery',
+      tokenExpiresAt: Timestamp.fromDate(new Date('2026-03-01T00:00:00Z')),
+      resolvedAt: Timestamp.fromDate(new Date('2026-02-14T00:00:00Z')),
+      redeemedBy: UID.counselor,
+      redeemedEmail: 'jo@example.org',
+      redeemedName: 'Jo Smith',
+      placed: [ID.restrictedSeries],
+      skipped: [],
+    };
+
+    it('cannot be created from a browser, admin included', async () => {
+      const db = asUser(env, UID.admin);
+      for (const [field, value] of Object.entries(serverHalf)) {
+        await assertFails(
+          setDoc(doc(db, paths.invitation(key)), { ...invitationDoc(), [field]: value }),
+        );
+      }
+    });
+
+    it('cannot be changed from a browser once the server has written it', async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore() as unknown as Firestore;
+        await setDoc(doc(db, paths.invitation(key)), { ...invitationDoc(), ...serverHalf });
+      });
+
+      const admin = asUser(env, UID.admin);
+      // The client's own fields still merge over it — re-inviting an address
+      // somebody has since been suspended on must not be a dead end.
+      await assertSucceeds(
+        setDoc(doc(admin, paths.invitation(key)), { note: 'nursery, Sundays' }, { merge: true }),
+      );
+      await assertFails(
+        setDoc(doc(admin, paths.invitation(key)), { resolvedAt: null }, { merge: true }),
+      );
+      await assertFails(
+        setDoc(doc(admin, paths.invitation(key)), { placed: [] }, { merge: true }),
+      );
+      await assertFails(
+        setDoc(
+          doc(admin, paths.invitation(key)),
+          { tokenExpiresAt: Timestamp.fromDate(new Date('2030-01-01T00:00:00Z')) },
+          { merge: true },
+        ),
+      );
+    });
+
+    it('is kept: a redeemed invitation is the record of who arrived', async () => {
+      await env.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore() as unknown as Firestore;
+        await setDoc(doc(db, paths.invitation(linkKey)), {
+          ...invitationDoc({ invitedBy: UID.core }),
+          ...serverHalf,
+        });
+      });
+
+      // Withdrawing would evict nobody and would delete the only account of it.
+      await assertFails(deleteDoc(doc(asUser(env, UID.core), paths.invitation(linkKey))));
+      // An admin may still tidy one away — the break-glass, as everywhere else.
+      await assertSucceeds(deleteDoc(doc(asUser(env, UID.admin), paths.invitation(linkKey))));
+    });
   });
 });
 
@@ -2055,6 +2215,133 @@ describe('eventAccess', () => {
  * feature that protects a restricted gathering by breaking every open one is
  * not a feature.
  */
+describe('asking to be added', () => {
+  /*
+   * The thinnest thing that works, on purpose. What these pin is that it can
+   * never become a workflow by accident: nobody writes an ask for somebody
+   * else, nobody deletes one, and clearing marks rather than erases — which is
+   * the only reason the asker can tell "nobody looked" from "somebody said no".
+   */
+  const ask = (chainKey: string = ID.restrictedSeries, uid: string = UID.outsider) => ({
+    chainKey,
+    uid,
+    name: 'Sam Whitfield',
+    askedAt: serverTimestamp(),
+  });
+  const at = (db: Firestore, chainKey: string = ID.restrictedSeries, uid: string = UID.outsider) =>
+    doc(db, paths.accessRequest(chainKey, uid));
+
+  async function seedAsk(
+    chainKey: string = ID.restrictedSeries,
+    uid: string = UID.outsider,
+  ): Promise<void> {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore() as unknown as Firestore;
+      await setDoc(doc(db, paths.accessRequest(chainKey, uid)), {
+        chainKey,
+        uid,
+        name: 'Sam Whitfield',
+        askedAt: Timestamp.fromDate(new Date('2026-02-13T19:00:00Z')),
+      });
+    });
+  }
+
+  it('is written by the person asking, about a gathering they are not on', async () => {
+    await assertSucceeds(setDoc(at(asUser(env, UID.outsider)), ask()));
+  });
+
+  it('is not written for somebody else, however senior the writer', async () => {
+    // A row somebody else can create is a name on a roster that the person
+    // named never put there.
+    await assertFails(
+      setDoc(at(asUser(env, UID.admin), ID.restrictedSeries, UID.outsider), ask()),
+    );
+    await assertFails(
+      setDoc(
+        at(asUser(env, UID.outsider), ID.restrictedSeries, UID.outsiderCore),
+        ask(ID.restrictedSeries, UID.outsiderCore),
+      ),
+    );
+  });
+
+  it('is not written about a gathering the asker can already work', async () => {
+    // Noise on somebody else's screen: `counselor` is on the restricted chain,
+    // and every member can work an unrestricted one.
+    await assertFails(setDoc(at(asUser(env, UID.counselor)), ask()));
+    await assertFails(
+      setDoc(at(asUser(env, UID.outsider), ID.series, UID.outsider), ask(ID.series)),
+    );
+  });
+
+  it('cannot carry a clear it was born with, or an id that is not the pair', async () => {
+    const db = asUser(env, UID.outsider);
+    await assertFails(
+      setDoc(at(db), { ...ask(), clearedBy: UID.core, clearedAt: serverTimestamp() }),
+    );
+    await assertFails(setDoc(doc(db, `accessRequests/whatever`), ask()));
+  });
+
+  it('is read by any active member, and by nobody outside the team', async () => {
+    await seedAsk();
+    await assertSucceeds(getDoc(at(asUser(env, UID.counselor))));
+    await assertSucceeds(getDocs(collection(asUser(env, UID.core), paths.accessRequestsCollection())));
+    await assertFails(getDoc(at(asUser(env, UID.stranger))));
+    await assertFails(getDoc(at(asUser(env, UID.inactive))));
+  });
+
+  it('is cleared by somebody on the gathering, or by the asker taking it back', async () => {
+    await seedAsk();
+    await assertSucceeds(
+      updateDoc(at(asUser(env, UID.counselor)), {
+        clearedBy: UID.counselor,
+        clearedAt: serverTimestamp(),
+      }),
+    );
+
+    await seedAsk(ID.restrictedSeries, UID.outsiderCore);
+    await assertSucceeds(
+      updateDoc(at(asUser(env, UID.outsiderCore), ID.restrictedSeries, UID.outsiderCore), {
+        clearedBy: UID.outsiderCore,
+        clearedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('is not cleared by a bystander, nor in somebody else’s name', async () => {
+    await seedAsk();
+    await assertFails(
+      updateDoc(at(asUser(env, UID.outsiderCore)), {
+        clearedBy: UID.outsiderCore,
+        clearedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(at(asUser(env, UID.counselor)), {
+        clearedBy: UID.core,
+        clearedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('is never rewritten under cover of a clear', async () => {
+    await seedAsk();
+    await assertFails(
+      updateDoc(at(asUser(env, UID.counselor)), {
+        clearedBy: UID.counselor,
+        clearedAt: serverTimestamp(),
+        name: 'Somebody else',
+      }),
+    );
+  });
+
+  it('is deleted by nobody: a clear that leaves no trace is what the mark prevents', async () => {
+    await seedAsk();
+    for (const uid of [UID.admin, UID.core, UID.counselor, UID.outsider]) {
+      await assertFails(deleteDoc(at(asUser(env, uid))));
+    }
+  });
+});
+
 describe('working a restricted gathering', () => {
   const locked = ID.restrictedEvent;
   const open = ID.event;

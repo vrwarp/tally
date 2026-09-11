@@ -77,6 +77,15 @@ function renderPending(result: ProvisionAccessResult) {
   );
 }
 
+/**
+ * A gathering as the server names one: a title, and a date only when it is a
+ * one-off. Every case here is a chain, which is what an invitation usually
+ * names — the dated shape is exercised where it is rendered, in the join page.
+ */
+function gathering(title: string) {
+  return { title, oneOffAt: null };
+}
+
 describe('AuthGate — not on the team', () => {
   it('says the true thing, and names nothing the person cannot act on', async () => {
     renderPending(NOT_ON_ROSTER);
@@ -175,6 +184,72 @@ describe('AuthGate — let in', () => {
       screen.getByText("You're on the team as counselor. Your access is set up."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Planning Center/)).not.toBeInTheDocument();
+  });
+
+  /*
+   * The other half of what a first sign-in did (P5).
+   *
+   * An invitation can carry the gatherings it is for, and `provisionAccess`
+   * acts on them the first time somebody signs in. A placement confirmed here
+   * is the one moment Tally can confirm the text message the volunteer is
+   * holding; a skip is a fact nobody else will ever mention, because the
+   * inviter does not know it happened.
+   */
+  it('names the gatherings the sign-in put them on', async () => {
+    renderPending({
+      status: 'granted',
+      role: 'counselor',
+      message: 'Welcome to Tally.',
+      placed: [gathering('Sunday School'), gathering('Nursery')],
+      skipped: [],
+    });
+
+    expect(await screen.findByText("You've been put on Sunday School and Nursery.")).toBeInTheDocument();
+  });
+
+  it('says a gathering it could not add, and what to do about it', async () => {
+    renderPending({
+      status: 'granted',
+      role: 'counselor',
+      message: 'Welcome to Tally.',
+      placed: [gathering('Nursery')],
+      skipped: [gathering('Sunday School')],
+    });
+
+    expect(await screen.findByText("You've been put on Nursery.")).toBeInTheDocument();
+    // No name here: `provisionAccess` answers an address, not an invitation, so
+    // this screen cannot name the inviter the way the join screen can.
+    expect(
+      screen.getByText(
+        "Sunday School couldn't be added — the leader who invited you is no longer on it. " +
+          'Ask that leader, or an admin, to add you.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the sentence grammatical when more than one gathering was skipped', async () => {
+    renderPending({
+      status: 'granted',
+      role: 'counselor',
+      message: 'Welcome to Tally.',
+      placed: [],
+      skipped: [gathering('Sunday School'), gathering('Nursery')],
+    });
+
+    expect(
+      await screen.findByText(
+        "Sunday School and Nursery couldn't be added — the leader who invited you is no longer " +
+          'on them. Ask that leader, or an admin, to add you.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about gatherings on a sign-in that redeemed nothing', async () => {
+    renderPending({ status: 'granted', role: 'counselor', message: 'Welcome to Tally.' });
+
+    await screen.findByRole('heading', { name: "You're on the team" });
+    expect(screen.queryByText(/put on/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/couldn't be added/)).not.toBeInTheDocument();
   });
 
   it('asks for the profile the grant has just written', async () => {

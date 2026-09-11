@@ -36,12 +36,13 @@ erDiagram
 
 ```
 users/{uid}                              counselor & core team profiles
-invitations/{emailKey}                   who an admin has said may sign in
+invitations/{emailKey | link_hash}       who may sign in: an address, or a link
 eventSeries/{seriesId}                   recurring templates (friday-fellowship, sunday-school)
 students/{studentId}                     the roster itself — a document is a membership
 events/{eventId}                         a single dated gathering
 events/{eventId}/attendance/{studentId}  who showed up
 events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
+accessRequests/{chainKey}__{uid}         somebody asking to be put on a gathering
 transitions/{chainKey}__{studentId}      this gathering no longer expects this student
 config/settings                          tunable thresholds
 config/planningCenter                    the non-secret Planning Center settings
@@ -513,6 +514,35 @@ deliberate untick of a name the sheet showed; only the names it never showed are
 lookup denies — so the natural `a == null || …` form would have denied every gathering nobody had
 restricted, which is all of them on the day it deployed. `firestore-tests/getSemantics.test.ts` pins
 that fact.
+
+### `accessRequests/{chainKey}__{uid}`
+
+Somebody asking to be put on a gathering they are not on — and **deliberately not a workflow**.
+Nothing is notified, nothing waits on one, and pressing it obliges nobody. A counselor who asks
+still walks over and asks out loud, exactly as today; what the row buys them is that their name is
+one tap on the roster instead of a search through it. Every surface that reads this avoids
+"request", "pending" and "asked" for that reason: anything shaped like a queue would be a promise
+the design does not make.
+
+| Field | Meaning |
+| --- | --- |
+| `chainKey`, `uid` | The pair. The document id is `{chainKey}__{uid}`, so pressing twice addresses the row that already exists rather than stacking a second claim on somebody else's screen. |
+| `name` | Denormalised, so a roster can name the asker without reading `users`. |
+| `askedAt` | Re-stamped by a second press, which is the honest reading of pressing again: the same ask, today. |
+| `clearedBy`, `clearedAt` | Set when somebody answers it. |
+
+**Clearing marks; it does not delete.** Without the mark the asker cannot tell "nobody has looked"
+from "somebody has said no", and presses again next week — so their own screen reads it back as
+"Miriam cleared this at 7:01 — ask her in person". The rules therefore refuse every client delete,
+and the ageing-out is a nightly job (`sweepOldAccessRequests`, 03:10) that removes anything older
+than seven days, cleared or not: an ask is about tonight.
+
+**Who writes:** the asker, as themselves, and only about a gathering they cannot already work — a
+row from somebody who can work it is noise on somebody else's screen. Clearing is anybody on the
+gathering (admins included, as everywhere) or the asker taking it back, and may touch only the two
+clearing fields, so a clear can never quietly rewrite who asked. **Who reads:** any active member.
+That is wider than who may act on one, on purpose: the asker has to be able to read their own row
+back to learn it was answered.
 
 ### What restriction does not protect
 
@@ -1005,11 +1035,47 @@ Tally creates gets pushed. Absent means Planning Center, which is what keeps eve
 before this document existed behaving identically. Core-writable, closed shape, enum-checked. A
 student already linked ignores it — writes dispatch to the backend that holds them.
 
-The allowlist: an admin saying "this Google address may sign in, as this". `emailKey` is the
-lowercased address with `.` replaced by `,` (`sam.smith@example.org` → `sam,smith@example,org`) —
-Firestore ids may not contain `/`, and `.` is legal but awkward to read.
+The allowlist, in two kinds — an address, and a link.
 
-Fields: `email`, `role`, `invitedAt`, `invitedBy`, and an optional `note`.
+**An address invitation** is somebody saying "this Google address may sign in, as this", keyed by
+`emailKey`: the *canonical* address with `.` replaced by `,` (`sam.smith@example.org` →
+`sam,smith@example,org`), where canonical folds dots, `+tags` and `googlemail.com` for the two Gmail
+domains and lowercases everything else — see `src/lib/emailKey.ts`. Firestore ids may not contain
+`/`, and `.` is legal but awkward to read. A sign-in looks up the canonical key first and, on a
+miss, the exact key invitations were written under before that rule, moving the document as it goes.
+
+**A link invitation** is for the ordinary case the address one never covered: the inviter knows the
+person but not which Google account they will use. Tally mints a 128-bit token, keeps only its
+SHA-256 — *as the document id*, `link_<hash>`, so redeeming is one `get()` at a known path rather
+than a scan an unauthenticated caller could provoke — and hands over `/join/<token>` as a link to
+send or a QR to hold up. A link is **single-use**, lives fourteen days (ten minutes when re-minted
+as a QR, whose whole safety property is that both people are in the room), and grants **counselor**
+whoever minted it: a core-team link that leaked in a screenshot would open Insights, Students and
+Settings. Minting is core and up. **Extend** and **QR** are the same act — a new token, the old one
+dead, the row moved to the new id with `label`, `gatherings`, `invitedBy` and `invitedAt` carried
+across. At most twenty unredeemed links exist at once.
+
+| Field | Meaning |
+| --- | --- |
+| `email` | The address as typed. Absent on a link until somebody redeems it. |
+| `role` | What they arrive as. A link is always `counselor`. |
+| `invitedAt`, `invitedBy` | Who invited them, and when. `invitedBy` is write-once in the rules, and is who may withdraw the row. |
+| `note` | Free text on an address invitation. |
+| `kind` | `'link'`, or absent for the address kind. |
+| `label` | Who a link is for, in the inviter's words — required, because a link row has no address to name it and eight anonymous rows on a Tuesday is how a season roll goes back into a spreadsheet. |
+| `tokenExpiresAt` | When the token stops opening it. |
+| `gatherings` | Chain keys to put them on at first sign-in, at most twenty. |
+| `resolvedAt`, `redeemedBy`, `redeemedEmail`, `redeemedName` | Who arrived on it, under which address, and when. |
+| `placed`, `skipped` | Which of `gatherings` the redemption managed, and which it could not. |
+
+**What an invitation is for, and what it did.** `gatherings` is the inviter's decision on Tuesday;
+carrying it out happens at the one moment Tally can confirm it, which is when the person signs in.
+`provisionAccess` (address) and `redeemInvitation` (link) both re-check that the inviter is *still*
+an admin or *still* on each chain — handing out access you no longer hold is the one way this could
+become an escalation — and add the new uid to `eventAccess.members`. A chain nobody has restricted
+counts as placed, because "you're on Sunday School" is true. Then the outcome is stamped back onto
+the invitation, which stops being a credential and becomes the record: the pending card reads it as
+**Arrived this week**, and a skip sits there as an outstanding item until somebody resolves it.
 
 There is no `active` flag any more. There was one, drawn on the Team screen as a checkbox reading
 "may sign in", and it could only ever refuse a *first* sign-in — `provisionAccess` returns on the
@@ -1023,9 +1089,22 @@ a uid does not exist until they do. Once they have, `users/{uid}` is the live au
 is only the record of how they arrived — which is why withdrawing an invitation stops somebody
 arriving but does not evict anybody who already has.
 
-**Who writes:** admins, through the app. **Who reads:** admins only — this is a list of church staff
-email addresses, and a counselor's phone has no reason to hold one. The shape is closed (`hasOnly`),
-so nothing unvalidated can be smuggled into an access decision.
+**Who writes:** an admin, for any role; a **core member**, for `counselor` invitations only — the
+governance change a children's director asked for in these words, that the only way to let her
+recruit her own nursery team was to make her an admin over everyone's access to a roster of minors,
+because she had one nineteen-year-old to add. Withdrawing is an admin for anything, and a core
+member for the unredeemed counselor rows they created. A redeemed row is never withdrawn by a core
+member: it would evict nobody and would delete the only account of who arrived.
+
+**Who reads:** core and up. The line used to be admin-only on the argument that a counselor's phone
+has no business holding staff addresses; `users` is already listable by every active member, so that
+was only ever true of *pending* invitations, and core-yes-counselor-no is where it belongs.
+
+The shape is closed (`hasOnly`), so nothing unvalidated can be smuggled into an access decision —
+and it is closed twice. Every field a link or a redemption owns (`kind`, `label`, `tokenExpiresAt`,
+`resolvedAt`, `placed`, `skipped`, `redeemed*`) is refused on a client create and unchangeable on a
+client update: a browser that could write `resolvedAt` could quietly cancel an invitation, and one
+that could write `tokenExpiresAt` could extend somebody else's link.
 
 This collection used to be a Planning Center List. A List is generated from filter rules, so "these
 particular twelve adults" was only expressible by inventing a custom field on every person in the

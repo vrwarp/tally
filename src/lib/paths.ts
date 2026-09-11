@@ -81,6 +81,16 @@ export const COLLECTIONS = {
    */
   kioskDevices: 'kioskDevices',
   /**
+   * One document per (chain, member) pair: somebody is asking to be put on a
+   * gathering they are not on.
+   *
+   * Deliberately not a workflow. Nothing is notified, nothing waits on it, and
+   * nobody is obliged to answer — a counselor who presses it still walks over
+   * and asks out loud, and the ask only makes their name one tap instead of a
+   * search. See `docs/team-access.md`. Rows live seven days.
+   */
+  accessRequests: 'accessRequests',
+  /**
    * One document per (chain, student) pair: this gathering no longer expects
    * this student, and why. The aging-out record — see docs/aging-out.md.
    *
@@ -107,6 +117,15 @@ export const COLLECTIONS = {
  */
 export function transitionId(chainKey: string, studentId: string): string {
   return `${chainKey}__${studentId}`;
+}
+
+/**
+ * Where an ask to be added lives. The same construction as `transitionId`, and
+ * for the same reason: one document per pair, so pressing twice addresses the
+ * row that already exists rather than stacking a second claim.
+ */
+export function accessRequestId(chainKey: string, uid: string): string {
+  return `${chainKey}__${uid}`;
 }
 
 export const SETTINGS_DOC_ID = 'settings';
@@ -153,6 +172,10 @@ export const paths = {
 
   kioskDevicesCollection: () => COLLECTIONS.kioskDevices,
   kioskDevice: (deviceId: string) => `${COLLECTIONS.kioskDevices}/${deviceId}`,
+
+  accessRequestsCollection: () => COLLECTIONS.accessRequests,
+  accessRequest: (chainKey: string, uid: string) =>
+    `${COLLECTIONS.accessRequests}/${accessRequestId(chainKey, uid)}`,
 
   transitionsCollection: () => COLLECTIONS.transitions,
   transition: (chainKey: string, studentId: string) =>

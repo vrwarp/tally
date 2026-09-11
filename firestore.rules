@@ -264,29 +264,108 @@ service cloud.firestore {
      * this is a list of church staff email addresses, and a counselor's phone
      * has no reason to hold one.
      */
-    match /invitations/{emailKey} {
+    match /invitations/{invitationId} {
       /*
-       * `active` is permitted but never required, and nothing reads it.
+       * Two kinds of document, and only one of them a client may write.
        *
-       * It used to be a pause switch on the Team screen and a required bool
-       * here. The switch is gone — it could only refuse a first sign-in, and by
-       * the time most rows showed it the person already had a profile deciding
-       * their access instead. The key stays in the permit list because a
-       * document written before the removal still carries it, and a merge that
-       * leaves it in place must not be rejected as a shape nobody validates.
+       * An **address invitation** is keyed by `emailKey(email)` and written
+       * from the Team screen. A **link invitation** is keyed by the hash of
+       * its token and written only by `createInvitationLink` through the admin
+       * SDK — which is why every key that belongs to a link, and every key a
+       * redemption stamps, is in the server's half below. A client that could
+       * write `resolvedAt` could make an invitation look spent; one that could
+       * write `label` or `tokenExpiresAt` could extend somebody else's link.
+       *
+       * `active` is permitted but never required, and nothing reads it. It used
+       * to be a pause switch on the Team screen and a required bool here. The
+       * switch is gone — it could only refuse a first sign-in, and by the time
+       * most rows showed it the person already had a profile deciding their
+       * access instead. The key stays in the permit list because a document
+       * written before the removal still carries it, and a merge that leaves it
+       * in place must not be rejected as a shape nobody validates.
        */
+      function clientKeys() {
+        return ['email', 'role', 'active', 'invitedAt', 'invitedBy', 'note', 'gatherings'];
+      }
+
+      function serverKeys() {
+        return ['kind', 'label', 'tokenExpiresAt', 'resolvedAt', 'placed', 'skipped',
+                'redeemedBy', 'redeemedEmail', 'redeemedName'];
+      }
+
       function validInvitation() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['email', 'role', 'active', 'invitedAt', 'invitedBy', 'note'])
+        return d.keys().hasOnly(clientKeys().concat(serverKeys()))
           && d.email is string
           && d.email.size() > 0
           && d.role in ['counselor', 'core', 'admin']
-          && (!('note' in d.keys()) || d.note is string);
+          && (!('note' in d.keys()) || d.note is string)
+          /*
+           * What is *in* the list is checked on the server — rules cannot walk
+           * one, and every reader turns an entry into `eventAccess/{key}`. See
+           * `isChainKey` in functions/src/invitations.ts.
+           */
+          && (!('gatherings' in d.keys())
+              || (d.gatherings is list && d.gatherings.size() <= 20));
       }
 
-      allow get, list: if isAdmin();
-      allow create, update: if isAdmin() && validInvitation();
-      allow delete: if isAdmin();
+      /**
+       * A core member may invite a counselor, and nothing above one.
+       *
+       * The governance change this is the whole of: a children's director
+       * recruiting her own nursery team needed an admin over everyone's access
+       * to a roster of minors, because she had one nineteen-year-old to add.
+       * Admin-role and core-role invitations stay admin-only in both
+       * directions — writing one, and editing one that already says so.
+       */
+      function mayWriteRole() {
+        return isAdmin()
+          || (isCore()
+              && request.resource.data.role == 'counselor'
+              && (resource == null || resource.data.get('role', 'counselor') == 'counselor'));
+      }
+
+      /*
+       * Core and up read the pending list. The documented reason for admin-only
+       * was that a counselor's phone has no business holding staff addresses;
+       * `users` is already listable by every active member, so that line was
+       * only ever true of *pending* invitations, and core-yes-counselor-no is
+       * where it belongs.
+       */
+      allow get, list: if isCore();
+
+      /*
+       * `invitedBy` is write-once: on an update it must be what it was. It is
+       * not pinned to the writer on *create*, because putting a withdrawn
+       * invitation back is a create — see the Team screen's Undo — and the row
+       * has to come back saying who originally invited them, which is also who
+       * may withdraw it again. A core member could therefore write somebody
+       * else's uid there; what that buys them is giving away their own right to
+       * withdraw the row, which is nobody's escalation.
+       */
+      allow create: if mayWriteRole()
+                    && validInvitation()
+                    && request.resource.data.keys().hasOnly(clientKeys())
+                    && request.resource.data.invitedBy is string
+                    && request.resource.data.invitedBy.size() > 0;
+
+      allow update: if mayWriteRole()
+                    && validInvitation()
+                    && touchesOnly(clientKeys())
+                    && request.resource.data.invitedBy == resource.data.invitedBy;
+
+      /*
+       * Withdrawing. An admin may withdraw anything — including tidying a row
+       * away — and a core member only the counselor invitations they created
+       * and nobody has redeemed. A redeemed invitation is the record of who
+       * arrived and what they were put on: withdrawing it would evict nobody
+       * and would delete the only account of it.
+       */
+      allow delete: if isAdmin()
+                    || (isCore()
+                        && resource.data.get('invitedBy', '') == request.auth.uid
+                        && resource.data.get('role', 'counselor') == 'counselor'
+                        && resource.data.get('resolvedAt', null) == null);
     }
 
     /* ---------------------------------------------------------------- */
@@ -1013,6 +1092,73 @@ service cloud.firestore {
      * after `releasedAt` stands it down), so no client ever has to be trusted
      * with a "void" write.
      */
+    /*
+     * Somebody asking to be put on a gathering they are not on.
+     *
+     * Deliberately the thinnest thing that works, because it is deliberately
+     * not a workflow: nothing is notified, nothing waits on it, and pressing it
+     * obliges nobody. A counselor who asks still walks over and asks out loud —
+     * what the row buys is that their name is one tap on the roster instead of
+     * a search. Anything shaped like a queue here would be a promise the design
+     * does not make.
+     *
+     * The one asymmetry worth naming: **clearing marks, it does not delete.**
+     * Otherwise the asker cannot tell "nobody looked" from "somebody said no",
+     * and presses again. The asker's own page reads the mark back as "Miriam
+     * cleared this at 7:01 — ask her in person".
+     */
+    match /accessRequests/{requestId} {
+      function validRequest() {
+        let d = request.resource.data;
+        return requestId == d.chainKey + '__' + d.uid
+          && d.keys().hasOnly(['chainKey', 'uid', 'name', 'askedAt', 'clearedBy', 'clearedAt'])
+          && d.chainKey is string && d.chainKey.size() > 0 && d.chainKey.size() <= 200
+          && d.uid == request.auth.uid
+          && d.name is string && d.name.size() <= 120
+          && d.askedAt is timestamp
+          && d.get('clearedBy', null) == null
+          && d.get('clearedAt', null) == null;
+      }
+
+      function validClear() {
+        let d = request.resource.data;
+        return d.clearedBy == request.auth.uid
+          && d.clearedAt is timestamp
+          && touchesOnly(['clearedBy', 'clearedAt']);
+      }
+
+      /*
+       * Read by any active member, which is wider than who may act on one — the
+       * asker has to be able to read their own row back to learn it was
+       * cleared, and the roster's "Who's on" sheet is open to whoever is
+       * looking at the gathering.
+       */
+      allow get, list: if isActive();
+
+      /* Asking is asking for yourself, and only about a gathering you are not
+         already on: a row from somebody who can already work it is noise on
+         somebody else's screen. */
+      allow create: if isActive()
+                    && validRequest()
+                    && !onChain(request.resource.data.chainKey);
+
+      /*
+       * Clearing is for somebody who could actually do something about it —
+       * anybody on the gathering — or for the asker taking it back. Marking
+       * rather than deleting is the whole point, so an update may touch only
+       * the two clearing fields.
+       */
+      allow update: if isActive()
+                    && validClear()
+                    && (onChain(resource.data.chainKey)
+                        || resource.data.uid == request.auth.uid);
+
+      /* Nobody deletes one from a client. Rows live seven days and the sweep is
+         the server's; a delete here would be a clear that leaves no trace,
+         which is exactly what the mark exists to prevent. */
+      allow delete: if false;
+    }
+
     match /transitions/{transitionId} {
       function validTransition() {
         let d = request.resource.data;

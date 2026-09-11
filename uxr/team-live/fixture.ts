@@ -78,7 +78,24 @@ export const USERS: UserProfile[] = MEMBERS.map((member, index) => ({
   pcoPersonId: null,
   createdAt: new Date(NOW - 200 * DAY),
   lastSeenAt: member.seen === null ? null : new Date(NOW - member.seen),
+  /*
+   * Nobody in the fixture has been suspended and put back. The one inactive
+   * member is drawn from `active` alone, which is what the screen reads; these
+   * two are the record of *when* it happened, and the person page is where
+   * they are rendered.
+   */
+  accessEndedAt: null,
+  accessRestoredAt: null,
 }));
+
+/** The half of an invitation that only a link ever fills in. */
+const UNSPENT = {
+  tokenExpiresAt: null,
+  resolvedAt: null,
+  gatherings: [] as string[],
+  placed: [] as string[],
+  skipped: [] as string[],
+};
 
 export const INVITATIONS: Invitation[] = [
   {
@@ -87,6 +104,7 @@ export const INVITATIONS: Invitation[] = [
     role: 'counselor',
     invitedBy: SELF_ID,
     invitedAt: new Date(NOW - 2 * DAY),
+    ...UNSPENT,
   },
   {
     id: 'ken.tanaka@example.org',
@@ -94,6 +112,7 @@ export const INVITATIONS: Invitation[] = [
     role: 'core',
     invitedBy: SELF_ID,
     invitedAt: new Date(NOW - 6 * DAY),
+    ...UNSPENT,
   },
   {
     id: 'wednesday.volunteer@example.org',
@@ -101,6 +120,7 @@ export const INVITATIONS: Invitation[] = [
     role: 'counselor',
     invitedBy: SELF_ID,
     invitedAt: new Date(NOW - 24 * DAY),
+    ...UNSPENT,
   },
   {
     id: 'noor.haddad@example.org',
@@ -108,6 +128,7 @@ export const INVITATIONS: Invitation[] = [
     role: 'counselor',
     invitedBy: SELF_ID,
     invitedAt: new Date(NOW - 40 * MINUTE),
+    ...UNSPENT,
   },
   /*
    * Sam accepted a month ago and is in the list above. Nothing deletes an
@@ -122,5 +143,6 @@ export const INVITATIONS: Invitation[] = [
     role: 'counselor',
     invitedBy: SELF_ID,
     invitedAt: new Date(NOW - 30 * DAY),
+    ...UNSPENT,
   },
 ];

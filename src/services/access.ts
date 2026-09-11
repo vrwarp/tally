@@ -37,8 +37,6 @@ import {
   deleteField,
   doc,
   onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -48,31 +46,69 @@ import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 import { emailKey, type Invitation, type Role } from '@/types';
 
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
 function toInvitation(snapshot: {
   id: string;
   data: () => Record<string, unknown> | undefined;
 }): Invitation {
   const data = snapshot.data() ?? {};
+  const link = data.kind === 'link';
   return {
     id: snapshot.id,
-    email: typeof data.email === 'string' ? data.email : snapshot.id.replace(/,/g, '.'),
+    /*
+     * A link has no address until somebody redeems it, and its id is a hash —
+     * so the fallback that reads an address out of the id is for the other
+     * kind only. A link row is named by its label instead.
+     */
+    ...(link
+      ? { kind: 'link' as const }
+      : { email: typeof data.email === 'string' ? data.email : snapshot.id.replace(/,/g, '.') }),
+    ...(typeof data.email === 'string' && link ? { email: data.email } : {}),
     role: (data.role === 'admin' || data.role === 'core' ? data.role : 'counselor') as Role,
     invitedAt: toDateOrNull(data.invitedAt),
     invitedBy: typeof data.invitedBy === 'string' ? data.invitedBy : null,
     ...(typeof data.note === 'string' && data.note ? { note: data.note } : {}),
+    ...(typeof data.label === 'string' && data.label ? { label: data.label } : {}),
+    tokenExpiresAt: toDateOrNull(data.tokenExpiresAt),
+    gatherings: strings(data.gatherings),
+    resolvedAt: toDateOrNull(data.resolvedAt),
+    ...(typeof data.redeemedBy === 'string' ? { redeemedBy: data.redeemedBy } : {}),
+    ...(typeof data.redeemedEmail === 'string' ? { redeemedEmail: data.redeemedEmail } : {}),
+    ...(typeof data.redeemedName === 'string' ? { redeemedName: data.redeemedName } : {}),
+    placed: strings(data.placed),
+    skipped: strings(data.skipped),
   };
 }
 
-/** Admin-only: the rules deny this read to everybody else. */
+/**
+ * Core and up: the rules deny this read to a counselor.
+ *
+ * Unordered on the wire, and sorted here. It used to `orderBy('email')`, which
+ * is a filter as much as an order: Firestore drops from an ordered query every
+ * document that lacks the field, so the day links arrived — a link has no
+ * address until somebody redeems it — every link would have been missing from
+ * the list that exists to show them. The collection is small enough that the
+ * sort belongs on this side.
+ */
 export function subscribeInvitations(
   onChange: (invitations: Invitation[]) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
-    query(collection(db, paths.invitations()), orderBy('email')),
-    (snapshot) => onChange(snapshot.docs.map(toInvitation)),
+    collection(db, paths.invitations()),
+    (snapshot) => onChange(snapshot.docs.map(toInvitation).sort(byInvitedAtThenName)),
     (error) => onError?.(error),
   );
+}
+
+/** Newest first, because the row somebody is looking for is the one they just made. */
+function byInvitedAtThenName(a: Invitation, b: Invitation): number {
+  const at = (b.invitedAt?.getTime() ?? 0) - (a.invitedAt?.getTime() ?? 0);
+  if (at !== 0) return at;
+  return (a.email ?? a.label ?? a.id).localeCompare(b.email ?? b.label ?? b.id);
 }
 
 /**
@@ -92,6 +128,12 @@ export async function inviteToTally(
   role: Role,
   invitedBy: string,
   note?: string,
+  /**
+   * The chains to put them on at first sign-in — see `InvitationDoc`. Written
+   * whole rather than merged: unticking a gathering on a re-invite has to be
+   * able to take it off again.
+   */
+  gatherings: readonly string[] = [],
 ): Promise<void> {
   const address = email.trim().toLowerCase();
   if (!address) throw new Error('An email address is required.');
@@ -104,12 +146,19 @@ export async function inviteToTally(
       active: deleteField(),
       invitedAt: serverTimestamp(),
       invitedBy,
+      gatherings: [...gatherings],
       ...(note?.trim() ? { note: note.trim() } : {}),
     },
     { merge: true },
   );
 }
 
+/**
+ * Withdraws an invitation — an address one or a link.
+ *
+ * Never offered on a redeemed row: withdrawing would evict nobody and would
+ * delete the only record of who arrived on it. The rules say the same.
+ */
 export async function withdrawInvitation(id: string): Promise<void> {
   await deleteDoc(doc(db, paths.invitation(id)));
 }

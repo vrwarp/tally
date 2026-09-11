@@ -382,9 +382,18 @@ gcloud projects add-iam-policy-binding tally-76406 \
 until pairing gives it one — and are covered by the same `allUsers` invoker binding as every other
 callable above. What keeps them harmless is in the handlers: a cap on live pairings, a ten-minute
 expiry, a hashed device secret, and the fact that no token exists until a signed-in staff member
-approves the code. They are also the **only** intentionally-unauthenticated callables since the
-QR/phone registration was retired: `registerFamily` requires the kiosk's own token outright, so
-nothing app-level accepts an anonymous caller any more.
+approves the code.
+
+`readInvitation` is the third, and it is unauthenticated for a reason of the same shape: the person
+holding an invite link has no account yet, and being asked to sign in before being told what they
+are signing in *to* is how a volunteer decides a link is phishing. It answers an inviter's display
+name and some gathering titles for a token that opens something, and nothing at all for one that
+does not — no addresses, no roster, and one `get()` at a path derived from the token's hash, so
+there is no query for a caller to turn into a scan. Redeeming is a different callable and requires
+a Google sign-in.
+
+`registerFamily` requires the kiosk's own token outright, so nothing else app-level accepts an
+anonymous caller.
 
 ### After the kiosk-identity update, every kiosk pairs once
 

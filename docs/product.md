@@ -334,10 +334,32 @@ Planning Center People is the system of record for *people*: names, grades, cont
 medical notes originate there, are read on demand, and are stored nowhere in Tally.
 
 *Membership* is Tally's own — both of them. Who is a student is a document in `students/`,
-put there from **Students → Add from Planning Center**; who may sign in is an invitation an admin
-writes on the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
+put there from **Students → Add from Planning Center**; who may sign in is an invitation written on
+the **Team** screen, plus the addresses in `TALLY_ADMIN_EMAILS`. Both used to be Planning
 Center Lists, which cannot express either: a List is generated from filter rules, so "these
 forty-three teenagers" is only sayable by inventing a custom field on every person in the church.
+
+An invitation comes through one of two doors, because the thing being invited is a *person* and what
+Tally can check is an *account*. **By address**, when the inviter knows which one they will use —
+the church's Workspace address, usually. **By link**, when they do not, which is the ordinary case
+for a volunteer whose Google account is a personal Gmail they have never spelled out loud: Tally
+mints a single-use link, good for a fortnight, that the inviter sends — or holds up as a QR, good
+for ten minutes, for the person standing beside them. A link grants counselor and nothing more,
+whoever mints it, and the screen it opens names the account before it spends anything: a phone's
+default Google account is not always the one its owner meant, and a link that granted silently would
+turn a refusal fixed in ten seconds into a wrong identity only an admin can undo.
+
+Either door can say what the invitation is *for* — the gatherings to put somebody on when they
+arrive — so the Tuesday decision finishes on Tuesday rather than at 9:05 on Sunday with a volunteer
+standing at a door. It is carried out at the one moment Tally can confirm it, and re-checked then:
+somebody who has since come off a gathering cannot still be seeding people onto it. Where that
+happens the invitation says so, and the skip waits on the Team screen as an outstanding item rather
+than being discovered at a door.
+
+**Core team may invite counselors.** The line used to be admin-only, which meant a children's
+director who needed to add one nineteen-year-old to the nursery had to be made an admin over
+everyone's access to a roster of minors. Admin- and core-role invitations are still an admin's
+alone.
 
 Team is its own route rather than the last card on Settings, which is where it lived until it was
 the one thing on that page anybody came back to and the only one below a colour picker. Four rounds

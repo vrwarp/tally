@@ -61,7 +61,7 @@
  * idiom: the roster draws, the controls stay, and a line says what could not
  * be checked.
  */
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Badge,
   Button,
@@ -69,18 +69,16 @@ import {
   CardHeader,
   EmptyState,
   ErrorBanner,
-  SelectField,
   SkeletonRows,
-  TextField,
 } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
+import { InviteCard } from '@/features/team/InviteCard';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { cn } from '@/lib/utils';
-import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import { listPinnedAdmins } from '@/services/functions';
 import { subscribeUsers, upsertUser } from '@/services/users';
-import { canonicalEmail, type Invitation, type Role, type UserProfile } from '@/types';
+import { canonicalEmail, type Role, type UserProfile } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -187,7 +185,6 @@ function Identity({
 }
 
 export function TeamPage() {
-  const tCommon = useTranslations('Common');
   const time = useTimeFormats();
   const t = useTranslations('Team');
   const { profile, can } = useAuth();
@@ -197,66 +194,9 @@ export function TeamPage() {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [invitations, setInvitations] = useState<Invitation[] | null>(null);
-  const [invitationsError, setInvitationsError] = useState<string | null>(null);
-  /**
-   * Which invitation, if any, is one tap from being deleted.
-   *
-   * One id rather than a set: arming a second row disarms the first, which is
-   * the behaviour a half-finished confirmation should have.
-   */
-  const [confirmingWithdrawal, setConfirmingWithdrawal] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<Role>('counselor');
-  const [inviting, setInviting] = useState(false);
-
-  /*
-   * The invite card is a disclosure on a phone and an ordinary card on a laptop.
-   *
-   * Below `lg` it opens on a tap, because promoting the *form* above eleven
-   * people — which is what an earlier round did — put zero of them on the first
-   * screen and the person an admin came to switch off two and a half viewports
-   * down. What is promoted now is the action, at 44px, at the top of the page.
-   *
-   * `open` is driven rather than left to the browser so the laptop is never in
-   * the collapsed state: at `lg` the body is always shown and the summary takes
-   * no pointer events. Doing it with `::details-content` instead would have
-   * pinned the layout to a browser floor Tally does not otherwise need.
-   */
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [wide, setWide] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
-  );
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 1024px)');
-    const sync = () => setWide(query.matches);
-    sync();
-    query.addEventListener('change', sync);
-    return () => query.removeEventListener('change', sync);
-  }, []);
-
   useEffect(() => subscribeUsers(setUsers, (cause) => setUsersError(cause.message)), []);
 
   const isAdmin = can('admin');
-
-  // Admin-only by rule as well as by screen: this is a list of staff addresses,
-  // so a core-team subscription would just be a denial in the console. It is
-  // also why a core member's screen says outstanding invitations exist rather
-  // than showing them — the browser cannot read them to count.
-  //
-  // Three states, the same three the roster above already has: `null` while
-  // the first snapshot is in flight, a string when the read failed, and `[]`
-  // only ever from a snapshot that actually arrived.
-  //
-  // The error callback used to answer `setInvitations([])`, which is not a
-  // record of a failure but a claim: the card then drew a count badge reading
-  // `0` and an empty state saying everybody invited had signed in. On a dropped
-  // connection that is a screen telling an admin — about access to a roster of
-  // minors — that four outstanding invitations are not outstanding.
-  useEffect(() => {
-    if (!isAdmin) return;
-    return subscribeInvitations(setInvitations, (cause) => setInvitationsError(cause.message));
-  }, [isAdmin]);
 
   const [pinned, setPinned] = useState<PinnedAdmins>({ status: 'loading', emails: NO_PINNED });
   /** Bumped by Retry, so a failed answer can be asked for again. */
@@ -317,61 +257,6 @@ export function TeamPage() {
     }
   };
 
-  const handleInvite = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const address = inviteEmail.trim();
-    if (!address || !profile || inviting) return;
-
-    setInviting(true);
-    try {
-      await inviteToTally(address, inviteRole, profile.id);
-      setInviteEmail('');
-      show(t('canNowSignIn', { address }), { tone: 'success' });
-    } catch {
-      show(t('saveInviteFailed'), { tone: 'error' });
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  /**
-   * Puts a withdrawn invitation back, exactly as it was.
-   *
-   * The document id is derived from the address, so re-inviting writes the same
-   * document the delete removed rather than a second one — which is what makes
-   * an undo possible at all here. Role and note are carried back over because
-   * an undo that returns somebody as a counselor they were not is not an undo.
-   */
-  const restoreInvitation = async (invitation: Invitation) => {
-    if (!profile) return;
-    setBusyId(invitation.id);
-    try {
-      await inviteToTally(invitation.email, invitation.role, profile.id, invitation.note);
-      show(t('invitedAgain', { email: invitation.email }), { tone: 'success' });
-    } catch {
-      show(t('restoreInviteFailed'), { tone: 'error' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const dropInvitation = async (invitation: Invitation) => {
-    setBusyId(invitation.id);
-    try {
-      await withdrawInvitation(invitation.id);
-      // The only way back from a `deleteDoc`. Without it the confirmation of an
-      // irreversible act is the one toast in the app that offers nothing.
-      show(t('withdrawn', { email: invitation.email }), {
-        tone: 'success',
-        action: { label: 'Undo', onPress: () => void restoreInvitation(invitation) },
-      });
-    } catch {
-      show(t('withdrawInviteFailed'), { tone: 'error' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   /*
    * A–Z, with the reader first.
    *
@@ -389,36 +274,6 @@ export function TeamPage() {
     : null;
 
   const columns = isAdmin ? COLUMNS_EDITABLE : COLUMNS_READ_ONLY;
-
-  /*
-   * The invited list, minus everybody it has stopped being about.
-   *
-   * An invitation is not consumed when it is used. `provisionAccess` reads it
-   * once, writes `users/{uid}`, and leaves the document where it was — so an
-   * address that signed in a month ago went on sitting under "Addresses that
-   * may sign in but have not yet", in both cards at once, wearing a role the
-   * profile beside it had already overruled.
-   *
-   * Filtered rather than deleted on sign-in, because the document is the record
-   * of who invited whom and the way back in if a profile is ever lost.
-   *
-   * Held at `null` until the roster arrives: until then the screen cannot say
-   * which invitations are outstanding, and a count is a claim. A roster that
-   * failed outright is the one case it lists them unfiltered — the card beside
-   * this one is already carrying that error, and a list with a stale row in it
-   * is a better answer there than a card that says nothing.
-   *
-   * Compared on the canonical address rather than lowercased: an invitation
-   * typed `josmith@gmail.com` is the profile that signed in as
-   * `jo.smith@gmail.com`, and a plain `toLowerCase()` here would keep that
-   * mailbox under "have not yet" for as long as the deployment lived — the
-   * same bug this filter was written about, one spelling over.
-   */
-  const signedIn = users ? new Set(users.map((member) => canonicalEmail(member.email))) : null;
-  const pending =
-    invitations && (signedIn || usersError)
-      ? invitations.filter((invitation) => !signedIn?.has(canonicalEmail(invitation.email)))
-      : null;
 
   return (
     <PageFrame>
@@ -680,198 +535,20 @@ export function TeamPage() {
           )}
         </Card>
 
-        {isAdmin ? (
-          <Card className="order-first lg:order-none">
-            <details
-              className="group"
-              open={wide || inviteOpen}
-              onToggle={(event) => setInviteOpen(event.currentTarget.open)}
-            >
-              <summary
-                className={cn(
-                  'flex list-none items-center justify-between gap-3 border-b border-transparent px-4 py-3 group-open:border-ink-800',
-                  wide ? 'pointer-events-none' : 'cursor-pointer',
-                )}
-              >
-                <div className="flex min-h-11 flex-col justify-center">
-                  <h2 className="flex items-center gap-2 text-base font-semibold text-ink-100">
-                    <span
-                      aria-hidden="true"
-                      className="inline-block text-xs text-ink-400 transition-transform group-open:rotate-90 lg:hidden"
-                    >
-                      ▸
-                    </span>
-                    {t('statusInvited')}
-                    {/* No number at all when the read failed: a stale count is
-                        the same false claim the empty state used to make. */}
-                    {pending && !invitationsError ? (
-                      <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
-                        {pending.length}
-                      </span>
-                    ) : null}
-                  </h2>
-                  {/* Shut, the card would otherwise say nothing whatever when
-                      the read failed, beside a "＋ Invite someone" that reads as
-                      "nobody is waiting". The banner itself is inside the card. */}
-                  {invitationsError ? (
-                    <p className="mt-0.5 group-open:hidden lg:hidden">
-                      <Badge tone="danger">{t('invitesNotLoaded')}</Badge>
-                    </p>
-                  ) : null}
-                  <p className="mt-0.5 hidden text-sm text-ink-500 lg:block">
-                    {t('invitesDescription')}
-                  </p>
-                </div>
-                <span className="-mr-2 flex shrink-0 items-center lg:hidden">
-                  <span className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-brand-300 group-open:hidden">
-                    <span aria-hidden="true">＋</span>{t('inviteSomeone')}
-                  </span>
-                  <span className="hidden min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-ink-400 group-open:inline-flex">
-                    {tCommon('close')}
-                  </span>
-                </span>
-              </summary>
-
-              <form
-                className="flex flex-col gap-3 border-b border-ink-800 px-4 py-3"
-                onSubmit={(event) => void handleInvite(event)}
-              >
-                <TextField
-                  label={t('googleAddress')}
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                  placeholder="volunteer@example.org"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  hint={t('googleAddressHint')}
-                />
-                <SelectField
-                  label={tCommon('role')}
-                  value={inviteRole}
-                  onChange={(event) => setInviteRole(event.target.value as Role)}
-                >
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role} value={role}>
-                      {t(ROLE_LABEL[role])}
-                    </option>
-                  ))}
-                </SelectField>
-                <Button type="submit" loading={inviting} disabled={!inviteEmail.trim()}>
-                  {t('invite')}
-                </Button>
-              </form>
-
-              {invitationsError ? (
-                <div className="px-4 py-3">
-                  <ErrorBanner message={invitationsError} />
-                </div>
-              ) : !pending ? (
-                <>
-                  <span role="status" className="sr-only">
-                    {t('loadingInvitations')}
-                  </span>
-                  <div aria-hidden="true">
-                    <SkeletonRows count={2} />
-                  </div>
-                </>
-              ) : pending.length === 0 ? (
-                <EmptyState
-                  title={t('invitesEmptyTitle')}
-                  description={t('invitesEmptyBody')}
-                />
-              ) : (
-                <ul className="divide-y divide-ink-800">
-                  {pending.map((invitation) => (
-                    <li
-                      key={invitation.id}
-                      className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:flex-col lg:items-stretch lg:gap-2"
-                    >
-                      <Identity
-                        title={invitation.email}
-                        meta={
-                          // The granted role speaks the roster's vocabulary: a
-                          // pending Core team is an elevation, and it used to
-                          // hide in the grey.
-                          <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-400">
-                            {invitation.role === 'counselor' ? (
-                              <span>{t(ROLE_LABEL[invitation.role])}</span>
-                            ) : (
-                              <Badge tone="brand" className="first:-ml-1.5">
-                                {t(ROLE_LABEL[invitation.role])}
-                              </Badge>
-                            )}
-                            {invitation.invitedAt ? (
-                              <span>· invited {time.relative(invitation.invitedAt)}</span>
-                            ) : null}
-                          </p>
-                        }
-                      />
-                      {/*
-                        * One control on the row, and it is the destructive one.
-                        *
-                        * There used to be a checkbox beside it reading "may
-                        * sign in", 12px away and under 44px. It was removed
-                        * rather than moved: the flag it wrote could only refuse
-                        * a *first* sign-in, so on the row of anybody who had
-                        * already arrived — the rows this card no longer shows —
-                        * it was a switch over access to a roster of minors that
-                        * changed nothing.
-                        *
-                        * What is left had the weights the wrong way round
-                        * anyway. Withdrawing is a `deleteDoc` and it wore
-                        * `ghost`, the quietest variant in the system, and fired
-                        * on one tap. It now costs a second, red tap, the shape
-                        * the event page already uses for calling off a
-                        * gathering, and the toast that follows offers the way
-                        * back.
-                        */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        {confirmingWithdrawal === invitation.id ? (
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" onClick={() => setConfirmingWithdrawal(null)}>
-                              {t('keepIt')}
-                            </Button>
-                            <Button
-                              variant="danger"
-                              loading={busyId === invitation.id}
-                              onClick={() => {
-                                setConfirmingWithdrawal(null);
-                                void dropInvitation(invitation);
-                              }}
-                            >
-                              {t('yesWithdraw')}
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="secondary"
-                            disabled={busyId === invitation.id}
-                            onClick={() => setConfirmingWithdrawal(invitation.id)}
-                          >
-                            {t('withdraw')}
-                          </Button>
-                        )}
-                        {/* `basis-full` drops the consequence onto its own line
-                            inside the same row rather than adding a wrapper the
-                            three layouts would each have to be re-checked
-                            against. Short, because in the tablet band the row is
-                            shrink-to-fit and a long sentence sets its width. */}
-                        {confirmingWithdrawal === invitation.id ? (
-                          <p role="alert" className="basis-full text-xs text-ink-400">
-                            {t('withdrawWarning')}
-                          </p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </details>
-          </Card>
-        ) : null}
+        {/*
+          * Who is on their way in, one card over from who is already here.
+          *
+          * Lifted out whole when the invitation grew a second door: a link is
+          * minted rather than typed, lives on a token nobody can recover, and
+          * carries four kinds of row — see `InviteCard`. Keeping that inside
+          * this file would have made the screen a place where two unrelated
+          * jobs shared one set of `useState` calls.
+          *
+          * Core and up, not admin only. A children's director recruiting her
+          * own nursery team used to need an admin over everyone's access to a
+          * roster of minors, because she had one nineteen-year-old to add.
+          */}
+        {can('core') ? <InviteCard members={users} membersError={usersError} /> : null}
       </div>
     </PageFrame>
   );

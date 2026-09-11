@@ -400,6 +400,16 @@ export function toUserProfile(snapshot: DocumentSnapshot<DocumentData>): UserPro
     createdAt: toDate(data.createdAt, pendingFallback(snapshot)),
     lastSeenAt: toDateOrNull(data.lastSeenAt),
     pcoPersonId: strOrNull(data.pcoPersonId),
+    /*
+     * How access began and ended. All four are absent on every profile written
+     * before they existed, and the person page says "Not recorded" rather than
+     * guessing — a safeguarding record that fills its own gaps is worse than
+     * one with holes in it.
+     */
+    invitedBy: strOrNull(data.invitedBy),
+    accessEndedAt: toDateOrNull(data.accessEndedAt),
+    accessEndedBy: strOrNull(data.accessEndedBy),
+    accessRestoredAt: toDateOrNull(data.accessRestoredAt),
   };
 }
 

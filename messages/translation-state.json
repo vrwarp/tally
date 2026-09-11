@@ -619,6 +619,11 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Errors.auth.linkNotYours": {
+    "source": "Only the person who created this invitation, or an admin, can change it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Errors.notFound.student": {
     "source": "No such student.",
     "context": "Refusal: no student with that id. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
@@ -654,6 +659,26 @@
     "context": "Refusal: this kiosk registration was already approved or discarded by somebody else. Usually two people reviewing the same queue at once. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Errors.invite.labelRequired": {
+    "source": "Say who the invitation is for before creating it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.invite.tooManyLive": {
+    "source": "There are already twenty invitations waiting to be used. Withdraw one before creating another.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.invite.gatheringNotYours": {
+    "source": "You can only put somebody on a gathering you are on yourself.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Errors.invite.gone": {
+    "source": "That invitation no longer exists.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Errors.backend.notConfigured": {
     "source": "Not configured.",
@@ -1225,6 +1250,26 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Auth.placed": {
+    "source": "You've been put on {gatherings}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.oneOffOnly": {
+    "source": "{title} ({date} only)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.skipped": {
+    "source": "{count, plural, one {{gatherings} couldn't be added — the leader who invited you is no longer on it. Ask that leader, or an admin, to add you.} other {{gatherings} couldn't be added — the leader who invited you is no longer on them. Ask that leader, or an admin, to add you.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.skippedByName": {
+    "source": "{count, plural, one {{gatherings} couldn't be added — {name} is no longer on it. Ask {name}, or an admin, to add you.} other {{gatherings} couldn't be added — {name} is no longer on them. Ask {name}, or an admin, to add you.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Auth.stuckBody": {
     "source": "Tally is having trouble opening on this device. Your access is fine — reloading normally sorts it out.",
     "zh-Hans": "machine",
@@ -1379,6 +1424,126 @@
     "source": "A leader adds you to Tally by your Google address. Sign in with the one they used, and you are in — no password to remember at a door.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Join.reading": {
+    "source": "Opening your invitation…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.invitedBy": {
+    "source": "{name} invited you to Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.invitedByFor": {
+    "source": "{name} invited you to Tally for {gatherings}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.invited": {
+    "source": "You've been invited to Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.invitedFor": {
+    "source": "You've been invited to Tally for {gatherings}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.anyAccountHelp": {
+    "source": "Any Google account works — a personal Gmail is fine. Tally goes by the address to know who you are.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.continueWithGoogle": {
+    "source": "Continue with Google — any account is fine",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.confirmTitle": {
+    "source": "Join as {email}?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.confirmBody": {
+    "source": "Tally will know you by this address from now on. If it isn't the one you meant to use, switch now — afterwards only an admin can change it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.join": {
+    "source": "Join",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.useDifferentAccount": {
+    "source": "Use a different account",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.doneAccount": {
+    "source": "You're in as {email} — open Tally with that account next time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.openTally": {
+    "source": "Open Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.spentTitle": {
+    "source": "That invitation has already been used",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.spentBody": {
+    "source": "An invitation link works once, and this one has been used.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.spentAlreadyIn": {
+    "source": "You're already on the team with this account, so there's nothing left to do.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.expiredTitle": {
+    "source": "That invitation has expired",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.expiredBody": {
+    "source": "Invitation links stop working after a while, and this one has.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.notFoundTitle": {
+    "source": "This invitation link doesn't work",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.notFoundBody": {
+    "source": "Check that the whole link came through — a message sometimes cuts a long one in half.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.askByName": {
+    "source": "Ask {name} for a new link.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.ask": {
+    "source": "Ask the leader who invited you for a new link.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.readFailed": {
+    "source": "Could not open this invitation. Check the wifi and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Join.joinFailed": {
+    "source": "Could not finish joining you. Check the wifi and try again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "FollowUp.contactAdult": {
     "source": "Contact adult",
@@ -3564,6 +3729,286 @@
     "source": "Could not withdraw that invitation.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Team.doorLabel": {
+    "source": "How are you inviting them?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.doorLink": {
+    "source": "With a link",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.doorAddress": {
+    "source": "By email address",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleFixedToCounselor": {
+    "source": "Every invitation you create joins somebody as a counselor. An admin can change that on their row once they are here.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkFor": {
+    "source": "Who is this for?",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkForPlaceholder": {
+    "source": "Jo, nursery, Marie’s daughter",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkForHint": {
+    "source": "Only you see this. A link has no address on it, so this is the only thing naming the row afterwards.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.createLink": {
+    "source": "Create link",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.createLinkFailed": {
+    "source": "Could not create the link. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkReadyTitle": {
+    "source": "A link for {label}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkShownOnce": {
+    "source": "This is the only time Tally can show it. Send it now — if you lose it, make a new one from the row below, which stops the old one working.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkFieldLabel": {
+    "source": "Invitation link",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.copy": {
+    "source": "Copy",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.copied": {
+    "source": "Copied.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.copyByHand": {
+    "source": "Could not copy — select the link and copy it by hand.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.share": {
+    "source": "Share",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.shareTitle": {
+    "source": "An invitation to Tally",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.shareText": {
+    "source": "Open this to join the team on Tally.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.showQr": {
+    "source": "Show QR",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.hideQr": {
+    "source": "Hide QR",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.qr": {
+    "source": "QR",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.qrLoading": {
+    "source": "Drawing the code…",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.qrFailed": {
+    "source": "Could not draw the code. Send the link instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.qrAlt": {
+    "source": "A QR code opening the invitation for {label}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.qrExplain": {
+    "source": "For the person standing next to you: they point their camera at it. It stops working in ten minutes, which is what makes it safe to hold up.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkLifeQr": {
+    "source": "Good until {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkLifeLink": {
+    "source": "Good until {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.noteLabel": {
+    "source": "Note (optional)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.notePlaceholder": {
+    "source": "Wednesday night volunteer",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.alreadyHasAccess": {
+    "source": "{name} already has access as {role}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.showTheirRow": {
+    "source": "Show their row",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.putThemOn": {
+    "source": "Put them on",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.nothingNarrowed": {
+    "source": "Nothing is narrowed yet, so everybody invited can work every gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.gatheringsCapped": {
+    "source": "An invitation can name twenty gatherings. Untick one to add another.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.putsThemOn": {
+    "source": "Puts them on {gatherings}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.unknownGathering": {
+    "source": "a gathering",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkBadge": {
+    "source": "Link",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitedBy": {
+    "source": "Invited by {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.somebody": {
+    "source": "somebody",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.someoneNoLongerHere": {
+    "source": "somebody no longer on the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkPending": {
+    "source": "Not used yet · expires {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkExpired": {
+    "source": "Expired {when} — extend it to make it work again",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.extend": {
+    "source": "Extend",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.extendFailed": {
+    "source": "Could not extend the link. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.withdrawLinkWarning": {
+    "source": "Withdraws the link for {label}. Anybody holding it can no longer use it, and Tally cannot bring it back — you would create a new one.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.linkWithdrawn": {
+    "source": "Withdrew the link for {label}. That link is gone for good; create a new one if they still need it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.arrivedHeading": {
+    "source": "Arrived this week",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.usedByNamed": {
+    "source": "Used by {name} ({email}) on {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.usedBy": {
+    "source": "Used by {who} on {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.outstandingHeading": {
+    "source": "Still to do",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.arrivedName": {
+    "source": "{name} arrived {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.skipDetail": {
+    "source": "{gathering} wasn’t added: {inviter} was no longer on it.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.addNow": {
+    "source": "Add now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.addedToGathering": {
+    "source": "{name} is on {gathering}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.addToGatheringFailed": {
+    "source": "Could not add them. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.askSomebodyOnIt": {
+    "source": "Ask somebody on {gathering} to add them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "KioskPair.title": {
     "source": "Pair a kiosk",

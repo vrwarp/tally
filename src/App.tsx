@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/context/ThemeProvider';
 import { ToastProvider } from '@/context/ToastProvider';
 import { AuthGate, RequireRole } from '@/features/auth/AuthGate';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { JoinPage } from '@/features/auth/JoinPage';
 import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { AppShell } from '@/components/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -77,6 +78,15 @@ export default function App() {
           <ToastProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              {/* Beside /login rather than inside the gate below, because
+                  everything about an invitation has to work for somebody who
+                  has no profile and has not signed in yet — being asked to
+                  sign in before being told what for is how a volunteer decides
+                  a link is phishing. The bare /join is the way back for a
+                  Google round trip that lost the path: the token is also kept
+                  for the tab. */}
+              <Route path="/join" element={<JoinPage />} />
+              <Route path="/join/:token" element={<JoinPage />} />
               <Route
                 path="/*"
                 element={

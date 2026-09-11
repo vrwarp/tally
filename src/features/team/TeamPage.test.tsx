@@ -53,7 +53,31 @@ vi.mock('@/services/access', () => ({
   inviteToTally,
   withdrawInvitation,
 }));
-vi.mock('@/services/functions', () => ({ listPinnedAdmins }));
+/*
+ * The invite card is its own component now, and it reaches further than this
+ * screen does: a link is minted through a callable and a skipped placement is
+ * repaired through the access service. Mocked rather than exercised here —
+ * `InviteCard` has its own tests — but they have to be mocked at all, because
+ * an unmocked `@/services/functions` loads Firebase and throws on the config.
+ */
+vi.mock('@/services/functions', () => ({
+  listPinnedAdmins,
+  createInvitationLink: vi.fn(),
+  refreshInvitationLink: vi.fn(),
+}));
+vi.mock('@/services/eventAccess', () => ({
+  addChainMembers: vi.fn(),
+  subscribeEventAccess: vi.fn(() => () => {}),
+}));
+/*
+ * The invite card names gatherings, which means it reads the calendar the app
+ * already holds. This screen's tests are about the roster, so it gets an empty
+ * one rather than a provider: with nothing narrowed the card draws its "nothing
+ * is narrowed yet" line and no tick-boxes, which is out of the way.
+ */
+vi.mock('@/context/dataContext', () => ({
+  useData: () => ({ events: [], series: [], access: new Map() }),
+}));
 
 type UsersListener = (users: UserProfile[]) => void;
 type InvitationsListener = (invitations: Invitation[]) => void;
@@ -84,6 +108,13 @@ function makeInvitation(overrides: Partial<Invitation> = {}): Invitation {
     role: 'counselor',
     invitedAt: new Date('2026-08-01T12:00:00'),
     invitedBy: ADMIN.id,
+    // The link half of the shape, empty on an address invitation nobody has
+    // redeemed — the state every row starts in.
+    tokenExpiresAt: null,
+    resolvedAt: null,
+    gatherings: [],
+    placed: [],
+    skipped: [],
     ...overrides,
   };
 }
@@ -489,7 +520,7 @@ describe('TeamPage — the way back from a delete', () => {
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
     await waitFor(() =>
-      expect(inviteToTally).toHaveBeenCalledWith(invitation.email, 'core', ADMIN.id, undefined),
+      expect(inviteToTally).toHaveBeenCalledWith(invitation.email, 'core', ADMIN.id, undefined, []),
     );
     expect(await screen.findByText(`${invitation.email} invited again`)).toBeInTheDocument();
   });
@@ -504,7 +535,14 @@ describe('TeamPage — the way back from a delete', () => {
   });
 });
 
-describe('TeamPage — the read-only screen', () => {
+/*
+ * A core member's screen, which is now two screens' worth of difference rather
+ * than one. The roster is still read-only to them — roles and the Active
+ * toggle are an admin's — but the invite card is *theirs*, because a children's
+ * director recruiting her own nursery team used to need an admin over
+ * everyone's access to a roster of minors to add one nineteen-year-old.
+ */
+describe('TeamPage — what a core member may do', () => {
   beforeEach(() => {
     const core = makeUser({
       id: 'core-1',
@@ -515,27 +553,48 @@ describe('TeamPage — the read-only screen', () => {
     useAuth.mockReturnValue({ profile: core, can: (required: Role) => required !== 'admin' });
   });
 
-  it('leaks none of the new controls into a core view', () => {
+  it('leaves the roster read-only, and never asks the admin-only question', () => {
     renderTeam();
     settleUsers();
 
     expect(screen.getByText('Sam Counselor')).toBeInTheDocument();
-    expect(subscribeInvitations).not.toHaveBeenCalled();
     // A list of the people who control access to a roster of minors, and a
-    // question the server would refuse: the read-only view never asks it.
+    // question the server would refuse: this view never asks it.
     expect(listPinnedAdmins).not.toHaveBeenCalled();
     expect(screen.queryByText('Pinned by the deployment')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Yes, withdraw' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Keep it' })).not.toBeInTheDocument();
+    // The roster's own controls: a role select and an Active toggle per row.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(screen.queryByText('Loading invitations')).not.toBeInTheDocument();
   });
 
-  it('still announces its one loading region', () => {
+  it('gives them the invite card', async () => {
+    renderTeam();
+    settleUsers();
+
+    // The card subscribes for itself, and the link door — the default — is the
+    // one a core member reaches for: they know the person, not the account.
+    expect(subscribeInvitations).toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Create link' })).toBeInTheDocument();
+  });
+
+  it('fixes the role to counselor on the address door, and says so', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    await user.click(await screen.findByRole('button', { name: 'By email address' }));
+
+    expect(
+      screen.getByText(/Every invitation you create joins somebody as a counselor/),
+    ).toBeInTheDocument();
+    // Not a select they can put 'Admin' into: the rules would refuse it, and a
+    // control that produces a permission error is worse than no control.
+    expect(screen.queryByLabelText('Role')).not.toBeInTheDocument();
+  });
+
+  it('still announces the roster\u2019s own loading region', () => {
     renderTeam();
 
     expect(screen.getByText('Loading the team')).toBeInTheDocument();
-    expect(screen.queryByText('Loading invitations')).not.toBeInTheDocument();
   });
 });

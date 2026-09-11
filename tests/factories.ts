@@ -150,6 +150,13 @@ export function makeUser(overrides: Partial<UserProfile> = {}): UserProfile {
     createdAt: pick(overrides, 'createdAt', new Date('2025-08-01T12:00:00')),
     lastSeenAt: pick(overrides, 'lastSeenAt', null),
     pcoPersonId: pick(overrides, 'pcoPersonId', null),
+    /*
+     * How access began and ended. Nobody in a factory has been suspended, which
+     * is the ordinary state and the one nearly every test wants; the person
+     * page's own tests set them.
+     */
+    accessEndedAt: pick(overrides, 'accessEndedAt', null),
+    accessRestoredAt: pick(overrides, 'accessRestoredAt', null),
   };
 }
 

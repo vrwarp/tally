@@ -1299,7 +1299,148 @@ function collectWrites(now: Date): {
     });
   }
 
+  writes.push(...accessWrites(now));
+
   return { writes, events, students, attendance, rsvps };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Who may work what, and who is waiting to                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Miriam's uid, as `signedInAs('core')` mints it.
+ *
+ * The seed runs before anybody has signed in, so it cannot know the uids the
+ * Auth emulator will hand out — except that the suite's own sign-in helper is
+ * deterministic about the addresses it uses, and every screen that reads these
+ * documents renders a name, not a uid. So the rows below are seeded under
+ * readable placeholders and are honest about it: they exist to give the access
+ * screens something to *draw*, not to authorise anybody. A real sign-in adds
+ * the real uid to the list the moment somebody restricts a gathering.
+ */
+const SEED_CORE_UID = 'seed-miriam';
+const SEED_COUNSELOR_UID = 'seed-sam';
+
+/**
+ * One locked gathering, one invitation of each kind, one arrival, one ask.
+ *
+ * Everything the access surfaces need in order to be looked at: a gathering
+ * with a fence around it, a pending list with both doors on it, a redemption
+ * that half-worked, a kiosk in the lobby and one in a drawer, and somebody
+ * asking to be let in. Without these the Team screen seeds empty and the
+ * screens that took a campaign to design have nothing on them.
+ *
+ * Sunday School is the one that is restricted, deliberately: Friday Fellowship
+ * is what nearly every other spec and walkthrough exercises, and locking it
+ * would quietly change what those screens show.
+ */
+function accessWrites(now: Date): PendingWrite[] {
+  const writes: PendingWrite[] = [];
+
+  writes.push({
+    path: paths.eventAccess(SERIES_IDS.sundaySchool),
+    data: {
+      chainKey: SERIES_IDS.sundaySchool,
+      restricted: true,
+      members: [SEED_CORE_UID],
+      updatedAt: addDays(now, -21),
+      updatedBy: SEED_CORE_UID,
+    },
+  });
+
+  /*
+   * A link waiting to be sent, named the way the form asks for: who it is for,
+   * in the inviter's own words, because a link row has no address to name it.
+   * The id is where the hash of a real token would be — no token exists for
+   * it, which is the honest state of a seeded row and the reason the screen's
+   * only offer on one is to re-mint.
+   */
+  writes.push({
+    path: paths.invitation('link_seed0000000000000000000000000000000000000000000000000000000000'),
+    data: {
+      kind: 'link',
+      role: 'counselor',
+      label: 'Jo, nursery, Marie’s daughter',
+      gatherings: [SERIES_IDS.sundaySchool],
+      invitedBy: SEED_CORE_UID,
+      invitedAt: addDays(now, -2),
+      tokenExpiresAt: addDays(now, 12),
+    },
+  });
+
+  /*
+   * One that was used, and half-worked. The skip is the interesting half: it
+   * is the outstanding item the pending card carries until somebody resolves
+   * it, and the only way anybody learns that a Tuesday decision did not land.
+   */
+  writes.push({
+    path: paths.invitation('link_seed1111111111111111111111111111111111111111111111111111111111'),
+    data: {
+      kind: 'link',
+      role: 'counselor',
+      label: 'Priya, Friday',
+      gatherings: [SERIES_IDS.sundaySchool, SERIES_IDS.fridayFellowship],
+      invitedBy: SEED_CORE_UID,
+      invitedAt: addDays(now, -6),
+      tokenExpiresAt: addDays(now, 8),
+      resolvedAt: addDays(now, -3),
+      redeemedBy: 'seed-priya',
+      redeemedEmail: 'priya.raman@example.org',
+      redeemedName: 'Priya Raman',
+      placed: [SERIES_IDS.fridayFellowship],
+      skipped: [SERIES_IDS.sundaySchool],
+    },
+  });
+
+  /*
+   * The lobby tablet, and the one in the drawer. A retired row is never
+   * deleted — it is the provenance of every morning that kiosk recorded — so
+   * the screen has to be able to draw one, and this is what it draws.
+   */
+  writes.push({
+    path: paths.kioskDevice('kiosk-lobby-000000000001'),
+    data: {
+      approvedBy: SEED_CORE_UID,
+      approvedByName: 'Miriam Achebe',
+      pairedAt: addDays(now, -30),
+      lastSeenAt: addDays(now, -1),
+      boundTo: 'Sunday School',
+      boundChain: SERIES_IDS.sundaySchool,
+      retiredAt: null,
+      retiredBy: null,
+    },
+  });
+  writes.push({
+    path: paths.kioskDevice('kiosk-drawer-00000000002'),
+    data: {
+      approvedBy: SEED_CORE_UID,
+      approvedByName: 'Miriam Achebe',
+      pairedAt: addDays(now, -200),
+      lastSeenAt: addDays(now, -120),
+      boundTo: null,
+      boundChain: null,
+      retiredAt: addDays(now, -119),
+      retiredBy: SEED_AUTHOR,
+    },
+  });
+
+  /*
+   * Sam asking to be put on Sunday School. Not a queue and not a workflow —
+   * nothing waits on it — but the roster has to have one on it for anybody to
+   * see what "one tap instead of a search" actually looks like.
+   */
+  writes.push({
+    path: paths.accessRequest(SERIES_IDS.sundaySchool, SEED_COUNSELOR_UID),
+    data: {
+      chainKey: SERIES_IDS.sundaySchool,
+      uid: SEED_COUNSELOR_UID,
+      name: 'Sam Whitfield',
+      askedAt: addDays(now, -1),
+    },
+  });
+
+  return writes;
 }
 
 /* -------------------------------------------------------------------------- */

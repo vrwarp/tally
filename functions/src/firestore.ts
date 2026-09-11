@@ -107,6 +107,15 @@ export const PATHS = {
   a32Config: 'config/attendees32',
   /** Cross-backend settings: which backend receives students Tally creates. */
   backendsConfig: 'config/backends',
+  /** Gatherings, and the two other collections an invitation's placement reads. */
+  events: 'events',
+  eventSeries: 'eventSeries',
+  /**
+   * Who may work one gathering, keyed by chain. Mirrors `EVENT_ACCESS` in
+   * eventAccess.ts, which reads it through the full admin SDK rather than the
+   * narrow surface here.
+   */
+  eventAccess: 'eventAccess',
 } as const;
 
 /** Accepts an admin `Timestamp`, a `Date` or epoch millis — whatever a test double stored. */

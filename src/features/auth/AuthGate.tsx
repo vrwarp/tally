@@ -24,6 +24,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth, type AuthStage } from '@/context/authContext';
 import { provisionAccess, type ProvisionAccessResult } from '@/services/functions';
 import { Button, ErrorBanner, LoadingScreen, Spinner } from '@/components/ui';
+import { PlacementNotes } from '@/features/auth/placement';
 import type { Role } from '@/types';
 import { useTranslations } from 'use-intl';
 
@@ -334,6 +335,10 @@ function PendingScreen() {
           <p className="text-sm text-ink-300">
             {role ? t('grantedBodyWithRole', { role: tAccount(ROLE_LABEL[role]) }) : t('grantedBody')}
           </p>
+          {/* What the invitation this sign-in consumed asked for, and what
+              became of it. Absent on every sign-in that redeemed nothing,
+              which is every sign-in after the first. */}
+          <PlacementNotes placed={phase.result.placed} skipped={phase.result.skipped} />
           {stuck ? (
             <>
               {/* Access exists; only this tab has failed to see it. Reloading
