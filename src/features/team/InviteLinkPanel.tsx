@@ -54,6 +54,11 @@ export interface MintedLink {
  *
  * One `<path>` rather than a rectangle per module, because a version 10 symbol
  * is 3,481 of them and this draws inside a card that also holds a list.
+ *
+ * A step smaller on a phone. At 224px the square's bottom edge landed on the
+ * tab bar, so the thing being held out to somebody was cut off by the app's
+ * own navigation; 192px is still about three pixels a module, which is a
+ * comfortable read for a camera held at arm's length.
  */
 function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]; label: string }) {
   const size = modules.length;
@@ -69,7 +74,7 @@ function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]
       role="img"
       aria-label={label}
       viewBox={`0 0 ${size + quiet * 2} ${size + quiet * 2}`}
-      className="h-56 w-56 rounded-xl bg-white"
+      className="h-48 w-48 rounded-xl bg-white sm:h-56 sm:w-56"
       shapeRendering="crispEdges"
     >
       <path d={parts.join('')} fill="#000" />
