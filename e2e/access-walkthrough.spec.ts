@@ -28,8 +28,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Page } from '@playwright/test';
-import { gotoReady, TEAM } from './support/auth';
-import { readCollection, writeDocument } from './support/emulator';
+import { gotoReady, signOut, TEAM } from './support/auth';
+import { deleteDocument, readCollection, writeDocument } from './support/emulator';
 import { test } from './support/fixtures';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -86,12 +86,38 @@ async function arrange(): Promise<{ miriam: string; sam: string; dana: string }>
   ]);
   const now = Date.now();
 
+  /*
+   * The seed writes its own pair of link invitations, under placeholder uids,
+   * so that the screens have something on them when this file is not driving
+   * them. Here they would be a second Priya arriving on a second link — two
+   * near-identical rows, which reads as a bug rather than as two states.
+   */
+  await deleteDocument('invitations/link_seed0000000000000000000000000000000000000000000000000000000000');
+  await deleteDocument('invitations/link_seed1111111111111111111111111111111111111111111111111111111111');
+
   await writeDocument('eventAccess/sunday-school', {
     chainKey: 'sunday-school',
     restricted: true,
     members: [miriam],
     updatedAt: new Date(now - 21 * 86_400_000),
     updatedBy: miriam,
+  });
+
+  /*
+   * Sam's own invitation, re-attributed to a real person.
+   *
+   * The seed writes it under a placeholder uid — it has to, it runs before
+   * anybody has signed in — so the person page reads it back as "invited by
+   * somebody no longer on the team". That is a true state and one worth having
+   * a design for, but it is not the ordinary one, and a walkthrough that
+   * photographs only the degraded case is a walkthrough about the wrong thing.
+   */
+  await writeDocument('invitations/sam,whitfield@example,org', {
+    email: 'sam.whitfield@example.org',
+    role: 'counselor',
+    invitedBy: miriam,
+    invitedAt: new Date(now - 120 * 86_400_000),
+    gatherings: [],
   });
 
   // Sam, asking to be put on it — the row the sheet leads with and the dot on
@@ -187,6 +213,30 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- Bringing somebody in --------------------------------------------- */
 
+  /*
+   * Everybody signs in once before anything is arranged.
+   *
+   * A profile does not exist until its owner has been through
+   * `provisionAccess`, and every document below is keyed on a uid — so
+   * arranging first would write a fence around people who are not there yet.
+   * The order is cheap and the alternative is a fixture that silently
+   * describes nobody.
+   */
+  // Back to the sign-in page first: the join screen above is a dead-link
+  // screen, which deliberately carries no way in, and `signedInAs` starts by
+  // looking for the Google button.
+  await page.goto('/login');
+  await page.waitForTimeout(400);
+
+  /*
+   * `signIn` goes to `/login` and looks for the Google button, which a session
+   * that is already signed in never shows — so each of these has to be signed
+   * out of first. Only this file needs it: every other spec signs in once.
+   */
+  await signedInAs('core');
+  await signOut(page);
+  await signedInAs('counselor');
+  await signOut(page);
   await signedInAs('admin');
   const { sam } = await arrange();
 
@@ -201,6 +251,27 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
       'the church issued.',
   });
 
+  /*
+   * On a phone the invite card is a disclosure, so the form is in the DOM but
+   * not reachable until somebody opens it — which is itself the first thing a
+   * person does here, and worth a frame.
+   */
+  const opener = page.getByText(/Invite someone/).first();
+  // Visible only while the disclosure is shut, which on a laptop it never is:
+  // there the card is an ordinary card and the summary label is hidden.
+  if (await opener.isVisible().catch(() => false)) {
+    await opener.click();
+    await page.waitForTimeout(500);
+    await capture(page, {
+      journey: 'Bringing somebody in',
+      title: 'Opening the invite card',
+      caption:
+        'A disclosure on a phone and an ordinary card on a laptop. What is promoted on the ' +
+        'small screen is the act, at full touch height, above eleven people — an earlier round ' +
+        'promoted the form instead and put nobody on the first screen.',
+    });
+  }
+
   const linkFor = page.getByLabel('Who is this for?');
   if (await linkFor.count()) {
     await linkFor.fill('Jo, nursery, Marie’s daughter');
@@ -214,7 +285,10 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
     });
 
     await page.getByRole('button', { name: 'Create link' }).click();
-    await page.waitForTimeout(1200);
+    // The token comes back from a callable, and the panel that shows it is the
+    // whole point of the frame — so wait for the field holding the link rather
+    // than for a clock. It is an `<input>`, so its value is not page text.
+    await page.getByLabel('Invitation link').waitFor({ timeout: 30_000 });
     await capture(page, {
       journey: 'Bringing somebody in',
       title: 'The link, shown once',
@@ -254,6 +328,19 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
   if (await person.count()) {
     await person.click();
     await page.waitForTimeout(700);
+    /*
+     * Scrolled to what the row *revealed*, not to the row. On a phone the one
+     * that opens is the third down and everything under it is below the fold —
+     * scrolling the summary into view changes nothing, because the summary was
+     * never out of it, and the frame would be captioned as the person page
+     * while showing none of it.
+     */
+    await page
+      .getByText('Kiosks they paired')
+      .first()
+      .scrollIntoViewIfNeeded()
+      .catch(() => {});
+    await page.waitForTimeout(400);
     await capture(page, {
       journey: 'The person',
       title: 'A person, gathered in one place',
@@ -265,6 +352,7 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- The fence --------------------------------------------------------- */
 
+  await signOut(page);
   await signedInAs('core');
   await gotoReady(page, '/');
   await page.waitForTimeout(900);
@@ -308,10 +396,11 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
 
   /* ---- The volunteer who is not on it ------------------------------------ */
 
+  await signOut(page);
   await signedInAs('counselor');
   await gotoReady(page, '/');
   await page.waitForTimeout(900);
-  const lockedRow = page.getByRole('button', { name: /Sunday School/ }).first();
+  const lockedRow = page.getByRole('link', { name: /Sunday School/ }).first();
   if (await lockedRow.count()) {
     await lockedRow.click();
     await page.waitForTimeout(1200);

@@ -12,11 +12,19 @@
  *    the wrong module, a mask undone in the wrong order, a character count in
  *    the wrong width: all of them come back as the wrong string.
  * 2. **It is pinned.** `JOIN_URL_MATRIX` is one whole symbol, module for
- *    module. It was checked outside this repository against
- *    [segno](https://github.com/heuer/segno), an unrelated Python encoder — the
- *    two agree exactly on this payload, and OpenCV's detector reads the
- *    rendered image back as the URL. Nothing here can drift without the fixture
- *    failing.
+ *    module, so nothing here can drift without the fixture failing.
+ *
+ *    What that fixture was checked against, and what it was not: OpenCV's
+ *    detector reads the rendered image back as the URL, and keeps reading it
+ *    through blur, sensor noise and a downscale to 55% — the abuse a phone
+ *    camera across a foyer actually applies. It is *not* module-identical to
+ *    what [segno](https://github.com/heuer/segno) produces for the same
+ *    payload, and that is not a defect: a QR symbol is not unique. Two
+ *    encoders that pick different masks, or lay the same codewords out under a
+ *    different penalty rule, produce different squares that both decode to the
+ *    same string, which is exactly what these two do. The claim worth making
+ *    is the one a volunteer cares about — it scans — and that is the one
+ *    checked.
  *
  * The one thing deliberately *not* asserted is which of the eight masks gets
  * chosen for an arbitrary payload. See the note in `qr.ts`: implementations

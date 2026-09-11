@@ -323,9 +323,15 @@ describe('a gathering the counselor is not on', () => {
 
     const notYours = screen.getByRole('region', { name: /not yours/i });
     expect(within(notYours).getByText('Sunday School')).toBeInTheDocument();
-    // Demoted, not promoted: no route in, because the gathering's own page
-    // would refuse them too.
-    expect(within(notYours).queryByRole('link')).not.toBeInTheDocument();
+    /*
+     * Demoted, not hidden — and it goes somewhere. The page it opens is not a
+     * refusal but the one screen that can help: who can add you, in full names,
+     * and the button that puts your name on their list. It was inert for a
+     * round, and on a touch screen a tap with no response is indistinguishable
+     * from a tap that missed.
+     */
+    const row = within(notYours).getByRole('link', { name: /sunday school/i });
+    expect(row).toHaveAttribute('href', `/event/${SUNDAY.id}`);
 
     await settle();
   });

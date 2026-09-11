@@ -25,6 +25,7 @@
  * gathering opens to carries both, in full.
  */
 import { EventIcon } from '@/components/ui';
+import { Link } from 'react-router-dom';
 import { useData } from '@/context/dataContext';
 import { approvers } from '@/features/events/approvers';
 import { useTeam } from '@/features/events/useTeam';
@@ -84,28 +85,41 @@ export function LockedGatherings({ events, hasOwn, now = new Date() }: LockedGat
             return (
               /*
                * A row, not a hero card, and deliberately less appealing than
-               * the thing the counselor came for. Not a link either: there is
-               * nowhere useful to go — the gathering's own page would refuse
-               * them too — so the row states the situation instead of
-               * promising a screen that cannot help.
+               * the thing the counselor came for — but it does go somewhere.
+               *
+               * It was inert for a round, on the argument that there is nowhere
+               * useful to go. Two things overturned that. The page it opens is
+               * not a refusal but the one screen that can help: full names of
+               * who can add you, an admin unconditionally, and the button that
+               * puts your name on their list. And on a touch screen a tap with
+               * no response is indistinguishable from a tap that missed — the
+               * inert-row argument was made about a disclosure the reader chose
+               * to open, and this section opens by itself precisely when they
+               * have chosen nothing.
+               *
+               * The phone row still prints one name, so the part that truncates
+               * is never the way out; the second name and the admin are on the
+               * page this leads to.
                */
-              <li
-                key={event.id}
-                className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left"
-              >
-                <span aria-hidden className="text-ink-600">
-                  🔒
-                </span>
-                <EventIcon name={event.icon} size="sm" tone="muted" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-ink-300">
-                    {event.title}
+              <li key={event.id}>
+                <Link
+                  to={`/event/${event.id}`}
+                  className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-ink-900 active:bg-ink-900"
+                >
+                  <span aria-hidden className="text-ink-600">
+                    🔒
                   </span>
-                  <span className="block truncate text-xs text-ink-500">
-                    {time.eventWindow(event)}
-                    {who ? ` · ${who}` : ''}
+                  <EventIcon name={event.icon} size="sm" tone="muted" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink-300">
+                      {event.title}
+                    </span>
+                    <span className="block truncate text-xs text-ink-500">
+                      {time.eventWindow(event)}
+                      {who ? ` · ${who}` : ''}
+                    </span>
                   </span>
-                </span>
+                </Link>
               </li>
             );
           })}
