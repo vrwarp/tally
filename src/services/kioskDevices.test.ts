@@ -11,6 +11,7 @@
  * these writes have to satisfy are checked.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { Timestamp } from 'firebase/firestore';
 import {
   KIOSK_LIVE_WITHIN_MS,
   isKioskLive,
@@ -79,6 +80,110 @@ describe('subscribeKioskDevices', () => {
     expect(source.path).toBe('kioskDevices');
   });
 
+  it('reads a full row back whole', () => {
+    /*
+     * The other half of the defensive read below. With only the empty-document
+     * case asserted, an implementation that ignored every stored value and
+     * answered its own defaults would pass — and that is a custody record
+     * reading as a tablet nobody paired.
+     */
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'lobby-tablet',
+          data: () => ({
+            approvedBy: 'uid-miriam',
+            approvedByName: 'Miriam Achebe',
+            pairedAt: new Timestamp(1_767_607_200, 0),
+            lastSeenAt: new Timestamp(1_767_610_800, 0),
+            boundTo: 'Sunday School',
+            boundChain: 'sunday-school',
+            retiredAt: new Timestamp(1_767_614_400, 0),
+            retiredBy: 'uid-dana',
+          }),
+        },
+      ],
+    });
+
+    expect(held[0]).toEqual({
+      id: 'lobby-tablet',
+      approvedBy: 'uid-miriam',
+      approvedByName: 'Miriam Achebe',
+      pairedAt: new Date(1_767_607_200_000),
+      lastSeenAt: new Date(1_767_610_800_000),
+      boundTo: 'Sunday School',
+      boundChain: 'sunday-school',
+      retiredAt: new Date(1_767_614_400_000),
+      retiredBy: 'uid-dana',
+    });
+  });
+
+  it('answers the defaults for a field stored as the wrong type', () => {
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'lobby-tablet',
+          data: () => ({
+            approvedBy: 7,
+            approvedByName: 7,
+            boundTo: 7,
+            boundChain: 7,
+            retiredBy: 7,
+          }),
+        },
+      ],
+    });
+
+    expect(held[0]).toMatchObject({
+      approvedBy: '',
+      approvedByName: null,
+      boundTo: null,
+      boundChain: null,
+      retiredBy: null,
+    });
+  });
+
+  it('hands a refusal to the caller, and survives not having one to hand it to', () => {
+    // The person page opens this listener; a counselor's session is refused the
+    // collection, and the screen has to go on drawing the rest of the panel.
+    const onError = vi.fn();
+    subscribeKioskDevices(() => {}, onError);
+    const [, , failed] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      unknown,
+      (error: Error) => void,
+    ];
+    const refusal = new Error('permission-denied');
+    failed(refusal);
+    expect(onError).toHaveBeenCalledWith(refusal);
+
+    subscribeKioskDevices(() => {});
+    const [, , failedAgain] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      unknown,
+      (error: Error) => void,
+    ];
+    expect(() => failedAgain(refusal)).not.toThrow();
+  });
+
   it('reads a stored row defensively', () => {
     let held: KioskDevice[] = [];
     subscribeKioskDevices((next) => {
@@ -121,6 +226,15 @@ describe('isKioskLive', () => {
   it('is false once the reports stop', () => {
     const stale = new Date(nowMs - KIOSK_LIVE_WITHIN_MS - 1);
     expect(isKioskLive(device({ lastSeenAt: stale }), nowMs)).toBe(false);
+  });
+
+  it('is false exactly at the window, and true a millisecond inside it', () => {
+    // The boundary is the whole of what the constant means, and `<=` here would
+    // arm Retire on a tablet whose last word was three minutes ago.
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS) }), nowMs))
+      .toBe(false);
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS + 1) }), nowMs))
+      .toBe(true);
   });
 
   it('is false for a row somebody has already retired, whatever it last said', () => {

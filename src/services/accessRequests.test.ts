@@ -13,6 +13,7 @@
  * these writes have to satisfy are checked.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { Timestamp } from 'firebase/firestore';
 import {
   ACCESS_REQUEST_LIFE_MS,
   askToBeAdded,
@@ -156,6 +157,93 @@ describe('subscribeChainRequests', () => {
       clearedBy: null,
     });
   });
+
+  it('reads a full row back whole', () => {
+    /*
+     * The other half of the defensive read above. Asserting only the empty
+     * document lets an implementation that answered its own defaults for every
+     * field pass — and the name is the only thing identifying the adult the
+     * sheet is about to put on a gathering of minors.
+     */
+    let held: AccessRequest[] = [];
+    subscribeChainRequests('sunday-school', (next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'sunday-school__uid-sam',
+          data: () => ({
+            chainKey: 'sunday-school',
+            uid: 'uid-sam',
+            name: 'Sam Whitfield',
+            askedAt: new Timestamp(1_767_607_200, 0),
+            clearedBy: 'uid-miriam',
+            clearedAt: new Timestamp(1_767_610_800, 0),
+          }),
+        },
+      ],
+    });
+
+    expect(held[0]).toEqual({
+      id: 'sunday-school__uid-sam',
+      chainKey: 'sunday-school',
+      uid: 'uid-sam',
+      name: 'Sam Whitfield',
+      askedAt: new Date(1_767_607_200_000),
+      clearedBy: 'uid-miriam',
+      clearedAt: new Date(1_767_610_800_000),
+    });
+  });
+
+  it('answers the defaults for a field stored as the wrong type', () => {
+    let held: AccessRequest[] = [];
+    subscribeChainRequests('sunday-school', (next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [{ id: 'row', data: () => ({ chainKey: 1, uid: 2, name: 3, clearedBy: 4 }) }],
+    });
+
+    expect(held[0]).toMatchObject({ chainKey: '', uid: '', name: '', clearedBy: null });
+  });
+
+  it('hands a refusal to the caller, and survives not having one to hand it to', () => {
+    /*
+     * Nothing waits on an ask, so a dropped listener has to leave the screen
+     * exactly as it was before asks existed — which is why the callers pass an
+     * `onError` that swallows to `[]`, and why one that does not pass one at
+     * all must not throw inside the snapshot callback.
+     */
+    const onError = vi.fn();
+    subscribeChainRequests('sunday-school', () => {}, onError);
+    const [, , failed] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      unknown,
+      (error: Error) => void,
+    ];
+    const refusal = new Error('permission-denied');
+    failed(refusal);
+    expect(onError).toHaveBeenCalledWith(refusal);
+
+    subscribeChainRequests('sunday-school', () => {});
+    const [, , failedAgain] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      unknown,
+      (error: Error) => void,
+    ];
+    expect(() => failedAgain(refusal)).not.toThrow();
+  });
 });
 
 describe('isOutstanding', () => {
@@ -173,6 +261,17 @@ describe('isOutstanding', () => {
     // open across the boundary must not show one in the meantime.
     const stale = new Date(nowMs - ACCESS_REQUEST_LIFE_MS - 1);
     expect(isOutstanding(request({ askedAt: stale }), nowMs)).toBe(false);
+  });
+
+  it('is false exactly at the week, and true a millisecond inside it', () => {
+    // The boundary is the whole of what the constant means: `<=` would keep an
+    // ask alive for one more millisecond than the sweep that deletes it does.
+    expect(
+      isOutstanding(request({ askedAt: new Date(nowMs - ACCESS_REQUEST_LIFE_MS) }), nowMs),
+    ).toBe(false);
+    expect(
+      isOutstanding(request({ askedAt: new Date(nowMs - ACCESS_REQUEST_LIFE_MS + 1) }), nowMs),
+    ).toBe(true);
   });
 
   it('trusts a row whose moment has not landed yet', () => {
