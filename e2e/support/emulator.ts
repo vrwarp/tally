@@ -6,10 +6,9 @@
  * Firestore, rather than trusting the screen — a check-in that renders but was
  * never written is precisely the bug worth catching.
  */
-import { E2E } from '../../playwright.config';
+import { E2E } from "../../playwright.config";
 
-const FIRESTORE_ROOT =
-  `http://127.0.0.1:${E2E.firestore}/v1/projects/${E2E.projectId}/databases/(default)/documents`;
+const FIRESTORE_ROOT = `http://127.0.0.1:${E2E.firestore}/v1/projects/${E2E.projectId}/databases/(default)/documents`;
 
 /**
  * The emulator's admin token. Tests read collections the security rules
@@ -17,11 +16,15 @@ const FIRESTORE_ROOT =
  * enumerate it could enumerate the team. Asserting through an admin channel
  * keeps the rules strict *and* the assertions honest.
  */
-const ADMIN = { Authorization: 'Bearer owner' } as const;
+const ADMIN = { Authorization: "Bearer owner" } as const;
 
-export async function waitForHttp(url: string, label: string, timeoutMs = 120_000): Promise<void> {
+export async function waitForHttp(
+  url: string,
+  label: string,
+  timeoutMs = 120_000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  let lastError = '';
+  let lastError = "";
 
   while (Date.now() < deadline) {
     try {
@@ -36,7 +39,9 @@ export async function waitForHttp(url: string, label: string, timeoutMs = 120_00
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  throw new Error(`${label} never became ready at ${url} (last error: ${lastError}).`);
+  throw new Error(
+    `${label} never became ready at ${url} (last error: ${lastError}).`,
+  );
 }
 
 /**
@@ -59,7 +64,7 @@ export async function clearFirestore(): Promise<void> {
   for (;;) {
     const response = await fetch(
       `http://127.0.0.1:${E2E.firestore}/emulator/v1/projects/${E2E.projectId}/databases/(default)/documents`,
-      { method: 'DELETE', headers: ADMIN },
+      { method: "DELETE", headers: ADMIN },
     );
     if (response.ok) return;
     attempts += 1;
@@ -69,7 +74,7 @@ export async function clearFirestore(): Promise<void> {
     if (response.status !== 409 || Date.now() >= deadline) {
       throw new Error(
         `Could not clear Firestore: HTTP ${response.status}` +
-          (attempts > 1 ? `, still after ${attempts} attempts over 30s.` : '.'),
+          (attempts > 1 ? `, still after ${attempts} attempts over 30s.` : "."),
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -97,13 +102,19 @@ function decode(value: RestValue): unknown {
   if (value.doubleValue !== undefined) return value.doubleValue;
   if (value.booleanValue !== undefined) return value.booleanValue;
   if (value.timestampValue !== undefined) return value.timestampValue;
-  if (value.arrayValue !== undefined) return (value.arrayValue.values ?? []).map(decode);
-  if (value.mapValue !== undefined) return decodeFields(value.mapValue.fields ?? {});
+  if (value.arrayValue !== undefined)
+    return (value.arrayValue.values ?? []).map(decode);
+  if (value.mapValue !== undefined)
+    return decodeFields(value.mapValue.fields ?? {});
   return null;
 }
 
-function decodeFields(fields: Record<string, RestValue>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, decode(value)]));
+function decodeFields(
+  fields: Record<string, RestValue>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [key, decode(value)]),
+  );
 }
 
 export interface FirestoreDoc {
@@ -118,12 +129,13 @@ export async function readCollection(path: string): Promise<FirestoreDoc[]> {
 
   do {
     const url = new URL(`${FIRESTORE_ROOT}/${path}`);
-    url.searchParams.set('pageSize', '300');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    url.searchParams.set("pageSize", "300");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
 
     const response = await fetch(url, { headers: ADMIN });
     if (response.status === 404) return docs;
-    if (!response.ok) throw new Error(`Reading ${path} failed: HTTP ${response.status}.`);
+    if (!response.ok)
+      throw new Error(`Reading ${path} failed: HTTP ${response.status}.`);
 
     const body = (await response.json()) as {
       documents?: Array<{ name: string; fields?: Record<string, RestValue> }>;
@@ -132,7 +144,7 @@ export async function readCollection(path: string): Promise<FirestoreDoc[]> {
 
     for (const document of body.documents ?? []) {
       docs.push({
-        id: document.name.slice(document.name.lastIndexOf('/') + 1),
+        id: document.name.slice(document.name.lastIndexOf("/") + 1),
         data: decodeFields(document.fields ?? {}),
       });
     }
@@ -160,7 +172,10 @@ export async function deleteDocument(path: string): Promise<void> {
   const deadline = Date.now() + 10_000;
 
   for (;;) {
-    const response = await fetch(`${FIRESTORE_ROOT}/${path}`, { method: 'DELETE', headers: ADMIN });
+    const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {
+      method: "DELETE",
+      headers: ADMIN,
+    });
     if (response.ok || response.status === 404) return;
     if (response.status !== 409 || Date.now() >= deadline) {
       throw new Error(`Deleting ${path} failed: HTTP ${response.status}.`);
@@ -174,26 +189,37 @@ function encode(value: unknown): RestValue {
   // A spec that arranges an *event* needs the four timestamps, and the REST
   // shape wants them as RFC 3339 rather than epoch millis.
   if (value instanceof Date) return { timestampValue: value.toISOString() };
-  if (typeof value === 'string') return { stringValue: value };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") {
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
   }
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  if (Array.isArray(value))
+    return { arrayValue: { values: value.map(encode) } };
   /*
    * Maps, because the documents worth arranging by hand are the ones with shape
    * — a `kioskRegistrations` record holds a guardian object, a list of children
    * objects and a duplicate-hint map keyed by child index, and a spec that
    * cannot write those can only arrange the easy half of the triage screen.
    */
-  if (typeof value === 'object') {
-    return { mapValue: { fields: encodeFields(value as Record<string, unknown>) } };
+  if (typeof value === "object") {
+    return {
+      mapValue: { fields: encodeFields(value as Record<string, unknown>) },
+    };
   }
-  throw new Error(`No encoding for ${typeof value} in a test-written document.`);
+  throw new Error(
+    `No encoding for ${typeof value} in a test-written document.`,
+  );
 }
 
-function encodeFields(data: Record<string, unknown>): Record<string, RestValue> {
-  return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, encode(value)]));
+function encodeFields(
+  data: Record<string, unknown>,
+): Record<string, RestValue> {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [key, encode(value)]),
+  );
 }
 
 /** What `writeDocument` will take: JSON, plus the Dates that become timestamps. */
@@ -217,12 +243,41 @@ export async function writeDocument(
 ): Promise<void> {
   const fields = encodeFields(data);
   const response = await fetch(`${FIRESTORE_ROOT}/${path}`, {
-    method: 'PATCH',
-    headers: { ...ADMIN, 'content-type': 'application/json' },
+    method: "PATCH",
+    headers: { ...ADMIN, "content-type": "application/json" },
     body: JSON.stringify({ fields }),
   });
   if (!response.ok) {
-    throw new Error(`Writing ${path} failed: HTTP ${response.status} ${await response.text()}.`);
+    throw new Error(
+      `Writing ${path} failed: HTTP ${response.status} ${await response.text()}.`,
+    );
+  }
+}
+
+/**
+ * Writes named fields of one document, leaving the rest of it alone.
+ *
+ * `writeDocument` replaces; this merges, which is what a spec needs when the
+ * document it wants to adjust was written by the app itself and re-creating it
+ * by hand would mean re-deriving every field the app put there. The mask is
+ * the keys of `data`, so a field is only touched if it is named.
+ */
+export async function patchDocument(
+  path: string,
+  data: Record<string, WritableValue>,
+): Promise<void> {
+  const mask = Object.keys(data)
+    .map((key) => `updateMask.fieldPaths=${encodeURIComponent(key)}`)
+    .join("&");
+  const response = await fetch(`${FIRESTORE_ROOT}/${path}?${mask}`, {
+    method: "PATCH",
+    headers: { ...ADMIN, "content-type": "application/json" },
+    body: JSON.stringify({ fields: encodeFields(data) }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Patching ${path} failed: HTTP ${response.status} ${await response.text()}.`,
+    );
   }
 }
 
@@ -248,8 +303,8 @@ export async function writeDocuments(
       },
     }));
     const response = await fetch(`${FIRESTORE_ROOT}:commit`, {
-      method: 'POST',
-      headers: { ...ADMIN, 'content-type': 'application/json' },
+      method: "POST",
+      headers: { ...ADMIN, "content-type": "application/json" },
       body: JSON.stringify({ writes }),
     });
     if (!response.ok) {
@@ -265,8 +320,11 @@ export async function writeDocuments(
 /* -------------------------------------------------------------------------- */
 
 export async function resetSimulator(): Promise<void> {
-  const response = await fetch(`${E2E.simulatorUrl}/_sim/reset`, { method: 'POST' });
-  if (!response.ok) throw new Error(`Could not reset the simulator: HTTP ${response.status}.`);
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/reset`, {
+    method: "POST",
+  });
+  if (!response.ok)
+    throw new Error(`Could not reset the simulator: HTTP ${response.status}.`);
 }
 
 /**
@@ -277,17 +335,25 @@ export async function resetSimulator(): Promise<void> {
  * built-in fixtures and every later assertion would be about the wrong people.
  */
 export async function clearSimulatorFaults(): Promise<void> {
-  const response = await fetch(`${E2E.simulatorUrl}/_sim/clear-faults`, { method: 'POST' });
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/clear-faults`, {
+    method: "POST",
+  });
   if (!response.ok) {
-    throw new Error(`Could not clear simulator faults: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not clear simulator faults: HTTP ${response.status}.`,
+    );
   }
 }
 
 /** Arms the simulator to answer the next `count` requests with an error. */
-export async function failSimulator(status: number, message: string, count = 99): Promise<void> {
+export async function failSimulator(
+  status: number,
+  message: string,
+  count = 99,
+): Promise<void> {
   await fetch(`${E2E.simulatorUrl}/_sim/fail`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ status, message, count }),
   });
 }
@@ -310,25 +376,35 @@ export async function createSimulatorStudent(input: {
   attendeesUuid?: string;
 }): Promise<void> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/seed`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ students: [input] }),
   });
   if (!response.ok) {
-    throw new Error(`Could not add a student to the simulator: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not add a student to the simulator: HTTP ${response.status}.`,
+    );
   }
 }
 
 /** Every request the simulator has answered, for asserting on what was asked. */
-export async function simulatorRequests(): Promise<Array<{ method: string; path: string }>> {
+export async function simulatorRequests(): Promise<
+  Array<{ method: string; path: string }>
+> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/requests`);
-  const body = (await response.json()) as { requests: Array<{ method: string; path: string }> };
+  const body = (await response.json()) as {
+    requests: Array<{ method: string; path: string }>;
+  };
   return body.requests;
 }
 
-export async function simulatorPeople(): Promise<Array<Record<string, unknown>>> {
+export async function simulatorPeople(): Promise<
+  Array<Record<string, unknown>>
+> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/people`);
-  const body = (await response.json()) as { people: Array<Record<string, unknown>> };
+  const body = (await response.json()) as {
+    people: Array<Record<string, unknown>>;
+  };
   return body.people;
 }
 
@@ -352,35 +428,55 @@ export async function simulatorPeople(): Promise<Array<Record<string, unknown>>>
  * tested — and the hold is applied before the handler runs, so the world on
  * screen while it waits is genuinely the world before the write.
  */
-export async function holdSimulator(match: { method?: string; path?: string } = {}): Promise<void> {
+export async function holdSimulator(
+  match: { method?: string; path?: string } = {},
+): Promise<void> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/hold`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(match),
   });
-  if (!response.ok) throw new Error(`Could not arm the simulator hold: HTTP ${response.status}.`);
+  if (!response.ok)
+    throw new Error(
+      `Could not arm the simulator hold: HTTP ${response.status}.`,
+    );
 }
 
 /** What the gate has caught. Waiting on this is how a spec avoids sleeping. */
-export async function heldRequests(): Promise<Array<{ method: string; path: string }>> {
+export async function heldRequests(): Promise<
+  Array<{ method: string; path: string }>
+> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/held`);
-  if (!response.ok) throw new Error(`Could not read held requests: HTTP ${response.status}.`);
-  return ((await response.json()) as { held: Array<{ method: string; path: string }> }).held;
+  if (!response.ok)
+    throw new Error(`Could not read held requests: HTTP ${response.status}.`);
+  return (
+    (await response.json()) as { held: Array<{ method: string; path: string }> }
+  ).held;
 }
 
 /** Blocks until the drain has actually reached Planning Center. */
-export async function waitForHeldRequest(label: string, timeoutMs = 30_000): Promise<void> {
+export async function waitForHeldRequest(
+  label: string,
+  timeoutMs = 30_000,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if ((await heldRequests()).length > 0) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`Planning Center was never asked for ${label} within ${timeoutMs}ms.`);
+  throw new Error(
+    `Planning Center was never asked for ${label} within ${timeoutMs}ms.`,
+  );
 }
 
 export async function releaseSimulator(): Promise<void> {
-  const response = await fetch(`${E2E.simulatorUrl}/_sim/release`, { method: 'POST' });
-  if (!response.ok) throw new Error(`Could not release the simulator: HTTP ${response.status}.`);
+  const response = await fetch(`${E2E.simulatorUrl}/_sim/release`, {
+    method: "POST",
+  });
+  if (!response.ok)
+    throw new Error(
+      `Could not release the simulator: HTTP ${response.status}.`,
+    );
 }
 
 /**
@@ -392,13 +488,17 @@ export async function releaseSimulator(): Promise<void> {
  * produce the state where an edit lands on somebody other than the person it
  * named.
  */
-export async function burySimulatorPerson(id: string, mergedInto?: string): Promise<void> {
+export async function burySimulatorPerson(
+  id: string,
+  mergedInto?: string,
+): Promise<void> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/bury`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ id, ...(mergedInto ? { mergedInto } : {}) }),
   });
-  if (!response.ok) throw new Error(`Could not bury ${id}: HTTP ${response.status}.`);
+  if (!response.ok)
+    throw new Error(`Could not bury ${id}: HTTP ${response.status}.`);
 }
 
 /**
@@ -407,13 +507,17 @@ export async function burySimulatorPerson(id: string, mergedInto?: string): Prom
  * `retryAfterSeconds` is what the drain believes over its own schedule, so this
  * is also the control over how long `waiting` lasts.
  */
-export async function rateLimitSimulator(count = 1, retryAfterSeconds = 1): Promise<void> {
+export async function rateLimitSimulator(
+  count = 1,
+  retryAfterSeconds = 1,
+): Promise<void> {
   const response = await fetch(`${E2E.simulatorUrl}/_sim/rate-limit`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ count, retryAfterSeconds }),
   });
-  if (!response.ok) throw new Error(`Could not arm a rate limit: HTTP ${response.status}.`);
+  if (!response.ok)
+    throw new Error(`Could not arm a rate limit: HTTP ${response.status}.`);
 }
 
 /* ---- calling a callable as somebody -------------------------------------- */
@@ -433,9 +537,9 @@ export async function rateLimitSimulator(count = 1, retryAfterSeconds = 1): Prom
  */
 function emulatorIdToken(uid: string, email: string): string {
   const segment = (value: unknown) =>
-    Buffer.from(JSON.stringify(value)).toString('base64url');
+    Buffer.from(JSON.stringify(value)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
-  const header = segment({ alg: 'none', typ: 'JWT' });
+  const header = segment({ alg: "none", typ: "JWT" });
   const payload = segment({
     iss: `https://securetoken.google.com/${E2E.projectId}`,
     aud: E2E.projectId,
@@ -446,14 +550,17 @@ function emulatorIdToken(uid: string, email: string): string {
     exp: now + 3600,
     email,
     email_verified: true,
-    firebase: { identities: { email: [email] }, sign_in_provider: 'google.com' },
+    firebase: {
+      identities: { email: [email] },
+      sign_in_provider: "google.com",
+    },
   });
   return `${header}.${payload}.`;
 }
 
 /** The uid the seeded ministry gave a signed-in member, by their address. */
 export async function uidOf(email: string): Promise<string> {
-  const users = await readCollection('users');
+  const users = await readCollection("users");
   const match = users.find((row) => row.data.email === email);
   if (!match) {
     throw new Error(
@@ -471,16 +578,17 @@ export async function callFunction(
   const response = await fetch(
     `http://127.0.0.1:${E2E.functions}/${E2E.projectId}/us-central1/${name}`,
     {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
         Authorization: `Bearer ${emulatorIdToken(as.uid, as.email)}`,
       },
       body: JSON.stringify({ data }),
     },
   );
   const text = await response.text();
-  if (!response.ok) throw new Error(`${name} failed: HTTP ${response.status} ${text}`);
+  if (!response.ok)
+    throw new Error(`${name} failed: HTTP ${response.status} ${text}`);
   return (JSON.parse(text) as { result?: unknown }).result;
 }
 
@@ -497,14 +605,24 @@ export async function patchSimulatorPerson(
   personId: string,
   attributes: Record<string, unknown>,
 ): Promise<void> {
-  const auth = Buffer.from('sim-app-id:sim-secret').toString('base64');
-  const response = await fetch(`${E2E.simulatorUrl}/people/v2/people/${personId}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json', Authorization: `Basic ${auth}` },
-    body: JSON.stringify({ data: { type: 'Person', id: personId, attributes } }),
-  });
+  const auth = Buffer.from("sim-app-id:sim-secret").toString("base64");
+  const response = await fetch(
+    `${E2E.simulatorUrl}/people/v2/people/${personId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify({
+        data: { type: "Person", id: personId, attributes },
+      }),
+    },
+  );
   if (!response.ok) {
-    throw new Error(`Could not edit ${personId} upstream: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not edit ${personId} upstream: HTTP ${response.status}.`,
+    );
   }
 }
 
@@ -520,9 +638,12 @@ export async function patchSimulatorPerson(
  * mutual exclusion: the same refusal a second worker would meet, and the same
  * one that keeps two edits of one child in the order they were queued.
  */
-export async function takeEditLease(studentId: string, forMs = 120_000): Promise<void> {
+export async function takeEditLease(
+  studentId: string,
+  forMs = 120_000,
+): Promise<void> {
   await writeDocument(`upstreamEditLeases/${studentId}`, {
-    editId: 'held-by-the-suite',
+    editId: "held-by-the-suite",
     untilMs: Date.now() + forMs,
   });
 }
@@ -541,12 +662,16 @@ export async function releaseEditLease(studentId: string): Promise<void> {
  * this is the product's own path and not a way around it.
  */
 export async function drainQueue(): Promise<{ ran: number; swept: number }> {
-  const { TEAM } = await import('./auth');
+  const { TEAM } = await import("./auth");
   const uid = await uidOf(TEAM.admin);
-  return (await callFunction('drainUpstreamEditsNow', {}, {
-    uid,
-    email: TEAM.admin,
-  })) as { ran: number; swept: number };
+  return (await callFunction(
+    "drainUpstreamEditsNow",
+    {},
+    {
+      uid,
+      email: TEAM.admin,
+    },
+  )) as { ran: number; swept: number };
 }
 
 /**
@@ -559,18 +684,24 @@ export async function drainQueue(): Promise<{ ran: number; swept: number }> {
  * waiting for, and eventually kill the call outright. This is the callable the
  * browser fires after a save, scoped to the one child in question.
  */
-export async function drainStudentNow(studentId: string): Promise<{ states: string[] }> {
-  const { TEAM } = await import('./auth');
+export async function drainStudentNow(
+  studentId: string,
+): Promise<{ states: string[] }> {
+  const { TEAM } = await import("./auth");
   const uid = await uidOf(TEAM.admin);
-  return (await callFunction('drainStudentEdits', { studentId }, {
-    uid,
-    email: TEAM.admin,
-  })) as { states: string[] };
+  return (await callFunction(
+    "drainStudentEdits",
+    { studentId },
+    {
+      uid,
+      email: TEAM.admin,
+    },
+  )) as { states: string[] };
 }
 
 /** Every queued edit, newest first, straight out of Firestore. */
 export async function readUpstreamEdits(): Promise<FirestoreDoc[]> {
-  return readCollection('upstreamEdits');
+  return readCollection("upstreamEdits");
 }
 
 /**
@@ -586,29 +717,34 @@ export async function waitForEditState(
   timeoutMs = 30_000,
 ): Promise<FirestoreDoc> {
   const deadline = Date.now() + timeoutMs;
-  let seen = '';
+  let seen = "";
   while (Date.now() < deadline) {
     const edits = await readUpstreamEdits();
     const mine = edits.filter((row) => row.data.studentId === studentId);
     const match = mine.find((row) => states.includes(String(row.data.state)));
     if (match) return match;
-    seen = mine.map((row) => String(row.data.state)).join(', ') || 'none';
+    seen = mine.map((row) => String(row.data.state)).join(", ") || "none";
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   throw new Error(
-    `Edit for ${studentId} never reached ${states.join(' or ')} within ${timeoutMs}ms (saw: ${seen}).`,
+    `Edit for ${studentId} never reached ${states.join(" or ")} within ${timeoutMs}ms (saw: ${seen}).`,
   );
 }
 
 export async function removeA32Residue(): Promise<void> {
-  for (const student of await readCollection('students')) {
-    if (student.id.startsWith('a32_') || student.data.upstreamBackend === 'a32') {
+  for (const student of await readCollection("students")) {
+    if (
+      student.id.startsWith("a32_") ||
+      student.data.upstreamBackend === "a32"
+    ) {
       await deleteDocument(`students/${student.id}`);
     }
   }
-  for (const event of await readCollection('events')) {
-    if (!event.id.startsWith('a32-meet-')) continue;
-    for (const record of await readCollection(`events/${event.id}/attendance`)) {
+  for (const event of await readCollection("events")) {
+    if (!event.id.startsWith("a32-meet-")) continue;
+    for (const record of await readCollection(
+      `events/${event.id}/attendance`,
+    )) {
       await deleteDocument(`events/${event.id}/attendance/${record.id}`);
     }
     for (const record of await readCollection(`events/${event.id}/rsvps`)) {
@@ -624,9 +760,13 @@ export async function removeA32Residue(): Promise<void> {
 
 /** Puts the Attendees simulator back to its seeded organisation. */
 export async function resetA32Simulator(): Promise<void> {
-  const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/reset`, { method: 'POST' });
+  const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/reset`, {
+    method: "POST",
+  });
   if (!response.ok) {
-    throw new Error(`Could not reset the Attendees simulator: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not reset the Attendees simulator: HTTP ${response.status}.`,
+    );
   }
 }
 
@@ -644,37 +784,49 @@ export async function resetA32Simulator(): Promise<void> {
  * like `down`. Afterwards the loser's id answers `410` with the survivor,
  * which is the contract attendees32 states.
  */
-export async function mergeA32Attendee(loser: string, survivor: string): Promise<void> {
+export async function mergeA32Attendee(
+  loser: string,
+  survivor: string,
+): Promise<void> {
   const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/merge`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ loser, survivor }),
   });
   if (!response.ok) {
-    throw new Error(`Could not merge ${loser} into ${survivor}: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not merge ${loser} into ${survivor}: HTTP ${response.status}.`,
+    );
   }
 }
 
 export async function a32PersonIdOf(name: string): Promise<string> {
   const url = `${E2E.a32SimulatorUrl}/persons/api/datagrid_data_attendee/?searchValue=${encodeURIComponent(name)}&take=5&skip=0`;
-  const response = await fetch(url, { headers: { Authorization: 'Token a32-sim-token' } });
+  const response = await fetch(url, {
+    headers: { Authorization: "Token a32-sim-token" },
+  });
   if (!response.ok) {
-    throw new Error(`Could not search the Attendees simulator: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not search the Attendees simulator: HTTP ${response.status}.`,
+    );
   }
   const body = (await response.json()) as { data: Array<{ id: string }> };
   const first = body.data[0];
-  if (!first) throw new Error(`The Attendees simulator holds nobody called "${name}".`);
+  if (!first)
+    throw new Error(`The Attendees simulator holds nobody called "${name}".`);
   return first.id;
 }
 
 /** Takes the whole Attendees server down (503s) — or brings it back. */
 export async function setA32Down(down: boolean): Promise<void> {
   const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/down`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: "POST",
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({ down }),
   });
   if (!response.ok) {
-    throw new Error(`Could not set the Attendees simulator down=${down}: HTTP ${response.status}.`);
+    throw new Error(
+      `Could not set the Attendees simulator down=${down}: HTTP ${response.status}.`,
+    );
   }
 }

@@ -20,11 +20,11 @@
  * turned into a QR — because they are the same object with different lifetimes,
  * and a person who has learned to read one has learned to read all three.
  */
-import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui';
-import type { InviteLife } from '@/services/functions';
-import { useTimeFormats } from '@/hooks/useTimeFormats';
-import { useTranslations } from 'use-intl';
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui";
+import type { InviteLife } from "@/services/functions";
+import { useTimeFormats } from "@/hooks/useTimeFormats";
+import { useTranslations } from "use-intl";
 
 /** How long "Copied" stays up. Long enough to read, short enough not to lie. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -53,13 +53,20 @@ export interface MintedLink {
  * One `<path>` rather than a rectangle per module, because a version 10 symbol
  * is 3,481 of them and this draws inside a card that also holds a list.
  */
-function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]; label: string }) {
+function QrSquare({
+  modules,
+  label,
+}: {
+  modules: readonly (readonly boolean[])[];
+  label: string;
+}) {
   const size = modules.length;
   const quiet = 4;
   const parts: string[] = [];
   for (let row = 0; row < size; row += 1) {
     for (let col = 0; col < size; col += 1) {
-      if (modules[row]![col]) parts.push(`M${col + quiet} ${row + quiet}h1v1h-1z`);
+      if (modules[row]![col])
+        parts.push(`M${col + quiet} ${row + quiet}h1v1h-1z`);
     }
   }
   return (
@@ -70,17 +77,17 @@ function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]
       className="h-56 w-56 rounded-xl bg-white"
       shapeRendering="crispEdges"
     >
-      <path d={parts.join('')} fill="#000" />
+      <path d={parts.join("")} fill="#000" />
     </svg>
   );
 }
 
 /** What the QR is doing: nothing yet, working, drawn, or beyond this encoder. */
 type QrState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; modules: boolean[][] }
-  | { status: 'failed' };
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; modules: boolean[][] }
+  | { status: "failed" };
 
 export function InviteLinkPanel({
   minted,
@@ -89,35 +96,62 @@ export function InviteLinkPanel({
   minted: MintedLink;
   onDismiss: () => void;
 }) {
-  const t = useTranslations('Team');
-  const tCommon = useTranslations('Common');
+  const t = useTranslations("Team");
+  const tCommon = useTranslations("Common");
   const time = useTimeFormats();
-  const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const [qr, setQr] = useState<QrState>({ status: 'idle' });
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  const [qr, setQr] = useState<QrState>({ status: "idle" });
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const field = useRef<HTMLInputElement>(null);
 
   const url = `${window.location.origin}/join/${minted.token}`;
   const expiresAt = new Date(minted.expiresAt);
 
-  useEffect(() => () => {
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    },
+    [],
+  );
 
   /*
    * A QR that was drawn for the previous token must never be left on screen
    * beside a new one: pressing QR on a row re-mints, and the old square would
    * then be a picture of a link that has just stopped working.
+   *
+   * A ten-minute token draws itself. Somebody who pressed **QR** on a row has
+   * already said what they want, and the clock on that token starts at the
+   * mint, not at the press — making them ask a second time spends the thing
+   * they were given.
    */
   useEffect(() => {
-    setQr({ status: 'idle' });
-    setCopied('idle');
-  }, [minted.token]);
+    setCopied("idle");
+    if (minted.life !== "qr") {
+      setQr({ status: "idle" });
+      return;
+    }
+    let live = true;
+    setQr({ status: "loading" });
+    void (async () => {
+      try {
+        const { encodeQr } = await import("@/lib/qr");
+        const { modules } = encodeQr(
+          `${window.location.origin}/join/${minted.token}`,
+        );
+        if (live) setQr({ status: "ready", modules });
+      } catch {
+        if (live) setQr({ status: "failed" });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [minted.token, minted.life]);
 
-  const flash = (state: 'copied' | 'failed') => {
+  const flash = (state: "copied" | "failed") => {
     setCopied(state);
     if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied('idle'), COPIED_FEEDBACK_MS);
+    copyTimer.current = setTimeout(() => setCopied("idle"), COPIED_FEEDBACK_MS);
   };
 
   const copy = async () => {
@@ -125,21 +159,25 @@ export function InviteLinkPanel({
       // Select it instead, so the next act is a long-press rather than
       // twenty-two characters read off the glass.
       field.current?.select();
-      flash('failed');
+      flash("failed");
       return;
     }
     try {
       await navigator.clipboard.writeText(url);
-      flash('copied');
+      flash("copied");
     } catch {
       field.current?.select();
-      flash('failed');
+      flash("failed");
     }
   };
 
   const share = async () => {
     try {
-      await navigator.share({ title: t('shareTitle'), text: t('shareText'), url });
+      await navigator.share({
+        title: t("shareTitle"),
+        text: t("shareText"),
+        url,
+      });
     } catch {
       /* Dismissed the sheet, or the platform refused. Neither is news: the
          link is still on screen with Copy beside it. */
@@ -152,12 +190,12 @@ export function InviteLinkPanel({
    * press rather than bundled into the screen. See `src/lib/qr.ts`.
    */
   const showQr = async () => {
-    setQr({ status: 'loading' });
+    setQr({ status: "loading" });
     try {
-      const { encodeQr } = await import('@/lib/qr');
-      setQr({ status: 'ready', modules: encodeQr(url).modules });
+      const { encodeQr } = await import("@/lib/qr");
+      setQr({ status: "ready", modules: encodeQr(url).modules });
     } catch {
-      setQr({ status: 'failed' });
+      setQr({ status: "failed" });
     }
   };
 
@@ -165,12 +203,12 @@ export function InviteLinkPanel({
     <div className="flex flex-col gap-3 border-b border-ink-800 px-4 py-3">
       <div>
         <h3 className="text-sm font-semibold text-ink-50">
-          {t('linkReadyTitle', { label: minted.label })}
+          {t("linkReadyTitle", { label: minted.label })}
         </h3>
         <p className="mt-0.5 text-xs text-ink-400">
-          {minted.life === 'qr'
-            ? t('linkLifeQr', { when: time.relative(expiresAt) })
-            : t('linkLifeLink', { when: time.weekdayDate(expiresAt) })}
+          {minted.life === "qr"
+            ? t("linkLifeQr", { when: time.relative(expiresAt) })
+            : t("linkLifeLink", { when: time.weekdayDate(expiresAt) })}
         </p>
       </div>
 
@@ -178,62 +216,70 @@ export function InviteLinkPanel({
         ref={field}
         readOnly
         value={url}
-        aria-label={t('linkFieldLabel')}
+        aria-label={t("linkFieldLabel")}
         onFocus={(event) => event.currentTarget.select()}
         className="min-h-11 w-full rounded-xl bg-ink-950 px-3 font-mono text-xs text-ink-100 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400"
       />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => void copy()}>
-          {copied === 'copied' ? t('copied') : t('copy')}
+          {copied === "copied" ? t("copied") : t("copy")}
         </Button>
         {/* Only where the platform actually has a share sheet. A button that
             opens nothing is worse than one that was never offered. */}
-        {typeof navigator.share === 'function' ? (
+        {typeof navigator.share === "function" ? (
           <Button variant="secondary" onClick={() => void share()}>
-            {t('share')}
+            {t("share")}
           </Button>
         ) : null}
-        {qr.status === 'idle' || qr.status === 'failed' ? (
+        {qr.status === "idle" || qr.status === "failed" ? (
           <Button variant="secondary" onClick={() => void showQr()}>
-            {t('showQr')}
+            {t("showQr")}
           </Button>
         ) : (
-          <Button variant="ghost" onClick={() => setQr({ status: 'idle' })}>
-            {t('hideQr')}
+          <Button variant="ghost" onClick={() => setQr({ status: "idle" })}>
+            {t("hideQr")}
           </Button>
         )}
         <Button variant="ghost" className="ml-auto" onClick={onDismiss}>
-          {tCommon('done')}
+          {tCommon("done")}
         </Button>
       </div>
 
-      {copied === 'failed' ? (
+      {copied === "failed" ? (
         <p role="status" className="text-xs text-warn-400">
-          {t('copyByHand')}
+          {t("copyByHand")}
         </p>
       ) : null}
 
-      {qr.status === 'loading' ? (
+      {qr.status === "loading" ? (
         <p role="status" className="text-xs text-ink-400">
-          {t('qrLoading')}
+          {t("qrLoading")}
         </p>
       ) : null}
-      {qr.status === 'failed' ? (
+      {qr.status === "failed" ? (
         <p role="status" className="text-xs text-warn-400">
-          {t('qrFailed')}
+          {t("qrFailed")}
         </p>
       ) : null}
-      {qr.status === 'ready' ? (
+      {qr.status === "ready" ? (
         <div className="flex flex-col items-center gap-2">
-          <QrSquare modules={qr.modules} label={t('qrAlt', { label: minted.label })} />
-          <p className="text-center text-xs text-ink-400">{t('qrExplain')}</p>
+          <QrSquare
+            modules={qr.modules}
+            label={t("qrAlt", { label: minted.label })}
+          />
+          {/* Two lifetimes, two sentences. **Show QR** on a fourteen-day link
+              draws that link; saying "ten minutes" under it would be a
+              security claim the token does not honour. */}
+          <p className="text-center text-xs text-ink-400">
+            {minted.life === "qr" ? t("qrExplain") : t("qrExplainLink")}
+          </p>
         </div>
       ) : null}
 
       {/* The sentence that has to be read before Done is pressed, so it sits
           under the controls rather than above them, where a heading is skipped. */}
-      <p className="text-xs leading-snug text-ink-400">{t('linkShownOnce')}</p>
+      <p className="text-xs leading-snug text-ink-400">{t("linkShownOnce")}</p>
     </div>
   );
 }

@@ -3875,8 +3875,13 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Team.qrExplainLink": {
+    "source": "For the person standing next to you: they point their camera at it. It opens the same link, so it lasts exactly as long as the link does.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Team.linkLifeQr": {
-    "source": "Good until {when}.",
+    "source": "Stops working {when}.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
