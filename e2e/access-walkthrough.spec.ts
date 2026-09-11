@@ -147,8 +147,8 @@ async function arrange(): Promise<{ miriam: string; sam: string; dana: string }>
   await writeDocument('invitations/link_walkthrough0000000000000000000000000000000000000000000001', {
     kind: 'link',
     role: 'counselor',
-    label: 'Jo, nursery, Marie’s daughter',
-    gatherings: ['sunday-school'],
+    label: 'Tomás, Friday, Ana’s brother',
+    gatherings: ['friday-fellowship'],
     invitedBy: miriam,
     invitedAt: new Date(now - 2 * 86_400_000),
     tokenExpiresAt: new Date(now + 12 * 86_400_000),
@@ -194,6 +194,22 @@ async function arrange(): Promise<{ miriam: string; sam: string; dana: string }>
     lastSeenAt: new Date(now - 20 * 60_000),
     boundTo: 'Sunday School',
     boundChain: 'sunday-school',
+    retiredAt: null,
+    retiredBy: null,
+  });
+  /*
+   * One Sam paired himself. The person page's kiosk list is half of what that
+   * page answers — which tablet in which lobby recorded a morning, and who
+   * stood it up — and a panel opened on somebody who has paired none says
+   * "None." where the caption promises the list.
+   */
+  await writeDocument('kioskDevices/kiosk-hall-0000000000003', {
+    approvedBy: sam,
+    approvedByName: 'Sam Whitfield',
+    pairedAt: new Date(now - 9 * 86_400_000),
+    lastSeenAt: new Date(now - 90_000),
+    boundTo: 'Friday Fellowship',
+    boundChain: 'friday-fellowship',
     retiredAt: null,
     retiredBy: null,
   });
@@ -484,6 +500,16 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
   await signedInAs('counselor');
   await gotoReady(page, '/');
   await page.waitForTimeout(900);
+  /*
+   * The "Not yours" rail arrives collapsed, and the claim this step is here to
+   * make is *locked, not hidden* — a frame with the lock behind a disclosure
+   * argues the opposite of its own caption.
+   */
+  const notYours = page.getByText(/Not yours/i).first();
+  if (await notYours.isVisible().catch(() => false)) {
+    await notYours.click();
+    await page.waitForTimeout(500);
+  }
   await capture(page, {
     journey: 'The fence',
     title: 'Tonight’s gatherings, and the ones that are not yours',
