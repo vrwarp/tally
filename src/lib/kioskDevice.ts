@@ -12,9 +12,24 @@
  * the uid the register export recognises as a lobby screen cannot drift.
  */
 
-/** Minted by the kiosk: opaque, bounded, one path segment, no `/`. */
+/**
+ * Minted by the kiosk: opaque, bounded, one path segment, no `/`.
+ *
+ * The disable below is about the runner, not about the tests. Both constants
+ * here are module-level, evaluated once when the file loads, so Stryker's
+ * per-test hot-swap never gets to substitute them and reports them survived
+ * without having run a test against them — `ignoreStatic` in
+ * `stryker.config.json` notwithstanding. They are neither equivalent nor
+ * untested: apply any of the four regex mutants by hand and
+ * `kioskDevice.test.ts` fails three times over, on the leading anchor, the
+ * trailing anchor and the bound.
+ */
+// Stryker disable next-line Regex: static; see above.
 export const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
+// Stryker disable next-line StringLiteral: static, as above — and emptying it
+// makes every well-formed uid read as a device, which `deviceIdOfUid` is
+// asserted against directly.
 export const KIOSK_UID_PREFIX = 'kiosk_';
 
 export function isDeviceId(value: unknown): value is string {
