@@ -824,3 +824,51 @@ want roughly 1,060px between them and have 992. Narrowing the rail makes the ove
 worse; stacking puts eleven members between an admin and the invitations they came for. It wants a
 layout decision rather than a fraction, and taking one in the last hour of this campaign would be
 the wrong time to make it.
+
+### Round two
+
+The re-shot frames went back to the same four critics. What round one had not been able to see
+— because it was reading a 1280px capture, a fence photographed from somebody who is on every
+gathering, and a spinner captioned as a refusal — round two could.
+
+**The sentence that was wrong in the other direction.** Section 5 records a deliberate decision
+that the suspension's computed consequence carries no kiosk clause: a kiosk holds its own identity,
+so suspending whoever paired the lobby tablet stops nothing, and the sentence that used to say
+otherwise was frightening people out of a correct act. The opening clause still read *on every
+device* — and in the frame it sits sixty pixels above a panel saying the hall tablet is recording
+right now. An admin who believes it walks away from a kiosk that goes on filing attendance. It
+says *on every phone they have signed in on*, which is what it does.
+
+**The sheet did not lead with the ask.** P6 says it does, and the walkthrough caption says it does,
+and it was third — under a scope switch that throws a gathering's list away — with an empty
+directory search below it wearing an autofocus ring brighter than the primary action. The ask is
+first now, `Modal` takes an opt-out on the focus, *Add* and *Clear* sit at opposite edges of the
+card rather than seven pixels apart in the middle of thumb territory, and the widening confirm
+renders under both options instead of between them, where it moved the safe one out from under a
+thumb already travelling.
+
+**Two things said where nobody could read them.** The QR's lifetime sentence sat under the square,
+and on a phone the square's bottom edge lands on the tab bar — so the line distinguishing a
+ten-minute code from a fortnight-long credential was never on screen while somebody was holding the
+phone out. It is above the square now, and the square is a step smaller. And the invite form's
+"nothing ticked" line sits under the keyboard while the form's one field has focus, on a form whose
+submit is the keyboard's own **Go** key: the minted panel now restates what the link grants, where
+it cannot be missed and before the link has been sent.
+
+**The locked row on the chooser was the least interactive-looking thing on the screen** — no
+surface, no chevron, on a rail of carded history rows — which is a strange way to draw the one item
+that opens the page that can help.
+
+Smaller, and all of a piece: the role select stops spending brand on a value, so brand goes on
+meaning *you can press this*; *Retire* matches the *Add* above it at thumb height; the still-to-do
+badge stops wrapping mid-phrase; *Change* moves off the chip that opens a sheet; the locked card's
+two sentences come in to a readable measure; and the join screen's button says the act while the
+paragraph above it goes on carrying the reassurance.
+
+Four things are recorded and not acted on, all of them layout decisions larger than this campaign:
+the Team screen's 60/40 split, which at 1440 gives the member table the 672px its row layout needs
+and leaves the invitation rail overflowing beside a quarter-screen of empty page; the roster's two
+*Regulars* counts, 17 in the filter chip and 27 in the section heading, which are both correct as
+implemented and contradictory as read; the roster grid's column gutter equalling its row gap, which
+makes a column-major list read as rows; and the amber budget in the roster header, where a status
+chip, a closed-window sentence and the asking dot share one accent.
