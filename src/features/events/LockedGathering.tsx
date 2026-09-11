@@ -132,9 +132,12 @@ export function LockedGathering({
           * one.
           */}
         {/* The measure, not the card. Two sentences do the whole work of this
-            screen and they were set to 97 characters a line in a 737px card
-            on a 1440px window — a width nothing forced. */}
-        <p className="max-w-[62ch] pt-1 text-sm text-ink-500">
+            screen and they were set to 97 characters a line in a 737px card on
+            a 1440px window — a width nothing forced. `ch` is the digit's
+            width, which against lowercase running text is generous: 52 of them
+            lands near the 65 characters the brief asks for, where 62 landed
+            at 79. */}
+        <p className="max-w-[52ch] pt-1 text-sm text-ink-500">
           {justRemoved
             ? t('justTakenOff')
             : finished

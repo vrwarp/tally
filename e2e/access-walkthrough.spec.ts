@@ -388,7 +388,10 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
       await guest.goto(url);
       await guest.getByText(/invited you to Tally/).waitFor({ timeout: 30_000 });
       await capture(guest, {
-        journey: 'The way in',
+        // Still "bringing somebody in": it is the other half of the hand-off,
+        // and giving it its own chapter would open a second "The way in"
+        // section halfway down a document that already has one at the top.
+        journey: 'Bringing somebody in',
         title: 'What the link opens',
         caption:
           'Jo, signed out, on her own phone. The name of the person who invited her and the ' +
@@ -401,7 +404,9 @@ test('capture the access walkthrough', async ({ page, signedInAs }) => {
     const qr = page.getByRole('button', { name: 'Show QR' });
     if (await qr.count()) {
       await qr.click();
-      await page.waitForTimeout(900);
+      // The panel scrolls the square into view when it draws; the shutter has
+      // to wait for that to land or the frame is the code mid-travel.
+      await page.waitForTimeout(1400);
       await capture(page, {
         journey: 'Bringing somebody in',
         title: 'The QR, for the person in the room',

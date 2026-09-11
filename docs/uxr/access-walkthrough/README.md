@@ -46,8 +46,6 @@ Tally keeps only the hash, so this is the only time it can show the link. Copy, 
 
 ![The link, shown once, on a phone](shots/phone-05-the-link-shown-once.png)
 
-## The way in
-
 ### What the link opens
 
 Jo, signed out, on her own phone. The name of the person who invited her and the gathering it is for, before anything asks her for an account — being asked to sign in first is how a volunteer decides a link is phishing, and they are right to.
@@ -55,8 +53,6 @@ Jo, signed out, on her own phone. The name of the person who invited her and the
 ![What the link opens](shots/desktop-05-what-the-link-opens.png)
 
 ![What the link opens, on a phone](shots/phone-06-what-the-link-opens.png)
-
-## Bringing somebody in
 
 ### The QR, for the person in the room
 

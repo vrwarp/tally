@@ -107,6 +107,7 @@ export function InviteLinkPanel({
   const [copied, setCopied] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [qr, setQr] = useState<QrState>({ status: 'idle' });
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const square = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
 
   const url = `${window.location.origin}/join/${minted.token}`;
@@ -147,6 +148,20 @@ export function InviteLinkPanel({
       live = false;
     };
   }, [minted.token, minted.life]);
+
+  /*
+   * Scrolled to when it appears, because a code you cannot see all of is a
+   * code that will not decode.
+   *
+   * On a phone the panel sits far enough down the Team screen that the
+   * square's bottom third lands under the tab bar — and the posture this
+   * button exists for is holding the phone out at arm's length, which is
+   * exactly when scrolling with the other hand is not available.
+   */
+  useEffect(() => {
+    if (qr.status !== 'ready') return;
+    square.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [qr.status]);
 
   const flash = (state: 'copied' | 'failed') => {
     setCopied(state);
@@ -303,7 +318,7 @@ export function InviteLinkPanel({
          * that link, and saying "ten minutes" over it would be a security
          * claim the token does not honour.
          */
-        <div className="flex flex-col items-start gap-2">
+        <div ref={square} className="flex flex-col items-start gap-2">
           <p className="text-xs leading-snug text-ink-400">
             {minted.life === 'qr' ? t('qrExplain') : t('qrExplainLink')}
           </p>

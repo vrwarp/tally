@@ -621,17 +621,18 @@ export function TeamPage() {
               value={member.role}
               disabled={busyId === member.id}
               onChange={(changed) => void changeRole(member, changed.target.value as Role)}
-              // Elevation reads on the ink ramp, not in brand. Brand means
-              // "you can press this" everywhere else on the screen, and
-              // spending it on a value made one of four identical selects
-              // look like the live one and the other three like text.
+              // One ink and one weight, whatever the value. Marking elevation
+              // on the control made one of four identical selects pop, so a
+              // column of four equal settings read as one selected item among
+              // three quiet ones — first in brand, then in contrast. The
+              // select already says "Core team"; the word is the mark.
               className={cn(
                 'min-h-11 rounded-xl bg-ink-950 px-2 text-sm ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 pointer-fine:min-h-9',
                 // Quiet at rest where there is a pointer to firm it
                 // up; a phone keeps the field, because a control
                 // with no resting affordance is one nobody finds.
                 '@2xl:bg-transparent @2xl:ring-transparent @2xl:hover:bg-ink-950 @2xl:hover:ring-ink-700',
-                member.role === 'counselor' ? 'text-ink-100' : 'font-semibold text-ink-50',
+                'text-ink-100',
               )}
             >
               {ROLE_OPTIONS.map((role) => (

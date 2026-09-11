@@ -872,3 +872,34 @@ and leaves the invitation rail overflowing beside a quarter-screen of empty page
 implemented and contradictory as read; the roster grid's column gutter equalling its row gap, which
 makes a column-major list read as rows; and the amber budget in the roster header, where a status
 chip, a closed-window sentence and the asking dot share one accent.
+
+### Round three
+
+The third pass was a verdict rather than a quota: the critics were asked to say whether each journey
+can be completed on its frame, and to report only what was blocking, major, or a round-two fix that
+had not landed. Three of the four returned the same blocker, and it was not a design question.
+
+**The app was showing a reader its own source.** A `/* … */` in JSX *children* position is not a
+comment — React renders it as text — and the note explaining why the locked chooser row deserves a
+surface and a chevron was drawn as body copy on the screen a stranded volunteer lands on. On a phone
+it was the entire fold below the divider, so the row it was written about, and the name of the person
+who can add them, were pushed off the screen. It is now braced, and `eslint.config.js` carries a
+`no-restricted-syntax` selector so that a block comment in JSX children fails the lint rather than
+shipping.
+
+Three rounds of critique read past it — which is the honest reason the guard is in the lint rather
+than in a reviewer's head.
+
+**One round-two fix had displaced its own problem.** Moving the QR's lifetime sentence above the
+square made the sentence readable and pushed the square's bottom third under the tab bar — so the
+thing being held out to somebody was a code missing a finder pattern, which will not decode. The
+panel now scrolls the square into view when it draws, which is the right lever: 192px is already
+near the floor for a camera at conversational distance.
+
+Two minors were taken because they were cheap: the `62ch` cap set at 79 characters against lowercase
+running text rather than the 65 it was meant to buy, and the role select was still marking elevation
+by reweighting one of four identical controls — first in brand, then in contrast. The select says
+"Core team"; the word is the mark.
+
+With those, the set is converged: every frame's journey can be completed on it, and what remains is
+queued minors and the four layout decisions recorded above.

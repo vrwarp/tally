@@ -101,17 +101,17 @@ export function LockedGatherings({ events, hasOwn, now = new Date() }: LockedGat
                * page this leads to.
                */
               <li key={event.id}>
-                /*
-                 * A surface and a chevron, because a row with neither was the
-                 * least interactive-looking thing on a rail of carded history
-                 * rows — the one item on the screen that opens the page that
-                 * can actually help read as the footnote explaining why you
-                 * are stuck. The lock carries the meaning, so it takes the
-                 * icon slot the catch-up rows use and the event's own icon
-                 * goes; two glyphs at equal size and equal spacing made "you
-                 * cannot work this" and "it is in the morning" look like a
-                 * matched pair of ornaments.
-                 */
+                {/*
+                  * A surface and a chevron, because a row with neither was the
+                  * least interactive-looking thing on a rail of carded history
+                  * rows — the one item on the screen that opens the page that
+                  * can actually help read as the footnote explaining why you
+                  * are stuck. The lock carries the meaning, so it takes the
+                  * icon slot the catch-up rows use and the event's own icon
+                  * goes; two glyphs at equal size and equal spacing made "you
+                  * cannot work this" and "it is in the morning" look like a
+                  * matched pair of ornaments.
+                  */}
                 <Link
                   to={`/event/${event.id}`}
                   className="flex min-h-11 items-center gap-3 rounded-xl bg-ink-900/60 px-3 py-2 text-left ring-1 ring-ink-800 hover:bg-ink-900 active:bg-ink-900"
