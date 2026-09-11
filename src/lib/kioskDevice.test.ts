@@ -31,3 +31,44 @@ describe('kioskUid', () => {
     expect(deviceIdOfUid('kiosk_')).toBeNull();
   });
 });
+
+describe('the shape a device id has to hold', () => {
+  it('anchors both ends, so neither a prefix nor a suffix can smuggle anything in', () => {
+    /*
+     * The id becomes a Firestore path segment and the tail of a uid. Without
+     * the leading anchor a pasted line ending in a valid id would pass; without
+     * the trailing one an id followed by `/x` would.
+     */
+    expect(isDeviceId('!!!!abcdefghijkl')).toBe(false);
+    expect(isDeviceId('abcdefghijkl/x')).toBe(false);
+    expect(isDeviceId('abcdefghijkl ')).toBe(false);
+    expect(isDeviceId('\nabcdefghijkl')).toBe(false);
+  });
+
+  it('is a bound, not a suggestion', () => {
+    expect(isDeviceId('a'.repeat(7))).toBe(false);
+    expect(isDeviceId('a'.repeat(8))).toBe(true);
+    expect(isDeviceId('a'.repeat(64))).toBe(true);
+    expect(isDeviceId('a'.repeat(65))).toBe(false);
+  });
+
+  it('wants a string, not something that merely spells one', () => {
+    // Device ids come back out of storage and off the wire, where a value can
+    // be anything; `String(x)` happening inside a regex test is not a check.
+    expect(isDeviceId({ toString: () => 'abcdefghijkl' })).toBe(false);
+    expect(isDeviceId(['abcdefghijkl'])).toBe(false);
+  });
+});
+
+describe('the prefix that separates a device from a person', () => {
+  it('is actually worn by the uid', () => {
+    expect(kioskUid('abcdefghijkl')).toBe('kiosk_abcdefghijkl');
+  });
+
+  it('is what a person’s uid is tested against, not merely the id’s shape', () => {
+    // Without the prefix every well-formed uid would read as a device — and
+    // `checkedInBy` on a register would name a tablet that never existed.
+    expect(deviceIdOfUid('abcdefghijklmnop')).toBeNull();
+    expect(deviceIdOfUid('kiosk-abcdefghijkl')).toBeNull();
+  });
+});
