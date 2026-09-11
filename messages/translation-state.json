@@ -3925,6 +3925,11 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Team.nothingTicked": {
+    "source": "Nothing ticked — they will be able to work every gathering nobody has narrowed, and none of these.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Team.putsThemOn": {
     "source": "Puts them on {gatherings}",
     "zh-Hans": "todo",
@@ -4002,6 +4007,16 @@
   },
   "Team.outstandingHeading": {
     "source": "Still to do",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.outstandingBadge": {
+    "source": "{count, plural, one {# still to do} other {# still to do}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.pendingHeading": {
+    "source": "Waiting to be used",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4157,6 +4172,11 @@
   },
   "Team.gatheringsHeading": {
     "source": "Gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.gatheringsScope": {
+    "source": "Only gatherings somebody has narrowed are listed. {name} can work every other one.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5429,7 +5449,22 @@
     "zh-Hant": "todo"
   },
   "Access.askedAlready": {
+    "source": "Your name went on the Add list {when}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askedAlreadyUndated": {
     "source": "Your name is on the Add list.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askedWaitingNamed": {
+    "source": "Nobody is notified. {names} will see it under Who’s on when they next open this roster — if they are not here, go and find them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askedWaitingNobody": {
+    "source": "Nobody is notified. Anybody on this gathering will see it under Who’s on when they next open this roster — if nobody is here, go and find a leader.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5450,6 +5485,31 @@
   },
   "Access.clear": {
     "source": "Clear",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.clearAsk": {
+    "source": "Clear {name}’s ask? They will see it was answered, and that it was you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.clearAskYes": {
+    "source": "Yes, clear it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.leaveIt": {
+    "source": "Leave it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.armReopen": {
+    "source": "Opens {title} to everybody on the team. The {count, plural, one {# person} other {# people}} on it now stop being a list, so narrowing it again later means adding them one at a time.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.armReopenYes": {
+    "source": "Yes, open it to everyone",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },

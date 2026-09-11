@@ -51,7 +51,6 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useChainTitles } from '@/features/team/gatherings';
-import { RoleTag } from '@/features/team/Identity';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 import { isOutstanding, subscribeChainRequests } from '@/services/accessRequests';
 import { addChainMembers, removeChainMember } from '@/services/eventAccess';
@@ -114,13 +113,26 @@ export interface PersonPanelProps {
   now?: Date;
 }
 
-/** A labelled fact. The label is the column a reader scans, so it never wraps away from its value. */
+/**
+ * A labelled fact, as two cells of the panel's own grid rather than as a row
+ * of its own.
+ *
+ * Set inline, each value started wherever its label happened to end — four
+ * facts at four left edges, in a panel captioned "a person, gathered in one
+ * place". The `<dl>` above carries `grid-cols-[auto_minmax(0,1fr)]`, so the
+ * label column is as wide as the longest label and no wider, and every value
+ * shares one edge at every width without a hard-coded measure.
+ *
+ * Sentence case, not uppercase: the section headings below are uppercase, and
+ * when both wore it the panel read as six peer tags rather than as four facts
+ * followed by two sections.
+ */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <dt className="text-xs uppercase tracking-wider text-ink-500">{label}</dt>
+    <>
+      <dt className="text-xs text-ink-500">{label}</dt>
       <dd className="min-w-0 text-sm text-ink-200">{children}</dd>
-    </div>
+    </>
   );
 }
 
@@ -323,10 +335,11 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
 
   return (
     <div className="flex flex-col gap-4 rounded-xl bg-ink-900/60 p-3 ring-1 ring-ink-800">
-      <dl className="flex flex-col gap-1.5">
-        <Fact label={tCommon('role')}>
-          <RoleTag role={member.role} />
-        </Fact>
+      {/* No ROLE row. The row this panel opens out of carries the role sixty
+          pixels above, in a live select — a static duplicate underneath is a
+          second answer to a question already answered, in the weaker of the
+          two affordances. */}
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5">
         <Fact label={t('columnLastSeen')}>
           {member.lastSeenAt ? time.relative(member.lastSeenAt, now) : t('neverSignedIn')}
         </Fact>
@@ -347,7 +360,15 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
         {narrowed.length === 0 ? (
           <p className="text-sm text-ink-400">{t('panelNothingNarrowed')}</p>
         ) : (
-          <ul className="flex flex-col">
+          <>
+            {/* What the list is, said once. Without it a single row reading
+                "Sunday School — Not on it" is read as the whole answer, and a
+                counselor who can work every open gathering in the ministry
+                looks like somebody who works none. */}
+            <p className="text-xs leading-snug text-ink-500">
+              {t('gatheringsScope', { name: member.displayName || member.email })}
+            </p>
+            <ul className="flex flex-col gap-1">
             {narrowed.map((row) => (
               <li
                 key={row.chain}
@@ -376,7 +397,6 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                   can('core') && row.readerOn && member.id !== uid ? (
                     <Button
                       variant="ghost"
-                      size="sm"
                       loading={busy === row.chain}
                       onClick={() => void remove(row.chain, row.title)}
                     >
@@ -386,7 +406,6 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                 ) : row.readerOn ? (
                   <Button
                     variant="secondary"
-                    size="sm"
                     loading={busy === row.chain}
                     onClick={() => void add(row.chain, row.title)}
                   >
@@ -395,7 +414,8 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                 ) : null}
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </section>
 

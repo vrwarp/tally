@@ -33,7 +33,7 @@
 import { Link } from 'react-router-dom';
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
-import { approversFallback, rankApprovers } from '@/features/events/approvers';
+import { fallbackAdmin, rankApprovers } from '@/features/events/approvers';
 import { AskToBeAdded } from '@/features/events/AskToBeAdded';
 import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
@@ -88,7 +88,16 @@ export function LockedGathering({
   const chain = chainKey(event);
   const list = access.get(chain);
   const people = rankApprovers(list?.members ?? [], byUid, now);
-  const fallback = approversFallback(t, team);
+  /*
+   * The admin, as a row rather than as a sentence after the list.
+   *
+   * They are unconditionally a way in — the point of naming them at all — and
+   * under the list as prose that read as the afterthought instead of as the
+   * answer. Skipped when the ranking already named them, or the same person
+   * would appear twice.
+   */
+  const admin = fallbackAdmin(team);
+  const askable = admin && !people.some((one) => one.id === admin.id) ? [...people, admin] : people;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-4">
@@ -130,13 +139,13 @@ export function LockedGathering({
               : t('lockedExplain')}
         </p>
 
-        {people.length > 0 ? (
+        {askable.length > 0 ? (
           <>
             <h2 className="pt-4 text-xs font-bold uppercase tracking-wider text-ink-400">
               {t('askOneOfThese')}
             </h2>
             <ul className="flex flex-col pt-1">
-              {people.map((profile) => (
+              {askable.map((profile) => (
                 <li key={profile.id} className="flex min-h-11 items-center gap-2 text-sm">
                   <span className="text-ink-200">{fullName(profile)}</span>
                   <span className="text-xs uppercase tracking-wider text-ink-600">
@@ -145,12 +154,9 @@ export function LockedGathering({
                 </li>
               ))}
             </ul>
-            {/* Unconditionally, and after the names: the list may name
-                somebody who is away, and an admin is always a way in. */}
-            {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
             {/* Under the names, because the names are the answer and this is
                 the shortcut to them — not a substitute for walking over. */}
-            <AskToBeAdded chain={chain} approvers={people} />
+            <AskToBeAdded chain={chain} approvers={askable} />
           </>
         ) : (
           /*
@@ -159,10 +165,12 @@ export function LockedGathering({
            * nobody at all, or everybody on it may be suspended. Either way "find
            * an admin" is the true next step and a blank space is not.
            */
+          /* `askable` being empty means there is no active admin in the
+             directory either, so there is no name to print — the sentence is
+             all there is to say, and the button is still worth offering. */
           <>
             <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
-            {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
-            <AskToBeAdded chain={chain} approvers={people} />
+            <AskToBeAdded chain={chain} approvers={askable} />
           </>
         )}
       </div>

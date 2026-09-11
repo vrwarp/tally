@@ -126,6 +126,19 @@ export function approversFallback(
   t: ApproverTranslator,
   team: readonly UserProfile[],
 ): string | null {
-  const admin = team.find((member) => member.active && member.role === 'admin');
+  const admin = fallbackAdmin(team);
   return admin ? t('orAnyAdmin', { name: fullName(admin) }) : null;
+}
+
+/**
+ * The same admin, as a person rather than as a sentence.
+ *
+ * A screen that already draws the people you could ask as rows wants this
+ * one as a row too. Rendering it as prose under the list made the reader
+ * parse two shapes for one idea — a name with a role beside it, then a
+ * sentence with a name after a colon — and the shape that looked like an
+ * afterthought was the one that is unconditionally true.
+ */
+export function fallbackAdmin(team: readonly UserProfile[]): UserProfile | null {
+  return team.find((member) => member.active && member.role === 'admin') ?? null;
 }

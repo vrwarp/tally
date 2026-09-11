@@ -774,3 +774,53 @@ And one the loop could not settle because it is a matter of taste rather than jo
 exact words (**Who's on · 3**), the join page, and the ask toast's shape are the things here that a
 rendered-frame round — `uxr-visual-critic` and `uxr-design-critic` over the real screens — should
 look at as they are built.
+
+---
+
+## 8. The rendered-frame round
+
+Section 7 closed by naming what the paper could not settle — the chip's exact words, the join page,
+the ask's shape — and handing them to a round over real screens. That round has now run:
+`e2e/access-walkthrough.spec.ts` photographs thirteen states from the live app against the
+emulators, and `uxr-visual-critic` and `uxr-design-critic` read the desktop and phone frames once
+each.
+
+What the frames caught that the paper could not:
+
+**Two things the screen was saying that were not true.** The QR's caption promised ten minutes
+under a fortnight-long link, because *Show QR* on a link draws that link and only the row's **QR**
+button re-mints; the sentence is now the lifetime's rather than the square's. And a ten-minute
+token's header read "Good until in 10 minutes", a relative time poured into an absolute sentence.
+
+**Three acts that were one tap.** *Clear* on an ask sat thirteen unbordered pixels from *Add*, and
+writes the one thing the design went out of its way to avoid saying by accident — that somebody
+looked and said no. **Everyone on the team** sat eight pixels above the option a thumb aims at to
+leave things alone, and threw a gathering's whole list away, on every gathering in the repeat, with
+no undo. Both are armed now, in the shape P9 already established. The third was quieter: a
+one-field form whose keyboard **Go** key minted a link with no gathering ticked, silently, on the
+screen where the ticks sit at the keyboard line — the form now says what an untouched fieldset
+means before the press rather than after the weekend.
+
+**Two places a value was unreadable.** The link truncated mid-token against its own right edge,
+with no ellipsis, on the one screen in the app that says out loud the value can never be shown
+again; it wraps now. And the gathering select on the roster header collapsed to "S." at 390px,
+because the row was held to one line unconditionally — a second line at a width is cheaper than a
+control with no label.
+
+**One thing that was said as if it were furniture.** "Your name is on the Add list." was one grey
+line set exactly like the directory of people above it — no date, nobody named, nothing to separate
+the reader's own outcome from a list about other people. It now says when, who will see it and
+where, and that nothing is queued.
+
+Two findings were answered by re-shooting rather than by changing the app: the fence chapter was
+photographed from somebody who is on every gathering, so the step titled "the ones that are not
+yours" contained none; and the pending list was shot with the phone's disclosure shut. One was
+answered by a wider window: the member row is a container query that lays out as a table above
+672px of card, which a 1280px capture never reached, so the desktop frames are taken at 1440×900.
+
+One finding is recorded and not acted on. At 1280×720 the Team screen's 60/40 split cannot give the
+member list the 672px its row layout needs *and* leave the invitation column room — the two columns
+want roughly 1,060px between them and have 992. Narrowing the rail makes the overflowing column
+worse; stacking puts eleven members between an admin and the invitations they came for. It wants a
+layout decision rather than a fraction, and taking one in the last hour of this campaign would be
+the wrong time to make it.

@@ -192,19 +192,33 @@ describe('who it names', () => {
     expect(screen.queryByText('Dana Ruiz')).not.toBeInTheDocument();
   });
 
-  it('names an admin after the names, whether or not the list had one', () => {
+  it('names an admin as one of the rows, whether or not the list had one', () => {
     show(['miriam']);
 
     expect(screen.getByText('Ask one of these to add you')).toBeInTheDocument();
-    expect(screen.getByText('or any admin: Ravi Menon')).toBeInTheDocument();
+    // A row, not a sentence after the list. The admin is the one name that is
+    // unconditionally a way in, and set as prose under two people drawn as
+    // rows it read as the afterthought rather than as the answer.
+    const rows = screen.getAllByRole('listitem').map((row) => row.textContent);
+    expect(rows.at(-1)).toContain('Ravi Menon');
+    expect(rows.at(-1)).toContain('Admin');
   });
 
-  it('says to find an admin when the list names nobody it can, and still names one', () => {
+  it('names the admin once, even when the gathering’s own list already had them', () => {
+    show(['miriam', 'ravi']);
+
+    const named = screen
+      .getAllByRole('listitem')
+      .filter((row) => row.textContent?.includes('Ravi Menon'));
+    expect(named).toHaveLength(1);
+  });
+
+  it('still names an admin when the list names nobody it can', () => {
     show(['dana']);
 
-    expect(screen.queryByText('Ask one of these to add you')).not.toBeInTheDocument();
-    expect(screen.getByText('Ask an admin to add you to this gathering.')).toBeInTheDocument();
-    expect(screen.getByText('or any admin: Ravi Menon')).toBeInTheDocument();
+    // The heading comes back, because there is somebody under it to ask.
+    expect(screen.getByText('Ask one of these to add you')).toBeInTheDocument();
+    expect(screen.getByText('Ravi Menon')).toBeInTheDocument();
   });
 
   it('leads back to check-in by default', () => {

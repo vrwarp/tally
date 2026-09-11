@@ -225,7 +225,16 @@ export function EventHeader({
         phone — and a second line of chips reads as a second group of things,
         which these are not.
       */}
-      <div className="mt-2 flex items-center gap-2">
+      {/*
+        * It wraps, and the select is what moves.
+        *
+        * Holding one row unconditionally is what produced a gathering select
+        * 59px wide rendering as "S." on a 390px phone — a control with no
+        * label, in the top-right corner, on the screen a counselor reaches for
+        * when they have landed on the wrong night. A second line is a cost
+        * paid once at a width; a select nobody can read is paid every time.
+        */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {/*
           Only when it is a warning.
 
@@ -286,7 +295,7 @@ export function EventHeader({
             <span
               aria-hidden
               data-testid="ask-waiting"
-              className="inline-block size-2 shrink-0 rounded-full bg-brand-400"
+              className="inline-block size-2 shrink-0 rounded-full bg-warn-400"
             />
           ) : null}
         </button>
@@ -319,7 +328,7 @@ export function EventHeader({
              one most likely to be reached for on the wrong night. On a laptop
              band the same rule made it a 900px pill: past the width of the
              longest option there is nothing left to reveal, so it stops. */
-          className="min-h-11 min-w-0 flex-1 truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9 lg:max-w-sm"
+          className="min-h-11 min-w-0 flex-1 basis-40 truncate rounded-full bg-ink-900 px-3 text-xs text-ink-200 ring-1 ring-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-400 pointer-fine:min-h-9 lg:max-w-sm"
         >
           {own.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>

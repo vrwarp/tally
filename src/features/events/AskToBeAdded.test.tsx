@@ -134,9 +134,15 @@ describe('once it is on the list', () => {
     ]);
     show();
 
+    // Dated, and followed by where it will be seen. A bare "your name is on
+    // the Add list", set like the directory of people above it, is the shape
+    // of a status — and a status is a promise nothing here makes.
     await waitFor(() =>
-      expect(screen.getByText('Your name is on the Add list.')).toBeInTheDocument(),
+      expect(screen.getByText(/Your name went on the Add list/)).toBeInTheDocument(),
     );
+    expect(
+      screen.getByText(/Nobody is notified\. Miriam Achebe and Dana Ruiz will see it/),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ask to be added' })).not.toBeInTheDocument();
   });
 

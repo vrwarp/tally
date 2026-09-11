@@ -245,6 +245,19 @@ export function InviteForm({
               />
             ))}
             {atCap ? <p className="text-xs text-warn-400">{t('gatheringsCapped')}</p> : null}
+            {/*
+              * What an untouched fieldset means, said before the press rather
+              * than discovered on Sunday.
+              *
+              * This is a one-field form with a submit button, so the keyboard's
+              * Go key mints the link — and on a phone the ticks sit at the
+              * keyboard line with Create link underneath it. Pressing Go was
+              * silent, and the volunteer found out the next weekend, standing
+              * in front of a door reading "Nothing you're on today".
+              */}
+            {chosen.size === 0 ? (
+              <p className="text-xs leading-snug text-ink-500">{t('nothingTicked')}</p>
+            ) : null}
           </>
         )}
       </fieldset>

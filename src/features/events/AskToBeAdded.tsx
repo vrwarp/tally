@@ -17,7 +17,7 @@
  * as the first, is how a person ends up pressing again next week instead of
  * walking across the lobby.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
@@ -80,15 +80,41 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
     const who = mine.clearedBy ? byUid.get(mine.clearedBy) : undefined;
     const when = time.clock(mine.clearedAt);
     return (
-      <p className="pt-3 text-sm text-ink-400">
-        {who
-          ? t('askCleared', { name: fullName(who), when })
-          : t('askClearedNoName', { when })}
-      </p>
+      <Standing>
+        <p className="text-sm text-ink-200">
+          {who
+            ? t('askCleared', { name: fullName(who), when })
+            : t('askClearedNoName', { when })}
+        </p>
+      </Standing>
     );
   }
 
-  if (mine) return <p className="pt-3 text-sm text-ink-400">{t('askedAlready')}</p>;
+  /*
+   * What the reader's own press did, said with the standing of an outcome.
+   *
+   * It used to be one grey line set exactly like the boilerplate above it —
+   * "Your name is on the Add list." — naming nobody and dated to nothing,
+   * which is the shape of a status, and a status is a promise this design does
+   * not make. So: when it happened, then who will see it and where, then that
+   * nothing is queued and the walk is still the path.
+   */
+  if (mine) {
+    return (
+      <Standing>
+        <p className="text-sm font-semibold text-ink-100">
+          {/* Undated only where the write has not come back from the server
+              yet — the local snapshot has no `askedAt` for that one beat. */}
+          {mine.askedAt
+            ? t('askedAlready', { when: time.relative(mine.askedAt) })
+            : t('askedAlreadyUndated')}
+        </p>
+        <p className="pt-0.5 text-sm leading-snug text-ink-400">
+          {approvers.length > 0 ? t('askedWaitingNamed', { names }) : t('askedWaitingNobody')}
+        </p>
+      </Standing>
+    );
+  }
 
   return (
     <div className="pt-3">
@@ -97,4 +123,12 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
       </Button>
     </div>
   );
+}
+
+/**
+ * A rule and some air, so the outcome is not a fourth item of the directory
+ * above it. The list is about other people; this is about the reader.
+ */
+function Standing({ children }: { children: ReactNode }) {
+  return <div className="mt-3 border-t border-ink-800 pt-3">{children}</div>;
 }

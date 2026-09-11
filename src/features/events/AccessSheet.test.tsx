@@ -196,6 +196,38 @@ describe('which state looks like the current one', () => {
   });
 });
 
+describe('opening a narrowed gathering back up', () => {
+  it('asks first, and names what the list costs to rebuild', async () => {
+    const user = userEvent.setup();
+    show(restricted());
+
+    await user.click(option('Everyone on the team'));
+
+    // Nothing written on the first press. The two directions are not
+    // symmetrical: narrowing previews a kept list and can be undone by adding
+    // somebody back, and this throws the list away on every gathering in the
+    // repeat.
+    expect(reopenChain).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Opens Sunday School to everybody on the team\. The 2 people on it now/,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Yes, open it to everyone' }));
+    expect(reopenChain).toHaveBeenCalled();
+  });
+
+  it('leaves the fence standing when the arm step is answered no', async () => {
+    const user = userEvent.setup();
+    show(restricted());
+
+    await user.click(option('Everyone on the team'));
+    await user.click(screen.getByRole('button', { name: 'Leave it' }));
+
+    expect(reopenChain).not.toHaveBeenCalled();
+    expect(option('Only people I add')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 describe('what the sheet says before it writes', () => {
   it('counts the team on the option that is currently true', () => {
     show();
@@ -488,15 +520,34 @@ describe('an ask, on the roster of somebody who can answer it', () => {
     expect(clearAccessRequest).toHaveBeenCalledWith('sunday-school', 'jo', 'miriam');
   });
 
-  it('clears without adding, which is also an answer', async () => {
+  it('clears without adding, which is also an answer — on the second press', async () => {
+    const user = userEvent.setup();
+    asking(waiting);
+    show(restricted());
+
+    // The first press only arms it. A clear is a write the asker reads as
+    // "somebody looked and said no", so it is not something a thumb does by
+    // landing thirteen pixels to the right of Add.
+    await user.click(await screen.findByRole('button', { name: 'Clear' }));
+    expect(clearAccessRequest).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/Clear Jo Adeyemi’s ask/);
+
+    await user.click(screen.getByRole('button', { name: 'Yes, clear it' }));
+
+    expect(addChainMembers).not.toHaveBeenCalled();
+    expect(clearAccessRequest).toHaveBeenCalledWith('sunday-school', 'jo', 'miriam');
+  });
+
+  it('leaves the ask alone when the arm step is answered no', async () => {
     const user = userEvent.setup();
     asking(waiting);
     show(restricted());
 
     await user.click(await screen.findByRole('button', { name: 'Clear' }));
+    await user.click(screen.getByRole('button', { name: 'Leave it' }));
 
-    expect(addChainMembers).not.toHaveBeenCalled();
-    expect(clearAccessRequest).toHaveBeenCalledWith('sunday-school', 'jo', 'miriam');
+    expect(clearAccessRequest).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
   });
 
   it('says nothing at all when nobody is asking', async () => {

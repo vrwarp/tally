@@ -334,6 +334,18 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
     isAdmin || (can('core') && access.get(chain)?.members.has(uid) === true);
 
   const pendingCount = lists && !invitationsError ? lists.pending.length : null;
+  /*
+   * What is behind the disclosure that is somebody's to *do*, as opposed to
+   * what is merely waiting on somebody else.
+   *
+   * On a phone this card is shut on every mount, and the count beside its
+   * title counted invitations only — so the one item on the Team screen that
+   * needs an admin's hand, and which this card is the only place in the app
+   * that ever mentions, was invisible behind a closed header with nothing to
+   * suggest opening it. At `lg` the card is forced open and the band is simply
+   * on the page, which is why this was a phone-only blind spot.
+   */
+  const outstandingCount = lists && !invitationsError ? lists.outstanding.length : 0;
 
   return (
     <Card className="order-first lg:order-none">
@@ -362,6 +374,14 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
               {pendingCount !== null ? (
                 <span className="rounded-full bg-ink-800 px-2 py-0.5 text-xs font-semibold text-ink-300">
                   {pendingCount}
+                </span>
+              ) : null}
+              {/* Amber, and a word rather than a number, because it is the one
+                  thing here somebody has to act on. Hidden at `lg`, where the
+                  band it stands for is already open below. */}
+              {outstandingCount > 0 ? (
+                <span className="rounded-full bg-warn-500/10 px-2 py-0.5 text-xs font-semibold text-warn-300 lg:hidden">
+                  {t('outstandingBadge', { count: outstandingCount })}
                 </span>
               ) : null}
             </h2>
@@ -412,9 +432,13 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
           <>
             {lists.outstanding.length > 0 ? (
               <section aria-labelledby="team-outstanding">
+                {/* A rule above as well as below. With only the lower one the
+                    amber band welded itself to the primary button 12px above
+                    it and read as a footnote about that button, rather than as
+                    a queue of work about people who have already arrived. */}
                 <h3
                   id="team-outstanding"
-                  className="border-b border-ink-800 bg-warn-500/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-warn-300"
+                  className="border-y border-ink-800 bg-warn-500/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-warn-300"
                 >
                   {t('outstandingHeading')}
                 </h3>
@@ -470,7 +494,18 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
             {lists.pending.length === 0 ? (
               <EmptyState title={t('invitesEmptyTitle')} description={t('invitesEmptyBody')} />
             ) : (
-              <ul className="divide-y divide-ink-800">
+              <section aria-labelledby="team-pending">
+                {/* Its own heading, so the amber section visibly closes before
+                    this one opens. Without it an unused invitation is the next
+                    thing under "Add now / Dismiss" and reads as a second item
+                    of still-to-do work. */}
+                <h3
+                  id="team-pending"
+                  className="border-y border-ink-800 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-400"
+                >
+                  {t('pendingHeading')}
+                </h3>
+                <ul className="divide-y divide-ink-800">
                 {lists.pending.map((invitation) => {
                   const link = invitation.kind === 'link';
                   const expired =
@@ -587,7 +622,8 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
                     </li>
                   );
                 })}
-              </ul>
+                </ul>
+              </section>
             )}
 
             {/* Nothing at all when nobody has arrived this week: a heading over

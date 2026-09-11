@@ -630,7 +630,15 @@ export interface CheckboxFieldProps extends Omit<InputHTMLAttributes<HTMLInputEl
 export function CheckboxField({ label, hint, className, ...rest }: CheckboxFieldProps) {
   const id = useId();
   return (
-    <div className="flex items-start gap-3">
+    /*
+     * A 44px band on a touch screen, not a 20px box.
+     *
+     * The box is the box, but the target is the whole row — the label carries
+     * the padding, so a thumb landing anywhere across the line ticks it. These
+     * are decisions people make one-handed in a lobby with the keyboard up;
+     * everywhere there is a mouse the band comes back down to the box.
+     */
+    <div className="flex min-h-11 items-start gap-3 pointer-fine:min-h-0">
       <input
         id={id}
         type="checkbox"
@@ -647,7 +655,8 @@ export function CheckboxField({ label, hint, className, ...rest }: CheckboxField
          * already had when checked.
          */
         className={cn(
-          'mt-0.5 size-5 shrink-0 appearance-none rounded bg-ink-950 ring-1 ring-inset ring-ink-600',
+          'mt-2.5 size-5 shrink-0 appearance-none rounded bg-ink-950 ring-1 ring-inset ring-ink-600',
+          'pointer-fine:mt-0.5',
           'checked:bg-brand-500 checked:ring-brand-500',
           // The tick itself is one rule in `index.css` — an arbitrary `bg-[url(…)]`
           // holding an inline SVG does not survive Tailwind's value parser.
@@ -656,7 +665,7 @@ export function CheckboxField({ label, hint, className, ...rest }: CheckboxField
         )}
         {...rest}
       />
-      <label htmlFor={id} className="text-sm text-ink-200">
+      <label htmlFor={id} className="flex-1 py-2.5 text-sm text-ink-200 pointer-fine:py-0">
         {label}
         {hint ? <span className="block text-xs text-ink-500">{hint}</span> : null}
       </label>

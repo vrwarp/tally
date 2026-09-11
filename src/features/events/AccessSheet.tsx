@@ -240,6 +240,11 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
 
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  /* Which ask's Clear has been pressed once. One at a time, like the
+     suspension on the Team screen: arming a second disarms the first. */
+  const [clearing, setClearing] = useState<string | null>(null);
+  /** Whether the press that widens the gathering has been made once. */
+  const [reopening, setReopening] = useState(false);
   const [prefill, setPrefill] = useState<Prefill>(() => ({ status: 'idle', uids: [] }));
   /**
    * Who was on the document when the sheet opened — `null` until it has.
@@ -591,8 +596,38 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                 label={t('everyoneOnTeam')}
                 detail={openDetail}
                 disabled={busy}
-                onPress={restricted ? () => void reopen() : () => {}}
+                onPress={restricted ? () => setReopening(true) : () => {}}
               />
+              {/*
+                * Armed, because the two directions are not symmetrical.
+                * Narrowing shows a kept list before it writes anything and can
+                * be undone by adding somebody back; widening throws the list
+                * away, on every gathering in the repeat, and there is no undo
+                * for a list. It sat eight pixels above the option a thumb aims
+                * at to leave things as they are.
+                */}
+              {reopening ? (
+                <div className="px-1">
+                  <p role="alert" className="text-xs leading-snug text-ink-300">
+                    {t('armReopen', { title: event.title, count: list?.members.size ?? 0 })}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <Button variant="ghost" onClick={() => setReopening(false)}>
+                      {t('leaveIt')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        setReopening(false);
+                        void reopen();
+                      }}
+                    >
+                      {t('armReopenYes')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <AccessOption
                 selected={restricted}
                 label={t('onlyPeopleIAdd')}
@@ -694,33 +729,71 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
               {t('askHeading')}
             </h3>
-            <ul className="flex flex-col pt-1">
+            {/*
+              * One card per asker, not one row.
+              *
+              * Three things a row could not do. The name gets a line of its
+              * own, because it is the decision — it was truncating to "Sam
+              * Whi…" so that "asked 21 minutes ago" could be spelled out, and
+              * on a lobby phone the identity of the adult is the last thing
+              * that should give way. The two answers are a thumb's width
+              * apart on separate rows rather than thirteen pixels apart on
+              * one, where a low tap on the first card's Add put the *second*
+              * asker on a gathering of minors. And Clear is armed: it is a
+              * write the asker reads as "somebody looked and said no", which
+              * is precisely the wrong thing to say by accident.
+              */}
+            <ul className="flex flex-col gap-2 pt-1.5">
               {asks.outstanding.map((request) => (
-                <li key={request.id} className="flex min-h-11 flex-wrap items-center gap-2 py-1">
-                  <span className="min-w-0 flex-1 truncate text-sm text-ink-200">
-                    {request.name}
-                  </span>
+                <li
+                  key={request.id}
+                  className="rounded-xl px-3 py-2.5 ring-1 ring-ink-800"
+                >
+                  <p className="text-sm text-ink-100">{request.name}</p>
                   {request.askedAt ? (
-                    <span className="text-xs text-ink-500">
+                    <p className="text-xs text-ink-500">
                       {t('askRowWhen', { when: time.relative(request.askedAt) })}
-                    </span>
+                    </p>
                   ) : null}
-                  {mayAdd ? (
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void answerAsk(request, true)}
-                    >
-                      {t('addThem')}
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => void answerAsk(request, false)}
-                  >
-                    {t('clear')}
-                  </Button>
+                  {clearing === request.id ? (
+                    <>
+                      <p role="alert" className="mt-1.5 text-xs leading-snug text-ink-300">
+                        {t('clearAsk', { name: request.name })}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <Button variant="ghost" onClick={() => setClearing(null)}>
+                          {t('leaveIt')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            setClearing(null);
+                            void answerAsk(request, false);
+                          }}
+                        >
+                          {t('clearAskYes')}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      {mayAdd ? (
+                        <Button disabled={busy} onClick={() => void answerAsk(request, true)}>
+                          {t('addThem')}
+                        </Button>
+                      ) : null}
+                      {/* Secondary, not ghost: an unbordered Clear beside a
+                          filled Add is a hit box nobody can see the edge of. */}
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => setClearing(request.id)}
+                      >
+                        {t('clear')}
+                      </Button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
