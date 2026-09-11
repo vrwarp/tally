@@ -34,6 +34,7 @@ import { Link } from 'react-router-dom';
 import { EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { approversFallback, rankApprovers } from '@/features/events/approvers';
+import { AskToBeAdded } from '@/features/events/AskToBeAdded';
 import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import type { Role, TallyEvent } from '@/types';
@@ -75,7 +76,17 @@ export function LockedGathering({
   const { access } = useData();
   const { members: team, byUid } = useTeam(true);
 
-  const list = access.get(chainKey(event));
+  /*
+   * The errand, read off the clock rather than plumbed through the route.
+   *
+   * A locked past row on the catch-up tail and a locked row for tonight go to
+   * the same URL, so nothing in the link says which errand brought somebody
+   * here — but a gathering that has already finished can only have been
+   * reached for its register.
+   */
+  const finished = (event.endAt ?? event.startAt).getTime() < now.getTime();
+  const chain = chainKey(event);
+  const list = access.get(chain);
   const people = rankApprovers(list?.members ?? [], byUid, now);
   const fallback = approversFallback(t, team);
 
@@ -102,8 +113,21 @@ export function LockedGathering({
         <p className="flex items-center gap-2 text-sm font-semibold text-ink-200">
           <span aria-hidden>🔒</span> {t('lockedRestricted')}
         </p>
+        {/*
+          * Three sentences, and which one is true is something the app knows
+          * without asking. Taken off just now: it had the roster open a second
+          * ago, so saying "you are not on this" would be a lie it knows it is
+          * telling. A gathering that has finished: the reader came here to take
+          * a register for a night that is over — the catch-up errand — and a
+          * sentence about tonight would not answer them. Otherwise, the plain
+          * one.
+          */}
         <p className="pt-1 text-sm text-ink-500">
-          {justRemoved ? t('justTakenOff') : t('lockedExplain')}
+          {justRemoved
+            ? t('justTakenOff')
+            : finished
+              ? t('lockedCatchUp')
+              : t('lockedExplain')}
         </p>
 
         {people.length > 0 ? (
@@ -124,6 +148,9 @@ export function LockedGathering({
             {/* Unconditionally, and after the names: the list may name
                 somebody who is away, and an admin is always a way in. */}
             {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
+            {/* Under the names, because the names are the answer and this is
+                the shortcut to them — not a substitute for walking over. */}
+            <AskToBeAdded chain={chain} approvers={people} />
           </>
         ) : (
           /*
@@ -135,6 +162,7 @@ export function LockedGathering({
           <>
             <p className="pt-3 text-sm text-ink-500">{t('askAnAdmin')}</p>
             {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
+            <AskToBeAdded chain={chain} approvers={people} />
           </>
         )}
       </div>

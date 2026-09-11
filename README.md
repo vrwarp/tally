@@ -188,7 +188,7 @@ with the same ground photographed from the running app:
 | --- | --- |
 | [docs/review-corrections.md](docs/review-corrections.md) — correcting a self-registered family before approving them | [frame by frame](docs/walkthrough/corrections/README.md) |
 | [docs/kiosk-reprint.md](docs/kiosk-reprint.md) — reprinting a name tag, and the two wider designs that were refused | [frame by frame](docs/walkthrough/reprint/README.md) |
-| [docs/team-access.md](docs/team-access.md) — **proposal, unbuilt**: who may sign in and who may work each gathering, every journey and edge case, and the changes that survived five rounds of critique and the owner's review | [Journey 8](docs/walkthrough/README.md#journey-8--a-gathering-that-is-not-everybodys) as shipped |
+| [docs/team-access.md](docs/team-access.md) — who may sign in and who may work each gathering: every journey and edge case, and the changes that survived five rounds of critique and the owner's review | [frame by frame](docs/uxr/access-walkthrough/README.md) |
 | [docs/parent-contact.md](docs/parent-contact.md) — taking a parent's number at the door without slowing the queue | — |
 | [docs/label-printing.md](docs/label-printing.md) — setting up a Brother QL: models, media, per-platform quirks, what a label may say | — |
 | [docs/profile-edits.md](docs/profile-edits.md) — the edit queue | [every state](docs/walkthrough/edit-queue.md) |

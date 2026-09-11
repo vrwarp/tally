@@ -108,13 +108,35 @@ function RestoringSession({ stage }: { stage: AuthStage }) {
 export function RequireRole({ role, children }: { role: Role; children: ReactNode }): ReactNode {
   const t = useTranslations('Auth');
   const { can } = useAuth();
-  if (can(role)) return children;
+  const allowed = can(role);
+
+  /*
+   * Whether this screen was open to the reader a moment ago.
+   *
+   * The profile is a live subscription, so an admin changing somebody's role
+   * on a Tuesday replaces whatever they were looking at with the refusal
+   * below, mid-edit. "Core team only" is a true sentence and the wrong one
+   * there: it reads as though they had wandered somewhere they never belonged,
+   * when what actually happened is that their access changed under them a
+   * second ago. The app knows which, because it rendered the screen.
+   */
+  const wasAllowed = useRef(allowed);
+  const demoted = wasAllowed.current && !allowed;
+  useEffect(() => {
+    wasAllowed.current = allowed;
+  }, [allowed]);
+
+  if (allowed) return children;
 
   return (
     <div className="px-4 py-10">
       <div className="mx-auto flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-ink-900 px-6 py-8 text-center ring-1 ring-ink-800">
-        <p className="text-base font-semibold text-ink-100">{t('coreOnlyTitle')}</p>
-        <p className="text-sm text-ink-500">{t('coreOnlyBody')}</p>
+        <p className="text-base font-semibold text-ink-100">
+          {demoted ? t('roleChangedTitle') : t('coreOnlyTitle')}
+        </p>
+        <p className="text-sm text-ink-500">
+          {demoted ? t('roleChangedBody') : t('coreOnlyBody')}
+        </p>
         <Link
           to="/"
           className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"

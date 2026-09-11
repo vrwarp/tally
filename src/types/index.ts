@@ -890,6 +890,22 @@ export interface TallyEvent
 /* -------------------------------------------------------------------------- */
 
 /**
+ * A kiosk device as a screen reads one.
+ *
+ * `pairedAt` widens to nullable on the way out, unlike its stored counterpart:
+ * a locally pending `serverTimestamp()` reads back as null until the server
+ * acknowledges it, and the Team screen has to draw the row either way.
+ */
+export interface KioskDevice
+  extends Omit<KioskDeviceDoc, 'pairedAt' | 'lastSeenAt' | 'retiredAt'> {
+  /** The device id the kiosk minted for itself; the document id. */
+  id: string;
+  pairedAt: Date | null;
+  lastSeenAt: Date | null;
+  retiredAt: Date | null;
+}
+
+/**
  * Stored at `accessRequests/{chainKey}__{uid}`: somebody asking to be put on a
  * gathering they are not on.
  *

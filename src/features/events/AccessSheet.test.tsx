@@ -43,6 +43,21 @@ const removeChainMember = vi.fn<Write>(async () => {});
  */
 const recentRegisterTakers = vi.fn(async () => new Set(['sam', 'dana', 'planning-center']));
 
+/*
+ * Asking to be added reaches Firestore, and every screen that draws a locked
+ * gathering now offers it. Mocked at the service boundary the way the access
+ * writes above are — `src/services/accessRequests.test.ts` is where the writes
+ * themselves are pinned, and an unmocked import loads Firebase and throws on
+ * the config.
+ */
+vi.mock('@/services/accessRequests', () => ({
+  subscribeChainRequests,
+  askToBeAdded,
+  clearAccessRequest,
+  isOutstanding: () => true,
+  ACCESS_REQUEST_LIFE_MS: 7 * 86_400_000,
+}));
+
 vi.mock('@/services/eventAccess', () => ({
   restrictChain: (...args: unknown[]) => restrictChain(...args),
   reopenChain: (...args: unknown[]) => reopenChain(...args),
@@ -375,6 +390,22 @@ describe('suspended members', () => {
   });
 });
 
+const subscribeChainRequests = vi.hoisted(() =>
+  vi.fn((_chain: string, _onChange: (next: unknown[]) => void) => () => {}),
+);
+const askToBeAdded = vi.hoisted(() => vi.fn(async () => {}));
+const clearAccessRequest = vi.hoisted(() => vi.fn(async () => {}));
+
+/** Publishes one snapshot of the asks on whatever chain subscribed. */
+function asking(rows: Record<string, unknown>[]) {
+  subscribeChainRequests.mockImplementation(
+    (_chain: string, onChange: (next: unknown[]) => void) => {
+      onChange(rows);
+      return () => {};
+    },
+  );
+}
+
 describe('a reader the gathering refuses', () => {
   const jo: Reader = { profile: team[3]!, can: (role) => role === 'counselor' };
 
@@ -409,6 +440,70 @@ describe('a reader the gathering refuses', () => {
     show(document(['ghost']), jo);
 
     expect(screen.getByText('Ask an admin to add you to this gathering.')).toBeInTheDocument();
+  });
+
+  it('offers the ask, under the names rather than instead of them', async () => {
+    const user = userEvent.setup();
+    asking([]);
+    show(restricted(), jo);
+
+    await user.click(screen.getByRole('button', { name: 'Ask to be added' }));
+
+    expect(askToBeAdded).toHaveBeenCalledWith('sunday-school', jo.profile.id, expect.any(String));
+    // The names are still the answer; the ask is only the shortcut to them.
+    expect(screen.getByText('Ask one of these to add you')).toBeInTheDocument();
+  });
+});
+
+describe('an ask, on the roster of somebody who can answer it', () => {
+  /*
+   * The sheet is the durable home for an ask, and it leads with it because it
+   * is the only thing here that is somebody's to do — everything below is a
+   * list to read. The roster itself carries nothing but a dot on the chip that
+   * opens this, because a strip above the first roster row would push every
+   * name down under a thumb already descending.
+   */
+  const waiting = [
+    {
+      id: 'friday-fellowship__jo',
+      chainKey: 'sunday-school',
+      uid: 'jo',
+      name: 'Jo Adeyemi',
+      askedAt: new Date('2026-02-13T18:00:00'),
+      clearedAt: null,
+      clearedBy: null,
+    },
+  ];
+
+  it('names who is asking, and adds them in one press', async () => {
+    const user = userEvent.setup();
+    asking(waiting);
+    show(restricted());
+
+    expect(await screen.findByText('Asking to be added')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(addChainMembers).toHaveBeenCalledWith('sunday-school', ['jo'], 'miriam');
+    // Answered, and the mark is what lets the asker tell that from silence.
+    expect(clearAccessRequest).toHaveBeenCalledWith('sunday-school', 'jo', 'miriam');
+  });
+
+  it('clears without adding, which is also an answer', async () => {
+    const user = userEvent.setup();
+    asking(waiting);
+    show(restricted());
+
+    await user.click(await screen.findByRole('button', { name: 'Clear' }));
+
+    expect(addChainMembers).not.toHaveBeenCalled();
+    expect(clearAccessRequest).toHaveBeenCalledWith('sunday-school', 'jo', 'miriam');
+  });
+
+  it('says nothing at all when nobody is asking', async () => {
+    asking([]);
+    show(restricted());
+
+    expect(screen.queryByText('Asking to be added')).not.toBeInTheDocument();
   });
 });
 

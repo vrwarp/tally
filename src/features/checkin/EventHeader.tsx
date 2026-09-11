@@ -22,11 +22,13 @@
  * reason to open the same sheet — a gathering that has refused three check-ins
  * — and two sheets for one question would be two answers.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
+import { useToast } from '@/context/toastContext';
 import { AccessSheet } from '@/features/events/AccessSheet';
+import { useChainRequests } from '@/features/events/useAccessRequests';
 import { useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import {
@@ -79,6 +81,7 @@ export function EventHeader({
   const t = useTranslations('EventHeader');
   const navigate = useNavigate();
   const { access, canWork } = useData();
+  const { show } = useToast();
   const open = isCheckInOpen(event, now);
 
   const list = access.get(chainKey(event));
@@ -95,6 +98,50 @@ export function EventHeader({
     if (teamLoading && byUid.size === 0) return members.length;
     return members.filter((uid) => byUid.get(uid)?.active === true).length;
   }, [list, byUid, teamLoading]);
+  /*
+   * Whether anybody is asking to be put on this gathering.
+   *
+   * Subscribed on the roster rather than only in the sheet, because the dot is
+   * the only signal there is — nothing is notified, so a leader who never opens
+   * the sheet would never learn. Only for a restricted gathering: nobody asks
+   * to be added to one everybody can already work.
+   */
+  const asks = useChainRequests(restricted ? chainKey(event) : null, restricted);
+  const asking = asks.outstanding.length > 0;
+
+  /*
+   * The nudge, once, when an ask lands while somebody who can act on it has
+   * the roster open.
+   *
+   * An ordinary toast: evictable, timed out like every other, and carrying one
+   * action. The fact it announces lives in the sheet, which is what makes that
+   * acceptable — a place for things that have just happened is not a place for
+   * an outstanding item. Keyed on the row id so a re-render never re-announces,
+   * and only for rows that arrive *after* the screen settled, so opening a
+   * roster does not greet somebody with a week of history.
+   */
+  const announced = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    /*
+     * The baseline is the first *snapshot*, not the first ask. Taking it from
+     * the first ask would swallow exactly the row this exists to announce: on
+     * a roster that opened with nobody asking, the one that arrives at 18:40
+     * would look like history and be silently added to the set.
+     */
+    if (!asks.settled) return;
+    if (announced.current === null) {
+      announced.current = new Set(asks.outstanding.map((row) => row.id));
+      return;
+    }
+    for (const row of asks.outstanding) {
+      if (announced.current.has(row.id)) continue;
+      announced.current.add(row.id);
+      show(t('somebodyAsking', { name: row.name }), {
+        action: { label: t('see'), onPress: () => onAccessSheetChange(event) },
+      });
+    }
+  }, [asks.outstanding, asks.settled, show, t, onAccessSheetChange, event]);
+
   const isToday = startOfDay(event.startAt).getTime() === startOfDay(now).getTime();
 
   // The picker only offers the last month plus everything upcoming, so an event
@@ -215,14 +262,33 @@ export function EventHeader({
         <button
           type="button"
           onClick={() => onAccessSheetChange(event)}
-          aria-label={
-            restricted
-              ? t('whoCount', { count: onGathering })
-              : t('whoEveryone')
-          }
-          className="flex min-h-11 shrink-0 items-center rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
+          aria-label={[
+            restricted ? t('whoCount', { count: onGathering }) : t('whoEveryone'),
+            asking ? t('askWaiting') : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-ink-900 px-3 text-xs font-semibold text-brand-300 ring-1 ring-ink-700 hover:bg-ink-800 active:bg-ink-800 pointer-fine:min-h-9"
         >
           {restricted ? t('whosOnCount', { count: onGathering }) : t('whosOnEveryone')}
+          {/*
+            * Somebody is asking to be added, and this is the whole of how the
+            * roster says so: eight pixels, after the text, no word and no
+            * target of its own.
+            *
+            * It costs the chip no width — the select beside it keeps its
+            * measure — and it cannot push a roster row under a descending
+            * thumb, which is what ruled out every louder version of this. The
+            * sentence is in the label, where a screen reader gets it; the sheet
+            * behind the chip is where the ask actually lives.
+            */}
+          {asking ? (
+            <span
+              aria-hidden
+              data-testid="ask-waiting"
+              className="inline-block size-2 shrink-0 rounded-full bg-brand-400"
+            />
+          ) : null}
         </button>
 
         {/* The way back to the chooser. It is a link rather than a "back to

@@ -15,7 +15,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthGate } from '@/features/auth/AuthGate';
+import { AuthGate, RequireRole } from '@/features/auth/AuthGate';
 import type { ProvisionAccessResult } from '@/services/functions';
 
 const useAuth = vi.hoisted(() => vi.fn());
@@ -262,3 +262,55 @@ describe('AuthGate — let in', () => {
     await waitFor(() => expect(refreshProfile).toHaveBeenCalled());
   });
 });
+
+describe('a screen that stops being yours while you are on it', () => {
+  /*
+   * The profile is a live subscription, so an admin changing somebody's role on
+   * a Tuesday replaces whatever they were looking at with this refusal,
+   * mid-edit. "Core team only" is true and is the wrong sentence there: it
+   * reads as though they had wandered somewhere they never belonged, when what
+   * happened is that their access changed under them a second ago.
+   */
+  function allow(allowed: boolean) {
+    useAuth.mockReturnValue({ can: () => allowed });
+  }
+
+  it('says "core team only" to somebody who was never let in', () => {
+    allow(false);
+    render(
+      <MemoryRouter>
+        <RequireRole role="core">
+          <p>The settings</p>
+        </RequireRole>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Core team only')).toBeInTheDocument();
+  });
+
+  it('says the role changed to somebody who had the screen open', () => {
+    allow(true);
+    const view = render(
+      <MemoryRouter>
+        <RequireRole role="core">
+          <p>The settings</p>
+        </RequireRole>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('The settings')).toBeInTheDocument();
+
+    allow(false);
+    view.rerender(
+      <MemoryRouter>
+        <RequireRole role="core">
+          <p>The settings</p>
+        </RequireRole>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('This was open to you a minute ago')).toBeInTheDocument();
+    expect(screen.getByText(/Your role changed just now/)).toBeInTheDocument();
+    expect(screen.queryByText('Core team only')).not.toBeInTheDocument();
+  });
+});
+

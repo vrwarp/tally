@@ -40,6 +40,21 @@ vi.mock('@/hooks/useAttendance', () => ({
 
 vi.mock('@/hooks/useNow', () => ({ useNow: () => NOW }));
 
+/*
+ * Asking to be added reaches Firestore, and every screen that draws a locked
+ * gathering now offers it. Mocked at the service boundary the way the access
+ * writes above are — `src/services/accessRequests.test.ts` is where the writes
+ * themselves are pinned, and an unmocked import loads Firebase and throws on
+ * the config.
+ */
+vi.mock('@/services/accessRequests', () => ({
+  subscribeChainRequests: vi.fn(() => () => {}),
+  askToBeAdded: vi.fn(async () => {}),
+  clearAccessRequest: vi.fn(async () => {}),
+  isOutstanding: () => true,
+  ACCESS_REQUEST_LIFE_MS: 7 * 86_400_000,
+}));
+
 vi.mock('@/services/events', () => ({
   ensureMaterialized: async () => 'event-1',
   setEventStatus: async () => {},

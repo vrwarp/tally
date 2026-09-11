@@ -1,0 +1,338 @@
+/**
+ * The team-and-access journeys, photographed from the live app.
+ *
+ * Not a test — a documentation build, the same shape as `walkthrough.spec.ts`.
+ * It signs in against the seeded emulator, arranges the handful of states this
+ * campaign is about, and photographs each one as the person it was designed
+ * for would actually meet it. `scripts/build-access-walkthrough.ts` assembles
+ * the frames into `docs/uxr/access-walkthrough.html`, which is what the
+ * critique loop reads.
+ *
+ *   npx playwright test --project=chromium-desktop e2e/access-walkthrough.spec.ts
+ *   npx playwright test --project=chromium-mobile  e2e/access-walkthrough.spec.ts
+ *
+ * ## Why it arranges its own state
+ *
+ * `scripts/seed.ts` writes a restricted gathering, two link invitations, a
+ * pair of kiosks and an ask — but it runs before anybody has signed in, so it
+ * can only use placeholder uids. Every one of these screens is about a *real*
+ * person's relationship to a gathering, so the state has to be written after
+ * the sign-in that mints their uid. That is what `arrange()` below does, and
+ * it is why the seed's rows are still worth having: they are what the screens
+ * fall back to when this file is not driving them.
+ *
+ * It asserts almost nothing on purpose. A screenshot that renders is the
+ * point, and an assertion here would turn a design review into a test failure.
+ */
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Page } from '@playwright/test';
+import { gotoReady, TEAM } from './support/auth';
+import { readCollection, writeDocument } from './support/emulator';
+import { test } from './support/fixtures';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const OUT_DIR = join(repoRoot, 'docs', 'uxr', 'access-walkthrough');
+
+interface Shot {
+  file: string;
+  title: string;
+  journey: string;
+  caption: string;
+  viewport: string;
+}
+
+const shots: Shot[] = [];
+
+async function capture(page: Page, shot: Omit<Shot, 'file' | 'viewport'>): Promise<void> {
+  const viewport = test.info().project.name.includes('mobile') ? 'phone' : 'desktop';
+  const slug = shot.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const file = `${viewport}-${String(shots.length + 1).padStart(2, '0')}-${slug}.png`;
+
+  await mkdir(join(OUT_DIR, 'shots'), { recursive: true });
+  // Let toasts settle and the disclosure animations land before the shutter.
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: join(OUT_DIR, 'shots', file), fullPage: false });
+
+  shots.push({ ...shot, file, viewport });
+}
+
+/** The uid the auth emulator minted for a seeded address, once they exist. */
+async function uidOf(email: string): Promise<string> {
+  const docs = await readCollection('users');
+  const match = docs.find((entry) => entry.data.email === email);
+  if (!match) throw new Error(`No profile for ${email}; has the sign-in landed?`);
+  return match.id;
+}
+
+/**
+ * The state every frame below is about, written with the real uids.
+ *
+ * Sunday School is the narrowed one — Friday Fellowship is what nearly every
+ * other spec and walkthrough exercises, and locking it would quietly change
+ * what those screens show. Miriam is on it and Sam is not, which is the pair
+ * the whole campaign is about: the leader who can add, and the volunteer at
+ * the door who cannot work the gathering they are standing in.
+ */
+async function arrange(): Promise<{ miriam: string; sam: string; dana: string }> {
+  const [miriam, sam, dana] = await Promise.all([
+    uidOf(TEAM.core),
+    uidOf(TEAM.counselor),
+    uidOf(TEAM.admin),
+  ]);
+  const now = Date.now();
+
+  await writeDocument('eventAccess/sunday-school', {
+    chainKey: 'sunday-school',
+    restricted: true,
+    members: [miriam],
+    updatedAt: new Date(now - 21 * 86_400_000),
+    updatedBy: miriam,
+  });
+
+  // Sam, asking to be put on it — the row the sheet leads with and the dot on
+  // the chip stands for.
+  await writeDocument(`accessRequests/sunday-school__${sam}`, {
+    chainKey: 'sunday-school',
+    uid: sam,
+    name: 'Sam Whitfield',
+    askedAt: new Date(now - 20 * 60_000),
+  });
+
+  // A link waiting to be sent, and one that was used and half-worked. The
+  // second is the interesting one: its skip is the outstanding item.
+  await writeDocument('invitations/link_walkthrough0000000000000000000000000000000000000000000001', {
+    kind: 'link',
+    role: 'counselor',
+    label: 'Jo, nursery, Marie’s daughter',
+    gatherings: ['sunday-school'],
+    invitedBy: miriam,
+    invitedAt: new Date(now - 2 * 86_400_000),
+    tokenExpiresAt: new Date(now + 12 * 86_400_000),
+  });
+  await writeDocument('invitations/link_walkthrough0000000000000000000000000000000000000000000002', {
+    kind: 'link',
+    role: 'counselor',
+    label: 'Priya, Friday',
+    gatherings: ['sunday-school', 'friday-fellowship'],
+    invitedBy: miriam,
+    invitedAt: new Date(now - 6 * 86_400_000),
+    tokenExpiresAt: new Date(now + 8 * 86_400_000),
+    resolvedAt: new Date(now - 2 * 86_400_000),
+    redeemedBy: 'walkthrough-priya',
+    redeemedEmail: 'priya.raman@example.org',
+    redeemedName: 'Priya Raman',
+    placed: ['friday-fellowship'],
+    skipped: ['sunday-school'],
+  });
+
+  // The lobby tablet and the one in a drawer. A retired row is never deleted,
+  // so the person page has to be able to draw one.
+  await writeDocument('kioskDevices/kiosk-lobby-000000000001', {
+    approvedBy: miriam,
+    approvedByName: 'Miriam Achebe',
+    pairedAt: new Date(now - 30 * 86_400_000),
+    lastSeenAt: new Date(now - 20 * 60_000),
+    boundTo: 'Sunday School',
+    boundChain: 'sunday-school',
+    retiredAt: null,
+    retiredBy: null,
+  });
+  await writeDocument('kioskDevices/kiosk-drawer-00000000002', {
+    approvedBy: miriam,
+    approvedByName: 'Miriam Achebe',
+    pairedAt: new Date(now - 200 * 86_400_000),
+    lastSeenAt: new Date(now - 120 * 86_400_000),
+    boundTo: null,
+    boundChain: null,
+    retiredAt: new Date(now - 119 * 86_400_000),
+    retiredBy: dana,
+  });
+
+  return { miriam, sam, dana };
+}
+
+test('capture the access walkthrough', async ({ page, signedInAs }) => {
+  test.setTimeout(420_000);
+
+  /*
+   * Dark, for the reason the main walkthrough gives: Tally follows the device,
+   * Playwright's default prefers light, and the app's home is a dim room on a
+   * Friday night.
+   */
+  await page.emulateMedia({ colorScheme: 'dark' });
+
+  /* ---- The way in: a link, before anybody has signed in ------------------ */
+
+  /*
+   * The signed-out screen first, and from a fresh context, because the whole
+   * claim about this page is that it says what the invitation is for *before*
+   * asking anybody to sign in. A page shot from a signed-in session would be
+   * the confirm step wearing the first screen's name.
+   */
+  await page.goto('/join/walkthroughtoken00000');
+  await page.waitForTimeout(900);
+  await capture(page, {
+    journey: 'The way in',
+    title: 'A link that no longer opens anything',
+    caption:
+      'A spent or expired link says which it is rather than refusing in general. ' +
+      'The live shape of this screen — the inviter’s name and what the invitation is for — ' +
+      'needs a token that exists, which only the Team screen can mint.',
+  });
+
+  /* ---- Bringing somebody in --------------------------------------------- */
+
+  await signedInAs('admin');
+  const { sam } = await arrange();
+
+  await gotoReady(page, '/team');
+  await page.waitForTimeout(900);
+  await capture(page, {
+    journey: 'Bringing somebody in',
+    title: 'The Team screen',
+    caption:
+      'Who is already here, and who is on their way. The invite card offers two doors: ' +
+      'a link for the volunteer whose Google account nobody knows, and an address for the one ' +
+      'the church issued.',
+  });
+
+  const linkFor = page.getByLabel('Who is this for?');
+  if (await linkFor.count()) {
+    await linkFor.fill('Jo, nursery, Marie’s daughter');
+    await page.waitForTimeout(300);
+    await capture(page, {
+      journey: 'Bringing somebody in',
+      title: 'Naming who a link is for',
+      caption:
+        'Required, because a link row has no address to name it — and eight anonymous rows ' +
+        'on a Tuesday is how a season roll goes back into a spreadsheet.',
+    });
+
+    await page.getByRole('button', { name: 'Create link' }).click();
+    await page.waitForTimeout(1200);
+    await capture(page, {
+      journey: 'Bringing somebody in',
+      title: 'The link, shown once',
+      caption:
+        'Tally keeps only the hash, so this is the only time it can show the link. ' +
+        'Copy, Share, or hold up a QR for the person standing beside you.',
+    });
+
+    const qr = page.getByRole('button', { name: 'Show QR' });
+    if (await qr.count()) {
+      await qr.click();
+      await page.waitForTimeout(900);
+      await capture(page, {
+        journey: 'Bringing somebody in',
+        title: 'The QR, for the person in the room',
+        caption:
+          'Ten minutes, because its whole safety property is that both people are there. ' +
+          'A photograph of it taken over somebody’s shoulder is worth nothing by lunchtime.',
+      });
+    }
+  }
+
+  await page.reload();
+  await page.waitForTimeout(1200);
+  await capture(page, {
+    journey: 'Bringing somebody in',
+    title: 'Who is on their way, and what is still to do',
+    caption:
+      'A link says when it stops working and offers Extend. An arrival says who spent it. ' +
+      'A gathering the redemption could not add them to waits here until somebody resolves it — ' +
+      'the only place that fact is ever said.',
+  });
+
+  /* ---- The person -------------------------------------------------------- */
+
+  const person = page.getByRole('button', { name: /Sam Whitfield/ }).first();
+  if (await person.count()) {
+    await person.click();
+    await page.waitForTimeout(700);
+    await capture(page, {
+      journey: 'The person',
+      title: 'A person, gathered in one place',
+      caption:
+        'Role, when they were let in and by whom, the gatherings they are on, the kiosks they ' +
+        'paired. The 9:22 rescue is here: Team → Sam → Nursery → Add, on a phone.',
+    });
+  }
+
+  /* ---- The fence --------------------------------------------------------- */
+
+  await signedInAs('core');
+  await gotoReady(page, '/');
+  await page.waitForTimeout(900);
+  await capture(page, {
+    journey: 'The fence',
+    title: 'Tonight’s gatherings, and the ones that are not yours',
+    caption:
+      'Locked, not hidden. A counselor at a door at 6:59 who sees an empty screen concludes ' +
+      'the app is broken; one who sees a lock and a name knows what to do.',
+  });
+
+  const sundayCard = page.getByRole('link', { name: /Sunday School/ }).first();
+  if (await sundayCard.count()) {
+    await sundayCard.click();
+    await page.waitForTimeout(1500);
+    await capture(page, {
+      journey: 'The fence',
+      title: 'The roster, and who is on it',
+      caption:
+        'The chip says how many people can work this gathering. The dot beside it says ' +
+        'somebody is asking to be added — eight pixels, no word, no target of its own, ' +
+        'because a strip above the first row would push every name under a descending thumb.',
+    });
+
+    const chip = page.getByRole('button', { name: /Who|asking/ }).first();
+    if (await chip.count()) {
+      await chip.click();
+      await page.waitForTimeout(800);
+      await capture(page, {
+        journey: 'The fence',
+        title: 'Who’s on, and who is asking',
+        caption:
+          'The sheet leads with the ask, because it is the only thing here that is somebody’s ' +
+          'to do. Add puts them on; Clear says it was answered — and marks it, so the person ' +
+          'who asked can tell that from nobody having looked.',
+      });
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(400);
+    }
+  }
+
+  /* ---- The volunteer who is not on it ------------------------------------ */
+
+  await signedInAs('counselor');
+  await gotoReady(page, '/');
+  await page.waitForTimeout(900);
+  const lockedRow = page.getByRole('button', { name: /Sunday School/ }).first();
+  if (await lockedRow.count()) {
+    await lockedRow.click();
+    await page.waitForTimeout(1200);
+    await capture(page, {
+      journey: 'The fence',
+      title: 'A gathering you are not on',
+      caption:
+        'Full names, whoever opened Tally today first, and an admin unconditionally — the ' +
+        'person the list names may have been on leave since June. Under them, one button, ' +
+        'which puts your name on the Add list and never claims to be a queue.',
+    });
+  }
+
+  await mkdir(OUT_DIR, { recursive: true });
+  const viewport = test.info().project.name.includes('mobile') ? 'phone' : 'desktop';
+  await writeFile(
+    join(OUT_DIR, `${viewport}.json`),
+    `${JSON.stringify({ viewport, shots }, null, 2)}\n`,
+    'utf8',
+  );
+  // Sam's ask is left where it is: the next run re-arranges everything anyway,
+  // and a spec that tidied up would photograph a screen nobody ever sees.
+  void sam;
+});

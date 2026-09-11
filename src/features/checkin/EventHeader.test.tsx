@@ -13,7 +13,7 @@
 import { useState, type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import type * as Router from 'react-router-dom';
-import { fireEvent, render, screen, within } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
@@ -28,6 +28,21 @@ const navigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof Router>()),
   useNavigate: () => navigate,
+}));
+
+/*
+ * Asking to be added reaches Firestore, and every screen that draws a locked
+ * gathering now offers it. Mocked at the service boundary the way the access
+ * writes above are — `src/services/accessRequests.test.ts` is where the writes
+ * themselves are pinned, and an unmocked import loads Firebase and throws on
+ * the config.
+ */
+vi.mock('@/services/accessRequests', () => ({
+  subscribeChainRequests,
+  askToBeAdded: vi.fn(async () => {}),
+  clearAccessRequest: vi.fn(async () => {}),
+  isOutstanding: () => true,
+  ACCESS_REQUEST_LIFE_MS: 7 * 86_400_000,
 }));
 
 vi.mock('@/services/eventAccess', () => ({
@@ -111,7 +126,7 @@ function show({
     profile: team[0],
     can: (role: string) => role !== 'admin',
   } as unknown as AuthContextValue;
-  const toast: ToastContextValue = { toasts: [], show: vi.fn(), dismiss: vi.fn() };
+  const toast: ToastContextValue = { toasts: [], show: toastShown, dismiss: vi.fn() };
 
   render(
     <AuthContext.Provider value={auth}>
@@ -137,6 +152,23 @@ function show({
   );
 }
 
+/** What the header asked the toast provider to say. */
+const toastShown = vi.hoisted(() => vi.fn());
+
+const subscribeChainRequests = vi.hoisted(() =>
+  vi.fn((_chain: string, _onChange: (next: unknown[]) => void) => () => {}),
+);
+
+/** Publishes one snapshot of the asks on whatever chain subscribed. */
+function asking(rows: Record<string, unknown>[]) {
+  subscribeChainRequests.mockImplementation(
+    (_chain: string, onChange: (next: unknown[]) => void) => {
+      onChange(rows);
+      return () => {};
+    },
+  );
+}
+
 const select = () => screen.getByRole('combobox', { name: 'Switch event' }) as HTMLSelectElement;
 const dialog = () => document.querySelector('dialog')!;
 
@@ -154,6 +186,73 @@ describe('the chip', () => {
     show({ access: new Map([list('friday-fellowship', ['miriam', 'sam', 'dana'])]) });
 
     expect(screen.getByRole('button', { name: /2 people/ })).toHaveTextContent("Who's on · 2");
+  });
+
+  it('carries a dot while somebody is asking, and no word and no target', async () => {
+    /*
+     * Eight pixels after the text is the whole of how the roster says this.
+     * A strip above the first row would push every name down under a thumb
+     * already descending, which is the mechanism Journey 1 was rebuilt to
+     * prevent; the sheet behind the chip is where the ask actually lives.
+     */
+    asking([
+      {
+        id: 'friday-fellowship__sam',
+        chainKey: 'friday-fellowship',
+        uid: 'sam',
+        name: 'Sam Whitfield',
+        askedAt: new Date('2026-02-13T18:00:00'),
+        clearedAt: null,
+        clearedBy: null,
+      },
+    ]);
+    show({ access: new Map([list('friday-fellowship', ['miriam'])]) });
+
+    const chip = await screen.findByRole('button', { name: /asking to be added/ });
+    expect(chip).toHaveTextContent("Who's on · 1");
+    expect(within(chip).getByTestId('ask-waiting')).toBeInTheDocument();
+  });
+
+  it('announces an ask that lands while the roster is open, with one way to see it', async () => {
+    /*
+     * The row this exists for. An earlier version took its baseline from the
+     * first *ask* it saw rather than the first snapshot, which swallowed
+     * exactly this one: the arriving row looked like history and the nudge
+     * never fired for the case it was written for.
+     */
+    let deliver: ((rows: unknown[]) => void) | null = null;
+    subscribeChainRequests.mockImplementation((_chain: string, onChange: (next: unknown[]) => void) => {
+      deliver = onChange;
+      onChange([]);
+      return () => {};
+    });
+    show({ access: new Map([list('friday-fellowship', ['miriam'])]) });
+
+    await act(async () => {
+      deliver?.([
+        {
+          id: 'friday-fellowship__sam',
+          chainKey: 'friday-fellowship',
+          uid: 'sam',
+          name: 'Sam Whitfield',
+          askedAt: new Date('2026-02-13T18:40:00'),
+          clearedAt: null,
+          clearedBy: null,
+        },
+      ]);
+    });
+
+    expect(toastShown).toHaveBeenCalledWith(
+      'Sam Whitfield is asking to be added',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'See' }) }),
+    );
+  });
+
+  it('draws no dot on an open gathering, where nobody would ask', () => {
+    asking([]);
+    show();
+
+    expect(screen.queryByTestId('ask-waiting')).not.toBeInTheDocument();
   });
 
   it('opens the sheet for this gathering', async () => {

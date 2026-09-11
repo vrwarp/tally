@@ -63,9 +63,9 @@ const src = join(projectRoot, 'src');
 /*
  * An explicit config rather than the project's own.
  *
- * The four aliases are the point — they are what swaps Firestore for the
- * fixture — and the project config cannot carry them without shipping the
- * fixture in the app's build graph. Everything else here is the app's build:
+ * The aliases are the point — they are what swaps Firestore for the fixture —
+ * and the project config cannot carry them without shipping the fixture in the
+ * app's build graph. Everything else here is the app's build:
  * the same React plugin, the same Tailwind plugin, the same `@` alias, so the
  * stylesheet this freezes is the stylesheet the app paints with.
  */
@@ -78,8 +78,13 @@ const server = await createServer({
     alias: [
       { find: /^@\/context\/authContext$/, replacement: stubs },
       { find: /^@\/context\/toastContext$/, replacement: stubs },
+      { find: /^@\/context\/dataContext$/, replacement: stubs },
       { find: /^@\/services\/users$/, replacement: stubs },
       { find: /^@\/services\/access$/, replacement: stubs },
+      { find: /^@\/services\/eventAccess$/, replacement: stubs },
+      { find: /^@\/services\/kioskDevices$/, replacement: stubs },
+      { find: /^@\/services\/accessRequests$/, replacement: stubs },
+      { find: /^@\/services\/functions$/, replacement: stubs },
       { find: /^@\//, replacement: `${src}/` },
     ],
   },

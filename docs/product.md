@@ -323,6 +323,32 @@ for the core team — its numbers come from registers, so a gathering you are no
 them, and the screen names what it left out rather than quietly showing a shorter MIA list that reads
 as good news.
 
+**Asking to be added, which is deliberately not a request queue.** A counselor looking at a
+gathering they are not on sees who can add them — full names, whoever opened Tally today first,
+and an admin unconditionally, because the person the list names may have been on leave since June.
+Under those names is one button. Pressing it puts their name on the Add list, and the sentence
+afterwards says so and says what to do with their feet: the people named will see it under
+**Who's on** when they open that roster, and if they are not here, go and find them. Nothing is
+notified, nothing waits on it, and nobody is obliged to answer — the words never say "request" or
+"pending", because a status is a promise this design does not make.
+
+On the other side it is one dot. While somebody is asking, the **Who's on · 3** chip on the roster
+carries an eight-pixel mark, and the sheet behind it leads with the ask and its two verbs, Add and
+Clear. The dot costs the chip no width and cannot push a roster row under a descending thumb,
+which is what ruled out every louder version. Clearing *marks* rather than deletes, so the asker's
+own screen can say "Miriam cleared this at 7:01 — ask her in person": without that they cannot tell
+being answered from being unread, and press again next week instead of walking over. Asks live a
+week.
+
+If nobody looks, the counselor walks over exactly as they do today and the ask has cost nothing.
+That is the point of it: on most Friday evenings the real path is still saying "can you add me" out
+loud, and the ask only makes the last step one tap instead of a search.
+
+**An admin sees the fences they pass.** A narrowed gathering looks exactly like an open one to
+somebody who passes every one of them — so the one person who can fix a fence was the one person
+who could not see it. Their chooser cards and calendar rows carry a quiet `🔒 narrowed · 3`.
+Nothing is demoted and nothing moves; the fact is simply drawn.
+
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is
 still deactivating them on the Team screen.
 

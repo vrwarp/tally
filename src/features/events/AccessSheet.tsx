@@ -83,6 +83,8 @@ import { useAuth } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { approversFallback, rankApprovers } from '@/features/events/approvers';
+import { AskToBeAdded } from '@/features/events/AskToBeAdded';
+import { useChainRequests } from '@/features/events/useAccessRequests';
 import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import { isPermissionDenied } from '@/lib/permissionDenied';
@@ -95,7 +97,9 @@ import {
   reopenChain,
   restrictChain,
 } from '@/services/eventAccess';
-import type { Role, TallyEvent, UserProfile } from '@/types';
+import { clearAccessRequest } from '@/services/accessRequests';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
+import type { AccessRequest, Role, TallyEvent, UserProfile } from '@/types';
 import { useTranslations } from 'use-intl';
 
 /**
@@ -228,6 +232,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const tCommon = useTranslations('Common');
   const tEvents = useTranslations('Events');
   const tTeam = useTranslations('Team');
+  const time = useTimeFormats();
   const { access, events } = useData();
   const { profile, can } = useAuth();
   const { show } = useToast();
@@ -491,6 +496,33 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
     }
   }
 
+  /**
+   * Somebody on the gathering answering an ask — by adding them, or by saying
+   * they have dealt with it.
+   *
+   * Both clear the row, and clearing *marks* rather than deletes, which is the
+   * whole mechanism: the asker's own screen reads the mark back as "Miriam
+   * cleared this at 7:01 — ask her in person", so they can tell being answered
+   * from being unread. A delete would leave those two indistinguishable.
+   */
+  async function answerAsk(request: AccessRequest, alsoAdd: boolean) {
+    setBusy(true);
+    try {
+      if (alsoAdd) await addChainMembers(chain, [request.uid], uid);
+      await clearAccessRequest(chain, request.uid, uid);
+      show(
+        alsoAdd
+          ? t('addedFromAsk', { name: request.name })
+          : t('cleared', { name: request.name }),
+        { tone: 'success' },
+      );
+    } catch (cause) {
+      failed(cause);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function add(member: UserProfile) {
     setBusy(true);
     try {
@@ -536,6 +568,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   };
 
   /** Who could add a reader the gathering refuses, and the admin fallback. */
+  const asks = useChainRequests(restricted ? chain : null, open);
   const canAdd = !onIt ? rankApprovers(list?.members ?? [], byUid, now) : [];
   const fallback = !onIt ? approversFallback(tEvents, team) : null;
 
@@ -638,7 +671,59 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             {/* Unconditionally, after the names: an admin is always a way in,
                 and the person the list names may be on leave since June. */}
             {fallback ? <p className="pt-1 text-sm text-ink-400">{fallback}</p> : null}
-            {/* P7: ask lands here */}
+            {/* Under the names, because the names are the answer and this is
+                only the shortcut to them. */}
+            <AskToBeAdded chain={chain} approvers={canAdd} enabled={open} />
+          </section>
+        ) : null}
+
+        {/*
+          * The durable home for an ask, and the first thing on the sheet when
+          * there is one.
+          *
+          * First because it is the only item here that is somebody's to do:
+          * everything below is a list to read. It is *here*, rather than on the
+          * roster, because a strip inserted above the first roster row would
+          * push every name down under a thumb already descending — the
+          * mechanism Journey 1 was rebuilt to prevent, on the screen
+          * `e2e/layout-shift.spec.ts` holds to a landing budget of zero. What
+          * the roster carries instead is a dot on the chip that opens this.
+          */}
+        {restricted && onIt && asks.outstanding.length > 0 ? (
+          <section>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {t('askHeading')}
+            </h3>
+            <ul className="flex flex-col pt-1">
+              {asks.outstanding.map((request) => (
+                <li key={request.id} className="flex min-h-11 flex-wrap items-center gap-2 py-1">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-200">
+                    {request.name}
+                  </span>
+                  {request.askedAt ? (
+                    <span className="text-xs text-ink-500">
+                      {t('askRowWhen', { when: time.relative(request.askedAt) })}
+                    </span>
+                  ) : null}
+                  {mayAdd ? (
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void answerAsk(request, true)}
+                    >
+                      {t('addThem')}
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => void answerAsk(request, false)}
+                  >
+                    {t('clear')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null}
 

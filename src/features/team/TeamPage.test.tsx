@@ -29,6 +29,20 @@
  * to read it has to be drawn as a failure. And "already on the team" is asked
  * on the canonical address: an invitation typed `josmith@gmail.com` is the
  * profile that signed in as `jo.smith@gmail.com`.
+ *
+ * Then the screen learned to answer for people rather than only about them, and
+ * four more things became assertable:
+ *
+ * 5. The leavers fold. A suspended profile is not deleted — deleting one
+ *    orphans the attribution on every register that person took — so it moves
+ *    under a collapsed heading at the foot, which opens itself when there is
+ *    nothing above it.
+ * 6. The find field searches that fold too, and opens it on a match, because
+ *    the name a director most often types is the leaver's.
+ * 7. Ending access is armed and says what it costs, computed from the
+ *    gatherings somebody is on; un-suspending is armed for the mirror reason.
+ *    A role change is neither, and both carry Undo.
+ * 8. A row opens into the person rather than navigating to them.
  */
 import { act, render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
@@ -36,18 +50,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';
 import { TeamPage } from '@/features/team/TeamPage';
 import { makeUser } from '../../../tests/factories';
-import type { Invitation, Role, UserProfile } from '@/types';
+
+import type { AccessRequest, Invitation, Role, UserProfile, KioskDevice} from '@/types';
 
 const useAuth = vi.hoisted(() => vi.fn());
 const subscribeUsers = vi.hoisted(() => vi.fn());
-const upsertUser = vi.hoisted(() => vi.fn());
+const setAccessActive = vi.hoisted(() => vi.fn());
+const setRole = vi.hoisted(() => vi.fn());
 const subscribeInvitations = vi.hoisted(() => vi.fn());
 const inviteToTally = vi.hoisted(() => vi.fn());
 const withdrawInvitation = vi.hoisted(() => vi.fn());
 const listPinnedAdmins = vi.hoisted(() => vi.fn());
+const addChainMembers = vi.hoisted(() => vi.fn());
+const removeChainMember = vi.hoisted(() => vi.fn());
+const subscribeKioskDevices = vi.hoisted(() => vi.fn());
+const retireKioskDevice = vi.hoisted(() => vi.fn());
+const subscribeChainRequests = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/authContext', () => ({ useAuth }));
-vi.mock('@/services/users', () => ({ subscribeUsers, upsertUser }));
+/*
+ * Two writes rather than one merged profile write. Suspension leaves the
+ * stamps a safeguarding question is asked of, and a role change leaves none —
+ * so the tests below assert which call was made as much as that one was.
+ */
+vi.mock('@/services/users', () => ({ subscribeUsers, setAccessActive, setRole }));
 vi.mock('@/services/access', () => ({
   subscribeInvitations,
   inviteToTally,
@@ -66,17 +92,49 @@ vi.mock('@/services/functions', () => ({
   refreshInvitationLink: vi.fn(),
 }));
 vi.mock('@/services/eventAccess', () => ({
-  addChainMembers: vi.fn(),
+  addChainMembers,
+  removeChainMember,
   subscribeEventAccess: vi.fn(() => () => {}),
 }));
 /*
- * The invite card names gatherings, which means it reads the calendar the app
- * already holds. This screen's tests are about the roster, so it gets an empty
- * one rather than a provider: with nothing narrowed the card draws its "nothing
- * is narrowed yet" line and no tick-boxes, which is out of the way.
+ * Firebase is never initialised in this suite, and the two modules below are
+ * imported for real — for their pure predicates — which means the bootstrap
+ * they pull in at module load has to answer with something. `db` is never
+ * touched: every call that would reach it is mocked.
  */
+vi.mock('@/lib/firebase', () => ({ db: {} }));
+/*
+ * The person page reaches two collections this screen never used to touch: the
+ * device rows behind "kiosks they paired", and the week's unanswered asks on
+ * the gatherings somebody is on. Both are live subscriptions, so both are
+ * mocked as ones that deliver nothing unless a test hands them something.
+ */
+vi.mock('@/services/kioskDevices', async () => {
+  // `isKioskLive` is the real predicate: whether Retire arms is the behaviour
+  // under test, and a stub of it would be the test asserting its own answer.
+  const real = (await vi.importActual('@/services/kioskDevices')) as Record<string, unknown>;
+  return { ...real, subscribeKioskDevices, retireKioskDevice };
+});
+vi.mock('@/services/accessRequests', async () => {
+  const real = (await vi.importActual('@/services/accessRequests')) as Record<string, unknown>;
+  return { ...real, subscribeChainRequests };
+});
+/*
+ * The calendar the app already holds, which the invite card and the person
+ * panel both name gatherings out of. Most of this file's tests are about the
+ * roster and get an empty one — with nothing narrowed the card draws its
+ * "nothing is narrowed yet" line and no tick-boxes, which is out of the way —
+ * and the ones that are about gatherings push a calendar into `narrowed`.
+ */
+const narrowed = vi.hoisted(
+  () => ({ events: [], series: [], access: new Map() }) as {
+    events: unknown[];
+    series: { id: string; title: string }[];
+    access: Map<string, { id: string; restricted: boolean; members: Set<string> }>;
+  },
+);
 vi.mock('@/context/dataContext', () => ({
-  useData: () => ({ events: [], series: [], access: new Map() }),
+  useData: () => narrowed,
 }));
 
 type UsersListener = (users: UserProfile[]) => void;
@@ -150,10 +208,29 @@ beforeEach(() => {
     return () => {};
   });
 
-  upsertUser.mockResolvedValue(undefined);
+  setAccessActive.mockResolvedValue(undefined);
+  setRole.mockResolvedValue(undefined);
+  addChainMembers.mockResolvedValue(undefined);
+  removeChainMember.mockResolvedValue(undefined);
+  retireKioskDevice.mockResolvedValue(undefined);
   inviteToTally.mockResolvedValue(undefined);
   withdrawInvitation.mockResolvedValue(undefined);
   listPinnedAdmins.mockResolvedValue({ data: { emails: [] } });
+
+  subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+    next([]);
+    return () => {};
+  });
+  subscribeChainRequests.mockImplementation(
+    (_chain: string, next: (requests: AccessRequest[]) => void) => {
+      next([]);
+      return () => {};
+    },
+  );
+
+  narrowed.events = [];
+  narrowed.series = [];
+  narrowed.access = new Map();
 
   useAuth.mockReturnValue({ profile: ADMIN, can: () => true });
 });
@@ -596,5 +673,352 @@ describe('TeamPage — what a core member may do', () => {
     renderTeam();
 
     expect(screen.getByText('Loading the team')).toBeInTheDocument();
+  });
+});
+
+/*
+ * The leavers, folded.
+ *
+ * A ministry's roster accumulates the people who left, and they used to be
+ * scattered through it in alphabetical order wearing a red badge — so the list
+ * every core member reads was a memorial as much as a working team. They move
+ * to a collapsed section at the foot, in the "Not yours" idiom the chooser
+ * already uses, and nothing is ever deleted: a deleted profile orphans the
+ * attribution on every register that person took, and the next sign-in would
+ * re-provision them from an invitation nothing consumes.
+ */
+describe('TeamPage — the list folds its leavers', () => {
+  const GONE = makeUser({
+    id: 'user-9',
+    email: 'marcus@example.org',
+    displayName: 'Marcus Webb',
+    active: false,
+  });
+
+  function arrive(members: UserProfile[] = [ADMIN, MATE, GONE]) {
+    const user = userEvent.setup();
+    renderTeam();
+    act(() => usersListener(members));
+    deliverInvitations([]);
+    return user;
+  }
+
+  it('takes a suspended row out of the working list and folds it', () => {
+    arrive();
+
+    const fold = screen.getByText('No longer on the team · 1');
+    expect(fold).toBeInTheDocument();
+    // Still on the screen, and still under the reader's own control — folded is
+    // not hidden. `details` keeps its contents in the DOM either way, so what
+    // the assertion is about is which list holds the row.
+    const section = fold.closest('details');
+    expect(within(section as HTMLElement).getByText('Marcus Webb')).toBeInTheDocument();
+    expect(within(section as HTMLElement).queryByText('Sam Counselor')).not.toBeInTheDocument();
+  });
+
+  it('stays shut while there is a working team above it', () => {
+    arrive();
+
+    expect(screen.getByText('No longer on the team · 1').closest('details')).not.toHaveAttribute(
+      'open',
+    );
+  });
+
+  it('opens itself when there is nothing above it', () => {
+    // The moment somebody needs to understand what they are looking at: a card
+    // that drew a heading and no rows would read as a roster that failed.
+    arrive([GONE]);
+
+    expect(screen.getByText('No longer on the team · 1').closest('details')).toHaveAttribute(
+      'open',
+    );
+    // And nothing above it claiming nobody matched: no search is running, so
+    // there is no query for a sentence to quote back.
+    expect(screen.queryByText(/Nobody on the team matches/)).not.toBeInTheDocument();
+  });
+
+  it('offers no way to delete anybody, and says why on the screen', async () => {
+    const user = arrive();
+
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('How Tally decides who may sign in'));
+    expect(screen.getByText(/Nobody is ever deleted here/)).toBeInTheDocument();
+    expect(screen.getByText(/attribution on every register/)).toBeInTheDocument();
+  });
+});
+
+/*
+ * Find by name — and the fold is part of what it searches, because the person a
+ * director most often looks for by name is the one who left in June.
+ */
+describe('TeamPage — finding somebody', () => {
+  const GONE = makeUser({
+    id: 'user-9',
+    email: 'marcus@example.org',
+    displayName: 'Marcus Webb',
+    active: false,
+  });
+
+  /** Nine profiles: enough that the screen offers to search them. */
+  function crowd(): UserProfile[] {
+    const filler = Array.from({ length: 6 }, (_, index) =>
+      makeUser({
+        id: `filler-${index}`,
+        email: `volunteer${index}@example.org`,
+        displayName: `Volunteer ${index}`,
+      }),
+    );
+    return [ADMIN, MATE, GONE, ...filler];
+  }
+
+  function arrive(members = crowd()) {
+    const user = userEvent.setup();
+    renderTeam();
+    act(() => usersListener(members));
+    deliverInvitations([]);
+    return user;
+  }
+
+  it('is not offered to a ministry small enough to read', () => {
+    arrive([ADMIN, MATE]);
+
+    expect(screen.queryByPlaceholderText('Find by name')).not.toBeInTheDocument();
+  });
+
+  it('narrows the list to the name typed', async () => {
+    const user = arrive();
+
+    await user.type(screen.getByPlaceholderText('Find by name'), 'Sam');
+
+    expect(screen.getByText('Sam Counselor')).toBeInTheDocument();
+    expect(screen.queryByText('Volunteer 1')).not.toBeInTheDocument();
+  });
+
+  it('searches the fold and opens it on a match', async () => {
+    const user = arrive();
+
+    await user.type(screen.getByPlaceholderText('Find by name'), 'Marcus');
+
+    const fold = screen.getByText('No longer on the team · 1').closest('details');
+    expect(fold).toHaveAttribute('open');
+    expect(within(fold as HTMLElement).getByText('Marcus Webb')).toBeInTheDocument();
+    // Nobody active matches, so the working list says so rather than going
+    // silent above an answer sitting folded underneath.
+    expect(screen.getByText('Nobody on the team matches “Marcus”.')).toBeInTheDocument();
+  });
+
+  it('says so when the name is on neither list', async () => {
+    const user = arrive();
+
+    await user.type(screen.getByPlaceholderText('Find by name'), 'Quentin');
+
+    expect(screen.getByText('Nobody on the team matches “Quentin”.')).toBeInTheDocument();
+    expect(screen.queryByText('No longer on the team · 1')).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * Ending access is the one act on this screen that takes something away from
+ * somebody who may be standing at a door, so it is armed: a press, a sentence
+ * computed from what the app knows, a second press. Un-suspending is armed for
+ * the mirror reason — membership survives suspension by design, so one tap on a
+ * folded row would otherwise return a former leader to Nursery in silence.
+ */
+describe('TeamPage — ending and restoring access', () => {
+  const MARCUS = makeUser({
+    id: 'user-9',
+    email: 'marcus@example.org',
+    displayName: 'Marcus Webb',
+    role: 'core',
+  });
+
+  /** Two narrowed gatherings, and Marcus is the last person on one of them. */
+  function narrowTwo() {
+    narrowed.series = [
+      { id: 'sunday-school', title: 'Sunday School' },
+      { id: 'nursery', title: 'Nursery' },
+    ];
+    narrowed.access = new Map([
+      [
+        'sunday-school',
+        { id: 'sunday-school', restricted: true, members: new Set([MARCUS.id, MATE.id]) },
+      ],
+      ['nursery', { id: 'nursery', restricted: true, members: new Set([MARCUS.id]) }],
+    ]);
+  }
+
+  function arrive(member: UserProfile = MARCUS) {
+    const user = userEvent.setup();
+    renderTeam();
+    act(() => usersListener([ADMIN, MATE, member]));
+    deliverInvitations([]);
+    return user;
+  }
+
+  it('writes nothing on the first press, and says what the second would do', async () => {
+    narrowTwo();
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+
+    expect(setAccessActive).not.toHaveBeenCalled();
+    expect(screen.getByText(/Ends Marcus Webb’s access now, on every device\./)).toBeInTheDocument();
+    expect(screen.getByText(/They are on Nursery and Sunday School\./)).toBeInTheDocument();
+    // The consequence nobody holds in their head: after this, only an admin can
+    // put anybody on Nursery.
+    expect(
+      screen.getByText(/only person left on Nursery, so afterwards only an admin/),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about kiosks, because suspending stops none of them', async () => {
+    narrowTwo();
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+
+    // A kiosk holds its own identity; the clause that used to be here was
+    // frightening admins out of a correct act.
+    expect(screen.queryByText(/kiosk/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the row alone on "Leave it"', async () => {
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Leave it' }));
+
+    expect(setAccessActive).not.toHaveBeenCalled();
+    expect(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' })).toBeChecked();
+  });
+
+  it('ends access on the confirming press, and stamps who did it', async () => {
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, end access' }));
+
+    await waitFor(() =>
+      expect(setAccessActive).toHaveBeenCalledWith(MARCUS.id, false, ADMIN.id),
+    );
+  });
+
+  it('offers Undo on the toast, which puts the access back', async () => {
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, end access' }));
+    await screen.findByText('Marcus Webb’s access has ended');
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(setAccessActive).toHaveBeenLastCalledWith(MARCUS.id, true, ADMIN.id));
+  });
+
+  it('arms the way back too, with the mirror sentence', async () => {
+    // Membership survives suspension, so one tap on a folded row would return a
+    // former leader to Nursery with nothing on screen saying so.
+    narrowTwo();
+    const user = arrive({ ...MARCUS, active: false });
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+
+    expect(setAccessActive).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Restores Marcus Webb as Core team, on Nursery and Sunday School.'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Yes, restore' }));
+    await waitFor(() => expect(setAccessActive).toHaveBeenCalledWith(MARCUS.id, true, ADMIN.id));
+  });
+
+  it('says so when the write fails, rather than nothing', async () => {
+    setAccessActive.mockRejectedValue(new Error('offline'));
+    const user = arrive();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Marcus Webb may sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, end access' }));
+
+    expect(await screen.findByText('Could not save that change.')).toBeInTheDocument();
+  });
+});
+
+/*
+ * A role is reversible and takes nothing away that a second tap cannot return,
+ * so it costs one press and the toast carries the way back. Arming it as well
+ * would teach an admin to confirm without reading, which is the one thing the
+ * suspension's arm step cannot afford.
+ */
+describe('TeamPage — changing a role', () => {
+  it('writes on the first press, with no sentence to confirm', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Role for Sam Counselor' }),
+      'core',
+    );
+
+    await waitFor(() => expect(setRole).toHaveBeenCalledWith(MATE.id, 'core'));
+    expect(screen.queryByRole('button', { name: 'Yes, end access' })).not.toBeInTheDocument();
+  });
+
+  it('offers Undo, which puts back the role they had', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Role for Sam Counselor' }),
+      'admin',
+    );
+    await screen.findByText('Sam Counselor is now Admin');
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    await waitFor(() => expect(setRole).toHaveBeenLastCalledWith(MATE.id, 'counselor'));
+  });
+});
+
+/*
+ * The row opens rather than navigating. What is inside it is `PersonPanel`'s
+ * own business and has its own tests; what matters here is that the name is the
+ * door, that one row opens at a time, and that the list is still under it.
+ */
+describe('TeamPage — a row opens into the person', () => {
+  it('opens on the name and closes on the same press', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    const name = screen.getByRole('button', { name: /Sam Counselor/ });
+    expect(name).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(name);
+    expect(screen.getByRole('button', { name: /Sam Counselor/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('Invited by')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Sam Counselor/ }));
+    expect(screen.queryByText('Invited by')).not.toBeInTheDocument();
+  });
+
+  it('keeps one open at a time', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    await user.click(screen.getByRole('button', { name: /Sam Counselor/ }));
+    await user.click(screen.getByRole('button', { name: /Ada Admin/ }));
+
+    expect(screen.getByRole('button', { name: /Sam Counselor/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.getAllByText('Invited by')).toHaveLength(1);
   });
 });

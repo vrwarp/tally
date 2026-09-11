@@ -1210,6 +1210,16 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Auth.roleChangedTitle": {
+    "source": "This was open to you a minute ago",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Auth.roleChangedBody": {
+    "source": "Your role changed just now, so this part of Tally is no longer yours. Checking students in still is. Ask an admin if that was not meant to happen.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Auth.backToCheckIn": {
     "source": "Back to check-in",
     "zh-Hans": "machine",
@@ -2811,6 +2821,21 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventHeader.somebodyAsking": {
+    "source": "{name} is asking to be added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.see": {
+    "source": "See",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "EventHeader.askWaiting": {
+    "source": "Somebody is asking to be added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Theme.cardTitle": {
     "source": "Appearance",
     "zh-Hans": "machine",
@@ -3518,7 +3543,7 @@
     "zh-Hant": "machine"
   },
   "Team.howBody": {
-    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost.",
+    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost. Nobody is ever deleted here. A profile is the attribution on every register that person took, and since nothing consumes an invitation, deleting one would only let their next sign-in put them back at the rank it carries — so ending somebody’s access is what removes them, and their row moves under “No longer on the team”.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3687,11 +3712,6 @@
   },
   "Team.withdrawWarning": {
     "source": "This deletes the invitation for good.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Team.memberUpdated": {
-    "source": "{name} updated",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -4007,6 +4027,246 @@
   },
   "Team.askSomebodyOnIt": {
     "source": "Ask somebody on {gathering} to add them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.you": {
+    "source": "(you)",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.suspended": {
+    "source": "Suspended",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.roleChanged": {
+    "source": "{name} is now {role}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.accessEnded": {
+    "source": "{name}’s access has ended",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.accessRestored": {
+    "source": "{name} is back on the team",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.armSuspend": {
+    "source": "Ends {name}’s access now, on every device.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.armSuspendOn": {
+    "source": "They are on {gatherings}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.armSuspendSole": {
+    "source": "{count, plural, one {They are the only person left on {gatherings}, so afterwards only an admin could put anybody on it.} other {They are the only person left on {gatherings}, so afterwards only an admin could put anybody on them.}}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.armRestore": {
+    "source": "Restores {name} as {role}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.armRestoreOn": {
+    "source": "Restores {name} as {role}, on {gatherings}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.leaveItAsIs": {
+    "source": "Leave it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.yesEndAccess": {
+    "source": "Yes, end access",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.yesRestore": {
+    "source": "Yes, restore",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.findLabel": {
+    "source": "Find somebody by name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.findPlaceholder": {
+    "source": "Find by name",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.noMatch": {
+    "source": "Nobody on the team matches “{query}”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.noLongerOnTeam": {
+    "source": "No longer on the team · {count}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.factInvitedBy": {
+    "source": "Invited by",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.factAccessBegan": {
+    "source": "Access began",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.factAccessEnded": {
+    "source": "Access ended",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.factAccessRestored": {
+    "source": "Access restored",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.endedByWhen": {
+    "source": "{when} · by {name}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitedByDeployment": {
+    "source": "The deployment",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.invitedByNotRecorded": {
+    "source": "Not recorded (before {when})",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.gatheringsHeading": {
+    "source": "Gatherings",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.panelNothingNarrowed": {
+    "source": "Nothing is narrowed, so everybody on the team can work every gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.onGathering": {
+    "source": "On it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.notOnGathering": {
+    "source": "Not on it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.alwaysOn": {
+    "source": "Always",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.addToGathering": {
+    "source": "Add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.removedFromGathering": {
+    "source": "{name} is off {gathering}.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.removeFromGatheringFailed": {
+    "source": "Could not take them off. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kiosksHeading": {
+    "source": "Kiosks they paired",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kiosksNone": {
+    "source": "None.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kiosksNotLoaded": {
+    "source": "Couldn’t check the kiosks.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kioskLive": {
+    "source": "Recording {gathering} right now",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kioskIdle": {
+    "source": "Paired {when} · not recording",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kioskRetiredOn": {
+    "source": "Retired {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.retireKiosk": {
+    "source": "Retire",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.retireLiveWarning": {
+    "source": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.keepItRunning": {
+    "source": "Keep it",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.yesRetire": {
+    "source": "Yes, retire",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.kioskRetiredToast": {
+    "source": "{device} retired. It stops recording at its next tap; the row stays as the record of what it took.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.retireKioskFailed": {
+    "source": "Could not retire that kiosk. Try again in a moment.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.asksHeading": {
+    "source": "Asked to be added this week",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.askRow": {
+    "source": "{name} · {gathering} · {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.mailboxNote": {
+    "source": "{address} looks like a shared mailbox. One account is one person in Tally: if several people sign in to this one, every register any of them takes is filed under this name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Team.noHistoryNote": {
+    "source": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5138,6 +5398,71 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Access.askHeading": {
+    "source": "Asking to be added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askToBeAdded": {
+    "source": "Ask to be added",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.asked": {
+    "source": "Your name is on the Add list for {names} — they’ll see it under Who’s on when they open this roster. If they’re not here, go and find them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askedNobodyNamed": {
+    "source": "Your name is on the Add list for this gathering. Anybody on it will see it under Who’s on. If nobody is here, go and find a leader.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askFailed": {
+    "source": "Could not put your name on the list. Ask a leader instead.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askedAlready": {
+    "source": "Your name is on the Add list.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askCleared": {
+    "source": "{name} cleared this at {when} — ask them in person.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askClearedNoName": {
+    "source": "Somebody cleared this at {when} — ask a leader in person.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.askRowWhen": {
+    "source": "asked {when}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.clear": {
+    "source": "Clear",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.cleared": {
+    "source": "Cleared {name}’s ask.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.addedFromAsk": {
+    "source": "{name} is on this gathering.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Access.addThem": {
+    "source": "Add",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "EventDetail.notFoundTitle": {
     "source": "That event is not here",
     "zh-Hans": "machine",
@@ -5951,6 +6276,11 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Events.lockedCatchUp": {
+    "source": "You came to take this gathering’s register. You are not on it, so the register is not yours to take — ask one of these to add you.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
   "Events.justTakenOff": {
     "source": "You've just been taken off this gathering.",
     "zh-Hans": "todo",
@@ -6043,6 +6373,11 @@
     "context": "The button that opens the icon grid, shown when it is closed. A verb: it invites picking a different icon.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Events.narrowedTag": {
+    "source": "🔒 narrowed · {count, number}",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "EventIcons.event": {
     "source": "Event",

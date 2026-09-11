@@ -26,21 +26,36 @@ export function Identity({
   suffix,
   badge,
   meta,
+  phrasing = false,
 }: {
   title: string;
   suffix?: ReactNode;
   badge?: ReactNode;
   meta: ReactNode;
+  /**
+   * Draw the block out of `span`s rather than a `div` and a `p`.
+   *
+   * For the one caller that puts a whole identity inside a `<button>` — the
+   * Team row, where the name is the control that opens the person. A button may
+   * only contain phrasing content, so a `div` and a `p` in there are invalid
+   * markup, and the browsers that do not simply tolerate it close the paragraph
+   * early and leave the rest of the name outside the target. The layout is
+   * identical: `block` on a `span` is what a `p` was doing anyway. A caller
+   * passing this has to pass a `span` as its `meta` too.
+   */
+  phrasing?: boolean;
 }) {
+  const Box = phrasing ? 'span' : 'div';
+  const Line = phrasing ? 'span' : 'p';
   return (
-    <div className="min-w-0">
-      <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink-50">
+    <Box className={phrasing ? 'block min-w-0' : 'min-w-0'}>
+      <Line className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink-50">
         <span className="min-w-0 truncate">{title}</span>
         {suffix}
         {badge}
-      </p>
+      </Line>
       {meta}
-    </div>
+    </Box>
   );
 }
 
