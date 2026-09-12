@@ -921,8 +921,15 @@ function chooseDevice(
  * Show the browser's device chooser, then ask whatever was picked what it is.
  *
  * The one place a user gesture is required, which is why it is only ever reached
- * from a button on the printer screen. Everything after pairing — reopening at
- * boot, printing, reading status — needs none.
+ * from a button pressed directly — the printer screen's primary, and the
+ * chooser's connect, which calls this in place rather than sending a volunteer
+ * through a screen to press a second button for the same errand. Everything
+ * after pairing — reopening at boot, printing, reading status — needs none.
+ *
+ * "Directly" is load-bearing on the chooser: `requestDevice` needs transient
+ * activation and an `await import` spends it, so the chunk has to be resident
+ * before the press. That is what `wantsPrinting` widening to the day's list
+ * buys — see `KioskApp`.
  *
  * `next` is what the screen was showing when the button was pressed, and it is
  * the fallback rather than the answer: a printer that names itself on the bus
@@ -1055,6 +1062,29 @@ export async function checkPrinter(): Promise<PrinterDetection | null> {
   const matched = status ? suggested(status, model) : [];
   const label = preferredLabel(matched)?.identifier ?? config?.label ?? active.label;
   if (label !== config?.label) await configure({ model, label });
+
+  /*
+   * Whether either answer above had to be guessed, written where the answering
+   * happens.
+   *
+   * The chooser's strip has no `PrinterDetection` — it has a config and a state
+   * — so without this it reported a guessed roll as a green *Printer connected*
+   * while this screen was calling the same fact amber. `configure` writes the
+   * two fields without it, which is the right clearing rule for free: a
+   * volunteer who picks the other roll by hand has answered the question, so it
+   * stops being a guess.
+   *
+   * A failed status read leaves the flag alone rather than inventing a guess:
+   * nothing was sensed, so nothing was guessed, and the state line is already
+   * saying the printer did not answer.
+   */
+  const guessed =
+    status === null ? config?.guessed === true : detected === null || matched.length !== 1;
+  if (guessed !== (config?.guessed === true)) {
+    const settled: PrinterConfig = { model, label, ...(guessed ? { guessed: true } : {}) };
+    writePrinterConfig(settled);
+    config = settled;
+  }
 
   return { config: { model, label }, modelFromPrinter: detected !== null, matched, status };
 }

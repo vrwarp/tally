@@ -39,6 +39,7 @@
  *                             and the staff menu (`none` on the staff menu: nothing to print)
  *   ?labels=all|some|none     which chooser rows belong to a gathering that prints  (default none)
  *   ?events=none              no gatherings today at all — the printer door on an empty page
+ *   ?cancelled=1              the chooser after a browser device list that came back empty
  *   ?rooms=long               the rooms named the way a church names them — "Fellowship Hall",
  *                             "Room 201, upstairs" — so the meta line's wrap is photographed
  *   ?detected=plain|guessed|unknown
@@ -438,6 +439,10 @@ function outcomeFor(buffer: string, nobody: boolean): KioskSearchOutcome {
    component and no exports as a mistake. */
 export function Kiosk() {
   const [buffer, setBuffer] = useState(params.get('buffer') ?? '');
+  /* The chooser's pick lives in `KioskApp` now, so that it survives the printer
+     door. Here it lives in the harness for the same reason the app holds it:
+     the shooter drives a row by pressing it, and the screen has to remember. */
+  const [chooserPick, setChooserPick] = useState<string | null>(null);
   const onKey = (key: KioskKey) => {
     if (key.kind === 'char') setBuffer((typed) => typed + key.value);
     else if (key.kind === 'backspace') setBuffer((typed) => typed.slice(0, -1));
@@ -484,6 +489,10 @@ export function Kiosk() {
       <PrinterScreen
         printing={printingHandle(state)}
         config={PRINTER_CONFIG}
+        /* `?printer=idle` is the kiosk nobody has given a printer; every other
+           state implies one was stored, which is what `hasConfig` reports. */
+        hasConfig={state.kind !== 'idle'}
+        gatheringPrints={midEvening}
         printedTonight={midEvening ? PRINTED_TONIGHT : []}
         onReprint={() => {}}
         onReprintByName={midEvening ? () => {} : undefined}
@@ -521,7 +530,20 @@ export function Kiosk() {
         // nobody has given a printer, which is the frame every earlier
         // campaign shot.
         printerState={printerStateFor()}
+        printerConfigured={params.get('printer') !== null && params.get('printer') !== 'idle'}
+        printerGuessed={params.get('detected') === 'guessed'}
+        printerModel={PRINTER_CONFIG.model}
+        /* The chunk is always in hand in the harness: the waiting slot is shot
+           with `?printer=looking`, which is the other wait it stands for. */
+        printingReady
+        listCameBackEmpty={params.get('cancelled') === '1'}
         onSetUpPrinter={() => {}}
+        onConnectPrinter={() => {}}
+        onLookAgain={() => {}}
+        onPrintTestLabel={() => {}}
+        onPrintingRows={() => {}}
+        selectedKey={chooserPick}
+        onSelect={setChooserPick}
         onBound={() => {}}
       />
     );

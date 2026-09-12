@@ -269,6 +269,30 @@ printer frames, the primary at one y on every one of them.
 Per direction, as the ideators committed to them — the prototype is thrown
 away; these sentences are what survive.
 
+**Built.** Both are in `src/` as described below. Three things were settled at
+the keyboard rather than on a frame, and are worth knowing:
+
+- **`unsupported` draws no control in the strip.** The specification lumped it
+  in with trouble, under *Look again*. A browser that cannot talk to USB will
+  not start being able to because somebody asked again, so it keeps the amber
+  line and offers no press — which is the campaign's own rule (the state line
+  names a press only when that press is in the slot) applied to the one fault
+  with nothing behind it.
+- **The slot is gated on the panel.** On a day when nothing prints and this
+  kiosk has never had a printer there is no panel, and the connect goes with
+  it: the foot is the door alone. Drawn from the predicates as written, the
+  connect survived into a frame with no sentence to explain it.
+- **The `guessed` flag is written by `checkPrinter`, not by `pairPrinter`.**
+  Both doors reach it, and it is where the detection is computed. `configure`
+  writes the two fields without the flag, which gives the clearing rule for
+  free: a volunteer who picks the other roll by hand has answered the
+  question, so it stops being a guess. A failed status read leaves the flag
+  alone rather than inventing one.
+
+The chooser's own tests now cover the strip's states, the printer screen's
+cover the new copy and the mid-evening verb map, and the module's cover both
+directions of the guessed flag.
+
 ### Shared by every chooser direction
 
 - **`printerConfigured`.** Pass `printerConfig !== null` (read once at mount,

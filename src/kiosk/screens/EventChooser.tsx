@@ -48,6 +48,7 @@ import { useTap } from "../components/tapGuard";
 import type { KioskEventEntry, KioskServices } from "../KioskApp";
 import type { KioskBinding } from "../binding";
 import type { PrinterState } from "../printing";
+import { usePrinterNote } from "../printerNote";
 import { useLocale, useTranslations } from "use-intl";
 
 function dayLabel(locale: string, startAtMs: number, nowMs: number): string {
@@ -80,16 +81,92 @@ function timeLabel(locale: string, ms: number): string {
   });
 }
 
+/**
+ * One gathering on this list, named so a pick survives leaving the screen.
+ *
+ * The chain alone is not enough — two sittings of one Wednesday share it, which
+ * is the misbinding this whole list was narrowed to today to prevent — so the
+ * start is what tells them apart. Same pair the rows are keyed by.
+ */
+function entryKey(entry: KioskEventEntry): string {
+  return `${entry.chain}:${entry.startAt}`;
+}
+
 export function EventChooser({
   services,
   printerState,
+  printerConfigured,
+  printerGuessed = false,
+  printerModel,
+  printingReady,
+  listCameBackEmpty = false,
   onSetUpPrinter,
+  onConnectPrinter,
+  onLookAgain,
+  onPrintTestLabel,
+  onPrintingRows,
+  selectedKey = null,
+  onSelect,
   onBound,
 }: {
   services: KioskServices;
   /** Null when this kiosk has no printer and nothing has asked for one yet. */
   printerState: PrinterState | null;
+  /**
+   * Whether this kiosk has a printer stored, which is a different question from
+   * whether one is answering right now.
+   *
+   * From `printerConfig !== null`, never from `printerState !== null`: the
+   * module initialises `idle` and emits it before `ready()` has looked at the
+   * bus, so on a kiosk that kept last week's printer `idle` is the first second
+   * of every boot rather than evidence of anything. Without this the strip said
+   * *No printer on this kiosk* at exactly the moment a volunteer was reading it.
+   */
+  printerConfigured: boolean;
+  /** Whether the stored model or roll had to be guessed — see `PrinterConfig`. */
+  printerGuessed?: boolean;
+  /** The stored model, named in the ready line so the fact is checkable. */
+  printerModel?: string;
+  /**
+   * Whether the printing chunk has landed.
+   *
+   * The connect is drawn before any row is tapped, so the chunk has to be in
+   * memory before the press — `requestDevice` needs transient activation and an
+   * `await import` spends it. Until then the slot holds its place at forward
+   * weight and says it is waiting.
+   */
+  printingReady: boolean;
+  /** Whether the last connect came back from the browser with nothing picked. */
+  listCameBackEmpty?: boolean;
   onSetUpPrinter: () => void;
+  /**
+   * The three things the strip's filled control can do, all of them in place.
+   *
+   * None of them navigates. A control whose word is *Connect the printer again*
+   * and whose effect is *open a screen with another button on it* is not true at
+   * the moment it is read, and unpaired — the Android Sunday — is the one state
+   * only a human press on the browser's chooser can fix.
+   */
+  onConnectPrinter: () => void;
+  onLookAgain: () => void;
+  onPrintTestLabel: () => void;
+  /**
+   * Called once the list has arrived, with whether any gathering still bindable
+   * today prints. What loads the printing chunk on a kiosk that has no printer
+   * of its own yet — the Sunday this whole screen is about.
+   */
+  onPrintingRows: (any: boolean) => void;
+  /**
+   * The picked row, held by `KioskApp` rather than here.
+   *
+   * By `chain:startAt` rather than by index, because the door to the printer
+   * screen unmounts this component and the list is refetched on the way back:
+   * an index would point at whatever row had moved into that slot. Identity
+   * survives the round trip, which is the whole point — *Back to the
+   * gatherings* lands on the row still ringed.
+   */
+  selectedKey?: string | null;
+  onSelect: (key: string | null) => void;
   onBound: (binding: KioskBinding) => void;
 }) {
   /*
@@ -100,13 +177,17 @@ export function EventChooser({
    * event`.
    */
   const t = useTranslations("Chooser");
+  // The printer's own words, borrowed rather than restated: *Look again* and
+  // *Looking for the printer…* mean the same thing on both screens, and two
+  // catalogue entries for one sentence is how they stop meaning it.
+  const tPrinter = useTranslations("Printer");
+  const printerNote = usePrinterNote();
   // The kiosk's language, not the tablet's: the dates on these rows are
   // formatted against it. See `eventWindow` in ../binding.ts.
   const locale = useLocale();
   const tap = useTap();
   const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [selected, setSelected] = useState<number | null>(null);
   const [binding, setBinding] = useState(false);
   const nowMs = useMemo(() => Date.now(), []);
 
@@ -142,6 +223,19 @@ export function EventChooser({
     [received, dayEndMs, nowMs],
   );
 
+  /**
+   * The picked row, resolved from the key `KioskApp` is holding.
+   *
+   * An index would not survive the printer door: this component unmounts, the
+   * list is refetched on the way back, and slot 2 is whatever sorted into slot
+   * 2 that time. The key is the gathering.
+   */
+  const selected = useMemo(() => {
+    if (selectedKey === null || !entries) return null;
+    const index = entries.findIndex((entry) => entryKey(entry) === selectedKey);
+    return index === -1 ? null : index;
+  }, [entries, selectedKey]);
+
   /** The row the commit button is about, or null while nothing is picked. */
   const selectedEntry =
     selected === null ? null : (entries?.[selected] ?? null);
@@ -164,6 +258,35 @@ export function EventChooser({
   }, [services]);
 
   /**
+   * Gatherings on this list that print and can still be bound.
+   *
+   * Ended rows are out: a sentence about tonight must not name a gathering that
+   * finished at six. The *mark* on the row stays on them, because that is a fact
+   * about the gathering rather than about tonight.
+   */
+  const bindablePrinting = useMemo(
+    () =>
+      entries?.filter(
+        (entry) => entry.labelTemplate !== null && nowMs <= entry.endAt,
+      ) ?? [],
+    [entries, nowMs],
+  );
+
+  /*
+   * What fetches the printing chunk on a kiosk that has never had a printer.
+   *
+   * The connect is drawn before any row is touched — the hold path never picks
+   * one — so the module has to be resident before the first press or the only
+   * control on the screen opens a waiting box. `requestDevice` needs transient
+   * activation and an `await import` spends it, which is why this cannot wait
+   * for the tap that needs it.
+   */
+  useEffect(() => {
+    if (entries === null) return;
+    onPrintingRows(bindablePrinting.length > 0);
+  }, [entries, bindablePrinting, onPrintingRows]);
+
+  /**
    * Sets the kiosk to one row, from either way in — a held row, or the button.
    *
    * `setSelected` even though the screen is about to be replaced: a bind takes
@@ -174,7 +297,7 @@ export function EventChooser({
   const bind = async (index: number) => {
     const entry = entries?.[index];
     if (!entry || binding) return;
-    setSelected(index);
+    onSelect(entryKey(entry));
     setBinding(true);
     try {
       const bound = await services.bindEntry(entry);
@@ -184,6 +307,183 @@ export function EventChooser({
       setFailed(true);
     }
   };
+
+  /* ---- The printer, in the foot ----------------------------------------
+   *
+   * The whole of it is decided here rather than inside the JSX, because the
+   * three parts have to agree: the state line names a press only when that
+   * press is in the slot, and the slot is what the line is about.
+   */
+
+  const kind = printerState?.kind;
+  /**
+   * The printer is a known negative and a person can act on it now.
+   *
+   * `unpaired && searching` is deliberately not a fault: those are the first
+   * ten seconds after a wake, while the boot retries are still looking, and a
+   * kiosk that has not finished looking must not accuse itself.
+   */
+  const fault =
+    printerState !== null &&
+    (kind === "trouble" ||
+      kind === "unsupported" ||
+      (kind === "unpaired" && !printerState.searching));
+  /**
+   * The kiosk has a printer and does not yet know whether it can see it.
+   *
+   * One predicate, shared by the sentence, the slot and the commit's sub-line —
+   * they used to disagree, so the panel said it was still looking over a button
+   * asserting the printer needed connecting.
+   */
+  const stillLooking =
+    printerConfigured &&
+    (printerState === null ||
+      kind === "idle" ||
+      (kind === "unpaired" && printerState.searching));
+  const ready = kind === "ready";
+  const selectedPrints =
+    selectedEntry !== null &&
+    selectedEntry.labelTemplate !== null &&
+    nowMs <= selectedEntry.endAt;
+  /** A row is picked and it does not print: this volunteer has no printer errand. */
+  const selectedQuiet = selectedEntry !== null && !selectedPrints;
+  const waiting = stillLooking || !printingReady;
+
+  /**
+   * Whether the panel is drawn at all.
+   *
+   * The *door* is drawn whatever happens, at the same pixel — a volunteer
+   * connecting the printer on Saturday for a printing Sunday is on a day whose
+   * own list has no printing row, and that errand has to stay possible.
+   */
+  const showPanel = printerConfigured || bindablePrinting.length > 0;
+
+  /**
+   * The filled control, or nothing.
+   *
+   * `unsupported` is the one fault with no press behind it — a browser that
+   * cannot talk to USB will not start being able to because somebody asked
+   * again — so it keeps the amber line and draws no button. Everything else
+   * that can be pressed here does what its word says, on this screen.
+   */
+  const slot = ((): { label: string; press: () => void } | "waiting" | null => {
+    // No panel, no controls: on a day when nothing prints and this kiosk has
+    // never had a printer, the foot is the door alone.
+    if (!showPanel) return null;
+    if (selectedQuiet && !fault) return null;
+    if (printerState !== null) {
+      // A cable somebody can push back in: re-ask the bus, no dialog. Unpaired
+      // is the other errand — the browser has lost the grant and only its own
+      // device list gives it back — which is why the two forks differ.
+      if (printerState.kind === "trouble")
+        return { label: tPrinter("lookAgain"), press: onLookAgain };
+      if (printerState.kind === "unpaired" && !printerState.searching)
+        return { label: t("connectThePrinterAgain"), press: onConnectPrinter };
+      if (printerState.kind === "unsupported") return null;
+    }
+    if (waiting) return "waiting";
+    if (!printerConfigured)
+      return { label: t("connectThePrinter"), press: onConnectPrinter };
+    if (ready && selectedPrints)
+      return { label: tPrinter("testPrint"), press: onPrintTestLabel };
+    return null;
+  })();
+  const slotLabel = slot !== null && slot !== "waiting" ? slot.label : null;
+
+  /**
+   * The line under the sentence — what this kiosk's printer is doing.
+   *
+   * First match wins, and the order is the order a volunteer needs: what the
+   * last press did, then what the kiosk has, then what it is doing about it.
+   */
+  const stateLine = ((): { text: string; tone: string } => {
+    if (listCameBackEmpty && slotLabel !== null) {
+      // Every press changes the screen. A dismissed device list is the one
+      // press that used to leave the strip byte-identical — and the browser
+      // reports a dismissal and an empty list with the same code, so this says
+      // only what is known and names the press that recovers it first.
+      return {
+        text: t("nothingWasPicked", { connect: slotLabel }),
+        tone: "text-ink-200",
+      };
+    }
+    if (!printerConfigured) {
+      // The errand outranks the sentence above it when there is one to do: the
+      // line that names a job is the news, and the gathering's name is context.
+      return slot === null
+        ? { text: t("noPrinterOnThisKiosk"), tone: "text-ink-400" }
+        : { text: t("noPrinterPlugOneIn"), tone: "text-ink-200" };
+    }
+    if (stillLooking) return { text: tPrinter("looking"), tone: "text-ink-400" };
+    if (printerState !== null && printerState.kind === "unpaired")
+      return { text: tPrinter("notConnected"), tone: "text-warn-400" };
+    if (
+      printerState !== null &&
+      (printerState.kind === "trouble" || printerState.kind === "unsupported")
+    ) {
+      // The kiosk's own message and its advice, joined: the printer screen
+      // prints them on two lines and the strip has one to spend.
+      const advice =
+        printerState.kind === "trouble" ? printerNote(printerState.advice) : "";
+      return {
+        text: [printerNote(printerState.message), advice].filter(Boolean).join(" "),
+        tone: "text-warn-400",
+      };
+    }
+    if (ready && printerGuessed) {
+      return {
+        text: selectedPrints
+          ? t("printerGuessedRoll")
+          : t("printerGuessedRollBare"),
+        tone: "text-warn-400",
+      };
+    }
+    if (printerState !== null && printerState.kind === "ready") {
+      return {
+        text: t("printerConnectedModel", {
+          model: printerModel ?? printerState.config.model,
+        }),
+        // Green is for news. On a Wednesday whose gathering prints nothing, a
+        // working printer is context — the quiet day keeps the green, because
+        // there it is the Saturday errand's receipt for tomorrow's volunteer.
+        tone: selectedQuiet ? "text-ink-400" : "text-present-400",
+      };
+    }
+    return { text: t("noPrinterOnThisKiosk"), tone: "text-ink-400" };
+  })();
+
+  /**
+   * The sentence above it — which gathering this is about.
+   *
+   * Scope follows the frame. With a row picked it is about that row, because
+   * the strip and the commit are one block at the foot and a panel naming Kids
+   * Club twelve pixels above a button that binds Wednesday Night reads as one
+   * statement about the thing being pressed.
+   */
+  const namesLine = ((): string | null => {
+    if (selectedEntry !== null) {
+      return selectedPrints
+        ? t("printsNameTagsFor", { names: selectedEntry.title, count: 1 })
+        : t("doesNotPrintNameTagsFor", { name: selectedEntry.title });
+    }
+    if (bindablePrinting.length === 0) return null;
+    // De-duped: two sittings of one Wednesday are one gathering as far as this
+    // sentence is concerned, and saying the title twice reads as a list of two.
+    const titles = [...new Set(bindablePrinting.map((entry) => entry.title))];
+    return t("printsNameTagsFor", {
+      names: new Intl.ListFormat(locale, { type: "conjunction" }).format(titles),
+      count: titles.length,
+    });
+  })();
+
+  /**
+   * Whether the commit is about to cost something.
+   *
+   * A *known* negative, which is why `stillLooking` is subtracted: a kiosk that
+   * has not finished looking for its printer must not accuse itself on the
+   * brightest control on the screen.
+   */
+  const wontPrint = selectedPrints && !ready && !stillLooking;
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -259,7 +559,7 @@ export function EventChooser({
                   </div>
                 )}
                 <HoldButton
-                  onTap={() => setSelected(index)}
+                  onTap={() => onSelect(entryKey(entry))}
                   onHeld={() => void bind(index)}
                   /*
                    * `active:` on a row, and the transition narrowed to the border
@@ -330,8 +630,24 @@ export function EventChooser({
                      * phone. A time range broken across two lines is unreadable,
                      * a date is not, so the range is the half that is held.
                      */}
-                    {dayLabel(locale, entry.startAt, nowMs)}
-                    {" · "}
+                    {/*
+                     * The facts, wrapped so the 16px before the status is a gap
+                     * between two things on one line and never an indent at the
+                     * head of a wrapped one.
+                     *
+                     * It was `sm:pl-4` on the status itself, which is the same
+                     * objection the middot above answers: a separator is a join,
+                     * and a join has nothing to do at the edge of a line. With a
+                     * room named the length a church names one — "Fellowship
+                     * Hall" — the status drops to a second line, and it arrived
+                     * there hanging 17px off a left edge that belongs to
+                     * nothing. `padding-inline-end` on an inline box lands at
+                     * the end of its last line, which is exactly where the gap
+                     * has a job.
+                     */}
+                    <span className="sm:pe-4">
+                      {dayLabel(locale, entry.startAt, nowMs)}
+                      {" · "}
                     {/*
                      * The hours, a step louder than the line they are in.
                      *
@@ -346,25 +662,47 @@ export function EventChooser({
                      * wear it — which is exactly why it is the one that had to
                      * come up.
                      */}
-                    <span className="font-medium whitespace-nowrap text-ink-200">
-                      {timeLabel(locale, entry.startAt)}–
-                      {timeLabel(locale, entry.endAt)}
+                      <span className="font-medium whitespace-nowrap text-ink-200">
+                        {timeLabel(locale, entry.startAt)}–
+                        {timeLabel(locale, entry.endAt)}
+                      </span>
+                      {entry.location ? (
+                        <>
+                          {/* The middot is drawn only where the room follows the
+                            hours on the same line. A separator is a join, and a
+                            join has nothing to do at the start of a line — which
+                            is where the phone puts this, every time, because
+                            three facts and a status do not fit in 297 pixels. */}
+                          <span className="hidden sm:inline"> · </span>
+                          <span className="block whitespace-nowrap sm:inline">
+                            {entry.location}
+                          </span>
+                        </>
+                      ) : (
+                        ""
+                      )}
+                      {/*
+                       * Whether this gathering prints, on the row, in plain
+                       * weight.
+                       *
+                       * The one fact the chooser never carried, and the reason
+                       * the printer could be skipped without anybody noticing:
+                       * nothing on the screen said which gatherings need one.
+                       *
+                       * Keyed off the template alone, so an *ended* printing row
+                       * wears it too — the mark is about the gathering, not
+                       * about tonight. The sentence in the foot is the one that
+                       * has to be careful about tonight, and it is.
+                       */}
+                      {entry.labelTemplate !== null && (
+                        <>
+                          <span className="hidden sm:inline"> · </span>
+                          <span className="block whitespace-nowrap text-ink-300 sm:inline">
+                            {t("printsNameTags")}
+                          </span>
+                        </>
+                      )}
                     </span>
-                    {entry.location ? (
-                      <>
-                        {/* The middot is drawn only where the room follows the
-                          hours on the same line. A separator is a join, and a
-                          join has nothing to do at the start of a line — which
-                          is where the phone puts this, every time, because
-                          three facts and a status do not fit in 297 pixels. */}
-                        <span className="hidden sm:inline"> · </span>
-                        <span className="block whitespace-nowrap sm:inline">
-                          {entry.location}
-                        </span>
-                      </>
-                    ) : (
-                      ""
-                    )}
                     {/* Where the gathering is becomes what the gathering is
                       doing, and on a phone that step has to be a line rather
                       than a wider space — the fold puts them side by side. */}
@@ -377,12 +715,12 @@ export function EventChooser({
                      * later fact is the one a volunteer has to act on.
                      */}
                     {live && !ended && (
-                      <span className="block font-medium text-present-400 sm:inline sm:pl-4">
+                      <span className="block font-medium text-present-400 sm:inline-block">
                         {t("checkInOpen")}
                       </span>
                     )}
                     {notOpenYet && (
-                      <span className="block font-medium text-ink-500 sm:inline sm:pl-4">
+                      <span className="block font-medium text-ink-500 sm:inline-block">
                         {t("opensAt", {
                           when: timeLabel(locale, entry.checkInOpensAt),
                         })}
@@ -400,7 +738,7 @@ export function EventChooser({
                      * something to say.
                      */}
                     {ended && (
-                      <span className="block font-medium text-warn-400 sm:inline sm:pl-4">
+                      <span className="block font-medium text-warn-400 sm:inline-block">
                         {t("endedPickupOnly")}
                       </span>
                     )}
@@ -432,28 +770,94 @@ export function EventChooser({
         <InstallPrompt className="mb-3" />
 
         {/*
-         * The way in to the printer, and the only one.
+         * The printer, said out loud before anybody touches a row.
          *
-         * Here rather than behind a second hidden gesture: this screen is
-         * already past the staff gate on the search screen, and a setup step
-         * nobody can find is a setup step nobody does. The rows' hold guards
-         * re-pointing a kiosk mid-service; looking at the printer settings
-         * breaks nothing, so this has never needed one.
+         * This was one hairline row reading "Set up a label printer", in the
+         * style of the optional install prompt above it, and the screen said
+         * nothing at all about which gatherings print. A volunteer who did
+         * exactly what it asked — hold a row, set the kiosk — bound a printing
+         * gathering with no printer and found out at the first family.
+         *
+         * So: a panel, drawn from first paint whenever a gathering today needs
+         * a printer or this kiosk has one. It names the gathering it is about
+         * and says the printer's state in a colour that means it, and its
+         * connect is a real button before any gesture — the hold path never
+         * picks a row, so a control that waits for a selection is a control
+         * that path never sees.
+         *
+         * The door stays, last and flush right, at one pixel position in every
+         * state including the two with no panel. How many controls exist used
+         * to decide where each one sat, so tapping a row moved the door 509px
+         * and dropped a button that opens the browser's USB dialog onto the
+         * pixels it had just vacated.
          */}
-        <button
-          type="button"
-          tabIndex={-1}
-          {...tap(onSetUpPrinter)}
-          className="mb-3 w-full rounded-xl border-2 border-ink-800 p-3 text-ink-400 active:bg-ink-800"
+        <div
+          className={`mb-6 p-4 kiosk:p-5 ${showPanel ? "rounded-xl bg-ink-900" : ""}`}
         >
-          {printerState === null || printerState.kind === "idle"
-            ? t("setUpPrinter")
-            : printerState.kind === "ready"
-              ? t("printerConnected")
-              : printerState.kind === "unpaired" && printerState.searching
-                ? t("lookingForPrinter")
-                : t("printerNeedsAttention")}
-        </button>
+          {showPanel && namesLine !== null && (
+            <div className="text-ink-300">{namesLine}</div>
+          )}
+          {showPanel && (
+            <div
+              className={`font-medium kiosk:text-lg ${namesLine !== null ? "pt-1 " : ""}${stateLine.tone}`}
+            >
+              {stateLine.text}
+            </div>
+          )}
+          <div
+            className={`flex items-center justify-end gap-4 ${showPanel ? "mt-3" : ""}`}
+          >
+            {slot === "waiting" ? (
+              /*
+               * The same box, fill and weight as the live control, differing by
+               * a moving mark and two words.
+               *
+               * `aria-disabled` rather than `disabled`, because `disabled`
+               * suppresses `:active` — and a 494px filled control that absorbs
+               * a press without acknowledging it is the "is this thing frozen"
+               * moment on a lobby tablet. One label for both waits (the chunk,
+               * and the boot retries); the line above says which.
+               */
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-disabled
+                aria-busy
+                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
+              >
+                <span
+                  aria-hidden
+                  className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                />
+                {t("oneMoment")}
+              </button>
+            ) : (
+              slot !== null && (
+                /* The edge is `ink-600` rather than the rows' `ink-800`: in the
+                   light ramp `ink-800` sits *between* this fill and the panel,
+                   so it softens the boundary instead of drawing it. One rung
+                   toward the reader from the fill in both ramps, which is the
+                   row family's own construction at the control's rung. */
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  {...tap(slot.press)}
+                  className="h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
+                >
+                  {slot.label}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              tabIndex={-1}
+              {...tap(onSetUpPrinter)}
+              className="h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 kiosk:h-14"
+            >
+              {t("printerSettings")}
+            </button>
+          </div>
+        </div>
 
         <button
           type="button"
@@ -461,10 +865,14 @@ export function EventChooser({
           {...tap(() => {
             if (selected !== null) void bind(selected);
           })}
-          className={`w-full rounded-xl p-5 text-xl font-semibold ${
+          /* The not-yet branch keeps the box and drops the skin. A filled
+             `ink-800` slab with dim type in it reads as an input waiting to be
+             filled in rather than as a button waiting for a row; the border
+             holds the 672×96 so nothing moves when a tap arms it. */
+          className={`w-full rounded-xl border-2 border-transparent p-5 text-xl font-semibold ${
             selected !== null && !binding
               ? "bg-brand-600 text-white active:bg-brand-500"
-              : "pointer-events-none bg-ink-800 text-ink-500"
+              : "pointer-events-none text-ink-500"
           }`}
           /* What `HoldButton` used to set here, in the version a tap can have:
              it swallowed the gesture outright, and a plain button only has to
@@ -514,19 +922,40 @@ export function EventChooser({
             </span>
           )}
           {!binding && selectedEntry && (
+            /*
+             * Three facts, two ranks, and the separators outside both.
+             *
+             * The gathering and the hour are what is being committed to, so
+             * both are white; the middots join them and belong to neither, so
+             * they are the step back — set as their own flex children, because
+             * inside the clause spans the second one rendered visibly bolder
+             * than the first, punctuation joining the emphasis.
+             *
+             * The clause is the loudest thing on the button because it is the
+             * only one that costs anything, and *Set kiosk* keeps its word, its
+             * fill and its place: a volunteer whose gathering prints nothing is
+             * never blocked, only told.
+             */
             <span className="mb-1 flex items-baseline justify-center gap-1 text-base font-medium">
-              {/* Quieter than the time, for the reason the row is: on a list of
-                  two sittings this half is the half they have in common. */}
-              <span className="min-w-0 truncate text-white/75">
+              <span className="min-w-0 truncate text-white">
                 <EventName
                   path={selectedEntry.iconPath}
                   title={selectedEntry.title}
                   tone="inherit"
                 />
               </span>
+              <span className="shrink-0 text-white/75">·</span>
               <span className="shrink-0 text-white">
-                · {timeLabel(locale, selectedEntry.startAt)}
+                {timeLabel(locale, selectedEntry.startAt)}
               </span>
+              {wontPrint && (
+                <>
+                  <span className="shrink-0 text-white/75">·</span>
+                  <span className="shrink-0 font-semibold text-white">
+                    {t("nameTagsWontPrint")}
+                  </span>
+                </>
+              )}
             </span>
           )}
           {binding

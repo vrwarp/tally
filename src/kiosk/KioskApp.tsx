@@ -385,6 +385,36 @@ export function KioskApp() {
   const [printing, setPrinting] = useState<KioskPrinting | null>(null);
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig | null>(() => readPrinterConfig());
   const [printerState, setPrinterState] = useState<PrinterState | null>(null);
+  /**
+   * Whether today's list holds a gathering that prints and can still be bound.
+   *
+   * Reported by the chooser when `listEvents` resolves, and the *only* reason a
+   * kiosk with no printer of its own fetches the printing chunk at all. The
+   * chooser's connect is drawn before any row is touched — the hold path never
+   * touches one — and `requestDevice` needs transient activation that an
+   * `await import` would spend, so the module has to be resident before the
+   * first press rather than fetched by it.
+   */
+  const [chooserPrints, setChooserPrints] = useState(false);
+  /**
+   * The row the chooser has picked, held here so it survives the printer door.
+   *
+   * `selected` was local to `EventChooser` and `setPhase('printer')` unmounts
+   * it, so a volunteer who went to connect a printer came back to a screen that
+   * had forgotten which gathering they were setting up — and the fix the whole
+   * strip depends on is that *Back to the gatherings* lands on the row still
+   * ringed, with the strip drawn and its state changed.
+   */
+  const [chooserSelected, setChooserSelected] = useState<string | null>(null);
+  /**
+   * Whether the last connect came back from the browser with nothing picked.
+   *
+   * `pairPrinter` resolves null for a dismissed chooser and an empty one alike
+   * — the browser reports both the same way — and deliberately does not colour
+   * the state for it, so without this the strip was byte-identical before and
+   * after the one press a volunteer had just made.
+   */
+  const [listCameBackEmpty, setListCameBackEmpty] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
   /**
    * Why a paired kiosk is showing its code again, for the pairing screen to
@@ -754,7 +784,15 @@ export function KioskApp() {
    * pairing or reconfiguring, mid-setup — is a window in which the first two
    * clauses are true anyway, because the printer screen is what is up.
    */
-  const wantsPrinting = phase === 'printer' || overlay?.kind === 'printer' || printerConfig !== null;
+  /*
+   * `chooserPrints` is the clause that reaches the kiosk this campaign is
+   * about: one that has never had a printer, on a Sunday whose nursery prints.
+   * It fetches the chunk while the volunteer is still reading the rows, so the
+   * connect in the chooser's foot is live by the time a finger reaches it. A
+   * kiosk whose day has no printing row still never fetches it.
+   */
+  const wantsPrinting =
+    phase === 'printer' || overlay?.kind === 'printer' || printerConfig !== null || chooserPrints;
 
   useEffect(() => {
     if (!wantsPrinting) return;
@@ -769,7 +807,47 @@ export function KioskApp() {
     };
   }, [wantsPrinting, printerConfig]);
 
-  useEffect(() => printing?.subscribe(setPrinterState), [printing]);
+  useEffect(
+    () =>
+      printing?.subscribe((next) => {
+        setPrinterState(next);
+        // Any emission is an answer, so the account of a press that produced
+        // none does not outlive it.
+        setListCameBackEmpty(false);
+      }),
+    [printing],
+  );
+
+  /*
+   * The three things the chooser's strip can do, done in place.
+   *
+   * Called straight out of a `useTap` handler so `requestDevice` is inside the
+   * press's own transient activation — none of these navigates, because a
+   * control reading *Connect the printer again* whose effect is *open a screen
+   * with another button on it* is not true at the moment it is read, and
+   * unpaired is the one state only a human press on the browser's own chooser
+   * can fix.
+   */
+  const connectPrinter = useCallback(() => {
+    if (!printing) return;
+    setListCameBackEmpty(false);
+    void printing
+      .pairPrinter(printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL })
+      .then((found) => {
+        if (found) setPrinterConfig(readPrinterConfig());
+        else setListCameBackEmpty(true);
+      });
+  }, [printing, printerConfig]);
+
+  const lookAgainForPrinter = useCallback(() => {
+    setListCameBackEmpty(false);
+    void printing?.ready();
+  }, [printing]);
+
+  const printTestLabel = useCallback(() => {
+    setListCameBackEmpty(false);
+    printing?.testPrint(locale);
+  }, [printing, locale]);
 
   /*
    * The one thing a label needs that the printing chunk cannot fetch for itself.
@@ -2130,6 +2208,10 @@ export function KioskApp() {
         // Defaults for a kiosk being set up for the first time — the QL-810W and
         // the 62x29mm name badge, which is what `device.ts` says is likeliest.
         config={printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL }}
+        // Which is why the screen is also told whether those are answers or
+        // defaults: two selects full of invented values on a kiosk that has
+        // never had a printer is the screen asserting what it does not know.
+        hasConfig={printerConfig !== null}
         onDone={() => {
           // Re-read rather than trusting the screen: pairing writes the config,
           // and this is what makes the boot effect above pick up a printer that
@@ -2146,7 +2228,18 @@ export function KioskApp() {
       <EventChooser
         services={services}
         printerState={printerState}
+        printerConfigured={printerConfig !== null}
+        printerGuessed={printerConfig?.guessed === true}
+        printerModel={printerConfig?.model}
+        printingReady={printing !== null}
+        listCameBackEmpty={listCameBackEmpty}
         onSetUpPrinter={() => setPhase('printer')}
+        onConnectPrinter={connectPrinter}
+        onLookAgain={lookAgainForPrinter}
+        onPrintTestLabel={printTestLabel}
+        onPrintingRows={setChooserPrints}
+        selectedKey={chooserSelected}
+        onSelect={setChooserSelected}
         onBound={(bound) => {
           writeBinding(bound);
           setBinding(bound);
@@ -2364,6 +2457,11 @@ export function KioskApp() {
           <PrinterScreen
             printing={printing!}
             config={printerConfig ?? { model: DEFAULT_PRINTER_MODEL, label: DEFAULT_PRINTER_LABEL }}
+            hasConfig={printerConfig !== null}
+            /* What decides whether the blue control mid-evening is the reprint
+               or the connect. A gathering that prints nothing has no printer
+               errand, however the transport is feeling. */
+            gatheringPrints={prints}
             printedTonight={printedTonight}
             onReprint={(label) => {
               /*

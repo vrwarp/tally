@@ -388,7 +388,7 @@ const SCENES: {
     id: 'setup-printer-light-detected',
     query: 'screen=printer&printer=ready&detected=plain&ground=light',
     views: ['kiosktall'],
-    drive: ['Check the printer'],
+    drive: ['Connect a different printer'],
   },
   /* The light ramp's amber on this screen — trouble, and the guessed roll. */
   { id: 'setup-printer-light-trouble', query: 'screen=printer&printer=trouble&ground=light', views: ['kiosktall'] },
@@ -396,7 +396,7 @@ const SCENES: {
     id: 'setup-printer-light-guessed',
     query: 'screen=printer&printer=ready&detected=guessed&ground=light',
     views: ['kiosktall'],
-    drive: ['Check the printer'],
+    drive: ['Connect a different printer'],
   },
   /*
    * Just connected, with what the printer said about itself on the screen —
@@ -404,18 +404,24 @@ const SCENES: {
    * line it comes back with". The read-off is a press away in the fixture, so
    * the shooter presses; `guessed` is the roll the packet could not choose,
    * which is the sentence the screen most owes anybody.
+   *
+   * Through the re-pair rather than through *Check the printer*: the set-up
+   * screen's ready state has one secondary now, because a volunteer standing
+   * there has come to connect a printer and prove it prints, and a second
+   * benign check beside the proof is a control with nothing to do. The fixture
+   * answers both doors with the same detection.
    */
   {
     id: 'setup-printer-detected',
     query: 'screen=printer&printer=ready&detected=plain',
     views: ['phone', 'kiosktall', 'kioskwide'],
-    drive: ['Check the printer'],
+    drive: ['Connect a different printer'],
   },
   {
     id: 'setup-printer-guessed',
     query: 'screen=printer&printer=ready&detected=guessed',
     views: ['kiosktall'],
-    drive: ['Check the printer'],
+    drive: ['Connect a different printer'],
   },
   /* The same screen mid-evening, for the difference. */
   { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },

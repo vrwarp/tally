@@ -29,7 +29,7 @@
  * a label coming out proves the whole chain rather than just that the device
  * answers.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
@@ -87,41 +87,71 @@ function stateLine(
   t: PrinterTranslator,
   note: (note: PrinterNote | null | undefined) => string,
   state: PrinterState,
+  detection: PrinterDetection | null,
 ): { text: string; tone: string } {
   switch (state.kind) {
     case 'ready':
-      return { text: t('connectedReady'), tone: 'text-present-400' };
+      /*
+       * Connected, and not called *ready*.
+       *
+       * It said "Connected and ready." on a printer nothing had been through
+       * yet — green, with the model beside it — and the only line in this
+       * direction that says anything is outstanding appeared *after* a test
+       * label. So the state that most needed telling a volunteer they were not
+       * finished was the one that read as finished, and walking away from it
+       * cost zero presses. What the bus can prove is that it answered and what
+       * it said; the proof that a sticker comes out is the button below.
+       */
+      if (detection && !detection.modelFromPrinter)
+        return { text: t('connectedGuessedModel'), tone: 'text-warn-400' };
+      if (detection && detection.matched.length !== 1)
+        return { text: t('connectedGuessedRoll'), tone: 'text-warn-400' };
+      return { text: t('connectedReadOff'), tone: 'text-present-400' };
     case 'unpaired':
       // Set up with a printer, which is what makes this different from `idle`
       // below: the browser is not listing the one this kiosk was given.
       return state.searching
-        ? { text: t('looking'), tone: 'text-ink-400' }
+        ? { text: t('looking'), tone: 'text-ink-300' }
         : { text: t('notConnected'), tone: 'text-warn-400' };
     case 'unsupported':
       return { text: note(state.message), tone: 'text-warn-400' };
     case 'trouble':
-      return { text: note(state.message), tone: 'text-warn-400' };
+      /*
+       * Message and advice on one line, and the head keeps nothing else.
+       *
+       * The advice used to be a second centred line and the follow-up a third,
+       * so the head overhung the 672px column the rest of the screen is built
+       * in and left a centred orphan under it. One line here is also what holds
+       * the primary at the same y in every configured state — no padded band,
+       * and it survives a language whose sentences wrap differently.
+       */
+      return {
+        text: [note(state.message), note(state.advice)].filter(Boolean).join(' '),
+        tone: 'text-warn-400',
+      };
     default:
-      return { text: t('noPrinter'), tone: 'text-ink-400' };
+      return { text: t('noPrinter'), tone: 'text-ink-300' };
   }
 }
 
 /**
- * What the printer just told us, as the sentence a volunteer needs.
+ * What connecting could *not* settle, as the sentence a volunteer needs.
  *
- * Above the settings rather than inside them, because the settings are folded:
- * a roll that had to be guessed is exactly the thing somebody would never open
- * a `details` to discover.
+ * Under the primary rather than in a panel above it, and only when there is
+ * something outstanding: the clean read-off used to be stated here as well as
+ * in the state line and again in the model row — the same two values three
+ * times, loudest where they were least use. What survives is the half that is
+ * a question, which is the half a volunteer has to answer.
  *
  * `label` is the *current* selection rather than the detected one, so the line
- * stays true after somebody takes the other chip.
+ * stays true after somebody takes the other roll.
  */
-function detectionNotice(
+function detectionAccount(
   t: PrinterTranslator,
   detection: PrinterDetection,
   label: string,
   nameOf: (entry: Label) => string,
-): { lines: string[]; tone: string } | null {
+): string | null {
   // The printer did not answer. The state line at the top of the screen is
   // already saying why, and saying it twice helps nobody.
   if (!detection.status) return null;
@@ -130,30 +160,15 @@ function detectionNotice(
     detection.status.mediaType === 'die-cut'
       ? t('mediaDieCut', { width: detection.status.mediaWidthMm })
       : t('mediaContinuous', { width: detection.status.mediaWidthMm });
-  const lines: string[] = [];
-  let tone = 'text-ink-400';
 
-  if (!detection.modelFromPrinter) {
-    lines.push(t('modelUnknown', { model: detection.config.model }));
-    tone = 'text-warn-400';
+  if (!detection.modelFromPrinter)
+    return t('modelUnknown', { model: detection.config.model });
+  if (detection.matched.length === 0) return t('mediaUnknown', { media });
+  if (detection.matched.length > 1) {
+    const chosen = detection.matched.find((entry) => entry.identifier === label);
+    return t('mediaAmbiguous', { media, label: nameOf(chosen ?? detection.matched[0]) });
   }
-
-  const chosen = detection.matched.find((entry) => entry.identifier === label);
-  if (detection.matched.length === 0) {
-    lines.push(t('mediaUnknown', { media }));
-    tone = 'text-warn-400';
-  } else if (detection.matched.length > 1) {
-    lines.push(
-      t('mediaAmbiguous', { media, label: nameOf(chosen ?? detection.matched[0]) }),
-    );
-    tone = 'text-warn-400';
-  } else {
-    lines.push(
-      t('readOff', { model: detection.config.model, label: nameOf(detection.matched[0]) }),
-    );
-  }
-
-  return { lines, tone };
+  return null;
 }
 
 /** "6:41 PM", the way every other time on this device is written. */
@@ -161,9 +176,41 @@ function clockTime(locale: string, atMs: number): string {
   return new Date(atMs).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 }
 
+/**
+ * A sentence belonging to the control above it.
+ *
+ * Capped short of the control's own measure. Set to the full 672px these ran
+ * 79–86 characters a line, which is past the point where a reader standing at
+ * a shelf reliably finds the start of the next one — and the same register in
+ * the chooser's foot runs 68. The left edge stays on the column so the prose
+ * still hangs off the control it explains.
+ *
+ * `ink-100` is what the last press produced, `ink-300` a standing instruction,
+ * `ink-400` a reference note.
+ */
+function Say({ tone = 'text-ink-300', children }: { tone?: string; children: ReactNode }) {
+  return <div className={`max-w-xl shrink-0 text-sm kiosk:text-base ${tone}`}>{children}</div>;
+}
+
+/**
+ * One control and its words, as a single object in the act group's rhythm.
+ *
+ * The group was a flat 12px stack of buttons and paragraphs, so nothing in the
+ * spacing said which sentence belonged to which control — and a paragraph's own
+ * leading is wider than a 12px gap, so two sentences about the primary sat
+ * *further* apart than the lower one sat from a control it said nothing about.
+ * Proximity was handing "Connecting opens a window…" to whichever grey row
+ * happened to follow it. Eight binds, twenty-four separates.
+ */
+function Unit({ children }: { children: ReactNode }) {
+  return <div className="flex shrink-0 flex-col gap-2">{children}</div>;
+}
+
 export function PrinterScreen({
   printing,
   config,
+  hasConfig,
+  gatheringPrints = false,
   printedTonight,
   onReprint,
   onReprintByName,
@@ -172,6 +219,22 @@ export function PrinterScreen({
 }: {
   printing: KioskPrinting;
   config: PrinterConfig;
+  /**
+   * Whether this kiosk has a printer stored, as opposed to being handed the
+   * defaults `config` falls back to.
+   *
+   * What decides whether the screen says "plug one in first" and whether the
+   * reprint door is live. It is a *fact* about the device rather than a reading
+   * of the transport, which matters mid-evening: the door somebody came through
+   * used to stay grey for the whole of the minute after they successfully
+   * connected, because the prop it was gated on was only re-read on the way out.
+   */
+  hasConfig: boolean;
+  /**
+   * Whether the gathering this kiosk is bound to prints. Absent during setup,
+   * where the kiosk is on no gathering at all.
+   */
+  gatheringPrints?: boolean;
   /** The evening's attempts, newest first. */
   printedTonight: readonly PrintedLabel[];
   /**
@@ -220,12 +283,46 @@ export function PrinterScreen({
   const [busy, setBusy] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [copied, setCopied] = useState<CopyState>('idle');
+  /**
+   * The browser's device list came back with nothing picked.
+   *
+   * Every press has to change the screen, and this was the one that did not:
+   * the chooser is the browser's, `pairPrinter` swallows a dismissal without
+   * emitting a state, and the frame afterwards was identical to the frame
+   * before — so a volunteer who fumbled the sheet pressed again, and again.
+   *
+   * What it may *say* is narrow. `NotFoundError` is what Chrome rejects with
+   * for a dismissed list and an empty one alike, so the screen cannot know
+   * which happened: it reports that nothing was picked, names the press that
+   * recovers it first, and puts the cable second.
+   */
+  const [attemptFailed, setAttemptFailed] = useState(false);
+  /** A test label has been sent since this screen last changed state. */
+  const [tested, setTested] = useState(false);
+  /**
+   * The roll was chosen by hand, so the question below has been answered.
+   *
+   * Without this the instruction went on reading "pick it below" after the
+   * picking — an instruction to do the thing just done, above the ring that
+   * records having done it.
+   */
+  const [rollAnswered, setRollAnswered] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowTap = useTapGuard(onReprint);
   const tap = useTap();
   const { regionRef, contentRef, overflowing, fadeVars } = useOverflowFade();
 
-  useEffect(() => printing.subscribe(setState), [printing]);
+  useEffect(
+    () =>
+      printing.subscribe((next) => {
+        setState(next);
+        // Any emission is an answer, so neither account outlives the thing it
+        // was an account of.
+        setAttemptFailed(false);
+        if (next.kind !== 'ready') setTested(false);
+      }),
+    [printing],
+  );
   useEffect(() => {
     return () => {
       if (copyTimer.current) clearTimeout(copyTimer.current);
@@ -276,7 +373,14 @@ export function PrinterScreen({
     [printing],
   );
 
+  /** Whatever the last press said about itself, cleared before the next one. */
+  const forget = () => {
+    setAttemptFailed(false);
+    setTested(false);
+  };
+
   const onModelChange = (nextModel: string) => {
+    forget();
     setModel(nextModel);
     const fits = printing.labelsForModel(nextModel);
     const nextLabel = fits.some((entry) => entry.identifier === label)
@@ -287,6 +391,8 @@ export function PrinterScreen({
   };
 
   const onLabelChange = (nextLabel: string) => {
+    forget();
+    setRollAnswered(true);
     setLabel(nextLabel);
     void apply({ model, label: nextLabel });
   };
@@ -301,12 +407,16 @@ export function PrinterScreen({
    */
   const adopt = (found: PrinterDetection | null) => {
     if (!found) return;
+    // A fresh reading asks the question again: the roll on the spindle may be
+    // the reason somebody pressed Check.
+    setRollAnswered(false);
     setDetection(found);
     setModel(found.config.model);
     setLabel(found.config.label);
   };
 
   const check = async () => {
+    forget();
     setBusy(true);
     try {
       adopt(await printing.checkPrinter());
@@ -316,12 +426,27 @@ export function PrinterScreen({
   };
 
   const connect = async () => {
+    forget();
     setBusy(true);
     try {
-      adopt(await printing.pairPrinter({ model, label }));
+      const found = await printing.pairPrinter({ model, label });
+      adopt(found);
+      // Null is a dismissed or empty list — a failure the module deliberately
+      // does not colour the screen for, which is why this screen has to.
+      if (!found) setAttemptFailed(true);
     } finally {
       setBusy(false);
     }
+  };
+
+  const testNow = () => {
+    forget();
+    // `testPrint` returns void and enqueues, so what is known at this instant is
+    // that the label was sent — which is what the sentence under the button then
+    // says. A line claiming one came out would be a claim about the tape,
+    // painted before the rasteriser had run.
+    printing.testPrint(locale);
+    setTested(true);
   };
 
   /**
@@ -332,6 +457,7 @@ export function PrinterScreen({
    * pushed a cable back in and wants to know now, not on the next label.
    */
   const lookAgain = async () => {
+    forget();
     setBusy(true);
     try {
       await printing.ready();
@@ -339,38 +465,231 @@ export function PrinterScreen({
       setBusy(false);
     }
   };
-  const canLookAgain =
-    state.kind === 'trouble' || (state.kind === 'unpaired' && !state.searching);
+
+  /* ---- Which screen this is, and what it offers ------------------------- */
+
+  /** Setup, reached from the chooser: no evening to list, nothing to reprint. */
+  const setup = !onReprintByName;
+  /** The ten seconds of boot retries after a wake, or after a failed look. */
+  const stillLooking = state.kind === 'unpaired' && state.searching;
+  /**
+   * Drawn in both values of `searching`, dimmed while it is true.
+   *
+   * It used to arrive only once the ladder settled — so a control materialised
+   * under a thumb already on its way down, in the place the model row had been.
+   */
+  const canLookAgain = state.kind === 'trouble' || state.kind === 'unpaired';
+  /**
+   * Whether a reprint has anything to aim at.
+   *
+   * The *fact*, not the prop: `pairPrinter` writes the config and tells
+   * `KioskApp` nothing, so a volunteer who came here because a sticker was
+   * missing connected successfully, watched the two checks come alive, and
+   * found the one door they came for still grey until they pressed Done and
+   * walked back in through it.
+   */
+  const canReprint = Boolean(detection) || hasConfig || state.kind === 'ready';
+  /**
+   * Mid-evening, with a queue: the brand slot is the control that fixes the
+   * evening rather than the one that cannot run without it.
+   *
+   * On a kiosk whose printer is working it stays Reprint — that is the door
+   * this screen is open for, and a saturated *Connect* over a bound kiosk is
+   * the browser's USB sheet one mis-aim away.
+   */
+  const connectLeads = !setup && gatheringPrints && state.kind !== 'ready';
+  const rollAmbiguous = detection !== null && detection.matched.length > 1;
 
   const nameOf = (entry: Label) => printing.labelName(entry);
-  const notice = detection ? detectionNotice(t, detection, label, nameOf) : null;
-  const line = stateLine(t, printerNote, state);
+  const account = detection ? detectionAccount(t, detection, label, nameOf) : null;
+  const line = stateLine(t, printerNote, state, detection);
   // Newest first, and read on every render rather than held in state: the
   // record moves whenever the state does, which is what re-renders this.
   const events = printing.printerLog().slice(-MAX_EVENTS_SHOWN).reverse();
   const now = Date.now();
 
+  /**
+   * The one saturated control, carrying the verb this state deserves.
+   *
+   * The set-up screen had none: *Connect a printer* was the dimmest of five
+   * controls, fifth down, under two disabled buttons and an empty card, with a
+   * bold **Done** as the loudest thing on a screen whose whole job was to get a
+   * printer connected. One blue per state, and the word on it is what pressing
+   * it does.
+   */
+  const primary = ((): { label: string; press: () => void } | null => {
+    if (!setup && !connectLeads) {
+      return onReprintByName
+        ? {
+            label: t('reprint'),
+            press: () => {
+              haptic();
+              forget();
+              onReprintByName();
+            },
+          }
+        : null;
+    }
+    switch (state.kind) {
+      case 'ready':
+        // Unreachable mid-evening — `connectLeads` excludes it — so this is the
+        // set-up screen's proof step.
+        return { label: t('testPrint'), press: testNow };
+      case 'trouble':
+        return { label: t('lookAgain'), press: () => void lookAgain() };
+      case 'unpaired':
+        /*
+         * The same verb in both values of `searching`. A control that reads
+         * *Connect this printer again* while the kiosk is looking and something
+         * else once it has settled is a button that changes its mind under a
+         * finger, and the press is harmless either way: the chooser is filtered
+         * to Brother devices, so picking the QL lands where the ladder was
+         * going, a second or two sooner.
+         */
+        return { label: t('connectThisAgain'), press: () => void connect() };
+      case 'unsupported':
+        // A browser that cannot talk to USB will not start being able to
+        // because somebody asked again. The line above says so; no button
+        // pretends otherwise.
+        return null;
+      default:
+        return { label: t('connectThePrinter'), press: () => void connect() };
+    }
+  })();
+
+  /** Whether pressing the primary opens the browser's own device list. */
+  const primaryOpensChooser =
+    primary !== null &&
+    (setup || connectLeads) &&
+    (state.kind === 'idle' || state.kind === 'unpaired');
+
+  /**
+   * What the primary's press produced, or what it is about to.
+   *
+   * One slot, under the control it belongs to, in one order: the account of the
+   * last press first, then the standing instruction. The post-test line used to
+   * be rendered *above* the primary, which pushed it 36px down — so the
+   * ordinary response to a blank label, pressing the same button again, landed
+   * on prose.
+   */
+  const primarySays: ReactNode[] = [];
+  if (primary !== null) {
+    if (attemptFailed && state.kind !== 'ready') {
+      primarySays.push(
+        <Say key="cancelled" tone="text-ink-100">
+          {t('selectionCancelled')}
+        </Say>,
+      );
+    }
+    if (state.kind === 'ready') {
+      if (account !== null) {
+        primarySays.push(
+          <Say key="account" tone="text-ink-100">
+            {account}
+          </Say>,
+        );
+      }
+      if (rollAmbiguous) {
+        // A black-only test label comes out identically off either 62mm roll,
+        // so the test cannot settle which is loaded — the spindle can, and the
+        // question is now directly below. What the test *can* settle is that a
+        // whole label comes out, which is what it is asked for here.
+        primarySays.push(
+          <Say key="roll">{rollAnswered ? t('rollPicked') : t('pickTheRoll')}</Say>,
+        );
+      } else if (tested) {
+        primarySays.push(
+          <Say key="sent" tone="text-ink-100">
+            {t('testSent')}
+          </Say>,
+          <Say key="waiting">{t('stillWaiting')}</Say>,
+        );
+      } else if (setup) {
+        primarySays.push(<Say key="be-sure">{t('testToBeSure')}</Say>);
+      }
+    } else if (state.kind === 'trouble') {
+      primarySays.push(<Say key="then">{t('troubleThenLookAgain')}</Say>);
+    } else {
+      if (stillLooking) primarySays.push(<Say key="wait">{t('mayConnectItself')}</Say>);
+      else if (state.kind === 'unpaired' && !attemptFailed)
+        primarySays.push(<Say key="cable">{t('checkPowerAndCable')}</Say>);
+      else if (!hasConfig) primarySays.push(<Say key="plug">{t('plugInFirst')}</Say>);
+      if (primaryOpensChooser)
+        primarySays.push(<Say key="window">{t('connectOpensWindow')}</Say>);
+    }
+  }
+
+  /**
+   * A control below the blue one: same family, no fill of its own to compete
+   * with, and never the `disabled` attribute.
+   *
+   * `disabled` suppresses `:active`, so a dead control answers a press with
+   * nothing at all — which on a lobby tablet is indistinguishable from a device
+   * that has frozen. `aria-disabled` says the same thing to a reader, the press
+   * still paints, and the line under the group says why.
+   */
+  const secondary = (
+    key: string,
+    label: string,
+    press: () => void,
+    dim = false,
+  ): ReactNode => (
+    <button
+      key={key}
+      type="button"
+      tabIndex={-1}
+      aria-disabled={dim || undefined}
+      {...tap(() => {
+        if (!dim) press();
+      })}
+      className={`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 kiosk:text-lg ${
+        dim ? 'opacity-50' : ''
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const checksDim = busy || state.kind !== 'ready';
+  const checkAndTest = (
+    <div key="checks" className="grid shrink-0 grid-cols-2 gap-3">
+      {secondary('check', t('checkPrinter'), () => void check(), checksDim)}
+      {secondary('test', t('testPrint'), testNow, checksDim)}
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col p-6">
-      <div className="pb-4 text-center">
+      {/*
+        * The head, inside the column the rest of the screen is built in, and
+        * holding two things: what this screen is, and what the printer is
+        * doing. Everything else it used to carry — the advice, the Android
+        * sentence — is prose, and prose belongs under the control it is about.
+        *
+        * That is also what holds the primary at one y across every configured
+        * state without a padded band, which is what stops a control arriving
+        * under a thumb when the boot ladder settles.
+        */}
+      <div
+        className={`mx-auto w-full max-w-2xl pb-4 text-center ${setup ? '' : 'lg:max-w-5xl'}`}
+      >
         <div className="text-lg font-medium text-ink-400 kiosk:text-xl">{t('title')}</div>
-        <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>{line.text}</div>
-        {state.kind === 'trouble' && state.advice && (
-          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">
-            {printerNote(state.advice)}
-          </div>
-        )}
-        {state.kind === 'unpaired' && !state.searching && (
-          <div className="pt-1 text-sm text-ink-500 kiosk:text-base">
-            {/*
-              The Android sentence is there because on Android it is the whole
-              story: a printer that lost power or its cable, however briefly, is
-              one the browser can no longer match to its grant, and only the
-              chooser brings it back. See docs/label-printing.md.
-            */}
-            {t('checkPowerAndCable')}
-          </div>
-        )}
+        <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>
+          {stillLooking ? (
+            /* The app's own busy mark, so both screens say "working" the same
+               way. Ten seconds of an ellipsis that never moves is a tablet a
+               volunteer decides has frozen. */
+            <span className="flex items-center justify-center gap-2">
+              <span
+                aria-hidden
+                className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              />
+              {line.text}
+            </span>
+          ) : (
+            line.text
+          )}
+        </div>
       </div>
 
       {/*
@@ -384,96 +703,222 @@ export function PrinterScreen({
         * guess-the-last-label habit survived the redesign. Meanwhile 47% of the
         * width was empty page.
         *
-        * Stacked rather than gridded at narrow widths, so the slack of a quiet
-        * evening falls *below* both blocks rather than between them: a `1fr` row
-        * for the list put five names in a 750px card and left a matching hole
-        * under the doors.
+        * The act group leads in both shapes, and the reference group is
+        * anchored to the foot rather than trailing the act: the void then falls
+        * between two masses instead of hanging off one, and nothing a thumb
+        * aims at moves to buy it.
         */}
-      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-4 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6">
-        {/* The card is the height of the evening, not the height of the track. */}
-        <div className="flex max-h-full min-h-0 flex-col rounded-xl bg-ink-900 p-4 lg:self-start">
-          {/* Named for what the group holds rather than for how the rows in it
-              ended: under "Printed tonight" the amber row reading *Did not
-              print* is an exception to its own heading, and that row is the one
-              a volunteer is here for. */}
-          <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
-            {t('tagsTonight')}
-          </div>
-          {printedTonight.length === 0 ? (
-            <div className="px-4 text-sm text-ink-500 kiosk:text-base">
-              {t('nothingPrinted')}
-            </div>
-          ) : (
-            /* The card's own padding is the dead gutter the list stops against,
-               and the ramp is what stops a clipped row from being a row with
-               half a name on it flush against the next control. Both are worked
-               out on the search screen; neither was here. */
-            <div
-              ref={regionRef}
-              className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch ${
-                overflowing ? 'kiosk-list-fade' : ''
-              }`}
-              style={{ touchAction: 'pan-y', ...fadeVars }}
-            >
-              <div ref={contentRef} className="flex shrink-0 flex-col gap-2">
-                {printedTonight.map((entry) => (
+      <div
+        className={`mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 ${
+          setup
+            ? 'overflow-y-auto'
+            : 'lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6'
+        }`}
+      >
+        <div
+          className={`flex shrink-0 flex-col gap-6 ${
+            setup ? '' : 'lg:order-2 lg:min-h-0 lg:overflow-y-auto'
+          }`}
+        >
+          {primary !== null && (
+            <Unit>
+              <button
+                type="button"
+                tabIndex={-1}
+                {...tap(primary.press)}
+                className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
+              >
+                {primary.label}
+              </button>
+              {primarySays}
+            </Unit>
+          )}
+
+          {/*
+            * The roll question, in the act rather than under the fold.
+            *
+            * It lived at the bottom of a 570px `details` behind a 69px
+            * *Change*, 500px below the sentence that said "pick it below" — so
+            * the nearest control under that sentence was the one that re-pairs
+            * the printer. On the one state whose whole subject is a question,
+            * the question is the act.
+            */}
+          {rollAmbiguous && (
+            <Unit>
+              <div className="max-w-xl shrink-0 text-sm text-ink-300 kiosk:text-base">
+                {t('whichOnSpindle')}
+              </div>
+              <div className="grid shrink-0 grid-cols-1 gap-3">
+                {detection.matched.map((entry) => (
                   <button
-                    key={entry.id}
+                    key={entry.identifier}
                     type="button"
                     tabIndex={-1}
-                    {...rowTap(entry)}
-                    className={`flex h-14 w-full shrink-0 items-center justify-between rounded-lg bg-ink-800 px-4 text-left active:bg-ink-700 kiosk:h-16 ${
-                      /* The row a volunteer most wants — a label that never came
-                         out — was distinguished by fourteen pixels of amber text
-                         on the right edge of a five-row list.
-
-                         Inset, because this list scrolls: a scrolling box clips
-                         at its padding edge on both axes, and there is no gutter
-                         between these rows and that edge — so an outer ring,
-                         which a browser draws outside the border box, arrived
-                         with its left and right strokes shaved off. The same
-                         defect the register's question list had. */
-                      entry.failed ? 'inset-ring-1 inset-ring-warn-500/40' : ''
+                    aria-pressed={entry.identifier === label}
+                    {...tap(() => onLabelChange(entry.identifier))}
+                    /* The app's own selected-tile treatment rather than a
+                       second brand fill. Promoted to a 60px full-width row, a
+                       `bg-brand-600` chip wore the primary's silhouette as well
+                       as its colour 650px under a primary that had just taught
+                       "blue is the thing to press" — and this blue is an answer
+                       already given. */
+                    className={`flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg ${
+                      entry.identifier === label
+                        ? 'bg-brand-600/25 text-brand-200 ring-2 ring-brand-500'
+                        : 'bg-ink-800 text-ink-100 active:bg-ink-700'
                     }`}
                   >
-                    <span className="min-w-0 truncate text-base font-semibold text-ink-100 kiosk:text-lg">
-                      {entry.name}
-                    </span>
-                    <span
-                      className={`shrink-0 pl-3 text-sm whitespace-nowrap kiosk:text-base ${
-                        entry.failed ? 'font-semibold text-warn-400' : 'text-ink-500'
-                      }`}
-                    >
-                      {entry.failed ? t('didNotPrint') : clockTime(locale, entry.atMs)}
-                    </span>
+                    {printing.labelName(entry)}
                   </button>
                 ))}
               </div>
-              {overflowing && (
-                <div aria-hidden className="shrink-0" style={{ height: 'var(--kiosk-fade)' }} />
+            </Unit>
+          )}
+
+          {/* Set-up: whichever second control this state has, with the sentence
+              that belongs to it. */}
+          {setup && state.kind === 'trouble' && (
+            <Unit>
+              {secondary('connect-again', t('connectThisAgain'), () => void connect(), busy)}
+              <Say>{t('connectOpensWindow')}</Say>
+            </Unit>
+          )}
+          {setup && state.kind === 'unpaired' && (
+            <Unit>
+              {secondary('look-again', t('lookAgain'), () => void lookAgain(), busy || stillLooking)}
+            </Unit>
+          )}
+          {setup && state.kind === 'ready' && (
+            <Unit>
+              {secondary('different', t('connectDifferent'), () => void connect(), busy)}
+              {/* A dismissed list on a *working* kiosk. The rule is never amber
+                  on green, not never an account on green: without this the one
+                  press available here changed nothing at all. */}
+              {attemptFailed && (
+                <Say tone="text-ink-100">
+                  {t('stillOnPrinter', { model: detection?.config.model ?? model })}
+                </Say>
               )}
-            </div>
+            </Unit>
+          )}
+
+          {/* Mid-evening: the doors this screen has always had, grouped so the
+              reason sits with whatever is greyed. */}
+          {!setup && (
+            <Unit>
+              <div className="flex shrink-0 flex-col gap-3">
+                {connectLeads &&
+                  onReprintByName &&
+                  secondary(
+                    'reprint',
+                    t('reprint'),
+                    () => {
+                      haptic();
+                      forget();
+                      onReprintByName();
+                    },
+                    !canReprint,
+                  )}
+                {canLookAgain &&
+                  connectLeads &&
+                  (state.kind === 'trouble'
+                    ? secondary('connect-again', t('connectThisAgain'), () => void connect(), busy)
+                    : secondary('look-again', t('lookAgain'), () => void lookAgain(), busy || stillLooking))}
+                {checkAndTest}
+              </div>
+              {!canReprint ? (
+                <Say>{t('reprintNeedsPrinter')}</Say>
+              ) : (
+                checksDim && <Say>{t('checksNeedPrinter')}</Say>
+              )}
+            </Unit>
+          )}
+          {!setup && state.kind === 'ready' && (
+            /* A full step below the benign pair, because it is the one control
+               here that can re-bind a live kiosk — a thumb aimed at the bottom
+               of *Print a test label* used to land 12px away on the browser's
+               device sheet, over a queue. */
+            <Unit>
+              {secondary('different', t('connectDifferent'), () => void connect(), busy)}
+              {attemptFailed && (
+                <Say tone="text-ink-100">
+                  {t('stillOnPrinter', { model: detection?.config.model ?? model })}
+                </Say>
+              )}
+            </Unit>
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
-          {/*
-            * What connecting just found out, outside the fold.
-            *
-            * The two settings below it are answered by the printer now, so the
-            * job of this column is no longer to ask — it is to show the answers
-            * and be honest about the one of them that is a guess. A roll chosen
-            * for somebody because the packet could not choose is the sentence
-            * this screen most owes a volunteer, and it cannot live inside a
-            * `details` nobody has a reason to open.
-            */}
-          {notice && (
-            <div className="shrink-0 rounded-xl bg-ink-900 p-4">
-              {notice.lines.map((text) => (
-                <div key={text} className={`text-sm kiosk:text-base ${notice.tone}`}>
-                  {text}
+        <div
+          className={`mt-auto flex min-h-0 shrink flex-col gap-3 ${
+            setup ? '' : 'lg:order-1 lg:mt-0'
+          }`}
+        >
+          {!setup && (
+            /* The card is the height of the evening, not the height of the track. */
+            <div className="flex max-h-full min-h-0 flex-col rounded-xl bg-ink-900 p-4 lg:self-start">
+              {/* Named for what the group holds rather than for how the rows in it
+                  ended: under "Printed tonight" the amber row reading *Did not
+                  print* is an exception to its own heading, and that row is the one
+                  a volunteer is here for. */}
+              <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
+                {t('tagsTonight')}
+              </div>
+              {printedTonight.length === 0 ? (
+                <div className="px-4 text-sm text-ink-500 kiosk:text-base">
+                  {t('nothingPrinted')}
                 </div>
-              ))}
+              ) : (
+                /* The card's own padding is the dead gutter the list stops against,
+                   and the ramp is what stops a clipped row from being a row with
+                   half a name on it flush against the next control. Both are worked
+                   out on the search screen; neither was here. */
+                <div
+                  ref={regionRef}
+                  className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-touch ${
+                    overflowing ? 'kiosk-list-fade' : ''
+                  }`}
+                  style={{ touchAction: 'pan-y', ...fadeVars }}
+                >
+                  <div ref={contentRef} className="flex shrink-0 flex-col gap-2">
+                    {printedTonight.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        tabIndex={-1}
+                        {...rowTap(entry)}
+                        className={`flex h-14 w-full shrink-0 items-center justify-between rounded-lg bg-ink-800 px-4 text-left active:bg-ink-700 kiosk:h-16 ${
+                          /* The row a volunteer most wants — a label that never came
+                             out — was distinguished by fourteen pixels of amber text
+                             on the right edge of a five-row list.
+
+                             Inset, because this list scrolls: a scrolling box clips
+                             at its padding edge on both axes, and there is no gutter
+                             between these rows and that edge — so an outer ring,
+                             which a browser draws outside the border box, arrived
+                             with its left and right strokes shaved off. The same
+                             defect the register's question list had. */
+                          entry.failed ? 'inset-ring-1 inset-ring-warn-500/40' : ''
+                        }`}
+                      >
+                        <span className="min-w-0 truncate text-base font-semibold text-ink-100 kiosk:text-lg">
+                          {entry.name}
+                        </span>
+                        <span
+                          className={`shrink-0 pl-3 text-sm whitespace-nowrap kiosk:text-base ${
+                            entry.failed ? 'font-semibold text-warn-400' : 'text-ink-500'
+                          }`}
+                        >
+                          {entry.failed ? t('didNotPrint') : clockTime(locale, entry.atMs)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  {overflowing && (
+                    <div aria-hidden className="shrink-0" style={{ height: 'var(--kiosk-fade)' }} />
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -481,92 +926,74 @@ export function PrinterScreen({
             * Settings chosen once at unboxing, folded to what they are set to.
             * `details` rather than a state flag: the browser already owns this
             * and the kiosk bundle has a budget.
+            *
+            * Two reference rows, one value: this summary was a rung brighter
+            * than the log's beside it, which made the closed disclosure of
+            * reference data the brightest ink on the screen.
             */}
-          <details className="shrink-0 rounded-xl bg-ink-900">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
-              <span className="min-w-0 truncate">
-                {model} · {printing.labelName(available.find((entry) => entry.identifier === label) ?? available[0])}
-              </span>
-              {/* Quieter than the summary in colour, not in size: this is the
-                  affordance that opens the row, read at arm's length. */}
-              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">Change</span>
-            </summary>
-            <div className="flex flex-col gap-4 px-4 pb-4">
-              <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400 kiosk:text-base">{t('model')}</span>
-                <select
-                  aria-label={t('model')}
-                  value={model}
-                  onChange={(event) => onModelChange(event.target.value)}
-                  className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
-                >
-                  {orderedModels(printing).map((identifier) => (
-                    <option key={identifier} value={identifier}>
-                      {identifier}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-ink-500 kiosk:text-sm">
-                  {t('modelHint')}
+          {hasConfig || detection ? (
+            <details className="shrink-0 rounded-xl bg-ink-900">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 truncate">
+                  {model} ·{' '}
+                  {printing.labelName(
+                    available.find((entry) => entry.identifier === label) ?? available[0],
+                  )}
                 </span>
-              </label>
+                {/* Quieter than the summary in colour, not in size: this is the
+                    affordance that opens the row, read at arm's length. */}
+                <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">Change</span>
+              </summary>
+              <div className="flex flex-col gap-4 px-4 pb-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-ink-400 kiosk:text-base">{t('model')}</span>
+                  <select
+                    aria-label={t('model')}
+                    value={model}
+                    onChange={(event) => onModelChange(event.target.value)}
+                    className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
+                  >
+                    {orderedModels(printing).map((identifier) => (
+                      <option key={identifier} value={identifier}>
+                        {identifier}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-ink-400 kiosk:text-sm">{t('modelHint')}</span>
+                </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="text-sm text-ink-400 kiosk:text-base">{t('loadedLabel')}</span>
-                <select
-                  aria-label={t('loadedLabel')}
-                  value={labelIsAvailable ? label : (available[0]?.identifier ?? label)}
-                  onChange={(event) => onLabelChange(event.target.value)}
-                  className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
-                >
-                  {available.map((entry) => (
-                    <option key={entry.identifier} value={entry.identifier}>
-                      {printing.labelName(entry)}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-ink-500 kiosk:text-sm">
-                  {t('loadedLabelHint')}
-                </span>
-              </label>
-
-              {/* Only when the packet could not choose. One match is already the
-                  answer in the select above, and a chip saying "use what you
-                  are using" is a control that does nothing. */}
-              {detection && detection.matched.length > 1 && (
-                <div className="rounded-xl bg-ink-950 p-4">
-                  <div className="pb-2 text-sm text-ink-400 kiosk:text-base">
-                    {t('whichOnSpindle')}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {detection.matched.map((entry) => (
-                      <button
-                        key={entry.identifier}
-                        type="button"
-                        tabIndex={-1}
-                        {...tap(() => onLabelChange(entry.identifier))}
-                        className={`rounded-lg px-4 py-2 text-ink-100 ${
-                          entry.identifier === label
-                            ? 'bg-brand-600 active:bg-brand-500'
-                            : 'bg-ink-800 active:bg-ink-700'
-                        }`}
-                      >
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-ink-400 kiosk:text-base">{t('loadedLabel')}</span>
+                  <select
+                    aria-label={t('loadedLabel')}
+                    value={labelIsAvailable ? label : (available[0]?.identifier ?? label)}
+                    onChange={(event) => onLabelChange(event.target.value)}
+                    className="rounded-xl border-2 border-ink-800 bg-ink-900 p-4 text-lg text-ink-100"
+                  >
+                    {available.map((entry) => (
+                      <option key={entry.identifier} value={entry.identifier}>
                         {printing.labelName(entry)}
-                      </button>
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-ink-400 kiosk:text-sm">{t('loadedLabelHint')}</span>
+                </label>
+
+                {detection && detection.status && detection.status.errors.length > 0 && (
+                  <div className="rounded-xl bg-ink-950 p-4 text-sm text-warn-400 kiosk:text-base">
+                    {detection.status.errors.map((flag) => (
+                      <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {detection && detection.status && detection.status.errors.length > 0 && (
-                <div className="rounded-xl bg-ink-950 p-4 text-sm text-warn-400 kiosk:text-base">
-                  {detection.status.errors.map((flag) => (
-                    <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
+                )}
+              </div>
+            </details>
+          ) : (
+            /* Nothing has been read off anything yet, so there is nothing to
+               fold — and two selects full of invented defaults on a kiosk with
+               no printer is the screen asserting answers it does not have. */
+            <Say tone="text-ink-400">{t('modelPending')}</Say>
+          )}
 
           {/*
             * What has happened to the printer lately.
@@ -584,7 +1011,7 @@ export function PrinterScreen({
             className="shrink-0 rounded-xl bg-ink-900"
             onToggle={(event) => setEventsOpen((event.target as HTMLDetailsElement).open)}
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-200 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">{t('recentEvents')}</span>
               <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
                 {eventsOpen ? 'Hide' : 'Show'}
@@ -592,9 +1019,7 @@ export function PrinterScreen({
             </summary>
             <div className="flex flex-col gap-3 px-4 pb-4">
               {events.length === 0 ? (
-                <div className="text-sm text-ink-500 kiosk:text-base">
-                  {t('nothingWritten')}
-                </div>
+                <div className="text-sm text-ink-500 kiosk:text-base">{t('nothingWritten')}</div>
               ) : (
                 <div
                   className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain scroll-touch font-mono text-xs text-ink-400 kiosk:text-sm"
@@ -620,9 +1045,7 @@ export function PrinterScreen({
                   {copied === 'copied' ? 'Copied' : 'Copy'}
                 </button>
                 {copied === 'failed' && (
-                  <span className="text-xs text-ink-500 kiosk:text-sm">
-                    {t('copyBlocked')}
-                  </span>
+                  <span className="text-xs text-ink-500 kiosk:text-sm">{t('copyBlocked')}</span>
                 )}
                 <span aria-live="polite" className="sr-only">
                   {copied === 'copied' ? t('eventsCopied') : ''}
@@ -640,100 +1063,10 @@ export function PrinterScreen({
             </div>
           </details>
 
-          {/*
-            * The saturated control on a screen about reprinting used to be
-            * **Choose a different printer** — the one that unbinds the printer —
-            * and a hurried volunteer aims at colour. It is the by-name reprint
-            * instead: the door this screen is now open for.
-            *
-            * Not gated on the device, unlike its two neighbours. This is the
-            * one control in the column that goes to another screen rather than
-            * talking to the printer, and a door disabled because a transport is
-            * not claimed is a door that refuses the errand the reprint screen
-            * exists to report on.
-            */}
-          {onReprintByName && (
-            <button
-              type="button"
-              tabIndex={-1}
-              {...tap(() => {
-                haptic();
-                onReprintByName();
-              })}
-              className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
-            >
-              {t('reprint')}
-            </button>
-          )}
-
-          {/* One size across the three secondary doors, and let colour do the
-              ranking on its own: `text-base text-ink-300` on the unbind against
-              `text-sm text-ink-100` on its two siblings made the largest of the
-              three also the dimmest — size saying *more important*, colour
-              saying *less available*, on the one control here that takes the
-              printer away from the kiosk. */}
-          <div className="grid shrink-0 grid-cols-2 gap-3">
-            <button
-              type="button"
-              tabIndex={-1}
-              disabled={busy || state.kind !== 'ready'}
-              {...tap(() => void check())}
-              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-            >
-              {t('checkPrinter')}
-            </button>
-            <button
-              type="button"
-              tabIndex={-1}
-              disabled={busy || state.kind !== 'ready'}
-              {...tap(() => printing.testPrint(locale))}
-              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-            >
-              {t('testPrint')}
-            </button>
-          </div>
-
-          {/*
-            * The one place requestDevice is called, and guarded like every
-            * other control here rather than left on a bare `onClick`.
-            *
-            * It used to be a bare one, on the belief that the chooser needs a
-            * *click* to count as a gesture. It does not: `pointerdown` grants
-            * transient activation for touch and `pointerup` for mouse, so
-            * `navigator.userActivation.isActive` is true inside the guard's
-            * `pointerup` — `preventDefault` on the press does not spend it.
-            *
-            * What the bare handler did instead was answer a press that was
-            * never made on it. The staff screen's rows act on `pointerup`, so
-            * the *click* that follows the same tap is dispatched after this
-            * screen has already mounted underneath the finger — and both
-            * screens centre their column, which put this button within a few
-            * pixels of the `Label printer` row across every viewport the kiosk
-            * runs at. So opening the printer screen opened the browser's device
-            * chooser, every time, on a printer that was already connected.
-            */}
-          <div className={`grid shrink-0 gap-3 ${canLookAgain ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {canLookAgain && (
-              <button
-                type="button"
-                tabIndex={-1}
-                disabled={busy}
-                {...tap(() => void lookAgain())}
-                className="rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-              >
-                {t('lookAgain')}
-              </button>
-            )}
-            <button
-              type="button"
-              tabIndex={-1}
-              disabled={busy}
-              {...tap(() => void connect())}
-              className="rounded-xl bg-ink-800 p-4 text-sm text-ink-300 active:bg-ink-700 disabled:opacity-50 kiosk:text-lg"
-            >
-              {state.kind === 'ready' ? t('chooseDifferent') : t('connectPrinter')}
-            </button>
-          </div>
+          {/* An errand for the person with the laptop on a Tuesday, so it sits
+              with the reference rather than competing with the test label at
+              9:03 on a Sunday. It is still the top cause of the state above. */}
+          {state.kind === 'ready' && <Say tone="text-ink-400">{t('autoPowerOff')}</Say>}
         </div>
       </div>
 
@@ -742,10 +1075,9 @@ export function PrinterScreen({
           door this screen was reorganised to expose — and it is the same control
           the reprint screen already draws as a pill in its console row.
 
-          Sixteen pixels above a stack whose own rhythm is twelve is not a
-          category break, it is a fifth item in a list of four. Both kiosk shapes
-          get the break from the column boundary; the phone has to get it from
-          the gap. */}
+          Promoted on the one frame where leaving *is* the next act: a volunteer
+          who has just sent a test label has done the last thing this screen is
+          for, and the sentence above names this button. */}
       <div className="mx-auto flex w-full max-w-2xl justify-center pt-7 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:pt-4">
         <button
           type="button"
@@ -754,9 +1086,17 @@ export function PrinterScreen({
           /* `min-w-0 shrink truncate`, because this button has two labels now
              and the longer one names where it goes — the same shape the reprint
              screen's way out already wears for the same sentence. */
-          className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-10 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-lg"
+          className={`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 kiosk:text-lg ${
+            setup && !tested
+              ? 'bg-ink-900 font-medium text-ink-300 active:bg-ink-800'
+              : 'bg-ink-800 font-semibold text-ink-100 active:bg-ink-700'
+          }`}
         >
-          {returnsTo === 'check-in' ? tStaff('doneBackToCheckIn') : t('done')}
+          {setup
+            ? t('backToGatherings')
+            : returnsTo === 'check-in'
+              ? tStaff('doneBackToCheckIn')
+              : t('done')}
         </button>
       </div>
     </div>
