@@ -1,10 +1,13 @@
 # The kiosk's printer set-up — three directions, photographed
 
-A design campaign, not a shipped change. The lobby kiosk's landing page (the
-gathering chooser) and its label-printer set-up were put through the
-[UXR refinement loop](../uxr/README.md) for three rounds, on the portrait shelf
-tablet (800×1280), and the result is three chooser directions and one printer
-screen fix for the product owner to choose between. Once one ships, this page's
+A design campaign, not yet a shipped change. The lobby kiosk's landing page
+(the gathering chooser) and its label-printer set-up were put through the
+[UXR refinement loop](../uxr/README.md) on the portrait shelf tablet
+(800×1280): three chooser directions and one printer-screen fix were built,
+photographed and argued over for three rounds, and the product owner chose
+**B — the printer is always on the landing page — with C, the printer-screen
+fix**, and set the other two aside. A fourth round then widened B and C to
+every state the comparison had not photographed. Once it ships, this page's
 campaign moves into [refinements.md](refinements.md) with the others.
 
 ## The concern
@@ -63,26 +66,9 @@ gathering*.
   which needs the lazily-loaded printing module in memory before the press —
   see *Found along the way*.
 
-## The three directions
+## The direction chosen, and the two set aside
 
-### F — the row says it, the foot answers it
-
-A printer panel appears above the unchanged blue commit **only when the
-selected row prints** (and, after round 2, whenever a configured printer is in
-a fault state, so the Android Sunday is announced before any tap). It reads
-*Kids Club prints name tags*, the state, then **Connect the printer** as its
-own forward control, **Print a test label** once ready, *Printer settings*.
-A clean Wednesday and a kiosk with no printer see nothing until a printing row
-is picked. The commit's sub-line says *name tags won't print* when a printing
-row is picked with no printer.
-
-*Cost, stated:* the hold path on a never-configured kiosk gets the row mark and
-nothing else. The staff consultant's pick ("the only one that puts a real
-printer control where the eye already is without putting a printer on a tablet
-that will never have one"). The design critic: the best-composed foot of the
-three.
-
-### B — the printer is always on the landing page
+### B — the printer is always on the landing page (chosen)
 
 The owner's own idea, corrected by the panel. The panel is drawn from first
 paint whenever a bindable gathering today prints or this kiosk has a printer,
@@ -96,23 +82,27 @@ Android Sunday.
 printer sentence every week, and loads the printing module. The journey
 critic's pick; the staff consultant would tolerate it.
 
-### D — the blue button is the next thing to do
+### Set aside: F and D
 
-With a printing row picked on a kiosk that has **never** had a printer, the
-primary reads **Connect the printer** in the commit's blue, with a full-weight
-*Set kiosk without a printer* beneath it carrying which sitting it binds. Once
-connected the primary is *Set kiosk*. A kiosk that has ever had a printer never
-re-labels its blue button; a lost printer gets an amber *Connect the printer
-again* pill, so a mid-evening re-bind with a queue is never hijacked. After
-round 2: a dismissed device list leaves the button saying *Connect*; the two
-slabs no longer share a 12px seam; the printer's absence is stated at first
-paint.
+**F — the row says it, the foot answers it.** The same panel, drawn only when
+the *selected* row prints or a configured printer is in a fault state; a clean
+Wednesday and a kiosk with no printer see nothing until a printing row is
+picked. The staff consultant's pick and the best-composed foot, but silent for
+the volunteer who holds a row on a kiosk that never had a printer — the gesture
+the screen itself teaches — which is the failure the campaign was opened
+about. Set aside for that.
 
-*Cost, stated:* on most kiosks — the ones that never have a printer — the blue
-button reads *Connect the printer* weekly and the correct action is the grey
-one; and the browser's own device list opens from the button everyone is
-trained to press. The volunteer's pick ("the only one where the thing that's
-not done and the blue button line up"); the staff consultant's never.
+**D — the blue button is the next thing to do.** With a printing row picked on
+a never-configured kiosk the primary read *Connect the printer*, with a
+full-weight *Set kiosk without a printer* beneath it. The first-time
+volunteer's pick ("the only one where the thing that's not done and the blue
+button line up"), and the staff consultant's never: it put the browser's own
+device list behind the button everyone is trained to press, and on most
+kiosks — the ones that never have a printer — the blue button would read
+*Connect the printer* every week with the correct action in grey beneath it.
+Guards were built (a kiosk that ever had a printer never re-labels; the verb
+latches at the tap; a dismissed dialog leaves it saying Connect) and the
+cost was judged still too high. Set aside for that.
 
 ### C — the printer screen, set-up mode (ships regardless)
 
@@ -126,7 +116,7 @@ state; the physical errand named before the press; the Android state built; and
 the mid-evening screen puts *Connect* ahead of *Reprint* when there is no
 printer, because that is the recovery screen.
 
-## How the panel voted
+## How the panel voted on the comparison (round 2)
 
 | reader | F | B | D | C |
 |---|---|---|---|---|
@@ -215,35 +205,6 @@ away; these sentences are what survive.
   drops its fill and stroke (`pointer-events-none text-ink-500` on a
   `border-2 border-transparent` box), keeping the 672×96 box so nothing moves.
 
-### F
-
-- Gate: render the strip when `printsSelected || printerConfigured`; visible
-  when `printsSelected || fault` where `fault` is
-  `unpaired && !searching || trouble || unsupported`; otherwise reserved
-  (`invisible`, `aria-hidden`, `&nbsp;` lines and an empty control box) so the
-  strip box is identical in every state. A configured kiosk whose printer is
-  working, with nothing selected, gets **only** the quiet *Printer settings*
-  door in the strip's slot — not the filled proof button — so a clean
-  Wednesday on the shared kiosk stays as quiet as F promises. (The final
-  visual pass caught the wider gate; that frame is not photographed and
-  should be before F ships.)
-- Wrapper `mb-2 rounded-xl bg-ink-900 p-4` (no ring — it sits on the column).
-  Context line `text-sm text-ink-400 kiosk:text-base`
-  (`printsSelected ? t('printsNameTagsFor', {title}) : t('Printer.title')`);
-  state line `pt-1 text-lg font-medium kiosk:text-xl` toned by a
-  `stripLine(printerState, printerConfigured)` helper mirroring the printer
-  screen's `stateLine` (`ink-200` / `warn-400` / `present-400`).
-- Controls row `flex items-center gap-6 pt-3`: one forward control
-  (`h-12 flex-1 rounded-lg bg-ink-700 px-4 text-base font-semibold text-ink-50 active:bg-ink-600 kiosk:h-16 kiosk:text-lg`)
-  — the connect, or *Print a test label* once ready — then a `gap-3` pack of
-  underlined `ink-400` links: *Connect a different printer* (ready only) and
-  *Printer settings* (carrying the existing `tap(onSetUpPrinter)`).
-- New `Chooser` messages: `printsNameTags`, `printsNameTagsFor`,
-  `noPrinterConnected`, `printerConnectedModel` (*Printer connected ✓ ·
-  {model}*), `connectPrinter`, `connectPrinterAgain`, `connectDifferentPrinter`,
-  `testPrint`, `printerSettings`, `gettingReady`, `nameTagsWontPrint`; reuse
-  `Printer.notConnected` and `printerNote()` for faults.
-
 ### B
 
 - Gate the strip on `printerConfigured || bindablePrinting.length > 0`, where
@@ -321,59 +282,6 @@ away; these sentences are what survive.
   `connectedReadOff`, `connectedGuessedRoll`, `connectedGuessedModel`,
   `thenTestLabel`, `modelRollPending`, `backToGatherings`, `testLabelCameOut`.
 
-### D
-
-- `printerConfigured` is read **once at mount** (`useState(() => readPrinterConfig() !== null)`),
-  never per render, so the primary's word and the geometry cannot change under
-  a hand. The blue *Connect the printer* may appear only when
-  `commitIntent === 'connect' && !printerConfigured && printing !== null && printerState?.kind !== 'ready'`;
-  a kiosk that has ever had a printer keeps *Set kiosk* forever and shows a
-  fault as its own amber pill in the strip.
-- `commitIntent` is written in the row's `onTap` (when the row prints and the
-  kiosk has no config) and cleared in exactly two places: inside `bind()`, and
-  when `printerState.kind` becomes `ready`. Never on `pairPrinter()` settling —
-  a dismissed device list is a resolution, and clearing there is how the blue
-  button would silently become *Set kiosk*. `attemptFailed` is set when
-  `pairPrinter()` resolves falsy and drives the warn sentence *The browser
-  found no printer — check it is plugged into this tablet and switched on,
-  then try again*; cleared on the next row tap or on `ready`.
-- The foot renders `InstallPrompt`, the strip, `{connectShown && <ConnectButton/>}`,
-  then the commit. The commit is extracted into a local `<CommitButton tone=brand|ink|ghost>`
-  used three ways; the hatch *Set kiosk without a printer* is the `ink` tone
-  and carries the meta line (*Kids Club · 9:09 AM*) so it says which sitting it
-  binds. The connect button is a separate
-  `flex h-24 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500`
-  above it, and the commit takes `mt-8` when the connect is rendered — a 32px
-  seam borrowed from the void, so the commit's bottom edge stays on the page
-  margin in every state. There is no invisible reserved slot anywhere in the
-  foot. Stated cost: on a never-configured kiosk, selecting a printing row
-  lifts the strip and its link 128px as the connect appears below them; the
-  commit itself is still.
-- Strip branch order: ready → present line; `unpaired && searching` →
-  *Looking for the printer…*; `unpaired && !searching` / trouble /
-  unsupported → warn line + the *Connect the printer again* pill;
-  `printerConfigured && (null || idle)` → *Looking for the printer…*;
-  `!printerConfigured && printing === null` → *No printer on this kiosk —
-  checking…* with the commit already reading *Set kiosk without a printer*
-  (the fact is settled at mount; only the Connect waits for the module — the
-  final visual pass caught the earlier version, which hid the fact and showed
-  an unqualified blue commit for the length of the fetch); else the fact line
-  *Kids Club prints name tags · No printer on this kiosk* (the selected
-  printing row's title, or the bindable printing rows' titles at first paint,
-  or the placeholder when a non-printing row is selected). On the
-  configured-but-lost frame the commit's sub-line also carries *· name tags
-  won’t print*.
-- Ready strip: *Print a test label* is a filled control
-  (`inline-flex h-12 items-center rounded-lg bg-ink-800 px-5 font-medium text-ink-100 kiosk:h-16 kiosk:px-6`)
-  beside the *Printer settings* link (`text-ink-300`, underlined), 16px apart;
-  green appears only on the state line.
-- New `Chooser` strings: `connectThePrinter`, `setKioskWithoutPrinter`,
-  `gatheringPrints` / `gatheringsPrint`, `noPrinterOnThisKiosk`,
-  `browserFoundNoPrinter`, `gettingPrinterReady`, `printerReady`,
-  `connectAgain`, `printerSettings`.
-
-
-
 ## Still open after the final pass
 
 Minor findings the confirmatory pass left for whoever implements, in the
@@ -384,8 +292,6 @@ order they were raised:
 - The commit's *name tags won’t print* clause is `text-white` on `brand-600`
   (4.1:1); a weight step is worth taking, and it belongs on the shelf-tablet
   photograph.
-- F's configured-and-working kiosk with nothing selected is not photographed
-  and is the frame the F-versus-B call turns on.
 - On the guessed-roll printer frame, the two roll chips behind *Change* are
   40px tall and 8px apart — the smallest targets in the set on the frame
   whose whole job is choosing between them. Inherited; give them the
