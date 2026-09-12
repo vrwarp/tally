@@ -94,7 +94,7 @@ describe('pressing it', () => {
     expect(askToBeAdded).toHaveBeenCalledWith('sunday-school', 'sam', 'Sam Whitfield');
     expect(
       await screen.findByText(
-        /Your name is on the Add list for Miriam Achebe and Dana Ruiz.*go and find them/,
+        /Nobody is told\. Miriam Achebe and Dana Ruiz.*go and find them/,
       ),
     ).toBeInTheDocument();
   });
@@ -134,14 +134,14 @@ describe('once it is on the list', () => {
     ]);
     show();
 
-    // Dated, and followed by where it will be seen. A bare "your name is on
-    // the Add list", set like the directory of people above it, is the shape
-    // of a status — and a status is a promise nothing here makes.
+    // Dated, and followed by the fact that nobody is coming. A bare "your name
+    // is on the Add list", set like the directory of people above it, is the
+    // shape of a status — and a status is a promise nothing here makes.
     await waitFor(() =>
       expect(screen.getByText(/Your name went on the Add list/)).toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/Nobody is notified\. Miriam Achebe and Dana Ruiz will see it/),
+      screen.getByText(/Nobody is told\. Miriam Achebe and Dana Ruiz will see it/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ask to be added' })).not.toBeInTheDocument();
   });

@@ -161,7 +161,30 @@ describe('what an admin can see that nobody else needs to', () => {
     );
     await settle();
 
-    expect(screen.getByText('🔒 narrowed · 2')).toBeInTheDocument();
+    // A padlock and a count, and nothing to read: this tag is only ever seen
+    // by the two or three people per church who set the fences, and they meet
+    // it the first time they press Limit.
+    expect(screen.getByText('🔐 2')).toBeInTheDocument();
+  });
+
+  /*
+   * What a trained eye does not need, a screen reader still does — the glyph
+   * is `aria-hidden`, so without this sentence the tag would announce as
+   * "closed lock, 2" and the count would have no noun.
+   */
+  it('says the whole sentence to a screen reader', async () => {
+    show(
+      [event({ id: 'next-friday', title: 'Friday Fellowship', seriesId: FRIDAY, startAt: at(31, 19), endAt: at(31, 21) })],
+      {
+        admin: true,
+        access: new Map([[FRIDAY, restricted(FRIDAY, ['miriam', 'dana'])]]),
+      },
+    );
+    await settle();
+
+    expect(
+      screen.getByText('Limited to 2 people — everybody else sees it locked'),
+    ).toBeInTheDocument();
   });
 
   it('says nothing of the kind to anybody else', async () => {
@@ -171,7 +194,8 @@ describe('what an admin can see that nobody else needs to', () => {
     );
     await settle();
 
-    expect(screen.queryByText(/narrowed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^🔐 \d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Limited to/)).not.toBeInTheDocument();
   });
 
   it('tags nothing on a gathering nobody has narrowed', async () => {
@@ -180,7 +204,8 @@ describe('what an admin can see that nobody else needs to', () => {
     });
     await settle();
 
-    expect(screen.queryByText(/narrowed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^🔐 \d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Limited to/)).not.toBeInTheDocument();
   });
 });
 

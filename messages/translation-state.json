@@ -2481,9 +2481,9 @@
     "zh-Hant": "machine"
   },
   "CheckIn.archivedEmptyBody": {
-    "source": "Tally reads a finished gathering with no attendance as one that did not happen — it is not a miss for anybody.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Nobody was checked in, so this is not a miss for anybody.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "CheckIn.formerStudent": {
     "source": "Former student",
@@ -3543,9 +3543,9 @@
     "zh-Hant": "machine"
   },
   "Team.howBody": {
-    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost. Nobody is ever deleted here. A profile is the attribution on every register that person took, and since nothing consumes an invitation, deleting one would only let their next sign-in put them back at the rank it carries — so ending somebody’s access is what removes them, and their row moves under “No longer on the team”.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost. Nobody is ever deleted here: a profile is the attribution on every register that person took, so ending somebody’s access is what removes them, and their row moves under “No longer on the team”.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Team.roleCounselor": {
     "source": "Counselor",
@@ -3806,7 +3806,7 @@
     "zh-Hant": "todo"
   },
   "Team.linkPutsOnNothing": {
-    "source": "Puts them on no narrowed gathering — they will be able to work every gathering nobody has narrowed.",
+    "source": "Puts them on no limited gathering — they will be able to work every gathering nobody has limited.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3926,7 +3926,7 @@
     "zh-Hant": "todo"
   },
   "Team.nothingNarrowed": {
-    "source": "Nothing is narrowed yet, so everybody invited can work every gathering.",
+    "source": "Nothing is limited yet, so everybody invited can work every gathering.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3936,7 +3936,7 @@
     "zh-Hant": "todo"
   },
   "Team.nothingTicked": {
-    "source": "Nothing ticked — they will be able to work every gathering nobody has narrowed, and none of these.",
+    "source": "Nothing ticked — they will be able to work every gathering nobody has limited, and none of these.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4186,12 +4186,12 @@
     "zh-Hant": "todo"
   },
   "Team.gatheringsScope": {
-    "source": "Only gatherings somebody has narrowed are listed. {name} can work every other one.",
+    "source": "Only gatherings somebody has limited are listed. {name} can work every other one.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Team.panelNothingNarrowed": {
-    "source": "Nothing is narrowed, so everybody on the team can work every gathering.",
+    "source": "Nothing is limited, so everybody on the team can work every gathering.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5314,12 +5314,12 @@
     "zh-Hant": "todo"
   },
   "Access.keptHeading": {
-    "source": "Kept when you narrow it",
+    "source": "Kept when you limit it",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Access.keptExplain": {
-    "source": "These are kept when you narrow it — nobody's access changes until you press <em>{option}</em>.",
+    "source": "These are kept when you limit it — nobody's access changes until you press <em>{option}</em>.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5443,16 +5443,6 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Access.asked": {
-    "source": "Your name is on the Add list for {names} — they’ll see it under Who’s on when they open this roster. If they’re not here, go and find them.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
-  "Access.askedNobodyNamed": {
-    "source": "Your name is on the Add list for this gathering. Anybody on it will see it under Who’s on. If nobody is here, go and find a leader.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
-  },
   "Access.askFailed": {
     "source": "Could not put your name on the list. Ask a leader instead.",
     "zh-Hans": "todo",
@@ -5468,13 +5458,15 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Access.askedWaitingNamed": {
-    "source": "Nobody is notified. {names} will see it under Who’s on when they next open this roster — if they are not here, go and find them.",
+  "Access.askedNamed": {
+    "source": "Nobody is told. {names} will see it — if they’re not here, go and find them.",
+    "context": "Said to a volunteer who has just put their name on a gathering's Add list, both as the toast and as the line that stands afterwards. Deliberately not a notification: the whole point is that nobody is paged, so the walk across the lobby is still the real path. Keep it short — they are reading it standing at a door.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
-  "Access.askedWaitingNobody": {
-    "source": "Nobody is notified. Anybody on this gathering will see it under Who’s on when they next open this roster — if nobody is here, go and find a leader.",
+  "Access.askedNobody": {
+    "source": "Nobody is told. Anybody on this gathering will see it — if nobody is here, go and find a leader.",
+    "context": "Said to a volunteer who has just put their name on a gathering's Add list, both as the toast and as the line that stands afterwards. Deliberately not a notification: the whole point is that nobody is paged, so the walk across the lobby is still the real path. Keep it short — they are reading it standing at a door.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5514,7 +5506,7 @@
     "zh-Hant": "todo"
   },
   "Access.armReopen": {
-    "source": "Opens {title} to everybody on the team. The {count, plural, one {# person} other {# people}} on it now stop being a list, so narrowing it again later means adding them one at a time.",
+    "source": "Opens {title} to everybody on the team. The {count, plural, one {# person} other {# people}} on it now stop being a list, so limiting it again later means adding them one at a time.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -5699,9 +5691,9 @@
     "zh-Hant": "machine"
   },
   "EventDetail.cancelledExplain": {
-    "source": "Nobody was checked in, so Tally reads this as a cancelled gathering: it is not counted as a miss for anybody, and it does not change who counts as a regular or the attendance trend.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Not counted as a miss for anybody.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "EventDetail.cancelledAdvice": {
     "source": "If it did go ahead and nobody took attendance, you can still take it now. If it was called off, cancelling the event says so on purpose.",
@@ -5719,9 +5711,9 @@
     "zh-Hant": "machine"
   },
   "EventDetail.whoRestricted": {
-    "source": "{count, plural, one {# person} other {# people}} — everyone else sees it locked",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "{count, plural, one {# person} other {# people}} — everybody else sees it locked",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "EventDetail.whoOpen": {
     "source": "Everyone on the team can take attendance here",
@@ -6347,9 +6339,9 @@
     "zh-Hant": "machine"
   },
   "Events.lockedExplain": {
-    "source": "You have not been added to this gathering — it has been narrowed to a set of people. You are still signed in to Tally.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "You have not been added to this gathering — it has been limited to a set of people. You are still signed in to Tally.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Events.lockedCatchUp": {
     "source": "You came to take this gathering’s register. You are not on it, so the register is not yours to take — ask one of these to add you.",
@@ -6449,8 +6441,15 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Events.narrowedTag": {
-    "source": "🔒 narrowed · {count, number}",
+  "Events.limitedTag": {
+    "source": "🔐 {count, number}",
+    "context": "The whole of what an admin sees on a gathering somebody has fenced: a padlock and how many people are on it. Admin-only, and there are two or three per church, so it is a mark to learn rather than a sentence to read. The padlock-with-key is deliberately not the plain 🔒 the rest of the app uses for a gathering you cannot take — an admin passes this one. Nothing here to translate but the number's formatting; the sentence a screen reader gets is `narrowedTagLabel`.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.limitedTagLabel": {
+    "source": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked",
+    "context": "What the padlock tag above says out loud — spoken to a screen reader, and shown on hover to an admin who did not set this fence. Same fact as the access sheet's `restrictedDetail`; keep the two in the same words.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -7811,9 +7810,9 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.stalledBody": {
-    "source": "{fields}, {by} {ago}. It may still land — nothing has failed, and nothing you typed is lost.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "{fields}, {by} {ago}. It may still land — nothing has failed.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "SyncStrip.sendingHeading": {
     "source": "Sending to {backend}",
@@ -7831,9 +7830,9 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.waitingBody": {
-    "source": "{fields}, {by} {ago}. {backend} asked Tally to slow down, so it is paused and resumes on its own. Nothing is stuck.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "{fields}, {by} {ago}. {backend} asked Tally to slow down, so it is paused and resumes on its own.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "SyncStrip.landedHeading": {
     "source": "Saved in {backend}",
@@ -7851,9 +7850,9 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.differsBody": {
-    "source": "Your edit went out and did not overwrite anything — somebody had already changed the same field. Nothing of yours was written, and nothing of theirs was lost. Which one is right is yours to say.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Your edit went out and did not overwrite anything — somebody had already changed the same field. Which one is right is yours to say.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "SyncStrip.mergedHeading": {
     "source": "This record was merged into another person",
@@ -7871,9 +7870,9 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.orphanedBody": {
-    "source": "{fields}, {by} {ago}. It has nowhere to land: the person it names was deleted — deleted outright, not merged into anybody. Nothing is lost, and neither is any gathering they attended — re-creating sends the edit with them, so nobody types it twice. Tally searches {backend} for a matching person first and links to them if it finds one, rather than adding a second.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "{fields}, {by} {ago}. It has nowhere to land: the person it names was deleted outright, not merged into anybody. Re-creating them sends this edit with them, so nobody types it twice — and their gatherings are kept either way.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "SyncStrip.exhaustedHeading": {
     "source": "Could not reach {backend}",
@@ -7881,9 +7880,9 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.exhaustedBody": {
-    "source": "{fields}, {by} {ago}. Tally tried and gave up, and has stopped trying on its own — sending it again is usually all it takes. Nothing was saved, and nothing you typed is lost.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "{fields}, {by} {ago}. Tally tried and gave up — sending it again is usually all it takes. Nothing was saved.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "SyncStrip.refusedHeading": {
     "source": "{backend} refused this edit",
@@ -9197,9 +9196,9 @@
     "zh-Hant": "machine"
   },
   "RowBadge.inactiveExplain": {
-    "source": "Inactive students are history rather than roster: they are hidden from the default view and from check-in, and every attendance record they are in is kept.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Hidden from the default view and from check-in. Every attendance record they are in is kept.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "RowBadge.inactiveUpstreamNote": {
     "source": " {backend} may say inactive too, in which case the next roster read will set it back.",
@@ -9884,24 +9883,24 @@
     "zh-Hant": "machine"
   },
   "Review.childRenameCaption": {
-    "source": "Renames this row on Tally’s roster and asks the roster again whether anybody already has that name. Nothing is sent to the church’s database.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Renames this row on Tally’s roster and asks the roster again whether anybody already has that name.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Review.childEditCaption": {
-    "source": "Corrects this child on Tally’s roster. Nothing is sent to the church’s database.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Corrects this child on Tally’s roster.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Review.guardianDigitsCaption": {
-    "source": "Changes the digits this family types at the kiosk from {from} to {to} — the old four stop finding them. Nothing is sent to the church’s database.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Changes the digits this family types at the kiosk from {from} to {to} — the old four stop finding them.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Review.guardianEditCaption": {
-    "source": "Corrects the adult recorded on this registration. Nothing is sent to the church’s database.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Corrects the adult recorded on this registration.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Review.theseChildren": {
     "source": "these children",
@@ -10169,9 +10168,9 @@
     "zh-Hant": "machine"
   },
   "Review.approveCancelCaption": {
-    "source": "Leaves this family in the queue. Nothing is sent to the church’s database and nothing is lost.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "source": "Leaves this family in the queue.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
   },
   "Review.confirmAdultCaption": {
     "source": "{sentence} Nothing added to the church’s database can be deleted or taken back.",

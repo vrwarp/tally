@@ -346,7 +346,8 @@ loud, and the ask only makes the last step one tap instead of a search.
 
 **An admin sees the fences they pass.** A narrowed gathering looks exactly like an open one to
 somebody who passes every one of them — so the one person who can fix a fence was the one person
-who could not see it. Their chooser cards and calendar rows carry a quiet `🔒 narrowed · 3`.
+who could not see it. Their chooser cards and calendar rows carry a quiet `🔐 3` — the
+padlock-with-key, not the 🔒 that means a gathering you cannot take.
 Nothing is demoted and nothing moves; the fact is simply drawn.
 
 Restriction is a scope, not a substitute for membership. Removing somebody from Tally altogether is

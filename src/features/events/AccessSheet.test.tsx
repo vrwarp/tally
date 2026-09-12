@@ -299,7 +299,7 @@ describe('the kept list, while the gathering is open', () => {
     show();
     await screen.findByText(/Would keep/);
 
-    expect(screen.getByText('Kept when you narrow it')).toBeInTheDocument();
+    expect(screen.getByText('Kept when you limit it')).toBeInTheDocument();
     expect(tick('Dana Brooks')).toBeChecked();
     expect(tick('Sam Okafor')).toBeChecked();
     // Her row has no box: `restrictChain` adds the writer whatever the ticks

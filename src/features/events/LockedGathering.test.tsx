@@ -147,7 +147,7 @@ describe('the lead sentence', () => {
 
     expect(
       screen.getByText(
-        'You have not been added to this gathering — it has been narrowed to a set of people. You are still signed in to Tally.',
+        'You have not been added to this gathering — it has been limited to a set of people. You are still signed in to Tally.',
       ),
     ).toBeInTheDocument();
   });
