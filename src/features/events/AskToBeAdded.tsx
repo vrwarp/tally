@@ -57,13 +57,19 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
     approvers.map(fullName),
   );
 
+  /*
+   * The same sentence at the press and afterwards. It used to be two pairs —
+   * a toast and a standing line, each naming the approvers and each spelling
+   * the mechanism out again — which is four strings for one idea, and the idea
+   * is that nobody is coming.
+   */
+  const said = approvers.length > 0 ? t('askedNamed', { names }) : t('askedNobody');
+
   const press = async () => {
     setBusy(true);
     try {
       await askToBeAdded(chain, profile.id, fullName(profile));
-      show(approvers.length > 0 ? t('asked', { names }) : t('askedNobodyNamed'), {
-        tone: 'success',
-      });
+      show(said, { tone: 'success' });
     } catch {
       show(t('askFailed'), { tone: 'error' });
     } finally {
@@ -91,13 +97,10 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
   }
 
   /*
-   * What the reader's own press did, said with the standing of an outcome.
-   *
-   * It used to be one grey line set exactly like the boilerplate above it —
-   * "Your name is on the Add list." — naming nobody and dated to nothing,
-   * which is the shape of a status, and a status is a promise this design does
-   * not make. So: when it happened, then who will see it and where, then that
-   * nothing is queued and the walk is still the path.
+   * What the reader's own press did, said with the standing of an outcome: when
+   * it happened, then that nobody is coming and the walk is still the path. It
+   * used to be one grey line naming nobody and dated to nothing, which is the
+   * shape of a status — and a status is a promise this design does not make.
    */
   if (mine) {
     return (
@@ -110,7 +113,7 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
             : t('askedAlreadyUndated')}
         </p>
         <p className="max-w-[52ch] pt-0.5 text-sm leading-snug text-ink-400">
-          {approvers.length > 0 ? t('askedWaitingNamed', { names }) : t('askedWaitingNobody')}
+          {said}
         </p>
       </Standing>
     );

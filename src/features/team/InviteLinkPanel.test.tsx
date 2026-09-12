@@ -77,7 +77,7 @@ describe('what the link grants', () => {
 
   it('says plainly when it puts them on nothing in particular', () => {
     render(<InviteLinkPanel minted={minted({ gatherings: [] })} onDismiss={() => {}} />);
-    expect(screen.getByText(/every gathering nobody has narrowed/)).toBeInTheDocument();
+    expect(screen.getByText(/every gathering nobody has limited/)).toBeInTheDocument();
   });
 });
 

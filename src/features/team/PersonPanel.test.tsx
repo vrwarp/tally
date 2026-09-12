@@ -202,7 +202,7 @@ describe('PersonPanel — the gatherings, drawn per chain', () => {
   it('says so rather than drawing an empty list when nothing is narrowed', () => {
     show(SAM);
 
-    expect(screen.getByText(/Nothing is narrowed/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is limited/)).toBeInTheDocument();
   });
 
   it('is the 9:22 rescue: one press puts them on the gathering', async () => {

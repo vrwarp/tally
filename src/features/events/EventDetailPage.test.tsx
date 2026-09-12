@@ -185,7 +185,9 @@ describe('a gathering that has happened', () => {
   it('still says why an empty finished gathering reads as cancelled', () => {
     show(finished);
 
-    expect(screen.getByText(/Tally reads this as a cancelled gathering/)).toBeInTheDocument();
+    // Said once. The tile's hint names what it counts as; the panel under it
+    // carries the consequence, and used to open by repeating the tile.
     expect(screen.getByText('Counted as a cancelled gathering.')).toBeInTheDocument();
+    expect(screen.getByText('Not counted as a miss for anybody.')).toBeInTheDocument();
   });
 });

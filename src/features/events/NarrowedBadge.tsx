@@ -21,12 +21,12 @@ import { Badge } from '@/components/ui';
 
 export function NarrowedBadge({ count }: { count: number }) {
   const t = useTranslations('Events');
-  const spoken = t('narrowedTagLabel', { count });
+  const spoken = t('limitedTagLabel', { count });
 
   return (
     <Badge tone="neutral" title={spoken}>
       <span className="sr-only">{spoken}</span>
-      <span aria-hidden="true">{t('narrowedTag', { count })}</span>
+      <span aria-hidden="true">{t('limitedTag', { count })}</span>
     </Badge>
   );
 }
