@@ -164,6 +164,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/ci.md](docs/ci.md) | What runs on a pull request and how to reproduce it |
 | [docs/deployment-setup.md](docs/deployment-setup.md) | Deploying, and everything that has to exist first |
 | [docs/error-handling.md](docs/error-handling.md) | The guards, why each exists, and the gaps that are still open |
+| [docs/roster-resilience.md](docs/roster-resilience.md) | What a failed roster read does now, and why each number is that number |
 | [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
 | [docs/mutation-testing.md](docs/mutation-testing.md) | Whether the tests would notice a wrong answer — the score, the loop, and what it found |
 | [docs/kiosk-performance.md](docs/kiosk-performance.md) | The kiosk benchmark: what it measures, what it found, and the budgets it holds |

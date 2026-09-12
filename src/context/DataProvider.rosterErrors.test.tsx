@@ -90,6 +90,24 @@ async function sentenceFor(cause: unknown): Promise<string | undefined> {
   return latest?.rosterError?.message;
 }
 
+/** The same, read by somebody whose Tally is not in English. */
+async function sentenceInChineseFor(cause: unknown): Promise<string | undefined> {
+  fetchRoster.mockRejectedValueOnce(cause);
+  render(
+    <DataProvider>
+      <Probe />
+    </DataProvider>,
+    { locale: 'zh-Hant' },
+  );
+  await waitFor(() => expect(latest?.rosterError).not.toBeNull());
+  return latest?.rosterError?.message;
+}
+
+/** A failure that named its sentence, as `reportBackendFailure` throws it. */
+function namedError(code: string, serverCode: string, args: Record<string, string>, message: string) {
+  return Object.assign(new Error(message), { code, details: { code: serverCode, args } });
+}
+
 beforeEach(() => {
   latest = null;
   fetchRoster.mockReset();
@@ -98,6 +116,50 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('a failure the server named', () => {
+  /*
+   * The roster banner used to be the one screen in Tally that answered in
+   * English whatever the reader reads. Every other screen routes a named
+   * failure through `useServerText`; this one took the server's own sentence
+   * and printed it, on exactly the failures most worth reading — a real outage
+   * arrives as `backend.unreachable.roster`.
+   */
+  it('says it in the reader’s language rather than the server’s', async () => {
+    expect(
+      await sentenceInChineseFor(
+        namedError(
+          'functions/unavailable',
+          'backend.unreachable.roster',
+          { backend: 'Planning Center' },
+          'Could not reach Planning Center to load the roster.',
+        ),
+      ),
+    ).toBe('無法連線 Planning Center 來讀取名單。');
+  });
+
+  it('still names the backend, which is the part no catalogue can supply', async () => {
+    expect(
+      await sentenceFor(
+        namedError(
+          'functions/unavailable',
+          'backend.unreachable.roster',
+          { backend: 'Attendees' },
+          'Could not reach Attendees to load the roster.',
+        ),
+      ),
+    ).toBe('Could not reach Attendees to load the roster.');
+  });
+
+  it('falls back to this module’s wording for a server too old to name anything', async () => {
+    // The deploy window: hosting goes out before the functions finish being
+    // created, so a browser holding the new bundle can be talking to a backend
+    // that has never heard of a `ServerCode`.
+    expect(await sentenceFor(callableError('functions/unavailable'))).toBe(
+      'Could not reach your church directory to load the roster. Check the wifi, then try again.',
+    );
+  });
 });
 
 describe('the sentence for a failed roster read', () => {

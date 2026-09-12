@@ -65,6 +65,8 @@
     "uxr/transitions-live/fixture.ts",
     "uxr/identity-live/main.tsx",
     "uxr/identity-live/stubs.tsx",
-    "uxr/identity-live/fixtures.ts"
+    "uxr/identity-live/fixtures.ts",
+    "uxr/roster-banner-live/main.tsx",
+    "uxr/roster-banner-live/stubs.tsx"
   ]
 }

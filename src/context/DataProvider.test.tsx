@@ -15,6 +15,7 @@ import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider, EVENT_WINDOW_DAYS } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
+import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import { PARTICIPATION_MAX_AGE_DAYS } from '@/features/roster/predictiveRoster';
 import type { PcoRosterPerson } from '@/types';
 import { makeStudent } from '../../tests/factories';
@@ -428,7 +429,10 @@ describe('applying one row a write handed back', () => {
 
     act(() => latest?.applyRosterPerson(undefined));
     await waitFor(() => expect(fetchRoster.mock.calls.length).toBe(reads + 1));
-    expect(fetchRoster).toHaveBeenLastCalledWith(expect.any(Date), true);
+    // Forced, because the row it could not correct is exactly what the held
+    // answer cannot contain — and on the ladder's first rung, because a read
+    // somebody's write asked for starts a ladder like any other.
+    expect(fetchRoster).toHaveBeenLastCalledWith(expect.any(Date), true, ROSTER_DEADLINES_MS[0]);
 
     act(() => latest?.applyRosterPerson(row({ pcoPersonId: '99' })));
     await waitFor(() => expect(fetchRoster.mock.calls.length).toBe(reads + 2));

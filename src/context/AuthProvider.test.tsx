@@ -80,6 +80,10 @@ vi.mock('@/services/users', () => ({
 }));
 vi.mock('@/services/functions', () => ({ provisionAccess }));
 
+/** The roster this device saved, which sign-out is supposed to drop. */
+const forgetRoster = vi.hoisted(() => vi.fn());
+vi.mock('@/services/roster', () => ({ forgetRoster }));
+
 const REDIRECT_PENDING_KEY = 'tally:google-redirect-pending';
 
 /** The Firebase listener's own callback, so a test can sign somebody in. */
@@ -757,6 +761,38 @@ describe('signing out', () => {
 
     expect(firebaseSignOut).toHaveBeenCalled();
     expect(window.sessionStorage.getItem(REDIRECT_PENDING_KEY)).toBeNull();
+  });
+
+  /*
+   * The saved roster is a few hundred children's names and grades, parked in
+   * `localStorage` so a cold start at a door has something to draw. On a shared
+   * church laptop the next person to open the browser is not the person who
+   * saved it. `forgetRoster` has always existed and always documented itself as
+   * "called on sign-out"; until this, nothing called it.
+   */
+  it('forgets the roster this device saved', async () => {
+    forgetRoster.mockClear();
+    await signedIn();
+
+    await act(async () => {
+      await latest?.signOut();
+    });
+
+    expect(forgetRoster).toHaveBeenCalled();
+  });
+
+  it('forgets it even if ending the session fails', async () => {
+    // Ordered before the sign-out on purpose: a `signOut` that throws must not
+    // leave the names on a device whose session may or may not have ended.
+    forgetRoster.mockClear();
+    firebaseSignOut.mockRejectedValueOnce(new Error('offline'));
+    await signedIn();
+
+    await act(async () => {
+      await expect(latest?.signOut()).rejects.toThrow('offline');
+    });
+
+    expect(forgetRoster).toHaveBeenCalled();
   });
 });
 

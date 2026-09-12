@@ -17,6 +17,7 @@ import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
 import type { PcoRosterPerson, Student } from '@/types';
 import { makeStudent } from '../../tests/factories';
+import { ROSTER_DEADLINES_MS, ROSTER_RETRY_GAPS_MS } from '@/lib/rosterLadder';
 
 const fetchRoster = vi.hoisted(() => vi.fn());
 const rememberRosterPerson = vi.hoisted(() => vi.fn());
@@ -505,5 +506,179 @@ describe('correcting one row from a write', () => {
     act(() => latest?.applyRosterPerson(null));
 
     await waitFor(() => expect(fetchRoster).toHaveBeenCalledTimes(2));
+  });
+});
+
+/**
+ * The ladder: what happens after a roster read fails.
+ *
+ * Before this existed, the answer was "nothing, for up to ten minutes" — the
+ * failure set the banner and the next automatic attempt was whenever the
+ * ten-minute interval next came round. A check-in desk on the first production
+ * Sunday spent that ten minutes looking at a red banner over an empty roster
+ * because of a blip that was over in seconds.
+ *
+ * Fake timers rather than the file's `offset` clock: these tests are about
+ * `setTimeout`, and the gaps between rungs are the thing being asserted.
+ */
+describe('after a read fails', () => {
+  beforeEach(() => {
+    // Replaces the `Date.now` spy installed above, which is what we want —
+    // advancing the fake clock must move both the timers and the clock the
+    // visibility floor reads.
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Lets the ladder run its course, gaps and all. */
+  async function runLadder() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ROSTER_RETRY_GAPS_MS[0] + ROSTER_RETRY_GAPS_MS[1] + 10);
+    });
+  }
+
+  function deadlinesAsked() {
+    return fetchRoster.mock.calls.map((call: unknown[]) => call[2]);
+  }
+
+  function forcesAsked() {
+    return fetchRoster.mock.calls.map((call: unknown[]) => call[1]);
+  }
+
+  it('tries again twice, on a longer deadline each time', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // The first attempt has failed and the banner is already up: the ladder
+    // runs underneath it rather than delaying it.
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+    expect(latest?.rosterError).not.toBeNull();
+
+    await runLadder();
+
+    expect(fetchRoster).toHaveBeenCalledTimes(3);
+    expect(deadlinesAsked()).toEqual([...ROSTER_DEADLINES_MS]);
+  });
+
+  it('stops at the end of the ladder rather than hammering', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    mount();
+    await runLadder();
+    expect(fetchRoster).toHaveBeenCalledTimes(3);
+
+    // A full minute past the last rung, and nothing further: the ten-minute
+    // interval owns what happens next.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetchRoster).toHaveBeenCalledTimes(3);
+  });
+
+  it('takes the banner down by itself when a rung lands', async () => {
+    fetchRoster.mockRejectedValueOnce(new Error('nope')).mockResolvedValue(reply());
+
+    mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(latest?.rosterError).not.toBeNull();
+
+    await runLadder();
+
+    // Two attempts, not three: the ladder ended when it succeeded.
+    expect(fetchRoster).toHaveBeenCalledTimes(2);
+    expect(latest?.rosterError).toBeNull();
+    expect(latest?.rosterOffline).toBe(false);
+  });
+
+  /*
+   * The one that must not regress silently. `force` skips the server's held
+   * answer *and* refuses to join a read already in flight, which is right for
+   * somebody pressing Try again and ruinous for a ladder: the attempt this one
+   * follows very likely left a read running server-side, and joining it is why
+   * the next rung is nearly free. A forcing ladder would start three fresh full
+   * reads against a backend already having a bad minute.
+   */
+  it('never forces a retry, even when the attempt that failed was forced', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fetchRoster.mockClear();
+
+    // A leader presses Try again, and it fails too.
+    await act(async () => {
+      await latest?.refreshRoster(true);
+    });
+    await runLadder();
+
+    expect(forcesAsked()).toEqual([true, false, false]);
+  });
+
+  it('starts a fresh ladder when the network comes back', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    mount();
+    await runLadder();
+    expect(fetchRoster).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Immediately, and from the top of the ladder — no floor, because `online`
+    // fires on a transition rather than on a glance.
+    expect(fetchRoster).toHaveBeenCalledTimes(4);
+    expect(deadlinesAsked()[3]).toBe(ROSTER_DEADLINES_MS[0]);
+  });
+
+  /*
+   * `lastAttemptAt` is stamped once per ladder rather than once per attempt. A
+   * ladder is most of a minute long, so per-attempt stamping would put the
+   * sixty-second visibility floor in front of somebody who picked their phone
+   * up *because* the roster looked wrong.
+   */
+  it('lets somebody coming back to the tab mid-ladder trigger a read', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ROSTER_RETRY_GAPS_MS[0] + 10);
+    });
+    const midLadder = fetchRoster.mock.calls.length;
+
+    comeBackToTheTab();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(fetchRoster.mock.calls.length).toBeGreaterThan(midLadder);
+  });
+
+  it('does not leave a rung running after the provider is gone', async () => {
+    fetchRoster.mockRejectedValue(new Error('nope'));
+
+    const view = mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
   });
 });

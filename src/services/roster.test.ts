@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cachedRoster, fetchRoster, forgetRoster, rememberRosterPerson } from '@/services/roster';
+import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import { getRoster, type RosterBackendStatus } from '@/services/functions';
 import type { PcoRosterPerson } from '@/types';
 
@@ -16,8 +17,14 @@ import type { PcoRosterPerson } from '@/types';
 vi.mock('@/services/functions', () => ({ getRoster: vi.fn() }));
 
 const CACHE_KEY = 'tally:roster';
-/** Mirrors `STALE_AFTER_MS` in the module: a week. */
-const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Mirrors `STALE_AFTER_MS` in the module: a month.
+ *
+ * A week until the first production Sunday, when it turned out to be the same
+ * length as the gap between two Sundays — so the fallback expired on the beat
+ * of the thing it exists to cover. See the constant's own note.
+ */
+const STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 function person(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
   return {
@@ -290,7 +297,7 @@ describe('fetchRoster with more than one backend', () => {
 
   it('lets a carried slice expire on its own clock, not the store’s', async () => {
     // The store as a whole is an hour old — Planning Center kept answering —
-    // but the Attendees slice has been carried for eight days of failures.
+    // but the Attendees slice has been carried past the window in failures.
     window.localStorage.setItem(
       CACHE_KEY,
       JSON.stringify({
@@ -298,7 +305,7 @@ describe('fetchRoster with more than one backend', () => {
         storedAt: Date.now() - 60 * 60 * 1000,
         freshAt: {
           pco: Date.now() - 60 * 60 * 1000,
-          a32: Date.now() - 8 * 24 * 60 * 60 * 1000,
+          a32: Date.now() - STALE_AFTER_MS - 1,
         },
       }),
     );
@@ -306,7 +313,7 @@ describe('fetchRoster with more than one backend', () => {
     vi.mocked(getRoster).mockResolvedValue(answer([person()], [report({}), DOWN]) as never);
     const snapshot = await fetchRoster();
 
-    // Too old to show: better a missing slice than names a week wrong.
+    // Too old to show: better a missing slice than names a month wrong.
     expect(snapshot.students.map((student) => student.id)).toEqual(['pco_1']);
   });
 
@@ -485,7 +492,9 @@ describe('asking the server for a fresh read', () => {
 
     await fetchRoster();
 
-    expect(getRoster).toHaveBeenCalledWith({ force: false });
+    // And on the server's whole budget, because a caller that named no deadline
+    // is a caller making one attempt. See `@/lib/rosterLadder`.
+    expect(getRoster).toHaveBeenCalledWith({ force: false }, {});
   });
 
   it('skips that cache when the caller insists', async () => {
@@ -495,7 +504,15 @@ describe('asking the server for a fresh read', () => {
 
     await fetchRoster(new Date(), true);
 
-    expect(getRoster).toHaveBeenCalledWith({ force: true });
+    expect(getRoster).toHaveBeenCalledWith({ force: true }, {});
+  });
+
+  it('asks for the deadline it was given, so a ladder can escalate', async () => {
+    vi.mocked(getRoster).mockResolvedValue(answer([person()]) as never);
+
+    await fetchRoster(new Date(), false, ROSTER_DEADLINES_MS[0]);
+
+    expect(getRoster).toHaveBeenCalledWith({ force: false }, { timeoutMs: 45_000 });
   });
 
   it('reports when the backends were actually read', async () => {

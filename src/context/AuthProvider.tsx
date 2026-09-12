@@ -30,6 +30,7 @@ import {
   isFirstPartyAuthDomain,
 } from '@/lib/embeddedBrowser';
 import { provisionAccess } from '@/services/functions';
+import { forgetRoster } from '@/services/roster';
 import { getUserProfileFromServer, subscribeUserProfile, touchLastSeen } from '@/services/users';
 import { roleAtLeast, type Role, type UserProfile } from '@/types';
 import {
@@ -422,6 +423,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   [t]);
 
   const signOut = useCallback(async () => {
+    /*
+     * The roster this device saved is a few hundred children's names and
+     * grades, parked in `localStorage` so a cold start at a door has something
+     * to draw. The next person to sign in on a shared church laptop is not the
+     * person who saved it.
+     *
+     * `forgetRoster` has always existed and always said in its own docstring
+     * that it was "called on sign-out". Nothing called it — this is that call.
+     * Before the sign-out rather than after, so a `signOut` that throws still
+     * leaves the names gone rather than keeping them on a device whose session
+     * may or may not have ended.
+     */
+    forgetRoster();
     await firebaseSignOut(auth);
     setRedirectPending(false);
   },
