@@ -276,6 +276,14 @@ const SCENES: {
     drive: ['Wednesday Night'],
   },
   { id: 'setup-chooser-ready', query: 'screen=chooser&labels=some&printer=ready', views: ['phone', 'kiosktall'] },
+  {
+    /* Wednesday Night picked on the kiosk that has the printer — a sentence
+       about someone else's Sunday, and nothing for this volunteer to press. */
+    id: 'setup-chooser-selected-withprinter',
+    query: 'screen=chooser&labels=some&printer=ready',
+    views: ['kiosktall'],
+    drive: ['Wednesday Night'],
+  },
   { id: 'setup-chooser-trouble', query: 'screen=chooser&labels=some&printer=trouble', views: ['kiosktall'] },
   /*
    * The Android Sunday: the printer lost power overnight, the grant went with

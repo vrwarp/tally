@@ -70,17 +70,22 @@ gathering*.
 
 ### B — the printer is always on the landing page (chosen)
 
-The owner's own idea, corrected by the panel. The panel is drawn from first
-paint whenever a bindable gathering today prints or this kiosk has a printer,
-naming the gatherings it is for; after round 2 its **buttons** appear only when
-the selected row prints or the printer is in a fault state, and a kiosk that
-has never had a printer gets a fact in ordinary ink rather than a fault in
-amber. The only direction that reaches the hold path, the first glance and the
-Android Sunday.
+The owner's own idea, corrected by the panel twice. The panel is drawn from
+first paint whenever a bindable gathering today prints or this kiosk has a
+printer, naming the gathering it is for. Its connect is a real button from the
+first glance whenever the kiosk has no printer and a gathering needs one — the
+round-4 panel found that the relevance gate written in round 2 had emptied the
+campaign's own headline frame, so the hold path saw only a link — and it steps
+aside only when the picked row does not print. A kiosk that has never had a
+printer gets a fact in ordinary ink, not a fault in amber; every filled control
+acts in place; every press changes the screen; the door to the printer screen
+sits on one pixel in every state. The only direction that reaches the hold
+path, the first glance and the Android Sunday.
 
 *Cost, stated:* every kiosk in a building where one gathering prints carries a
-printer sentence every week, and loads the printing module. The journey
-critic's pick; the staff consultant would tolerate it.
+printer sentence every week — and a grey connect until a non-printing row is
+picked — and loads the printing module once at set-up. The journey critic's
+pick in round 2; after round 4, the staff consultant's too.
 
 ### Set aside: F and D
 
@@ -155,7 +160,32 @@ old: the shelf-tablet photograph of the strip and the fault frames in lobby
 light, both grounds — the numbers say the filled control's edge is the weak
 point and no render can settle it.
 
-<!-- r04-fix-pass -->
+**The fix pass** answered the nine majors and the craft in one round, and
+the two visual critics and the design critic then confirmed the result
+<!-- r04-confirm -->. On the landing page: the filled connect at first
+paint on a never-configured kiosk, withheld only when the picked row does not
+print; the door pinned on one pixel in all twenty-six states, the two with no
+panel included; the slot held with a spinner through the chunk load and the
+boot ladder, so *Look again* no longer deletes itself when pressed and
+*Connect the printer again* is never offered while the kiosk is still
+looking; the account after a dismissed device list; the errand named before
+the first connect; the sentence about the picked row, never about another
+gathering; a guessed roll in amber; the ✓ dropped, the re-connect dropped
+from the ready row, the sub-line at two ranks, the wrapped status at the
+card's edge, and a 2px `ink-600` edge on the filled control that the light
+ramp turned out to need. On the printer screen: the cancel account says only
+what the browser reported and names the recovery press first; *ready* is
+gone from an untested printer and the pre-test instruction is on screen
+before the test; the test line reports a send; the mid-evening screen
+follows the same verb map as set-up, keeps Reprint live on any configured
+kiosk, explains its greyed controls, and is built in C's own order; the
+looking state has the spinner, a sentence that makes waiting a choice, and
+*Look again* drawn from first paint; the chosen roll row wears the app's
+selected-tile treatment instead of the primary's blue and the chooser opens
+itself; the head joined the column; the reference group is anchored above
+the foot. Twenty-six chooser frames and sixteen printer frames, all
+portrait.
+
 
 > "B is the first version of this a volunteer can act on with me not on the
 > phone — the Android Sunday is two sentences and the unplugged one is a
@@ -222,10 +252,12 @@ away; these sentences are what survive.
   that reads as a press but does nothing — never `ink-500` on `ink-800`, and
   never a control that is byte-identical to the live one except for its word.
   A kiosk whose day has no printing row never fetches the chunk.
-- **Connect and test are the printer screen's own calls**, made synchronously
-  from a `useTap` handler: `printing.pairPrinter(printerConfig ?? defaults)`
-  and `printing.testPrint(locale)`. The doc comment on `pairPrinter` ("only
-  ever reached from a button on the printer screen") needs updating.
+- **Connect, look again and test are the printing module's own calls**, made
+  synchronously from a `useTap` handler on either screen:
+  `printing.pairPrinter(printerConfig ?? defaults)`, `printing.ready()` and
+  `printing.testPrint(locale)`. The strip's controls never navigate. The doc
+  comment on `pairPrinter` ("only ever reached from a button on the printer
+  screen") needs updating.
 - **The selection survives the settings door.** `selected` is local state in
   `EventChooser` and `setPhase('printer')` unmounts it. Lift it into `KioskApp`
   as a controlled pair (or render the printer screen as an overlay over the
@@ -239,193 +271,272 @@ away; these sentences are what survive.
   row prints and the printer is a **known negative** — never configured, or a
   fault — not merely "not yet ready": while a configured kiosk is still
   looking, the line holds its reserved height with the plain *Kids Club ·
-  9:09 AM*. Word, fill and place of *Set kiosk* unchanged. The clause is
-  `text-white` on `brand-600` (4.1:1); a weight step (`font-semibold`) is
-  worth taking, and it should be checked on the shelf tablet in daylight.
+  9:09 AM*. Word, fill and place of *Set kiosk* unchanged. Two ranks, not four: the
+  title `text-white`, the time and both separators `text-white/75` as their
+  own flex children, the clause `font-semibold text-white`. The clause is
+  4.1:1 on `brand-600` in the dark — a shelf-tablet check in daylight.
 - **The ghosted commit.** The not-yet branch of the commit's class template
   drops its fill and stroke (`pointer-events-none text-ink-500` on a
   `border-2 border-transparent` box), keeping the 672×96 box so nothing moves.
 
-### B
+### B — the landing page strip
 
-- Gate the strip on `printerConfigured || bindablePrinting.length > 0`, where
-  `bindablePrinting = entries.filter(e => e.labelTemplate !== null && nowMs <= e.endAt)`
-  — the negation of the row's own `ended`. Never on `printerState !== null`,
-  which never clears once the printer screen has been visited.
-- Names line: de-duped titles of the bindable printing rows through
-  `Intl.ListFormat(locale, {type: 'conjunction'})`, message
-  `printsNameTagsFor` taking `{names, count}` for singular/plural; rendered
-  only when the list is non-empty.
-- Controls row `mt-3 flex items-center gap-4`: connect
-  (`h-12 flex-1 rounded-lg bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14`)
-  when `selectedPrints || fault`; *Print a test label* (forward) when
-  `ready && selectedPrints`; quiet controls as plain underlined type on a
-  `<button>` (`h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 kiosk:h-14`,
-  the link-as-button pattern in `StudentSyncStrip`); *Printer settings*
-  always, which is what holds the row at a constant height.
-- State line via the shared helper: never configured → *No printer on this
-  kiosk* (`ink-400`); lost → *The printer this kiosk was set up with is not
-  connected* (`warn-400`) with *Connect the printer again* on the control;
-  ready → `present-400`. Wrapper `mb-6 rounded-xl bg-ink-900 p-4 kiosk:p-5`
-  (a 24px seam to the commit).
+As it stands after the round-4 fix pass; the full statement is in the B
+ideator's final report.
 
-- **Round 4 — the panel and the door are gated separately.**
-  `showPanel = printerConfigured || bindablePrinting.length > 0` gates the
-  two text lines and the forward slot; *Printer settings* is rendered
-  unconditionally, so on a day with no printing row and no printer the door
-  alone sits where the strip's controls row would be (the Saturday errand:
-  connecting the printer the day before a printing Sunday). Wrapper
-  `mb-6 p-4 kiosk:p-5`, plus `rounded-xl bg-ink-900` when the panel is drawn
-  and `flex items-center` when it is not — the padding stays, so the door
-  lands on the same pixel in both worlds.
-- **Trouble is a retry, not a dialog.** The fault predicate stays
-  `trouble || unsupported || (unpaired && !searching)`, but the forward slot
-  forks on the kind: `trouble` → *Look again* (`Printer.lookAgain`, already
-  shipped) wired to the `lookAgain` handler that is local to
-  `PrinterScreen.tsx` today (~335–345: `await printing.ready()` behind a busy
-  flag) — lift it into the shared printer hook so both screens call one
-  function; `unpaired && !searching` → *Connect the printer again* →
-  `onSetUpPrinter`. The trouble state line is `message + ' ' + advice` on one
-  line (*The printer was unplugged. Plug it back in.*) — the two keys the
-  printer screen prints on separate lines.
-- **The names line owns the `pt-1`.** When no bindable row prints and a
-  printer is connected, the strip is the state line and the door alone
-  (136px rather than 164px); the bottom edge, the controls row and the commit
-  do not move.
-- **The waiting slot acknowledges a press.** No `pointer-events-none` and no
-  `disabled` (both suppress `:active`): `aria-disabled` + `aria-busy`, a
-  handler that returns early while loading, `active:bg-ink-600`, and the
-  app's own spinner (`size-4 animate-spin rounded-full border-2 border-current border-t-transparent`,
-  as in `components/ui/Button.tsx` ~106) before *Getting ready to connect…*.
-- **The sub-line clause takes `font-semibold`**
-  (`shrink-0 font-semibold text-white`); its 4.1:1 on the dark ground stays a
-  shelf-tablet check. On the light ground the same clause is about 7:1.
-- **Row wrap rule — shared by every direction and the app's own chooser.**
-  The three status spans (`checkInOpen`, `opensAt`, `endedPickupOnly`,
-  `EventChooser.tsx` ~380, 385, 403) go `sm:inline` → `sm:inline-block`:
-  every fact on the row is an atom and the line breaks between them, so a
-  long room name drops the status whole to a second, indented line instead of
-  stranding *pickup only*. Residual: room and mark are one unbreakable run,
-  so a room over roughly 33 characters overflows (about 52 today, without
-  the mark) — truncate the room, never break the mark.
-- **The copy variant is a catalogue change only**, if the owner takes it:
-  `printsNameTags` → *Needs the label printer*, `printsNameTagsFor` →
-  *{names} needs the label printer* (no plural fork — *needs* agrees with the
-  list). It wraps both printing rows to two lines on this seed, 24px each.
-- **Light ramp:** B adds no colour outside `ink-*`, `present-400`, `warn-400`
-  and `brand-600/500`, all of which `:root[data-theme="light"]` already
-  redefines; nothing to change.
-- Ready with nothing selected falls out of the two predicates
-  (`showTest = ready && selectedPrints`, `showConnect = selectedPrints || fault`):
-  sentence, green line, door, no buttons.
+- **Gate.** The foot always renders the door. The panel
+  (`mb-6 rounded-xl bg-ink-900 p-4 kiosk:p-5`) is drawn when
+  `printerConfigured || bindablePrinting.length > 0`, with
+  `printerConfigured = printerConfig !== null` (a new prop from
+  `KioskApp.tsx` ~386 — never `printerState !== null`) and
+  `bindablePrinting = entries.filter(e => e.labelTemplate !== null && nowMs <= e.endAt)`.
+  Without the panel the wrapper keeps its padding and drops the skin
+  (`mb-6 flex items-center justify-end p-4 kiosk:p-5`), so the door lands on
+  the same pixel on a quiet day and on a day with nothing on at all.
+- **Predicates.**
+  `selectedPrints = selected !== null && selectedEntry.labelTemplate !== null && nowMs <= selectedEntry.endAt`;
+  `selectedQuiet = selected !== null && !selectedPrints`;
+  `fault = printerState !== null && (kind === 'trouble' || kind === 'unsupported' || (kind === 'unpaired' && !searching))`;
+  `stillLooking = printerConfigured && (printerState === null || kind === 'idle' || (kind === 'unpaired' && searching))`;
+  `chunkLoading = printing === null`; `ready = kind === 'ready'`. One
+  `stillLooking` is shared by the state line, the slot and the sub-line's
+  `wontPrint = selectedPrints && kind !== 'ready' && !stillLooking`.
+- **Names line** (`text-ink-300`, one line, first when present): a picked row
+  makes it about that row — `printsNameTagsFor({names: [title], count: 1})`
+  or `doesNotPrintNameTagsFor({name})`; nothing picked makes it about the
+  day — de-duped titles through `Intl.ListFormat`, plural through `count`.
+  Omitted only when nothing is picked and `bindablePrinting` is empty, and
+  then the state line drops its `pt-1` (the 136px box).
+- **State line** (`pt-1 font-medium <tone> kiosk:text-lg`), first match
+  wins: the account after a dismissed list → `text-ink-200`, two lines;
+  `!printerConfigured` → `text-ink-400`, *No printer on this kiosk — plug one
+  in, switch it on, then connect it.* when the slot holds the connect,
+  otherwise the bare *No printer on this kiosk*; `stillLooking` →
+  `text-ink-400`, `Printer.looking`; unpaired settled → `text-warn-400`,
+  `Printer.notConnected`; trouble/unsupported → `text-warn-400`,
+  `printerNote(message) + ' ' + printerNote(advice)`; ready and guessed →
+  `text-warn-400`, *Printer connected — the roll had to be guessed. Print a
+  test label and look at it.* (the second sentence only when the test is in
+  the slot); ready → `text-present-400`, *Printer connected · {model}*.
+  Rule: the state line names a press only when that press is in the slot.
+- **Slot**
+  (`h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14`,
+  494×56): fault → `Printer.lookAgain` (trouble, unsupported) or *Connect
+  the printer again* (unpaired settled); else `stillLooking || chunkLoading`
+  → the waiting treatment; else `!printerConfigured` → *Connect the
+  printer*; else `ready && selectedPrints` → `Printer.testPrint`; else empty.
+  Withheld in every branch but fault when `selectedQuiet`. Every filled
+  control acts in place, inside the tap's own activation, through new props
+  `onConnectPrinter` → `printing.pairPrinter(printerConfig ?? defaults)`,
+  `onLookAgain` → `printing.ready()`, `onPrintTestLabel` →
+  `printing.testPrint(locale)` (`KioskApp.tsx` ~2144); `lookAgain`'s busy
+  flag lifts out of `PrinterScreen.tsx` ~334 into the shared printer hook.
+  Nothing in the slot navigates; nothing moves on a tap.
+- **Waiting treatment.** Same box and fill, `aria-disabled` + `aria-busy`,
+  never the `disabled` attribute (it suppresses `:active`),
+  `active:bg-ink-600` still paints, the app's spinner
+  (`size-4 animate-spin rounded-full border-2 border-current border-t-transparent`,
+  `components/ui/Button.tsx` ~106), and one label for both waits — *One
+  moment…* — while the state line says which wait it is.
+- **Door.**
+  `h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 kiosk:h-14`,
+  last child of `mt-3 flex items-center justify-end gap-4`, at 594,1040
+  (122×56) in every state including the two with no panel;
+  `onSetUpPrinter`; the only navigation in the strip.
+- **Box.** Bottom edge y1116, controls row y1040–1096, commit 64,1140
+  (672×100) in every state; only the top edge moves with the line count —
+  952 (names + one-line state), 980 (state only), 924 (two-line account or
+  guessed), 1020 (no panel).
+- **Account.** `listCameBackEmpty` in `KioskApp`: set when `pairPrinter`
+  resolves `null` and the emitted state is not trouble
+  (`printing/index.ts` ~957, `selection-cancelled`); cleared on any press in
+  the strip, any state emission, any change of `selected`. *Nothing was
+  picked from the browser's list. Press {connect} and pick the QL — if it is
+  not listed, plug it in and switch it on.*, `{connect}` interpolated with
+  the slot's own label. Never a second amber.
+- **Guessed.** `PrinterConfig` (`printing/device.ts` ~35) gains
+  `guessed?: boolean`, written by `pairPrinter` when the model or roll was
+  not read off, persisted with the config, read back as `printerGuessed`; it
+  makes the ready state amber, never green. (C reads the live `detection`
+  for the same fact.)
+- **Row wrap** — shared by every direction and the app's own chooser:
+  `sm:inline-block` on the three status spans (`EventChooser.tsx` ~380, 385,
+  403) so the status drops whole; `sm:pe-4` on the meta run in place of
+  `sm:pl-4` on the status, so the 16px stays a gap between siblings and never
+  an indent. The mark is `entry.labelTemplate !== null` alone, painted on
+  ended rows too. Residual: room plus mark is one unbreakable run (about 33
+  characters before overflow) — truncate the room, never break the mark.
+- **Light ramp.** The forward control's edge is `border-ink-600`: one rung
+  toward the reader from the fill in both ramps (`border-ink-800` sits
+  between the fill and the panel in the light ramp and softens the boundary
+  instead of drawing it). No hex, nothing theme-forked.
+- **Keys** under `Chooser`: `printsNameTagsFor{names,count}`,
+  `doesNotPrintNameTagsFor{name}`, `noPrinterOnThisKiosk`,
+  `noPrinterPlugOneIn`, `printerConnectedModel{model}`, `printerGuessedRoll`,
+  `printerGuessedRollBare`, `nothingWasPicked{connect}`, `connectThePrinter`,
+  `connectThePrinterAgain`, `oneMoment`, `printerSettings`,
+  `nameTagsWontPrint`. Reused from `Printer`: `looking`, `notConnected`,
+  `lookAgain`, `testPrint`, and the trouble message/advice pairs through the
+  shared `stateLine` helper lifted out of `PrinterScreen.tsx` ~91–106.
+- **The copy variant** (*Needs the label printer*) was built for comparison
+  and not adopted: a catalogue change only if the owner ever takes it.
+- **Still owed:** X4 (the selection survives the door), X3 (the chunk
+  resident before the first press — load-bearing now that the connect is
+  drawn before any tap), and the shelf photograph.
+
 
 ### C — the printer screen
 
-- Mode: `const setup = !onReprintByName` (the set-up mount passes
-  `printedTonight={[]}` and no `onReprintByName`). New props `hasConfig`
-  (`printerConfig !== null`, at both mounts — they currently hand the screen
-  invented defaults) and `gatheringPrints` (from `KioskApp`'s `prints`, at the
-  mid-evening mount).
-- Primary (set-up): one `<button>` in the Reprint button's treatment
-  (`flex h-16 w-full … bg-brand-600 text-lg font-semibold text-white kiosk:h-20 kiosk:text-xl`);
-  verb and action by state — ready → `testPrint`; trouble → `lookAgain`;
-  unpaired (either `searching`) → `connect` labelled *Connect this printer
-  again*, so the verb does not change while the retry ladder settles; idle →
-  `connect` labelled *Connect the printer*; `unsupported` draws no primary.
-  Secondary row: trouble → *Connect this printer again*; unpaired → *Look
-  again*; ready → *Check the printer* + *Connect a different printer*, both
-  `text-ink-300`. No disabled buttons are drawn.
-- Head: the trouble `stateLine` case returns message and advice as one
-  `warn-400` sentence; beneath it `t('troubleThenLookAgain')` at `ink-300`
-  (*If that is already done, check the printer's light and the cable at the
-  tablet end, then press Look again.*); the unpaired `checkPowerAndCable`
-  line steps to `ink-300`. A `Look again` that finds nothing walks the
-  module's own path — trouble → unpaired/searching → unpaired — which is the
-  Android frame with the chooser in the blue slot.
-- Under the connect: when `!hasConfig`, `t('plugInFirst')` at `ink-300`
-  (plug it in and switch it on, then what the press produces); when the
-  primary is the browser chooser on a configured kiosk (the Android frame),
-  the second sentence alone — *Connecting opens a window from the browser
-  listing the USB devices it can see — pick the QL.* The final visual pass
-  found that frame silent about the dialog it opens. On the ready frames,
-  `t('autoPowerOff')` closes the act group.
-- `stateLine` takes `detection`: a clean read-off joins the state line
-  (*Connected and ready — read off the printer: {model}, {label}.*,
-  `present-400`); a guessed roll makes the line *Connected — the roll had to be
-  guessed.* in `warn-400` and the notice (now prose, no panel) ends with
-  `t('thenTestLabel')`. The pending statement
-  `t('modelRollPending')` is prose in `ink-400`, drawn when
-  `!(detection || hasConfig)`.
-- Layout (set-up): wrapper `mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto`
-  holding two `gap-3` groups — the act (notice, primary, secondaries, errand
-  line) and the reference (model row, log). The `lg:grid` two-column wrapper
-  is off in set-up mode; the tonight card is not drawn. Foot pill centred,
-  `bg-ink-900 font-medium text-ink-300`, labelled `t('backToGatherings')`.
-- Mid-evening: `connectLeads = gatheringPrints && state.kind !== 'ready'` puts
-  the connect in the brand slot (labelled per `hasConfig`) and *Reprint a name
-  tag* in the quiet treatment beneath it, still live. `printedTonight` already
-  drives the empty line. The events `<summary>` steps to `text-ink-300` in
+As it stands after the round-4 fix pass; the full statement is in the C
+ideator's final report. Sixteen portrait states, two mounts of one component,
+both ramps.
+
+- **Mode and props.** `const setup = !onReprintByName`. New props
+  `hasConfig` (`printerConfig !== null`, at both mounts, `KioskApp.tsx`
+  ~2118 and ~2364) and `gatheringPrints` (`KioskApp`'s `prints`, ~1239, at
+  the mid-evening mount).
+- **Predicates.** `stillLooking = kind === 'unpaired' && searching`;
+  `canLookAgain = kind === 'trouble' || kind === 'unpaired'` (drawn in both,
+  dimmed while looking);
+  `canReprint = Boolean(detection) || hasConfig || kind === 'ready'` (the
+  fact, not a prop re-read only in `onDone`);
+  `connectLeads = !setup && gatheringPrints && kind !== 'ready'`;
+  `rollAmbiguous = detection?.matched.length > 1`.
+- **Primary** (one 672×80 brand control per state:
+  `flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl`):
+  ready → set-up `testPrint` / mid-evening `onReprintByName`; trouble →
+  `lookAgain`; unpaired, either value of `searching` → `connect` labelled
+  *Connect this printer again*; idle → `connect` labelled *Connect the
+  printer*; unsupported → none. Mid-evening the map applies when
+  `connectLeads`; otherwise the brand slot is Reprint.
+- **Head** (`mx-auto w-full max-w-2xl pb-4 text-center`, `lg:max-w-5xl`
+  mid-evening) holds exactly the title
+  (`text-lg font-medium text-ink-400 kiosk:text-xl`) and the state line
+  (`pt-1 text-sm kiosk:text-base`): idle *No printer set up on this kiosk.*
+  ink-300 · looking *Looking for the printer this kiosk was set up with…*
+  ink-300 with the app's spinner inline · unpaired `notConnected` warn-400 ·
+  trouble `message + advice` warn-400 · ready *Connected — model and roll
+  read off the printer.* present-400 · ready and guessed
+  `connectedGuessedRoll` / `connectedGuessedModel` warn-400. Nothing else is
+  ever in the head — which is what holds the primary at y96 on every frame,
+  both mounts, both ramps, with no padded state.
+- **The slot under a control** (`shrink-0 text-sm kiosk:text-base`; ink-100
+  for the account of the last press, ink-300 for the standing instruction,
+  ink-400 for a reference note). Under the primary: idle → `plugInFirst` +
+  `connectOpensWindow`; looking → *It may connect on its own in a few
+  seconds; the button below hurries it.* + `connectOpensWindow`; unpaired →
+  `checkPowerAndCable` + `connectOpensWindow`; trouble → *If it is plugged in
+  and switched on and nothing changes, press Look again.*; ready untested →
+  *Print a test label to be sure, then go back and set the kiosk.*; ready
+  tested → *The test label has been sent — take it off the printer and check
+  it.* (ink-100) + *The kiosk is still waiting to be set — Back to the
+  gatherings.*; ready guessed → `mediaAmbiguous` / `modelUnknown` (ink-100)
+  + *Look at the roll in the printer and pick it below, then print a test
+  label — it should come out the full width with nothing cut off.*;
+  mid-evening never → `plugInFirst` + `connectOpensWindow`. Under the
+  secondary: trouble → `connectOpensWindow`; the mid-evening greyed group →
+  *Connect the printer first to reprint a name tag.* or *These two need the
+  printer connected.* When `attemptFailed && kind !== 'ready'`, *Nothing was
+  picked from the browser's list. Press Connect this printer again and
+  choose the QL — if it is not listed, check it is plugged into this tablet
+  and switched on.* (ink-100) becomes the first line of the slot belonging to
+  the control that opened the chooser — the primary on idle/unpaired, the
+  secondary on trouble — replacing `checkPowerAndCable` but never
+  `connectOpensWindow`.
+- **Secondaries**
+  (`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 kiosk:text-lg`,
+  672×60 or 330×60 in a two-column grid; gated ones add `aria-disabled` +
+  `opacity-50` and keep `active:`, never the `disabled` attribute): set-up
+  idle → none; looking → *Look again* (dimmed); unpaired → *Look again*;
+  trouble → *Connect this printer again*; ready → *Connect a different
+  printer* only. Mid-evening never → Reprint (dim), Check the printer | Print
+  a test label (dim); mid-evening unpaired/trouble → Reprint (live), Look
+  again / Connect this printer again (live), Check | Test (dim); mid-evening
+  ready → Check | Test (live), Connect a different printer.
+- **`attemptFailed`**: set only when `pairPrinter` resolves `null`; cleared
+  at the top of every press handler and inside `printing.subscribe`; never
+  drawn when ready. **`tested`**: set in the `testPrint` handler
+  (`testPrint` is void and enqueues, so the copy says *sent*); cleared by any
+  non-ready emission and by every other press. If the owner wants the
+  outcome rather than the send, pass the real `printedTonight` to the set-up
+  mount and read the newest `__test__` row's `failed` flag
+  (`printing/queue.ts` ~53–68).
+- **Roll rows.** `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`;
+  chosen `bg-brand-600/25 text-brand-200 ring-2 ring-brand-500` +
+  `aria-pressed` (the app's selected-tile treatment,
+  `RegistrationFlow.tsx` ~1328, no `active:`); others
+  `bg-ink-800 text-ink-100 active:bg-ink-700`. The model `<details>` is
+  controlled and opens itself when `rollAmbiguous`. Copy: `mediaAmbiguous` =
+  *{media} is loaded, and more than one roll is that size. Set to {label}.*
+- **Layout.** Set-up:
+  `mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto`
+  = act (`flex shrink-0 flex-col gap-3`) + reference
+  (`mt-auto flex shrink-0 flex-col gap-3`, anchored above the foot).
+  Mid-evening:
+  `… flex-col gap-8 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6`,
+  act first in DOM (`lg:order-2`), reference second
+  (`mt-auto … lg:order-1 lg:mt-0`). Reference group: the tonight card
+  (mid-evening only); the model row (summary `text-ink-300`, affordance
+  `text-ink-400`) or `modelPending` at ink-400; the log row (summary
+  `text-ink-300`); `autoPowerOff` at ink-400 when ready.
+- **Foot.** Centred pill
+  (`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 kiosk:text-lg`):
+  set-up *Back to the gatherings* at
+  `bg-ink-900 font-medium text-ink-300 active:bg-ink-800`, promoted to
+  `bg-ink-800 font-semibold text-ink-100 active:bg-ink-700` on the tested
+  frame only; mid-evening *Done* at the promoted weight always.
+- **Keys** (`Printer.*`) new: `selectionCancelled`, `mayConnectItself`,
+  `testToBeSure`, `testSent`, `stillWaiting`, `pickTheRoll`, `modelPending`,
+  `reprintNeedsPrinter`, `checksNeedPrinter`, `connectThePrinter`,
+  `connectThisAgain`, `connectDifferent`, `connectedReadOff`,
+  `connectedGuessedRoll`, `connectedGuessedModel`, `plugInFirst`,
+  `connectOpensWindow`; changed: `troubleThenLookAgain`, `mediaAmbiguous`;
+  retired: `connectedReady`, `chooseDifferent`, `connectPrinter`, `readOff`.
+  `printing/index.ts` needs no change; `KioskApp.tsx` adds the two props at
   both mounts.
-- After a test label (`tested` state set when `testPrint` resolves, cleared
-  when the state leaves ready): `t('testLabelCameOut')` first in the act group.
-- New `Printer` keys: `connectThePrinter`, `connectThisAgain`,
-  `connectDifferent`, `troubleThenLookAgain`, `plugInFirst`, `autoPowerOff`,
-  `connectedReadOff`, `connectedGuessedRoll`, `connectedGuessedModel`,
-  `thenTestLabel`, `modelRollPending`, `backToGatherings`, `testLabelCameOut`.
+- **Answering the staff:** dismissing or abandoning the browser's device
+  list returns to this screen — `pairPrinter` catches `selection-cancelled`
+  and returns `null` without emitting, the screen paints the account, and the
+  sheet is browser-owned and modal only over the tab, so no bound kiosk is
+  parked behind it.
+- **Residual, recorded:** *Look again* sits 24px lower on unpaired than on
+  looking (the Android sentence is two lines where the wait sentence is one)
+  — a 60px target with 36px of overlap; a padded line was declined.
 
-- **Round 4 — looking.** Both values of `searching` map to the same primary
-  (*Connect this printer again*); while `searching` the head reads *Looking
-  for the printer this kiosk was set up with…* in `ink-400` with no second
-  line, and no *Look again* is drawn until the ladder settles.
-- **After a cancelled device list.** `attemptFailed`: false before
-  `printing.pairPrinter()`, true when it resolves `null`, cleared when the
-  state becomes ready. The slot under the primary renders
-  `attemptFailed ? t('attemptFailed')` in `warn-400` (*The browser found no
-  printer — check it is plugged into this tablet and switched on, then try
-  again.*) `: primaryIsChooser ? (!hasConfig && plugInFirst) + connectOpensWindow`
-  in `ink-300` `: null`. New key `Printer.attemptFailed`; `plugInFirst`
-  splits into `plugInFirst` (only when `!hasConfig`) and `connectOpensWindow`
-  (wherever the primary is the chooser). On trouble the same slot carries the
-  account under *Look again*.
-- **Roll rows.** In the `detection.matched.length > 1` block: container
-  `flex flex-col gap-3`; each chip
-  `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`, the
-  chosen one `bg-brand-600 text-white`, the others `bg-ink-800 text-ink-100`;
-  the question `pb-3`. Two 608×60 rows, 12px apart.
-- **Mid-evening with no printer:** the `onReprintByName` button takes
-  `disabled={!hasConfig}` and `disabled:opacity-50`, so it renders like its
-  siblings instead of leading a screen that cannot print.
-- **Light ramp:** no React change; every class is a token, and every measured
-  pair holds except `text-warn-400` at 4.29:1 on the light page — the app's
-  fault colour everywhere (`warn-300` would fix it system-wide at 7.56:1); a
-  ramp decision for the owner, not this component.
-- Declined and recorded: the chosen roll row's white on `brand-600` at 4.10:1
-  in the dark (one blue means one thing); reserving the advice line so the
-  primary does not shift 52px when the ladder settles (a permanent hole for a
-  ten-second window); the `ink-500` hints inside closed details at 3.75:1
-  (the hint rung, behind a fold); the light-ramp secondaries' fill at 1.07:1
-  (ramp-wide; their labels are 6.17:1).
 
-## Still open after the final pass
+## Still open after round 4
 
-Minor findings the confirmatory pass left for whoever implements, in the
-order they were raised:
+For whoever implements, in the order they matter:
 
-- The waiting connect slot (F, B) should acknowledge a press — an `active:`
-  state or an animated ellipsis — rather than absorbing it silently.
-- The commit's *name tags won’t print* clause is `text-white` on `brand-600`
-  (4.1:1); a weight step is worth taking, and it belongs on the shelf-tablet
-  photograph.
-- On the guessed-roll printer frame, the two roll chips behind *Change* are
-  40px tall and 8px apart — the smallest targets in the set on the frame
-  whose whole job is choosing between them. Inherited; give them the
-  screen's 60px rows on that state.
-- On the mid-evening no-printer frame, *Reprint a name tag* stays live at
-  full weight above two half-weight ghosts; either half-weight it while there
-  is no printer or say why it is live.
-- C's Android frame inherits D's cost — the browser dialog behind the blue
-  button — without D's post-cancel account; the module's own walk
-  (trouble → looking → unpaired) is the only feedback.
+- **The shelf-tablet photograph** — the strip and both screens' fault
+  frames, both grounds, in lobby light. Asked for since round 2. The forward
+  control now has a measured edge in both ramps; the photograph confirms the
+  rung rather than deciding whether there should be one. Also on that
+  photograph: the commit's *name tags won't print* clause at 4.1:1 on
+  `brand-600` in the dark.
+- **`warn-400` on the light page** is 4.29:1 on the printer screen and
+  4.65:1 on the strip, below the context line above it; `warn-300` is
+  8.19:1 light and 13.54:1 dark. The app's fault colour everywhere — a ramp
+  decision, now photographed on four light frames.
+- **The ready screen's amber dot is trouble-only**, so a kiosk that goes
+  unpaired mid-service says nothing on the only screen anybody is looking
+  at. The journey critic ranks it the largest remaining Sunday-loser in this
+  area; the round-1 rule upheld the dot. The owner decides.
+- **X4** — the selection survives the printer door — with a touch test
+  attached: C's exit pill sits inside the chooser commit's 100px band, so a
+  real touch on the return must not land on a live *Set kiosk*.
+- **Governance**, from the staff consultant: the editor's hint under *Print a
+  label at check-in* should say the tick puts a line on the kiosk's set-up
+  screen; one-off events cannot carry a label template
+  (`EventEditorModal.tsx` ~530), so the strip never appears for a holiday
+  club; `labelTemplate` travels on the binding, so a kiosk bound before the
+  template was set prints nothing all morning. The staff-visible
+  pre-service check, asked for since round 1, is the honest answer to the
+  last of these.
+- A per-kiosk "this kiosk has no printer" flag, if the always-on sentence on
+  a corridor tablet ever bites (recorded, not built); the 40px *Copy* button
+  behind the log fold (pre-existing).
+
 
 ## How it was made
 
