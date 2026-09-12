@@ -38,6 +38,8 @@
  *                             what the printer is doing, on the chooser, the printer screen
  *                             and the staff menu (`none` on the staff menu: nothing to print)
  *   ?labels=all|some|none     which chooser rows belong to a gathering that prints  (default none)
+ *   ?rooms=long               the rooms named the way a church names them — "Fellowship Hall",
+ *                             "Room 201, upstairs" — so the meta line's wrap is photographed
  *   ?detected=plain|guessed|unknown
  *                             what "Check the printer" comes back with on the printer screen —
  *                             a clean read-off, a roll the packet could not choose between, or a
@@ -199,6 +201,21 @@ const chooserIcons = params.get('icons') ?? 'all';
  */
 const chooserLabels = params.get('labels') ?? 'none';
 
+/*
+ * The rooms, the length a church actually types them.
+ *
+ * `Hall` is the shortest room name there is, and a row mark that fits beside
+ * it with twelve pixels to spare has not been tested. `?rooms=long` swaps the
+ * fixture's rooms for the real thing so the meta line is photographed at the
+ * width it wraps.
+ */
+const LONG_ROOMS: Record<string, string> = {
+  Hall: 'Fellowship Hall',
+  'Youth room': 'Room 201, upstairs',
+};
+const roomOf = (location: string | null) =>
+  location && params.get('rooms') === 'long' ? (LONG_ROOMS[location] ?? location) : location;
+
 function chooserEntries(): KioskEventEntry[] {
   return (params.get('twins') === '1' ? TWINS : CHOOSER).map((row, index) => {
     const startAt = NOW - 22 * 60_000 + row.inHours * 3_600_000;
@@ -217,7 +234,7 @@ function chooserEntries(): KioskEventEntry[] {
       // which is the only reason a finished row is ever on this list.
       checkInClosesAt: endAt + 90 * 60_000,
       seriesId: null,
-      location: row.location,
+      location: roomOf(row.location),
       requiresCheckOut: false,
       labelTemplate: prints ? DEFAULT_LABEL_TEMPLATE : null,
       allergiesSupported: true,

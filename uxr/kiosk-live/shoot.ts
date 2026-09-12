@@ -308,6 +308,34 @@ const SCENES: {
     views: ['kiosktall'],
     drive: ['Kids Club'],
   },
+  /*
+   * The states the chosen direction has to be right in beyond the ones the
+   * comparison was judged on. A printer unplugged mid-session with the row
+   * picked; a day where every row prints, so the names line has two names;
+   * two sittings of one printing gathering, which the names line must say
+   * once; a day with no printing row on a kiosk that has a printer, and on
+   * one that has not; the light ground a themed gathering wears, which every
+   * token in the strip has to survive; and rooms named the length a church
+   * names them.
+   */
+  {
+    id: 'setup-chooser-picked-prints-trouble',
+    query: 'screen=chooser&labels=some&printer=trouble',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  { id: 'setup-chooser-all-print', query: 'screen=chooser&labels=all', views: ['kiosktall'] },
+  { id: 'setup-chooser-twins-print', query: 'screen=chooser&labels=all&twins=1', views: ['kiosktall'] },
+  { id: 'setup-chooser-none-print', query: 'screen=chooser&labels=none', views: ['kiosktall'] },
+  { id: 'setup-chooser-none-print-ready', query: 'screen=chooser&labels=none&printer=ready', views: ['kiosktall'] },
+  { id: 'setup-chooser-light', query: 'screen=chooser&labels=some&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-chooser-light-picked',
+    query: 'screen=chooser&labels=some&ground=light',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  { id: 'setup-chooser-long-rooms', query: 'screen=chooser&labels=some&rooms=long', views: ['kiosktall'] },
   /* The printer screen as setup reaches it: no evening, no reprint door. */
   { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
@@ -319,6 +347,19 @@ const SCENES: {
    * chooser brings the printer back — so the screen has to say so.
    */
   { id: 'setup-printer-unpaired', query: 'screen=printer&printer=unpaired', views: ['kiosktall'] },
+  /*
+   * Still looking — the ten seconds of boot retries after a wake or a failed
+   * "Look again" — and the printer screen on the light ground, where the
+   * brand slot and the surface family have to hold in the other ramp.
+   */
+  { id: 'setup-printer-looking', query: 'screen=printer&printer=looking', views: ['kiosktall'] },
+  { id: 'setup-printer-light', query: 'screen=printer&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-printer-light-detected',
+    query: 'screen=printer&printer=ready&detected=plain&ground=light',
+    views: ['kiosktall'],
+    drive: ['Check the printer'],
+  },
   /*
    * Just connected, with what the printer said about itself on the screen —
    * the state a volunteer is actually looking at when the doc says "read the
