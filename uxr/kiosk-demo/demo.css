@@ -1,0 +1,11 @@
+/*
+ * The kiosk's own stylesheet, told where the kiosk is.
+ *
+ * Tailwind v4 detects its sources from the root it is built at, and this demo
+ * is built at `uxr/kiosk-demo/` so that its `base` and its output shape can
+ * differ from the app's. Left alone it scanned this folder, found the six
+ * classes in `main.tsx`, and rendered the two screens as unstyled markup —
+ * which is a convincing way to publish a page that proves nothing.
+ */
+@import '../../src/index.css';
+@source '../../src';
