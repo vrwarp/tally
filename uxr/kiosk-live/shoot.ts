@@ -340,6 +340,14 @@ const SCENES: {
   },
   /* The same screen mid-evening, for the difference. */
   { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },
+  /*
+   * Mid-evening on a kiosk that was never given a printer, on a gathering
+   * that prints: the recovery screen for the volunteer who skipped set-up
+   * and is finding out at the first family. The blue slot is Reprint here
+   * and Connect is the last and dimmest control — which is the order of the
+   * job reversed.
+   */
+  { id: 'staff-printer-screen-idle', query: 'screen=printer&from=staff&printer=idle', views: ['kiosktall'] },
   /* The staff menu on a kiosk that was never given a printer, and on one whose
      printer has stopped — the two states of it a setup decision lands on. */
   { id: 'staff-printer-none', query: 'screen=staff&printer=none&icon=groups', views: ['kiosktall'] },
