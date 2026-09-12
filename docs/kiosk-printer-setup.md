@@ -228,6 +228,56 @@ away; these sentences are what survive.
   ready → `present-400`. Wrapper `mb-6 rounded-xl bg-ink-900 p-4 kiosk:p-5`
   (a 24px seam to the commit).
 
+- **Round 4 — the panel and the door are gated separately.**
+  `showPanel = printerConfigured || bindablePrinting.length > 0` gates the
+  two text lines and the forward slot; *Printer settings* is rendered
+  unconditionally, so on a day with no printing row and no printer the door
+  alone sits where the strip's controls row would be (the Saturday errand:
+  connecting the printer the day before a printing Sunday). Wrapper
+  `mb-6 p-4 kiosk:p-5`, plus `rounded-xl bg-ink-900` when the panel is drawn
+  and `flex items-center` when it is not — the padding stays, so the door
+  lands on the same pixel in both worlds.
+- **Trouble is a retry, not a dialog.** The fault predicate stays
+  `trouble || unsupported || (unpaired && !searching)`, but the forward slot
+  forks on the kind: `trouble` → *Look again* (`Printer.lookAgain`, already
+  shipped) wired to the `lookAgain` handler that is local to
+  `PrinterScreen.tsx` today (~335–345: `await printing.ready()` behind a busy
+  flag) — lift it into the shared printer hook so both screens call one
+  function; `unpaired && !searching` → *Connect the printer again* →
+  `onSetUpPrinter`. The trouble state line is `message + ' ' + advice` on one
+  line (*The printer was unplugged. Plug it back in.*) — the two keys the
+  printer screen prints on separate lines.
+- **The names line owns the `pt-1`.** When no bindable row prints and a
+  printer is connected, the strip is the state line and the door alone
+  (136px rather than 164px); the bottom edge, the controls row and the commit
+  do not move.
+- **The waiting slot acknowledges a press.** No `pointer-events-none` and no
+  `disabled` (both suppress `:active`): `aria-disabled` + `aria-busy`, a
+  handler that returns early while loading, `active:bg-ink-600`, and the
+  app's own spinner (`size-4 animate-spin rounded-full border-2 border-current border-t-transparent`,
+  as in `components/ui/Button.tsx` ~106) before *Getting ready to connect…*.
+- **The sub-line clause takes `font-semibold`**
+  (`shrink-0 font-semibold text-white`); its 4.1:1 on the dark ground stays a
+  shelf-tablet check. On the light ground the same clause is about 7:1.
+- **Row wrap rule — shared by every direction and the app's own chooser.**
+  The three status spans (`checkInOpen`, `opensAt`, `endedPickupOnly`,
+  `EventChooser.tsx` ~380, 385, 403) go `sm:inline` → `sm:inline-block`:
+  every fact on the row is an atom and the line breaks between them, so a
+  long room name drops the status whole to a second, indented line instead of
+  stranding *pickup only*. Residual: room and mark are one unbreakable run,
+  so a room over roughly 33 characters overflows (about 52 today, without
+  the mark) — truncate the room, never break the mark.
+- **The copy variant is a catalogue change only**, if the owner takes it:
+  `printsNameTags` → *Needs the label printer*, `printsNameTagsFor` →
+  *{names} needs the label printer* (no plural fork — *needs* agrees with the
+  list). It wraps both printing rows to two lines on this seed, 24px each.
+- **Light ramp:** B adds no colour outside `ink-*`, `present-400`, `warn-400`
+  and `brand-600/500`, all of which `:root[data-theme="light"]` already
+  redefines; nothing to change.
+- Ready with nothing selected falls out of the two predicates
+  (`showTest = ready && selectedPrints`, `showConnect = selectedPrints || fault`):
+  sentence, green line, door, no buttons.
+
 ### C — the printer screen
 
 - Mode: `const setup = !onReprintByName` (the set-up mount passes
@@ -282,6 +332,39 @@ away; these sentences are what survive.
   `connectedReadOff`, `connectedGuessedRoll`, `connectedGuessedModel`,
   `thenTestLabel`, `modelRollPending`, `backToGatherings`, `testLabelCameOut`.
 
+- **Round 4 — looking.** Both values of `searching` map to the same primary
+  (*Connect this printer again*); while `searching` the head reads *Looking
+  for the printer this kiosk was set up with…* in `ink-400` with no second
+  line, and no *Look again* is drawn until the ladder settles.
+- **After a cancelled device list.** `attemptFailed`: false before
+  `printing.pairPrinter()`, true when it resolves `null`, cleared when the
+  state becomes ready. The slot under the primary renders
+  `attemptFailed ? t('attemptFailed')` in `warn-400` (*The browser found no
+  printer — check it is plugged into this tablet and switched on, then try
+  again.*) `: primaryIsChooser ? (!hasConfig && plugInFirst) + connectOpensWindow`
+  in `ink-300` `: null`. New key `Printer.attemptFailed`; `plugInFirst`
+  splits into `plugInFirst` (only when `!hasConfig`) and `connectOpensWindow`
+  (wherever the primary is the chooser). On trouble the same slot carries the
+  account under *Look again*.
+- **Roll rows.** In the `detection.matched.length > 1` block: container
+  `flex flex-col gap-3`; each chip
+  `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`, the
+  chosen one `bg-brand-600 text-white`, the others `bg-ink-800 text-ink-100`;
+  the question `pb-3`. Two 608×60 rows, 12px apart.
+- **Mid-evening with no printer:** the `onReprintByName` button takes
+  `disabled={!hasConfig}` and `disabled:opacity-50`, so it renders like its
+  siblings instead of leading a screen that cannot print.
+- **Light ramp:** no React change; every class is a token, and every measured
+  pair holds except `text-warn-400` at 4.29:1 on the light page — the app's
+  fault colour everywhere (`warn-300` would fix it system-wide at 7.56:1); a
+  ramp decision for the owner, not this component.
+- Declined and recorded: the chosen roll row's white on `brand-600` at 4.10:1
+  in the dark (one blue means one thing); reserving the advice line so the
+  primary does not shift 52px when the ladder settles (a permanent hole for a
+  ten-second window); the `ink-500` hints inside closed details at 3.75:1
+  (the hint rung, behind a fold); the light-ramp secondaries' fill at 1.07:1
+  (ramp-wide; their labels are 6.17:1).
+
 ## Still open after the final pass
 
 Minor findings the confirmatory pass left for whoever implements, in the
@@ -313,4 +396,8 @@ first-time-volunteer walkthrough read the shipped frames and five candidate
 directions; the panel converged on three plus the printer-screen fix. Round 2:
 four ideators built them, nine readers critiqued the result per direction.
 Round 3: the ideators fixed every major finding and built the states nobody had
-photographed. Portrait kiosk only, on the owner's instruction.
+photographed. Round 4, after the owner chose B with C: the two ideators widened
+them to nineteen and twelve portrait states — the light ground, long room
+names, every row printing, two sittings of one gathering, the quiet day, the
+looking ladder, the cancelled device list, the roll rows — and the full panel
+read the result. Portrait kiosk only, on the owner's instruction.
