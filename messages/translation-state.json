@@ -10916,26 +10916,6 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Chooser.setUpPrinter": {
-    "source": "Set up a label printer",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Chooser.printerConnected": {
-    "source": "Label printer connected",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Chooser.lookingForPrinter": {
-    "source": "Looking for the label printer…",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Chooser.printerNeedsAttention": {
-    "source": "Label printer needs attention",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Chooser.settingUp": {
     "source": "Setting up…",
     "zh-Hans": "machine",
@@ -10955,6 +10935,76 @@
     "source": "Not yours",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Chooser.printsNameTags": {
+    "source": "Prints name tags",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.printsNameTagsFor": {
+    "source": "{names} {count, plural, one {prints} other {print}} name tags",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.doesNotPrintNameTagsFor": {
+    "source": "{name} does not print name tags",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.noPrinterOnThisKiosk": {
+    "source": "No printer on this kiosk",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.noPrinterPlugOneIn": {
+    "source": "No printer on this kiosk — plug one in, switch it on, then connect it.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.printerConnectedModel": {
+    "source": "Printer connected · {model}",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.printerGuessedRoll": {
+    "source": "Printer connected — the roll had to be guessed. Print a test label and look at it.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.printerGuessedRollBare": {
+    "source": "Printer connected — the roll had to be guessed.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.nothingWasPicked": {
+    "source": "Nothing was picked from the browser’s list. Press {connect} and pick the QL — if it is not listed, plug it in and switch it on.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.connectThePrinter": {
+    "source": "Connect the printer",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.connectThePrinterAgain": {
+    "source": "Connect the printer again",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.oneMoment": {
+    "source": "One moment…",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.printerSettings": {
+    "source": "Printer settings",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.nameTagsWontPrint": {
+    "source": "name tags won’t print",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Register.couldNotSave": {
     "source": "Tally could not finish that just now. Try again, or see a leader.",
@@ -11387,11 +11437,6 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Printer.connectedReady": {
-    "source": "Connected and ready.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Printer.looking": {
     "source": "Looking for the printer this kiosk was set up with…",
     "zh-Hans": "machine",
@@ -11422,16 +11467,6 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Printer.chooseDifferent": {
-    "source": "Choose a different printer",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.connectPrinter": {
-    "source": "Connect a printer",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Printer.modelUnknown": {
     "source": "The printer did not say which model it is — check that {model} is right.",
     "zh-Hans": "machine",
@@ -11439,11 +11474,6 @@
   },
   "Printer.mediaUnknown": {
     "source": "{media} is loaded, and no roll this printer takes is that size.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.readOff": {
-    "source": "Read off the printer: {model}, {label}.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -11473,7 +11503,7 @@
     "zh-Hant": "machine"
   },
   "Printer.mediaAmbiguous": {
-    "source": "{media} is loaded, which is more than one roll. Set to {label} — change it below if that is not what is on the spindle.",
+    "source": "{media} is loaded, and more than one roll is that size. Set to {label}.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -11484,6 +11514,116 @@
   },
   "Printer.mediaContinuous": {
     "source": "{width}mm continuous",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectThePrinter": {
+    "source": "Connect the printer",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectThisAgain": {
+    "source": "Connect this printer again",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectDifferent": {
+    "source": "Connect a different printer",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectedReadOff": {
+    "source": "Connected — model and roll read off the printer.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectedGuessedRoll": {
+    "source": "Connected — the roll had to be guessed.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectedGuessedModel": {
+    "source": "Connected — the model had to be guessed.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.plugInFirst": {
+    "source": "Plug the printer into this tablet and switch it on first.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.connectOpensWindow": {
+    "source": "Connecting opens a window from the browser listing the USB devices it can see — pick the QL.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.mayConnectItself": {
+    "source": "It may connect on its own in a few seconds — or press Connect this printer again to hurry it.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troubleThenLookAgain": {
+    "source": "If it is plugged in and switched on and nothing changes, press Look again.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.selectionCancelled": {
+    "source": "Nothing was picked from the browser’s list. Press Connect this printer again and choose the QL — if it is not listed, check it is plugged into this tablet and switched on.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.stillOnPrinter": {
+    "source": "Nothing was picked from the browser’s list — this kiosk is still on the {model}.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.testToBeSure": {
+    "source": "Print a test label to be sure, then go back and set the kiosk.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.testSent": {
+    "source": "The test label has been sent — take it off the printer and check it.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.stillWaiting": {
+    "source": "The kiosk is still waiting to be set — Back to the gatherings.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.pickTheRoll": {
+    "source": "Look at the roll in the printer and pick it below, then print a test label — it should come out the full width with nothing cut off — and go back and set the kiosk.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.rollPicked": {
+    "source": "Print a test label — it should come out the full width with nothing cut off — then go back and set the kiosk.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.modelPending": {
+    "source": "Model and roll — read from the printer when it connects.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.reprintNeedsPrinter": {
+    "source": "Connect the printer first to reprint a name tag.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.checksNeedPrinter": {
+    "source": "Check and test need the printer connected. A reprint will try to reconnect first, and say if it could not.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.autoPowerOff": {
+    "source": "In Brother’s Printer Setting Tool, set Auto Power Off to None. A printer that switches itself off has to be connected again from this screen.",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.backToGatherings": {
+    "source": "Back to the gatherings",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

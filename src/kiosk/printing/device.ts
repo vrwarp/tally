@@ -37,6 +37,22 @@ export interface PrinterConfig {
   model: string;
   /** A `brother_ql` label identifier, e.g. `62x29` or `62`. */
   label: string;
+  /**
+   * Whether either of the two answers above had to be guessed when the printer
+   * was connected.
+   *
+   * Written by `pairPrinter` and read by the *chooser*, which is the reason it
+   * is persisted at all. The printer screen has the live `PrinterDetection` in
+   * hand and says which half was a guess in as many words; the chooser has only
+   * this config and a state, and without this flag it reported a guessed roll
+   * as a green *Printer connected* — the same fact amber on one screen and a
+   * tick on the other, and the tick is the one the next six volunteers read.
+   *
+   * Optional because every config written before this existed lacks it, and a
+   * missing flag has to mean "nothing known against it" rather than a kiosk
+   * that refuses to load.
+   */
+  guessed?: boolean;
 }
 
 /**
@@ -76,11 +92,21 @@ function isConfig(value: unknown): value is PrinterConfig {
 export function readPrinterConfig(): PrinterConfig | null {
   const stored = readJson<PrinterConfig>(KIOSK_KEYS.printer);
   if (!isConfig(stored)) return null;
-  return { model: stored.model, label: stored.label };
+  // Only ever written as `true`, so anything else — absent, or some older
+  // shape's leftovers — reads as "nothing known against this config".
+  return stored.guessed === true
+    ? { model: stored.model, label: stored.label, guessed: true }
+    : { model: stored.model, label: stored.label };
 }
 
 export function writePrinterConfig(config: PrinterConfig): void {
-  writeJson(KIOSK_KEYS.printer, { model: config.model, label: config.label });
+  writeJson(KIOSK_KEYS.printer, {
+    model: config.model,
+    label: config.label,
+    // Omitted rather than written `false`, so the stored shape stays the two
+    // fields it has always been on the ordinary kiosk.
+    ...(config.guessed === true ? { guessed: true } : {}),
+  });
 }
 
 export function clearPrinterConfig(): void {

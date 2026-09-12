@@ -7,7 +7,14 @@
  * plus an `index.json` manifest — so a round of kiosk frames reads exactly like
  * a round of app frames.
  *
- *   npx tsx uxr/kiosk-live/shoot.ts [--out uxr/renders/ks-r01]
+ *   npx tsx uxr/kiosk-live/shoot.ts [--out uxr/renders/ks-r01] [--only setup] [--freeze uxr/prototype-kiosk]
+ *
+ * `--freeze` also writes each state as the frozen HTML the rest of the loop
+ * edits — `<scene>--<viewport>.html`, through the same `snapshot.ts` the
+ * capture spec uses — so a campaign that wants to *change* a kiosk screen
+ * rather than photograph it can hand the ideator a prototype that was the app
+ * a moment ago, and re-shoot the edit with `uxr/shoot.ts`, which knows both
+ * kiosk shapes by name.
  *
  * Every frame is checked for horizontal overflow on the way past, because the
  * one failure this screen keeps producing is a fixed-height row whose contents
@@ -21,6 +28,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { freeze } from '../snapshot';
 
 /** Same fallback as `uxr/shoot.ts`: an image that ships its own Chromium. */
 const executablePath =
@@ -247,6 +255,191 @@ const SCENES: {
     query: 'screen=unbind&icon=groups&title=Wednesday+Night+Middle+School+Gathering',
     views: ['phone'],
   },
+  /*
+   * The printer, on the way in.
+   *
+   * Setting a kiosk up for a gathering that prints is this chooser, the quiet
+   * bordered row above its blue button, the printer screen that row opens, and
+   * the way back. Until this campaign the path had been photographed exactly
+   * once — the chooser, with no printer — so a question about how many taps it
+   * costs, and whether a volunteer would find the first of them, had no frame
+   * to be answered on. `labels=some` is the church the question is about: one
+   * gathering on the list prints and its neighbour does not.
+   */
+  { id: 'setup-chooser', query: 'screen=chooser&labels=some', views: ['phone', 'kiosktall', 'kioskwide'] },
+  {
+    /* The row picked and the blue button live — the frame a volunteer is
+       looking at when they decide whether the printer row above it is for them. */
+    id: 'setup-chooser-selected',
+    query: 'screen=chooser&labels=some',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Wednesday Night'],
+  },
+  { id: 'setup-chooser-ready', query: 'screen=chooser&labels=some&printer=ready', views: ['phone', 'kiosktall'] },
+  {
+    /* Wednesday Night picked on the kiosk that has the printer — a sentence
+       about someone else's Sunday, and nothing for this volunteer to press. */
+    id: 'setup-chooser-selected-withprinter',
+    query: 'screen=chooser&labels=some&printer=ready',
+    views: ['kiosktall'],
+    drive: ['Wednesday Night'],
+  },
+  { id: 'setup-chooser-trouble', query: 'screen=chooser&labels=some&printer=trouble', views: ['kiosktall'] },
+  /*
+   * The Android Sunday: the printer lost power overnight, the grant went with
+   * it, and the kiosk boots to `unpaired` with the boot retries spent. The row
+   * reads the same words as `trouble`, which is one of the findings.
+   */
+  { id: 'setup-chooser-unpaired', query: 'screen=chooser&labels=some&printer=unpaired', views: ['kiosktall'] },
+  /*
+   * A row that *prints* picked — Kids Club, which in `labels=some` carries a
+   * template — with no printer, with the printer ready, and with it gone.
+   * `setup-chooser-selected` above picks Wednesday Night, which does not
+   * print, and a direction that reacts to the picked row needs both frames:
+   * the one where it should say something and the one where it must not.
+   */
+  {
+    id: 'setup-chooser-picked-prints',
+    query: 'screen=chooser&labels=some',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-picked-prints-ready',
+    query: 'screen=chooser&labels=some&printer=ready',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-picked-prints-unpaired',
+    query: 'screen=chooser&labels=some&printer=unpaired',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  /*
+   * The states the chosen direction has to be right in beyond the ones the
+   * comparison was judged on. A printer unplugged mid-session with the row
+   * picked; a day where every row prints, so the names line has two names;
+   * two sittings of one printing gathering, which the names line must say
+   * once; a day with no printing row on a kiosk that has a printer, and on
+   * one that has not; the light ground a themed gathering wears, which every
+   * token in the strip has to survive; and rooms named the length a church
+   * names them.
+   */
+  {
+    id: 'setup-chooser-picked-prints-trouble',
+    query: 'screen=chooser&labels=some&printer=trouble',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  { id: 'setup-chooser-all-print', query: 'screen=chooser&labels=all', views: ['kiosktall'] },
+  { id: 'setup-chooser-twins-print', query: 'screen=chooser&labels=all&twins=1', views: ['kiosktall'] },
+  { id: 'setup-chooser-none-print', query: 'screen=chooser&labels=none', views: ['kiosktall'] },
+  { id: 'setup-chooser-none-print-ready', query: 'screen=chooser&labels=none&printer=ready', views: ['kiosktall'] },
+  { id: 'setup-chooser-light', query: 'screen=chooser&labels=some&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-chooser-light-picked',
+    query: 'screen=chooser&labels=some&ground=light',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  { id: 'setup-chooser-long-rooms', query: 'screen=chooser&labels=some&rooms=long', views: ['kiosktall'] },
+  /*
+   * Round 4: the states the panel found missing from the chosen direction.
+   * The kiosk still looking for its printer (the boot ladder, or the ten
+   * seconds after a Look again), with nothing picked and with a printing row
+   * picked; the light ramp's amber and green, which two never-configured
+   * light frames could not show; and the real Saturday — no gatherings at
+   * all, so the printer door has to stand on an empty page.
+   */
+  { id: 'setup-chooser-looking', query: 'screen=chooser&labels=some&printer=looking', views: ['kiosktall'] },
+  {
+    id: 'setup-chooser-picked-prints-looking',
+    query: 'screen=chooser&labels=some&printer=looking',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-light-trouble',
+    query: 'screen=chooser&labels=some&printer=trouble&ground=light',
+    views: ['kiosktall'],
+  },
+  { id: 'setup-chooser-light-ready', query: 'screen=chooser&labels=some&printer=ready&ground=light', views: ['kiosktall'] },
+  { id: 'setup-chooser-nothing-today', query: 'screen=chooser&events=none', views: ['kiosktall'] },
+  /* The printer screen as setup reaches it: no evening, no reprint door. */
+  { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-printer-trouble', query: 'screen=printer&printer=trouble', views: ['kiosktall'] },
+  /*
+   * The Android Sunday on the printer screen: set up with a printer the
+   * browser no longer lists, the boot retries spent. The state this church
+   * meets most weeks, and the one where only a human press on the browser's
+   * chooser brings the printer back — so the screen has to say so.
+   */
+  { id: 'setup-printer-unpaired', query: 'screen=printer&printer=unpaired', views: ['kiosktall'] },
+  /*
+   * Still looking — the ten seconds of boot retries after a wake or a failed
+   * "Look again" — and the printer screen on the light ground, where the
+   * brand slot and the surface family have to hold in the other ramp.
+   */
+  { id: 'setup-printer-looking', query: 'screen=printer&printer=looking', views: ['kiosktall'] },
+  { id: 'setup-printer-light', query: 'screen=printer&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-printer-light-detected',
+    query: 'screen=printer&printer=ready&detected=plain&ground=light',
+    views: ['kiosktall'],
+    drive: ['Connect a different printer'],
+  },
+  /* The light ramp's amber on this screen — trouble, and the guessed roll. */
+  { id: 'setup-printer-light-trouble', query: 'screen=printer&printer=trouble&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-printer-light-guessed',
+    query: 'screen=printer&printer=ready&detected=guessed&ground=light',
+    views: ['kiosktall'],
+    drive: ['Connect a different printer'],
+  },
+  /*
+   * Just connected, with what the printer said about itself on the screen —
+   * the state a volunteer is actually looking at when the doc says "read the
+   * line it comes back with". The read-off is a press away in the fixture, so
+   * the shooter presses; `guessed` is the roll the packet could not choose,
+   * which is the sentence the screen most owes anybody.
+   *
+   * Through the re-pair rather than through *Check the printer*: the set-up
+   * screen's ready state has one secondary now, because a volunteer standing
+   * there has come to connect a printer and prove it prints, and a second
+   * benign check beside the proof is a control with nothing to do. The fixture
+   * answers both doors with the same detection.
+   */
+  {
+    id: 'setup-printer-detected',
+    query: 'screen=printer&printer=ready&detected=plain',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Connect a different printer'],
+  },
+  {
+    id: 'setup-printer-guessed',
+    query: 'screen=printer&printer=ready&detected=guessed',
+    views: ['kiosktall'],
+    drive: ['Connect a different printer'],
+  },
+  /* The same screen mid-evening, for the difference. */
+  { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },
+  /*
+   * Mid-evening on a kiosk that was never given a printer, on a gathering
+   * that prints: the recovery screen for the volunteer who skipped set-up
+   * and is finding out at the first family. The blue slot is Reprint here
+   * and Connect is the last and dimmest control — which is the order of the
+   * job reversed.
+   */
+  { id: 'staff-printer-screen-idle', query: 'screen=printer&from=staff&printer=idle', views: ['kiosktall'] },
+  /* Mid-evening on a kiosk whose printer Android forgot: the brand slot has
+     to carry the verb that fixes it, over a queue. */
+  { id: 'staff-printer-screen-unpaired', query: 'screen=printer&from=staff&printer=unpaired', views: ['kiosktall'] },
+  /* The staff menu on a kiosk that was never given a printer, and on one whose
+     printer has stopped — the two states of it a setup decision lands on. */
+  { id: 'staff-printer-none', query: 'screen=staff&printer=none&icon=groups', views: ['kiosktall'] },
+  { id: 'staff-printer-trouble', query: 'screen=staff&printer=trouble&icon=groups', views: ['kiosktall'] },
   {
     id: 'register-confirm',
     query: 'screen=register',
@@ -380,6 +573,10 @@ const only = onlyFlag === -1 ? null : args[onlyFlag + 1]!;
 const outFlag = args.indexOf('--out');
 const outDir = resolve(outFlag === -1 ? 'uxr/renders/kiosk-live' : args[outFlag + 1]!);
 await mkdir(outDir, { recursive: true });
+/* `--freeze <dir>`: the frozen HTML beside the PNG — see the note at the top. */
+const freezeFlag = args.indexOf('--freeze');
+const freezeDir = freezeFlag === -1 ? null : resolve(args[freezeFlag + 1]!);
+if (freezeDir) await mkdir(freezeDir, { recursive: true });
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const server = await createServer({
@@ -469,6 +666,7 @@ for (const scene of SCENES) {
     const frame = join(outDir, `${stem}-fold.png`);
     await page.screenshot({ path: frame });
     written.push(frame);
+    if (freezeDir) await writeFile(join(freezeDir, `${stem}.html`), await freeze(page), 'utf8');
     await context.close();
   }
 }

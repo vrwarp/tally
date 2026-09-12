@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+  The kiosk's set-up screens, live, inside a walkthrough page.
+
+  Its own document rather than a div on the host page: `src/index.css` is
+  Tailwind with a preflight, and a preflight reaches everything in the document
+  it is loaded into. In here it reaches the kiosk and nothing else, which is
+  what lets the page around it have a design of its own.
+
+  `data-theme="dark"` and `class="h-full"` are what `kiosk.html` sets, and the
+  screens are laid out against a full-height root.
+-->
+<html lang="en" class="h-full" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=800, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Kiosk set-up</title>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

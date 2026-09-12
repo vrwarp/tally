@@ -14,6 +14,7 @@
  * to prevent.
  */
 import { act, fireEvent, render, screen } from '@/test/rtl';
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import type { KioskPrinting } from '@/kiosk/KioskApp';
@@ -81,14 +82,22 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
   return printing as unknown as KioskPrinting & typeof printing;
 }
 
-function mount(printing: KioskPrinting, config = { model: 'QL-800', label: '62' }) {
+function mount(
+  printing: KioskPrinting,
+  config = { model: 'QL-800', label: '62' },
+  extra: Partial<ComponentProps<typeof PrinterScreen>> = {},
+) {
   render(
     <PrinterScreen
       printing={printing}
       config={config}
+      // Set-up mode on a kiosk that already has a printer, which is what these
+      // suites are about: they press connect and check and read what comes back.
+      hasConfig
       printedTonight={[]}
       onReprint={vi.fn()}
       onDone={vi.fn()}
+      {...extra}
     />,
   );
 }
@@ -122,7 +131,7 @@ describe('connecting a printer', () => {
     const printing = handleWith(detection());
     mount(printing);
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
     // The screen was set up as a QL-800 with 62mm tape, which is what the
     // selects would have sent. What the printer said is what the kiosk is now.
@@ -134,10 +143,52 @@ describe('connecting a printer', () => {
   it('says what it read, so somebody can see it is right', async () => {
     mount(handleWith(detection()));
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
+    /*
+     * Once, and in two halves: the head says where the values came from, the
+     * model row carries the values. They used to be printed three times — the
+     * state line, a notice under it, and the row — loudest where they were
+     * least use, and the notice's job was really the *other* branch, the one
+     * where something had to be guessed.
+     */
+    expect(screen.getByText('Connected — model and roll read off the printer.')).toBeInTheDocument();
+    expect(screen.getByText(/QL-810W · 62mm x 29mm die-cut/)).toBeInTheDocument();
+  });
+
+  it('does not call an untested printer ready', async () => {
+    /*
+     * Connected is a fact the bus can prove; ready is not. It said "Connected
+     * and ready." with nothing yet through the machine, and the only line that
+     * said anything was outstanding appeared *after* a test label — so the
+     * state that most needed to say "you are not finished" was the one that
+     * read as finished.
+     */
+    mount(handleWith(detection()));
+
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
+
+    expect(screen.queryByText(/ready/)).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Read off the printer: QL-810W, 62mm x 29mm die-cut/),
+      screen.getByText('Print a test label to be sure, then go back and set the kiosk.'),
+    ).toBeInTheDocument();
+  });
+
+  it('reports a test label as sent rather than as printed', async () => {
+    // `testPrint` returns void and enqueues, so a line claiming one came out
+    // would be a claim about the tape painted before the rasteriser had run.
+    const printing = handleWith(detection());
+    mount(printing);
+
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
+    await press(/Print a test label/);
+
+    expect(printing.testPrint).toHaveBeenCalled();
+    expect(
+      screen.getByText('The test label has been sent — take it off the printer and check it.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('The kiosk is still waiting to be set — Back to the gatherings.'),
     ).toBeInTheDocument();
   });
 
@@ -156,10 +207,10 @@ describe('connecting a printer', () => {
     );
     mount(printing);
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
     expect(
-      screen.getByText(/62mm continuous is loaded, which is more than one roll/),
+      screen.getByText(/62mm continuous is loaded, and more than one roll is that size/),
     ).toBeInTheDocument();
     expect(screen.getByText(/Set to 62mm endless/)).toBeInTheDocument();
 
@@ -173,7 +224,7 @@ describe('connecting a printer', () => {
     // The list is still somebody's to answer, and they have to be told that.
     mount(handleWith(detection({ modelFromPrinter: false })));
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
     expect(
       screen.getByText(/did not say which model it is — check that QL-810W is right/),
@@ -183,7 +234,7 @@ describe('connecting a printer', () => {
   it('says so when the roll is one no printer here takes', async () => {
     mount(handleWith(detection({ matched: [], status: status({ mediaWidthMm: 38 }) })));
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
     expect(
       screen.getByText(/38mm continuous is loaded, and no roll this printer takes is that size/),
@@ -194,7 +245,7 @@ describe('connecting a printer', () => {
     // Nothing was connected, so nothing is claimed about what is connected.
     mount(handleWith(null));
 
-    await press(/Connect a printer|Choose a different printer/);
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
 
     expect(screen.getByLabelText('Printer model')).toHaveValue('QL-800');
     expect(screen.queryByText(/Read off the printer:/)).not.toBeInTheDocument();
@@ -202,6 +253,14 @@ describe('connecting a printer', () => {
 });
 
 describe('checking a printer that is already connected', () => {
+  /*
+   * Mid-evening, which is where this control lives now. The set-up screen's
+   * ready state has one secondary — the one that re-pairs — because a volunteer
+   * standing there has come to connect a printer and prove it prints, and a
+   * second benign check beside the proof is a control with nothing to do.
+   */
+  const midEvening = { onReprintByName: vi.fn(), gatheringPrints: true };
+
   it('goes down the same path, which is what a changed roll needs', async () => {
     const printing = handleWith(
       detection({
@@ -210,7 +269,7 @@ describe('checking a printer that is already connected', () => {
         status: status(),
       }),
     );
-    mount(printing);
+    mount(printing, undefined, midEvening);
 
     await press(/Check the printer/);
 
@@ -228,6 +287,8 @@ describe('checking a printer that is already connected', () => {
           }),
         }),
       ),
+      undefined,
+      midEvening,
     );
 
     await press(/Check the printer/);
@@ -256,7 +317,7 @@ describe('a press this screen never received', () => {
     mount(printing);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Choose a different printer/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Connect a different printer/ }));
     });
 
     expect(printing.pairPrinter).not.toHaveBeenCalled();
@@ -266,9 +327,10 @@ describe('a press this screen never received', () => {
     const printing = handleWith(
       detection({ config: { model: 'QL-810W', label: '62' }, matched: [PLAIN_62, RED_62] }),
     );
-    mount(printing);
-    // Open the fold so the chips are reachable, then click without pressing.
-    await press(/Connect a printer|Choose a different printer/);
+    // Mid-evening, because that is the mount that draws all three of these.
+    mount(printing, undefined, { onReprintByName: vi.fn(), gatheringPrints: true });
+    // Connect so the roll rows are on screen, then click without pressing.
+    await press(/Connect the printer|Connect this printer again|Connect a different printer/);
     printing.pairPrinter.mockClear();
 
     await act(async () => {

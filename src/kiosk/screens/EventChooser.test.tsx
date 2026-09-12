@@ -13,6 +13,7 @@
  * that scrolls cannot also re-point the kiosk from the touch that scrolled it.
  */
 import { act, fireEvent, render, screen } from '@/test/rtl';
+import { useState, type ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
 import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
@@ -128,15 +129,48 @@ function up(element: HTMLElement, offset = 0): void {
   pointer('pointerup', element, 100, 100 + offset);
 }
 
-async function renderChooser(services: KioskServices, onBound = vi.fn()) {
-  render(
-    <EventChooser
-      services={services}
-      printerState={null}
-      onSetUpPrinter={vi.fn()}
-      onBound={onBound}
-    />,
-  );
+/**
+ * The printer strip at its quietest: no printer stored, no row on the list that
+ * prints, the chunk in hand. The foot is then the door alone, which is what
+ * every suite here that is not about the strip wants behind it.
+ */
+const QUIET_PRINTER = {
+  printerState: null,
+  printerConfigured: false,
+  printingReady: true,
+  onSetUpPrinter: vi.fn(),
+  onConnectPrinter: vi.fn(),
+  onLookAgain: vi.fn(),
+  onPrintTestLabel: vi.fn(),
+  onPrintingRows: vi.fn(),
+};
+
+/**
+ * The chooser with its printer strip in its quietest state: no printer stored,
+ * no gathering on the list that prints, so the foot is the door alone. The
+ * suites that are about the strip pass their own `extra`.
+ */
+async function renderChooser(
+  services: KioskServices,
+  onBound = vi.fn(),
+  extra: Partial<ComponentProps<typeof EventChooser>> = {},
+) {
+  function Harness() {
+    // The pick lives in `KioskApp` now, so a test that taps a row has to hold
+    // it the way the app does.
+    const [selected, setSelected] = useState<string | null>(null);
+    return (
+      <EventChooser
+        services={services}
+        {...QUIET_PRINTER}
+        selectedKey={selected}
+        onSelect={setSelected}
+        onBound={onBound}
+        {...extra}
+      />
+    );
+  }
+  render(<Harness />);
   await tick();
   return onBound;
 }
@@ -424,19 +458,12 @@ describe('the gatherings the pairer does not work', () => {
     }) as unknown as KioskServices;
 
   it('draws them below a divider, still bindable', async () => {
-    const onBound = vi.fn();
-    render(
-      <EventChooser
-        services={services([
-          { ...NURSERY, yours: true },
-          { ...YOUTH, yours: false },
-        ])}
-        printerState={null}
-        onSetUpPrinter={vi.fn()}
-        onBound={onBound}
-      />,
+    const onBound = await renderChooser(
+      services([
+        { ...NURSERY, yours: true },
+        { ...YOUTH, yours: false },
+      ]),
     );
-    await tick();
 
     expect(screen.getByText('Not yours')).toBeInTheDocument();
     // The divider sits between the two, not above the first.
@@ -458,8 +485,8 @@ describe('the gatherings the pairer does not work', () => {
           { ...NURSERY, yours: false },
           { ...YOUTH, yours: false },
         ])}
-        printerState={null}
-        onSetUpPrinter={vi.fn()}
+        {...QUIET_PRINTER}
+        onSelect={vi.fn()}
         onBound={vi.fn()}
       />,
     );
@@ -470,12 +497,173 @@ describe('the gatherings the pairer does not work', () => {
     render(
       <EventChooser
         services={services([NURSERY, YOUTH])}
-        printerState={null}
-        onSetUpPrinter={vi.fn()}
+        {...QUIET_PRINTER}
+        onSelect={vi.fn()}
         onBound={vi.fn()}
       />,
     );
     await tick();
     expect(screen.queryByText('Not yours')).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * The printer, in the foot.
+ *
+ * The screen used to say nothing at all about which gatherings print, and the
+ * only way to the printer was a hairline row in the style of the optional
+ * install prompt above it — so a volunteer who did exactly what the screen asks
+ * (hold a row, set the kiosk) bound a printing gathering with no printer and
+ * found out at the first family. These are the facts the strip now puts on the
+ * screen before anybody touches anything.
+ */
+describe('the printer strip', () => {
+  /** A gathering that prints, which is what makes the strip appear at all. */
+  const PRINTS: KioskEventEntry = {
+    ...entry('Kids Club', TEN_AM + HOUR),
+    labelTemplate: { lines: [] } as unknown as KioskEventEntry['labelTemplate'],
+  };
+  const listing = (events: KioskEventEntry[]) =>
+    ({
+      listEvents: vi.fn(async () => events),
+      bindEntry: vi.fn(async (row: KioskEventEntry) => bindingFor(row)),
+    }) as unknown as KioskServices;
+
+  it('names the gathering that needs a printer, and offers the press, before any row is touched', async () => {
+    /*
+     * The hold path binds without ever selecting, so a control that waits for a
+     * tap is a control that path never sees — which is how the relevance gate
+     * written for the Wednesday volunteer emptied the campaign's own headline
+     * frame.
+     */
+    await renderChooser(listing([PRINTS, YOUTH]));
+
+    expect(screen.getByText('Kids Club prints name tags')).toBeInTheDocument();
+    expect(
+      screen.getByText('No printer on this kiosk — plug one in, switch it on, then connect it.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect the printer' })).toBeInTheDocument();
+  });
+
+  it('says so on the row too, whether or not that gathering is the one picked', async () => {
+    await renderChooser(listing([PRINTS, YOUTH]));
+
+    expect(screen.getByText('Prints name tags')).toBeInTheDocument();
+  });
+
+  it('drops the buttons for a volunteer whose gathering prints nothing', async () => {
+    // A Wednesday on a kiosk in a building where the nursery prints: the
+    // sentence is about the row they picked, and Set kiosk keeps its full
+    // weight. Nobody here has a printer errand, so nobody is handed one.
+    await renderChooser(listing([PRINTS, YOUTH]));
+
+    down(row('Youth group'));
+    up(row('Youth group'));
+
+    expect(screen.getByText('Youth group does not print name tags')).toBeInTheDocument();
+    expect(screen.getByText('No printer on this kiosk')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect the printer' })).not.toBeInTheDocument();
+  });
+
+  it('says what the commit will cost, without taking anything away from it', async () => {
+    await renderChooser(listing([PRINTS, YOUTH]));
+
+    down(row('Kids Club'));
+    up(row('Kids Club'));
+
+    expect(screen.getByText('name tags won’t print')).toBeInTheDocument();
+    // The word, the fill and the place of the commit are untouched: a kiosk
+    // with no printer is told, never blocked.
+    expect(screen.getByText('Set kiosk')).toBeInTheDocument();
+  });
+
+  it('does not accuse a kiosk that has not finished looking for its printer', async () => {
+    // The ten seconds of boot retries after a wake. The sentence, the slot and
+    // the commit share one predicate — they used to disagree, so the panel said
+    // it was still looking over a button asserting the printer needed
+    // connecting, and the commit called the morning lost before anybody knew.
+    await renderChooser(listing([PRINTS, YOUTH]), vi.fn(), {
+      printerConfigured: true,
+      printerState: { kind: 'unpaired', searching: true },
+    });
+
+    down(row('Kids Club'));
+    up(row('Kids Club'));
+
+    expect(screen.getByText(/Looking for the printer/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /One moment/ })).toBeInTheDocument();
+    expect(screen.queryByText('name tags won’t print')).not.toBeInTheDocument();
+  });
+
+  it('answers a browser list that came back empty, naming the press that recovers it', async () => {
+    // Every press changes the screen. This was the one that did not: the
+    // browser reports a dismissal and an empty list the same way, so the strip
+    // says only what is known and puts the retry before the cable.
+    await renderChooser(listing([PRINTS, YOUTH]), vi.fn(), { listCameBackEmpty: true });
+
+    expect(
+      screen.getByText(
+        /Nothing was picked from the browser’s list. Press Connect the printer and pick the QL/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('wears amber rather than a green tick when the roll had to be guessed', async () => {
+    await renderChooser(listing([PRINTS, YOUTH]), vi.fn(), {
+      printerConfigured: true,
+      printerGuessed: true,
+      printerModel: 'QL-810W',
+      printerState: { kind: 'ready', config: { model: 'QL-810W', label: '62' } },
+    });
+
+    expect(screen.getByText(/the roll had to be guessed/)).toBeInTheDocument();
+    expect(screen.queryByText(/Printer connected ·/)).not.toBeInTheDocument();
+  });
+
+  it('reports a printing row so the module is in memory before the press', async () => {
+    /*
+     * `requestDevice` needs transient activation and an `await import` spends
+     * it, so the chunk has to be resident before the first press — which, now
+     * that the connect is drawn before any tap, could be the first thing that
+     * happens on this screen.
+     */
+    const onPrintingRows = vi.fn();
+    await renderChooser(listing([PRINTS, YOUTH]), vi.fn(), { onPrintingRows });
+
+    expect(onPrintingRows).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps the door, and only the door, on a day when nothing prints', async () => {
+    // The Saturday errand: a volunteer connecting the printer the day before a
+    // printing Sunday is on a day whose own list has no printing row.
+    await renderChooser(listing([NURSERY, YOUTH]));
+
+    expect(screen.getByRole('button', { name: 'Printer settings' })).toBeInTheDocument();
+    expect(screen.queryByText(/prints name tags/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Connect the printer' })).not.toBeInTheDocument();
+  });
+
+  it('holds the picked row across the door to the printer screen', async () => {
+    /*
+     * The pick lives in `KioskApp` and is named by the gathering rather than by
+     * its place in the list, so the round trip through the printer screen — an
+     * unmount, a refetch, a re-sort — comes back to the row still ringed. It
+     * used to come back to *Pick a gathering*.
+     */
+    const services = listing([PRINTS, YOUTH]);
+    const { unmount } = render(
+      <EventChooser
+        services={services}
+        {...QUIET_PRINTER}
+        selectedKey={`${PRINTS.chain}:${PRINTS.startAt}`}
+        onSelect={vi.fn()}
+        onBound={vi.fn()}
+      />,
+    );
+    await tick();
+
+    expect(screen.getByText('Set kiosk')).toBeInTheDocument();
+    expect(screen.getByText('Kids Club prints name tags')).toBeInTheDocument();
+    unmount();
   });
 });

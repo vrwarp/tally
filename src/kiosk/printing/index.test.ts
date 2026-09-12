@@ -573,6 +573,11 @@ describe('pairing', () => {
     expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
       model: 'QL-810W',
       label: '62x29',
+      // This device puts no name on the bus, so the model is what the screen
+      // was showing rather than what the printer said — and the chooser, which
+      // has only this config to read, has to know that before it paints a green
+      // tick over a guess. See `PrinterConfig.guessed`.
+      guessed: true,
     });
     // Built with the record's tracer, or the transport narrates to nobody.
     expect(cores.made.at(-1)).toMatchObject({
@@ -752,6 +757,29 @@ describe('asking the printer what it is', () => {
     });
   });
 
+  it('stops calling the config a guess once the printer has named itself', async () => {
+    /*
+     * The clearing half, which is the half a stale flag would break: a kiosk
+     * that was set up blind and later re-checked against a printer that does
+     * answer must stop wearing amber in the chooser's foot.
+     */
+    const device = loaded({ device: { productName: 'QL-810W', serialNumber: SERIAL } });
+    window.localStorage.setItem(
+      KIOSK_KEYS.printer,
+      JSON.stringify({ model: 'QL-810W', label: '62x29', guessed: true }),
+    );
+    const printing = await load();
+    await printing.ready();
+
+    await printing.checkPrinter();
+
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
+      model: 'QL-810W',
+      label: '62x29',
+    });
+    expect(device.opened).toBe(true);
+  });
+
   it('sets the kiosk to the roll it can see', async () => {
     // The reason this is not a suggestion any more. A kiosk left on the roll
     // somebody put in it last month prints a name badge at a size the
@@ -768,6 +796,9 @@ describe('asking the printer what it is', () => {
     expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
       model: 'QL-810W',
       label: '62x29',
+      // The roll was read; the model was not, because this device names itself
+      // to nobody.
+      guessed: true,
     });
     expect(device.opened).toBe(true);
   });

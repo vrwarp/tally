@@ -77,6 +77,18 @@ npm run uxr:team -- --out uxr/prototype-team      # frozen from a live mount
 npm run uxr:kiosk-setup -- --out uxr/prototype-kiosk-setup
 ```
 
+The kiosk shooter can also freeze what it shoots — `--freeze <dir>` writes each
+state as `<scene>--<viewport>.html` beside the PNG, through the same
+`snapshot.ts` — so a campaign that wants to *change* a kiosk screen rather than
+photograph it hands the ideator a prototype that was the app a moment ago and
+re-shoots the edit with `uxr/shoot.ts`, which knows both kiosk shapes by name.
+The printer set-up campaign ran that way: `--only setup --freeze
+uxr/prototype-printer-base`, one copy of the frozen set per direction, and the
+critics reading `uxr/shoot.ts` renders of the edits. The knobs that reach the
+printer states — `?screen=printer`, `?printer=idle|ready|unpaired|looking|
+trouble`, `?labels=some`, `?detected=plain|guessed|unknown`, `?rooms=long`,
+`?events=none` — are listed at the top of `kiosk-live/main.tsx`.
+
 That matters beyond convenience. `kiosk-confirm.ts` — the generator that served
 the confirm-screen rounds — hand-writes a static copy of the component's markup
 and keeps its measurements in step by discipline, and a critique is only worth
