@@ -171,7 +171,187 @@ printer, because that is the recovery screen.
 Per direction, as the ideators committed to them — the prototype is thrown
 away; these sentences are what survive.
 
-<!-- filled from the round-3 ideation reports -->
+### Shared by every chooser direction
+
+- **`printerConfigured`.** Pass `printerConfig !== null` (read once at mount,
+  `KioskApp.tsx` ~386) into `EventChooser` beside `printerState`. Branch the
+  strip's state line on it first: configured and `printerState` is `null`,
+  `idle` or `unpaired && searching` → *Looking for the printer…* in `ink-400`
+  and the connect slot is a waiting not-yet; *No printer connected* is only
+  reachable when `printerConfigured === false`. `printing/index.ts` initialises
+  `idle` and `subscribe` emits it before `ready()` has looked at the bus, so
+  `idle` is not evidence of anything on a configured kiosk.
+- **Loading the printing chunk.** `wantsPrinting` (`KioskApp.tsx` ~757) gains
+  `|| chooserPrints`, set from the chooser when `listEvents()` resolves with a
+  bindable printing row (`labelTemplate !== null && nowMs <= endAt`). The
+  chunk lands while the volunteer reads the rows, so `printing.pairPrinter()`
+  runs inside the click's own transient activation. Until `printing !== null`
+  the connect slot renders `disabled` in the forward treatment reading
+  *Getting ready…* — never `ink-500` on `ink-800`. A kiosk whose day has no
+  printing row never fetches the chunk.
+- **Connect and test are the printer screen's own calls**, made synchronously
+  from a `useTap` handler: `printing.pairPrinter(printerConfig ?? defaults)`
+  and `printing.testPrint(locale)`. The doc comment on `pairPrinter` ("only
+  ever reached from a button on the printer screen") needs updating.
+- **The selection survives the settings door.** `selected` is local state in
+  `EventChooser` and `setPhase('printer')` unmounts it. Lift it into `KioskApp`
+  as a controlled pair (or render the printer screen as an overlay over the
+  still-mounted chooser) so *Back to the gatherings* lands on the row still
+  ringed, the strip drawn, and the strip's new state.
+- **The row mark.** In the meta block after the `entry.location` fragment:
+  `{entry.labelTemplate && (<><span className="hidden sm:inline"> · </span><span className="block whitespace-nowrap text-ink-300 sm:inline">{t('printsNameTags')}</span></>)}`.
+  Plain weight, so it does not compete with the hours. One shared change.
+- **The commit's sub-line.** Inside the `!binding && selectedEntry` block after
+  the time span: `· name tags won’t print` in `text-white`, when the selected
+  row prints and the printer is known not to be available (not while a
+  configured kiosk is still looking). Word, fill and place of *Set kiosk*
+  unchanged; the invisible reservation line stays.
+- **The ghosted commit.** The not-yet branch of the commit's class template
+  drops its fill and stroke (`pointer-events-none text-ink-500` on a
+  `border-2 border-transparent` box), keeping the 672×96 box so nothing moves.
+
+### F
+
+- Gate: render the strip when `printsSelected || printerConfigured`; visible
+  when `printsSelected || fault || ready` where `fault` is
+  `unpaired && !searching || trouble || unsupported`; otherwise reserved
+  (`invisible`, `aria-hidden`, `&nbsp;` lines and an empty control box) so the
+  strip box is identical in every state.
+- Wrapper `mb-2 rounded-xl bg-ink-900 p-4` (no ring — it sits on the column).
+  Context line `text-sm text-ink-400 kiosk:text-base`
+  (`printsSelected ? t('printsNameTagsFor', {title}) : t('Printer.title')`);
+  state line `pt-1 text-lg font-medium kiosk:text-xl` toned by a
+  `stripLine(printerState, printerConfigured)` helper mirroring the printer
+  screen's `stateLine` (`ink-200` / `warn-400` / `present-400`).
+- Controls row `flex items-center gap-6 pt-3`: one forward control
+  (`h-12 flex-1 rounded-lg bg-ink-700 px-4 text-base font-semibold text-ink-50 active:bg-ink-600 kiosk:h-16 kiosk:text-lg`)
+  — the connect, or *Print a test label* once ready — then a `gap-3` pack of
+  underlined `ink-400` links: *Connect a different printer* (ready only) and
+  *Printer settings* (carrying the existing `tap(onSetUpPrinter)`).
+- New `Chooser` messages: `printsNameTags`, `printsNameTagsFor`,
+  `noPrinterConnected`, `printerConnectedModel` (*Printer connected ✓ ·
+  {model}*), `connectPrinter`, `connectPrinterAgain`, `connectDifferentPrinter`,
+  `testPrint`, `printerSettings`, `gettingReady`, `nameTagsWontPrint`; reuse
+  `Printer.notConnected` and `printerNote()` for faults.
+
+### B
+
+- Gate the strip on `printerConfigured || bindablePrinting.length > 0`, where
+  `bindablePrinting = entries.filter(e => e.labelTemplate !== null && nowMs <= e.endAt)`
+  — the negation of the row's own `ended`. Never on `printerState !== null`,
+  which never clears once the printer screen has been visited.
+- Names line: de-duped titles of the bindable printing rows through
+  `Intl.ListFormat(locale, {type: 'conjunction'})`, message
+  `printsNameTagsFor` taking `{names, count}` for singular/plural; rendered
+  only when the list is non-empty.
+- Controls row `mt-3 flex items-center gap-4`: connect
+  (`h-12 flex-1 rounded-lg bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14`)
+  when `selectedPrints || fault`; *Print a test label* (forward) when
+  `ready && selectedPrints`; quiet controls as plain underlined type on a
+  `<button>` (`h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 kiosk:h-14`,
+  the link-as-button pattern in `StudentSyncStrip`); *Printer settings*
+  always, which is what holds the row at a constant height.
+- State line via the shared helper: never configured → *No printer on this
+  kiosk* (`ink-400`); lost → *The printer this kiosk was set up with is not
+  connected* (`warn-400`) with *Connect the printer again* on the control;
+  ready → `present-400`. Wrapper `mb-6 rounded-xl bg-ink-900 p-4 kiosk:p-5`
+  (a 24px seam to the commit).
+
+### C — the printer screen
+
+- Mode: `const setup = !onReprintByName` (the set-up mount passes
+  `printedTonight={[]}` and no `onReprintByName`). New props `hasConfig`
+  (`printerConfig !== null`, at both mounts — they currently hand the screen
+  invented defaults) and `gatheringPrints` (from `KioskApp`'s `prints`, at the
+  mid-evening mount).
+- Primary (set-up): one `<button>` in the Reprint button's treatment
+  (`flex h-16 w-full … bg-brand-600 text-lg font-semibold text-white kiosk:h-20 kiosk:text-xl`);
+  verb and action by state — ready → `testPrint`; trouble → `lookAgain`;
+  unpaired (either `searching`) → `connect` labelled *Connect this printer
+  again*, so the verb does not change while the retry ladder settles; idle →
+  `connect` labelled *Connect the printer*; `unsupported` draws no primary.
+  Secondary row: trouble → *Connect this printer again*; unpaired → *Look
+  again*; ready → *Check the printer* + *Connect a different printer*, both
+  `text-ink-300`. No disabled buttons are drawn.
+- Head: the trouble `stateLine` case returns message and advice as one
+  `warn-400` sentence; beneath it `t('troubleThenLookAgain')` at `ink-300`
+  (*If that is already done, check the printer's light and the cable at the
+  tablet end, then press Look again.*); the unpaired `checkPowerAndCable`
+  line steps to `ink-300`. A `Look again` that finds nothing walks the
+  module's own path — trouble → unpaired/searching → unpaired — which is the
+  Android frame with the chooser in the blue slot.
+- Under the connect when `!hasConfig`: `t('plugInFirst')` at `ink-300`. On
+  the ready frames, `t('autoPowerOff')` closes the act group.
+- `stateLine` takes `detection`: a clean read-off joins the state line
+  (*Connected and ready — read off the printer: {model}, {label}.*,
+  `present-400`); a guessed roll makes the line *Connected — the roll had to be
+  guessed.* in `warn-400` and the notice (now prose, no panel) ends with
+  `t('thenTestLabel')`. The pending statement
+  `t('modelRollPending')` is prose in `ink-400`, drawn when
+  `!(detection || hasConfig)`.
+- Layout (set-up): wrapper `mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto`
+  holding two `gap-3` groups — the act (notice, primary, secondaries, errand
+  line) and the reference (model row, log). The `lg:grid` two-column wrapper
+  is off in set-up mode; the tonight card is not drawn. Foot pill centred,
+  `bg-ink-900 font-medium text-ink-300`, labelled `t('backToGatherings')`.
+- Mid-evening: `connectLeads = gatheringPrints && state.kind !== 'ready'` puts
+  the connect in the brand slot (labelled per `hasConfig`) and *Reprint a name
+  tag* in the quiet treatment beneath it, still live. `printedTonight` already
+  drives the empty line. The events `<summary>` steps to `text-ink-300` in
+  both mounts.
+- After a test label (`tested` state set when `testPrint` resolves, cleared
+  when the state leaves ready): `t('testLabelCameOut')` first in the act group.
+- New `Printer` keys: `connectThePrinter`, `connectThisAgain`,
+  `connectDifferent`, `troubleThenLookAgain`, `plugInFirst`, `autoPowerOff`,
+  `connectedReadOff`, `connectedGuessedRoll`, `connectedGuessedModel`,
+  `thenTestLabel`, `modelRollPending`, `backToGatherings`, `testLabelCameOut`.
+
+### D
+
+- `printerConfigured` is read **once at mount** (`useState(() => readPrinterConfig() !== null)`),
+  never per render, so the primary's word and the geometry cannot change under
+  a hand. The blue *Connect the printer* may appear only when
+  `commitIntent === 'connect' && !printerConfigured && printing !== null && printerState?.kind !== 'ready'`;
+  a kiosk that has ever had a printer keeps *Set kiosk* forever and shows a
+  fault as its own amber pill in the strip.
+- `commitIntent` is written in the row's `onTap` (when the row prints and the
+  kiosk has no config) and cleared in exactly two places: inside `bind()`, and
+  when `printerState.kind` becomes `ready`. Never on `pairPrinter()` settling —
+  a dismissed device list is a resolution, and clearing there is how the blue
+  button would silently become *Set kiosk*. `attemptFailed` is set when
+  `pairPrinter()` resolves falsy and drives the warn sentence *The browser
+  found no printer — check it is plugged into this tablet and switched on,
+  then try again*; cleared on the next row tap or on `ready`.
+- The foot renders `InstallPrompt`, the strip, `{connectShown && <ConnectButton/>}`,
+  then the commit. The commit is extracted into a local `<CommitButton tone=brand|ink|ghost>`
+  used three ways; the hatch *Set kiosk without a printer* is the `ink` tone
+  and carries the meta line (*Kids Club · 9:09 AM*) so it says which sitting it
+  binds. The connect button is a separate
+  `flex h-24 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500`
+  above it, and the commit takes `mt-8` when the connect is rendered — a 32px
+  seam borrowed from the void, so the commit's bottom edge stays on the page
+  margin in every state. There is no invisible reserved slot anywhere in the
+  foot. Stated cost: on a never-configured kiosk, selecting a printing row
+  lifts the strip and its link 128px as the connect appears below them; the
+  commit itself is still.
+- Strip branch order: ready → present line; `unpaired && searching` →
+  *Looking for the printer…*; `unpaired && !searching` / trouble /
+  unsupported → warn line + the *Connect the printer again* pill;
+  `printerConfigured && (null || idle)` → *Looking for the printer…*;
+  `!printerConfigured && printing === null` → *Getting the printer ready…*;
+  else the fact line *Kids Club prints name tags · No printer on this kiosk*
+  (the selected printing row's title, or the bindable printing rows' titles at
+  first paint, or the placeholder when a non-printing row is selected).
+- Ready strip: *Print a test label* is a filled control
+  (`inline-flex h-12 items-center rounded-lg bg-ink-800 px-5 font-medium text-ink-100 kiosk:h-16 kiosk:px-6`)
+  beside the *Printer settings* link (`text-ink-300`, underlined), 16px apart;
+  green appears only on the state line.
+- New `Chooser` strings: `connectThePrinter`, `setKioskWithoutPrinter`,
+  `gatheringPrints` / `gatheringsPrint`, `noPrinterOnThisKiosk`,
+  `browserFoundNoPrinter`, `gettingPrinterReady`, `printerReady`,
+  `connectAgain`, `printerSettings`.
+
+
 
 ## How it was made
 
