@@ -8,6 +8,7 @@
  */
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
+import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import type {
   BackendId,
   BackendStatuses,
@@ -222,17 +223,53 @@ export interface RosterResponse {
 }
 
 /**
+ * One handle per deadline, because `httpsCallable` bakes the timeout in at
+ * creation and a handle rebuilt per call would be rebuilt a few hundred times
+ * an hour for nothing.
+ */
+const rosterHandles = new Map<number, ReturnType<typeof rosterHandle>>();
+
+function rosterHandle(timeoutMs: number) {
+  return httpsCallable<{ force?: boolean } | void, RosterResponse>(functions, 'getRoster', {
+    timeout: timeoutMs,
+  });
+}
+
+/**
  * The youth roster: Tally's own membership, with Planning Center's names on it.
  *
  * Who is on it comes from `students/` — a decision somebody made in this app.
  * What they are called comes from Planning Center, read on demand and stored
  * nowhere. Names and grades only; parent contact and allergies are a separate
  * call.
+ *
+ * ## Why the deadline is an argument
+ *
+ * A callable runs on the SDK's 70-second default unless told otherwise, and
+ * this function is allowed 120 (`functions/src/index.ts`). A cold read of
+ * several hundred people can therefore finish server-side and still be reported
+ * to the screen as unreachable — which is exactly what a check-in desk met on
+ * the first production Sunday, and why nothing is reported as unreachable on
+ * this side any earlier than the server would give up itself.
+ *
+ * The caller escalates rather than picking one number, and why is written down
+ * where the numbers are: `@/lib/rosterLadder`. `DataProvider` walks that ladder.
+ *
+ * An omitted deadline is the last rung: a caller making a single attempt wants
+ * the server's whole budget, never less.
  */
-export const getRoster = httpsCallable<{ force?: boolean } | void, RosterResponse>(
-  functions,
-  'getRoster',
-);
+export function getRoster(
+  data: { force?: boolean } = {},
+  options: { timeoutMs?: number } = {},
+): Promise<{ data: RosterResponse }> {
+  const timeoutMs = options.timeoutMs ?? ROSTER_DEADLINES_MS[ROSTER_DEADLINES_MS.length - 1]!;
+  let handle = rosterHandles.get(timeoutMs);
+  if (!handle) {
+    handle = rosterHandle(timeoutMs);
+    rosterHandles.set(timeoutMs, handle);
+  }
+  return handle(data);
+}
 
 /**
  * One student's attendance, filtered server-side by what the caller may see.

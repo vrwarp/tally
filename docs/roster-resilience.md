@@ -1,9 +1,9 @@
 # Roster read resilience
 
-**Status: proposal, awaiting a decision.** Nothing in items 1–8 is implemented.
+**Status: items 1–8 shipped. 9 and 10 recorded, not scheduled.**
 
 Written from the first production Sunday, 12 September 2026, against the code at
-`feb84cb`.
+`feb84cb`, and kept as the record of why each number is the number it is.
 
 ## What happened
 
@@ -23,7 +23,7 @@ try again for **up to ten minutes**.
 
 None of it is about the person's role. `getRoster` is open to any active member
 precisely so a door volunteer can check somebody in (`requireMemberOrKiosk`,
-`functions/src/index.ts:630`).
+`functions/src/index.ts`).
 
 ## Three independent causes
 
@@ -42,56 +42,63 @@ Each would have been survivable alone.
 
 ## The ten minutes
 
-| | Today | Proposed |
+| | Was | Now |
 | --- | --- | --- |
 | Attempt 1 | fails at 70s | 45s deadline |
 | Then | *nothing for 530 seconds* | +2s, 90s deadline |
 | Then | — | +5s, 120s deadline |
 | Then | interval tick at 600s | interval tick at 600s |
 
-## The decision
+## What shipped
 
-| # | Change | Recommended | |
+| # | Change | Settled on | Where |
 | --- | --- | --- | --- |
-| 1 | Retry ladder after a failed roster read | +2s, +5s, then the interval | ship |
-| 2 | Escalating client deadline per attempt | 45s / 90s / 120s | ship |
-| 3 | Automatic retries never send `force` | force = user only | ship |
-| 4 | Banner decoupled from the ladder | show at once, clear on success | ship |
-| 5 | Read again when the network returns | `online` listener | ship |
-| 6 | Saved-roster window off the weekly cycle | 7 days → 30 days | ship |
-| 7 | `forgetRoster` wired to sign-out | it is dead code today | bug |
-| 8 | Roster banner says server errors in English only | route through `useServerText` | bug |
+| 1 | Retry ladder after a failed roster read | +2s, +5s, then the interval | `DataProvider` |
+| 2 | Escalating client deadline per attempt | 45s / 90s / 120s | `lib/rosterLadder`, `services/functions` |
+| 3 | Automatic retries never send `force` | force = user only | `DataProvider` |
+| 4 | Banner decoupled from the ladder | show at once, clear on success | `DataProvider` |
+| 5 | Read again when the network returns | `online` listener | `DataProvider` |
+| 6 | Saved-roster window off the weekly cycle | 7 days → 30 days | `services/roster` |
+| 7 | `forgetRoster` wired to sign-out | it was dead code | `AuthProvider` |
+| 8 | Roster banner said server errors in English only | routed through `useServerText` | `DataProvider` |
+
+The two halves of the ladder — three deadlines, two gaps — live together in
+`src/lib/rosterLadder.ts`, a leaf module with no imports, because they describe
+one thing and drift apart the moment they live in two files. The kiosk reads the
+last rung from there too: it makes a single attempt, and a single attempt wants
+the server's whole budget rather than the SDK's 70-second default.
 
 ## The changes
 
 ### 1. Retry the read, on a ladder
 
-`src/context/DataProvider.tsx:357` — `refreshRoster`
+`src/context/DataProvider.tsx` — `readRoster`, `refreshRoster`
 
 A failed read schedules the next one: **+2s, then +5s**, then hands back to the
-existing ten-minute interval. Three attempts inside about four minutes, against
-today's one attempt inside ten. The ladder resets on success, on `online`, on a
+existing ten-minute interval. Three attempts inside about four minutes, where
+there used to be one attempt inside ten. The ladder resets on success, on `online`, on a
 visibility resync, and on a press of Try again. One ladder at a time — the
 existing `inFlight`/`pending` coalescing already guarantees that.
 
-One detail worth getting right: `lastAttemptAt` (line 402) is stamped in
-`finally` and gates the sixty-second visibility floor. Stamp it for the ladder as
-a whole, not for each rung, or coming back to the tab mid-ladder stops triggering
-a read at exactly the moment somebody has picked the phone up to look.
+One detail that had to be right: `lastAttemptAt` is stamped in `finally` and
+gates the sixty-second visibility floor. It is stamped for the ladder as a whole
+rather than for each rung — per-rung, coming back to the tab mid-ladder stops
+triggering a read at exactly the moment somebody has picked the phone up to
+look.
 
 Tally's outbound edit queue already has all of this — `[15s, 30s, 60s, 2m, 4m,
 8m, 15m, 15m]` with attempt counts and `nextAttemptAt` persisted
-(`functions/src/upstreamEdits.ts:50`). Writes back off properly; the read
+(`functions/src/upstreamEdits.ts`). Writes back off properly; the read
 everything else depends on gets one shot every ten minutes. This closes that
 asymmetry rather than inventing a policy.
 
 ### 2. Give each attempt a longer deadline than the last
 
-`src/services/functions.ts:232` — `getRoster`
+`src/services/functions.ts` · `src/lib/rosterLadder.ts` — `getRoster`
 
 The timeout is baked into an `httpsCallable` handle at creation, so `getRoster`
-becomes a handle built per attempt. Deadlines **45s → 90s → 120s**, ending level
-with the server's own budget (`timeoutSeconds: 120`, `functions/src/index.ts:627`)
+is now a function over one handle per deadline rather than a single handle. Deadlines **45s → 90s → 120s**, ending level
+with the server's own budget (`timeoutSeconds: 120`, `functions/src/index.ts`)
 instead of under it.
 
 A cold read of several hundred people has already been seen to exceed 70 seconds
@@ -103,7 +110,7 @@ slow-but-alive one.
 
 ### 3. Automatic retries must not send `force`
 
-`src/context/DataProvider.tsx:360` · `functions/src/pco/cache.ts:118`
+`src/context/DataProvider.tsx` · `functions/src/pco/cache.ts`
 
 The one that turns this from cheap to expensive if it is wrong.
 
@@ -134,10 +141,10 @@ clean.
 
 ### 4. Let the banner appear early and leave on its own
 
-`src/context/DataProvider.tsx:395` · `src/components/RosterErrorBanner.tsx`
+`src/context/DataProvider.tsx` · `src/components/RosterErrorBanner.tsx`
 
-Today one event does two jobs: the first failure both raises the banner and ends
-all activity. Split them. The banner still appears on the first failure — no new
+One event used to do two jobs: the first failure both raised the banner and ended
+all activity. They are separate now. The banner still appears on the first failure — no new
 latency — and the ladder keeps running underneath it, taking it down the moment a
 read lands.
 
@@ -148,10 +155,10 @@ than below it. Self-healing is the fix; hiding is not.
 
 ### 5. Read again when the network comes back
 
-`src/context/DataProvider.tsx:450` — the refresh effect
+`src/context/DataProvider.tsx` — the refresh effect
 
 There is no `online` listener anywhere in the staff app. The kiosk has one
-(`src/kiosk/KioskApp.tsx:1008`, replaying its write queue on reconnect); the app
+(`src/kiosk/KioskApp.tsx`, replaying its write queue on reconnect); the app
 volunteers actually hold does not, so church wifi dropping and returning changes
 nothing until the next interval tick. Add one: reset the ladder and read
 immediately. It covers the most common real-world shape of this failure — a
@@ -159,7 +166,7 @@ router, not an outage.
 
 ### 6. Stop the saved roster expiring on the ministry's own cycle
 
-`src/services/roster.ts:50` — `STALE_AFTER_MS`
+`src/services/roster.ts` — `STALE_AFTER_MS`
 
 The device's saved copy is discarded after **seven days**, and Tally runs weekly
 gatherings. A tablet used only on Sundays holds a copy written last Sunday, and if
@@ -167,8 +174,8 @@ this week's first read happens any later in the day than last week's did, the
 fallback expired minutes before the moment it exists for. Seven days is precisely
 the wrong number for a weekly cadence.
 
-Proposed: **30 days**. The same constant governs how long a failed backend's
-people are carried through a partial read (`src/services/roster.ts:215`), so both
+Settled on **30 days**. The same constant governs how long a failed backend's
+people are carried through a partial read (`src/services/roster.ts`), so both
 move together and both want the same answer.
 
 The cost is that names can be older before they vanish, and that is the right
@@ -178,7 +185,7 @@ no name at a door.
 
 ### 7. `forgetRoster` has never once been called
 
-`src/services/roster.ts:150` · `src/context/AuthProvider.tsx:424`
+`src/services/roster.ts` · `src/context/AuthProvider.tsx`
 
 Its own docstring says "Called on sign-out." Nothing calls it outside its test.
 Signing out therefore leaves a roster of minors' names and grades in
@@ -188,7 +195,7 @@ person who opens the browser. Call it from `signOut`. Worth deciding alongside
 
 ### 8. The roster banner says server errors in English, whatever the language
 
-`src/context/DataProvider.tsx:132` — `describeRosterError`
+`src/context/DataProvider.tsx` — `describeRosterError`
 
 Every other screen renders a server failure through `useServerText`, which maps
 the server's `ServerCode` into the reader's catalogue. The roster path does not:
@@ -238,7 +245,7 @@ updated to say so either way.
 
 ### 9. One bad page kills a whole paginated roster read
 
-`functions/src/pco/client.ts:360`, `DEFAULT_MAX_RETRIES = 4`
+`functions/src/pco/client.ts`, `DEFAULT_MAX_RETRIES = 4`
 
 Retries are per HTTP request: five attempts with 0.5/1/2/4-second backoff,
 honouring `Retry-After`, covering 429 always and 5xx and socket failures for
@@ -252,7 +259,7 @@ practical damage meanwhile.
 
 ### 10. A kiosk that boots during a blip can hold an empty roster for six hours
 
-`src/kiosk/services.ts:413` — `ROSTER_REFRESH_MS = 6 * 60 * 60_000`
+`src/kiosk/services.ts` — `ROSTER_REFRESH_MS = 6 * 60 * 60_000`
 
 The kiosk's warm path is better than the app's and should be left alone:
 cache-first, falling back to a roster of any stored version, silent on failure
@@ -262,5 +269,5 @@ scheduled roster read is six hours out.
 
 The escalating deadline from item 2 reaches the kiosk for free if the per-attempt
 handle is shared rather than duplicated, since both surfaces call the same
-callable (`src/kiosk/services.ts:220`). A cold-start ladder for the kiosk is
+callable (`src/kiosk/services.ts`). A cold-start ladder for the kiosk is
 separate work and should be sized against a real lobby.

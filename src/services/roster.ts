@@ -46,8 +46,23 @@ const CACHE_KEY = 'tally:roster';
  * the alternative is a counselor unable to check anybody in. It is only ever
  * shown while a fresh read is in flight, or after one has failed — or, per
  * backend, while that backend stays unreachable.
+ *
+ * A month rather than the week it used to be, and the reason is the cadence of
+ * the thing it protects. Tally runs weekly gatherings on devices used weekly,
+ * so a tablet that only wakes up on Sundays holds a copy written last Sunday —
+ * and at a seven-day window, a service starting any later in the day than last
+ * week's read expired the fallback minutes before the morning it exists for.
+ * That is not a long-tail edge; on a weekly ministry it is most Sundays. Seven
+ * days is precisely the wrong number here, and any number that is not a
+ * multiple of the gathering's own period would do; a month is the one that also
+ * survives a device left in a cupboard over Christmas.
+ *
+ * The cost is that a name can be a month out of date before it disappears
+ * rather than a week. That is the right trade at a door: the roster carries
+ * names and grades, never contact details, and the banner above it says in as
+ * many words that this copy was saved earlier.
  */
-const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+const STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface RosterSnapshot {
   students: Student[];
@@ -186,9 +201,17 @@ export function cachedRoster(now = new Date()): RosterSnapshot | null {
  * keep the failed backends' people from vanishing: their last good copy is
  * lifted out of storage and kept on the roster, for as long as the staleness
  * window allows. The `perBackend` report says which rows those are.
+ *
+ * `timeoutMs` is how long this attempt may take, and it is the caller's to
+ * choose because only the caller knows which attempt this is — see
+ * `ROSTER_DEADLINES_MS`. Omitted means the server's whole budget.
  */
-export async function fetchRoster(now = new Date(), force = false): Promise<RosterSnapshot> {
-  const response = await getRoster({ force });
+export async function fetchRoster(
+  now = new Date(),
+  force = false,
+  timeoutMs?: number,
+): Promise<RosterSnapshot> {
+  const response = await getRoster({ force }, timeoutMs === undefined ? {} : { timeoutMs });
   const fresh = response.data.people ?? [];
   const perBackend = response.data.perBackend;
   const readAt = Date.now();

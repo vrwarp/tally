@@ -100,14 +100,20 @@ Three places look like they are missing error handling and are not:
 
 ## Known gaps
 
-- **Losing the network is not surfaced.** Tally is an online-only app: Firestore
-  runs on an in-memory cache, so a check-in with no connection is a write that
-  sits in the SDK's queue until the connection returns or the tab is closed —
-  and nothing on screen says which. A counselor who notices the wifi symbol drop
-  has no way to tell whether their taps are landing. The honest fix is a small
-  connection indicator driven by Firestore's own online/offline state; it is a
-  real gap, not an oversight, and it is not something to guess at without
-  watching a real Friday night.
+- **Losing the network is not surfaced *for a write*.** Tally is an online-only
+  app: Firestore runs on an in-memory cache, so a check-in with no connection is
+  a write that sits in the SDK's queue until the connection returns or the tab
+  is closed — and nothing on screen says which. A counselor who notices the wifi
+  symbol drop has no way to tell whether their taps are landing. The honest fix
+  is a small connection indicator driven by Firestore's own online/offline
+  state.
+
+  This entry used to cover the *read* as well, and said the fix was "not
+  something to guess at without watching a real Friday night". A real Sunday has
+  now been watched, and what it showed about the read was not an offline-mode
+  gap but a retry gap: one failed roster read, then nothing for ten minutes. That
+  half is closed — see [roster-resilience.md](roster-resilience.md) — and the
+  write half above is still open and still wants watching rather than guessing.
 - **An unacknowledged write is not distinguishable from a committed one.**
   Related to the above and with the same reasoning.
 - **`updateStudent` has no optimistic-concurrency check.** Two core-team members

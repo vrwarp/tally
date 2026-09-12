@@ -51,6 +51,7 @@ import {
 import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
+import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import {
   attendancePayload,
   checkOutPayload,
@@ -217,9 +218,19 @@ const materializeOccurrence = httpsCallable<
   { id: string; created: boolean }
 >(functions, 'materializeOccurrence');
 // Type-only mirror of the server's RosterResponse — the kiosk reads `people`.
+/*
+ * The server is allowed 120 seconds for this read and the SDK would give up at
+ * 70, so a cold read of several hundred people could finish upstream and still
+ * be reported here as a failure. The kiosk makes one attempt rather than the
+ * app's ladder — a lobby screen has no one to press Try again — so its single
+ * attempt takes the whole budget: the last rung of `ROSTER_DEADLINES_MS`, which
+ * is a leaf module precisely so this bundle can read it without pulling in the
+ * app's callables.
+ */
 const getRoster = httpsCallable<{ force?: boolean } | void, { people: PcoRosterPerson[] }>(
   functions,
   'getRoster',
+  { timeout: ROSTER_DEADLINES_MS[ROSTER_DEADLINES_MS.length - 1] },
 );
 const refreshKioskPhoneIndex = httpsCallable<
   { force?: boolean } | void,

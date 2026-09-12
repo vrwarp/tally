@@ -4,16 +4,19 @@ import { subscribeEventSeries, subscribeEvents, subscribeSettings } from '@/serv
 import { subscribeEventAccess } from '@/services/eventAccess';
 import { subscribeStudents } from '@/services/students';
 import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/services/roster';
+import type { RosterBackendStatus } from '@/services/functions';
+import { ROSTER_DEADLINES_MS, ROSTER_RETRY_GAPS_MS } from '@/lib/rosterLadder';
 import { applyPendingEdits } from '@/features/roster/pendingEdits';
 import { useDrainPokes } from '@/features/roster/useDrainPokes';
 import { subscribeUpstreamEdits } from '@/services/upstreamEdits';
-import type { RosterBackendStatus } from '@/services/functions';
 import { fromRosterPerson } from '@/services/converters';
 import { useNow } from '@/hooks/useNow';
 import { calendarSignature, projectEvents } from '@/lib/eventProjection';
 import { canWorkChain } from '@/lib/eventAccess';
 import { chainKey } from '@/lib/materialize';
 import { pcoErrorReport } from '@/lib/pcoErrors';
+import { isServerText } from '@/lib/serverCodes';
+import { useServerText } from '@/hooks/useServerText';
 import { useAuth } from '@/context/authContext';
 import {
   DEFAULT_SETTINGS,
@@ -128,8 +131,34 @@ function rosterSignature(students: readonly Student[]): string {
 }
 
 type ErrorTranslator = ReturnType<typeof useTranslations<'Errors'>>;
+type ServerTranslator = ReturnType<typeof useServerText>;
 
-function describeRosterError(t: ErrorTranslator, cause: unknown): string {
+/**
+ * What to put in the banner, from whatever was thrown.
+ *
+ * The first branch is the one every other screen in the app already takes: a
+ * callable that named its sentence with a `ServerCode` gets said in the
+ * reader's language. This module used to skip it and pass the server's raw
+ * English through, which made the roster banner the one place in Tally that
+ * answers a Chinese reader in English — and it did it on exactly the failures
+ * most worth reading, since `backend.unreachable.roster` is what a genuine
+ * outage arrives as.
+ *
+ * Everything below that branch is for a failure that named nothing: a browser
+ * that never reached a function, a `notConfigured` refusal that deliberately
+ * carries deploy-time English, or a server older than the codes. Their
+ * sentences stay this module's own, because the sentence a counselor needs
+ * depends on which failure it was and the server cannot know it is answering a
+ * roster read.
+ */
+function describeRosterError(
+  t: ErrorTranslator,
+  serverText: ServerTranslator,
+  cause: unknown,
+): string {
+  if (isServerText((cause as { details?: unknown } | null)?.details)) {
+    return serverText(cause, t('rosterUnreachable'));
+  }
   // Stryker disable next-line StringLiteral: the fallback is only ever
   // compared against the codes below, and no string that is not one of them
   // reads differently from any other. Empty is what "no code at all" looks
@@ -156,13 +185,17 @@ function describeRosterError(t: ErrorTranslator, cause: unknown): string {
  * is not lost — `pcoErrorReport` keeps it, and the details panel shows it under
  * "Underlying error".
  */
-function rosterErrorReport(t: ErrorTranslator, cause: unknown): PcoErrorReport {
+function rosterErrorReport(
+  t: ErrorTranslator,
+  serverText: ServerTranslator,
+  cause: unknown,
+): PcoErrorReport {
   return {
     // Stryker disable next-line StringLiteral: `pcoErrorReport` uses this
     // fallback for `message` and nothing else, and `message` is overwritten on
     // the very next line. It is here so the call reads honestly on its own.
     ...pcoErrorReport(cause, t('rosterUnreachable')),
-    message: describeRosterError(t, cause),
+    message: describeRosterError(t, serverText, cause),
   };
 }
 
@@ -185,6 +218,8 @@ function backendReportSignature(entries: readonly RosterBackendStatus[]): string
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const tErrors = useTranslations('Errors');
+  /** For a failure the server named; see `describeRosterError`. */
+  const tServer = useServerText();
   const { profile, can } = useAuth();
   /*
    * The rules refuse `upstreamEdits` to a counselor, so the listener is not
@@ -345,27 +380,91 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const pending = useRef<{ force: boolean } | null>(null);
 
   /**
-   * When a read last finished, landed or failed, for the freshness floor above.
+   * When a *ladder* last finished, landed or exhausted, for the freshness floor
+   * above.
    *
    * A failed read counts: Planning Center being unreachable is not a reason to
    * ask it again every time the tab regains focus. Only the visibility resync
    * consults this — the ten-minute interval and the "Try again" button both call
    * `refreshRoster` directly, because both are already deliberate about when.
+   *
+   * Stamped once per ladder rather than once per attempt, and that distinction
+   * is the whole point of it: a ladder can be most of a minute long, so
+   * stamping each rung means a counselor who picks the phone up mid-ladder
+   * meets the sixty-second floor and gets no read at exactly the moment they
+   * went looking for one.
    */
   const lastAttemptAt = useRef(0);
 
-  const refreshRoster = useCallback(async (force = false) => {
+  /** The rung waiting to run, if a failed attempt scheduled one. */
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Abandons a ladder that has not run out on its own.
+   *
+   * Called before every deliberate read and on unmount. A deliberate read is a
+   * new ladder by definition — somebody pressed Try again, or the tab came
+   * back, or the network did — and two ladders interleaving would be two reads
+   * racing each other to set the same state.
+   */
+  const stopLadder = useCallback(() => {
+    if (retryTimer.current === null) return;
+    clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+  }, []);
+
+  /**
+   * One attempt, and whatever follows from how it went.
+   *
+   * The ladder exists because there was nothing here at all: a failed roster
+   * read used to set the banner and stop, and the next automatic attempt was
+   * whenever the ten-minute interval next came round — up to ten minutes of red
+   * banner over a check-in desk whose only real problem lasted three seconds.
+   * Tally's outbound edit queue has had proper backoff all along
+   * (`functions/src/upstreamEdits.ts`); the read every screen depends on had
+   * none.
+   *
+   * Two rules about what a rung may do:
+   *
+   * **It never forces.** `force` skips the server's held answer *and* refuses
+   * to join a read already in flight — "a forced read must not join a flight
+   * that started before the caller asked" (`functions/src/pco/cache.ts`). That
+   * is right for somebody pressing Try again and catastrophic for a ladder: the
+   * attempt this one is following very likely left a read running server-side
+   * after this browser stopped listening, and joining it is the entire reason
+   * the next rung is nearly free. A forcing ladder would instead start three
+   * fresh full reads against a backend already having a bad minute. So `force`
+   * belongs to the attempt a human asked for and to nothing after it, however
+   * that attempt went.
+   *
+   * **It does not wait for the banner.** The failure is published on the first
+   * attempt, exactly as before, and the ladder runs underneath it — a volunteer
+   * reading a short list has to know it is short before they conclude a student
+   * is missing and quick-add a duplicate. What changed is that the banner now
+   * leaves on its own when a rung lands.
+   */
+  const readRoster = useCallback(async (force: boolean, attempt: number): Promise<void> => {
     if (inFlight.current) {
       // `force` is sticky: a deliberate refresh must not be downgraded by an
-      // incidental one that happened to arrive alongside it.
+      // incidental one that happened to arrive alongside it. Sticky *here* and
+      // nowhere else — see the ladder's first rule.
       pending.current = { force: force || (pending.current?.force ?? false) };
       return;
     }
     inFlight.current = true;
     setRosterLoading(true);
 
+    let failed = false;
     try {
-      const snapshot = await fetchRoster(new Date(), force);
+      const snapshot = await fetchRoster(
+        new Date(),
+        force,
+        // Stryker disable next-line ArrayDeclaration: an attempt past the end
+        // of the ladder cannot happen — the rung that would schedule it is the
+        // one that returns instead — and `fetchRoster` treats an undefined
+        // deadline as the server's whole budget, which is the last rung anyway.
+        ROSTER_DEADLINES_MS[attempt] ?? ROSTER_DEADLINES_MS[ROSTER_DEADLINES_MS.length - 1],
+      );
       setRoster((current) =>
         rosterSignature(current) === rosterSignature(snapshot.students) ? current : snapshot.students,
       );
@@ -395,23 +494,60 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (cause) {
       // Deliberately not clearing `roster`: whatever is already on screen is
       // more useful than nothing, and `rosterOffline` says where it came from.
-      setRosterError(rosterErrorReport(tErrors, cause));
+      failed = true;
+      setRosterError(rosterErrorReport(tErrors, tServer, cause));
       setRosterOffline(true);
     } finally {
       inFlight.current = false;
-      lastAttemptAt.current = Date.now();
       setRosterLoading(false);
       setRosterSettled(true);
 
       const queued = pending.current;
       pending.current = null;
-      if (queued) void refreshRoster(queued.force);
+      if (queued) {
+        // A deliberate read arrived while this one was in the air. It is a new
+        // ladder, not the next rung of this one — whoever asked for it asked
+        // for a fresh start, and inheriting this attempt's rung would hand them
+        // a shorter deadline than they would have got on their own.
+        void readRoster(queued.force, 0);
+      } else {
+        const gap = failed ? ROSTER_RETRY_GAPS_MS[attempt] : undefined;
+        if (gap === undefined) {
+          // The ladder is over: it landed, or it ran out of rungs. Only now is
+          // there an answer to "when did we last try".
+          lastAttemptAt.current = Date.now();
+        } else {
+          retryTimer.current = setTimeout(() => {
+            retryTimer.current = null;
+            void readRoster(false, attempt + 1);
+          }, gap);
+        }
+      }
     }
   },
   // Stryker disable next-line ArrayDeclaration: any constant array is the same
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself.
-  [tErrors]);
+  [tErrors, tServer]);
+
+  /**
+   * A read somebody or something deliberately asked for, and the start of a
+   * ladder.
+   *
+   * Everything outside this module calls this one: the mount, the ten-minute
+   * timer, the visibility resync, the network coming back, the "Try again"
+   * button and a write that could not correct a row in place. Every one of them
+   * means "start again from the top", so every one of them abandons whatever
+   * rung was waiting.
+   */
+  const refreshRoster = useCallback(async (force = false) => {
+    stopLadder();
+    await readRoster(force, 0);
+  },
+  // Stryker disable next-line ArrayDeclaration: both are `useCallback`s over
+  // values that do not change, so this list never differs from itself. Naming
+  // them is what stops that being an accident the next edit silently relies on.
+  [readRoster, stopLadder]);
 
   /**
    * The roster as last committed, for `applyRosterPerson` to look somebody up
@@ -461,16 +597,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
     document.addEventListener('visibilitychange', resync);
 
+    /*
+     * The most common real shape of a failed roster read is not an outage but a
+     * router, and the browser knows the moment that is over. The kiosk has
+     * listened for this all along to replay its write queue; the app the
+     * volunteers actually hold listened for nothing, so wifi dropping and
+     * coming back changed nothing until the next ten-minute tick.
+     *
+     * No freshness floor on this one, unlike the resync above: `online` fires
+     * on a transition rather than on a glance, and the transition is exactly
+     * the news worth spending a read on.
+     */
+    const online = () => void refreshRoster();
+    window.addEventListener('online', online);
+
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('online', online);
+      // Nothing may fire a read into an unmounted provider.
+      stopLadder();
     };
   },
-  // Stryker disable next-line ArrayDeclaration: `refreshRoster` is a
-  // `useCallback` over no state, so its identity never changes and an empty
-  // list would behave the same. Naming it is what stops that being an
-  // accident the next edit to it silently relies on.
-  [refreshRoster]);
+  // Stryker disable next-line ArrayDeclaration: both are `useCallback`s whose
+  // identity never changes, so an empty list would behave the same. Naming
+  // them is what stops that being an accident the next edit silently relies
+  // on.
+  [refreshRoster, stopLadder]);
 
   /* ---- Profile edits on their way upstream ------------------------------- */
 
