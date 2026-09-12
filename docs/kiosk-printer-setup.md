@@ -212,7 +212,16 @@ will do; and the two hints inside the open roll chooser stepped up a rung.
 The design critic's two remaining majors — the act group bound its
 sentences to controls by order alone, and the guessed state filed the roll
 question under reference behind the one control that re-pairs the printer
-— went to a third, short pass <!-- r04c -->.
+— went to a third, short pass. That pass made the act group a stack of
+units — a control and its words at 8px, controls inside one unit at 12px,
+unit to unit at 24px, the act group to the reference group at 32px — so
+proximity now says which sentence belongs to which button; moved the roll
+question and its two tiles up into the act group on the guessed frames,
+where "pick it below" is literally true and the re-pair control is the last
+thing in the group, a unit away; and capped every caption at `max-w-xl`,
+flush left, so a sentence under a button is no longer as wide as the
+button (66–74 characters a line, where B's panel runs 68). Seventeen
+printer frames, the primary at one y on every one of them.
 
 
 > "B is the first version of this a volunteer can act on with me not on the
@@ -478,7 +487,8 @@ both ramps.
   it could not.*; a ready screen after a dismissed list → *Nothing was
   picked from the browser's list — this kiosk is still on the {model}.*
   (ink-100) under *Connect a different printer*, so a press changes the
-  screen on a green frame without contradicting the head. When `attemptFailed && kind !== 'ready'`, *Nothing was
+  screen on a green frame without contradicting the head — the rule is
+  "never amber on green", not "never an account on green". When `attemptFailed && kind !== 'ready'`, *Nothing was
   picked from the browser's list. Press Connect this printer again and
   choose the QL — if it is not listed, check it is plugged into this tablet
   and switched on.* (ink-100) becomes the first line of the slot belonging to
@@ -505,17 +515,49 @@ both ramps.
   outcome rather than the send, pass the real `printedTonight` to the set-up
   mount and read the newest `__test__` row's `failed` flag
   (`printing/queue.ts` ~53–68).
-- **Roll rows.** `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`;
-  chosen `bg-brand-600/25 text-brand-200 ring-2 ring-brand-500` +
-  `aria-pressed` (the app's selected-tile treatment,
-  `RegistrationFlow.tsx` ~1328, no `active:`); others
-  `bg-ink-800 text-ink-100 active:bg-ink-700`. The two hint lines inside the
-  chooser are `text-ink-400` (they are in view whenever the question is). Copy: `mediaAmbiguous` =
+- **Roll rows.** In the guessed state the question (*The printer cannot tell
+  these two apart. Which is on the spindle?*, `text-ink-300`) and the two
+  tiles are **act, not reference**: the second unit of the act group,
+  between the primary's sentences and the re-pair control, as
+  `grid shrink-0 grid-cols-1 gap-3` at the column's own 672px — no
+  `bg-ink-950` well, no wrap row. Tiles
+  `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`; chosen
+  `bg-brand-600/25 text-brand-200 ring-2 ring-brand-500` + `aria-pressed`
+  (the app's selected-tile treatment, `RegistrationFlow.tsx` ~1328, no
+  `active:`); others `bg-ink-800 text-ink-100 active:bg-ink-700`. The model
+  `<details>` is uncontrolled again and carries only the settled model and
+  roll selects; `rollAmbiguous` survives solely as the condition for drawing
+  the unit. The two hint lines inside it are `text-ink-400`. Copy: `mediaAmbiguous` =
   *{media} is loaded, and more than one roll is that size. Set to {label}.*
 - **Layout.** Set-up:
   `mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto`
-  = act (`flex shrink-0 flex-col gap-3`) + reference
-  (`mt-auto flex shrink-0 flex-col gap-3`, anchored above the foot).
+  = act (`flex shrink-0 flex-col gap-6`) + reference
+  (`mt-auto flex shrink-0 flex-col gap-3`, anchored above the foot). The act
+  group's children are **units** (`flex shrink-0 flex-col gap-2`): one
+  control, or one control block (`flex shrink-0 flex-col gap-3`, where a
+  unit carries more than one control row — the mid-evening greyed group),
+  followed by that control's slot lines. The spacing ladder is 8 (a control
+  and its words) / 12 (control to control inside one unit) / 24 (unit to
+  unit) / 32 (act to reference). Units per state — set-up idle: [primary +
+  plugInFirst + connectOpensWindow]; looking: [primary + mayConnectItself +
+  connectOpensWindow] [lookAgain, dimmed]; unpaired: [primary +
+  checkPowerAndCable + connectOpensWindow] [lookAgain]; unpaired-cancelled:
+  [primary + selectionCancelled + connectOpensWindow] [lookAgain]; trouble:
+  [primary + troubleThenLookAgain] [connectThisAgain + connectOpensWindow];
+  ready: [primary + testToBeSure | testSent + stillWaiting]
+  [connectDifferent (+ stillOnPrinter after a dismissed list)]; ready and
+  guessed: [primary + mediaAmbiguous + pickTheRoll] [whichOnSpindle + the
+  two roll tiles] [connectDifferent]; mid-evening never: [primary +
+  plugInFirst + connectOpensWindow] [block(reprint dim, check | test dim) +
+  reprintNeedsPrinter]; mid-evening unpaired/trouble: [primary +
+  checkPowerAndCable + connectOpensWindow] [block(reprint live, lookAgain /
+  connectThisAgain live, check | test dim) + checksNeedPrinter]; mid-evening
+  ready: [primary] [check | test] [connectDifferent with `mt-2`, so the
+  benign pair is a full 32px from the one control that re-binds a live
+  kiosk]. Every flush-left sentence the screen owns (both slots, the reason
+  lines, `autoPowerOff`, `modelPending`) is
+  `max-w-xl shrink-0 text-sm text-ink-{100|300|400} kiosk:text-base` — 576px
+  at x64, 66–74 characters a line; type size unchanged.
   Mid-evening:
   `… flex-col gap-8 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6`,
   act first in DOM (`lg:order-2`), reference second
@@ -534,7 +576,7 @@ both ramps.
   `reprintNeedsPrinter`, `checksNeedPrinter`, `connectThePrinter`,
   `connectThisAgain`, `connectDifferent`, `connectedReadOff`,
   `connectedGuessedRoll`, `connectedGuessedModel`, `plugInFirst`,
-  `connectOpensWindow`, `rollPicked`, `stillOnThisPrinter{model}`; changed:
+  `connectOpensWindow`, `rollPicked`, `stillOnPrinter{model}`; changed:
   `troubleThenLookAgain`, `mediaAmbiguous`, `mayConnectItself`,
   `pickTheRoll`, `checksNeedPrinter`;
   retired: `connectedReady`, `chooseDifferent`, `connectPrinter`, `readOff`.
@@ -598,4 +640,6 @@ photographed. Round 4, after the owner chose B with C: the two ideators widened
 them to nineteen and twelve portrait states — the light ground, long room
 names, every row printing, two sittings of one gathering, the quiet day, the
 looking ladder, the cancelled device list, the roll rows — and the full panel
-read the result. Portrait kiosk only, on the owner's instruction.
+read the result; a fix pass answered it, a confirmatory pass read that, and
+a third, short pass settled the printer screen's composition. Portrait
+kiosk only, on the owner's instruction.
