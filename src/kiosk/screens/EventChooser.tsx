@@ -414,7 +414,8 @@ export function EventChooser({
         ? { text: t("noPrinterOnThisKiosk"), tone: "text-ink-400" }
         : { text: t("noPrinterPlugOneIn"), tone: "text-ink-200" };
     }
-    if (stillLooking) return { text: tPrinter("looking"), tone: "text-ink-400" };
+    if (stillLooking)
+      return { text: tPrinter("looking"), tone: "text-ink-400" };
     if (printerState !== null && printerState.kind === "unpaired")
       return { text: tPrinter("notConnected"), tone: "text-warn-400" };
     if (
@@ -426,7 +427,9 @@ export function EventChooser({
       const advice =
         printerState.kind === "trouble" ? printerNote(printerState.advice) : "";
       return {
-        text: [printerNote(printerState.message), advice].filter(Boolean).join(" "),
+        text: [printerNote(printerState.message), advice]
+          .filter(Boolean)
+          .join(" "),
         tone: "text-warn-400",
       };
     }
@@ -471,7 +474,9 @@ export function EventChooser({
     // sentence is concerned, and saying the title twice reads as a list of two.
     const titles = [...new Set(bindablePrinting.map((entry) => entry.title))];
     return t("printsNameTagsFor", {
-      names: new Intl.ListFormat(locale, { type: "conjunction" }).format(titles),
+      names: new Intl.ListFormat(locale, { type: "conjunction" }).format(
+        titles,
+      ),
       count: titles.length,
     });
   })();
@@ -648,57 +653,69 @@ export function EventChooser({
                     <span className="sm:pe-4">
                       {dayLabel(locale, entry.startAt, nowMs)}
                       {" · "}
-                    {/*
-                     * The hours, a step louder than the line they are in.
-                     *
-                     * The one fact that tells two sittings of one gathering
-                     * apart, and until now the quietest thing on the row: two
-                     * identical titles, two identical marks, one green border on
-                     * whichever happened to be open, and the discriminator set
-                     * in the base weight of the dimmest line. Everything loud on
-                     * the row pointed at the same place; the volunteer picked on
-                     * colour. This is the only fact on a row that a mark cannot
-                     * carry — an icon belongs to the gathering, so both sittings
-                     * wear it — which is exactly why it is the one that had to
-                     * come up.
-                     */}
+                      {/*
+                       * The hours, a step louder than the line they are in.
+                       *
+                       * The one fact that tells two sittings of one gathering
+                       * apart, and until now the quietest thing on the row: two
+                       * identical titles, two identical marks, one green border on
+                       * whichever happened to be open, and the discriminator set
+                       * in the base weight of the dimmest line. Everything loud on
+                       * the row pointed at the same place; the volunteer picked on
+                       * colour. This is the only fact on a row that a mark cannot
+                       * carry — an icon belongs to the gathering, so both sittings
+                       * wear it — which is exactly why it is the one that had to
+                       * come up.
+                       */}
                       <span className="font-medium whitespace-nowrap text-ink-200">
                         {timeLabel(locale, entry.startAt)}–
                         {timeLabel(locale, entry.endAt)}
                       </span>
-                      {entry.location ? (
-                        <>
-                          {/* The middot is drawn only where the room follows the
-                            hours on the same line. A separator is a join, and a
-                            join has nothing to do at the start of a line — which
-                            is where the phone puts this, every time, because
-                            three facts and a status do not fit in 297 pixels. */}
-                          <span className="hidden sm:inline"> · </span>
-                          <span className="block whitespace-nowrap sm:inline">
-                            {entry.location}
-                          </span>
-                        </>
-                      ) : (
-                        ""
-                      )}
                       {/*
-                       * Whether this gathering prints, on the row, in plain
-                       * weight.
+                       * Where the gathering is and whether it prints, as one
+                       * run.
                        *
-                       * The one fact the chooser never carried, and the reason
-                       * the printer could be skipped without anybody noticing:
-                       * nothing on the screen said which gatherings need one.
+                       * The mark is the one fact this chooser never carried, and
+                       * the reason the printer could be skipped without anybody
+                       * noticing: nothing on the screen said which gatherings
+                       * need one. It is keyed off the template alone, so an
+                       * *ended* printing row wears it too — the mark is about
+                       * the gathering, not about tonight. The sentence in the
+                       * foot is the one that has to be careful about tonight.
                        *
-                       * Keyed off the template alone, so an *ended* printing row
-                       * wears it too — the mark is about the gathering, not
-                       * about tonight. The sentence in the foot is the one that
-                       * has to be careful about tonight, and it is.
+                       * Room and mark share a line, and that is the whole of
+                       * why they share a span. Copying the room's own
+                       * `block sm:inline` gave the mark a line of its own below
+                       * `sm`, which grew every printing row by 24px on a phone —
+                       * a cost on a shape this campaign never looked at, paid by
+                       * a screen that is a list. Both are facts about the
+                       * gathering and "Hall · Prints name tags" is 23 characters;
+                       * they fit.
+                       *
+                       * The middot between them is always drawn because they are
+                       * always on one line together. The one *before* them is
+                       * not: a separator is a join, and a join has nothing to do
+                       * at the start of a line — which is where the phone puts
+                       * this, every time, because three facts and a status do
+                       * not fit in 297 pixels.
                        */}
-                      {entry.labelTemplate !== null && (
+                      {(entry.location || entry.labelTemplate !== null) && (
                         <>
                           <span className="hidden sm:inline"> · </span>
-                          <span className="block whitespace-nowrap text-ink-300 sm:inline">
-                            {t("printsNameTags")}
+                          <span className="block sm:inline">
+                            {entry.location && (
+                              <span className="whitespace-nowrap">
+                                {entry.location}
+                              </span>
+                            )}
+                            {entry.location && entry.labelTemplate !== null && (
+                              <span className="whitespace-nowrap"> · </span>
+                            )}
+                            {entry.labelTemplate !== null && (
+                              <span className="whitespace-nowrap text-ink-300">
+                                {t("printsNameTags")}
+                              </span>
+                            )}
                           </span>
                         </>
                       )}
@@ -759,7 +776,23 @@ export function EventChooser({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl pt-4 pb-[max(1rem,var(--spacing-safe-bottom))]">
+      {/*
+       * Everything below the kiosk breakpoint is denser than the design above
+       * it, and the reason is arithmetic rather than taste.
+       *
+       * The panel was drawn for an 800×1280 shelf tablet, where it costs a
+       * fifth of the glass and its sentences are one line each. An iPhone is
+       * 664 points tall: the same panel at the same scale took this foot from
+       * 216px to 328px and left a list — the whole point of the screen — with
+       * 244px, which is one row of a list whose rows are 148px. A volunteer
+       * looking for tonight's gathering on a phone could see one of them.
+       *
+       * So every measurement in here has a `kiosk:` twin holding the reviewed
+       * value, and the bare one is the phone's: smaller type in the panel, a
+       * 44px control rather than 48, and a seam instead of a margin. It buys
+       * the list back its second row and changes nothing at 800×1280.
+       */}
+      <div className="mx-auto w-full max-w-2xl pt-2 pb-[max(1rem,var(--spacing-safe-bottom))] kiosk:pt-4">
         {/*
          * The second way in to installing, for a kiosk that was paired in a
          * browser tab and is being tidied up afterwards. The first is the
@@ -792,20 +825,22 @@ export function EventChooser({
          * pixels it had just vacated.
          */}
         <div
-          className={`mb-6 p-4 kiosk:p-5 ${showPanel ? "rounded-xl bg-ink-900" : ""}`}
+          className={`mb-2 p-2.5 kiosk:mb-6 kiosk:p-5 ${showPanel ? "rounded-xl bg-ink-900" : ""}`}
         >
           {showPanel && namesLine !== null && (
-            <div className="text-ink-300">{namesLine}</div>
+            <div className="text-sm text-ink-300 kiosk:text-base">
+              {namesLine}
+            </div>
           )}
           {showPanel && (
             <div
-              className={`font-medium kiosk:text-lg ${namesLine !== null ? "pt-1 " : ""}${stateLine.tone}`}
+              className={`text-sm font-medium kiosk:text-lg ${namesLine !== null ? "pt-1 " : ""}${stateLine.tone}`}
             >
               {stateLine.text}
             </div>
           )}
           <div
-            className={`flex items-center justify-end gap-4 ${showPanel ? "mt-3" : ""}`}
+            className={`flex items-center justify-end gap-4 ${showPanel ? "mt-2 kiosk:mt-3" : ""}`}
           >
             {slot === "waiting" ? (
               /*
@@ -823,7 +858,7 @@ export function EventChooser({
                 tabIndex={-1}
                 aria-disabled
                 aria-busy
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
               >
                 <span
                   aria-hidden
@@ -842,7 +877,7 @@ export function EventChooser({
                   type="button"
                   tabIndex={-1}
                   {...tap(slot.press)}
-                  className="h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
+                  className="h-11 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14"
                 >
                   {slot.label}
                 </button>
@@ -852,7 +887,7 @@ export function EventChooser({
               type="button"
               tabIndex={-1}
               {...tap(onSetUpPrinter)}
-              className="h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 kiosk:h-14"
+              className="h-11 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 kiosk:h-14"
             >
               {t("printerSettings")}
             </button>
@@ -869,7 +904,7 @@ export function EventChooser({
              `ink-800` slab with dim type in it reads as an input waiting to be
              filled in rather than as a button waiting for a row; the border
              holds the 672×96 so nothing moves when a tap arms it. */
-          className={`w-full rounded-xl border-2 border-transparent p-5 text-xl font-semibold ${
+          className={`w-full rounded-xl border-2 border-transparent p-4 text-lg font-semibold kiosk:p-5 kiosk:text-xl ${
             selected !== null && !binding
               ? "bg-brand-600 text-white active:bg-brand-500"
               : "pointer-events-none text-ink-500"
@@ -916,7 +951,7 @@ export function EventChooser({
           {(binding || !selectedEntry) && (
             <span
               aria-hidden
-              className="invisible mb-1 block text-base font-medium"
+              className="invisible mb-1 block text-sm font-medium kiosk:text-base"
             >
               &nbsp;
             </span>
@@ -936,7 +971,7 @@ export function EventChooser({
              * fill and its place: a volunteer whose gathering prints nothing is
              * never blocked, only told.
              */
-            <span className="mb-1 flex items-baseline justify-center gap-1 text-base font-medium">
+            <span className="mb-1 flex items-baseline justify-center gap-1 text-sm font-medium kiosk:text-base">
               <span className="min-w-0 truncate text-white">
                 <EventName
                   path={selectedEntry.iconPath}
