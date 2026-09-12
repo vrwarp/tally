@@ -32,6 +32,12 @@
  *   ?photo=1                  the gathering's photograph behind the idle screen
  *   ?backdrop=1               the staff menu's "Hide the photo" row
  *   ?ground=light             the light ground, as a light-themed gathering wears it
+ *   ?screen=printer           the label printer screen, as setup reaches it from the chooser
+ *   ?from=staff               …or as the staff menu reaches it, mid-evening, with tonight's tags
+ *   ?printer=idle|ready|unpaired|looking|trouble
+ *                             what the printer is doing, on the chooser, the printer screen
+ *                             and the staff menu (`none` on the staff menu: nothing to print)
+ *   ?labels=all|some|none     which chooser rows belong to a gathering that prints  (default none)
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -45,10 +51,27 @@ import { RegistrationFlow } from '@/kiosk/registration/RegistrationFlow';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
 import { ChangeEventScreen } from '@/kiosk/screens/ChangeEventScreen';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
+import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
 import { SuccessScreen } from '@/kiosk/screens/SuccessScreen';
-import type { KioskEventEntry, KioskServices } from '@/kiosk/KioskApp';
+import type { KioskEventEntry, KioskPrinting, KioskServices } from '@/kiosk/KioskApp';
+/*
+ * The printer, without a printer.
+ *
+ * `PrinterScreen` reads everything through the `printing` handle so that the
+ * transport stays out of the kiosk's first paint; here the handle is a table of
+ * models, a table of media, a state and four calls that settle without doing
+ * anything. The tables are the library's own — the model list and the roll
+ * names on the frame are the ones a volunteer would read — and the log's two
+ * describers are the module's, so the folded record reads as it does on the
+ * device. Nothing here touches `navigator.usb`.
+ */
+import { labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
+import { modelIdentifiers } from '@vrwarp/brother-ql-webusb/models';
+import { describeAge, describeEntry } from '@/kiosk/printing/log';
+import type { PrintedLabel, PrinterState } from '@/kiosk/printing';
+import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 
 const params = new URLSearchParams(location.search);
 
@@ -161,11 +184,23 @@ const TWINS = [
 
 const chooserIcons = params.get('icons') ?? 'all';
 
+/*
+ * Which rows belong to a gathering that prints name tags.
+ *
+ * `?labels=`, defaulting to none so every frame the earlier campaigns shot is
+ * the frame they shot. `some` is the church this campaign is about: a nursery
+ * that prints and a youth night that does not, on one list, in front of one
+ * volunteer with one printer on the shelf. The template is the app's default —
+ * the chooser only asks whether there is one.
+ */
+const chooserLabels = params.get('labels') ?? 'none';
+
 function chooserEntries(): KioskEventEntry[] {
   return (params.get('twins') === '1' ? TWINS : CHOOSER).map((row, index) => {
     const startAt = NOW - 22 * 60_000 + row.inHours * 3_600_000;
     const endAt = startAt + row.runsMinutes * 60_000;
     const wears = chooserIcons === 'all' || (chooserIcons === 'some' && index % 2 === 0);
+    const prints = chooserLabels === 'all' || (chooserLabels === 'some' && index % 2 === 0);
     return {
       chain: `chain-${index}`,
       predictsFrom: `chain-${index}`,
@@ -180,12 +215,80 @@ function chooserEntries(): KioskEventEntry[] {
       seriesId: null,
       location: row.location,
       requiresCheckOut: false,
-      labelTemplate: null,
+      labelTemplate: prints ? DEFAULT_LABEL_TEMPLATE : null,
       allergiesSupported: true,
       iconPath: wears ? findEventIcon(row.icon)?.path : undefined,
     };
   });
 }
+
+/** The printer this kiosk was set up with, when it was set up with one. */
+const PRINTER_CONFIG = { model: 'QL-810W', label: '62x29' };
+
+/**
+ * What the printer is doing, by `?printer=`.
+ *
+ * Absent means the state `KioskApp` holds before anything has asked for the
+ * printing module — `null` on the chooser, which is the frame every earlier
+ * campaign shot, and `idle` on the printer screen, which is what the module
+ * reports on a kiosk that has never been given a printer.
+ */
+function printerStateFor(): PrinterState | null {
+  switch (params.get('printer')) {
+    case 'ready':
+      return { kind: 'ready', config: PRINTER_CONFIG };
+    case 'unpaired':
+      return { kind: 'unpaired', searching: false };
+    case 'looking':
+      return { kind: 'unpaired', searching: true };
+    case 'trouble':
+      return {
+        kind: 'trouble',
+        message: { key: 'troubleUnplugged' },
+        advice: { key: 'advicePlugBackIn' },
+      };
+    case 'idle':
+      return { kind: 'idle' };
+    default:
+      return null;
+  }
+}
+
+/*
+ * The printing handle the printer screen reads — see the import note above.
+ * Every call settles at once and changes nothing, because the frame under
+ * review is a state rather than a session.
+ */
+function printingHandle(state: PrinterState): KioskPrinting {
+  const handle = {
+    currentState: () => state,
+    subscribe: () => () => {},
+    modelIdentifiers,
+    labelsForModel,
+    labelName,
+    printerLog: () => [],
+    printerLogText: () => '',
+    describeAge,
+    describeEntry,
+    configure: async () => state,
+    pairPrinter: async () => null,
+    checkPrinter: async () => null,
+    ready: async () => state,
+    testPrint: () => {},
+  };
+  return handle as unknown as KioskPrinting;
+}
+
+/*
+ * Tonight's tags, for the printer screen as the staff menu reaches it. Three
+ * rows, one of them the row a volunteer is there for. Setup has none: a kiosk
+ * on no gathering has printed nothing.
+ */
+const PRINTED_TONIGHT: PrintedLabel[] = [
+  { id: 'p1', studentId: '1', name: 'Ramona Alvarez', atMs: NOW - 4 * 60_000, failed: false },
+  { id: 'p2', studentId: '2', name: 'Noah Alvarez', atMs: NOW - 4 * 60_000, failed: true },
+  { id: 'p3', studentId: '6', name: 'Alice Alberts', atMs: NOW - 11 * 60_000, failed: false },
+];
 
 /* Two of the fourteen methods, which are the two this screen calls. */
 const chooserServices = {
@@ -285,18 +388,49 @@ export function Kiosk() {
   };
 
   if (params.get('screen') === 'staff') {
+    /*
+     * `ready` unless asked, which is what every earlier frame of this menu
+     * showed. `none` is the menu on a kiosk with nothing to print — the
+     * statement in place of the reprint door — and `trouble` is the one with
+     * the amber sentence under it.
+     */
+    const asked = params.get('printer');
+    const printer = asked === 'none' ? 'none' : asked === 'trouble' ? 'trouble' : 'ready';
     return (
       <StaffScreen
         title={binding.title}
         iconPath={binding.iconPath}
         window={eventWindow('en', binding)}
-        printer="ready"
+        printer={printer}
+        trouble={printer === 'trouble' ? { key: 'troubleUnplugged' } : null}
         backdrop={params.get('backdrop') === '1'}
         onReprint={() => {}}
         onPrinter={() => {}}
         onChangeEvent={() => {}}
         onHideBackdrop={() => {}}
         onStay={() => {}}
+      />
+    );
+  }
+
+  if (params.get('screen') === 'printer') {
+    /*
+     * Two ways in, and the frame has to say which. From the chooser, mid-setup,
+     * the kiosk is on no gathering: nothing printed tonight and no reprint
+     * door, which is `KioskApp`'s `phase === 'printer'` branch. From the staff
+     * menu it carries the evening. `?from=staff` is the second; the first is
+     * the default because setup is the journey this screen is photographed for.
+     */
+    const midEvening = params.get('from') === 'staff';
+    const state = printerStateFor() ?? { kind: 'idle' as const };
+    return (
+      <PrinterScreen
+        printing={printingHandle(state)}
+        config={PRINTER_CONFIG}
+        printedTonight={midEvening ? PRINTED_TONIGHT : []}
+        onReprint={() => {}}
+        onReprintByName={midEvening ? () => {} : undefined}
+        onDone={() => {}}
       />
     );
   }
@@ -326,7 +460,10 @@ export function Kiosk() {
     return (
       <EventChooser
         services={chooserServices}
-        printerState={null}
+        // Null unless `?printer=` says otherwise: the chooser on a kiosk
+        // nobody has given a printer, which is the frame every earlier
+        // campaign shot.
+        printerState={printerStateFor()}
         onSetUpPrinter={() => {}}
         onBound={() => {}}
       />

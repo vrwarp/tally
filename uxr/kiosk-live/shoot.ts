@@ -7,7 +7,14 @@
  * plus an `index.json` manifest — so a round of kiosk frames reads exactly like
  * a round of app frames.
  *
- *   npx tsx uxr/kiosk-live/shoot.ts [--out uxr/renders/ks-r01]
+ *   npx tsx uxr/kiosk-live/shoot.ts [--out uxr/renders/ks-r01] [--only setup] [--freeze uxr/prototype-kiosk]
+ *
+ * `--freeze` also writes each state as the frozen HTML the rest of the loop
+ * edits — `<scene>--<viewport>.html`, through the same `snapshot.ts` the
+ * capture spec uses — so a campaign that wants to *change* a kiosk screen
+ * rather than photograph it can hand the ideator a prototype that was the app
+ * a moment ago, and re-shoot the edit with `uxr/shoot.ts`, which knows both
+ * kiosk shapes by name.
  *
  * Every frame is checked for horizontal overflow on the way past, because the
  * one failure this screen keeps producing is a fixed-height row whose contents
@@ -21,6 +28,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import { freeze } from '../snapshot';
 
 /** Same fallback as `uxr/shoot.ts`: an image that ships its own Chromium. */
 const executablePath =
@@ -247,6 +255,38 @@ const SCENES: {
     query: 'screen=unbind&icon=groups&title=Wednesday+Night+Middle+School+Gathering',
     views: ['phone'],
   },
+  /*
+   * The printer, on the way in.
+   *
+   * Setting a kiosk up for a gathering that prints is this chooser, the quiet
+   * bordered row above its blue button, the printer screen that row opens, and
+   * the way back. Until this campaign the path had been photographed exactly
+   * once — the chooser, with no printer — so a question about how many taps it
+   * costs, and whether a volunteer would find the first of them, had no frame
+   * to be answered on. `labels=some` is the church the question is about: one
+   * gathering on the list prints and its neighbour does not.
+   */
+  { id: 'setup-chooser', query: 'screen=chooser&labels=some', views: ['phone', 'kiosktall', 'kioskwide'] },
+  {
+    /* The row picked and the blue button live — the frame a volunteer is
+       looking at when they decide whether the printer row above it is for them. */
+    id: 'setup-chooser-selected',
+    query: 'screen=chooser&labels=some',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Wednesday Night'],
+  },
+  { id: 'setup-chooser-ready', query: 'screen=chooser&labels=some&printer=ready', views: ['phone', 'kiosktall'] },
+  { id: 'setup-chooser-trouble', query: 'screen=chooser&labels=some&printer=trouble', views: ['kiosktall'] },
+  /* The printer screen as setup reaches it: no evening, no reprint door. */
+  { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-printer-trouble', query: 'screen=printer&printer=trouble', views: ['kiosktall'] },
+  /* The same screen mid-evening, for the difference. */
+  { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },
+  /* The staff menu on a kiosk that was never given a printer, and on one whose
+     printer has stopped — the two states of it a setup decision lands on. */
+  { id: 'staff-printer-none', query: 'screen=staff&printer=none&icon=groups', views: ['kiosktall'] },
+  { id: 'staff-printer-trouble', query: 'screen=staff&printer=trouble&icon=groups', views: ['kiosktall'] },
   {
     id: 'register-confirm',
     query: 'screen=register',
@@ -380,6 +420,10 @@ const only = onlyFlag === -1 ? null : args[onlyFlag + 1]!;
 const outFlag = args.indexOf('--out');
 const outDir = resolve(outFlag === -1 ? 'uxr/renders/kiosk-live' : args[outFlag + 1]!);
 await mkdir(outDir, { recursive: true });
+/* `--freeze <dir>`: the frozen HTML beside the PNG — see the note at the top. */
+const freezeFlag = args.indexOf('--freeze');
+const freezeDir = freezeFlag === -1 ? null : resolve(args[freezeFlag + 1]!);
+if (freezeDir) await mkdir(freezeDir, { recursive: true });
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const server = await createServer({
@@ -469,6 +513,7 @@ for (const scene of SCENES) {
     const frame = join(outDir, `${stem}-fold.png`);
     await page.screenshot({ path: frame });
     written.push(frame);
+    if (freezeDir) await writeFile(join(freezeDir, `${stem}.html`), await freeze(page), 'utf8');
     await context.close();
   }
 }
