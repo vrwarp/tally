@@ -186,9 +186,11 @@ away; these sentences are what survive.
   bindable printing row (`labelTemplate !== null && nowMs <= endAt`). The
   chunk lands while the volunteer reads the rows, so `printing.pairPrinter()`
   runs inside the click's own transient activation. Until `printing !== null`
-  the connect slot renders `disabled` in the forward treatment reading
-  *Getting ready…* — never `ink-500` on `ink-800`. A kiosk whose day has no
-  printing row never fetches the chunk.
+  the strip's state line carries the wait (*Getting the printer ready…*) and
+  the connect slot holds its place at forward weight with an `active:` state
+  that reads as a press but does nothing — never `ink-500` on `ink-800`, and
+  never a control that is byte-identical to the live one except for its word.
+  A kiosk whose day has no printing row never fetches the chunk.
 - **Connect and test are the printer screen's own calls**, made synchronously
   from a `useTap` handler: `printing.pairPrinter(printerConfig ?? defaults)`
   and `printing.testPrint(locale)`. The doc comment on `pairPrinter` ("only
@@ -203,9 +205,12 @@ away; these sentences are what survive.
   Plain weight, so it does not compete with the hours. One shared change.
 - **The commit's sub-line.** Inside the `!binding && selectedEntry` block after
   the time span: `· name tags won’t print` in `text-white`, when the selected
-  row prints and the printer is known not to be available (not while a
-  configured kiosk is still looking). Word, fill and place of *Set kiosk*
-  unchanged; the invisible reservation line stays.
+  row prints and the printer is a **known negative** — never configured, or a
+  fault — not merely "not yet ready": while a configured kiosk is still
+  looking, the line holds its reserved height with the plain *Kids Club ·
+  9:09 AM*. Word, fill and place of *Set kiosk* unchanged. The clause is
+  `text-white` on `brand-600` (4.1:1); a weight step (`font-semibold`) is
+  worth taking, and it should be checked on the shelf tablet in daylight.
 - **The ghosted commit.** The not-yet branch of the commit's class template
   drops its fill and stroke (`pointer-events-none text-ink-500` on a
   `border-2 border-transparent` box), keeping the 672×96 box so nothing moves.
@@ -213,10 +218,15 @@ away; these sentences are what survive.
 ### F
 
 - Gate: render the strip when `printsSelected || printerConfigured`; visible
-  when `printsSelected || fault || ready` where `fault` is
+  when `printsSelected || fault` where `fault` is
   `unpaired && !searching || trouble || unsupported`; otherwise reserved
   (`invisible`, `aria-hidden`, `&nbsp;` lines and an empty control box) so the
-  strip box is identical in every state.
+  strip box is identical in every state. A configured kiosk whose printer is
+  working, with nothing selected, gets **only** the quiet *Printer settings*
+  door in the strip's slot — not the filled proof button — so a clean
+  Wednesday on the shared kiosk stays as quiet as F promises. (The final
+  visual pass caught the wider gate; that frame is not photographed and
+  should be before F ships.)
 - Wrapper `mb-2 rounded-xl bg-ink-900 p-4` (no ring — it sits on the column).
   Context line `text-sm text-ink-400 kiosk:text-base`
   (`printsSelected ? t('printsNameTagsFor', {title}) : t('Printer.title')`);
@@ -280,8 +290,13 @@ away; these sentences are what survive.
   line steps to `ink-300`. A `Look again` that finds nothing walks the
   module's own path — trouble → unpaired/searching → unpaired — which is the
   Android frame with the chooser in the blue slot.
-- Under the connect when `!hasConfig`: `t('plugInFirst')` at `ink-300`. On
-  the ready frames, `t('autoPowerOff')` closes the act group.
+- Under the connect: when `!hasConfig`, `t('plugInFirst')` at `ink-300`
+  (plug it in and switch it on, then what the press produces); when the
+  primary is the browser chooser on a configured kiosk (the Android frame),
+  the second sentence alone — *Connecting opens a window from the browser
+  listing the USB devices it can see — pick the QL.* The final visual pass
+  found that frame silent about the dialog it opens. On the ready frames,
+  `t('autoPowerOff')` closes the act group.
 - `stateLine` takes `detection`: a clean read-off joins the state line
   (*Connected and ready — read off the printer: {model}, {label}.*,
   `present-400`); a guessed roll makes the line *Connected — the roll had to be
@@ -338,10 +353,16 @@ away; these sentences are what survive.
   *Looking for the printer…*; `unpaired && !searching` / trouble /
   unsupported → warn line + the *Connect the printer again* pill;
   `printerConfigured && (null || idle)` → *Looking for the printer…*;
-  `!printerConfigured && printing === null` → *Getting the printer ready…*;
-  else the fact line *Kids Club prints name tags · No printer on this kiosk*
-  (the selected printing row's title, or the bindable printing rows' titles at
-  first paint, or the placeholder when a non-printing row is selected).
+  `!printerConfigured && printing === null` → *No printer on this kiosk —
+  checking…* with the commit already reading *Set kiosk without a printer*
+  (the fact is settled at mount; only the Connect waits for the module — the
+  final visual pass caught the earlier version, which hid the fact and showed
+  an unqualified blue commit for the length of the fetch); else the fact line
+  *Kids Club prints name tags · No printer on this kiosk* (the selected
+  printing row's title, or the bindable printing rows' titles at first paint,
+  or the placeholder when a non-printing row is selected). On the
+  configured-but-lost frame the commit's sub-line also carries *· name tags
+  won’t print*.
 - Ready strip: *Print a test label* is a filled control
   (`inline-flex h-12 items-center rounded-lg bg-ink-800 px-5 font-medium text-ink-100 kiosk:h-16 kiosk:px-6`)
   beside the *Printer settings* link (`text-ink-300`, underlined), 16px apart;
@@ -352,6 +373,29 @@ away; these sentences are what survive.
   `connectAgain`, `printerSettings`.
 
 
+
+## Still open after the final pass
+
+Minor findings the confirmatory pass left for whoever implements, in the
+order they were raised:
+
+- The waiting connect slot (F, B) should acknowledge a press — an `active:`
+  state or an animated ellipsis — rather than absorbing it silently.
+- The commit's *name tags won’t print* clause is `text-white` on `brand-600`
+  (4.1:1); a weight step is worth taking, and it belongs on the shelf-tablet
+  photograph.
+- F's configured-and-working kiosk with nothing selected is not photographed
+  and is the frame the F-versus-B call turns on.
+- On the guessed-roll printer frame, the two roll chips behind *Change* are
+  40px tall and 8px apart — the smallest targets in the set on the frame
+  whose whole job is choosing between them. Inherited; give them the
+  screen's 60px rows on that state.
+- On the mid-evening no-printer frame, *Reprint a name tag* stays live at
+  full weight above two half-weight ghosts; either half-weight it while there
+  is no printer or say why it is live.
+- C's Android frame inherits D's cost — the browser dialog behind the blue
+  button — without D's post-cancel account; the module's own walk
+  (trouble → looking → unpaired) is the only feedback.
 
 ## How it was made
 
