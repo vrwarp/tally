@@ -161,8 +161,8 @@ light, both grounds — the numbers say the filled control's edge is the weak
 point and no render can settle it.
 
 **The fix pass** answered the nine majors and the craft in one round, and
-the two visual critics and the design critic then confirmed the result
-<!-- r04-confirm -->. On the landing page: the filled connect at first
+the two visual critics and the design critic then read the result once
+more. On the landing page: the filled connect at first
 paint on a never-configured kiosk, withheld only when the picked row does not
 print; the door pinned on one pixel in all twenty-six states, the two with no
 panel included; the slot held with a spinner through the chunk load and the
@@ -183,8 +183,36 @@ looking state has the spinner, a sentence that makes waiting a choice, and
 *Look again* drawn from first paint; the chosen roll row wears the app's
 selected-tile treatment instead of the primary's blue and the chooser opens
 itself; the head joined the column; the reference group is anchored above
-the foot. Twenty-six chooser frames and sixteen printer frames, all
+the foot. Twenty-six chooser frames and seventeen printer frames, all
 portrait.
+
+**The confirmatory pass** found the landing page buildable as drawn and
+left three minors, taken at once: the rank swap had made the commit's time
+the dimmest fact on the button — the one fact that tells two sittings of a
+gathering apart — so the time is white again and only the separators step
+back; the errand line now outranks the context line above it (`ink-200`,
+the rule the account already used); and on the Wednesday shared kiosk the
+connected line sits at the neutral rung, because a fact about a printer
+nobody there needs is context, not news (the quiet day keeps its green: it
+is the Saturday errand's receipt). The light ramp's amber, photographed at
+last, is the quietest line in the panel — the owner's ramp call, recorded
+below. On the printer screen the pass found two sentences and two
+compositions. The looking frame's wait sentence pointed at a dimmed control
+("the button below hurries it" — the button below was the greyed *Look
+again*), so it now names *Connect this printer again*; a dismissed device
+list on a ready screen changed nothing on the frame, so the ready states
+gained their own account under *Connect a different printer* (*Nothing was
+picked from the browser's list — this kiosk is still on the QL-810W.*),
+photographed as a seventeenth frame; the mid-evening ready frame put the
+re-bind 12px under the benign pair, so it took a full step; the guessed
+path never named the kiosk errand and the after-pick frame still said "pick
+it below", so both sentences changed; the reason line under the greyed pair
+taught that Reprint works on an unpaired kiosk, so it says what a reprint
+will do; and the two hints inside the open roll chooser stepped up a rung.
+The design critic's two remaining majors — the act group bound its
+sentences to controls by order alone, and the guessed state filed the roll
+question under reference behind the one control that re-pairs the printer
+— went to a third, short pass <!-- r04c -->.
 
 
 > "B is the first version of this a volunteer can act on with me not on the
@@ -272,8 +300,10 @@ away; these sentences are what survive.
   fault — not merely "not yet ready": while a configured kiosk is still
   looking, the line holds its reserved height with the plain *Kids Club ·
   9:09 AM*. Word, fill and place of *Set kiosk* unchanged. Two ranks, not four: the
-  title `text-white`, the time and both separators `text-white/75` as their
-  own flex children, the clause `font-semibold text-white`. The clause is
+  title and the time `text-white`, both separators `text-white/75` as their
+  own flex children, the clause `font-semibold text-white` — the time keeps
+  full white because on a day with two sittings it is the only fact that
+  says which row is being bound. The clause is
   4.1:1 on `brand-600` in the dark — a shelf-tablet check in daylight.
 - **The ghosted commit.** The not-yet branch of the commit's class template
   drops its fill and stroke (`pointer-events-none text-ink-500` on a
@@ -309,16 +339,20 @@ ideator's final report.
   then the state line drops its `pt-1` (the 136px box).
 - **State line** (`pt-1 font-medium <tone> kiosk:text-lg`), first match
   wins: the account after a dismissed list → `text-ink-200`, two lines;
-  `!printerConfigured` → `text-ink-400`, *No printer on this kiosk — plug one
-  in, switch it on, then connect it.* when the slot holds the connect,
-  otherwise the bare *No printer on this kiosk*; `stillLooking` →
+  `!printerConfigured` → *No printer on this kiosk — plug one in, switch it
+  on, then connect it.* at `text-ink-200` when the slot holds the connect
+  (the line that names a job outranks the context line above it), otherwise
+  the bare *No printer on this kiosk* at `text-ink-400`; `stillLooking` →
   `text-ink-400`, `Printer.looking`; unpaired settled → `text-warn-400`,
   `Printer.notConnected`; trouble/unsupported → `text-warn-400`,
   `printerNote(message) + ' ' + printerNote(advice)`; ready and guessed →
   `text-warn-400`, *Printer connected — the roll had to be guessed. Print a
   test label and look at it.* (the second sentence only when the test is in
-  the slot); ready → `text-present-400`, *Printer connected · {model}*.
-  Rule: the state line names a press only when that press is in the slot.
+  the slot); ready → `text-present-400`, *Printer connected · {model}* — at
+  `text-ink-400` when the picked row does not print, where the fact is
+  context (a day with no printing row keeps the green: it is the Saturday
+  errand's receipt for tomorrow's volunteer). Rule: the state line names a
+  press only when that press is in the slot.
 - **Slot**
   (`h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14`,
   494×56): fault → `Printer.lookAgain` (trouble, unsupported) or *Connect
@@ -424,7 +458,8 @@ both ramps.
   for the account of the last press, ink-300 for the standing instruction,
   ink-400 for a reference note). Under the primary: idle → `plugInFirst` +
   `connectOpensWindow`; looking → *It may connect on its own in a few
-  seconds; the button below hurries it.* + `connectOpensWindow`; unpaired →
+  seconds — or press Connect this printer again to hurry it.* +
+  `connectOpensWindow`; unpaired →
   `checkPowerAndCable` + `connectOpensWindow`; trouble → *If it is plugged in
   and switched on and nothing changes, press Look again.*; ready untested →
   *Print a test label to be sure, then go back and set the kiosk.*; ready
@@ -432,11 +467,18 @@ both ramps.
   it.* (ink-100) + *The kiosk is still waiting to be set — Back to the
   gatherings.*; ready guessed → `mediaAmbiguous` / `modelUnknown` (ink-100)
   + *Look at the roll in the printer and pick it below, then print a test
-  label — it should come out the full width with nothing cut off.*;
+  label — it should come out the full width with nothing cut off — and go
+  back and set the kiosk.* (after a hand pick: *Print a test label — it
+  should come out the full width with nothing cut off — then go back and
+  set the kiosk.*);
   mid-evening never → `plugInFirst` + `connectOpensWindow`. Under the
   secondary: trouble → `connectOpensWindow`; the mid-evening greyed group →
-  *Connect the printer first to reprint a name tag.* or *These two need the
-  printer connected.* When `attemptFailed && kind !== 'ready'`, *Nothing was
+  *Connect the printer first to reprint a name tag.* or *Check and test need
+  the printer connected. A reprint will try to reconnect first, and say if
+  it could not.*; a ready screen after a dismissed list → *Nothing was
+  picked from the browser's list — this kiosk is still on the {model}.*
+  (ink-100) under *Connect a different printer*, so a press changes the
+  screen on a green frame without contradicting the head. When `attemptFailed && kind !== 'ready'`, *Nothing was
   picked from the browser's list. Press Connect this printer again and
   choose the QL — if it is not listed, check it is plugged into this tablet
   and switched on.* (ink-100) becomes the first line of the slot belonging to
@@ -452,7 +494,9 @@ both ramps.
   printer* only. Mid-evening never → Reprint (dim), Check the printer | Print
   a test label (dim); mid-evening unpaired/trouble → Reprint (live), Look
   again / Connect this printer again (live), Check | Test (dim); mid-evening
-  ready → Check | Test (live), Connect a different printer.
+  ready → Check | Test (live), then *Connect a different printer* a full
+  step (`mt-5`) below the benign pair, because it is the one control that
+  can re-bind a live kiosk.
 - **`attemptFailed`**: set only when `pairPrinter` resolves `null`; cleared
   at the top of every press handler and inside `printing.subscribe`; never
   drawn when ready. **`tested`**: set in the `testPrint` handler
@@ -465,8 +509,8 @@ both ramps.
   chosen `bg-brand-600/25 text-brand-200 ring-2 ring-brand-500` +
   `aria-pressed` (the app's selected-tile treatment,
   `RegistrationFlow.tsx` ~1328, no `active:`); others
-  `bg-ink-800 text-ink-100 active:bg-ink-700`. The model `<details>` is
-  controlled and opens itself when `rollAmbiguous`. Copy: `mediaAmbiguous` =
+  `bg-ink-800 text-ink-100 active:bg-ink-700`. The two hint lines inside the
+  chooser are `text-ink-400` (they are in view whenever the question is). Copy: `mediaAmbiguous` =
   *{media} is loaded, and more than one roll is that size. Set to {label}.*
 - **Layout.** Set-up:
   `mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto`
@@ -490,7 +534,9 @@ both ramps.
   `reprintNeedsPrinter`, `checksNeedPrinter`, `connectThePrinter`,
   `connectThisAgain`, `connectDifferent`, `connectedReadOff`,
   `connectedGuessedRoll`, `connectedGuessedModel`, `plugInFirst`,
-  `connectOpensWindow`; changed: `troubleThenLookAgain`, `mediaAmbiguous`;
+  `connectOpensWindow`, `rollPicked`, `stillOnThisPrinter{model}`; changed:
+  `troubleThenLookAgain`, `mediaAmbiguous`, `mayConnectItself`,
+  `pickTheRoll`, `checksNeedPrinter`;
   retired: `connectedReady`, `chooseDifferent`, `connectPrinter`, `readOff`.
   `printing/index.ts` needs no change; `KioskApp.tsx` adds the two props at
   both mounts.
