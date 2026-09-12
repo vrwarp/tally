@@ -336,6 +336,28 @@ const SCENES: {
     drive: ['Kids Club'],
   },
   { id: 'setup-chooser-long-rooms', query: 'screen=chooser&labels=some&rooms=long', views: ['kiosktall'] },
+  /*
+   * Round 4: the states the panel found missing from the chosen direction.
+   * The kiosk still looking for its printer (the boot ladder, or the ten
+   * seconds after a Look again), with nothing picked and with a printing row
+   * picked; the light ramp's amber and green, which two never-configured
+   * light frames could not show; and the real Saturday — no gatherings at
+   * all, so the printer door has to stand on an empty page.
+   */
+  { id: 'setup-chooser-looking', query: 'screen=chooser&labels=some&printer=looking', views: ['kiosktall'] },
+  {
+    id: 'setup-chooser-picked-prints-looking',
+    query: 'screen=chooser&labels=some&printer=looking',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-light-trouble',
+    query: 'screen=chooser&labels=some&printer=trouble&ground=light',
+    views: ['kiosktall'],
+  },
+  { id: 'setup-chooser-light-ready', query: 'screen=chooser&labels=some&printer=ready&ground=light', views: ['kiosktall'] },
+  { id: 'setup-chooser-nothing-today', query: 'screen=chooser&events=none', views: ['kiosktall'] },
   /* The printer screen as setup reaches it: no evening, no reprint door. */
   { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
@@ -357,6 +379,14 @@ const SCENES: {
   {
     id: 'setup-printer-light-detected',
     query: 'screen=printer&printer=ready&detected=plain&ground=light',
+    views: ['kiosktall'],
+    drive: ['Check the printer'],
+  },
+  /* The light ramp's amber on this screen — trouble, and the guessed roll. */
+  { id: 'setup-printer-light-trouble', query: 'screen=printer&printer=trouble&ground=light', views: ['kiosktall'] },
+  {
+    id: 'setup-printer-light-guessed',
+    query: 'screen=printer&printer=ready&detected=guessed&ground=light',
     views: ['kiosktall'],
     drive: ['Check the printer'],
   },
@@ -389,6 +419,9 @@ const SCENES: {
    * job reversed.
    */
   { id: 'staff-printer-screen-idle', query: 'screen=printer&from=staff&printer=idle', views: ['kiosktall'] },
+  /* Mid-evening on a kiosk whose printer Android forgot: the brand slot has
+     to carry the verb that fixes it, over a queue. */
+  { id: 'staff-printer-screen-unpaired', query: 'screen=printer&from=staff&printer=unpaired', views: ['kiosktall'] },
   /* The staff menu on a kiosk that was never given a printer, and on one whose
      printer has stopped — the two states of it a setup decision lands on. */
   { id: 'staff-printer-none', query: 'screen=staff&printer=none&icon=groups', views: ['kiosktall'] },

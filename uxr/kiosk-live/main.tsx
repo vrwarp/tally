@@ -38,6 +38,7 @@
  *                             what the printer is doing, on the chooser, the printer screen
  *                             and the staff menu (`none` on the staff menu: nothing to print)
  *   ?labels=all|some|none     which chooser rows belong to a gathering that prints  (default none)
+ *   ?events=none              no gatherings today at all — the printer door on an empty page
  *   ?rooms=long               the rooms named the way a church names them — "Fellowship Hall",
  *                             "Room 201, upstairs" — so the meta line's wrap is photographed
  *   ?detected=plain|guessed|unknown
@@ -217,6 +218,9 @@ const roomOf = (location: string | null) =>
   location && params.get('rooms') === 'long' ? (LONG_ROOMS[location] ?? location) : location;
 
 function chooserEntries(): KioskEventEntry[] {
+  // `?events=none`: the real Saturday — nothing on today at all, so the printer
+  // door has to stand on an empty page.
+  if (params.get('events') === 'none') return [];
   return (params.get('twins') === '1' ? TWINS : CHOOSER).map((row, index) => {
     const startAt = NOW - 22 * 60_000 + row.inHours * 3_600_000;
     const endAt = startAt + row.runsMinutes * 60_000;
