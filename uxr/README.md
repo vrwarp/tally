@@ -86,8 +86,8 @@ The printer set-up campaign ran that way: `--only setup --freeze
 uxr/prototype-printer-base`, one copy of the frozen set per direction, and the
 critics reading `uxr/shoot.ts` renders of the edits. The knobs that reach the
 printer states — `?screen=printer`, `?printer=idle|ready|unpaired|looking|
-trouble`, `?labels=some`, `?detected=plain|guessed|unknown` — are listed at the
-top of `kiosk-live/main.tsx`.
+trouble`, `?labels=some`, `?detected=plain|guessed|unknown`, `?rooms=long`,
+`?events=none` — are listed at the top of `kiosk-live/main.tsx`.
 
 That matters beyond convenience. `kiosk-confirm.ts` — the generator that served
 the confirm-screen rounds — hand-writes a static copy of the component's markup

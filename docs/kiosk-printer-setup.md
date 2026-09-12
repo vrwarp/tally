@@ -126,6 +126,47 @@ printer, because that is the recovery screen.
 | visual critic | over shipped, with fault-at-first-paint | over shipped, with two amendments | only with the sentence filled and a post-cancel state | ship |
 | design critic | best-composed foot | best-made panel, no row grammar | clearest in its own frame, least composed | composed at the top, assembled below |
 
+## What the panel said about B + C (round 4)
+
+Six readers on the widened set — nineteen chooser states and twelve printer
+states, portrait only: a visual critic per screen, the design critic on both,
+the church-staff consultant, a volunteer walkthrough (Jordan, 61, five
+Sundays) and the journey critic on eight journeys. No blockers.
+
+| reader | on B, the landing page | on C, the printer screen |
+|---|---|---|
+| visual critic | Right shape, close, not buildable as specified: the never-configured first glance offered only a link; the controls row moved under a finger; the strip's connect was wired two ways. | — |
+| visual critic | — | The layout is finished and the words are not: the cancel account claims what the API cannot know, *ready* on an untested printer, *a test label came out* off a void call. |
+| design critic | Composed. One major: the sentence naming a gathering the commit does not. Craft: the ✓, the sub-line's four weights, the wrapped status's indent. | Composed. One major: the chosen roll row in the primary's costume. The head outside the column. |
+| staff | Adopt, on three terms: every press changes the screen; the errand named before the first connect; the shelf-tablet photograph. | Adopt; build C first if only one can be built this week. |
+| volunteer | Connected the printer on every walkthrough. "That yellow line was the best thing on there." | Stalled once, on the cancelled browser list: "don't give me two 'again' buttons." |
+| journey | Ship. Three of the majors are one predicate: B waits for the boot ladder in its sentence and its commit and not in its buttons. | Ship. The cancel sentence; the reprint gate that goes stale the moment the printer connects. |
+
+Settled by the panel, four readers to one against the volunteer: the row mark
+and the sentence stay *Prints name tags* (a fact stays true on a ready kiosk
+and an ended row; the errand is already said by the strip's second line).
+Settled from the record: the strip's controls act in place — the round-4 note
+that wired *Connect the printer again* to the printer screen was a slip; the
+door is the only navigation. Settled by three readers: trouble → *Look again*
+(a retry), unpaired → *Connect again* (the browser's list) is the right fork,
+because plugging the printer back in flips the state on its own; the visual
+critic's dissent for the printer screen is recorded. Still owed, two rounds
+old: the shelf-tablet photograph of the strip and the fault frames in lobby
+light, both grounds — the numbers say the filled control's edge is the weak
+point and no render can settle it.
+
+<!-- r04-fix-pass -->
+
+> "B is the first version of this a volunteer can act on with me not on the
+> phone — the Android Sunday is two sentences and the unplugged one is a
+> single sentence. I will put it on the shelf on one condition: every press
+> changes the screen, because the thing I will not defend to a volunteer is
+> a grey button that does nothing twice." — the staff consultant
+
+> "Tell me to plug it in and I'll plug it in; that yellow line was the best
+> thing on there. But don't give me two 'again' buttons and make me guess
+> which one actually does it." — the volunteer walkthrough
+
 ## Found along the way — code, not design
 
 - **`printer='none'` conflates two facts.** `KioskApp.tsx` (the staff-screen
