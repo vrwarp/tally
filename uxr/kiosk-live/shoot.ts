@@ -277,10 +277,60 @@ const SCENES: {
   },
   { id: 'setup-chooser-ready', query: 'screen=chooser&labels=some&printer=ready', views: ['phone', 'kiosktall'] },
   { id: 'setup-chooser-trouble', query: 'screen=chooser&labels=some&printer=trouble', views: ['kiosktall'] },
+  /*
+   * The Android Sunday: the printer lost power overnight, the grant went with
+   * it, and the kiosk boots to `unpaired` with the boot retries spent. The row
+   * reads the same words as `trouble`, which is one of the findings.
+   */
+  { id: 'setup-chooser-unpaired', query: 'screen=chooser&labels=some&printer=unpaired', views: ['kiosktall'] },
+  /*
+   * A row that *prints* picked — Kids Club, which in `labels=some` carries a
+   * template — with no printer, with the printer ready, and with it gone.
+   * `setup-chooser-selected` above picks Wednesday Night, which does not
+   * print, and a direction that reacts to the picked row needs both frames:
+   * the one where it should say something and the one where it must not.
+   */
+  {
+    id: 'setup-chooser-picked-prints',
+    query: 'screen=chooser&labels=some',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-picked-prints-ready',
+    query: 'screen=chooser&labels=some&printer=ready',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Kids Club'],
+  },
+  {
+    id: 'setup-chooser-picked-prints-unpaired',
+    query: 'screen=chooser&labels=some&printer=unpaired',
+    views: ['kiosktall'],
+    drive: ['Kids Club'],
+  },
   /* The printer screen as setup reaches it: no evening, no reprint door. */
   { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-trouble', query: 'screen=printer&printer=trouble', views: ['kiosktall'] },
+  /*
+   * Just connected, with what the printer said about itself on the screen —
+   * the state a volunteer is actually looking at when the doc says "read the
+   * line it comes back with". The read-off is a press away in the fixture, so
+   * the shooter presses; `guessed` is the roll the packet could not choose,
+   * which is the sentence the screen most owes anybody.
+   */
+  {
+    id: 'setup-printer-detected',
+    query: 'screen=printer&printer=ready&detected=plain',
+    views: ['phone', 'kiosktall', 'kioskwide'],
+    drive: ['Check the printer'],
+  },
+  {
+    id: 'setup-printer-guessed',
+    query: 'screen=printer&printer=ready&detected=guessed',
+    views: ['kiosktall'],
+    drive: ['Check the printer'],
+  },
   /* The same screen mid-evening, for the difference. */
   { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },
   /* The staff menu on a kiosk that was never given a printer, and on one whose

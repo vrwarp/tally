@@ -38,6 +38,10 @@
  *                             what the printer is doing, on the chooser, the printer screen
  *                             and the staff menu (`none` on the staff menu: nothing to print)
  *   ?labels=all|some|none     which chooser rows belong to a gathering that prints  (default none)
+ *   ?detected=plain|guessed|unknown
+ *                             what "Check the printer" comes back with on the printer screen —
+ *                             a clean read-off, a roll the packet could not choose between, or a
+ *                             model the table does not carry; the shooter presses the button
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -70,7 +74,7 @@ import type { KioskEventEntry, KioskPrinting, KioskServices } from '@/kiosk/Kios
 import { labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
 import { modelIdentifiers } from '@vrwarp/brother-ql-webusb/models';
 import { describeAge, describeEntry } from '@/kiosk/printing/log';
-import type { PrintedLabel, PrinterState } from '@/kiosk/printing';
+import type { PrintedLabel, PrinterDetection, PrinterState, PrinterStatus } from '@/kiosk/printing';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 
 const params = new URLSearchParams(location.search);
@@ -254,6 +258,38 @@ function printerStateFor(): PrinterState | null {
   }
 }
 
+/**
+ * What asking the printer about itself comes back with, by `?detected=`.
+ *
+ * The notice above the settings is the one sentence the printer screen most
+ * owes a volunteer — it names a roll that had to be guessed — and it is drawn
+ * only from a detection, which only a press produces. So the handle answers
+ * **Check the printer** with one of the three shapes `detectionNotice` knows,
+ * and the shooter presses the button. A status packet as far as the screen
+ * reads one: width, type and no error flags.
+ */
+function detectionFor(): PrinterDetection | null {
+  const status = { mediaWidthMm: 62, mediaType: 'die-cut', errors: [] } as unknown as PrinterStatus;
+  const rolls = labelsForModel(PRINTER_CONFIG.model);
+  const badge = rolls.filter((entry) => entry.identifier === '62x29');
+  const endless = rolls.filter((entry) => entry.identifier === '62' || entry.identifier === '62red');
+  switch (params.get('detected')) {
+    case 'plain':
+      return { config: PRINTER_CONFIG, modelFromPrinter: true, matched: badge, status };
+    case 'guessed':
+      return {
+        config: { model: PRINTER_CONFIG.model, label: '62' },
+        modelFromPrinter: true,
+        matched: endless,
+        status: { ...status, mediaType: 'continuous' } as unknown as PrinterStatus,
+      };
+    case 'unknown':
+      return { config: PRINTER_CONFIG, modelFromPrinter: false, matched: badge, status };
+    default:
+      return null;
+  }
+}
+
 /*
  * The printing handle the printer screen reads — see the import note above.
  * Every call settles at once and changes nothing, because the frame under
@@ -271,8 +307,8 @@ function printingHandle(state: PrinterState): KioskPrinting {
     describeAge,
     describeEntry,
     configure: async () => state,
-    pairPrinter: async () => null,
-    checkPrinter: async () => null,
+    pairPrinter: async () => detectionFor(),
+    checkPrinter: async () => detectionFor(),
     ready: async () => state,
     testPrint: () => {},
   };
