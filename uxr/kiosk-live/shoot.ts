@@ -313,6 +313,13 @@ const SCENES: {
   { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-trouble', query: 'screen=printer&printer=trouble', views: ['kiosktall'] },
   /*
+   * The Android Sunday on the printer screen: set up with a printer the
+   * browser no longer lists, the boot retries spent. The state this church
+   * meets most weeks, and the one where only a human press on the browser's
+   * chooser brings the printer back — so the screen has to say so.
+   */
+  { id: 'setup-printer-unpaired', query: 'screen=printer&printer=unpaired', views: ['kiosktall'] },
+  /*
    * Just connected, with what the printer said about itself on the screen —
    * the state a volunteer is actually looking at when the doc says "read the
    * line it comes back with". The read-off is a press away in the fixture, so
