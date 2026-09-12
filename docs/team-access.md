@@ -537,7 +537,7 @@ A **find-by-name** field sits over the list, and it searches the fold (P12) too,
 match: the person the director most often looks for by name is the leaver.
 
 Admins stop being blind without ceasing to pass: a narrowed gathering on an admin's chooser and
-calendar carries a quiet "🔒 narrowed · 3" on the card or row it already has. Nothing is demoted
+calendar carries a quiet "🔐 3" on the card or row it already has. Nothing is demoted
 for an admin; the fact is drawn.
 
 ### P11 — A kiosk is a room, not a volunteer (C6, B3)

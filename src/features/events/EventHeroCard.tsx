@@ -20,9 +20,8 @@ import {
 import { eventStatusLine } from '@/features/events/eventStatus';
 import { cn } from '@/lib/utils';
 import type { TallyEvent } from '@/types';
-import { useAuth } from '@/context/authContext';
-import { useData } from '@/context/dataContext';
-import { chainKey } from '@/lib/materialize';
+import { NarrowedBadge } from '@/features/events/NarrowedBadge';
+import { useNarrowedCount } from '@/hooks/useNarrowedCount';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats, useTimeStrings } from '@/hooks/useTimeFormats';
 
@@ -70,17 +69,7 @@ export function EventHeroCard({
   const time = useTimeFormats();
   const timeStrings = useTimeStrings();
   const t = useTranslations('EventHero');
-  const tEvents = useTranslations('Events');
-  const { can } = useAuth();
-  const { access } = useData();
-  /*
-   * Only for an admin, and only where there is a fence. Everybody else already
-   * learns this the way the app has always said it — the gathering is either
-   * theirs or it is under "Not yours" — and repeating it on their own cards
-   * would be a lock on a door that is open to them.
-   */
-  const list = access.get(chainKey(event));
-  const narrowed = can('admin') && list?.restricted === true ? list.members.size : null;
+  const narrowed = useNarrowedCount(event);
   const tStatus = useTranslations('EventStatus');
   const cancelled = event.status === 'cancelled';
   const open = isCheckInOpen(event, now) && !cancelled;
@@ -146,19 +135,8 @@ export function EventHeroCard({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {/*
-          * An admin is never told a gathering is narrowed, because an admin
-          * passes every one — so the fact simply disappears from their screen,
-          * and the person who can fix a fence is the one person who cannot see
-          * it. This is that fact, drawn where the card already carries facts.
-          *
-          * A tag rather than a demotion: nothing about an admin's card moves.
-          * The count is the people on it, which is what an admin asked the
-          * question to learn.
-          */}
-        {narrowed !== null ? (
-          <Badge tone="neutral">{tEvents('narrowedTag', { count: narrowed })}</Badge>
-        ) : null}
+        {/* Admin-only, and only where there is a fence. See `NarrowedBadge`. */}
+        {narrowed !== null ? <NarrowedBadge count={narrowed} /> : null}
         {cancelled ? <Badge tone="danger">{t('cancelled')}</Badge> : null}
         {open ? <Badge tone="success">{t('checkInOpen')}</Badge> : null}
         {event.requiresRsvp ? <Badge tone="warn">{t('rsvpOnly')}</Badge> : null}

@@ -1369,7 +1369,8 @@
     "iconLabel": "图标",
     "iconDone": "完成",
     "iconChange": "更换",
-    "narrowedTag": "🔒 narrowed · {count, number}"
+    "narrowedTag": "🔐 {count, number}",
+    "narrowedTagLabel": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked"
   },
   "EventIcons": {
     "event": "活动",

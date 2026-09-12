@@ -1369,7 +1369,8 @@
     "iconLabel": "Icon",
     "iconDone": "Done",
     "iconChange": "Change",
-    "narrowedTag": "🔒 narrowed · {count, number}"
+    "narrowedTag": "🔐 {count, number}",
+    "narrowedTagLabel": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked"
   },
   "EventIcons": {
     "event": "Event",

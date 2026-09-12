@@ -6450,7 +6450,14 @@
     "zh-Hant": "machine"
   },
   "Events.narrowedTag": {
-    "source": "🔒 narrowed · {count, number}",
+    "source": "🔐 {count, number}",
+    "context": "The whole of what an admin sees on a gathering somebody has fenced: a padlock and how many people are on it. Admin-only, and there are two or three per church, so it is a mark to learn rather than a sentence to read. The padlock-with-key is deliberately not the plain 🔒 the rest of the app uses for a gathering you cannot take — an admin passes this one. Nothing here to translate but the number's formatting; the sentence a screen reader gets is `narrowedTagLabel`.",
+    "zh-Hans": "todo",
+    "zh-Hant": "todo"
+  },
+  "Events.narrowedTagLabel": {
+    "source": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked",
+    "context": "What the padlock tag above says out loud — spoken to a screen reader, and shown on hover to an admin who did not set this fence. Same fact as the access sheet's `restrictedDetail`; keep the two in the same words.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
