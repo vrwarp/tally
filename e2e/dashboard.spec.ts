@@ -116,7 +116,7 @@ test.describe('dashboard', () => {
         name: new RegExp(`^Add a contact for ${escapeForRegExp(name)}`),
       });
       const nobodyToCall = block.getByText(
-        /no longer has a record for|Not in Planning Center yet/,
+        /is no longer in|Not in Planning Center yet/,
       );
 
       await expect(reachOut.or(addOne).or(nobodyToCall).first()).toBeVisible({ timeout: 20_000 });
