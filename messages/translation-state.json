@@ -357,7 +357,7 @@
     "zh-Hant": "machine"
   },
   "Dashboard.emptyBody": {
-    "source": "Check a few students in and this screen fills itself: who has drifted, who is new, and who nobody can reach.",
+    "source": "Attendance insights will appear here once students are checked in.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -487,17 +487,17 @@
     "zh-Hant": "machine"
   },
   "Errors.provisionUnauthenticated": {
-    "source": "Your session ended before we could check the roster. Sign out and sign in again.",
+    "source": "Your session ended. Sign in again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.provisionPermissionDenied": {
-    "source": "Tally refused this account.",
+    "source": "Access denied. Ask an admin to check your account.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Errors.provisionUnavailable": {
-    "source": "Could not reach the service that checks your access. Check the wifi and try again. If it keeps happening, ask an admin.",
+    "source": "Could not verify access. Check your connection or ask an admin.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -911,7 +911,7 @@
     "zh-Hant": "machine"
   },
   "Errors.field.allergyText": {
-    "source": "allergies must be text.",
+    "source": "Allergies must be text.",
     "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Reachable only from a malformed request, not from anything a person can type. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -1021,7 +1021,7 @@
     "zh-Hant": "machine"
   },
   "Roster.staleEmpty": {
-    "source": "Nobody can be shown until the roster source answers. Students already on the roster have not been lost — Tally simply cannot read their names right now.",
+    "source": "Cannot display students until your church directory responds. Check your connection and try again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1186,7 +1186,7 @@
     "zh-Hant": "machine"
   },
   "Auth.slowBody": {
-    "source": "Tally is still trying to restore your session. Check the wifi, then reload — or sign in again to start fresh.",
+    "source": "Restoring your session is taking longer than expected. Check your connection, then reload or sign in again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1216,7 +1216,7 @@
     "zh-Hant": "todo"
   },
   "Auth.roleChangedBody": {
-    "source": "Your role changed just now, so this part of Tally is no longer yours. Checking students in still is. Ask an admin if that was not meant to happen.",
+    "source": "Your role changed and you no longer have access to this page. You can still check students in.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -1301,7 +1301,7 @@
     "zh-Hant": "machine"
   },
   "Auth.notFoundBody": {
-    "source": "Tally lets people in by Google address, and nobody has added this one.",
+    "source": "This Google address has not been added to Tally.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1321,7 +1321,7 @@
     "zh-Hant": "todo"
   },
   "Auth.notFoundHelp": {
-    "source": "Ask the leader who set you up to add this exact address on Tally's Team page — an admin or a core member can do that.",
+    "source": "Ask an admin or core team member to add this address on the Team page.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1431,7 +1431,7 @@
     "zh-Hant": "machine"
   },
   "Login.footer": {
-    "source": "A leader adds you to Tally by your Google address. Sign in with the one they used, and you are in — no password to remember at a door.",
+    "source": "Sign in with the Google address added by your team leader.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1476,7 +1476,7 @@
     "zh-Hant": "todo"
   },
   "Join.confirmBody": {
-    "source": "Tally will know you by this address from now on. If it isn't the one you meant to use, switch now — afterwards only an admin can change it.",
+    "source": "Tally identifies you by this address. Switch now if you need to use a different account.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -1671,7 +1671,7 @@
     "zh-Hant": "machine"
   },
   "FollowUp.recordGone": {
-    "source": "{backend} no longer has a record for {name} — deleted or merged there. Nobody can follow up until that is sorted out.",
+    "source": "{name} is no longer in {backend} — deleted or merged there. Nobody can follow up until that is sorted out.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1951,12 +1951,12 @@
     "zh-Hant": "machine"
   },
   "Release.consequenceMovedOn": {
-    "source": "{name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes the release by itself.",
+    "source": "{name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes this automatically.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Release.consequenceMovedOnUnseen": {
-    "source": "{name} has not been seen at any gathering since {date}. {name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes the release by itself.",
+    "source": "{name} has not been seen at any gathering since {date}. {name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes this automatically.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -1966,7 +1966,7 @@
     "zh-Hant": "machine"
   },
   "OneOff.recapDescription": {
-    "source": "Retreats and trips. Head count on the day — there is nothing to compare it against.",
+    "source": "Attendance count for retreats and special events.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2626,7 +2626,7 @@
     "zh-Hant": "machine"
   },
   "QuickAdd.saveFailed": {
-    "source": "Could not save {name}. Please add them again.",
+    "source": "Could not save {name}. Add them again.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2842,7 +2842,7 @@
     "zh-Hant": "machine"
   },
   "Theme.cardDescription": {
-    "source": "Just for this device — it is not shared with the rest of the team.",
+    "source": "Applies to this device only.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2862,27 +2862,27 @@
     "zh-Hant": "machine"
   },
   "Theme.hintSystem": {
-    "source": "Follows your phone, including when it switches at sunset.",
+    "source": "Matches your device setting.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Theme.hintLight": {
-    "source": "Always light, whatever the device is doing.",
+    "source": "Always light.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Theme.hintDark": {
-    "source": "Always dark. Easier on the eyes in a dim room.",
+    "source": "Always dark.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Theme.hintSystemNowLight": {
-    "source": "Follows your phone, including when it switches at sunset. Right now that is light.",
+    "source": "Matches your device setting (currently light).",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Theme.hintSystemNowDark": {
-    "source": "Follows your phone, including when it switches at sunset. Right now that is dark.",
+    "source": "Matches your device setting (currently dark).",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3238,7 +3238,7 @@
     "zh-Hant": "machine"
   },
   "Backends.pcoQueued": {
-    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Push them from the Not sent yet badge on their roster row.",
+    "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Send them using the Not sent yet badge on their row.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3323,7 +3323,7 @@
     "zh-Hant": "machine"
   },
   "Backends.newStudentsDescription": {
-    "source": "Which system a student created in Tally — a quick-add at the door — is pushed to.",
+    "source": "Where a student created in Tally — a quick-add at the door — is sent.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3338,7 +3338,7 @@
     "zh-Hant": "machine"
   },
   "Backends.queuedGoingTo": {
-    "source": "{count, plural, one {# student is} other {# students are}} queued and will go to {backend} on the next push.",
+    "source": "{count, plural, one {# student is} other {# students are}} queued and will go to {backend} the next time Tally sends changes.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3413,7 +3413,7 @@
     "zh-Hant": "machine"
   },
   "Backends.pcoWriteHintFull": {
-    "source": "Tally creates people, and Edit profile becomes editable for students Planning Center already has — first name, last name, grade and medical notes are saved there. A leader can also add an adult, and the household if there is none. It offers anybody Planning Center already has by that name before creating a second record, and never overwrites a number on file.",
+    "source": "Creates new people and saves profile edits directly to Planning Center, checking for existing matches first.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3458,7 +3458,7 @@
     "zh-Hant": "machine"
   },
   "Backends.a32WriteHintFull": {
-    "source": "Tally creates attendees, and Edit profile becomes editable for students Attendees already has — name, grade, allergies and birthday are saved there. A leader can also add an adult to the family, and fill in their phone or email when Attendees has none.",
+    "source": "Creates new attendees and saves profile edits directly to Attendees.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3543,7 +3543,7 @@
     "zh-Hant": "machine"
   },
   "Team.howBody": {
-    "source": "Tally decides access by Google address. An admin invites somebody here, they sign in with that Google account, and their profile appears beside this — from then on the profile decides what they may do. Some admins are pinned by the deployment itself and cannot be changed here; that is the way back in if access is ever lost. Nobody is ever deleted here: a profile is the attribution on every register that person took, so ending somebody’s access is what removes them, and their row moves under “No longer on the team”.",
+    "source": "Invite team members by Google address. Roles set permissions. Ending someone's access revokes sign-in while preserving past attendance history.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3681,7 +3681,7 @@
     "zh-Hant": "machine"
   },
   "Team.googleAddressHint": {
-    "source": "It has to be the Google account they will actually sign in with — Tally matches on the address. For Gmail addresses, dots and +tags don't matter.",
+    "source": "Must match the Google account they sign in with. For Gmail, dots and +tags are ignored.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3811,7 +3811,7 @@
     "zh-Hant": "todo"
   },
   "Team.linkShownOnce": {
-    "source": "This is the only time Tally can show it. Send it now — if you lose it, make a new one from the row below, which stops the old one working.",
+    "source": "This link is only shown once. Send it now, or generate a new one later.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -3881,12 +3881,12 @@
     "zh-Hant": "todo"
   },
   "Team.qrExplain": {
-    "source": "For the person standing next to you: they point their camera at it. It stops working in ten minutes, which is what makes it safe to hold up.",
+    "source": "Have them scan this code with their camera. Expires in 10 minutes.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
   "Team.qrExplainLink": {
-    "source": "For the person standing next to you: they point their camera at it. It opens the same link, so it lasts exactly as long as the link does.",
+    "source": "Have them scan this code with their camera. Expires with the link.",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
@@ -4321,7 +4321,7 @@
     "zh-Hant": "machine"
   },
   "KioskPair.whatIsKiosk": {
-    "source": "<mono>/kiosk</mono> is a self-serve screen for a device in the lobby, served on this same site: families check themselves in by name, or by the last four digits of a household phone number.",
+    "source": "<mono>/kiosk</mono> is a self-serve check-in screen for lobby tablets, allowing families to check in by name or phone number.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5696,7 +5696,7 @@
     "zh-Hant": "todo"
   },
   "EventDetail.cancelledAdvice": {
-    "source": "If it did go ahead and nobody took attendance, you can still take it now. If it was called off, cancelling the event says so on purpose.",
+    "source": "Take attendance now if this gathering occurred, or cancel the event if it was called off.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5836,7 +5836,7 @@
     "zh-Hant": "machine"
   },
   "DangerZone.hasAttendance": {
-    "source": "{count, plural, one {# student was checked in here.} other {# students were checked in here.}} Deleting this gathering deletes that attendance too, and the dashboard and the predictive roster are built from it. Cancelling keeps it and can be reversed.",
+    "source": "{count, plural, one {# student was checked in here.} other {# students were checked in here.}} Deleting this gathering also deletes that attendance. Cancelling keeps check-in history and can be reversed.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -5861,7 +5861,7 @@
     "zh-Hant": "machine"
   },
   "DangerZone.datesAheadGo": {
-    "source": "The dates ahead go too. They are not saved anywhere — the calendar works them out from the ones it has already held — so once the last one is gone, nothing puts a {title} back on the calendar.",
+    "source": "Future scheduled dates for {title} will also be removed from the calendar.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -6188,7 +6188,7 @@
     "zh-Hant": "machine"
   },
   "Events.notYoursDates": {
-    "source": "Their dates are below; their head counts are not, and nothing in them is yours to open or edit.",
+    "source": "Dates are shown below. Attendance counts and event details are restricted.",
     "context": "Explains what a counselor can see of gatherings they have not been added to.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -7148,19 +7148,19 @@
     "zh-Hant": "machine"
   },
   "KioskBackdrop.guidanceNoWords": {
-    "source": "Photographs, not posters: no words in the image — the kiosk’s own instructions must stay the loudest thing on the glass.",
+    "source": "Use photos without words so kiosk instructions remain easy to read.",
     "context": "Guidance for staff choosing a kiosk background photo.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "KioskBackdrop.guidanceConsent": {
-    "source": "A child’s face on this screen needs their parent’s yes — it stands in a public lobby all morning. Rooms, decorations and seasons work better than people. Use a photo the church owns or took.",
+    "source": "Get parental permission before using photos of children. Photos of rooms or decorations work best.",
     "context": "Guidance about consent and copyright for a kiosk background photo.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "KioskBackdrop.guidanceCrop": {
-    "source": "The kiosk’s own words hold the top of the glass — deepest on a screen stood on end, and never a promise of cover: the wide shelf shows more of the photo than the tall one. The previews show exactly how much of each crop stays clear.",
+    "source": "The top of the photo will be covered by kiosk text. Check the previews below for both orientations.",
     "context": "Explains how much of a background photo the kiosk’s own text will cover.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -7855,7 +7855,7 @@
     "zh-Hant": "todo"
   },
   "SyncStrip.mergedHeading": {
-    "source": "This record was merged into another person",
+    "source": "Merged into another person",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7925,7 +7925,7 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.theSurvivingRecord": {
-    "source": "the surviving record",
+    "source": "the surviving profile",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -7950,7 +7950,7 @@
     "zh-Hant": "machine"
   },
   "SyncStrip.onTheRecordNow": {
-    "source": "On the record now",
+    "source": "On file now",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8099,7 +8099,7 @@
     "zh-Hant": "machine"
   },
   "JobChip.differsTitle": {
-    "source": "It landed on a value nobody typed — somebody changed the same field in your church directory. It will not resolve itself.",
+    "source": "This field was changed in your church directory. Review and resolve the difference.",
     "context": "Tooltip on the conflict chip. \"It will not resolve itself\" is what separates this from waiting and stalled.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -8147,7 +8147,7 @@
     "zh-Hant": "machine"
   },
   "JobChip.orphanedShort": {
-    "source": "No record",
+    "source": "Missing",
     "context": "Chip form: the person no longer exists in the directory. *Short* must fit inside a chip a few characters wide.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -8183,7 +8183,7 @@
     "zh-Hant": "machine"
   },
   "JobChip.stalledTitle": {
-    "source": "Taking longer than it should. It may still land — nothing has failed.",
+    "source": "Taking longer than usual, but still sending.",
     "context": "Tooltip on the stalled chip. \"Nothing has failed\" is the load-bearing half.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -8235,7 +8235,7 @@
     "zh-Hant": "machine"
   },
   "Students.actionsDescription": {
-    "source": "Two ways onto the roster, and the one file that leaves it.",
+    "source": "Add students or export the roster.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8296,7 +8296,7 @@
     "zh-Hant": "machine"
   },
   "Students.rosterErrorBody": {
-    "source": "Nobody has been lost — Tally cannot reach your church directory. The banner above has the details.",
+    "source": "Cannot reach your church directory. See the banner above for details.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8473,7 +8473,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.removeHintUpstream": {
-    "source": "Removing them here leaves their {backend} record alone, and keeps every gathering they attended.",
+    "source": "Removing them here leaves them alone in {backend}, and keeps every gathering they attended.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8523,12 +8523,12 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.recreateNameNote": {
-    "source": "Tally never stored their name — it lived on the deleted record. Enter it to re-create them.",
+    "source": "Tally never stored their name — it lived on the deleted profile. Enter it to re-create them.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.relinkNote": {
-    "source": "If they were merged into another record, this relinks instead of creating a duplicate.",
+    "source": "If they were merged into another profile, this relinks instead of creating a duplicate.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8678,7 +8678,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.pushed": {
-    "source": "Pushed",
+    "source": "Sent",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8713,7 +8713,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.withheld": {
-    "source": "{count, plural, one {{titles} is left out — not a gathering you work. Nothing above counts those nights, so this is a shorter history than somebody on it would see.} other {{titles} are left out — not gatherings you work. Nothing above counts those nights, so this is a shorter history than somebody on them would see.}}",
+    "source": "{count, plural, one {{titles} is not shown because you are not assigned to it.} other {{titles} are not shown because you are not assigned to them.}}",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8879,12 +8879,12 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.recordGoneContact": {
-    "source": "{backend} no longer has a record for {name} — deleted or merged there. Contact details live on that record, so there is nothing to show until it is sorted out below.",
+    "source": "{name} is no longer in {backend}. Contact details live there, so there is nothing to show until resolved.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.recordGoneFrozen": {
-    "source": "{backend} no longer has a record for {name} — deleted or merged there. Check-ins are frozen, past nights included, until this is sorted out: take them off the roster, or put a record back.",
+    "source": "{name} is no longer in {backend}. Check-ins are frozen until this is resolved: remove them from the roster or restore them in {backend}.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8904,7 +8904,7 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.recordMissingBadge": {
-    "source": "{backend} record missing",
+    "source": "Missing from {backend}",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8934,12 +8934,12 @@
     "zh-Hant": "machine"
   },
   "AddStudent.descriptionMulti": {
-    "source": "Search every connected directory at once. Tally records that they are on the roster and nothing else about them.",
+    "source": "Search connected directories to add students to the roster.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "AddStudent.descriptionPco": {
-    "source": "Search your church directory. Tally records that they are on the roster and nothing else about them.",
+    "source": "Search Planning Center to add students to the roster.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -8959,12 +8959,12 @@
     "zh-Hant": "machine"
   },
   "AddStudent.anyoneMulti": {
-    "source": "Anyone in your directories can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.",
+    "source": "Anyone in your directories can be added, regardless of grade.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "AddStudent.anyonePco": {
-    "source": "Anyone in Planning Center can be added, whatever their grade says. The roster is yours — the 5th grader who comes with a sibling belongs on it if you say so.",
+    "source": "Anyone in Planning Center can be added, regardless of grade.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9010,7 +9010,7 @@
     "zh-Hant": "machine"
   },
   "AddStudent.importOnceNote": {
-    "source": "Import a list, once. Everyone on it today joins the roster; nothing stays linked, so a rule change upstream will not quietly add or drop a student later.",
+    "source": "Imports current members once. Future changes in Planning Center will not alter this roster.",
     "context": "Explains that a list import is a one-time copy, not a standing connection.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9236,7 +9236,7 @@
     "zh-Hant": "machine"
   },
   "RowBadge.pushing": {
-    "source": "Pushing…",
+    "source": "Sending…",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9276,7 +9276,7 @@
     "zh-Hant": "machine"
   },
   "RowBadge.noRecordYet": {
-    "source": "{name} does not exist in {backend} yet, so there is nowhere to put one until their push lands.",
+    "source": "{name} does not exist in {backend} yet. Send them first.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9421,12 +9421,12 @@
     "zh-Hant": "machine"
   },
   "StudentEditor.writableNote": {
-    "source": "Name, grade, birthday and allergies are {backend}'s, and Save writes them there — Tally keeps no copy.",
+    "source": "Name, grade, birthday and allergies are saved directly to {backend}.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentEditor.readOnlyNote": {
-    "source": "Name, grade, birthday, allergies and status come from {backend} and would be overwritten by the next sync.",
+    "source": "Details come from {backend} and cannot be edited here.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9621,7 +9621,7 @@
     "zh-Hant": "machine"
   },
   "ParentContact.noneOfOurOwn": {
-    "source": "Tally holds no contact details of its own. Once this student reaches {backend}, their contact details are added there.",
+    "source": "Contact details are saved in {backend} once this student is added there.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9681,7 +9681,7 @@
     "zh-Hant": "machine"
   },
   "EarlierAttendance.sourceNote": {
-    "source": "Read from this student’s own check-in records, so it reaches back as far as Tally has them — further than the year the screens above keep loaded. Only nights they were here; nothing is claimed about the ones in between.",
+    "source": "Complete check-in history for this student, showing every gathering they attended.",
     "context": "Explains where this longer history comes from and what it does not claim.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9758,7 +9758,7 @@
     "zh-Hant": "machine"
   },
   "Review.intro": {
-    "source": "Two doors, one queue: families who put themselves on the roster at the lobby kiosk, and contacts a counselor was given beside a visitor they quick-added. Everybody named here is on the roster and was checked in — no adult has gone into the church’s database yet. Soonest to be cleared first.",
+    "source": "Review new families and door check-ins before saving them to your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -9983,7 +9983,7 @@
     "zh-Hant": "machine"
   },
   "Review.counselorQueued": {
-    "source": "A counselor added {names} at the door and was given an adult’s details. {names} is already on the roster and already queued for the church’s database — the adult below is the only thing waiting on you.",
+    "source": "{names} is checked in. Review the adult's contact details below to save them to your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -10253,17 +10253,17 @@
     "zh-Hant": "machine"
   },
   "Review.discardAdultConfirm": {
-    "source": "Forgets {number} for good — it is the only copy. {names} stays on the roster exactly as they are, and nobody is added to the church’s database.",
+    "source": "Deletes {number}. {names} stays on the roster, and nothing is added to your church directory.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Review.discardChildrenConfirm": {
-    "source": "Takes {names} off the roster for good. Their check-in history is kept, and only a new registration at the kiosk brings them back.",
+    "source": "Removes {names} from the roster. Check-in history is kept.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Review.discardChildrenConfirmWithPhone": {
-    "source": "Takes {names} off the roster and forgets {number} for good. Their check-in history is kept, and only a new registration at the kiosk brings them back.",
+    "source": "Removes {names} from the roster and deletes {number}. Check-in history is kept.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -11568,7 +11568,7 @@
     "zh-Hant": "machine"
   },
   "Printer.selectionCancelled": {
-    "source": "Nothing was picked from the browser’s list. Press Connect this printer again and choose the QL — if it is not listed, check it is plugged into this tablet and switched on.",
+    "source": "No printer selected. Choose the QL, or make sure it is plugged in and switched on.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -11593,7 +11593,7 @@
     "zh-Hant": "machine"
   },
   "Printer.pickTheRoll": {
-    "source": "Look at the roll in the printer and pick it below, then print a test label — it should come out the full width with nothing cut off — and go back and set the kiosk.",
+    "source": "Choose the loaded roll below and print a test label to confirm.",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
