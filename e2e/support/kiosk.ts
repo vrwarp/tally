@@ -76,10 +76,27 @@ export async function hold(
   target: string | Locator,
 ): Promise<void> {
   const locator = typeof target === 'string' ? page.locator(target) : target;
+  /*
+   * Scrolled to first, because the press below is raw coordinates.
+   *
+   * `page.mouse` goes where it is told. Playwright's own `click()` scrolls the
+   * element up first and this does not, so a row sitting half out of the
+   * chooser's scrolling list gave a box whose centre was under the list's
+   * bottom edge — on the printer panel in the foot, which is a different
+   * control on a different part of the glass. The press landed there, the row
+   * was never held, and the only thing that noticed was the pixel check below,
+   * which reported the progress bar as invisible: a true statement about those
+   * pixels and a false accusation against the button.
+   *
+   * A volunteer scrolls the row into view before holding it. So does this.
+   */
+  await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   if (!box) throw new Error(`Cannot hold ${String(target)} — it has no box on screen.`);
 
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await expectPointIsOn(locator, at);
+  await page.mouse.move(at.x, at.y);
   await page.mouse.down();
   // The grace first, and then half the count — the bar has not started drawing
   // until the grace is spent, so a sample taken across it would be sampling an
@@ -88,6 +105,32 @@ export async function hold(
   await expectProgressShows(page, box);
   await page.waitForTimeout(HOLD_MS / 2 + HOLD_SLACK_MS);
   await page.mouse.up();
+}
+
+/**
+ * The point about to be pressed really is on the thing being held.
+ *
+ * Cheap, and it buys back the difference between "this control does not draw
+ * its progress" and "you pressed the wrong pixels". The first is a bug worth a
+ * morning; the second is this helper's own aim, and telling them apart from a
+ * screenshot of a dark panel is not something anybody should have to do twice.
+ */
+async function expectPointIsOn(
+  locator: Locator,
+  at: { x: number; y: number },
+): Promise<void> {
+  const onTarget = await locator.evaluate(
+    (node, point) => {
+      const hit = node.ownerDocument.elementFromPoint(point.x, point.y);
+      return hit !== null && (node === hit || node.contains(hit));
+    },
+    at,
+  );
+
+  expect(
+    onTarget,
+    `the press at ${Math.round(at.x)},${Math.round(at.y)} does not land on the control being held`,
+  ).toBe(true);
 }
 
 /**
