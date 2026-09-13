@@ -48,9 +48,9 @@ describe('a fortnight-long link', () => {
     await user.click(screen.getByRole('button', { name: 'Show QR' }));
 
     expect(await screen.findByRole('img')).toBeInTheDocument();
-    expect(screen.getByText(/lasts exactly as long as the link does/)).toBeInTheDocument();
+    expect(screen.getByText(/Expires with the link/)).toBeInTheDocument();
     // The ten-minute promise belongs to the other lifetime and to nothing else.
-    expect(screen.queryByText(/ten minutes/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/10 minutes/)).not.toBeInTheDocument();
   });
 });
 
@@ -64,7 +64,7 @@ describe('a ten-minute code', () => {
     );
 
     expect(await screen.findByRole('img')).toBeInTheDocument();
-    expect(screen.getByText(/It stops working in ten minutes/)).toBeInTheDocument();
+    expect(screen.getByText(/Expires in 10 minutes/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hide QR' })).toBeInTheDocument();
   });
 });

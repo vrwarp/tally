@@ -99,7 +99,7 @@ describe('FollowUpActions', () => {
 
     mount(inPlanningCenter());
 
-    expect(await screen.findByText(/no longer has a record for Iris Chen/)).toBeInTheDocument();
+    expect(await screen.findByText(/Iris Chen is no longer in Planning Center/)).toBeInTheDocument();
     // The state this replaced: a button offering to do what has already been done.
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });

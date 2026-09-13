@@ -350,6 +350,6 @@ describe('the birthday badge', () => {
     personDetails.current = null;
     openBadge(makeStudent({ id: 'tally-1', pcoPersonId: null, birthday: null }));
 
-    expect(screen.getByText(/nowhere to put one/)).toBeInTheDocument();
+    expect(screen.getByText(/Send them first/)).toBeInTheDocument();
   });
 });

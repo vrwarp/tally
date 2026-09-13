@@ -242,14 +242,15 @@ describe('a gathering the reader is not on', () => {
     // By name — "some of this is missing" leaves a leader guessing at how much.
     // The series title, not the occurrence's own, so it reads the same here as
     // in the gathering headers below it.
-    expect(screen.getByText(/Sunday School is left out/)).toBeInTheDocument();
-    expect(screen.getByText(/Nothing above counts those nights/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Sunday School is not shown because you are not assigned to it/),
+    ).toBeInTheDocument();
   });
 
   it('says nothing at all when the whole history was theirs to see', () => {
     openProfile(linked(), { events: [friday, sunday], series } as Partial<DataContextValue>);
 
-    expect(screen.queryByText(/left out/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not shown/)).not.toBeInTheDocument();
   });
 });
 

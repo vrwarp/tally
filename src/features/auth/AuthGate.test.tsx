@@ -94,10 +94,10 @@ describe('AuthGate — not on the team', () => {
       await screen.findByRole('heading', { name: "This address isn't on the team yet" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Tally lets people in by Google address, and nobody has added this one.'),
+      screen.getByText('This Google address has not been added to Tally.'),
     ).toBeInTheDocument();
     expect(screen.getByText('jo.smith@gmail.com')).toBeInTheDocument();
-    expect(screen.getByText(/add this exact address on Tally's Team page/)).toBeInTheDocument();
+    expect(screen.getByText(/add this address on the Team page/)).toBeInTheDocument();
     expect(screen.getByText(/open that link instead of signing in here/)).toBeInTheDocument();
     expect(screen.getByText(/addresses pinned when Tally was set up always can/)).toBeInTheDocument();
 
@@ -309,7 +309,7 @@ describe('a screen that stops being yours while you are on it', () => {
     );
 
     expect(screen.getByText('This was open to you a minute ago')).toBeInTheDocument();
-    expect(screen.getByText(/Your role changed just now/)).toBeInTheDocument();
+    expect(screen.getByText(/Your role changed and you no longer have access/)).toBeInTheDocument();
     expect(screen.queryByText('Core team only')).not.toBeInTheDocument();
   });
 });

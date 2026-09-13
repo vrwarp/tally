@@ -109,7 +109,7 @@ describe('RosterErrorBanner', () => {
     const { wrap } = harness({ rosterError: FAILURE });
     render(wrap(<RosterErrorBanner />));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/have not been lost/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/cannot display students/i);
   });
 
   it('warns that names already on screen came from this device', () => {

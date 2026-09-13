@@ -530,7 +530,7 @@ test.describe('an edit on its way to Planning Center', () => {
 
     const merged = await pump(studentId, ['merged'], 60_000);
     expect(merged.data.survivorPersonId).toBe(survivorId);
-    await expect(strip(page)).toContainText('merged into another person');
+    await expect(strip(page)).toContainText('Merged into another person');
   });
 
   /**

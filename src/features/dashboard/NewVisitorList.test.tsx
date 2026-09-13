@@ -173,7 +173,7 @@ describe('NewVisitorList', () => {
       screen.queryByRole('button', { name: 'Add a contact for Janet Lee' }),
     ).not.toBeInTheDocument();
     // It falls through to the lookup instead, which speaks for itself.
-    expect(await screen.findByText(/Planning Center no longer has a record/)).toBeInTheDocument();
+    expect(await screen.findByText(/Janet Lee is no longer in Planning Center/)).toBeInTheDocument();
   });
 
   it('follows Planning Center once a quick-add has been pushed', async () => {
