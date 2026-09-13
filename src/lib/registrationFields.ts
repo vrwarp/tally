@@ -104,7 +104,7 @@ export const FIELD_MESSAGES: Record<FieldCode, string> = {
   'field.phoneRequired': 'A phone number is required.',
   'field.phoneDigits': 'Enter a 10-digit phone number.',
   'field.phoneShape': 'That does not look like a phone number.',
-  'field.allergyText': 'allergies must be text.',
+  'field.allergyText': 'Allergies must be text.',
   'field.allergyTooLong': 'That allergy note is too long.',
 };
 

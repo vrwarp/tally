@@ -98,7 +98,7 @@ describe('EarlierAttendance', () => {
 
     // A sparse list must not read as a patchy attender. An absence is a fact
     // about the gathering's calendar, and this list has not established one.
-    expect(screen.getByText(/nothing is claimed about the ones in between/i)).toBeInTheDocument();
+    expect(screen.getByText(/Complete check-in history for this student/i)).toBeInTheDocument();
   });
 
   /*

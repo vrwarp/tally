@@ -55,8 +55,7 @@ describe('ThemeCard', () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    // `system` is a real answer, so it says what the device is doing right now.
-    expect(screen.getByText(/Right now that is dark/)).toBeInTheDocument();
+    expect(screen.getByText(/currently dark/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: /^light$/i }));
 
@@ -64,7 +63,7 @@ describe('ThemeCard', () => {
       'aria-checked',
       'true',
     );
-    expect(screen.getByText(/Always light, whatever the device is doing/)).toBeInTheDocument();
+    expect(screen.getByText(/Always light\./)).toBeInTheDocument();
   });
 
   it('caps the control and puts the explainer beside it above lg', () => {

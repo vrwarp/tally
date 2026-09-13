@@ -253,8 +253,8 @@ test.describe('reviewing a family the kiosk recorded', () => {
       // Two presses, because the number goes and the students come off the
       // roster — the sentence comes before the second one.
       await card.getByRole('button', { name: /Not ours/i }).click();
-      // The sentence names the number it forgets rather than referring to it.
-      await expect(card.getByText(/forgets \(555\) 016-3311 for good/i)).toBeVisible();
+      // The sentence names the number it deletes rather than referring to it.
+      await expect(card.getByText(/deletes \(555\) 016-3311/i)).toBeVisible();
       await card.getByRole('button', { name: /Yes, take them off/i }).click();
 
       // This card, not the whole queue — see the note in the test above.
