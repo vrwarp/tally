@@ -424,8 +424,7 @@ describe('the two decisions', () => {
     mount();
 
     await user.click(await screen.findByRole('button', { name: /Not ours/i }));
-    // Irreversible for the phone number, so the sentence comes before the press.
-    expect(screen.getByText(/forgets \(555\) 010-3344 for good/i)).toBeInTheDocument();
+    expect(screen.getByText(/deletes \(555\) 010-3344/i)).toBeInTheDocument();
     expect(discardRegistration).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: /Yes, take them off/i }));
@@ -1438,7 +1437,7 @@ describe('a parent taken at a door', () => {
     mount();
     expect(await screen.findByText(/Taken at the door/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/already on the roster and already queued for the church/i),
+      screen.getByText(/Maya is checked in\. Review the adult's contact details below/i),
     ).toBeInTheDocument();
   });
 

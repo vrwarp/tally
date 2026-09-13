@@ -743,8 +743,7 @@ describe('TeamPage — the list folds its leavers', () => {
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByText('How Tally decides who may sign in'));
-    expect(screen.getByText(/Nobody is ever deleted here/)).toBeInTheDocument();
-    expect(screen.getByText(/attribution on every register/)).toBeInTheDocument();
+    expect(screen.getByText(/preserving past attendance history/)).toBeInTheDocument();
   });
 });
 

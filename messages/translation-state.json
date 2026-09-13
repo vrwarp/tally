@@ -358,8 +358,8 @@
   },
   "Dashboard.emptyBody": {
     "source": "Attendance insights will appear here once students are checked in.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Dashboard.tileLastGathering": {
     "source": "Last gathering",
@@ -488,18 +488,18 @@
   },
   "Errors.provisionUnauthenticated": {
     "source": "Your session ended. Sign in again.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.provisionPermissionDenied": {
     "source": "Access denied. Ask an admin to check your account.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.provisionUnavailable": {
     "source": "Could not verify access. Check your connection or ask an admin.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.provisionUnknown": {
     "source": "Could not check your access. Try again.",
@@ -913,8 +913,8 @@
   "Errors.field.allergyText": {
     "source": "Allergies must be text.",
     "context": "Validation message painted directly under the allergies box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Reachable only from a malformed request, not from anything a person can type. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.field.allergyTooLong": {
     "source": "That allergy note is too long.",
@@ -1022,8 +1022,8 @@
   },
   "Roster.staleEmpty": {
     "source": "Cannot display students until your church directory responds. Check your connection and try again.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Pco.emptyBody": {
     "source": "Planning Center sent an empty body.",
@@ -1187,8 +1187,8 @@
   },
   "Auth.slowBody": {
     "source": "Restoring your session is taking longer than expected. Check your connection, then reload or sign in again.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Auth.reload": {
     "source": "Reload",
@@ -1217,8 +1217,8 @@
   },
   "Auth.roleChangedBody": {
     "source": "Your role changed and you no longer have access to this page. You can still check students in.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Auth.backToCheckIn": {
     "source": "Back to check-in",
@@ -1302,8 +1302,8 @@
   },
   "Auth.notFoundBody": {
     "source": "This Google address has not been added to Tally.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Auth.signedInAs": {
     "source": "Signed in as",
@@ -1322,8 +1322,8 @@
   },
   "Auth.notFoundHelp": {
     "source": "Ask an admin or core team member to add this address on the Team page.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Auth.notFoundLinkHint": {
     "source": "If a leader sent you a link, open that link instead of signing in here.",
@@ -1432,8 +1432,8 @@
   },
   "Login.footer": {
     "source": "Sign in with the Google address added by your team leader.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Join.reading": {
     "source": "Opening your invitation…",
@@ -1477,8 +1477,8 @@
   },
   "Join.confirmBody": {
     "source": "Tally identifies you by this address. Switch now if you need to use a different account.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Join.join": {
     "source": "Join",
@@ -1672,8 +1672,8 @@
   },
   "FollowUp.recordGone": {
     "source": "{name} is no longer in {backend} — deleted or merged there. Nobody can follow up until that is sorted out.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Transitions.reasonMovedOn": {
     "source": "Moved on within the ministry",
@@ -1952,13 +1952,13 @@
   },
   "Release.consequenceMovedOn": {
     "source": "{name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes this automatically.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Release.consequenceMovedOnUnseen": {
     "source": "{name} has not been seen at any gathering since {date}. {name} leaves this list now and stays on the ministry's radar: if no gathering sees them, they will appear under “Not seen at any gathering” after about {threshold} more gatherings. Checking them in here again undoes this automatically.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "OneOff.recapTitle": {
     "source": "One-off events",
@@ -1967,8 +1967,8 @@
   },
   "OneOff.recapDescription": {
     "source": "Attendance count for retreats and special events.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "OneOff.recapEmptyTitle": {
     "source": "No one-off events recently.",
@@ -2627,8 +2627,8 @@
   },
   "QuickAdd.saveFailed": {
     "source": "Could not save {name}. Add them again.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "QuickAdd.contactFailed": {
     "source": "{name} is checked in and counted. The adult’s details did not save — give the number to the core team instead.",
@@ -2843,8 +2843,8 @@
   },
   "Theme.cardDescription": {
     "source": "Applies to this device only.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Theme.labelSystem": {
     "source": "Match device",
@@ -2863,28 +2863,28 @@
   },
   "Theme.hintSystem": {
     "source": "Matches your device setting.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Theme.hintLight": {
     "source": "Always light.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Theme.hintDark": {
     "source": "Always dark.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Theme.hintSystemNowLight": {
     "source": "Matches your device setting (currently light).",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Theme.hintSystemNowDark": {
     "source": "Matches your device setting (currently dark).",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Settings.loading": {
     "source": "Loading settings…",
@@ -3239,8 +3239,8 @@
   },
   "Backends.pcoQueued": {
     "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet. Send them using the Not sent yet badge on their row.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Backends.pcoRosterOffline": {
     "source": "This device is showing a roster it saved earlier. Check-in still works; anyone added since will not appear until Planning Center is reachable again.",
@@ -3324,8 +3324,8 @@
   },
   "Backends.newStudentsDescription": {
     "source": "Where a student created in Tally — a quick-add at the door — is sent.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Backends.defaultChanged": {
     "source": "New students now go to {backend}",
@@ -3339,8 +3339,8 @@
   },
   "Backends.queuedGoingTo": {
     "source": "{count, plural, one {# student is} other {# students are}} queued and will go to {backend} the next time Tally sends changes.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Backends.notMoved": {
     "source": "Students already matched to a directory are not moved by this — it decides only where a brand-new student is created.",
@@ -3414,8 +3414,8 @@
   },
   "Backends.pcoWriteHintFull": {
     "source": "Creates new people and saves profile edits directly to Planning Center, checking for existing matches first.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Backends.cacheLabel": {
     "source": "Reuse an answer for (seconds)",
@@ -3459,8 +3459,8 @@
   },
   "Backends.a32WriteHintFull": {
     "source": "Creates new attendees and saves profile edits directly to Attendees.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Backends.a32ConnectedHint": {
     "source": "Attendees serves the roster alongside any other connected directory.",
@@ -3544,8 +3544,8 @@
   },
   "Team.howBody": {
     "source": "Invite team members by Google address. Roles set permissions. Ending someone's access revokes sign-in while preserving past attendance history.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Team.roleCounselor": {
     "source": "Counselor",
@@ -3682,8 +3682,8 @@
   },
   "Team.googleAddressHint": {
     "source": "Must match the Google account they sign in with. For Gmail, dots and +tags are ignored.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Team.loadingInvitations": {
     "source": "Loading invitations",
@@ -3812,8 +3812,8 @@
   },
   "Team.linkShownOnce": {
     "source": "This link is only shown once. Send it now, or generate a new one later.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Team.linkFieldLabel": {
     "source": "Invitation link",
@@ -3882,13 +3882,13 @@
   },
   "Team.qrExplain": {
     "source": "Have them scan this code with their camera. Expires in 10 minutes.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Team.qrExplainLink": {
     "source": "Have them scan this code with their camera. Expires with the link.",
-    "zh-Hans": "todo",
-    "zh-Hant": "todo"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Team.linkLifeQr": {
     "source": "Stops working {when}.",
@@ -4322,8 +4322,8 @@
   },
   "KioskPair.whatIsKiosk": {
     "source": "<mono>/kiosk</mono> is a self-serve check-in screen for lobby tablets, allowing families to check in by name or phone number.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "KioskPair.retire": {
     "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
@@ -5697,8 +5697,8 @@
   },
   "EventDetail.cancelledAdvice": {
     "source": "Take attendance now if this gathering occurred, or cancel the event if it was called off.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "EventDetail.formerStudent": {
     "source": "Former student",
@@ -5837,8 +5837,8 @@
   },
   "DangerZone.hasAttendance": {
     "source": "{count, plural, one {# student was checked in here.} other {# students were checked in here.}} Deleting this gathering also deletes that attendance. Cancelling keeps check-in history and can be reversed.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "DangerZone.deleteWithCheckIns": {
     "source": "Delete this gathering and its check-ins",
@@ -5862,8 +5862,8 @@
   },
   "DangerZone.datesAheadGo": {
     "source": "Future scheduled dates for {title} will also be removed from the calendar.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "DangerZone.cannotBeUndone": {
     "source": "This cannot be undone.",
@@ -6190,8 +6190,8 @@
   "Events.notYoursDates": {
     "source": "Dates are shown below. Attendance counts and event details are restricted.",
     "context": "Explains what a counselor can see of gatherings they have not been added to.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Events.export": {
     "source": "Export",
@@ -7150,20 +7150,20 @@
   "KioskBackdrop.guidanceNoWords": {
     "source": "Use photos without words so kiosk instructions remain easy to read.",
     "context": "Guidance for staff choosing a kiosk background photo.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "KioskBackdrop.guidanceConsent": {
     "source": "Get parental permission before using photos of children. Photos of rooms or decorations work best.",
     "context": "Guidance about consent and copyright for a kiosk background photo.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "KioskBackdrop.guidanceCrop": {
     "source": "The top of the photo will be covered by kiosk text. Check the previews below for both orientations.",
     "context": "Explains how much of a background photo the kiosk’s own text will cover.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "KioskBackdrop.fieldHint": {
     "source": "Behind the kiosk’s idle screen while it is bound to this gathering, and gone the moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.",
@@ -7856,8 +7856,8 @@
   },
   "SyncStrip.mergedHeading": {
     "source": "Merged into another person",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "SyncStrip.mergedBody": {
     "source": "Your correction followed the merge and landed on the survivor, not here. This page now reads from them, and the ids below are what moved.",
@@ -7926,8 +7926,8 @@
   },
   "SyncStrip.theSurvivingRecord": {
     "source": "the surviving profile",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "SyncStrip.theSurvivor": {
     "source": "the survivor",
@@ -7951,8 +7951,8 @@
   },
   "SyncStrip.onTheRecordNow": {
     "source": "On file now",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "SyncStrip.inBackend": {
     "source": "in {backend}",
@@ -8101,8 +8101,8 @@
   "JobChip.differsTitle": {
     "source": "This field was changed in your church directory. Review and resolve the difference.",
     "context": "Tooltip on the conflict chip. \"It will not resolve itself\" is what separates this from waiting and stalled.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "JobChip.mergedLong": {
     "source": "Merged in the directory",
@@ -8149,8 +8149,8 @@
   "JobChip.orphanedShort": {
     "source": "Missing",
     "context": "Chip form: the person no longer exists in the directory. *Short* must fit inside a chip a few characters wide.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "JobChip.orphanedTitle": {
     "source": "The person this edit names no longer exists in your church directory.",
@@ -8185,8 +8185,8 @@
   "JobChip.stalledTitle": {
     "source": "Taking longer than usual, but still sending.",
     "context": "Tooltip on the stalled chip. \"Nothing has failed\" is the load-bearing half.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "JobChip.withAge": {
     "source": "{words} · {age}",
@@ -8236,8 +8236,8 @@
   },
   "Students.actionsDescription": {
     "source": "Add students or export the roster.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Students.exportBlockedLoading": {
     "source": "Still reading the roster — nothing to export yet.",
@@ -8297,8 +8297,8 @@
   },
   "Students.rosterErrorBody": {
     "source": "Cannot reach your church directory. See the banner above for details.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Students.emptyFilteredTitle": {
     "source": "Nobody matches those filters.",
@@ -8474,8 +8474,8 @@
   },
   "StudentDetail.removeHintUpstream": {
     "source": "Removing them here leaves them alone in {backend}, and keeps every gathering they attended.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.theContactOnFile": {
     "source": "the contact on file",
@@ -8524,13 +8524,13 @@
   },
   "StudentDetail.recreateNameNote": {
     "source": "Tally never stored their name — it lived on the deleted profile. Enter it to re-create them.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.relinkNote": {
     "source": "If they were merged into another profile, this relinks instead of creating a duplicate.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.openTheirProfile": {
     "source": "Open their profile",
@@ -8679,8 +8679,8 @@
   },
   "StudentDetail.pushed": {
     "source": "Sent",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.streakNotSeenAny": {
     "source": "not seen at any gathering",
@@ -8714,8 +8714,8 @@
   },
   "StudentDetail.withheld": {
     "source": "{count, plural, one {{titles} is not shown because you are not assigned to it.} other {{titles} are not shown because you are not assigned to them.}}",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.noGatheringsTitle": {
     "source": "No gatherings on record yet.",
@@ -8880,13 +8880,13 @@
   },
   "StudentDetail.recordGoneContact": {
     "source": "{name} is no longer in {backend}. Contact details live there, so there is nothing to show until resolved.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.recordGoneFrozen": {
     "source": "{name} is no longer in {backend}. Check-ins are frozen until this is resolved: remove them from the roster or restore them in {backend}.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.readFrom": {
     "source": "Read from {backend}.",
@@ -8905,8 +8905,8 @@
   },
   "StudentDetail.recordMissingBadge": {
     "source": "Missing from {backend}",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentDetail.visitorBadge": {
     "source": "Visitor",
@@ -8935,13 +8935,13 @@
   },
   "AddStudent.descriptionMulti": {
     "source": "Search connected directories to add students to the roster.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "AddStudent.descriptionPco": {
     "source": "Search Planning Center to add students to the roster.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "AddStudent.searchLabelMulti": {
     "source": "Search your directories",
@@ -8960,13 +8960,13 @@
   },
   "AddStudent.anyoneMulti": {
     "source": "Anyone in your directories can be added, regardless of grade.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "AddStudent.anyonePco": {
     "source": "Anyone in Planning Center can be added, regardless of grade.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "AddStudent.noMatchMulti": {
     "source": "Nobody matches “{query}”.",
@@ -9012,8 +9012,8 @@
   "AddStudent.importOnceNote": {
     "source": "Imports current members once. Future changes in Planning Center will not alter this roster.",
     "context": "Explains that a list import is a one-time copy, not a standing connection.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "AddStudent.noLists": {
     "source": "Planning Center returned no lists.",
@@ -9237,8 +9237,8 @@
   },
   "RowBadge.pushing": {
     "source": "Sending…",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "RowBadge.pushNow": {
     "source": "Send now",
@@ -9277,8 +9277,8 @@
   },
   "RowBadge.noRecordYet": {
     "source": "{name} does not exist in {backend} yet. Send them first.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentEditor.titleEdit": {
     "source": "Edit {name}",
@@ -9422,13 +9422,13 @@
   },
   "StudentEditor.writableNote": {
     "source": "Name, grade, birthday and allergies are saved directly to {backend}.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentEditor.readOnlyNote": {
     "source": "Details come from {backend} and cannot be edited here.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentEditor.openIn": {
     "source": "Open in {backend}",
@@ -9622,8 +9622,8 @@
   },
   "ParentContact.noneOfOurOwn": {
     "source": "Contact details are saved in {backend} once this student is added there.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "ParentContact.saveTo": {
     "source": "Save to {backend}",
@@ -9683,8 +9683,8 @@
   "EarlierAttendance.sourceNote": {
     "source": "Complete check-in history for this student, showing every gathering they attended.",
     "context": "Explains where this longer history comes from and what it does not claim.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "EarlierAttendance.unknownGathering": {
     "source": "A gathering no longer on record",
@@ -9759,8 +9759,8 @@
   },
   "Review.intro": {
     "source": "Review new families and door check-ins before saving them to your church directory.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.loadFailed": {
     "source": "Could not read the registrations waiting for review.",
@@ -9984,8 +9984,8 @@
   },
   "Review.counselorQueued": {
     "source": "{names} is checked in. Review the adult's contact details below to save them to your church directory.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.counselorOnRoster": {
     "source": "A counselor added {names} at the door and was given an adult’s details. {names} is on the roster — the adult below is the only thing waiting on you.",
@@ -10254,18 +10254,18 @@
   },
   "Review.discardAdultConfirm": {
     "source": "Deletes {number}. {names} stays on the roster, and nothing is added to your church directory.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.discardChildrenConfirm": {
     "source": "Removes {names} from the roster. Check-in history is kept.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.discardChildrenConfirmWithPhone": {
     "source": "Removes {names} from the roster and deletes {number}. Check-in history is kept.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.yesForgetNumber": {
     "source": "Yes, forget the number",
@@ -11569,8 +11569,8 @@
   },
   "Printer.selectionCancelled": {
     "source": "No printer selected. Choose the QL, or make sure it is plugged in and switched on.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Printer.stillOnPrinter": {
     "source": "Nothing was picked from the browser’s list — this kiosk is still on the {model}.",
@@ -11594,8 +11594,8 @@
   },
   "Printer.pickTheRoll": {
     "source": "Choose the loaded roll below and print a test label to confirm.",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Printer.rollPicked": {
     "source": "Print a test label — it should come out the full width with nothing cut off — then go back and set the kiosk.",

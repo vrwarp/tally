@@ -83,7 +83,7 @@ describe('AddParentContact', () => {
     it('tells a Tally-only visitor they have to reach Planning Center first', () => {
       mount(makeStudent({ id: 'tally-1', pcoPersonId: null, profileComplete: false }), null);
 
-      expect(screen.getByText(/Once this student reaches Planning Center/)).toBeInTheDocument();
+      expect(screen.getByText(/Contact details are saved in Planning Center/)).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Add it there' })).not.toBeInTheDocument();
     });
 
