@@ -490,7 +490,7 @@ test.describe('the edit queue, photographed', () => {
     });
     await takeEditLease(aisha);
     await openProfile(page, aisha);
-    await expect(strip(page)).toContainText('Taking longer than usual');
+    await expect(strip(page)).toContainText('Taking longer than it should');
     await capture(page, {
       journey: 'When the far end is busy',
       state: 'Taking longer',

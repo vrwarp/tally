@@ -781,9 +781,9 @@ test.describe('an edit on its way to Planning Center', () => {
     await takeEditLease(studentId);
 
     await openProfile(page, studentId);
-    await expect(strip(page)).toContainText('Taking longer than usual');
+    await expect(strip(page)).toContainText('Taking longer than it should');
     // It must never read as a failure: nothing has failed, and it may still land.
-    await expect(strip(page)).toContainText('still sending');
+    await expect(strip(page)).toContainText('may still land');
 
     await releaseEditLease(studentId);
   });
