@@ -507,11 +507,15 @@ function NoMatchPanel({
 }) {
   const t = useTranslations('Search');
   return (
-    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
+    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-xl tall:justify-end tall:gap-4 lg:max-w-2xl">
       {/* Its own measure, wider than the doors under it, and balanced:
           inheriting the button column broke the sentence inside its own
-          phrase on a phone. */}
-      <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
+          phrase on a phone. On a tablet stood on end the whole panel takes
+          the sign's measure rather than the old doors' column: the register
+          door carries its question now, and at 448px it broke "Register your
+          child" across two lines — in English, and in every other language
+          a little sooner. */}
+      <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-xl kiosk:text-4xl">
         {refresh === 'done' ? (
           /*
            * "Still" is the one word that carries the whole answer after the
@@ -530,7 +534,7 @@ function NoMatchPanel({
           t('noMatch')
         )}
       </div>
-      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-ink-100 tall:max-w-md kiosk:text-2xl">
+      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-ink-100 tall:max-w-xl kiosk:text-2xl">
         {t(mode === 'phone' ? 'afterPhoneMiss' : 'afterNameMiss')}
         {mode !== 'phone' && <DigitsCue />}
       </div>
