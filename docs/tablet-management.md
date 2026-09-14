@@ -82,6 +82,13 @@ So the cheerful version — "the church enables the API in their Firebase projec
 tablets" — does not exist. Every deployment of Tally would have to file a business justification
 for a management product it is not selling, and wait, before a single tablet enrols.
 
+**This is recent, which is why the internet disagrees.** Until reportedly 29 October 2025 a new
+project got 500 devices by default and nobody was asked anything; the quota existed only as a
+ceiling. Every blog post, Stack Overflow answer and AI-written brief describing "stand up a Cloud
+project, enable the API, enrol your fleet, it's free" was true when it was written. What changed is
+the *default*, from 500 to 0, so the gate moved from the 501st device to the first. Anything on this
+subject that does not mention requesting quota is describing the old world.
+
 ### 2.3 The blast radius is wrong for this codebase
 
 Tally's most-repeated design decision is that it holds as little as it can get away with. It keeps
@@ -492,16 +499,23 @@ tiering and the physical constraints in §5 come from it and are good. Two thing
 ways that would cost a weekend, and they are recorded here because the brief is the kind of document
 that gets forwarded:
 
-- **"AMAPI … includes a default project quota supporting 500 to 1,000 enrolled endpoints."** It does
-  not. [Google's own page](https://developers.google.com/android/management/permissible-usage) puts
-  the default at **zero devices**; *up to* 500 requires "a full business justification" and a review
-  measured in weeks. The brief presents AMAPI-direct as the free, self-serve option for larger
-  fleets. It is neither free of process nor self-serve, and a church that follows its Methodology 2
-  will get through the whole `curl` sequence and then fail to enrol a single tablet.
+- **"AMAPI … includes a default project quota supporting 500 to 1,000 enrolled endpoints."** True
+  until reportedly 29 October 2025, and not since: the default is now **zero**, and *up to* 500
+  requires "a full business justification" and a review measured in weeks
+  ([Permissible Usage](https://developers.google.com/android/management/permissible-usage)). The
+  brief is not making this up — it is describing the regime that ended, which is what most writing
+  on the subject still describes. The consequence is the same either way: a church that follows its
+  Methodology 2 gets cleanly through the whole `curl` sequence, mints an enrolment token, scans the
+  QR, and enrols nothing.
 - **The brief does not mention Permissible Usage at all**, and its Methodology 2 — the church stands
   up its own Cloud project, service account and enterprise — is the pattern that policy names as not
   allowed ("solutions developed and used exclusively for first party in-house applications"). See
-  §2.1. This is the reason this document routes through a validated EMM instead.
+  §2.1. This matters more now than it used to: the quota request is where a human reads your
+  justification, and "we manage our own three tablets" is the case the sentence was written to
+  exclude. There is a
+  [form](https://developers.google.com/android/management/permissible-usage) for asking anyway, and
+  exceptions are granted case by case, but it is a request, not a switch. This is the reason this
+  document routes through a validated EMM instead.
 
 One smaller correction: the brief's policy sets `stayOnWhilePluggedIn`. The AMAPI field is
 `stayOnPluggedModes`; `stayOnWhilePluggedIn` is the Android settings key underneath it and is
