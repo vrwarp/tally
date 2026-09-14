@@ -86,6 +86,8 @@ const SCENES: {
      rows carry the Chinese name the roster holds, which is what a reader who
      cannot spell recognises. */
   { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'], langs: ['en'] },
+  /* One letter: more children than fit, and the sentence past the cap. */
+  { id: 'typed-many', query: 'buffer=A', views: ['kiosktall'], langs: ['en'] },
   { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['en'] },
   { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], langs: ['en'], settle: 1900 },
