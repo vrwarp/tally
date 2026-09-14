@@ -44,6 +44,7 @@
  */
 import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
+import { LOCALE_LABELS, type Locale } from '@/lib/locales';
 import { usePrinterNote } from '../printerNote';
 import type { PrinterNote } from '../printing';
 import { EventName } from '../components/EventName';
@@ -91,6 +92,8 @@ export function StaffScreen({
   onPrinter,
   onChangeEvent,
   onHideBackdrop,
+  pins,
+  onEnglishOnly,
   onStay,
 }: {
   title: string;
@@ -127,6 +130,13 @@ export function StaffScreen({
   onChangeEvent: () => void;
   /** Takes the photograph off this device for the rest of the binding. */
   onHideBackdrop: () => void;
+  /**
+   * The languages this lobby offers beside English — the row below is drawn
+   * only while there are some to take off, and names them.
+   */
+  pins: readonly Locale[];
+  /** Takes every language but English off the idle screen's switch. */
+  onEnglishOnly: () => void;
   onStay: () => void;
 }) {
   const t = useTranslations('Staff');
@@ -288,6 +298,34 @@ export function StaffScreen({
             className={DOOR}
           >
             {t('hideThePhoto')}
+          </button>
+        )}
+
+        {/*
+          * The language switch's off switch, for the Sunday the pins are
+          * wrong — a tablet moved from one lobby to another, or a switch that
+          * is confusing more families than it is helping. Built like the
+          * photograph's: device-local, no network, and the row removes itself
+          * with the languages, which is the confirmation. The languages it
+          * will take off stand after the label, so nobody presses it blind.
+          */}
+        {pins.length > 0 && (
+          <button
+            type="button"
+            tabIndex={-1}
+            {...tap(() => {
+              haptic();
+              onEnglishOnly();
+            })}
+            className={DOOR}
+          >
+            {/* The label keeps its width and the names give way — three of
+                them at the row's size took "English only" down to "Eng…",
+                and a door that cannot be read is a door pressed blind. */}
+            <span className="shrink-0">{t('englishOnly')}</span>
+            <span className="min-w-0 truncate text-base font-normal text-ink-400 kiosk:text-xl">
+              {pins.map((pin) => LOCALE_LABELS[pin]).join(' · ')}
+            </span>
           </button>
         )}
       </div>

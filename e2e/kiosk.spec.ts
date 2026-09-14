@@ -170,7 +170,7 @@ test.describe('the kiosk', () => {
 
       await hold(kiosk, nursery);
 
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -199,7 +199,7 @@ test.describe('the kiosk', () => {
       await kiosk.getByText(/welcome/i).click();
 
       // The placeholder is the proof: the query the check-in came from is gone.
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
       await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
@@ -422,7 +422,7 @@ test.describe('the kiosk', () => {
       // no-match panel is correct — but its headline must stay plain. "Still
       // no match" is the sweep's trace, the sweep fires only when the FULL
       // roster is empty of quill, and the pulse has already delivered him.
-      await expect(kiosk.getByText(/no match — first time here/i)).toBeVisible({
+      await expect(kiosk.getByText(/^no match$/i)).toBeVisible({
         timeout: 10_000,
       });
       await kiosk.waitForTimeout(3_000);
@@ -625,7 +625,7 @@ test.describe('the kiosk', () => {
 
       // Back to the parent's screen, on the same gathering it never left.
       await kiosk.getByRole('button', { name: /back to check-in/i }).click();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
     } finally {
       await context.close();
     }
@@ -729,7 +729,7 @@ test.describe('the kiosk', () => {
       await kiosk.reload();
       // Straight back to the search screen: the binding, the roster and the
       // phone index all come out of localStorage before the SDK loads.
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -793,7 +793,7 @@ test.describe('the kiosk', () => {
       await expect(kiosk.getByText('Staff')).toBeVisible();
 
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
 
       await leaveGathering(kiosk);
       await expect(kiosk.getByText(/which gathering/i)).toBeVisible();
@@ -945,8 +945,10 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await typeOnKiosk(kiosk, 'Zzzq');
-      await expect(kiosk.getByText(/No match — first time here\?/i)).toBeVisible();
-      await expect(kiosk.getByText(/or see a leader/i)).toBeVisible();
+      await expect(kiosk.getByText(/^No match$/i)).toBeVisible();
+      // The way forward after a name that matched nobody: the phone's four
+      // digits, or a person — a leader is still offered, just not first.
+      await expect(kiosk.getByText(/or ask a leader/i)).toBeVisible();
     } finally {
       await context.close();
     }

@@ -8,6 +8,7 @@
  * reboot.
  */
 import { isDeviceId } from '@/lib/kioskDevice';
+import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/locales';
 import { asGrade } from '@/types';
 import type { KioskStudent } from './search';
 
@@ -70,6 +71,15 @@ export const KIOSK_KEYS = {
    * the build — see `src/kiosk/messages.ts`.
    */
   messages: 'tally:kiosk:messages',
+  /**
+   * The languages this lobby's families read beside English — see `readPins`.
+   *
+   * A property of the tablet on the wall, like the printer: set on the pairing
+   * screen, offered at the top of the search screen, taken off again by the
+   * staff gate's **English only** row. Never the family's own choice, which is
+   * the provider's one current language and rests back to English on its own.
+   */
+  pins: 'tally:kiosk:pins',
 } as const;
 
 export function readJson<T>(key: string): T | null {
@@ -302,4 +312,47 @@ export function readCachedPulse(): CachedPulse | null {
 
 export function writeCachedPulse(pulse: CachedPulse): void {
   writeJson(KIOSK_KEYS.pulse, pulse);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The pinned languages                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many languages a lobby can offer beside English.
+ *
+ * Three is every language the catalogue has, so the cap is not a limit any
+ * lobby meets today. It is here so the switch on the search screen has one
+ * known largest shape — four names, two across and two down — and so a hand-
+ * edited key cannot hand the idle screen a column of buttons.
+ */
+export const MAX_PINS = 3;
+
+/**
+ * A stored list of languages, made safe to offer.
+ *
+ * English is never a pin: it is the resting language and the first cell of the
+ * switch whatever this list says. Anything else that is not a locale this
+ * build speaks — a tag from a build that spoke more, a typo in a hand-edited
+ * key — is dropped rather than offered, because the next thing done with a pin
+ * is to import its catalogue and put its name on a button.
+ */
+export function sanitizePins(value: unknown): Locale[] {
+  if (!Array.isArray(value)) return [];
+  const pins: Locale[] = [];
+  for (const entry of value) {
+    if (!isLocale(entry) || entry === DEFAULT_LOCALE || pins.includes(entry)) continue;
+    pins.push(entry);
+    if (pins.length === MAX_PINS) break;
+  }
+  return pins;
+}
+
+/** The languages this kiosk offers beside English, in the order it offers them. */
+export function readPins(): Locale[] {
+  return sanitizePins(readJson<unknown>(KIOSK_KEYS.pins));
+}
+
+export function writePins(pins: readonly Locale[]): void {
+  writeJson(KIOSK_KEYS.pins, sanitizePins(pins));
 }

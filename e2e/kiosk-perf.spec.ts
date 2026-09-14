@@ -580,7 +580,7 @@ test.describe('kiosk performance', () => {
     await throttleCpu(cdp, 1);
     await pairKiosk(kiosk, staff);
     await bindTo(kiosk, /nursery/i);
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -640,14 +640,14 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   test('reboots warm, the way a shelf device does at 4am', async () => {
     await throttleCpu(cdp, THROTTLE);
     const { wall, thread } = await measureThread(cdp, async () => {
       await kiosk.reload();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({ timeout: 60_000 });
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({ timeout: 60_000 });
     });
 
     const probe = await readProbe(kiosk);
@@ -678,7 +678,7 @@ test.describe('kiosk performance', () => {
     await throttleCpu(cdp, THROTTLE);
     const { wall, thread } = await measureThread(cdp, async () => {
       await kiosk.reload();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({ timeout: 60_000 });
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({ timeout: 60_000 });
       // The screen is usable before the roster lands, so waiting for the screen
       // alone would report a boot that cannot find anybody yet. The first
       // search is what proves the roster arrived.
@@ -707,7 +707,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   test('answers a name, letter by letter', async () => {
@@ -723,7 +723,7 @@ test.describe('kiosk performance', () => {
     const taps = percentiles(probe.taps.map((tap) => tap.ms));
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
 
     /*
      * A second pass, profiled, and nothing asserted inside it.
@@ -768,7 +768,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   test('checks a child in', async () => {
@@ -821,7 +821,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.getByText(/welcome/i).click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   test('answers four phone digits', async () => {
@@ -860,7 +860,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -929,7 +929,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -1010,7 +1010,7 @@ test.describe('kiosk performance', () => {
     } = await profile(cdp, async () => {
       const { wall } = await measureThread(cdp, async () => {
         await kiosk.reload();
-        await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({ timeout: 60_000 });
+        await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({ timeout: 60_000 });
         await typeOnKiosk(kiosk, 'ADA');
         await expect(kiosk.getByRole('button', { name: /Adaeze/i }).first()).toBeVisible({
           timeout: 60_000,
@@ -1040,7 +1040,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
     const pad = await keyPad(kiosk, 'ADAEZE');
     await beginPhase(kiosk);
 
@@ -1052,7 +1052,7 @@ test.describe('kiosk performance', () => {
     const taps = percentiles(probe.taps.map((tap) => tap.ms));
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
 
     const { hotspots, sampledMs } = await profile(cdp, async () => {
       await tapKeys(kiosk, pad, 'ADAEZE');
@@ -1122,7 +1122,7 @@ test.describe('kiosk performance', () => {
     // looking for an Adaeze — so the buffer is cleared separately.
     await kiosk.getByRole('button', { name: /← Back/ }).click();
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -1161,7 +1161,7 @@ test.describe('kiosk performance', () => {
       // The tick is dismissed the way a parent dismisses it, which is also what
       // clears the buffer for the family behind them.
       await kiosk.getByText(/welcome/i).click();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
     }
 
     const after = await heapBytes(cdp);
@@ -1251,7 +1251,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.locator('[data-key="clear"]').click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -1351,7 +1351,7 @@ test.describe('kiosk performance', () => {
     });
 
     await kiosk.getByRole('button', { name: /^Done$/ }).click();
-    await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+    await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
   });
 
   /**
@@ -1462,7 +1462,7 @@ test.describe('kiosk performance', () => {
        * spend the window.
        */
       await printer.page.getByText(/welcome/i).click().catch(() => {});
-      await expect(printer.page.getByText(/^type a name$/i)).toBeVisible({ timeout: 10_000 });
+      await expect(printer.page.getByText(/^type your child’s name$/i)).toBeVisible({ timeout: 10_000 });
       // While the keyboard is still on screen — the confirm screen has none.
       const pad = await keyPad(printer.page, 'JOS');
 
@@ -1480,7 +1480,7 @@ test.describe('kiosk performance', () => {
         // Tapped if the tick is still up, waited out if it has already returned:
         // both are what a volunteer meets, and neither is what is being measured.
         await printer.page.getByText(/welcome/i).click({ timeout: 3000 }).catch(() => {});
-        await expect(printer.page.getByText(/^type a name$/i)).toBeVisible({ timeout: 10_000 });
+        await expect(printer.page.getByText(/^type your child’s name$/i)).toBeVisible({ timeout: 10_000 });
         await tapKeys(printer.page, pad, 'JOS');
         await expect(printer.page.getByRole('button', { name: /Josiah/i }).first()).toBeVisible({
           timeout: 15_000,

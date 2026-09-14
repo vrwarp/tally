@@ -1,418 +1,310 @@
 /**
- * The kiosk's set-up screens, driveable.
+ * The kiosk's home screen, live, for the walkthrough of the lobby-languages
+ * change (PR #231).
  *
- * `uxr/kiosk-live` photographs one state per query string and never presses
- * anything. This mounts the same two components with a *stateful* stand-in for
- * the printing module, so a reader can walk the whole errand — tap the
- * gathering, press connect, pick the QL out of a device list, print a test
- * label, come back, set the kiosk — on the real screens, with the real props.
+ * Real components — `SearchScreen`, `PairingScreen`, `StaffScreen` — over a
+ * fixture roster and no network, with the few things `KioskApp` owns rebuilt
+ * here in miniature: the typed buffer, the lobby's pins, and the clock that
+ * gives the screen back. The strip along the top is the demo's, not the
+ * kiosk's: it moves between the three screens and says what the language
+ * clock is doing, which on a real tablet is invisible by design.
  *
- * The transport is the only fake. `EventChooser` and `PrinterScreen` are
- * imported from `src/` unmodified, and the shell around them holds exactly what
- * `KioskApp` holds for them: the config, the state, the picked row, and whether
- * the last device list came back empty.
+ * Knobs, all optional, for the walkthrough's frames and deep links:
  *
- * The browser's own chooser cannot be shown in a published page — it needs a
- * user gesture against real USB — so a stand-in sheet takes its place, with the
- * two ways out that matter: pick the QL, or dismiss it. Dismissing is the whole
- * reason the strip has an account to give.
- *
- * Driven from the page around it by `postMessage`, because the two documents
- * exist so the kiosk's Tailwind preflight stays inside this one.
+ *   ?screen=checkin|pairing|staff   which screen to open on
+ *   ?pins=zh-Hans,es-MX,zh-Hant     the lobby's languages (default: all three)
+ *   ?photo=1                        a photograph behind the idle screen
+ *   ?buffer=Alva                    letters already typed
+ *   ?nomatch=1                      the roster finds nobody, whatever is typed
+ *   ?lang=zh-Hant                   the language a family chose
+ *   ?bare=1                         no strip — the kiosk alone, for frames
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import './demo.css';
+import '@/index.css';
+import { useLocaleControl } from '@/i18n/localeContext';
+import { eventWindow, type KioskBinding } from '@/kiosk/binding';
+import { Backdrop } from '@/kiosk/components/Backdrop';
+import type { KioskKey } from '@/kiosk/components/Keyboard';
+import type { KioskRefresh, KioskServices } from '@/kiosk/KioskApp';
 import { KioskIntlProvider } from '@/kiosk/KioskIntlProvider';
-import { EventChooser } from '@/kiosk/screens/EventChooser';
-import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
-import type { KioskEventEntry, KioskPrinting, KioskServices } from '@/kiosk/KioskApp';
-import type { PrinterConfig, PrinterDetection, PrinterState, PrintedLabel } from '@/kiosk/printing';
-import { labelName, labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
-import { modelIdentifiers } from '@vrwarp/brother-ql-webusb/models';
-import { describeAge, describeEntry } from '@/kiosk/printing/log';
-import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
+import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
+import { PairingScreen } from '@/kiosk/screens/PairingScreen';
+import { SearchScreen } from '@/kiosk/screens/SearchScreen';
+import { StaffScreen } from '@/kiosk/screens/StaffScreen';
+import { sanitizePins } from '@/kiosk/storage';
+import {
+  DEFAULT_LOCALE,
+  KIOSK_LOCALE_STORAGE_KEY,
+  LOCALE_LABELS,
+  isLocale,
+  type Locale,
+} from '@/lib/locales';
 
-/* ---- The church ------------------------------------------------------- */
+const params = new URLSearchParams(location.search);
+
+/* The language the kiosk wakes in: the knob's, else English — a demo that
+   remembered the last visitor's choice would look like a kiosk that had
+   forgotten to reset. */
+const lang = params.get('lang');
+if (isLocale(lang)) localStorage.setItem(KIOSK_LOCALE_STORAGE_KEY, lang);
+else localStorage.removeItem(KIOSK_LOCALE_STORAGE_KEY);
+
+type Screen = 'checkin' | 'pairing' | 'staff';
+const SCREENS: readonly Screen[] = ['checkin', 'pairing', 'staff'];
+const isScreen = (value: string | null): value is Screen =>
+  (SCREENS as readonly string[]).includes(value ?? '');
+
+const screenParam = params.get('screen');
+const INITIAL_SCREEN: Screen = isScreen(screenParam) ? screenParam : 'checkin';
+/* The owner's lobby: Chinese in both scripts and Spanish, which is the fullest
+   shape the switch takes — two names across, two down. */
+const INITIAL_PINS: Locale[] = params.has('pins')
+  ? sanitizePins(params.get('pins')!.split(','))
+  : ['zh-Hans', 'es-MX', 'zh-Hant'];
+const NOBODY = params.get('nomatch') === '1';
+const BARE = params.get('bare') === '1';
+const PHOTO_URL = new URL('./backdrop-demo.svg', import.meta.url).href;
+
+/** How long a chosen language outlives the last touch — `KioskApp`'s figure. */
+const LANGUAGE_RESET_MS = 60_000;
 
 const NOW = Date.now();
-const MIN = 60_000;
-
-/**
- * Today, on a shelf tablet.
- *
- * Three gatherings, two of which print — which is the list this whole campaign
- * is about: the volunteer is here for one of them, and nothing on the screen
- * used to say which needed a printer. Sunday Kids has already ended and stays
- * on the list on purpose, so a kiosk rebooting mid-pickup can find it again.
- */
-const ROWS: { title: string; icon: string; inMin: number; runs: number; room: string; prints: boolean }[] = [
-  { title: 'Sunday Kids', icon: 'church', inMin: -330, runs: 90, room: 'Hall', prints: true },
-  { title: 'Wednesday Night', icon: 'groups', inMin: -40, runs: 90, room: 'Youth room', prints: false },
-  { title: 'Kids Club', icon: 'child_care', inMin: 50, runs: 120, room: 'Hall', prints: true },
-];
-
-function entries(printingDay: boolean): KioskEventEntry[] {
-  return ROWS.map((row, index) => {
-    const startAt = NOW + row.inMin * MIN;
-    const endAt = startAt + row.runs * MIN;
-    return {
-      chain: `chain-${index}`,
-      predictsFrom: `chain-${index}`,
-      id: `event-${index}`,
-      title: row.title,
-      startAt,
-      endAt,
-      checkInOpensAt: startAt - 30 * MIN,
-      checkInClosesAt: endAt + 90 * MIN,
-      seriesId: null,
-      location: row.room,
-      requiresCheckOut: false,
-      labelTemplate: printingDay && row.prints ? DEFAULT_LABEL_TEMPLATE : null,
-      allergiesSupported: true,
-      iconPath: findIcon(row.icon),
-      yours: true,
-    } as unknown as KioskEventEntry;
-  });
-}
-
-/* The icon catalogue is handed to the kiosk as answers, not code — and a demo
-   that could not draw the marks would be arguing about a row that is not the
-   row. Resolved lazily so a missing glyph costs a mark, never the page. */
-let icons: ((name: string) => string | null) | null = null;
-function findIcon(name: string): string | null {
-  try {
-    return icons ? icons(name) : null;
-  } catch {
-    return null;
-  }
-}
-
-const PRINTED_TONIGHT: PrintedLabel[] = [
-  { id: 'p1', studentId: '1', name: 'Ramona Alvarez', atMs: NOW - 4 * MIN, failed: false },
-  { id: 'p2', studentId: '2', name: 'Noah Alvarez', atMs: NOW - 4 * MIN, failed: true },
-  { id: 'p3', studentId: '6', name: 'Alice Alberts', atMs: NOW - 11 * MIN, failed: false },
-];
-
-/* ---- The scenarios ---------------------------------------------------- */
-
-/**
- * The mornings this campaign was judged on.
- *
- * Named for what the volunteer is doing rather than for the state they land in,
- * because that is how the panel read them: a screen is right or wrong inside
- * somebody's errand, not on its own.
- */
-export type SceneId =
-  | 'new-kiosk'
-  | 'android-sunday'
-  | 'unplugged'
-  | 'wednesday'
-  | 'quiet-day'
-  | 'mid-evening';
-
-interface Scene {
-  /** What this kiosk has stored, if anything. */
-  config: PrinterConfig | null;
-  /** Where the printer starts, once the boot ladder has settled. */
-  settles: PrinterState;
-  /** Whether the kiosk spends its first seconds looking, as a real wake does. */
-  wakes: boolean;
-  /** Whether today's list holds a gathering that prints. */
-  printingDay: boolean;
-  /** Mid-evening: the printer screen over a bound, printing gathering. */
-  midEvening?: boolean;
-}
-
-const QL: PrinterConfig = { model: 'QL-810W', label: '62x29' };
-
-const SCENES: Record<SceneId, Scene> = {
-  'new-kiosk': { config: null, settles: { kind: 'idle' }, wakes: false, printingDay: true },
-  'android-sunday': {
-    config: QL,
-    settles: { kind: 'unpaired', searching: false },
-    wakes: true,
-    printingDay: true,
-  },
-  unplugged: {
-    config: QL,
-    settles: {
-      kind: 'trouble',
-      message: { key: 'troubleUnplugged' },
-      advice: { key: 'advicePlugBackIn' },
-    } as unknown as PrinterState,
-    wakes: false,
-    printingDay: true,
-  },
-  wednesday: { config: null, settles: { kind: 'idle' }, wakes: false, printingDay: true },
-  'quiet-day': { config: null, settles: { kind: 'idle' }, wakes: false, printingDay: false },
-  'mid-evening': {
-    config: QL,
-    settles: { kind: 'unpaired', searching: false },
-    wakes: false,
-    printingDay: true,
-    midEvening: true,
-  },
+const binding: KioskBinding = {
+  eventId: 'demo-event',
+  seriesId: null,
+  title: 'Sunday Kids',
+  startAtMs: NOW - 22 * 60_000,
+  endAtMs: NOW + 68 * 60_000,
+  checkInClosesAtMs: NOW + 98 * 60_000,
+  boundAtMs: NOW - 45 * 60_000,
+  requiresCheckOut: false,
+  allergiesSupported: true,
 };
 
-/** How long the boot retries look before they settle. The real ladder is 2+3+5s. */
-const WAKE_MS = 4000;
+const STUDENTS: KioskStudent[] = [
+  { id: '1', firstName: 'Ramona', lastName: 'Alvarez', grade: 7 },
+  { id: '2', firstName: 'Noah', lastName: 'Alvarez', grade: 9 },
+  { id: '3', firstName: 'Priya', lastName: 'Alvarez-Bell', grade: 11 },
+  { id: '4', firstName: 'Sam', lastName: 'Alvarado', grade: 6 },
+  { id: '5', firstName: 'Jonah', lastName: 'Alvarado', grade: 12 },
+  { id: '6', firstName: 'Alice', lastName: 'Alberts', grade: 6 },
+  { id: '7', firstName: 'Benson “蔡秉洲”', lastName: 'Tsai', grade: 3 },
+  { id: '8', firstName: 'Emily “陳恩慈”', lastName: 'Chen', grade: 1 },
+  { id: '9', firstName: 'Mateo', lastName: 'Hernández', grade: 4 },
+  { id: '10', firstName: 'Lucía', lastName: 'Hernández', grade: 2 },
+  { id: '11', firstName: 'Alonzo', lastName: 'Allred', grade: 9 },
+] as KioskStudent[];
 
-/* ---- The transport, faked --------------------------------------------- */
-
-/** What the QL says about itself when it is picked out of the device list. */
-function detectionFor(config: PrinterConfig, guessRoll: boolean): PrinterDetection {
-  const matched = guessRoll
-    ? [
-        { identifier: '62', name: '62mm endless' },
-        { identifier: '62red', name: '62mm endless (black/red/white)' },
-      ]
-    : [{ identifier: '62x29', name: '62mm x 29mm die-cut' }];
-  return {
-    config: guessRoll ? { model: config.model, label: '62' } : config,
-    modelFromPrinter: true,
-    matched,
-    status: { mediaType: guessRoll ? 'continuous' : 'die-cut', mediaWidthMm: 62, errors: [] },
-  } as unknown as PrinterDetection;
+/** The search `KioskApp` would run, over the fixture: names by prefix, four digits find the Tsai and Chen households. */
+function outcomeFor(buffer: string): KioskSearchOutcome {
+  const digits = /^\d+$/.test(buffer);
+  const mode = !buffer ? 'idle' : digits ? (buffer.length === 4 ? 'phone' : 'phone-partial') : 'name';
+  const needles = buffer.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const matched =
+    NOBODY || needles.length === 0
+      ? []
+      : mode === 'phone'
+        ? STUDENTS.filter((student) => student.id === '7' || student.id === '8')
+        : mode === 'phone-partial'
+          ? []
+          : STUDENTS.filter((student) => {
+              const words = `${student.firstName} ${student.lastName}`
+                .toLowerCase()
+                .split(/[\s-“”]+/);
+              return needles.every((needle) => words.some((word) => word.startsWith(needle)));
+            });
+  return { mode, results: matched.slice(0, 8), total: matched.length } as KioskSearchOutcome;
 }
+
+/** Enough of the pairing service to show a code that never pairs. */
+const services = {
+  beginPairing: async () => ({ code: 'HJ4K2P', secret: 'demo', expiresInSeconds: 600 }),
+  pollPairing: async () => 'pending' as const,
+} as unknown as KioskServices;
+
+const EMPTY = new Set<string>();
 
 export function Demo() {
-  const [scene, setScene] = useState<SceneId>('new-kiosk');
-  const spec = SCENES[scene];
+  const { locale, setLocale } = useLocaleControl();
+  const [screen, setScreen] = useState<Screen>(INITIAL_SCREEN);
+  const [pins, setPins] = useState<Locale[]>(INITIAL_PINS);
+  const [buffer, setBuffer] = useState(params.get('buffer') ?? '');
+  const [photo, setPhoto] = useState(params.get('photo') === '1');
+  const [present, setPresent] = useState<Set<string>>(EMPTY);
+  const [widening, setWidening] = useState(false);
+  const [refresh, setRefresh] = useState<KioskRefresh>('idle');
+  const [note, setNote] = useState<string | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
 
-  /* Exactly what `KioskApp` holds for these two screens. */
-  const [phase, setPhase] = useState<'choosing' | 'printer'>('choosing');
-  const [config, setConfig] = useState<PrinterConfig | null>(spec.config);
-  const [state, setState] = useState<PrinterState>(
-    spec.wakes ? { kind: 'unpaired', searching: true } : spec.settles,
-  );
-  const [selected, setSelected] = useState<string | null>(null);
-  const [listCameBackEmpty, setListCameBackEmpty] = useState(false);
-  /** The browser's device list, which a page cannot open for real. */
-  const [sheet, setSheet] = useState(false);
-  const listeners = useRef(new Set<(next: PrinterState) => void>());
-
-  /** One place a state change happens, so the screens hear it as they would. */
-  const emit = useCallback((next: PrinterState) => {
-    setState(next);
-    setListCameBackEmpty(false);
-    for (const fn of listeners.current) fn(next);
+  /* What `KioskApp` does with the same facts: a language is a family's, and
+     goes home when they do — on the way back to the door from any other
+     screen, and after a minute nobody has touched the glass. */
+  const touchedAt = useRef(Date.now());
+  useEffect(() => {
+    const touched = () => {
+      touchedAt.current = Date.now();
+    };
+    window.addEventListener('pointerdown', touched, { capture: true });
+    window.addEventListener('keydown', touched, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', touched, { capture: true });
+      window.removeEventListener('keydown', touched, { capture: true });
+    };
   }, []);
 
-  /* Starting a scene over, which is what picking one in the rail means. */
-  useEffect(() => {
-    setPhase(SCENES[scene].midEvening ? 'printer' : 'choosing');
-    setConfig(SCENES[scene].config);
-    setSelected(null);
-    setListCameBackEmpty(false);
-    setSheet(false);
-    const opening: PrinterState = SCENES[scene].wakes
-      ? { kind: 'unpaired', searching: true }
-      : SCENES[scene].settles;
-    setState(opening);
-    for (const fn of listeners.current) fn(opening);
-    if (!SCENES[scene].wakes) return;
-    // The wake, at the length a volunteer actually stands through.
-    const timer = setTimeout(() => emit(SCENES[scene].settles), WAKE_MS);
-    return () => clearTimeout(timer);
-  }, [scene, emit]);
+  const home = useCallback(() => {
+    setScreen('checkin');
+    setBuffer('');
+    setRefresh('idle');
+    setLocale(DEFAULT_LOCALE);
+  }, [setLocale]);
 
-  /** Told to the page around this one, so the rail can follow along. */
+  const armed = screen === 'checkin' && locale !== DEFAULT_LOCALE;
   useEffect(() => {
-    window.parent?.postMessage(
-      { type: 'kiosk:state', scene, phase, printer: state.kind, configured: config !== null },
-      '*',
-    );
-  }, [scene, phase, state, config]);
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; scene?: SceneId } | null;
-      if (data?.type === 'kiosk:scene' && data.scene && data.scene in SCENES) setScene(data.scene);
+    if (!armed) {
+      setLeft(null);
+      return;
+    }
+    const tick = () => {
+      const since = Date.now() - touchedAt.current;
+      if (since >= LANGUAGE_RESET_MS) {
+        setLocale(DEFAULT_LOCALE);
+        setLeft(null);
+        return;
+      }
+      setLeft(Math.ceil((LANGUAGE_RESET_MS - since) / 1000));
     };
-    window.addEventListener('message', onMessage);
-    window.parent?.postMessage({ type: 'kiosk:ready' }, '*');
-    return () => window.removeEventListener('message', onMessage);
+    tick();
+    const timer = setInterval(tick, 500);
+    return () => clearInterval(timer);
+  }, [armed, setLocale]);
+
+  const say = useCallback((words: string) => {
+    setNote(words);
+    setTimeout(() => setNote((current) => (current === words ? null : current)), 3200);
   }, []);
 
-  /* The module handle, with a real state machine behind it. */
-  const printing = useMemo<KioskPrinting>(() => {
-    const handle = {
-      currentState: () => state,
-      subscribe: (fn: (next: PrinterState) => void) => {
-        listeners.current.add(fn);
-        return () => listeners.current.delete(fn);
-      },
-      modelIdentifiers,
-      labelsForModel,
-      labelName,
-      printerLog: () => [],
-      printerLogText: () => '',
-      describeAge,
-      describeEntry,
-      configure: async (next: PrinterConfig) => {
-        setConfig(next);
-        return state;
-      },
-      /*
-       * The one call that cannot be faked away: it opens the browser's own
-       * device list, and everything about this flow turns on what happens when
-       * that list comes back empty. The sheet below is the stand-in, and it
-       * resolves this promise either way.
-       */
-      pairPrinter: () =>
-        new Promise<PrinterDetection | null>((resolve) => {
-          setSheet(true);
-          pending.current = resolve;
-        }),
-      checkPrinter: async () => detectionFor(config ?? QL, false),
-      ready: async () => {
-        // A retry that finds nothing walks the module's own path: looking, then
-        // settled. Plugging the printer back in is what changes the answer.
-        emit({ kind: 'unpaired', searching: true });
-        setTimeout(() => emit(SCENES[scene].settles), 1400);
-        return state;
-      },
-      testPrint: () => {
-        window.parent?.postMessage({ type: 'kiosk:printed' }, '*');
-      },
-    };
-    return handle as unknown as KioskPrinting;
-  }, [state, config, scene, emit]);
+  const onKey = useCallback((key: KioskKey) => {
+    setRefresh('idle');
+    if (key.kind === 'char') setBuffer((typed) => typed + key.value);
+    else if (key.kind === 'backspace') setBuffer((typed) => typed.slice(0, -1));
+    else if (key.kind === 'clear') setBuffer('');
+  }, []);
 
-  const pending = useRef<((found: PrinterDetection | null) => void) | null>(null);
+  /* "Search everyone" reads the whole church; here the fixture is the whole
+     church, so the read comes back with the same answer and the headline says
+     so — which is the state a real parent meets when the sweep finds nobody. */
+  const onWiden = useCallback(() => {
+    setWidening(true);
+    setTimeout(() => {
+      setWidening(false);
+      setRefresh('done');
+    }, 900);
+  }, []);
 
-  /** The QL, picked out of the list. */
-  const pick = (guessRoll: boolean) => {
-    const found = detectionFor(QL, guessRoll);
-    setSheet(false);
-    setConfig(found.config);
-    emit({ kind: 'ready', config: found.config } as PrinterState);
-    pending.current?.(found);
-    pending.current = null;
-  };
-
-  /** Dismissed — the press the strip used to answer with nothing at all. */
-  const dismiss = () => {
-    setSheet(false);
-    pending.current?.(null);
-    pending.current = null;
-  };
-
-  const services = useMemo(
-    () =>
-      ({
-        listEvents: async () => entries(spec.printingDay),
-        bindEntry: async () => {
-          window.parent?.postMessage({ type: 'kiosk:bound' }, '*');
-          return new Promise(() => {});
-        },
-      }) as unknown as KioskServices,
-    [spec.printingDay],
+  const onPick = useCallback(
+    (student: KioskStudent) => {
+      setPresent((held) => new Set([...held, student.id]));
+      say(`${student.firstName.replace(/\s*“.*”/, '')} checked in — the kiosk goes home, in English.`);
+      home();
+    },
+    [home, say],
   );
 
-  const connect = () => {
-    setListCameBackEmpty(false);
-    void printing.pairPrinter(config ?? QL).then((found) => {
-      if (!found) setListCameBackEmpty(true);
-    });
-  };
+  const outcome = outcomeFor(buffer);
+  const idle = outcome.mode === 'idle';
 
-  return (
-    <div className="relative h-full">
-      {phase === 'printer' ? (
-        <PrinterScreen
-          printing={printing}
-          config={config ?? QL}
-          hasConfig={config !== null}
-          gatheringPrints={spec.midEvening === true}
-          printedTonight={spec.midEvening ? PRINTED_TONIGHT : []}
-          onReprint={() => {}}
-          onReprintByName={spec.midEvening ? () => {} : undefined}
-          onDone={() => setPhase(spec.midEvening ? 'printer' : 'choosing')}
-        />
-      ) : (
-        <EventChooser
-          services={services}
-          printerState={state}
-          printerConfigured={config !== null}
-          printerGuessed={config?.guessed === true}
-          printerModel={config?.model}
-          printingReady
-          listCameBackEmpty={listCameBackEmpty}
-          onSetUpPrinter={() => setPhase('printer')}
-          onConnectPrinter={connect}
-          onLookAgain={() => void printing.ready()}
-          onPrintTestLabel={() => printing.testPrint('en')}
-          onPrintingRows={() => {}}
-          selectedKey={selected}
-          onSelect={setSelected}
-          onBound={() => {}}
-        />
-      )}
-
-      {sheet && <DeviceSheet onPick={pick} onDismiss={dismiss} />}
+  const strip = BARE ? null : (
+    <div className="flex h-11 shrink-0 items-center gap-1 border-b border-ink-800 bg-ink-950 px-2 text-sm text-ink-300">
+      {SCREENS.map((candidate) => (
+        <button
+          key={candidate}
+          type="button"
+          onClick={() => (candidate === 'checkin' ? home() : setScreen(candidate))}
+          className={`h-8 rounded-md px-3 font-semibold ${
+            screen === candidate ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
+          }`}
+        >
+          {candidate === 'checkin' ? 'Check-in' : candidate === 'pairing' ? 'Pairing' : 'Staff'}
+        </button>
+      ))}
+      <span className="min-w-0 flex-1 truncate px-2 text-ink-400">
+        {note ??
+          (screen !== 'checkin'
+            ? ''
+            : left !== null
+              ? `${LOCALE_LABELS[locale]} — English again in ${left}s untouched`
+              : 'Resting in English')}
+      </span>
+      <button
+        type="button"
+        onClick={() => setPhoto((on) => !on)}
+        aria-pressed={photo}
+        className={`h-8 rounded-md px-3 font-semibold ${
+          photo ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
+        }`}
+      >
+        Photo
+      </button>
     </div>
   );
-}
 
-/**
- * A stand-in for the browser's own USB device list.
- *
- * Deliberately not styled like the kiosk: it is Chrome's sheet, not Tally's,
- * and half of what makes the unpaired state expensive is that a volunteer has
- * to recognise somebody else's window and find the printer in it. The empty
- * button is the one this demo exists to let somebody press.
- */
-function DeviceSheet({
-  onPick,
-  onDismiss,
-}: {
-  onPick: (guessRoll: boolean) => void;
-  onDismiss: () => void;
-}) {
   return (
-    <div className="absolute inset-0 z-10 flex items-start justify-center bg-black/50 pt-16">
-      <div
-        style={{ fontFamily: 'system-ui, sans-serif' }}
-        className="w-[560px] rounded-xl bg-[#292a2d] p-5 text-[#e8eaed] shadow-2xl"
-      >
-        <div className="text-[15px] font-medium">
-          tally.church wants to connect to a USB device
-        </div>
-        <div className="mt-4 flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => onPick(false)}
-            className="rounded-lg bg-[#3c4043] px-4 py-3 text-left text-[14px] active:bg-[#4a4e52]"
-          >
-            Brother QL-810W (62mm x 29mm die-cut loaded)
-          </button>
-          <button
-            type="button"
-            onClick={() => onPick(true)}
-            className="rounded-lg px-4 py-3 text-left text-[14px] active:bg-[#3c4043]"
-          >
-            Brother QL-810W (62mm tape loaded — the roll it cannot name)
-          </button>
-        </div>
-        <div className="mt-5 flex justify-end gap-3 text-[14px]">
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="rounded px-4 py-2 text-[#8ab4f8] active:bg-white/10"
-          >
-            Cancel
-          </button>
-        </div>
+    <div className="flex h-full flex-col">
+      {strip}
+      <div className="relative min-h-0 flex-1">
+        {screen === 'pairing' ? (
+          <PairingScreen services={services} onPaired={() => {}} pins={pins} onPins={setPins} />
+        ) : screen === 'staff' ? (
+          <StaffScreen
+            title={binding.title}
+            window={eventWindow(locale, binding)}
+            printer="none"
+            trouble={null}
+            backdrop={photo}
+            onHideBackdrop={() => {
+              setPhoto(false);
+              home();
+            }}
+            onReprint={() => say('The reprint screen is not part of this demo.')}
+            onPrinter={() => say('The printer screen is not part of this demo.')}
+            onChangeEvent={() => say('Changing the gathering is not part of this demo.')}
+            pins={pins}
+            onEnglishOnly={() => {
+              setPins([]);
+              home();
+            }}
+            onStay={home}
+          />
+        ) : (
+          <>
+            {photo && <Backdrop url={PHOTO_URL} shown={idle} />}
+            <SearchScreen
+              binding={binding}
+              buffer={buffer}
+              onKey={onKey}
+              outcome={outcome}
+              presentIds={present}
+              checkedOutIds={EMPTY}
+              tracksCheckOut={false}
+              printerNeedsAttention={false}
+              onPrinter={() => {}}
+              backdrop={photo && idle}
+              refresh={refresh}
+              widening={widening}
+              onWiden={onWiden}
+              onPick={onPick}
+              onRegister={() => say('The registration wizard is not part of this demo.')}
+              onStaffGate={() => setScreen('staff')}
+              pins={pins}
+            />
+          </>
+        )}
       </div>
     </div>
   );
 }
-
-void import('@/lib/eventIcons').then((module) => {
-  icons = (name: string) => module.findEventIcon(name)?.path ?? null;
-});
 
 createRoot(document.getElementById('root')!).render(
   <KioskIntlProvider>

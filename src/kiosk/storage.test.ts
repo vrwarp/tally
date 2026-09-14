@@ -20,6 +20,7 @@ import { isDeviceId } from '@/lib/kioskDevice';
 import {
   KIOSK_KEYS,
   KIOSK_ROSTER_VERSION,
+  MAX_PINS,
   NO_PARTICIPATION,
   ensureDeviceId,
   participationScope,
@@ -28,9 +29,12 @@ import {
   readCachedRoster,
   readCachedRosterOfAnyVersion,
   readJson,
+  readPins,
+  sanitizePins,
   writeCachedPulse,
   writeCachedRoster,
   writeJson,
+  writePins,
 } from '@/kiosk/storage';
 import type { KioskStudent } from '@/kiosk/search';
 
@@ -297,5 +301,42 @@ describe('ensureDeviceId', () => {
     const first = ensureDeviceId();
     localStorage.clear();
     expect(ensureDeviceId()).not.toBe(first);
+  });
+});
+
+/*
+ * The lobby's languages, which are the names on the idle screen's switch. The
+ * next thing done with a pin is to import its catalogue and put its name on a
+ * button, so the reader is the one place a stale or hand-edited key is caught.
+ */
+describe('readPins', () => {
+  it('reads back the languages a volunteer pinned, in the order they were pinned', () => {
+    writePins(['zh-Hant', 'es-MX']);
+    expect(readPins()).toEqual(['zh-Hant', 'es-MX']);
+  });
+
+  it('answers nothing for a kiosk nobody has pinned', () => {
+    expect(readPins()).toEqual([]);
+  });
+
+  it('never offers English as a pin — it is the first cell whatever the disk says', () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['en', 'zh-Hans']));
+    expect(readPins()).toEqual(['zh-Hans']);
+  });
+
+  it('drops a tag this build does not speak, and a language pinned twice', () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['fr', 'zh-Hant', 7, 'zh-Hant', null]));
+    expect(readPins()).toEqual(['zh-Hant']);
+  });
+
+  it('offers every language the build has, which is the cap', () => {
+    expect(sanitizePins(['zh-Hant', 'es-MX', 'zh-Hans'])).toHaveLength(MAX_PINS);
+  });
+
+  it('survives a key that is not a list', () => {
+    localStorage.setItem(KIOSK_KEYS.pins, '"zh-Hant"');
+    expect(readPins()).toEqual([]);
+    localStorage.setItem(KIOSK_KEYS.pins, 'not json');
+    expect(readPins()).toEqual([]);
   });
 });

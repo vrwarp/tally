@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1280" width="1920" height="1280">
+  <!--
+    The demo photograph: a sunlit children's room, drawn rather than shot, so
+    the harness and the walkthrough have a backdrop that follows the feature's
+    own guidance — a place, not a poster; no words; no faces. Composed for the
+    cover-crop both shelves take: everything that matters lives in the middle
+    two-fifths, which is all a portrait kiosk keeps of a landscape image.
+  -->
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7ddc0"/>
+      <stop offset=".55" stop-color="#f2c9a2"/>
+      <stop offset="1" stop-color="#e8b088"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff3d6"/>
+      <stop offset="1" stop-color="#ffd98f"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c98a5e"/>
+      <stop offset="1" stop-color="#b06f47"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".62" cy=".32" r=".75">
+      <stop offset="0" stop-color="#fff2cf" stop-opacity=".85"/>
+      <stop offset=".5" stop-color="#ffe3a8" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#ffe3a8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1920" height="1280" fill="url(#wall)"/>
+  <rect y="960" width="1920" height="320" fill="url(#floor)"/>
+  <rect y="948" width="1920" height="18" fill="#8f5636" opacity=".55"/>
+
+  <!-- sunlight wash -->
+  <rect width="1920" height="1280" fill="url(#glow)"/>
+
+  <!-- arched window, right of centre but inside the portrait crop -->
+  <g>
+    <path d="M980 300 a190 190 0 0 1 380 0 v560 h-380 z" fill="#a86b3e"/>
+    <path d="M998 306 a172 172 0 0 1 344 0 v536 h-344 z" fill="url(#sun)"/>
+    <path d="M1170 140 v720 M998 470 h344" stroke="#a86b3e" stroke-width="16"/>
+    <!-- hills and sun through the glass -->
+    <circle cx="1090" cy="330" r="58" fill="#ffb84d"/>
+    <path d="M998 700 q90 -90 180 -20 q100 -80 164 -10 v172 h-344 z" fill="#9fbf6e"/>
+    <path d="M998 760 q120 -60 344 -8 v90 h-344 z" fill="#7ea757" opacity=".9"/>
+  </g>
+
+  <!-- bunting across the top -->
+  <g stroke="#8f5636" stroke-width="7" fill="none">
+    <path d="M-20 120 q480 150 980 70 q520 -80 980 60"/>
+  </g>
+  <g>
+    <path d="M170 172 l46 -12 l-14 66 z" fill="#e0685a"/>
+    <path d="M360 205 l46 -8 l-18 64 z" fill="#f2b544"/>
+    <path d="M560 225 l46 -4 l-21 62 z" fill="#6aa7a0"/>
+    <path d="M760 230 l46 0 l-23 60 z" fill="#e0685a"/>
+    <path d="M950 222 l45 -6 l-19 62 z" fill="#9fbf6e"/>
+    <path d="M1420 172 l44 8 l-30 56 z" fill="#f2b544"/>
+    <path d="M1610 196 l44 12 l-33 52 z" fill="#6aa7a0"/>
+  </g>
+
+  <!-- wall art in the centre band — what the portrait and phone crops keep -->
+  <g>
+    <!-- rainbow decal -->
+    <g transform="translate(700 560)">
+      <path d="M-150 90 a150 150 0 0 1 300 0" fill="none" stroke="#e0685a" stroke-width="30"/>
+      <path d="M-114 90 a114 114 0 0 1 228 0" fill="none" stroke="#f2b544" stroke-width="30"/>
+      <path d="M-78 90 a78 78 0 0 1 156 0" fill="none" stroke="#9fbf6e" stroke-width="30"/>
+      <path d="M-42 90 a42 42 0 0 1 84 0" fill="none" stroke="#6aa7a0" stroke-width="30"/>
+    </g>
+    <!-- little sun decal above it -->
+    <g transform="translate(700 380)">
+      <circle r="44" fill="#ffb84d"/>
+      <g stroke="#ffb84d" stroke-width="12" stroke-linecap="round">
+        <path d="M0 -62 v-26 M0 62 v26 M-62 0 h-26 M62 0 h26 M-46 -46 l-18 -18 M46 46 l18 18 M-46 46 l-18 18 M46 -46 l18 -18"/>
+      </g>
+    </g>
+    <!-- two small frames between rainbow and window -->
+    <g transform="translate(905 430)">
+      <rect x="-46" y="-56" width="92" height="112" rx="10" fill="#8f5636"/>
+      <rect x="-34" y="-44" width="68" height="88" rx="6" fill="#fbe8cf"/>
+      <path d="M-30 24 l22 -26 l16 14 l14 -20 l12 30 z" fill="#9fbf6e"/>
+      <circle cx="14" cy="-18" r="9" fill="#ffb84d"/>
+    </g>
+    <g transform="translate(905 600)">
+      <rect x="-46" y="-42" width="92" height="84" rx="10" fill="#8f5636"/>
+      <rect x="-34" y="-30" width="68" height="60" rx="6" fill="#fbe8cf"/>
+      <path d="M-22 16 q22 -34 44 0" fill="none" stroke="#e0685a" stroke-width="9" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- shelf with books and a plant, left -->
+  <g>
+    <rect x="150" y="520" width="360" height="26" rx="8" fill="#8f5636"/>
+    <rect x="185" y="430" width="34" height="90" rx="6" fill="#e0685a"/>
+    <rect x="227" y="446" width="30" height="74" rx="6" fill="#6aa7a0"/>
+    <rect x="265" y="424" width="36" height="96" rx="6" fill="#f2b544"/>
+    <rect x="309" y="452" width="28" height="68" rx="6" fill="#9fbf6e"/>
+    <g transform="translate(420 430)">
+      <rect x="-26" y="52" width="52" height="44" rx="10" fill="#d98f5c"/>
+      <path d="M0 56 q-44 -30 -34 -78 q40 8 40 60 M0 56 q40 -36 66 -22 q-10 44 -60 34" fill="#7ea757"/>
+    </g>
+  </g>
+
+  <!-- rug, centred for the portrait crop -->
+  <ellipse cx="880" cy="1120" rx="460" ry="130" fill="#e6a37a"/>
+  <ellipse cx="880" cy="1120" rx="360" ry="98" fill="#efc196"/>
+  <ellipse cx="880" cy="1120" rx="250" ry="66" fill="#e6a37a"/>
+
+  <!-- blocks and a ball on the rug -->
+  <g>
+    <rect x="700" y="1010" width="88" height="88" rx="14" fill="#e0685a"/>
+    <rect x="796" y="1042" width="70" height="70" rx="12" fill="#f2b544"/>
+    <rect x="742" y="936" width="66" height="66" rx="12" fill="#6aa7a0"/>
+    <circle cx="1010" cy="1076" r="52" fill="#6aa7a0"/>
+    <path d="M958 1076 a52 52 0 0 1 104 0" fill="#e0685a"/>
+    <circle cx="1010" cy="1076" r="52" fill="none" stroke="#8f5636" stroke-width="6" opacity=".4"/>
+  </g>
+
+  <!-- toy house, far left on the floor -->
+  <g transform="translate(300 900)">
+    <rect x="-90" y="0" width="180" height="150" rx="12" fill="#f2b544"/>
+    <path d="M-110 10 L0 -80 L110 10 z" fill="#e0685a"/>
+    <rect x="-30" y="60" width="60" height="90" rx="8" fill="#8f5636"/>
+  </g>
+
+  <!-- tall plant, far right -->
+  <g transform="translate(1680 850)">
+    <rect x="-44" y="140" width="88" height="110" rx="14" fill="#d98f5c"/>
+    <path d="M0 150 q-90 -60 -70 -170 q80 20 82 130 M0 150 q84 -80 130 -40 q-24 96 -120 66 M0 150 q-16 -120 40 -190 q46 60 -18 178" fill="#7ea757"/>
+  </g>
+</svg>

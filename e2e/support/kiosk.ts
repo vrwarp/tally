@@ -260,7 +260,7 @@ export async function bindTo(kiosk: Page, title: string | RegExp): Promise<void>
   // Not anchored at the start: the button also names the gathering and its
   // start time above the instruction, and both are in its accessible name.
   await kiosk.getByRole('button', { name: /Set kiosk$/ }).click();
-  await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
+  await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({
     timeout: 30_000,
   });
 }

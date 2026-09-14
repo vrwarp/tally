@@ -64,6 +64,8 @@ import {
   readCachedPulse,
   readCachedRoster,
   readJson,
+  readPins,
+  writePins,
   type CachedPulse,
 } from './storage';
 import { keepScreenAwake } from './wakeLock';
@@ -422,6 +424,16 @@ export function KioskApp() {
    */
   const [pairingReason, setPairingReason] = useState<PairingReason | null>(null);
   const [binding, setBinding] = useState<KioskBinding | null>(() => readBinding());
+  /**
+   * The languages this lobby offers beside English — the tablet's own setting
+   * (`readPins`), chosen on the pairing screen, and the names on the idle
+   * screen's switch.
+   */
+  const [pins, setPinsState] = useState<Locale[]>(() => readPins());
+  const setPins = useCallback((next: Locale[]) => {
+    writePins(next);
+    setPinsState(next);
+  }, []);
   const [students, setStudents] = useState<KioskStudent[]>(
     () => readCachedRoster()?.students ?? [],
   );
@@ -700,6 +712,18 @@ export function KioskApp() {
     // standing there plain.
     setOverlay(null);
   }, [binding]);
+
+  /**
+   * The staff gate's answer to a language switch that is wrong *today* — the
+   * pairing screen's pins, taken off this device now, with no network and no
+   * re-pairing. Built like `hideBackdrop`: written through so the ~4am reload
+   * keeps them off, and the idle screen standing there in English is the
+   * confirmation.
+   */
+  const englishOnly = useCallback(() => {
+    setPins([]);
+    setOverlay(null);
+  }, [setPins]);
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
@@ -2184,6 +2208,8 @@ export function KioskApp() {
       <PairingScreen
         services={services}
         reason={pairingReason}
+        pins={pins}
+        onPins={setPins}
         onPaired={(paired) => {
           setUid(paired);
           setPairingReason(null);
@@ -2411,6 +2437,8 @@ export function KioskApp() {
             trouble={printerState?.kind === 'trouble' ? printerState.message : null}
             backdrop={!!binding.kioskBackdropId}
             onHideBackdrop={hideBackdrop}
+            pins={pins}
+            onEnglishOnly={englishOnly}
             onReprint={() => {
               setBuffer('');
               setSentId(null);
@@ -2719,6 +2747,7 @@ export function KioskApp() {
          * the gathering is one of them rather than all of them.
          */
         onStaffGate={onStaffGate}
+        pins={pins}
       />
       </>
     );

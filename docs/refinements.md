@@ -500,3 +500,69 @@ start in that environment, and each produced one phantom finding as a result —
 duplicated button in round 1, a stale desktop layout in round 2 caused by `sm:`
 utilities that did not exist in the frozen stylesheet. Both critics refused to
 give a desktop verdict on the stale frame, which was the right call.
+
+---
+
+## Kiosk home screen in four languages — 10 rounds
+
+The finding arrived from the lobby rather than from a critic: members of the
+Chinese congregation who read no English could not start at the kiosk. The screen
+had a language control — three one-glyph chips beside the keys — and the people
+it was for walked past it, because 繁 is not something you look for unless you
+already know it is there.
+
+The panel was the widest this log has used. Four parents (English, Traditional
+Chinese, Simplified Chinese, and from round 7 a Spanish-speaking mother), a
+first-time family, the church staff who set the tablet up and steady the lobby,
+and — added at round 8 after the owner's own reaction to the candidates — a
+**clutter critic** whose findings are only ever subtractions. Every round shot
+the portrait tablet in all four languages from `uxr/kiosk-language/`, a harness
+that renders the real `SearchScreen` and a file of variants beside it.
+
+What was rejected, and why it is worth keeping:
+
+- **Digits first.** The one route that needs no reading — four digits — cannot
+  lead: the phone-number association is not good enough at this church.
+- **Welcomes.** Four greetings stacked at rest said the screen was multilingual
+  and nothing else; the Chinese grandmother still could not find where to begin.
+- **Voices everywhere.** The instruction repeated in every language answered the
+  finding and produced the screen the clutter critic counted at fourteen
+  objects; repetition was moved to the one place it earns its keep.
+- **The 48px grid.** Every reader refused it: on a photo Sunday three Han names
+  at that size broke mid-word, and two headlines read as two screens.
+
+What shipped is the owner's idea from round 10 — the languages in their own
+names, in a grid at the instruction's size, first — at the smaller of the two
+sizes tried. Staff put it first on both days it was tested; both Spanish
+readers on the day ("an invitation the moment one of the names is yours"); the
+English parent and the father would have taken the bar but pressed the grid
+without complaint; the grandmother preferred a plate but pressed the grid. The
+clutter critic preferred the bar to the end and called the second row a blocker,
+which is why the cap on pins exists and why the row count, not the cell height,
+is what the layout is sized around.
+
+The conditions the rounds attached to shipping it, carried into the code: a
+staff-gate row that puts the kiosk back to English only; pins per kiosk, at
+pairing, at most three, ordered, none by default, with a preview; a name that
+never wraps; the failure panel's route line saying what to try next by what
+missed, with four faint keys after it, the wider search first and brighter, the
+register door quieter and carrying its own question; chips at the band's left
+end at 44px, only for the languages the lobby offers, hidden at rest while the
+switch stands. And copy: *Type your child's name* with no "English" for Latin
+readers and 英文 for Chinese ones, *su hijo o hija*, *No aparece*,
+*voluntario* for the person at the table.
+
+One condition did not survive contact with the owner. The rounds had the
+failure panel speak every pinned language until a family chose one — three
+headings, three route lines, doors carrying three voices — for the reader who
+had typed without finding the switch. Shown live, it was turned down on sight
+as too much on the glass, and the panel speaks the kiosk's current language
+only, which is what the switch above it is for. The clock that gives the screen
+back stayed on the language, as it was, rather than on a "chosen" fact built
+for that panel.
+
+The photograph earned its own round. The grid's cells broke Chinese names on a
+photo Sunday until they were forbidden to wrap, four empty boxes standing for
+"digits" read as missing glyphs until digits were put in them, and the panel on
+a portrait tablet with three voices overran the region's top until it took a
+smaller step for its size and the sign's measure for its lines.

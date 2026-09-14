@@ -92,4 +92,18 @@ describe('LanguagePicker', () => {
     render(<LanguagePicker />);
     expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
   });
+
+  /*
+   * A lobby that has said what it speaks gets chips for those languages and
+   * no others: a chip for a language nobody in the room reads is one more
+   * thing on the glass.
+   */
+  it('offers only the languages a lobby speaks, when told them', () => {
+    render(<LanguagePicker quiet only={['en', 'zh-Hant']} />);
+    expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '繁體中文' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Español' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '简体中文' })).toBeNull();
+  });
+
 });

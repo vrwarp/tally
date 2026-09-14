@@ -15,7 +15,7 @@
  * Time is driven rather than waited through, so the poll interval can grow
  * without these getting slower.
  */
-import { act, render, screen } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PairingScreen, POLL_MS, TROUBLE_AFTER_FAILURES } from '@/kiosk/screens/PairingScreen';
 import type { KioskServices } from '@/kiosk/KioskApp';
@@ -214,5 +214,79 @@ describe('the reason a paired kiosk is here again', () => {
     expect(reason).toHaveTextContent(/retired/);
     expect(reason).toHaveTextContent(/9:12/);
     expect(reason).toHaveTextContent(/leader’s phone/);
+  });
+});
+
+/*
+ * What this lobby speaks, chosen by whoever mounts the tablet. A different
+ * fact from the picker above it — that one is the volunteer's own reading
+ * language — and kept by the kiosk, not by this screen.
+ */
+describe('the lobby’s languages', () => {
+  const pending = () => vi.fn(async () => 'pending' as const);
+
+  function pressIn(group: HTMLElement, name: string): void {
+    const button = within(group).getByRole('button', { name });
+    act(() => {
+      fireEvent.pointerDown(button);
+      fireEvent.pointerUp(button);
+    });
+  }
+
+  it('offers the pins only to a screen that can keep them', async () => {
+    render(<PairingScreen services={servicesWith(pending())} onPaired={vi.fn()} />);
+    await tick();
+    expect(screen.queryByTestId('language-pins')).toBeNull();
+  });
+
+  it('pins a language in the order it was tapped, and unpins it again', async () => {
+    const onPins = vi.fn();
+    render(
+      <PairingScreen
+        services={servicesWith(pending())}
+        onPaired={vi.fn()}
+        pins={['zh-Hant']}
+        onPins={onPins}
+      />,
+    );
+    await tick();
+    const pins = screen.getByTestId('language-pins');
+    expect(within(pins).getByRole('button', { name: '繁體中文' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    pressIn(pins, 'Español');
+    expect(onPins).toHaveBeenLastCalledWith(['zh-Hant', 'es-MX']);
+    pressIn(pins, '繁體中文');
+    expect(onPins).toHaveBeenLastCalledWith([]);
+  });
+
+  it('never offers English as a pin — it is on the switch regardless', async () => {
+    render(
+      <PairingScreen services={servicesWith(pending())} onPaired={vi.fn()} pins={[]} onPins={vi.fn()} />,
+    );
+    await tick();
+    const pins = screen.getByTestId('language-pins');
+    expect(within(pins).queryByRole('button', { name: 'English' })).toBeNull();
+    // Nothing to preview until something is pinned.
+    expect(screen.queryByTestId('language-switch')).toBeNull();
+  });
+
+  it('shows the volunteer the switch a family will see', async () => {
+    render(
+      <PairingScreen
+        services={servicesWith(pending())}
+        onPaired={vi.fn()}
+        pins={['zh-Hant', 'es-MX']}
+        onPins={vi.fn()}
+      />,
+    );
+    await tick();
+    const preview = screen.getByTestId('language-switch');
+    expect(Array.from(preview.querySelectorAll('button')).map((cell) => cell.textContent)).toEqual([
+      'English',
+      '繁體中文',
+      'Español',
+    ]);
   });
 });

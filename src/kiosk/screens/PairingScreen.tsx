@@ -11,6 +11,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 import { InstallPrompt } from '../components/InstallPrompt';
 import { LanguagePicker } from '../components/LanguagePicker';
+import { LanguageSwitch } from '../components/LanguageSwitch';
+import { useTap } from '../components/tapGuard';
+import { haptic } from '@/lib/utils';
+import { DEFAULT_LOCALE, LOCALES, LOCALE_LABELS, type Locale } from '@/lib/locales';
+import { MAX_PINS } from '../storage';
 import type { PairingReason } from '../session';
 import { useLocale, useTranslations } from 'use-intl';
 
@@ -52,10 +57,15 @@ const TROUBLE_KEYS = {
   stuck: 'stuck',
 } as const satisfies Record<PairingTrouble, 'noCode' | 'stuck'>;
 
+/** One frozen empty list, so a screen given no pins does not re-render on a fresh one. */
+const NO_PINS: readonly Locale[] = [];
+
 export function PairingScreen({
   services,
   reason = null,
   onPaired,
+  pins = NO_PINS,
+  onPins,
 }: {
   services: KioskServices;
   /**
@@ -65,9 +75,14 @@ export function PairingScreen({
    */
   reason?: PairingReason | null;
   onPaired: (uid: string) => void;
+  /** The languages this lobby offers beside English, in the order it offers them. */
+  pins?: readonly Locale[];
+  /** Absent on a harness that only wants the code; the chips are drawn only with it. */
+  onPins?: (pins: Locale[]) => void;
 }) {
   const t = useTranslations('Pairing');
   const locale = useLocale();
+  const tap = useTap();
   const [code, setCode] = useState<string | null>(null);
   const [trouble, setTrouble] = useState<PairingTrouble | null>(null);
   const pairedRef = useRef(onPaired);
@@ -236,6 +251,66 @@ export function PairingScreen({
         * ~4am reload alike.
         */}
       <LanguagePicker />
+
+      {/*
+        * What this lobby speaks, beside what this volunteer reads.
+        *
+        * The picker above is the setup language — whoever is mounting the
+        * tablet, reading this screen. These chips are a different fact about
+        * a different set of people: the languages the families in this lobby
+        * read, which the check-in screen then offers at its top in their own
+        * names (`LanguageSwitch`), in the order tapped. Set here because it
+        * belongs with the rest of the mount — a property of the tablet on the
+        * wall, like its printer — and taken off again from the staff gate.
+        *
+        * A miniature of the switch as it will stand, once anything is chosen:
+        * the volunteer is deciding what a family will see, and the honest way
+        * to show a layout is the layout.
+        */}
+      {onPins && (
+        <div className="flex w-full max-w-md flex-col items-center gap-3">
+          <div className="text-base font-medium text-ink-300">{t('pinLanguages')}</div>
+          <div
+            role="group"
+            aria-label={t('pinLanguages')}
+            data-testid="language-pins"
+            className="flex flex-wrap items-center justify-center gap-2"
+          >
+            {LOCALES.filter((candidate) => candidate !== DEFAULT_LOCALE).map((candidate) => {
+              const pinned = pins.includes(candidate);
+              return (
+                <button
+                  key={candidate}
+                  type="button"
+                  tabIndex={-1}
+                  lang={candidate}
+                  aria-pressed={pinned}
+                  {...tap(() => {
+                    if (!pinned && pins.length >= MAX_PINS) return;
+                    haptic();
+                    onPins(pinned ? pins.filter((pin) => pin !== candidate) : [...pins, candidate]);
+                  })}
+                  className={`flex h-14 min-w-24 items-center justify-center rounded-xl px-5 text-lg font-semibold ${
+                    pinned
+                      ? 'bg-ink-700 text-ink-50 ring-2 ring-ink-400'
+                      : 'bg-ink-800/70 text-ink-400 ring-1 ring-ink-700 active:bg-ink-700 active:text-ink-100'
+                  }`}
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  {LOCALE_LABELS[candidate]}
+                </button>
+              );
+            })}
+          </div>
+          <div className="max-w-md text-sm leading-relaxed text-ink-400">{t('pinHint')}</div>
+          {pins.length > 0 && (
+            <div className="flex w-full flex-col items-center gap-2 pt-2">
+              <div className="text-sm text-ink-500">{t('pinPreview')}</div>
+              <LanguageSwitch names={[DEFAULT_LOCALE, ...pins]} preview />
+            </div>
+          )}
+        </div>
+      )}
 
       {/*
         * The best moment to install, and the reason the offer is here rather

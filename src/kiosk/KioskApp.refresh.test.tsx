@@ -168,7 +168,7 @@ function searchEveryone(): HTMLElement {
  * sentence around it.
  */
 function noMatchLine(): string | null {
-  const line = screen.queryByText(/no match — first time here\?/i);
+  const line = screen.queryByText(/no match$/i);
   return line ? line.textContent!.replace(/\s+/g, ' ').trim() : null;
 }
 
@@ -265,7 +265,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
 
     expect(screen.getByText(/No connection just now/)).toBeTruthy();
     // Emphatically not "still no match": nobody looked.
-    expect(noMatchLine()).toBe('No match — first time here?');
+    expect(noMatchLine()).toBe('No match');
   });
 
   it('shows the half of the answer that landed', async () => {
@@ -292,7 +292,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
 
     // "Still" is the sweep's one visible trace: the church has been asked,
     // and the honest next doors are the register and a leader.
-    expect(noMatchLine()).toBe('Still no match — first time here?');
+    expect(noMatchLine()).toBe('Still no match');
   });
 
   it('answers the next family from the sweep it just ran, without sweeping again', async () => {
@@ -308,7 +308,7 @@ describe('the silent sweep for somebody the cached roster does not hold', () => 
     // Answered from the sweep a minute ago rather than a second one: a queue
     // of latecomers is one clump, and it must not be one sweep each.
     expect(services.refreshDirectory).toHaveBeenCalledTimes(1);
-    expect(noMatchLine()).toBe('Still no match — first time here?');
+    expect(noMatchLine()).toBe('Still no match');
   });
 
   it('never fires for a search that is still being typed', async () => {
@@ -392,7 +392,7 @@ describe('the Search everyone button', () => {
     expect(searchEveryone().getAttribute('aria-busy')).toBe('false');
     expect(screen.getByText('Search everyone').className).not.toContain('invisible');
     expect(searchEveryone().querySelector('.animate-spin')).toBeNull();
-    expect(noMatchLine()).toBe('Still no match — first time here?');
+    expect(noMatchLine()).toBe('Still no match');
   });
 
   it('looks like work even when the answer was already in hand', async () => {
