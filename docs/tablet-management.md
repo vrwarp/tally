@@ -118,7 +118,11 @@ EMM, which is the supported path and the only one with a quota.
 | ManageEngine Mobile Device Manager Plus, free edition | free permanently, up to 25 devices | The recommendation for a church. Binds to managed Google Play with an ordinary Google account, has a form for Chrome's managed configuration and a raw-JSON box beside it, and does single-app kiosk. A ministry with three tablets never leaves the free tier. |
 | A small commercial EMM that speaks dedicated devices (TinyMDM, Esper, Scalefusion, Hexnode, Miradore …) | roughly £1–3 per device per month; several have free tiers under ~10–30 devices | Also fine. Most accept an AMAPI policy JSON more or less verbatim, or expose the same fields as toggles. |
 | Google Workspace endpoint management | included, but **not at the tier a church is likely on** | Settled: managed app configuration is listed as *Android app settings*, an **Advanced** mobile management feature, and Advanced needs Business Plus or better. Basic — which is what Business Starter, Cloud Identity Free and the donated Google Workspace for Nonprofits grant come with — enforces lock screens and account wipes and cannot push a Chrome configuration at all. Dedicated-device/kiosk mode is not in the Workspace feature set at any tier. So an existing Workspace subscription is very unlikely to be the answer, which is worth knowing before somebody spends an afternoon in the Admin console. |
+| Microsoft Intune, via the non-profit grant | free for 10 seats (M365 Business Premium) to a registered charity | Worth checking **first** if the church already runs Microsoft 365 for staff mail, because then it is already paid for. Intune has first-class Android Enterprise dedicated-device support and a Chrome app-configuration designer. The grant needs charity paperwork; an existing tenant needs nothing. |
+| JumpCloud free tier | free for 10 users | A real EMM with dedicated-device policies. Its free tier counts *users*, which is an awkward unit for tablets nobody signs in to. |
 | Headwind MDM or another self-hosted EMM | a VM | Not AMAPI — a legacy Device Policy Controller. Works, but it is another server the church now runs. |
+| Google Test DPC (`afw#testdpc`) | free, unlimited, no account anywhere | **Not a deployment. An instrument** — see §4.6. It will set device owner and push Chrome's managed configuration, which is exactly enough to prove §4.3 on a bench tablet in twenty minutes. It is Google's own words a "testing application"; it has no remote anything, and the evidence that it can hold Chrome in an unattended boot-into-kiosk state is thin. Use it to learn, not to run Sundays. |
+| Miradore free tier | free, 50 devices | Looks like the obvious answer and is not: managed configurations and kiosk mode are both behind the paid tier, so the free plan can do neither thing this document needs. |
 | Screen pinning, by hand, on the device | free | Android's own single-app lock. No remote anything, no Wi-Fi push, no update window, and a volunteer can leave it with a long-press. Worth knowing about as the zero-effort floor, not as the answer. |
 | A kiosk-browser app (Fully Kiosk Browser and friends) | ~€7 once | **Fatal for a printing kiosk.** These render in Android's System WebView, and WebUSB is not exposed in WebView. The Brother QL simply is not reachable. Fine for a kiosk that never prints; nothing else. |
 
@@ -352,6 +356,44 @@ itself, both before the first Sunday:
 Reaching `chrome://policy` on a locked kiosk means unlocking it, so do both while the tablet is
 still being staged and before the kiosk profile is applied.
 
+### 4.6 Proving all of it on a bench tablet, for nothing
+
+Before any of §3 is chosen, before a licence is bought and before a church is asked to enrol
+anything, every uncertain claim in this document can be settled on one spare Android tablet in about
+twenty minutes, with no account, no console, no quota and no money.
+
+Google publishes **Test DPC**, the open-source reference Device Policy Controller it built to
+exercise the Android Enterprise APIs. On a factory-reset tablet, typing `afw#testdpc` into the
+Google account field at setup makes it the device owner. From there its *Manage app restrictions*
+screen writes Chrome's managed configuration directly — the same `RestrictionsManager` bundle a real
+EMM would push, arriving by a different road.
+
+That is enough to answer everything §8 asks:
+
+1. Set `WebUsbAllowDevicesForUrls` on `com.android.chrome` and check `chrome://policy` per §4.5.
+   Wrong encoding or a bad rule shows up here as *Status: Error* or as a missing policy, and you can
+   try the array and the string forms against each other in a minute — which settles §4.3 for real
+   rather than by reading vendor documentation.
+2. Plug the Brother in, open the kiosk in Chrome, run the `getDevices()` line from §4.5. This is the
+   whole premise of the pre-grant, tested.
+3. Then **install the kiosk to the home screen** — Tally already offers this itself, from
+   `src/kiosk/install.ts` — and run the same line again inside the installed app. Chrome mints a
+   WebAPK for it, which is the same rendering path an AMAPI web app uses, minted differently. If
+   `getDevices()` still returns the printer there, §8's first open question is closed and the web-app
+   kiosk in §4 is safe. If it comes back empty in the WebAPK but full in the tab, take the
+   Chrome-as-kiosk fallback instead.
+
+**What Test DPC will not do, and why it is not the deployment.** Nothing in it manages anything
+remotely: a changed Wi-Fi password, a new origin in `URLAllowlist`, a printer from a different
+vendor — each is a walk to each tablet and a JSON blob retyped on a touchscreen. Device owner can
+only be set during provisioning, so a tablet staged this way must be wiped to move to a real EMM
+later. And the kiosk half is doubtful: lock task mode requires the foreground app to call
+`startLockTask()`, Chrome does not call it on itself, and what makes a real dedicated device boot
+straight back into its app is the EMM's own launcher standing in as HOME — which is what AMAPI's
+`installType: KIOSK` provides and Test DPC, a settings-poking app rather than a launcher, does not
+appear to. Google calls it "a testing application to flex the APIs"; that is exactly what it is good
+for, and the reason it belongs in this section and not in §3.
+
 ---
 
 ## 5. What this buys, and what it does not
@@ -473,6 +515,8 @@ tablets.
 ---
 
 ## 8. Open questions — things only a tablet can answer
+
+All but the last are answerable this week, on a spare tablet, for nothing. §4.6 is how.
 
 - Does `WebUsbAllowDevicesForUrls` reach a **WebAPK** context, or only tabs in Chrome proper? A
   WebAPK runs on Chrome's engine and policy should apply, but this is inference, not a tested fact,
