@@ -57,7 +57,17 @@ interface StoredMessages {
  * warm start over, and only the second is what a deploy changes.
  */
 function shapeOf(node: unknown): unknown {
-  if (node === null || typeof node !== 'object') return 1;
+  if (typeof node !== 'object') return 1;
+  /*
+   * `typeof null` is `'object'`, so this is the line that stops
+   * `Object.entries(null)` from throwing — but no catalogue reaches it. JSON
+   * has nulls; `messages/` never holds one, because a null message is an empty
+   * string to the parity test in tests/messages.test.ts, which fails the build
+   * long before this module loads. The clause stays because `shapeOf` takes
+   * `unknown` and the next caller may not be handing it a catalogue.
+   */
+  // Stryker disable next-line ConditionalExpression: unreachable — see above.
+  if (node === null) return 1;
   return Object.fromEntries(
     Object.entries(node as Record<string, unknown>).map(([key, value]) => [key, shapeOf(value)]),
   );
@@ -107,6 +117,13 @@ export async function loadCatalog(locale: Locale): Promise<KioskCatalog> {
       }
     })();
     memory.set(locale, loaded);
+    /*
+     * English never gets here, so this cannot be observed: `memory` is seeded
+     * with it and `cachedCatalog` answers on the first line. The guard is the
+     * statement that the bundled slice is never worth a storage write, and it
+     * would start mattering the moment English stopped being seeded.
+     */
+    // Stryker disable next-line ConditionalExpression: unreachable for `en` — see above.
     if (locale !== DEFAULT_LOCALE) {
       writeJson(KIOSK_KEYS.messages, { locale, shape: EN_SHAPE, messages: loaded });
     }
