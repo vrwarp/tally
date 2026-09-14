@@ -912,3 +912,168 @@ rejected by the API. And its remedy for Android's "Open Chrome to handle this de
 device access is not one. The **Always allow** checkbox during staging is the part of that remedy
 that works, and [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5, which was
 written against the Chromium sources, remains the more trustworthy account.
+
+---
+
+## 10. The plan
+
+Ordered so that the thing that matters (§4.6 — the pre-grant working on a real tablet) is proved
+before a line of code is written, and so that every phase after it is independently shippable. No
+phase depends on a later one. Phases 1–2 are the ones that pay for themselves on the WebUSB
+priority; 3–6 are the rest of §6.
+
+### Phase 0 — the field trial. No code.
+
+The only phase that can invalidate the others, so it goes first, and it needs nothing merged.
+
+1. **Prove the printer path** on one tablet, unmanaged, with the chooser (§4.6 step 0). Print a
+   label. Read `vendorId`/`productId` off *Recent printer events* on the printer screen and check
+   them against §4.3 — this is also the first real use of the log as an instrument rather than as a
+   post-mortem.
+2. **Provision that tablet to device owner**, whichever of §4.6's two routes suits (`afw#testdpc`
+   from a reset, or `dpm set-device-owner` over adb with the accounts removed).
+3. **Revoke the manual grant** in Chrome's site settings. This is the step that makes the rest a
+   test rather than a rehearsal; skip it and the pass is false.
+4. **Set `WebUsbAllowDevicesForUrls`** in Test DPC → Managed configurations → Chrome, vendor-only.
+   Note which editor Test DPC renders — one text box or a nested bundle — because that is the
+   answer to the last live question in §8, and it decides how Phase 3's page should present the
+   value.
+5. **Verify per §4.5**: `chrome://policy` shows *Status: OK*, then `getDevices()` returns the
+   printer with no chooser. Reboot, edit the value, reboot again — the Android 14 caution in §4.6.
+6. **Toggle keep-awake**, and leave the tablet running with the printer attached for a week.
+
+**What Phase 0 decides.** If step 5 fails, nothing below matters and §7 (ChromeOS) is the
+conversation instead. If it passes, Phases 1–2 become worth building and the remaining phases are
+ordinary product work.
+
+### Phase 1 — the kiosk notices a pre-grant
+
+The one code change the WebUSB priority actually needs, and it is not where you would expect.
+
+**The problem.** `ready()` (`src/kiosk/printing/index.ts:680`) opens with
+`const stored = readPrinterConfig(); if (!stored) { setState({ kind: 'idle' }); return; }` — and the
+printing chunk is only imported at all when `tally:kiosk:printer` is set. So a tablet that has a
+policy pre-grant but has *never been manually paired here* never calls `getDevices()`, never sees
+the printer, and shows the setup flow as if nothing were connected. **The pre-grant is invisible to
+exactly the kiosk it was configured for.** That is the whole point of the policy defeated by a
+boot-time guard written before the policy existed.
+
+**The change.** A boot probe that runs before the chunk decision:
+
+- New `src/lib/printerVendor.ts` exporting `BROTHER_VENDOR_ID = 0x04f9`. The number currently lives
+  only inside `@vrwarp/brother-ql-webusb`; Phases 1–3 all need it, so it gets a home and a comment
+  explaining that it is a USB-IF constant and not a property of anyone's printer.
+- In the kiosk boot path, when there is no stored config: `navigator.usb?.getDevices()`, filtered to
+  that vendor. A device means a policy grant. Only then import the printing chunk and let `ready()`
+  adopt it.
+- `ready()` gains a path for *granted but unconfigured*: adopt the device, write the config, land in
+  `ready`.
+
+**Why it must be a bare probe and not an early chunk import.** `scripts/check-kiosk-budget.mjs` is a
+hard build gate ([`kiosk-performance.md`](kiosk-performance.md)), and pulling the printing module
+into every boot to answer a question most kiosks answer "no" to would spend the budget on nothing.
+`navigator.usb.getDevices()` is three lines and no import. Guard it: `navigator.usb` is undefined in
+jsdom and on non-Chromium engines, and `getDevices()` rejects rather than resolving empty in some
+states.
+
+**Tests.** `src/kiosk/printing/index.test.ts` already mocks `navigator.usb` (`usb.paired`,
+`getPairedDevices`), so the new cases sit beside the existing ones: granted-and-unconfigured adopts;
+granted-and-configured is unchanged; ungranted-and-unconfigured still short-circuits without
+importing; `navigator.usb` absent is idle, not a crash. Add a budget-check assertion that a boot
+with no printer does not pull the chunk.
+
+### Phase 2 — the printer screen says what it knows
+
+Two small things on `src/kiosk/screens/PrinterScreen.tsx`, both from the device object it already
+holds.
+
+- **Say *set by policy*.** Phase 1 knows the difference between a device adopted from a chooser
+  grant and one that appeared without one. The screen's copy, argued at length in
+  [`kiosk-printer-setup.md`](kiosk-printer-setup.md), currently assumes somebody must connect a
+  printer; it should not offer *Connect a printer* to a kiosk whose printer is pre-granted, and
+  should say so rather than going quiet.
+- **Hand back the policy line.** Once connected, show the finished rule for *this* printer with a
+  copy button — §6.5. This is what makes §4.6 step 0 and the policy one continuous action.
+
+**Strings.** Every new line needs an entry in `messages/kiosk/en.json` and its three siblings
+(`es-MX`, `zh-Hans`, `zh-Hant`), plus a `messages/translation-state.json` record carrying a
+`context` sentence. See [`i18n.md`](i18n.md) and the [glossary](../messages/GLOSSARY.md). The policy
+JSON itself is not translated and must not be — it is a machine value in a `<code>`.
+
+### Phase 3 — the staging page
+
+A third Vite entry beside `index` and `kiosk` (`vite.config.ts:112-117`): `setup.html`, public, no
+auth, no framework.
+
+It needs no server-side configuration at all, which is the pleasing part: **`location.origin` is
+exactly the origin the policy needs**, so the page computes its own correct answer wherever it is
+deployed, and `BROTHER_VENDOR_ID` from Phase 1 supplies the rest. Each §4.2 key with a copy button,
+ordered so `URLBlocklist` and `URLAllowlist` come last (§4.6 step 2). Present the value in whichever
+shape Phase 0 step 4 found Test DPC renders — and show both if it turns out to vary.
+
+Not staff-gated, for the reasons in §6.3: there is nothing secret on it, and a login would mean
+signing a staff Google account into the browser of a tablet about to face the public.
+
+### Phase 4 — battery and charging on the device row
+
+Independent of everything above; do it whether or not a single tablet is ever enrolled.
+
+- `reportStanding` (`src/kiosk/services.ts:342`) gains `batteryLevel` and `charging` from
+  `navigator.getBattery()`.
+- `KioskDeviceDoc` (`src/types/index.ts:946`) gains both as optional, in the way `boundTo` already
+  is.
+- `firestore.rules:1434`: extend `touchesOnly(['lastSeenAt', 'boundTo', 'boundChain'])` and
+  `validKioskReport()` — a number in 0..1 and a boolean, both optional. Tests in `firestore-tests/`.
+- `src/features/team/PersonPanel.tsx:431` renders it next to `isKioskLive`.
+
+**The invariant.** An older kiosk that never writes these must keep passing `validKioskReport()`.
+The Battery Status API is absent on some engines and can reject; the report must survive that
+without failing, because the report is also the kiosk's liveness oracle
+(`src/kiosk/session.ts` — `StandingOutcome`).
+
+### Phase 5 — the quiet hour, said out loud
+
+`isQuietHour()` is a hard-coded `4` inside `src/kiosk/KioskApp.tsx:367`. Lift it to a named export
+so §4.1's maintenance window can be stated as *the same hour the kiosk reloads* rather than as a
+coincidence. Small, and it stops two numbers that must agree from being invisible to each other.
+
+### Phase 6 — zero-touch pairing
+
+`src/kiosk/` reads no URL parameters today. Add `?pair=` to the kiosk boot, entering the existing
+`startKioskPairing` → `approveKioskPairing` → `claimKioskToken` handshake
+(`functions/src/kiosk/pairing.ts`) at step 3 instead of step 1, and an app-side screen to mint a
+pre-approved pairing and show the URL.
+
+**Two things that are not optional.** The token is a credential, so it stays off Phase 3's public
+page and on its own gated, shown-once path. And it must be stripped from the URL the moment it is
+claimed (`history.replaceState`), or it lives in the kiosk's history for weeks.
+
+### Phase 7 — fold the findings back
+
+Phase 0 answers §8. Whatever it finds, this document and
+[`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5 both want updating: how often
+Android's own dialog actually appears, whether the Android 14 editing defect bites, and which editor
+Test DPC renders. Then the campaign moves into [`refinements.md`](refinements.md) with the others.
+
+### Pitfalls the implementation must respect
+
+1. The boot probe must not import the printing chunk. `check-kiosk-budget.mjs` fails the build, and
+   it should.
+2. `navigator.usb` does not exist in jsdom or on non-Chromium engines. Every new path needs the
+   undefined case, and `getDevices()` can reject rather than resolve empty.
+3. A pre-granted device has no chooser gesture behind it, so nothing about Phase 1 may depend on
+   transient activation — the constraint noted at `index.ts:929`.
+4. Phase 4 must not make `reportStanding` fail. It is the oracle that distinguishes *retired* from
+   *offline*; a rejected battery promise must not look like a refusal.
+5. Compare device identity by `===` first, then vendor/product/serial — never vendor alone
+   (`index.ts:420-421`). Vendor alone is right for the *policy*, and wrong for deciding whether the
+   thing that just disconnected is ours.
+6. New strings need all four locales and a `translation-state.json` context line, or the i18n check
+   fails.
+
+### What is deliberately not in the plan
+
+- **Any AMAPI client in Tally.** §2.
+- **The kiosk lockdown half of §4.6.** Nice-to-have; screen pinning is the answer until it isn't.
+- **Hosting a COSU XML.** Only needed if the lockdown half is ever taken.
+- **A fleet dashboard.** Phase 4 is the answer to "is the tablet alright", and it is enough.
