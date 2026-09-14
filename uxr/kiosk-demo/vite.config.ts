@@ -1,40 +1,36 @@
 /**
- * The kiosk set-up demo, built to publish.
+ * Builds the live demo as one static page — `kiosk.html` and its hashed
+ * assets under `./assets/` — with relative URLs, so the output can be served
+ * from any folder: the walkthrough artifact publishes it as supporting files.
  *
- * A separate config rather than a fourth entry in the app's own: this build is
- * for a page that gets handed to somebody, so it wants `base: './'` (published
- * artifacts serve no root) and none of the PWA plumbing, and the app's build
- * should not grow an output nobody deploys.
- *
- * The ICU parser is deliberately *not* swapped out here. The app aliases
- * `use-intl/format-message` to a format-only build and compiles its catalogues
- * at build time to match; this demo skips both, pays the 15 kB, and reads the
- * same `messages/kiosk/en.json` the kiosk ships.
+ * The app's own config, minus the PWA plugin (a demo has no service worker to
+ * install) and with the demo folder as the root. Run from the repository root
+ * so Tailwind's source scan covers `src/`.
  */
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+// @ts-expect-error — plain Node ESM, deliberately untyped: it has to run
+// standalone as `--check` with no toolchain around it (see tests/messages.test.ts).
+import { compileMessages } from '../../scripts/vite-compile-messages.mjs';
+
+const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
-  root: fileURLToPath(new URL('.', import.meta.url)),
+  root: here('.'),
   base: './',
-  plugins: [react(), tailwindcss()],
+  define: { __E2E_HOOKS__: 'false' },
+  plugins: [compileMessages(), react(), tailwindcss()],
   resolve: {
-    alias: [{ find: '@', replacement: fileURLToPath(new URL('../../src', import.meta.url)) }],
+    alias: [
+      { find: '@', replacement: here('../../src') },
+      { find: /^use-intl\/format-message$/, replacement: 'use-intl/format-message/format-only' },
+    ],
   },
   build: {
-    outDir: fileURLToPath(new URL('../../uxr/renders/kiosk-demo-dist', import.meta.url)),
+    outDir: process.env.KIOSK_DEMO_OUT ?? here('../renders/kiosk-demo/dist'),
     emptyOutDir: true,
-    // One file each, so the publish is three paths rather than a directory
-    // listing that changes shape every time a chunk splits.
-    rollupOptions: {
-      output: {
-        inlineDynamicImports: true,
-        entryFileNames: 'kiosk.js',
-        chunkFileNames: 'kiosk.js',
-        assetFileNames: 'kiosk[extname]',
-      },
-    },
+    rollupOptions: { input: { kiosk: here('./kiosk.html') } },
   },
 });

@@ -319,8 +319,11 @@ export function StaffScreen({
             })}
             className={DOOR}
           >
-            <span className="min-w-0 truncate">{t('englishOnly')}</span>
-            <span className="shrink-0 font-normal whitespace-nowrap text-ink-400">
+            {/* The label keeps its width and the names give way — three of
+                them at the row's size took "English only" down to "Eng…",
+                and a door that cannot be read is a door pressed blind. */}
+            <span className="shrink-0">{t('englishOnly')}</span>
+            <span className="min-w-0 truncate text-base font-normal text-ink-400 kiosk:text-xl">
               {pins.map((pin) => LOCALE_LABELS[pin]).join(' · ')}
             </span>
           </button>
