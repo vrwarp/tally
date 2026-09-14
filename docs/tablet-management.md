@@ -320,17 +320,55 @@ schema validator behind it, and **a rule that fails validation is dropped silent
 back to prompting, the kiosk looks merely un-configured, and nothing anywhere says why. The rules,
 in the order people trip over them:
 
-- **Identifiers are base-10 integers, never hex.** `0x04f9` is the number Brother publishes and the
-  number every other document uses; the policy wants `1273`. A hex string fails the schema and takes
-  the whole rule with it. This is the single commonest mistake.
-- **`product_id` cannot appear without `vendor_id`.** A rule carrying only a product id is invalid.
-  The reverse is fine and is what you usually want: `vendor_id` alone matches every model that
-  vendor makes, which is how a QL-700 swapped for a QL-820NWB on a Sunday morning needs no policy
-  edit at all.
-- **Origins must be `https://`, and only the origin is read.** Scheme, host and port; a path such as
-  `/kiosk` is ignored during matching, and wildcards are rejected. (`URLAllowlist`, one row up, is a
-  different policy and *does* take paths — the two look alike and behave differently.)
-- **Both `urls` and `devices` are mandatory.** A dictionary missing either is dropped.
+Chromium's own policy definition
+([`WebUsbAllowDevicesForUrls.yaml`](https://source.chromium.org/chromium/chromium/src/+/main:components/policy/resources/templates/policy_definitions/ContentSettings/WebUsbAllowDevicesForUrls.yaml))
+settles the matching rules in one sentence, quoted here because the whole §4.6 staging story rests
+on it:
+
+> Omitting the `vendor_id` field will create a policy matching any device. Omitting the `product_id`
+> field will create a policy matching any device with the given vendor ID. A policy which has a
+> `product_id` field without a `vendor_id` field is invalid.
+
+And the schema itself:
+
+```yaml
+schema:
+  items:
+    properties:
+      devices:
+        items:
+          properties:
+            product_id: { type: integer, minimum: 0, maximum: 65535 }
+            vendor_id:  { type: integer, minimum: 0, maximum: 65535 }
+      urls:
+        items: { type: string }
+    required: [devices, urls]
+```
+
+From which, in the order people trip over them:
+
+- **A vendor-wide grant is explicitly supported.** `vendor_id` alone matches every product that
+  vendor makes. Neither identifier is in the schema's `required` list; only `devices` and `urls`
+  are. This is the line §4.6 depends on, and it is Chromium's, not an inference.
+- **Identifiers are base-10 integers, never hex.** The schema says `type: integer`, 0 to 65535.
+  `0x04f9` is the number Brother publishes and every other document uses; the policy wants `1273`.
+  A hex string is not an integer, fails validation, and takes the whole rule with it. This is the
+  single commonest mistake.
+- **`product_id` without `vendor_id` is invalid**, in those words. The reverse is fine and is what
+  you want.
+- **Both `urls` and `devices` are mandatory.** A dictionary missing either is dropped — this is the
+  `required` list above, and Chromium's description says the same.
+- **Only the origin is read, and an invalid URL voids the rule.** "The URL must be valid, otherwise
+  the policy is ignored." Permission is granted to a *top-level origin*, so a path such as `/kiosk`
+  does no work here. Use the bare origin, as Chromium's own example does. (`URLAllowlist`, one row
+  up, is a different policy that *does* take paths — the two look alike and behave differently.)
+  Note that `https://` is required by **WebUSB**, which needs a secure context, rather than by this
+  schema; the practical rule is the same, but a plain `http://` origin fails in the API, not in the
+  policy parser, so it will not show as a policy error.
+- **It refreshes without a restart** (`dynamic_refresh: true`), so a corrected value takes effect
+  without rebooting the tablet — useful during staging.
+- **It overrides everything below it**: `DefaultWebUsbGuardSetting`, `WebUsbAskForUrls`,
+  `WebUsbBlockedForUrls`, and the user's own choices.
 
 For Tally's kiosk, matching the vendor and leaving the model open — which is not a shortcut but the
 correct choice, because it is exactly what the kiosk's own `getPairedDevices()` does, because a
@@ -350,17 +388,23 @@ The decimal identifiers for the printers a church check-in desk actually has:
 | Zebra ZD410 / ZD420 | `0x0A5F` / `0x011A` | 2655 | 282 |
 | Dymo LabelWriter 450 | `0x0922` / `0x0020` | 2338 | 32 |
 
-**How the value is encoded depends on the console, and this is not settled.** Chrome's Android
-managed-configuration schema takes simple list policies (`URLBlocklist`, `URLAllowlist`) as real
-string arrays, but complex policies whose items are dictionaries are commonly carried as a *JSON
-string* instead:
+**Both encodings work, and this *is* settled.** An earlier revision of this section said consoles
+disagree about whether to send a real JSON array or a JSON string, and left it to be tested. That
+was needless worry. Chrome's Android policy bridge,
+[`PolicyConverter.java`](https://source.chromium.org/chromium/chromium/src/+/main:components/policy/android/java/src/org/chromium/components/policy/PolicyConverter.java),
+accepts `Boolean`, `String`, `Integer`, `String[]`, `Bundle` and `Bundle[]` from the app-restrictions
+bundle — and for the two structured forms it converts to JSON and hands the result to the same
+native entry point a plain string uses, with the comment: *"the native code already accepts
+arbitrary JSON strings"*.
+
+So a console that sends a structured `Bundle[]` and one that sends
 
 ```json
 "WebUsbAllowDevicesForUrls": "[{\"devices\":[{\"vendor_id\":1273}],\"urls\":[\"https://tally.example.org\"]}]"
 ```
 
-Consoles disagree about which form they send, and the failure looks identical either way: no error,
-no printer. Do not reason about it — read the answer off the device, per §4.5.
+arrive at the same place. Whichever form the tool in front of you offers is the right one. §4.5
+still verifies, but it is verifying the *content* of the rule, not the shape of its container.
 
 ### 4.4 Enrolling
 
@@ -439,6 +483,11 @@ tablet.**
 same number on every Brother product ever made. It is not a property of the church's unit, its
 model, or its serial. And because the rule omits `product_id` (which it should, per §4.3), nothing
 in it depends on which Brother is in the building.
+
+That a vendor-only rule is legal is not an inference from a worked example. Chromium's policy
+definition says it outright — *"Omitting the `product_id` field will create a policy matching any
+device with the given vendor ID"* — and neither identifier appears in the schema's `required` list.
+§4.3 quotes both.
 
 Three consequences, and the church has exactly the shape of problem they solve:
 
@@ -541,13 +590,12 @@ bricked afternoon.
   just cut off the page you are still copying from. WebUSB first, privacy keys next, the two URL
   lists at the very end — and make sure the allowlist includes wherever the setup page lives if you
   ever want to reach it again.
-- **Whether you paste at all depends on how Chrome declares the policy.** §4.3's unsettled question
-  surfaces here in its most concrete form. If Chrome's app-restriction schema declares
-  `WebUsbAllowDevicesForUrls` as a string, Test DPC renders one text box and you paste the JSON into
-  it. If it declares it as a nested bundle, Test DPC renders a small structured editor instead —
-  and then there is nothing to paste, because you are typing `1273` into an integer field and the
-  origin into a string field. Either is fine. The second is arguably *better*, since a typed integer
-  cannot be a malformed JSON document. Look at the screen before deciding you have a problem.
+- **You may not paste at all, and that is fine.** Test DPC renders whatever Chrome's app-restriction
+  schema declares. If that is a string, you get one text box and paste the JSON into it. If it is a
+  nested bundle, you get a small structured editor and type `1273` into an integer field instead —
+  arguably the better outcome, since a typed integer cannot be a malformed JSON document. §4.3
+  establishes that Chrome accepts both forms, so whichever appears on the screen is correct. Look
+  before concluding anything is wrong.
 
 **3. Keep the screen on.** Test DPC → *Keep the device on while plugged in*. One toggle, and it is
 the fix `src/kiosk/wakeLock.ts` cannot make for itself: a wake lock is a request Android refuses on
@@ -807,9 +855,6 @@ you there and §4.5 is the instrument.
   it is the one failure that would otherwise need a re-enrolment to undo.
 - Does Test DPC's kiosk mode survive a reboot? No, from its source (§4.6) — recorded because it is
   the reason the kiosk half is optional here, not because anything depends on it.
-- Which encoding does the chosen console send for `WebUsbAllowDevicesForUrls` — a real JSON array or
-  a JSON string (§4.3)? Answered by `chrome://policy` on the first tablet, not by reading anybody's
-  documentation.
 - With the pre-grant in force, how often does Android's own dialog actually appear in a week of
   real Sundays? Phase 5 predicts "on the first `open()` after a re-attach"; the printer event log
   the reliability work added is the instrument that can answer it.
