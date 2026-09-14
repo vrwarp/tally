@@ -14,11 +14,12 @@ policy-managed, and the policy they need is specific enough that only Tally can 
 should **emit** that policy, not **be** the thing that applies it. Google's own terms say so, the
 quota says so, and the blast radius says so.
 
-The applier chosen here is **Google's own Test DPC** — free, accountless, and enough for a handful
-of tablets in one building, with two named gaps this document does not paper over. What follows is
-the argument (§2), the policy stated once in AMAPI's vocabulary (§4), the runbook that applies it
-and the bill that comes with it (§4.6–§4.9), and the five small changes inside Tally that make a
-managed tablet worth having (§6).
+And the goal is narrower than the list above suggests. Exactly one of those properties cannot be
+held without a managed device — the printer's pre-grant — and it is the one that fails in front of a
+queue. The applier chosen for it is **Google's own Test DPC**: free, accountless, provisioned once
+per tablet and then left alone. What follows is the argument (§2), the policy stated once in AMAPI's
+vocabulary because that form outlives any particular applier (§4), the runbook and its honest bill
+(§4.6–§4.9), and the five small changes inside Tally that make a managed tablet worth having (§6).
 
 ---
 
@@ -39,6 +40,13 @@ that they are one problem.
 
 Six of the seven are exactly the dedicated-device (kiosk) solution set of Android Enterprise. The
 seventh — battery — turns out not to need an EMM at all, which matters below.
+
+**They are not equally important, and the ranking is what makes this tractable.** Only the first
+genuinely requires a managed device and only the first fails in front of a queue of parents; it is
+the priority, and §4.6 is built around it alone. The screen and the battery have answers that are
+one toggle and one field of code respectively. The lockdown wants — not leaving the kiosk, coming
+back after a power cut — are nice-to-haves with a free approximation (Android's own screen pinning),
+and treating them as requirements is what pushes this whole subject into needing an EMM.
 
 ---
 
@@ -115,16 +123,19 @@ that is, and Tally's contribution is to know exactly what the policy should say.
 
 ## 3. The shape that works: state the policy once, apply it with Test DPC
 
-Tally states the policy. Something else applies it. **The chosen applier is Google's own Test DPC**
-(§4.6), for three reasons: it is free with no account, no quota and no third party holding
-device-owner authority over the church's hardware; it covers more of §1 than its reputation suggests
-(kiosk mode, lock task, managed configurations, keep-awake, an update window — all confirmed in its
-source, §4.7); and at three tablets the thing an EMM actually sells you, remote change, is a walk
-across the lobby.
+**The goal is narrower than §1 makes it look.** Of the seven wants, one genuinely requires a managed
+device — the WebUSB pre-grant — and it is the one that fails in front of a queue. The lockdown is a
+nice-to-have; screen pinning covers most of it for free. That narrowing decides everything else.
 
-It is not free of cost, it is free of *money*. §4.8 is the bill: two of §1's seven wants are not
-delivered, and the rest is staged by hand on each tablet. Read it before committing, and read §4.9
-for the line at which this stops being the right answer.
+Tally states the policy. Something else applies it, and **the chosen applier is Google's own
+Test DPC** (§4.6): free, no account, no quota, no third party holding device-owner authority over
+the church's hardware. Provision once, paste one value into Chrome's managed configuration, walk
+away — app restrictions are persistent state, so nothing needs re-arming and no reboot disturbs
+them.
+
+Test DPC's real weakness is that kiosk mode does not survive a reboot. That is in the half not being
+taken. §4.8 is the honest bill anyway, and §4.9 is the line at which this stops being the right
+answer.
 
 The alternatives are kept below, because the decision should be re-made when the ministry grows,
 when the first Sunday goes badly, or when somebody reading this has different facts. Everything
@@ -256,6 +267,11 @@ this is not merely one option:
 > This is strongly recommended for kiosk devices because this is the only way apps persistently
 > pinned to the foreground can be updated by Play.
 
+(This argument has exactly one premise, and §4.6 removes it: it holds for an app *pinned* to the
+foreground. An unpinned Chrome on a shelf tablet updates the ordinary way. Read the rest of this
+section as the reason the window matters *if* you take the kiosk half, and as tidiness if you do
+not.)
+
 A tablet pinned to the kiosk with no maintenance window is a tablet whose Chrome never updates —
 and the reason is worth spelling out, because it is not obvious. `AUTO_UPDATE_DEFAULT`, the ordinary
 per-app update mode, waits for four constraints at once: the device idle, on an unmetered network,
@@ -351,6 +367,9 @@ the QR the console mints is scanned, or a token is typed into the Google account
 for a console-managed enrolment, **`afw#testdpc` for the route chosen here**. Budget twenty minutes
 for the first tablet and five for each after.
 
+One exception, and it is the useful one for tablets already in service: device owner *can* be
+granted after setup over adb, while no accounts exist on the device. §4.6 step 1 has the command.
+
 Worth doing while the tablets are still on a desk: print the enrolment QR and leave a laminated copy
 at the check-in desk. A tablet that dies on a Sunday is then a factory reset, a scan and three
 minutes, done by whoever is standing there, rather than a phone call.
@@ -377,121 +396,136 @@ itself, both before the first Sunday:
    `navigator.usb` being `undefined` means the page is not in Chrome proper — a WebView container, or
    an insecure origin.
 
-Reaching `chrome://policy` on a locked kiosk means unlocking it, so do both while the tablet is
-still being staged and before the kiosk profile is applied.
+Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both while the tablet is
+still being staged, before anything in §4.6's optional half is applied.
 
-### 4.6 Applying it with Test DPC — the runbook
+### 4.6 The part that actually needs a managed device
 
-**Test DPC** is the open-source reference Device Policy Controller Google publishes to exercise the
-Android Enterprise APIs. It is a real device owner with a settings UI instead of a cloud console.
-There is no account, no tenant, no quota and no subscription; the tablet answers to nobody but the
-person holding it.
+Of everything in §4, exactly one thing cannot be done on a consumer tablet by a volunteer with
+twenty minutes: **`WebUsbAllowDevicesForUrls`**. Chrome only reads it from an app-restrictions bundle
+pushed by a device owner. Every other line — the screen staying awake, the update window, the
+lockdown, the allowlist — is a nicety, an optimisation, or reachable another way.
 
-Everything below was read out of [its source](https://github.com/googlesamples/android-testdpc)
-rather than inferred, because its documentation is thin and most write-ups about it are wrong in
-both directions.
+So the goal is narrow, and the route is correspondingly small:
 
-**Stage 1 — provision.** Factory reset the tablet. At the setup wizard's Google account field, type
-`afw#testdpc`. Android fetches Test DPC and makes it device owner. Join the church Wi-Fi when asked.
+> Make Test DPC the device owner. Paste one value into Chrome's managed configuration. Walk away.
 
-**Stage 2 — the COSU config.** Test DPC has a dedicated-device mode (COSU, *corporate-owned
-single-use*) driven by an XML file it downloads at provisioning time from a URL carried in the
-enrolment QR's admin extras (`com.afwsamples.testdpc.COSU_CONFIG` in the provisioning bundle). This
-is the closest thing to central configuration the route has, and it is worth using: one file, served
-from one place, and every tablet provisions identically.
+That is the whole deployment. It is a one-time job per tablet with **no ongoing management at all**,
+because app restrictions are *persistent state*: the system stores the bundle and hands it to Chrome
+through `RestrictionsManager` on every start, for the life of the provisioning. Nothing re-arms it,
+nothing expires, and no reboot disturbs it.
 
-```xml
-<cosu-config mode="single">
-  <kiosk-apps>
-    <app package-name="com.android.chrome" />
-  </kiosk-apps>
-  <policies>
-    <global-setting name="stay_on_while_plugged_in" value="7" />
-    <disable-status-bar />
-    <disable-keyguard />
-    <disable-screen-capture />
-    <user-restriction name="no_factory_reset" />
-    <user-restriction name="no_safe_boot" />
-    <user-restriction name="no_debugging_features" />
-    <user-restriction name="no_install_unknown_sources" />
-  </policies>
-</cosu-config>
-```
+That last point is what makes this route work where §4.8 previously said it wouldn't. The thing
+Test DPC cannot hold across a reboot is *lock task mode*, which is entered by a running activity and
+is session state. The WebUSB grant is not that. **Kiosk lockdown is the fragile half and the
+pre-grant is the durable half, and only the durable half is needed.**
 
-`mode="single"` launches the first kiosk app directly; `mode="custom"` shows Test DPC's own kiosk
-launcher with the listed apps on it, which is what you want if the printer utility ever needs to be
-reachable. `stay_on_while_plugged_in` is a bitmask — `7` is AC | USB | wireless, the direct
-equivalent of §4's `stayOnPluggedModes`, and it is the fix `wakeLock.ts` cannot make for itself.
+#### The runbook
 
-Tally can serve this file (§6.3). Firebase Hosting is already deployed, the URL is stable, and it
-puts the church's tablet configuration in the same repository as the thing it configures.
+**1. Get to device owner.** Two ways in; neither needs a console, an account or a network service.
 
-**Stage 3 — the managed configuration, by hand.** The COSU XML has **no key for app restrictions** —
-`kiosk-apps`, `download-apps`, `hide-apps`, `user-restriction`, `global-setting` and the `disable-*`
-flags are the whole vocabulary. So `WebUsbAllowDevicesForUrls` and the rest of §4.2 are entered
-per-tablet, in Test DPC → **Managed configurations** → Chrome.
+- **`afw#testdpc`** — factory reset, and at the setup wizard's Google account field type
+  `afw#testdpc`. Android fetches Test DPC and makes it device owner.
+- **adb, without a factory reset** — if the tablets are already set up, this is usually quicker.
+  Device owner can be granted post-setup *only* over adb and *only* while no accounts exist on the
+  device, so remove every account in Settings first, then:
 
-Do not type them. The WebUSB value is a quote-heavy one-liner and a touchscreen keyboard is how
-§4.3's failure modes happen. Get it onto the tablet's clipboard instead — §6.3 is the proposal for
-Tally serving a paste-ready page for exactly this.
+  ```
+  adb shell dpm set-device-owner "com.afwsamples.testdpc/.DeviceAdminReceiver"
+  ```
 
-**Stage 4 — the rest of the policy.** Test DPC's own screens carry it: *Manage lock task list* for
-the lock-task allowlist, *Kiosk mode → Start kiosk mode* to enter it, and the system update policy
-screen for §4.1's windowed maintenance window.
+  Install Test DPC from Play beforehand. If the command refuses, an account is still on the device —
+  that is almost always what it means.
 
-**Stage 5 — verify.** §4.5, before you leave the tablet. `chrome://policy` will be unreachable
-afterwards.
+**2. Set the managed configuration.** Test DPC → **Managed configurations** → Chrome. Enter
+`WebUsbAllowDevicesForUrls` per §4.3, and as much of §4.2 as you want (the privacy keys —
+`PasswordManagerEnabled`, `AutofillAddressEnabled`, `BrowserSignin` — are cheap and worth it on a
+tablet that takes parents' phone numbers).
+
+Do not type the WebUSB value. It is a quote-heavy one-liner and a touchscreen keyboard is precisely
+how §4.3's failure modes happen. Put it on the tablet's clipboard — §6.3 is the proposal for Tally
+serving a page that does this properly.
+
+**3. Keep the screen on.** Test DPC → *Keep the device on while plugged in*. One toggle, and it is
+the fix `src/kiosk/wakeLock.ts` cannot make for itself: a wake lock is a request Android refuses on
+low battery, and this is a device setting it does not get to refuse.
+
+**4. Verify before you leave the tablet.** §4.5 — `chrome://policy` for *Status: OK*, then
+`getDevices()` with the printer plugged in.
+
+**Set it right the first time.** There are reports of an Android 14 defect where some policy values
+become stuck after a reboot and cannot be changed without re-enrolling. Change the value once and
+reboot to confirm it is still editable, while the tablet is still on the desk.
+
+#### The optional half
+
+None of this is needed for the printer. Each is a separate decision, and skipping all of them costs
+nothing that §4.6 delivers.
+
+- **Stopping people leaving the kiosk.** Android's own **screen pinning** (Settings → Security) needs
+  no device owner, no policy and no EMM: a volunteer taps to pin, and leaving needs a deliberate
+  gesture. It is most of the benefit of lock task for none of the cost, and it is the right answer
+  here unless somebody is actively misusing the tablet.
+- **Lock task and a real kiosk.** Test DPC has *Manage lock task list* and *Kiosk mode → Start kiosk
+  mode*, and a dedicated-device (COSU) mode driven by an XML config it downloads at provisioning
+  from a URL in the enrolment QR's admin extras — that config sets lock-task packages, hides apps,
+  applies user restrictions and disables the status bar and keyguard. It is genuinely capable. It
+  also has to be re-entered by hand after every reboot, because nothing in Test DPC registers a
+  persistent HOME activity. Worth setting up only if somebody will be there to notice.
+- **The update window (§4.1).** Much less pressing now. The "`WINDOWED` is the only way" argument
+  applies to an app *pinned to the foreground*, which never satisfies `AUTO_UPDATE_DEFAULT`'s
+  not-in-the-foreground constraint. An unpinned Chrome updates the ordinary way — idle, charging,
+  unmetered — which a shelf tablet is every night. Setting the window (Test DPC has the screen) is
+  still tidier, because it puts updates in the same hour as the kiosk's own reload. It is no longer
+  load-bearing.
 
 ### 4.7 The same policy, in both vocabularies
 
-§4 is written in AMAPI's words because that is the durable statement of intent. This is how each
-line reaches a Test DPC tablet.
+§4 is written in AMAPI's words because that is the durable statement of intent, and the one every
+console in §3 speaks. This is how each line reaches a Test DPC tablet, and which lines are simply
+not being taken.
 
-| §4 intent | AMAPI | Test DPC |
-| --- | --- | --- |
-| Boot into the kiosk, cannot be left | `installType: KIOSK` | COSU `mode="single"` + `kiosk-apps`, **but see §4.8** |
-| Lock-task allowlist | implied by `KIOSK` | *Manage lock task list* |
-| The WebUSB pre-grant, and all of §4.2 | `managedConfiguration` | *Managed configurations* → Chrome, **by hand, per tablet** |
-| Screen never sleeps | `stayOnPluggedModes` | `<global-setting name="stay_on_while_plugged_in" value="7"/>` |
-| No lock screen | `keyguardDisabled` | `<disable-keyguard/>` |
-| No status bar or notifications | `kioskCustomization.statusBar` | `<disable-status-bar/>` |
-| No settings, no safe boot, no reset, no adb | `factoryResetDisabled`, `debuggingFeaturesAllowed`, `advancedSecurityOverrides` | `<user-restriction name="no_factory_reset"/>` and friends |
-| Update window (§4.1 — mandatory for a pinned app) | `systemUpdate: WINDOWED` | the system update policy screen |
-| Wi-Fi pushed centrally | `openNetworkConfiguration` | — join it by hand at provisioning |
-| Kiosk as its own app | `webApps` + `FULL_SCREEN` | — Chrome is the kiosk app; set `HomepageLocation` in the managed configuration |
-| Battery and health visible remotely | `statusReportingSettings` | — **§6.1 instead**, which is the better answer anyway |
+| §4 intent | AMAPI | Test DPC | Needed? |
+| --- | --- | --- | --- |
+| **The WebUSB pre-grant** | `managedConfiguration` | *Managed configurations* → Chrome, per tablet | **the whole point** |
+| The rest of §4.2 | `managedConfiguration` | same screen | cheap, worth it |
+| Screen never sleeps | `stayOnPluggedModes` | *Keep the device on while plugged in* | yes, one toggle |
+| Boot into the kiosk, cannot be left | `installType: KIOSK` | COSU `mode="single"`, re-armed by hand after each reboot | no — screen pinning instead |
+| Lock-task allowlist | implied by `KIOSK` | *Manage lock task list* | no |
+| No lock screen, no status bar | `keyguardDisabled`, `kioskCustomization.statusBar` | COSU `<disable-keyguard/>`, `<disable-status-bar/>` | no |
+| No settings, safe boot, reset, adb | `factoryResetDisabled`, `debuggingFeaturesAllowed` | COSU `<user-restriction .../>` | no |
+| Update window | `systemUpdate: WINDOWED` | system update policy screen | optional — see §4.6 |
+| Wi-Fi pushed centrally | `openNetworkConfiguration` | — join by hand | no |
+| Kiosk as its own app | `webApps` + `FULL_SCREEN` | — Chrome is the browser; `HomepageLocation` if wanted | no |
+| Battery and health visible | `statusReportingSettings` | — **§6.1 instead**, which is better anyway | yes, via Tally |
 
 ### 4.8 What you are accepting
 
-Two of §1's seven wants are not delivered, and pretending otherwise is how a Sunday goes wrong.
+Much less than the previous revision of this document claimed, because the gap it worried about was
+in the half that is not being taken.
 
-- **A reboot leaves the kiosk.** This is the significant one. Nothing in Test DPC registers a
-  persistent HOME activity — there is no such control in the app, and its COSU code does not set one
-  — and its boot receiver only tells the device owner the user has unlocked. Kiosk mode is *entered*
-  by a person tapping *Start kiosk mode*. So after a power cut the tablet comes up on the stock
-  launcher and someone has to put it back. Mitigations, in order: keep the tablet on mains through
-  something that rides out a flicker; put "if the tablet restarted: open Test DPC → Start kiosk
-  mode" on a card beside the shelf; and test the full power-off/power-on cycle before the first
-  Sunday rather than discovering it on one. An EMM's `installType: KIOSK` is precisely what this
-  buys, and it is the honest reason to leave (§4.9).
-- **Nothing changes remotely.** A new Wi-Fi password, a new origin in `URLAllowlist`, a printer from
-  a different vendor: each is a walk to each tablet. At three tablets in one building this is a
-  ten-minute job a couple of times a year — the identifiers in §4.3 are static, and the origin
-  changes about never. At two campuses it is a car journey and the calculus inverts.
+- **Nothing changes remotely.** A new origin in `URLAllowlist`, a printer from a different vendor,
+  a different Wi-Fi password: each is a walk to the tablet. How often does that happen? The vendor
+  and product identifiers in §4.3 are fixed properties of hardware, and Tally's origin changes about
+  never. Realistically this is a ten-minute visit every year or two — and the tablet is in the lobby.
+- **Device owner is only grantable at provisioning** (or over adb on an account-less device). Moving
+  to an EMM later means factory-resetting each tablet. Cheap — a kiosk tablet holds nothing and
+  Tally's pairing is a code — but not free.
+- **No fleet visibility.** Test DPC reports to nobody. This is the one that would genuinely hurt, and
+  it is why §6.1 is first in §6: the kiosk can report its own battery and charging state into the row
+  it already writes, which is better than what an EMM would tell you anyway, because it is reported
+  by the thing you actually care about staying up.
 
-And one structural fact worth knowing before you start: **device owner can only be set during
-provisioning.** Moving to an EMM later means factory-resetting every tablet. That is cheap here — a
-kiosk tablet holds nothing, and Tally's pairing is a code — but it is not free, and it is a reason
-to make the §4.9 call deliberately rather than by drift.
+What is *not* on this list any more: the reboot. Kiosk mode not surviving one is real (§4.6) and
+irrelevant to a tablet that is not in kiosk mode.
 
 ### 4.9 When to stop using Test DPC
 
-Any one of these, and the answer becomes a real EMM from the §3 table:
-
 - More than one building, or tablets nobody on staff can walk to.
-- A second reboot incident that nobody noticed until a parent said something.
 - More than about six tablets, at which point per-device hand-staging stops being a morning.
-- Anyone other than the person who set it up needing to change the policy.
+- Somebody starts misusing the tablet and screen pinning is not enough, so real lockdown is wanted
+  — and wanted *reliably*, across reboots, which is the thing Test DPC cannot do.
+- Anyone other than the person who staged them needing to change the policy.
 
 None of these is a failure of the decision. They are the conditions under which it was never the
 right one, written down now while it is cheap to be honest about them.
@@ -556,29 +590,25 @@ device, two numbers have to agree and only one of them is visible. Lift the hour
 (and, if a church ever needs it, to `config/settings`), so §4.1's window can be stated as "the same
 hour the kiosk reloads" rather than as a coincidence.
 
-### 6.3 Serve the staging kit
+### 6.3 Serve the value that must not be mistyped
 
-The Test DPC route has two things it wants from a server, and Tally is already a deployed one with a
-stable origin. Both are static, both are derived from configuration Tally already holds, and
-together they are the difference between staging a tablet in five minutes and staging one wrongly.
+This shrinks to one page, because the route shrank. The COSU XML of §4.6's optional half needs
+hosting only if the kiosk lockdown is taken; the thing that is always needed is a way to get
+`WebUsbAllowDevicesForUrls` onto a tablet's clipboard without anyone typing it.
 
-1. **The COSU config, at a fixed URL.** `/kiosk/cosu.xml`, served by Firebase Hosting, which the
-   enrolment QR's admin extras point at (§4.6, stage 2). This is the one piece of the route that is
-   central rather than per-device, and putting it in this repository means the tablets' configuration
-   is reviewed and versioned like everything else here.
-2. **A paste-ready page for the managed configuration.** `/kiosk/setup`, staff-gated, showing each
-   §4.2 key with a copy button — the WebUSB value built from this deployment's real origin and the
-   printer vendor from the printing module rather than from a worked example, so §4.3's failure modes
-   cannot be typed in. Stage 3 of §4.6 becomes: open this page on the tablet, copy, paste, next key.
+`/kiosk/setup`, staff-gated: each §4.2 key with a copy button, the WebUSB value built from **this
+deployment's** real origin and the printer vendor read from the printing module rather than from a
+worked example. Step 2 of §4.6 becomes: open this page on the tablet, copy, paste into Test DPC,
+next key.
 
-The maintenance window comes from the quiet hour (§6.2), the origin from the deployment, the vendor
-from the code. Nothing here is a control plane — no service account, no quota, no permissible-usage
-problem, and nothing Tally can do to a tablet on a bad day. It is Tally knowing its own deployment
-well enough to write the configuration down correctly, which is the honest form of "Tally supports
-tablet management".
+That is a small page, and it is the difference between a staging step that works and one that fails
+silently — every failure mode in §4.3 is a typo, and a typo produces no error, just a kiosk that
+asks for a printer it was supposed to already have. Tally is the only thing that knows the right
+answer for a given deployment, so it is the right thing to say it out loud.
 
-If the church ever moves to an EMM (§4.9), the same generator emits the §4 policy JSON for its
-console. The inputs are identical; only the output format changes.
+If the church ever moves to an EMM (§4.9), the same generator emits §4's policy JSON for its
+console, and the COSU XML for the optional half in the meantime. The inputs are identical; only the
+output format changes.
 
 ### 6.4 Zero-touch pairing through `startUrl`
 
@@ -641,9 +671,12 @@ you there and §4.5 is the instrument.
   the browser drawing the page. It matters again the day the church moves to an EMM and the web app
   of §4 comes back. To settle it early: install the kiosk to the home screen — Tally offers this
   itself, from `src/kiosk/install.ts` — and run §4.5's `getDevices()` line inside the installed app.
-- Does Test DPC's kiosk mode survive a reboot on the church's actual hardware? §4.8 says no, from
-  its source. Test the full power-off/power-on cycle anyway: it is the single most consequential
-  thing about this route, and the only one where being wrong is good news.
+- Does the managed configuration survive a reboot, and can it still be *changed* afterwards? The
+  first is how app restrictions are specified to work; the second is where the reported Android 14
+  defect bites (§4.6). Set the value, reboot, edit it, reboot again — five minutes on the desk, and
+  it is the one failure that would otherwise need a re-enrolment to undo.
+- Does Test DPC's kiosk mode survive a reboot? No, from its source (§4.6) — recorded because it is
+  the reason the kiosk half is optional here, not because anything depends on it.
 - Which encoding does the chosen console send for `WebUsbAllowDevicesForUrls` — a real JSON array or
   a JSON string (§4.3)? Answered by `chrome://policy` on the first tablet, not by reading anybody's
   documentation.
