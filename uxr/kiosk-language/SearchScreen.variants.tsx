@@ -1423,23 +1423,10 @@ export function SearchScreenVariant({
             * geometry: absolutely positioned, so the count cannot push the
             * letters off centre or move a row.
             */}
-          {matchCount > 0 && (
-            /* The count swaps edges with the chips (see PromotedChips): both
-               are absolute, both cheap to move, and the count is the one
-               that cannot be pressed by mistake. */
-            <span className={`absolute ${VARIANTS[variant]?.Picker ? 'left-0' : 'right-0'} text-sm text-ink-400 kiosk:text-base`}>
-              {/*
-                * A number while the list is all of it, a sentence when it is
-                * not. `MAX_RESULTS` is eight, and "8 names" over a list that
-                * was cut from twenty-three is a complete-looking answer to an
-                * incomplete search — the parent scrolls all eight, finds
-                * nobody, and the doors left to them include the one that
-                * registers a child the church already has. Past the cap the
-                * only useful thing to say is the thing that works.
-                */}
-              {t('matchCount', { count: matchCount })}
-            </span>
-          )}
+          {/* No count (round 9's cut): while every row fits, the eye has
+              counted; past the cap the body's own sentence says the useful
+              thing, and "8 names" over a list cut from twenty-three was a
+              complete-looking answer to an incomplete search. */}
         </div>
       </div>
 
@@ -1614,7 +1601,7 @@ const COPY: Record<
     orDigits: 'o los últimos 4 dígitos de su teléfono',
     thenTap: 'Luego toque el nombre de su niño o niña.',
     tapHere: 'Toque aquí',
-    noMatch: 'No encontramos ese nombre.',
+    noMatch: 'No lo encontramos.',
     routeDigits: 'Los acentos no importan. Revise lo que escribió, o pida ayuda a un voluntario.',
     routeName: 'Pruebe escribiendo el nombre de su niño o niña, o pida ayuda a un voluntario.',
     offerFirstTime: '¿Primera vez? Inscríbalos aquí',
@@ -1824,13 +1811,18 @@ function NoMatchPanel({ mode, onWiden, onRegister, chosen, pins }: NoMatchProps)
           </span>
         ))}
       </div>
-      <div className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-balance text-ink-100 tall:max-w-md ${many ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'}`}>
-        {distinct(route).map((candidate) => (
-          <span key={candidate} lang={candidate}>
-            {route(candidate)}
-          </span>
-        ))}
-      </div>
+      {/* The route sentence only once a language is chosen (round 9's cut):
+          said three times it was three paragraphs between the heading and
+          the doors, and the doors are the route. One language, one sentence. */}
+      {chosen !== null && (
+        <div className="mx-auto flex max-w-sm flex-col gap-1 text-center text-xl leading-snug text-balance text-ink-100 tall:max-w-md kiosk:text-2xl">
+          {distinct(route).map((candidate) => (
+            <span key={candidate} lang={candidate}>
+              {route(candidate)}
+            </span>
+          ))}
+        </div>
+      )}
       {/* The wider search first — the door most of the queue wants — and the
           register door second, carrying its own question so that nobody
           already registered presses it; both at the quiet weight, every
