@@ -42,7 +42,7 @@ const ONE_TICK_MS = 70_000;
 const ABANDONED_MS = 2 * 60_000;
 
 const CHOOSER = /which gathering is this kiosk for/i;
-const SEARCH = /^type a name$/i;
+const SEARCH = /^type your child’s name$/i;
 
 /** A gathering that is over half a minute from now, and nothing else notable. */
 function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {

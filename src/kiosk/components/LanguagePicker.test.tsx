@@ -8,7 +8,7 @@
  * a lobby's language is a property of the tablet on the wall, and must never
  * be written to the key a counselor's phone reads.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@/test/rtl';
 import { useLocaleControl } from '@/i18n/localeContext';
 import { LanguagePicker } from './LanguagePicker';
@@ -91,5 +91,37 @@ describe('LanguagePicker', () => {
   it('is a labelled group, so it reads as one choice', () => {
     render(<LanguagePicker />);
     expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument();
+  });
+
+  /*
+   * A lobby that has said what it speaks gets chips for those languages and
+   * no others: a chip for a language nobody in the room reads is one more
+   * thing on the glass.
+   */
+  it('offers only the languages a lobby speaks, when told them', () => {
+    render(<LanguagePicker quiet only={['en', 'zh-Hant']} />);
+    expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '繁體中文' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Español' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '简体中文' })).toBeNull();
+  });
+
+  /*
+   * The search screen routes a press through the kiosk's own record of "a
+   * family chose this", which is what arms the clock that gives the screen
+   * back. The picker then sets nothing itself.
+   */
+  it('lets the screen own the choice, when it asks to', () => {
+    const onChoose = vi.fn();
+    const seen: string[] = [];
+    function Owned() {
+      const { locale } = useLocaleControl();
+      seen.push(locale);
+      return <LanguagePicker quiet onChoose={onChoose} />;
+    }
+    render(<Owned />);
+    press('繁體中文');
+    expect(onChoose).toHaveBeenCalledWith('zh-Hant');
+    expect(seen).toEqual(['en']);
   });
 });

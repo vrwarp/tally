@@ -89,7 +89,7 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
    * to make impossible. Same English, so nothing in a catalogue comparison
    * could see it.
    */
-  ['Search.typeAName', 'KioskBackdrop.previewTypeAName'],
+  ['Search.typeChildsName', 'KioskBackdrop.previewTypeChildsName'],
   ['Team.title', 'Nav.team'],
   ['Settings.title', 'Nav.settings'],
 
@@ -242,20 +242,33 @@ export const REQUIRED_WORDING: readonly {
   key: string;
   text: Partial<Readonly<Record<TargetLocale, string>>>;
   why: string;
-}[] = (
-  [
-    'Register.labelFirstName',
-    'Register.labelLastName',
-    'Register.placeholderChildFirst',
-    'Register.placeholderChildLast',
-    'Register.placeholderYourFirst',
-    'Register.placeholderYourLast',
-  ] as const
-).map((key) => ({
-  key,
-  text: { 'zh-Hans': '英文', 'zh-Hant': '英文' },
-  why: 'The kiosk keyboard is Latin-only, so this name can only be typed in English.',
-}));
+}[] = [
+  ...(
+    [
+      'Register.labelFirstName',
+      'Register.labelLastName',
+      'Register.placeholderChildFirst',
+      'Register.placeholderChildLast',
+      'Register.placeholderYourFirst',
+      'Register.placeholderYourLast',
+    ] as const
+  ).map((key) => ({
+    key,
+    text: { 'zh-Hans': '英文', 'zh-Hant': '英文' },
+    why: 'The kiosk keyboard is Latin-only, so this name can only be typed in English.',
+  })),
+  /*
+   * The same constraint on the search screen. A Chinese reader is told to type
+   * the child's *English* name, on the idle prompt and again on the line that
+   * suggests trying the name after four digits found nobody — dropping 英文
+   * from either sends them looking for a script the keyboard does not have.
+   */
+  ...(['Search.typeChildsName', 'Search.afterPhoneMiss'] as const).map((key) => ({
+    key,
+    text: { 'zh-Hans': '英文', 'zh-Hant': '英文' },
+    why: 'The kiosk keyboard is Latin-only, so the name it asks for is the English one.',
+  })),
+];
 
 export function flatten(obj: Messages, prefix = ''): Map<string, string> {
   const out = new Map<string, string>();

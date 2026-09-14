@@ -100,8 +100,16 @@ export function cachedCatalog(locale: Locale): KioskCatalog | null {
  * the main app does: a chunk that will not load — the stale-service-worker
  * failure the kiosk's own worker is written around — must degrade to a readable
  * screen in the wrong language, never a blank one.
+ *
+ * `store: false` is for a language fetched on somebody else's behalf — the
+ * pinned voices the failure panel speaks (`voices.ts`) — so that warming three
+ * catalogues at boot cannot overwrite the one slice `localStorage` holds, which
+ * is for the language the kiosk is actually in.
  */
-export async function loadCatalog(locale: Locale): Promise<KioskCatalog> {
+export async function loadCatalog(
+  locale: Locale,
+  { store = true }: { store?: boolean } = {},
+): Promise<KioskCatalog> {
   const held = cachedCatalog(locale);
   if (held) return held;
   try {
@@ -118,13 +126,13 @@ export async function loadCatalog(locale: Locale): Promise<KioskCatalog> {
     })();
     memory.set(locale, loaded);
     /*
-     * English never gets here, so this cannot be observed: `memory` is seeded
-     * with it and `cachedCatalog` answers on the first line. The guard is the
-     * statement that the bundled slice is never worth a storage write, and it
-     * would start mattering the moment English stopped being seeded.
+     * English never gets here — `memory` is seeded with it and `cachedCatalog`
+     * answers on the first line — so that half of the guard is a statement:
+     * the bundled slice is never worth a storage write, and it would start
+     * mattering the moment English stopped being seeded. The other half is
+     * what `voices.ts` asks for, and `messages.test.ts` holds it.
      */
-    // Stryker disable next-line ConditionalExpression: unreachable for `en` — see above.
-    if (locale !== DEFAULT_LOCALE) {
+    if (store && locale !== DEFAULT_LOCALE) {
       writeJson(KIOSK_KEYS.messages, { locale, shape: EN_SHAPE, messages: loaded });
     }
     return loaded;

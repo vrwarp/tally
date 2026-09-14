@@ -33,13 +33,14 @@
  * in the wrong place besides. A labelled key in a fixed position can be
  * described over the phone; the prompt is what makes it safe to be findable.
  */
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
 import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { tallyRender } from '../renderTally';
 import { EventName } from '../components/EventName';
 import { Keyboard, type KioskKey } from '../components/Keyboard';
 import { LanguagePicker } from '../components/LanguagePicker';
+import { LanguageSwitch } from '../components/LanguageSwitch';
 import { useTap, useTapGuard, type TapHandlers } from '../components/tapGuard';
 import type { KioskRefresh } from '../KioskApp';
 import {
@@ -50,8 +51,11 @@ import {
   type KioskBinding,
 } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
+import { EN_KIOSK_CATALOG } from '../messages';
+import { spokenLanguages, type Voices } from '../voices';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/locales';
 import { useGrades } from '@/hooks/usePureStrings';
-import { useLocale, useTranslations } from 'use-intl';
+import { createTranslator, useLocale, useTranslations } from 'use-intl';
 
 function gradeLabel(grades: GradeStrings, grade: number | null): string {
   return grade === null ? '' : gradeDescription(grades, grade);
@@ -395,6 +399,256 @@ const SearchConsole = memo(function SearchConsole({
 });
 
 /**
+ * Four faint keys, saying "digits" without a word.
+ *
+ * Beside "or the last 4 digits of your phone" for the reader who cannot read
+ * it — the wordless route the Chinese congregation's parents asked for. Digits
+ * inside the boxes rather than four empty ones: empty boxes are what a missing
+ * glyph looks like, and the one reader this is for is exactly the one who
+ * would take them for that.
+ */
+function DigitsCue() {
+  return (
+    <span aria-hidden="true" className="ml-2 inline-flex items-center gap-1 align-middle">
+      {['1', '2', '3', '4'].map((digit) => (
+        <span
+          key={digit}
+          className="inline-flex h-5 w-4 items-center justify-center rounded-sm bg-ink-800 text-xs leading-none font-semibold text-ink-500 ring-1 ring-ink-600 tall:h-6 tall:w-5 tall:text-sm"
+        >
+          {digit}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The `Search` strings the failure panel says, in one language. */
+interface SearchVoice {
+  (key: 'noMatch' | 'afterNameMiss' | 'afterPhoneMiss' | 'searchEveryone' | 'offerFirstTime'): string;
+  rich(key: 'stillNoMatch', values: { pulse: (chunks: ReactNode) => ReactNode }): ReactNode;
+}
+
+interface VoiceWords {
+  locale: Locale;
+  heading: ReactNode;
+  route: string;
+  widen: string;
+  register: string;
+}
+
+/**
+ * One door, in every language the panel is speaking.
+ *
+ * The first voice sets the label; the others follow underneath, smaller and
+ * dimmer, so that a family who chose nothing still meets a button they can
+ * read. Duplicate words — two scripts that spell a door the same — collapse
+ * to one line. The widen door keeps `WidenButton`'s manners: a spinner over an
+ * invisible label, so the button is one width in both states, and an
+ * `aria-label` so it keeps its name while its face is a spinner.
+ */
+function VoiceDoor({
+  voices,
+  pick,
+  onPress,
+  primary = false,
+  busy = false,
+  label,
+}: {
+  voices: readonly VoiceWords[];
+  pick: (voice: VoiceWords) => string;
+  onPress: () => void;
+  primary?: boolean;
+  busy?: boolean;
+  label?: string;
+}) {
+  const tap = useTap();
+  const lines = voices.filter(
+    (voice, index) => voices.findIndex((other) => pick(other) === pick(voice)) === index,
+  );
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={label}
+      aria-busy={busy}
+      {...tap(() => {
+        haptic();
+        onPress();
+      })}
+      className={`relative flex min-h-14 w-full flex-col items-center justify-center rounded-xl px-6 py-2 text-ink-100 tall:min-h-16 lg:flex-1 ${
+        primary ? 'bg-ink-700 ring-1 ring-ink-500 active:bg-ink-600' : 'bg-ink-800 active:bg-ink-700'
+      }`}
+      style={{ touchAction: 'manipulation' }}
+    >
+      <span className="flex flex-col items-center">
+        {lines.map((voice, index) => (
+          <span
+            key={voice.locale}
+            lang={voice.locale}
+            className={`${busy ? 'invisible ' : ''}${
+              index === 0
+                ? lines.length > 1
+                  ? 'text-base leading-tight font-semibold kiosk:text-lg'
+                  : 'text-lg leading-tight font-semibold kiosk:text-xl'
+                : 'text-sm leading-tight text-ink-300 kiosk:text-base'
+            }`}
+          >
+            {pick(voice)}
+          </span>
+        ))}
+      </span>
+      {busy && (
+        <span className="absolute block h-6 w-6 animate-spin rounded-full border-2 border-ink-600 border-t-ink-100" />
+      )}
+    </button>
+  );
+}
+
+/**
+ * Nothing matched, said in every language the lobby offers.
+ *
+ * The family this panel is for has, by definition, not found the language
+ * switch — they typed, and the kiosk answered in a language they may not
+ * read. So until somebody chooses a language it speaks all of them: a heading
+ * per voice, then the way forward per voice, then the two doors carrying every
+ * voice at once. Repetition is spent here on purpose; it is the failure state,
+ * and the one screen whose reader has already failed to read. Once a language
+ * is chosen the panel speaks only that one, in the shipped shape.
+ *
+ * The way forward depends on what missed. After a name, the phone's four
+ * digits — with the four faint keys, for the reader who cannot read the
+ * sentence — or a person; after four digits, the name, or a person. The wider
+ * search leads the doors, and brighter, because it is the commonest correct
+ * move: a child who is in the directory but not this gathering's pool. The
+ * register door follows, quieter, carrying its own question so that nobody
+ * already registered presses it.
+ *
+ * Inside the scrolling results region on purpose: this file promises that
+ * typing never moves the keyboard, and a block that appeared the moment a
+ * name matched nobody would be the one thing that did. The heading holds the
+ * top of the ramp, where the rows were, because that is where a parent is
+ * looking; the doors fall to the foot of the region, a hand's width above the
+ * console — except on a screen stood on end, where the whole block travels
+ * down together so a question and its answers stay one statement.
+ */
+function NoMatchPanel({
+  mode,
+  refresh,
+  widening,
+  onWiden,
+  onRegister,
+  spoken,
+  voices,
+}: {
+  mode: 'phone' | 'name';
+  refresh: KioskRefresh;
+  widening: boolean;
+  onWiden: () => void;
+  onRegister: () => void;
+  spoken: readonly Locale[];
+  voices: Voices;
+}) {
+  const t = useTranslations('Search');
+  const locale = useLocale();
+  const pulse = useCallback(
+    (chunks: ReactNode) => <span className="animate-word-pulse text-ink-100">{chunks}</span>,
+    [],
+  );
+  const words = useMemo<VoiceWords[]>(
+    () =>
+      spoken.flatMap((candidate) => {
+        const own = candidate === locale;
+        const messages = candidate === DEFAULT_LOCALE ? EN_KIOSK_CATALOG : voices[candidate];
+        // A pinned language whose words have not arrived yet is one voice
+        // fewer, never a key on the glass.
+        if (!own && !messages) return [];
+        const voice: SearchVoice =
+          own || !messages
+            ? t
+            : createTranslator({ locale: candidate, messages, namespace: 'Search' });
+        return [
+          {
+            locale: candidate,
+            /*
+             * "Still" is the one word that carries the whole answer after the
+             * roster has been refreshed, and the one a parent watching their
+             * own finger did not see change. It brightens three times and
+             * stops: long enough to catch an eye coming back up from the
+             * button, short enough that a lobby screen is not blinking at
+             * anybody. The word is what changed, so the word is what moves.
+             */
+            heading: refresh === 'done' ? voice.rich('stillNoMatch', { pulse }) : voice('noMatch'),
+            route: voice(mode === 'phone' ? 'afterPhoneMiss' : 'afterNameMiss'),
+            widen: voice('searchEveryone'),
+            register: voice('offerFirstTime'),
+          },
+        ];
+      }),
+    [spoken, voices, locale, t, refresh, mode, pulse],
+  );
+  const many = words.length > 1;
+  const first = words[0];
+  const routes = words.filter(
+    (voice, index) => words.findIndex((other) => other.route === voice.route) === index,
+  );
+
+  return (
+    /* The lines take the sign's measure on a portrait tablet rather than the
+       doors' column: at the doors' width two of three route sentences broke
+       into two rows apiece, and the panel read as three paragraphs rather than
+       three lines. Tighter steps while it speaks more than one language, so
+       three headings and three routes still clear the region's top. */
+    <div
+      className={`mx-auto flex h-full w-full max-w-xs flex-col items-stretch text-center tall:max-w-xl tall:justify-end lg:max-w-2xl ${
+        many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'
+      }`}
+    >
+      <div
+        className={`mx-auto flex max-w-sm flex-col items-center gap-1 text-center leading-tight font-semibold text-balance text-ink-100 tall:max-w-xl ${
+          many ? 'text-2xl' : 'text-3xl kiosk:text-4xl'
+        }`}
+      >
+        {words.map((voice) => (
+          <span key={voice.locale} lang={voice.locale}>
+            {voice.heading}
+          </span>
+        ))}
+      </div>
+      <div
+        className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-ink-100 tall:max-w-xl ${
+          many ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'
+        }`}
+      >
+        {routes.map((voice) => (
+          <span key={voice.locale} lang={voice.locale}>
+            {voice.route}
+            {voice === first && mode !== 'phone' && <DigitsCue />}
+          </span>
+        ))}
+      </div>
+      <div
+        className={`mt-auto flex flex-col items-stretch tall:mt-0 lg:flex-row lg:justify-center lg:gap-4 ${
+          many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'
+        }`}
+      >
+        <VoiceDoor
+          voices={words}
+          pick={(voice) => voice.widen}
+          onPress={onWiden}
+          primary
+          busy={widening}
+          label={t('searchEveryone')}
+        />
+        <VoiceDoor voices={words} pick={(voice) => voice.register} onPress={onRegister} />
+      </div>
+      {refresh === 'failed' && (
+        <div className="text-base text-ink-500 kiosk:text-lg">{t('networkFailed')}</div>
+      )}
+    </div>
+  );
+}
+
+/**
  * One result row, memoized on the child it names.
  *
  * A keystroke that narrows a search usually keeps its best matches: typing the
@@ -487,6 +741,10 @@ export function SearchScreen({
   onPick,
   onRegister,
   onStaffGate,
+  pins,
+  chosen,
+  onChooseLanguage,
+  voices,
 }: {
   binding: KioskBinding;
   buffer: string;
@@ -530,6 +788,16 @@ export function SearchScreen({
    * leaves the gathering. A screen that unbound on a hold could not ask first.
    */
   onStaffGate: () => void;
+  /** The languages this lobby offers beside English, in its order — `readPins`. */
+  pins: readonly Locale[];
+  /**
+   * Whether the language on the glass is one a family chose. The failure
+   * panel speaks every offered language until then; see `NoMatchPanel`.
+   */
+  chosen: boolean;
+  onChooseLanguage: (locale: Locale) => void;
+  /** The pinned languages' words, as far as they have arrived — `usePinnedCatalogs`. */
+  voices: Voices;
 }) {
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
@@ -588,6 +856,9 @@ export function SearchScreen({
    */
   const offeredAbove =
     (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
+  // English first, then the lobby's pins in their order: the switch's names.
+  const offered = useMemo<Locale[]>(() => [DEFAULT_LOCALE, ...pins], [pins]);
+  const spoken = useMemo(() => spokenLanguages(locale, pins, chosen), [locale, pins, chosen]);
 
   /*
    * Whether there is a search here to widen at all.
@@ -622,7 +893,6 @@ export function SearchScreen({
    * components/tapGuard.ts for why that has to be, and what counts as a tap.
    */
   const rowTap = useTapGuard(onPick);
-  const tap = useTap();
 
   /*
    * The latest handlers behind stable identities — the same trick the keyboard
@@ -920,57 +1190,55 @@ export function SearchScreen({
                 * backdrop layer rather than here on purpose: it fades with
                 * the image, so no keystroke can catch the title over an
                 * unveiled photograph. Paint only: negative insets, so the
-                * three lines keep their exact shipped positions — and pure
-                * page token, so a kiosk with no photograph composites all of
-                * it back to the bare page. `isolate` keeps the negative
+                * lines keep their exact shipped positions — and pure page
+                * token, so a kiosk with no photograph composites all of it
+                * back to the bare page. `isolate` keeps the negative
                 * z-indices inside this block rather than racing the backdrop
                 * layer for the same layer order.
-                */}
-              <div className="relative isolate flex flex-col items-center">
-                <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
-                <div aria-hidden="true" className="kiosk-idle-plate absolute -inset-x-10 -inset-y-7 -z-10 rounded-2xl" />
-              {/* Two voices, not three. The instruction and its alternative are
-                  one unit, set tight; what happens next is separated by air
-                  rather than by a third size, which at a 2px step read as one
-                  paragraph fading out. */}
-              <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">
-                {t('typeAName')}
-              </div>
-              <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>{t('orLastFour')}</div>
-              {/*
-                * What happens next, said before it has to be guessed.
                 *
-                * A name row is a button and does not look like one — no ring,
-                * no chevron, a card a fraction off the page it sits on — and
-                * the only unmistakably pressable thing on the screen is the
-                * register offer. A parent who finds their child and then hunts
-                * for the button to press is a parent one tap from the wrong
-                * door. This is the sentence that stops that, and it is free
-                * here: the space is empty and the eye is already on it.
-                */}
-              {/*
-                * One sentence, in both modes.
-                *
-                * It carried "…to check in or check out" at a pickup gathering,
-                * which said the mode twice on one screen — the header had it
-                * too — and wrapped this line onto two, ending in a one-word
-                * orphan. Neither copy was where the answer actually is: the
-                * row itself says "Tap to check out", "✓ Checked in" or a dimmed
-                * "Checked out", and that is a thing a parent acts on rather than
-                * files.
-                *
-                * `ink-400`, the same step as the line above it. At `ink-500`
-                * the one sentence that tells a parent a name row is pressable
-                * was the dimmest text on the glass — below AA on a
-                * fingerprinted lobby screen — and skipping it is exactly what
-                * sends somebody hunting for a button and finding the register
-                * offer.
+                * With a switch standing over the instruction the block is
+                * taller than the canopy was drawn for, so on a portrait shape
+                * with a photograph it wears a card of its own; without one
+                * the page is the ground and nothing is painted.
                 */}
               <div
-                className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}
+                className={`relative isolate flex flex-col items-center ${
+                  pins.length > 0 ? 'w-full max-w-2xl' : ''
+                } ${
+                  backdrop && pins.length > 0
+                    ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5'
+                    : ''
+                }`}
               >
-                {t('thenTapName')}
-              </div>
+                <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
+                <div aria-hidden="true" className="kiosk-idle-plate absolute -inset-x-10 -inset-y-7 -z-10 rounded-2xl" />
+                {/*
+                  * The languages this lobby offers, in their own names, first.
+                  *
+                  * The finding that started this screen's last redesign: parents
+                  * from the Chinese congregation could not start, because the
+                  * only way to their language was a one-glyph chip beside the
+                  * keys. The switch stands here, at the instruction's own size,
+                  * only where a lobby has said what it speaks — a kiosk with
+                  * nothing pinned is the shipped screen, chips and all.
+                  */}
+                {pins.length > 0 && (
+                  <div className="w-full pb-6 tall:pb-8">
+                    <LanguageSwitch names={offered} current={locale} onChoose={onChooseLanguage} />
+                  </div>
+                )}
+                {/* Two voices, not three. The instruction and its alternative
+                    are one unit, set tight. There is no third line saying what
+                    to do next: the rows themselves say "Tap to check out" or
+                    "✓ Checked in", and a sentence about pressing was one more
+                    thing for a reader who cannot read it to get past. */}
+                <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 kiosk:text-5xl">
+                  {t('typeChildsName')}
+                </div>
+                <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>
+                  {t('orLastFour')}
+                  <DigitsCue />
+                </div>
               </div>
             </div>
           )}
@@ -981,128 +1249,39 @@ export function SearchScreen({
           )}
           {(outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0 && (
             /*
-             * Nothing matched, and the answer is three different doors.
+             * Nothing matched, and the answer is different doors.
              *
-             * The commonest reason is being new, so the register door leads —
-             * straight into the wizard now, one tap. The second is a child who
-             * belongs to a *different* gathering — the search is scoped to the
-             * children who have been to this one, and "Search everyone" is
-             * that scope's honest way out. The third reason — somebody added
-             * the family minutes ago, at the welcome desk or in the main app —
-             * needs no door of its own: the pulse delivers additions within a
-             * minute, and the church-wide sweep runs silently the moment a
-             * finished search comes up empty. "Search everyone" is also how a
-             * greeter asks for that read by hand, which is what its spinner is
-             * spinning about; the sweep's other surfaces are the headline's
-             * "Still" and the network-failure line below.
+             * The commonest reason is a child who belongs to a *different*
+             * gathering — the search is scoped to the children who have been
+             * to this one, and "Search everyone" is that scope's honest way
+             * out, so it leads. The next is being new, which is the register
+             * door — straight into the wizard, one tap. The third — somebody
+             * added the family minutes ago, at the welcome desk or in the main
+             * app — needs no door of its own: the pulse delivers additions
+             * within a minute, and the church-wide sweep runs silently the
+             * moment a finished search comes up empty. "Search everyone" is
+             * also how a greeter asks for that read by hand, which is what its
+             * spinner is spinning about; the sweep's other surfaces are the
+             * headline's "Still" and the network-failure line.
              *
-             * Inside the scrolling results region on purpose: this file
-             * promises that typing never moves the keyboard, and a block that
-             * appeared the moment a name matched nobody would be the one thing
-             * that did.
+             * "Search everyone" stays, and reports — it used to remove itself
+             * the moment it was pressed, which left a parent looking at the
+             * place a button had been with no more evidence of the press than
+             * one word changing in the line above. And it left the family it
+             * had failed with nothing to press: four digits are a small
+             * keyspace and names collide, so "widened and still not mine" is a
+             * real state, and the answer to it — look again, the church may
+             * have added them since — is that control.
              */
-            /* One width for the stacked pair. Auto-width buttons stacked and
-               centred missed each other's edges by 11px a side, which nothing
-               in the frame explained — because nothing did: it was the length
-               of two labels. */
-            /*
-             * The heading sits where the rows were, because that is where a
-             * parent is looking. The doors do not travel with it: they fall to
-             * the foot of the region, a hand's width above the console, which
-             * is where the standing pair lives in every other state.
-             *
-             * Without that split, the keystroke that turns one match into none
-             * teleported "Search everyone" — the commonest correct move when a
-             * scoped search misses a child who is in the directory but not this
-             * gathering's pool — from just under the rule to the top third of
-             * the screen, seven hundred pixels from the keys the parent was
-             * pressing a moment ago.
-             */
-            <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
-              {/* The state's own sentence holds the top of the ramp. Set at the
-                  bottom of it, the loudest thing in the frame was the query
-                  that did not work, echoed in bold white above the keys, and
-                  the fact explaining the empty screen read as fine print over
-                  two buttons. One thing at the top of a ramp, and here it is
-                  the outcome rather than the input. */}
-              {/* Its own measure, wider than the doors under it, and balanced.
-                  Inheriting the button column broke the sentence inside its own
-                  phrase on a phone — "No match — first / time here?" — with the
-                  em dash sitting right there unused. */}
-              <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
-                {refresh === 'done' ? (
-                  <>
-                    {/*
-                      * The one word that carries the whole answer, and the one
-                      * a parent watching their own finger did not see change.
-                      * It brightens three times and stops: long enough to
-                      * catch an eye coming back up from the button, short
-                      * enough that a lobby screen is not blinking at anybody.
-                      * The word is what changed, so the word is what moves —
-                      * animating the sentence would say the sentence is new.
-                      */}
-                    {t.rich('stillNoMatch', {
-                      pulse: (chunks) => (
-                        <span className="animate-word-pulse text-ink-100">{chunks}</span>
-                      ),
-                    })}
-                  </>
-                ) : (
-                  t('noMatch')
-                )}
-              </div>
-              {/*
-                * Stacked, until the screen is wide and short.
-                *
-                * On a 1280×800 kiosk the fixed chrome leaves this track 259px
-                * and the stack needed about 300, so the closing line — "or see
-                * a leader.", the door that costs the church nothing — was cut
-                * through its x-height and faded out by the region's mask. A
-                * parent deciding whether they have to create a record was
-                * reading what looked like a broken screen. That shape has
-                * width and no height, so the doors spend the axis it has.
-                */}
-              {/*
-                * The doors hang from the foot of the region — except on a
-                * screen stood on end, where the whole block travels down
-                * together instead. Anchoring the two ends independently put a
-                * third of a portrait tablet between a question and its own two
-                * answers, so they stopped reading as one statement and started
-                * reading as two blocks sharing a screen. The other shapes hold
-                * it together at fifty to ninety pixels; this is the one where
-                * the family broke.
-                */}
-              <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  {...tap(() => {
-                    haptic();
-                    onRegister();
-                  })}
-                  className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
-                >
-                  {t('registerYourChild')}
-                </button>
-                <WidenButton widening={widening} onWiden={onWiden} />
-              </div>
-              {refresh === 'failed' && (
-                <div className="text-base text-ink-500 kiosk:text-lg">
-                  {t('networkFailed')}
-                </div>
-              )}
-              {/*
-                * "Search everyone" stays, and reports — it used to remove
-                * itself the moment it was pressed, which left a parent looking
-                * at the place a button had been with no more evidence of the
-                * press than one word changing in the line above. And it left
-                * the family it had failed with nothing to press: four digits
-                * are a small keyspace and names collide, so "widened and still
-                * not mine" is a real state, and the answer to it — look again,
-                * the church may have added them since — is that control.
-                */}
-              <div className="text-base text-ink-400 kiosk:text-lg">{t('orSeeALeader')}</div>
-            </div>
+            <NoMatchPanel
+              mode={outcome.mode}
+              refresh={refresh}
+              widening={widening}
+              onWiden={onWiden}
+              onRegister={onRegister}
+              spoken={spoken}
+              voices={voices}
+            />
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => (
             <ResultRow
@@ -1146,10 +1325,9 @@ export function SearchScreen({
       </div>
 
       {/* Only where there is a list to run past. The panel that fills the
-          region on a failed search ends with "or see a leader." — the door
-          that costs the church nothing — and an unconditional ramp dimmed it
-          below legible, so the state read as a block that had been cut off
-          rather than one that finished. */}
+          region on a failed search ends with its doors, and an unconditional
+          ramp dimmed them below legible, so the state read as a block that had
+          been cut off rather than one that finished. */}
       {rows && (
         <div className="kiosk-list-fade-overlay pointer-events-none absolute inset-x-0 bottom-0" />
       )}
@@ -1255,14 +1433,14 @@ export function SearchScreen({
             the edge the rows are flush to rather than off this band's own
             padding — it is the list's caption, and it was missing the strongest
             vertical line in the frame by sixteen pixels. */}
-        {/* `px-24` is the clearance the two corner objects need. Both are
+        {/* `px-36` is the clearance the two corner objects need. Both are
             absolutely positioned, so neither can move a row or push the
             letters off centre — but a long enough buffer is centred *through*
             them, and "Bartholomew" under the language chips is the readout
             failing at the one thing it does. Padding insets the flex content
             only: an absolute child is placed against the padding box, so the
             corners stay in the corners. */}
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-24 text-center tall:h-20 lg:max-w-5xl">
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-36 text-center tall:h-20 lg:max-w-5xl">
           {/*
             * The way out of a language a parent cannot read.
             *
@@ -1276,9 +1454,22 @@ export function SearchScreen({
             * not for, and it changes the words without taking their place in
             * the queue away from them.
             */}
-          <span className="absolute left-0">
-            <LanguagePicker quiet />
-          </span>
+          {/* Hidden while the switch stands: a lobby that has said what it
+              speaks puts the languages at the top of the idle screen in their
+              own names, and the same chips a hand's width below would be the
+              second copy of one control. Back the moment there is a buffer,
+              when the idle screen is gone, and only in the languages this
+              lobby offers. A kiosk with nothing pinned keeps every chip at
+              rest, because they are then the only way out. */}
+          {(pins.length === 0 || outcome.mode !== 'idle') && (
+            <span className="absolute left-0">
+              <LanguagePicker
+                quiet
+                only={pins.length > 0 ? offered : undefined}
+                onChoose={onChooseLanguage}
+              />
+            </span>
+          )}
           {buffer && (
             <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
               {buffer}
@@ -1302,8 +1493,12 @@ export function SearchScreen({
             * geometry: absolutely positioned, so the count cannot push the
             * letters off centre or move a row.
             */}
+          {/* Not on a tablet stood on end, where every row fits: the count
+              told a phone that rows existed below its fold, and on the one
+              shape where they never do it was one more thing on the glass
+              (the clutter pass, docs/refinements.md). */}
           {matchCount > 0 && (
-            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base">
+            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base tall:hidden">
               {/*
                 * A number while the list is all of it, a sentence when it is
                 * not. `MAX_RESULTS` is eight, and "8 names" over a list that

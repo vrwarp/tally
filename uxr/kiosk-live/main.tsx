@@ -470,6 +470,8 @@ export function Kiosk() {
         onPrinter={() => {}}
         onChangeEvent={() => {}}
         onHideBackdrop={() => {}}
+        pins={[]}
+        onEnglishOnly={() => {}}
         onStay={() => {}}
       />
     );
@@ -609,6 +611,10 @@ export function Kiosk() {
       onPick={() => {}}
       onRegister={() => {}}
       onStaffGate={() => {}}
+      pins={[]}
+      chosen={false}
+      onChooseLanguage={() => {}}
+      voices={{}}
     />
     </>
   );

@@ -302,7 +302,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
                             className="relative text-[10px] leading-tight font-semibold"
                             style={{ color: colours['--color-ink-100'] }}
                           >
-                            {t('previewTypeAName')}
+                            {t('previewTypeChildsName')}
                           </div>
                           <div
                             className="relative text-[6px] leading-tight"

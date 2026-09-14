@@ -45,7 +45,7 @@ const ADA: KioskStudent = {
 
 /* The empty search readout. Two lines since the prompt became a heading —
    the instruction is what identifies the screen, so match that half. */
-const PLACEHOLDER = /^type a name$/i;
+const PLACEHOLDER = /^type your child’s name$/i;
 
 function binding(): KioskBinding {
   const now = Date.now();
@@ -340,5 +340,37 @@ describe('the staff gate', () => {
      */
     expect(screen.queryByText('Staff')).toBeNull();
     expect(screen.queryByText(/Change gathering\?/i)).toBeNull();
+  });
+});
+
+/*
+ * The language switch's off switch. Device-local like the photograph's, for
+ * the Sunday a tablet has moved lobbies or the switch is confusing more
+ * families than it helps.
+ */
+describe('the lobby’s languages, from behind the gate', () => {
+  it('takes every language but English off the switch, and off the disk', async () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['zh-Hant', 'es-MX']));
+    await mount();
+    expect(screen.getByTestId('language-switch')).toBeTruthy();
+
+    await holdClear();
+    // Named, so nobody presses it blind.
+    const row = screen.getByText('English only').closest('button')!;
+    expect(row.textContent).toContain('繁體中文 · Español');
+
+    await tap('English only');
+    // Back on the door, with English alone on it —
+    expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
+    expect(screen.queryByTestId('language-switch')).toBeNull();
+    // — and off the disk, so the ~4am reload keeps it that way.
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual([]);
+  });
+
+  it('has no such row on a kiosk with nothing pinned', async () => {
+    await mount();
+    await holdClear();
+    expect(screen.getByText('Change gathering')).toBeTruthy();
+    expect(screen.queryByText('English only')).toBeNull();
   });
 });

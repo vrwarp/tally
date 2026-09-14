@@ -234,6 +234,21 @@ describe('loadCatalog', () => {
    * a chunk the page asks for that the deploy no longer has. English in a lobby
    * that speaks Chinese is bad; a blank screen is worse.
    */
+  /*
+   * The failure panel's voices are fetched at boot for every pinned language.
+   * Three catalogues warming at once must not fight over the one slice kept
+   * for the next boot, which is for the language the kiosk is actually in.
+   */
+  it('can fetch a language on the lobby’s behalf without touching the stored slice', async () => {
+    const { loadCatalog } = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await expect(loadCatalog('zh-Hans', { store: false })).resolves.toEqual(HANS);
+    expect(localStorage.getItem(KIOSK_KEYS.messages)).toBeNull();
+    // Held in memory all the same: the next ask is free.
+    const { cachedCatalog } = await import('./messages');
+    expect(cachedCatalog('zh-Hans')).toEqual(HANS);
+  });
+
   it('falls back to English when the chunk will not load', async () => {
     const { loadCatalog, EN_KIOSK_CATALOG } = await freshModule();
     vi.doMock('../../messages/kiosk/zh-Hans.json', () => {

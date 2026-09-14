@@ -170,7 +170,7 @@ test.describe('the kiosk', () => {
 
       await hold(kiosk, nursery);
 
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -199,7 +199,7 @@ test.describe('the kiosk', () => {
       await kiosk.getByText(/welcome/i).click();
 
       // The placeholder is the proof: the query the check-in came from is gone.
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
       await findOnKiosk(kiosk, COLLECTED);
 
       // The row that used to be inert now says what a tap would do.
@@ -625,7 +625,7 @@ test.describe('the kiosk', () => {
 
       // Back to the parent's screen, on the same gathering it never left.
       await kiosk.getByRole('button', { name: /back to check-in/i }).click();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
     } finally {
       await context.close();
     }
@@ -729,7 +729,7 @@ test.describe('the kiosk', () => {
       await kiosk.reload();
       // Straight back to the search screen: the binding, the roster and the
       // phone index all come out of localStorage before the SDK loads.
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible({
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible({
         timeout: 30_000,
       });
     } finally {
@@ -793,7 +793,7 @@ test.describe('the kiosk', () => {
       await expect(kiosk.getByText('Staff')).toBeVisible();
 
       await kiosk.getByRole('button', { name: /Keep checking in/i }).click();
-      await expect(kiosk.getByText(/^type a name$/i)).toBeVisible();
+      await expect(kiosk.getByText(/^type your child’s name$/i)).toBeVisible();
 
       await leaveGathering(kiosk);
       await expect(kiosk.getByText(/which gathering/i)).toBeVisible();

@@ -8604,8 +8604,9 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "KioskBackdrop.previewTypeAName": {
-    "source": "Type a name",
+  "KioskBackdrop.previewTypeChildsName": {
+    "source": "Type your child’s name",
+    "context": "Same words as Search.typeChildsName: the event editor's preview of the kiosk's idle screen must show exactly what the kiosk shows.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -12785,6 +12786,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Staff.englishOnly": {
+    "source": "English only",
+    "context": "A row on the kiosk's staff screen (behind the held Clear key), beside Staff.hideThePhoto. Tapping it takes the extra languages off the check-in screen's language switch, leaving English; the languages currently offered are printed after it. A door label, like Staff.hideThePhoto — not a status.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Staff.reprintNoRegisterChange": {
     "source": "Nobody is checked in or out from this screen.",
     "es-MX": "machine",
@@ -12893,13 +12901,6 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Search.thenTapName": {
-    "source": "Then tap your child’s name.",
-    "context": "On the lobby kiosk, under \"Type a name\". The one sentence telling a parent that the name rows below are pressable. \"Tap\" is the same gesture as in Search.tapToCheckOut and should use the same verb. Addresses the parent as 您.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Search.checkedIn": {
     "source": "✓ Checked in",
     "es-MX": "machine",
@@ -12918,8 +12919,9 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Search.typeAName": {
-    "source": "Type a name",
+  "Search.typeChildsName": {
+    "source": "Type your child’s name",
+    "context": "The lobby kiosk's idle prompt — the largest words on the screen. A parent reads it and starts typing on the Latin-only keyboard beneath. Chinese must say the name is the child's English name (英文名字), because the keyboard has no other script; Spanish need not, since a Spanish speaker types a Latin name anyway. Addresses the parent as usted / 您.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -12937,25 +12939,29 @@
     "zh-Hant": "machine"
   },
   "Search.stillNoMatch": {
-    "source": "<pulse>Still</pulse> no match — first time here?",
+    "source": "<pulse>Still</pulse> no match",
+    "context": "Search.noMatch after the kiosk has refreshed its roster from the network and still found nothing. <pulse> wraps the one word that changed, which the screen animates.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "Search.noMatch": {
-    "source": "No match — first time here?",
+    "source": "No match",
+    "context": "Heading of the kiosk's failure panel when nothing on the roster matches what a parent typed. That may have been a name or the last 4 digits of a phone, so it must not name either. Two or three words; the route line beneath (Search.afterNameMiss / Search.afterPhoneMiss) says what to try.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Search.registerYourChild": {
-    "source": "Register your child",
+  "Search.afterNameMiss": {
+    "source": "Try the last 4 digits of your phone, or ask a leader.",
+    "context": "Under Search.noMatch after a parent typed letters (a name) that matched nobody: the ways forward. 'Leader' is the volunteer at the lobby table. One sentence, addressed as usted / 您; Chinese may put the person before the digits, since a reader who cannot type an English name is best served by one.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Search.orSeeALeader": {
-    "source": "or see a leader.",
+  "Search.afterPhoneMiss": {
+    "source": "Try typing your child’s name, or ask a leader.",
+    "context": "Under Search.noMatch after a parent typed 4 digits (a phone) that matched nobody: the ways forward. Sibling of Search.afterNameMiss; Chinese must say English name (英文名字), as Search.typeChildsName does.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -13937,6 +13943,27 @@
     "es-MX": "machine",
     "zh-Hans": "todo",
     "zh-Hant": "todo"
+  },
+  "Pairing.pinLanguages": {
+    "source": "Languages families here speak",
+    "context": "Caption over the language chips on the kiosk's pairing screen: the volunteer setting the tablet up taps the languages families in this lobby read, and the check-in screen then offers those at its top. Addresses the volunteer as tú / 你, like the rest of Pairing.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Pairing.pinHint": {
+    "source": "Tap up to three, in the order they should appear. English is always offered.",
+    "context": "Beneath Pairing.pinLanguages. Up to three languages may be offered, in the order tapped; English is on the switch whether or not it is tapped.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Pairing.pinPreview": {
+    "source": "What families will see",
+    "context": "Label over a live miniature of the check-in screen's language switch, showing the volunteer what the chosen languages will look like to a family.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Time.today": {
     "source": "Today",

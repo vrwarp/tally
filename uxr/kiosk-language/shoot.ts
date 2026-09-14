@@ -79,8 +79,8 @@ const SCENES: {
   drive?: readonly string[];
 }[] = [
   { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
-  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
-  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
+  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
+  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
   { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
   /* Two letters of an English name the family knows only as a sound: the
      rows carry the Chinese name the roster holds, which is what a reader who
@@ -88,7 +88,7 @@ const SCENES: {
   { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'], langs: ['en'] },
   /* One letter: more children than fit, and the sentence past the cap. */
   { id: 'typed-many', query: 'buffer=A', views: ['kiosktall'], langs: ['en'] },
-  { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
+  { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['en'] },
   { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], langs: ['en'], settle: 1900 },
   { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], langs: ['en'], settle: 1900 },
@@ -100,7 +100,7 @@ const flag = (name: string): string | null => {
   return at === -1 ? null : (args[at + 1] ?? null);
 };
 const only = flag('--only')?.split(',').filter(Boolean) ?? null;
-const langs = flag('--lang')?.split(',').filter(Boolean) ?? ['en', 'zh-Hant', 'zh-Hans', 'es'];
+const langs = flag('--lang')?.split(',').filter(Boolean) ?? ['en', 'zh-Hant', 'zh-Hans', 'es-MX'];
 const views = (flag('--view')?.split(',').filter(Boolean) ?? ['kiosktall']) as ViewportName[];
 const variants = flag('--variant')?.split(',').filter(Boolean) ?? ['shipped'];
 const speaks = flag('--speaks');

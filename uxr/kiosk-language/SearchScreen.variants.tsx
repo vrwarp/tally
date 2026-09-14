@@ -54,15 +54,25 @@ import { LOCALES, LOCALE_LABELS, LOCALE_SHORT_LABELS, isLocale, type Locale } fr
  * a choice the provider knows is set on the provider, one it does not is
  * kept here.
  */
-export type Lang = Locale | 'es';
-// eslint-disable-next-line react-refresh/only-export-components
-export const LANGS: readonly Lang[] = [...LOCALES, 'es'];
-const LABELS: Record<Lang, string> = { ...LOCALE_LABELS, es: 'Español' };
-const SHORT: Record<Lang, string> = { ...LOCALE_SHORT_LABELS, es: 'ES' };
+export type Lang = Locale;
+
+/**
+ * The words the shipped screen carried when this study began, kept for the
+ * replica of it below (the `shipped` variant, round 0's frames). The catalogue
+ * has since dropped them — the study's own outcome — so they live here.
+ */
+const LEGACY = {
+  thenTapName: 'Then tap your child’s name.',
+  registerYourChild: 'Register your child',
+  orSeeALeader: 'or see a leader.',
+} as const;
+export const LANGS: readonly Lang[] = LOCALES;
+const LABELS: Record<Lang, string> = LOCALE_LABELS;
+const SHORT: Record<Lang, string> = LOCALE_SHORT_LABELS;
 /** The languages typed on this keyboard as they are spelled — no door needed to type a name. */
-const LATIN: readonly Lang[] = ['en', 'es'];
+const LATIN: readonly Lang[] = ['en', 'es-MX'];
 /** What this lobby pins beside English at rest, until `?pins=` says otherwise. */
-const DEFAULT_PINS: Lang[] = ['zh-Hant', 'es'];
+const DEFAULT_PINS: Lang[] = ['zh-Hant', 'es-MX'];
 /**
  * The languages the kiosk can speak all the way down — the catalogues it
  * has. Round 7's rule: a pinned language the kiosk speaks is a door (a
@@ -1050,7 +1060,7 @@ export function SearchScreenVariant({
                   rather than by a third size, which at a 2px step read as one
                   paragraph fading out. */}
               <div className="text-4xl font-semibold text-ink-100 kiosk:text-5xl">
-                {t('typeAName')}
+                {t('typeChildsName')}
               </div>
               <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>{t('orLastFour')}</div>
               {/*
@@ -1085,7 +1095,7 @@ export function SearchScreenVariant({
               <div
                 className={`pt-4 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}
               >
-                {t('thenTapName')}
+                {LEGACY.thenTapName}
               </div>
               </div>
             </div>
@@ -1212,7 +1222,7 @@ export function SearchScreenVariant({
                   })}
                   className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
                 >
-                  {t('registerYourChild')}
+                  {LEGACY.registerYourChild}
                 </button>
                 <WidenButton widening={widening} onWiden={onWiden} />
               </div>
@@ -1231,7 +1241,7 @@ export function SearchScreenVariant({
                 * not mine" is a real state, and the answer to it — look again,
                 * the church may have added them since — is that control.
                 */}
-              <div className="text-base text-ink-400 kiosk:text-lg">{t('orSeeALeader')}</div>
+              <div className="text-base text-ink-400 kiosk:text-lg">{LEGACY.orSeeALeader}</div>
             </div>
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => (
@@ -1354,15 +1364,10 @@ export function SearchScreenVariant({
         hasResults={hasResults}
         onWiden={steadyWiden}
         onRegister={steadyRegister}
-        offerWords={
-          chosen && !isLocale(chosen)
-            ? {
-                firstTime: COPY[chosen].offerFirstTime,
-                notYours: COPY[chosen].offerNotYours,
-                widen: COPY[chosen].widen,
-              }
-            : undefined
-        }
+        /* Every language the study offers has a catalogue now that `es-MX`
+           has landed, so the console's words always come from the provider;
+           the override carried the Spanish before its catalogue existed. */
+        offerWords={undefined}
         offerSecond={
           chosen === null && unspoken
             ? { firstTime: COPY[unspoken].offerFirstTime, notYours: COPY[unspoken].offerNotYours }
@@ -1625,7 +1630,7 @@ const COPY: Record<
     offerNotYours: '不是您家的孩子嗎？為您的孩子登記',
     widen: '搜尋所有人',
   },
-  es: {
+  'es-MX': {
     name: 'Escriba el nombre de su hijo o hija',
     orDigits: 'o los últimos 4 dígitos de su teléfono',
     thenTap: 'Luego toque el nombre de su hijo o hija.',

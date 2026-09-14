@@ -357,9 +357,10 @@ describe('getting into the wizard', () => {
     await mount();
     await type('ZZ');
 
-    expect(screen.getByText(/No match — first time here\?/)).toBeTruthy();
-    // Seeing a leader is still offered; it is no longer the whole answer.
-    expect(screen.getByText(/or see a leader/)).toBeTruthy();
+    expect(screen.getByText(/^No match$/)).toBeTruthy();
+    // Asking a leader is still offered — after the phone's four digits, and
+    // no longer as the whole answer.
+    expect(screen.getByText(/or ask a leader/)).toBeTruthy();
   });
 
   it('keeps the door open when the four digits matched somebody else', async () => {
@@ -1064,7 +1065,7 @@ describe('the clock', () => {
       await vi.advanceTimersByTimeAsync(95_000);
     });
 
-    expect(screen.getByText(/^Type a name$/)).toBeTruthy();
+    expect(screen.getByText(/^Type your child’s name$/)).toBeTruthy();
   });
 });
 

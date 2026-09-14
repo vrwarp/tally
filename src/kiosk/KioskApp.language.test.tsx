@@ -17,11 +17,13 @@
  * than on "the family left and came back" would take a parent's language away
  * for fixing their own typo, mid-search, with the queue behind them.
  */
-import { act, fireEvent, render, screen } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
+import { loadCatalog } from '@/kiosk/messages';
+import type { Locale } from '@/lib/locales';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 
@@ -40,7 +42,7 @@ const ADA: KioskStudent = {
  * words, and a reset that moved a key without moving the words would be no
  * reset at all.
  */
-const ENGLISH_PROMPT = /^type a name$/i;
+const ENGLISH_PROMPT = /^type your child’s name$/i;
 /*
  * Not 請輸入姓名 — the prompt names the keys the lobby keyboard actually makes,
  * because a bare 姓名 sends a parent hunting for an IME that is not on the
@@ -49,7 +51,7 @@ const ENGLISH_PROMPT = /^type a name$/i;
  * standardises that, so the screen states a fact about the keyboard rather than
  * a claim about the roster.
  */
-const CHINESE_PROMPT = '請用英文字母輸入姓名';
+const CHINESE_PROMPT = '輸入您孩子的英文名字';
 
 function binding(): KioskBinding {
   const now = Date.now();
@@ -108,14 +110,48 @@ async function settle(): Promise<void> {
 }
 
 /** Boot straight into a bound, family-facing screen, already in Traditional. */
-async function mountInChinese(bound: KioskBinding | null = binding()): Promise<void> {
+async function mountIn(locale: Locale, bound: KioskBinding | null = binding()): Promise<void> {
   if (bound) localStorage.setItem(KIOSK_KEYS.binding, JSON.stringify(bound));
   localStorage.setItem(
     KIOSK_KEYS.roster,
     JSON.stringify({ version: KIOSK_ROSTER_VERSION, fetchedAtMs: Date.now(), students: [ADA] }),
   );
-  render(<KioskApp />, { locale: 'zh-Hant' });
+  render(<KioskApp />, { locale });
   await settle();
+}
+
+async function mountInChinese(bound: KioskBinding | null = binding()): Promise<void> {
+  await mountIn('zh-Hant', bound);
+}
+
+/**
+ * A lobby that has said what it speaks, with those languages' words already
+ * on the device — as they are on any kiosk after its first boot with them.
+ */
+async function pin(...pins: Locale[]): Promise<void> {
+  localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(pins));
+  for (const locale of pins) await loadCatalog(locale, { store: false });
+}
+
+const clearKey = () => document.querySelector<HTMLButtonElement>('[data-key="clear"]')!;
+
+async function tapClear(): Promise<void> {
+  await act(async () => {
+    fireEvent.pointerDown(clearKey());
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(200);
+  });
+  await act(async () => {
+    fireEvent.pointerUp(clearKey());
+  });
+  await settle();
+}
+
+async function idle(): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(61_000);
+  });
 }
 
 async function type(text: string): Promise<void> {
@@ -223,5 +259,88 @@ describe('a family’s language does not outlive their visit', () => {
     });
 
     expect(screen.getByText('這台簽到台是給哪場聚會用的？')).toBeTruthy();
+  });
+});
+
+/*
+ * The lobby's own languages, offered at the top of the idle screen in their
+ * own names — for the family who could not find a one-glyph chip. The pins
+ * are the tablet's setting; what a family does with them is a visit, and
+ * every visit ends the same way the language does.
+ */
+describe('the lobby’s own languages', () => {
+  it('speaks every pinned language on the failure panel until a family chooses one', async () => {
+    await pin('zh-Hant');
+    await mountIn('en');
+    // The switch, over the instruction, in the languages' own names.
+    expect(screen.getByRole('button', { name: '繁體中文' })).toBeTruthy();
+    expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
+
+    await type('zz');
+    // Nobody has chosen, so the panel speaks both: the family it is for has,
+    // by definition, not found the switch.
+    expect(screen.getByText(/^No match$/)).toBeTruthy();
+    expect(screen.getByText('找不到')).toBeTruthy();
+  });
+
+  it('treats the English cell as a choice too — the next family meets every language again', async () => {
+    await pin('zh-Hant');
+    await mountIn('en');
+    await tap('English');
+    await type('zz');
+    // English was chosen, so the panel speaks English alone.
+    expect(screen.getByText(/^No match$/)).toBeTruthy();
+    expect(screen.queryByText('找不到')).toBeNull();
+
+    await tapClear();
+    await idle();
+    await type('zz');
+    // A minute untouched, and the choice has gone home with the family.
+    expect(screen.getByText('找不到')).toBeTruthy();
+  });
+
+  it('gives the screen back to English after a family chose Spanish and walked away', async () => {
+    await pin('es-MX');
+    await mountIn('en');
+    await tap('Español');
+    expect(screen.getByText('Escriba el nombre de su hijo o hija')).toBeTruthy();
+    await idle();
+    expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
+  });
+
+  it('keeps the doors’ words in the language a family chose', async () => {
+    await pin('es-MX');
+    await mountIn('en');
+    await type('zz');
+    // Before a choice, each door carries both languages.
+    expect(screen.getByText('Search everyone')).toBeTruthy();
+    expect(screen.getByText('Buscar entre todos')).toBeTruthy();
+
+    await tapClear();
+    await tap('Español');
+    await type('zz');
+    expect(screen.getByText('No lo encontramos')).toBeTruthy();
+    expect(screen.queryByText(/^No match$/)).toBeNull();
+    expect(screen.getByText('Buscar entre todos')).toBeTruthy();
+    expect(screen.queryByText('Search everyone')).toBeNull();
+  });
+
+  it('brings the chips beside the keys back only once the switch has gone', async () => {
+    await pin('zh-Hant');
+    await mountIn('en');
+    // At rest the switch is the control; the same languages a hand's width
+    // lower would be a second copy of it.
+    expect(screen.queryByTestId('language-picker')).toBeNull();
+    await type('a');
+    const chips = screen.getByTestId('language-picker');
+    expect(within(chips).getByRole('button', { name: '繁體中文' })).toBeTruthy();
+    // And only in the languages this lobby offers.
+    expect(within(chips).queryByRole('button', { name: 'Español' })).toBeNull();
+  });
+
+  it('is the shipped screen on a kiosk with nothing pinned', async () => {
+    await mountIn('en');
+    expect(screen.queryByTestId('language-switch')).toBeNull();
+    expect(screen.getByTestId('language-picker')).toBeTruthy();
   });
 });

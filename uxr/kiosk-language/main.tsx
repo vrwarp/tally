@@ -48,6 +48,7 @@ import { KioskIntlProvider } from '@/kiosk/KioskIntlProvider';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { LANGS, SearchScreenVariant, VARIANTS, type Lang } from './SearchScreen.variants';
+import { usePinnedCatalogs } from '../../src/kiosk/voices';
 
 const params = new URLSearchParams(location.search);
 
@@ -153,6 +154,8 @@ export function Kiosk() {
     else if (key.kind === 'clear') setBuffer('');
   };
 
+  // The pinned languages' words, as the kiosk itself fetches them.
+  const voices = usePinnedCatalogs(pins ?? []);
   const props = {
     binding,
     buffer,
@@ -185,7 +188,13 @@ export function Kiosk() {
           {...props}
         />
       ) : (
-        <SearchScreen {...props} />
+        <SearchScreen
+          {...props}
+          pins={pins ?? []}
+          chosen={chosen !== null}
+          onChooseLanguage={() => {}}
+          voices={voices}
+        />
       )}
     </>
   );

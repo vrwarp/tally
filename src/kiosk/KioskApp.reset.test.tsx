@@ -29,7 +29,7 @@ const ADA: KioskStudent = {
 
 /* The empty search readout. Two lines since the prompt became a heading —
    the instruction is what identifies the screen, so match that half. */
-const PLACEHOLDER = /^type a name$/i;
+const PLACEHOLDER = /^type your child’s name$/i;
 
 function binding(overrides: Partial<KioskBinding> = {}): KioskBinding {
   const now = Date.now();
