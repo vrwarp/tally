@@ -30,6 +30,7 @@ export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
 
 /** Where a signed-out reader's choice lives, and the mirror of a signed-in one's. */
+/* Stryker disable next-line all: static — see docs/mutation-testing.md. */
 export const LOCALE_STORAGE_KEY = 'tally:locale';
 
 /**
@@ -41,6 +42,7 @@ export const LOCALE_STORAGE_KEY = 'tally:locale';
  * property of the tablet bolted to the wall in this lobby, and must not change
  * because the person who set it up prefers English.
  */
+/* Stryker disable next-line all: static — see docs/mutation-testing.md. */
 export const KIOSK_LOCALE_STORAGE_KEY = 'tally:kiosk:locale';
 
 /**
@@ -52,22 +54,30 @@ export const KIOSK_LOCALE_STORAGE_KEY = 'tally:kiosk:locale';
  * families it is for are Salvadoran, Guatemalan or Puerto Rican. A country in
  * the label would answer that question wrong for them.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: 'English',
   'es-MX': 'Español',
   'zh-Hans': '简体中文',
   'zh-Hant': '繁體中文',
 };
+/* Stryker restore all */
 
 /** Short badges, for places too narrow to carry a language's whole name. */
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 export const LOCALE_SHORT_LABELS: Record<Locale, string> = {
   en: 'EN',
   'es-MX': 'ES',
   'zh-Hans': '简',
   'zh-Hant': '繁',
 };
+/* Stryker restore all */
 
 export function isLocale(value: unknown): value is Locale {
+  // Stryker disable next-line ConditionalExpression: `includes` compares with
+  // `===` against four strings, so it already refuses every non-string the
+  // `typeof` does. The guard is here to narrow `unknown` for the cast, not to
+  // change an answer.
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
@@ -90,8 +100,12 @@ export function isLocale(value: unknown): value is Locale {
  * switcher, which is a far better failure than English.
  */
 export function negotiateLocale(preferences: readonly string[] | null | undefined): Locale {
-  for (const preference of preferences ?? []) {
+  if (!preferences) return DEFAULT_LOCALE;
+  for (const preference of preferences) {
     const tag = preference.trim().toLowerCase();
+    // Stryker disable next-line ConditionalExpression: a blank entry matches
+    // none of the four tests below either, so skipping it here and falling
+    // through are the same answer. The line is the shortcut, not the rule.
     if (!tag) continue;
     if (tag === 'zh-tw' || tag === 'zh-hk' || tag === 'zh-mo' || tag.startsWith('zh-hant')) {
       return 'zh-Hant';
@@ -112,6 +126,7 @@ export function negotiateLocale(preferences: readonly string[] | null | undefine
  */
 export function detectLocale(): Locale {
   if (typeof navigator === 'undefined') return DEFAULT_LOCALE;
-  const preferences = navigator.languages ?? (navigator.language ? [navigator.language] : []);
+  const preferences =
+    navigator.languages ?? (navigator.language ? [navigator.language] : undefined);
   return negotiateLocale(preferences);
 }

@@ -77,6 +77,98 @@ describe('cachedCatalog', () => {
     expect(next.cachedCatalog('zh-Hans')).toBeNull();
   });
 
+  /*
+   * The shape is the key tree, and these are the two halves of what that buys.
+   *
+   * It has to be a *tree*: a stored copy is rejected when a deploy has added or
+   * dropped a key, and kept when one has only been reworded — which is the
+   * whole trade this module makes (a boot in stale words is survivable, a
+   * missing key on the glass in front of a parent is not). A shape that
+   * collapsed to a constant would accept both and a shape that hashed the
+   * messages would reject both, and neither would fail any other test here.
+   */
+  it('stores the key tree, not a digest of it', async () => {
+    const { loadCatalog, EN_KIOSK_CATALOG } = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await loadCatalog('zh-Hans');
+
+    const { shape } = JSON.parse(localStorage.getItem(KIOSK_KEYS.messages)!) as { shape: string };
+    expect(Object.keys(JSON.parse(shape))).toEqual(Object.keys(EN_KIOSK_CATALOG));
+    // A leaf is a placeholder rather than the message, so rewording is free.
+    expect(JSON.parse(shape).Search).not.toEqual(EN_KIOSK_CATALOG.Search);
+  });
+
+  it('refuses a slice whose shape has collapsed to a constant', async () => {
+    const { cachedCatalog } = await freshModule();
+    localStorage.setItem(
+      KIOSK_KEYS.messages,
+      JSON.stringify({ locale: 'zh-Hans', shape: '1', messages: HANS }),
+    );
+    expect(cachedCatalog('zh-Hans')).toBeNull();
+  });
+
+  /*
+   * The locale check on its own, which the test above it cannot make: that one
+   * stores a shape from another build, so the shape check alone would reject it
+   * and nothing would notice if the locale stopped being compared. Here the
+   * slice is cut from *this* build and only the language is wrong — a kiosk
+   * switched from Traditional to Simplified must not be handed the slice the
+   * previous language left behind.
+   */
+  it('refuses a slice from this build that was stored for another language', async () => {
+    const first = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await first.loadCatalog('zh-Hans');
+
+    const stored = JSON.parse(localStorage.getItem(KIOSK_KEYS.messages)!) as {
+      shape: string;
+    };
+    localStorage.setItem(KIOSK_KEYS.messages, JSON.stringify({ ...stored, locale: 'zh-Hant' }));
+
+    const next = await freshModule();
+    expect(next.cachedCatalog('zh-Hans')).toBeNull();
+  });
+
+  /*
+   * Right language, right build, and messages that are not messages. Nothing
+   * this app writes produces it; a half-finished `localStorage` write or a hand
+   * that edited site data does, and the lobby screen must not render a string
+   * as if it were a catalogue.
+   */
+  it('refuses a slice whose messages are not an object', async () => {
+    const first = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await first.loadCatalog('zh-Hans');
+
+    const stored = JSON.parse(localStorage.getItem(KIOSK_KEYS.messages)!) as {
+      shape: string;
+    };
+    localStorage.setItem(
+      KIOSK_KEYS.messages,
+      JSON.stringify({ ...stored, messages: 'not a catalogue' }),
+    );
+
+    const next = await freshModule();
+    expect(next.cachedCatalog('zh-Hans')).toBeNull();
+  });
+
+  /*
+   * Read once, then held. `localStorage` is the warm-start copy and the map is
+   * the session's; a second question in the same session must not go back to
+   * storage, because the search screen asks on every keystroke.
+   */
+  it('keeps what it read, so a second question never touches storage', async () => {
+    const first = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await first.loadCatalog('zh-Hans');
+
+    const next = await freshModule();
+    expect(next.cachedCatalog('zh-Hans')).toEqual(HANS);
+
+    localStorage.clear();
+    expect(next.cachedCatalog('zh-Hans')).toEqual(HANS);
+  });
+
   it('survives a cache entry that is not what it should be', async () => {
     const { cachedCatalog } = await freshModule();
     localStorage.setItem(KIOSK_KEYS.messages, 'not json at all');
@@ -115,6 +207,20 @@ describe('loadCatalog', () => {
     vi.doMock('../../messages/kiosk/zh-Hant.json', () => ({ default: HANT }));
 
     await expect(loadCatalog('zh-Hant')).resolves.toEqual(HANT);
+  });
+
+  /*
+   * The same holding, one layer up: what an import brought back is kept in the
+   * session's map, not only written to storage. A kiosk whose site data is
+   * cleared mid-shift keeps the words it already has.
+   */
+  it('holds what it imported, even if storage is emptied under it', async () => {
+    const { loadCatalog, cachedCatalog } = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hans.json', () => ({ default: HANS }));
+    await loadCatalog('zh-Hans');
+
+    localStorage.clear();
+    expect(cachedCatalog('zh-Hans')).toEqual(HANS);
   });
 
   it('never stores English, which is already in the bundle', async () => {

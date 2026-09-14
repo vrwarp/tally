@@ -94,6 +94,18 @@ describe('negotiateLocale', () => {
   });
 
   /*
+   * English as a *choice*, which the assertions above cannot make: they end in
+   * `en` because nothing matched and the fallback is English, so they would
+   * pass just as well if the English branch were deleted. Here English is
+   * second-guessed by a language Tally also speaks, and the answer has to be
+   * the one the reader put first.
+   */
+  it('stops at English rather than reading further down the list', () => {
+    expect(negotiateLocale(['en', 'zh-TW'])).toBe('en');
+    expect(negotiateLocale(['en-CA', 'zh-TW'])).toBe('en');
+  });
+
+  /*
    * Not a match, and deliberately not a prefix match either: `zho` is a
    * language tag this app does not speak, and reading it as `zh` would be
    * guessing at somebody's script from three letters.
@@ -141,6 +153,17 @@ describe('detectLocale', () => {
 
   it('answers English for a browser that says nothing at all', () => {
     vi.stubGlobal('navigator', {});
+    expect(detectLocale()).toBe('en');
+  });
+
+  /*
+   * No browser at all. This module is imported by `scripts/`, by the Vitest
+   * runs that have no DOM, and by anything that ever renders a page on a
+   * server — all of which reach `detectLocale` with no `navigator` to read.
+   * Without the guard the line below it throws rather than answering English.
+   */
+  it('answers English where there is no browser to ask', () => {
+    vi.stubGlobal('navigator', undefined);
     expect(detectLocale()).toBe('en');
   });
 });

@@ -118,14 +118,32 @@ export const DEFAULT_PRINTER_MODEL = 'QL-810W';   // mutant: ""
 expect(DEFAULT_PRINTER_MODEL).toBe('QL-810W');    // passes either way
 ```
 
-There are only a handful in this codebase — four across the whole scope — and
-they are annotated where they live, with `all` rather than a mutator name,
-because every mutator has the same problem there:
+There are only a handful in this codebase — eight sites across the whole scope
+— and they are annotated where they live, with `all` rather than a mutator
+name, because every mutator has the same problem there:
 
 ```ts
 /* Stryker disable next-line all: static — see docs/mutation-testing.md. */
 export const DEFAULT_PRINTER_LABEL = '62x29';
 ```
+
+A table is a block rather than a line, so it takes the paired form. The five
+mutants inside `LOCALE_LABELS` — one per language, plus the object itself — are
+hybrid for the same reason the printer constants are, and
+`src/lib/locales.test.ts` pins every one of those values with a `toEqual` the
+tool cannot see working:
+
+```ts
+/* Stryker disable all: static — see docs/mutation-testing.md. */
+export const LOCALE_LABELS: Record<Locale, string> = { ... };
+/* Stryker restore all */
+```
+
+**Annotate them rather than leaving them red.** A hybrid survivor is
+indistinguishable in the report from a real gap, and the pull-request gate in
+`.github/workflows/mutation.yml` counts it against the module's score — so a
+file with a couple of tables in it can sit under 90% with nothing actually
+untested. `src/lib/locales.ts` scored 75% that way for months.
 
 Two ways to tell a hybrid from a real survivor when one turns up: the JSON
 report has `"static": true` on the mutant, and the value it changes is almost
