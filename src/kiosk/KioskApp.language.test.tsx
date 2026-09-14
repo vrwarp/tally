@@ -279,12 +279,12 @@ describe('the lobby’s own languages', () => {
     expect(screen.getByText(/^No match$/)).toBeTruthy();
     expect(screen.getByText(/or ask a leader/)).toBeTruthy();
     expect(screen.queryByText('找不到')).toBeNull();
-    expect(screen.queryByText('No lo encontramos')).toBeNull();
+    expect(screen.queryByText('No aparece')).toBeNull();
 
     await tapClear();
     await tap('Español');
     await type('zz');
-    expect(screen.getByText('No lo encontramos')).toBeTruthy();
+    expect(screen.getByText('No aparece')).toBeTruthy();
     expect(screen.getByText('Buscar entre todos')).toBeTruthy();
     expect(screen.queryByText(/^No match$/)).toBeNull();
     expect(screen.queryByText('Search everyone')).toBeNull();
@@ -294,7 +294,7 @@ describe('the lobby’s own languages', () => {
     pin('es-MX');
     await mountIn('en');
     await tap('Español');
-    expect(screen.getByText('Escriba el nombre de su hijo o hija')).toBeTruthy();
+    expect(screen.getByText('Nombre de su hijo o hija')).toBeTruthy();
     await idle();
     expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
   });

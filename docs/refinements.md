@@ -549,7 +549,7 @@ missed, with four faint keys after it, the wider search first and brighter, the
 register door quieter and carrying its own question; chips at the band's left
 end at 44px, only for the languages the lobby offers, hidden at rest while the
 switch stands. And copy: *Type your child's name* with no "English" for Latin
-readers and 英文 for Chinese ones, *su hijo o hija*, *No lo encontramos*,
+readers and 英文 for Chinese ones, *su hijo o hija*, *No aparece*,
 *voluntario* for the person at the table.
 
 One condition did not survive contact with the owner. The rounds had the

@@ -12921,7 +12921,7 @@
   },
   "Search.typeChildsName": {
     "source": "Type your child’s name",
-    "context": "The lobby kiosk's idle prompt — the largest words on the screen. A parent reads it and starts typing on the Latin-only keyboard beneath. Chinese must say the name is the child's English name (英文名字), because the keyboard has no other script; Spanish need not, since a Spanish speaker types a Latin name anyway. Addresses the parent as usted / 您.",
+    "context": "The lobby kiosk's idle prompt — the largest words on the screen. A parent reads it and starts typing on the Latin-only keyboard beneath. Chinese must say the name is the child's English name (英文名字), because the keyboard has no other script; Spanish need not, since a Spanish speaker types a Latin name anyway. Addresses the parent as usted / 您. Spanish takes a noun phrase (Nombre de su hijo o hija), per the glossary's terseness rules: the imperative ran to two lines at the prompt's size.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
