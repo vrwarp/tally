@@ -422,7 +422,7 @@ test.describe('the kiosk', () => {
       // no-match panel is correct — but its headline must stay plain. "Still
       // no match" is the sweep's trace, the sweep fires only when the FULL
       // roster is empty of quill, and the pulse has already delivered him.
-      await expect(kiosk.getByText(/no match — first time here/i)).toBeVisible({
+      await expect(kiosk.getByText(/^no match$/i)).toBeVisible({
         timeout: 10_000,
       });
       await kiosk.waitForTimeout(3_000);
@@ -945,8 +945,10 @@ test.describe('registering a family at the kiosk', () => {
       await bindTo(kiosk, /nursery/i);
 
       await typeOnKiosk(kiosk, 'Zzzq');
-      await expect(kiosk.getByText(/No match — first time here\?/i)).toBeVisible();
-      await expect(kiosk.getByText(/or see a leader/i)).toBeVisible();
+      await expect(kiosk.getByText(/^No match$/i)).toBeVisible();
+      // The way forward after a name that matched nobody: the phone's four
+      // digits, or a person — a leader is still offered, just not first.
+      await expect(kiosk.getByText(/or ask a leader/i)).toBeVisible();
     } finally {
       await context.close();
     }
