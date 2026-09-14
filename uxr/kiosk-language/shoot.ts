@@ -63,22 +63,18 @@ const SCENES: {
   /** Presses to run before the shot — `data-key` values or button labels. */
   drive?: readonly string[];
 }[] = [
-  { id: 'idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
-  /* The same language, chosen: what a family sees after taking a door, in
-     every language including the resting one — the English door has to
-     commit like the other two. */
+  /* Every idle scene pins the cycling candidates to their first moment, so a
+     frame is a known moment; `phase-1` and `phase-2` are the other two. The
+     static candidates ignore the knob. */
+  { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'phase-1', query: 'phase=1', views: ['kiosktall'] },
+  { id: 'phase-2', query: 'phase=2', views: ['kiosktall'] },
   { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'] },
   { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'] },
   { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'phone', query: 'buffer=7788', views: ['kiosktall'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'] },
-  { id: 'photo-idle', query: 'photo=1&icon=church', views: ['kiosktall', 'kioskwide'], settle: 1900 },
-  /* After a door is taken, over the photograph — the frame the halo fix is
-     actually visible in, under its own name. */
-  { id: 'photo-chosen', query: 'photo=1&icon=church&chosen=1', views: ['kiosktall', 'kioskwide'], settle: 1900 },
-  /* The light ground, which the theme editor offers first and which flips
-     every token these panels are built from. */
-  { id: 'photo-light', query: 'photo=1&icon=church&ground=light', views: ['kiosktall', 'kioskwide'], settle: 1900 },
+  { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], settle: 1900 },
+  { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], settle: 1900 },
 ];
 
 const args = process.argv.slice(2);

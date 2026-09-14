@@ -28,6 +28,7 @@
  *   ?photo=1                   the gathering's photograph behind the idle screen
  *   ?chosen=1                  a family has chosen a language this visit (with ?lang=)
  *   ?ground=light              the light ground, as a light-themed gathering wears it
+ *   ?phase=0|1|2               pin a cycling greeting to one of its moments
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -157,7 +158,12 @@ export function Kiosk() {
     <>
       {photoUrl && <Backdrop url={photoUrl} shown={buffer === ''} />}
       {variant && variant in VARIANTS ? (
-        <SearchScreenVariant variant={variant} initialChosen={params.get('chosen') === '1'} {...props} />
+        <SearchScreenVariant
+          variant={variant}
+          initialChosen={params.get('chosen') === '1'}
+          phase={params.has('phase') ? Number(params.get('phase')) : undefined}
+          {...props}
+        />
       ) : (
         <SearchScreen {...props} />
       )}
