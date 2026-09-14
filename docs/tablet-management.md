@@ -333,8 +333,9 @@ in the order people trip over them:
 - **Both `urls` and `devices` are mandatory.** A dictionary missing either is dropped.
 
 For Tally's kiosk, matching the vendor and leaving the model open — which is not a shortcut but the
-correct choice, because it is exactly what the kiosk's own `getPairedDevices()` does, and because a
-model-pinned rule would need editing the first time a printer is replaced:
+correct choice, because it is exactly what the kiosk's own `getPairedDevices()` does, because a
+model-pinned rule would need editing the first time a printer is replaced, and because a rule with
+no `product_id` in it is a constant that can be written before anyone has seen the printer (§4.6):
 
 ```json
 [{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
@@ -401,6 +402,12 @@ itself, both before the first Sunday:
 Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both
 while the tablet is still being staged, before anything in §4.6's optional half is applied.
 
+**On a tablet with no printer attached, check 1 is the whole verification, and that is fine.** The
+policy either parsed or it did not, and that question has nothing to do with whether a device is
+plugged in. Check 2 needs the printer and is therefore run once, on the tablet that did §4.6's step
+0 — it proves the *rule works*, which is a claim about the rule rather than about a tablet. Every
+other tablet carries the identical rule, so *Status: OK* is the evidence that matters there.
+
 ### 4.6 The part that actually needs a managed device
 
 Of everything in §4, exactly one thing cannot be done on a consumer tablet by a volunteer with
@@ -422,21 +429,53 @@ Test DPC cannot hold across a reboot is *lock task mode*, which is entered by a 
 is session state. The WebUSB grant is not that. **Kiosk lockdown is the fragile half and the
 pre-grant is the durable half, and only the durable half is needed.**
 
-#### Step 0 — connect the printer the ordinary way first
+#### The policy value is a constant, so staging needs no printer
 
-Do this before anything else in this section, on an unmanaged tablet, today. It needs no device
-owner, no adb and no decisions.
+Worth stating before the runbook, because it removes the most awkward-looking step in it: **the
+value in §4.3 can be written today, without the printer, and it is the same string on every
+tablet.**
 
-Plug the printer in, open the kiosk, and connect it through the ordinary chooser exactly as
-[`label-printing.md`](label-printing.md) describes. Print one label.
+`1273` is `0x04F9`, Brother Industries' USB vendor id — a global constant assigned by the USB-IF, the
+same number on every Brother product ever made. It is not a property of the church's unit, its
+model, or its serial. And because the rule omits `product_id` (which it should, per §4.3), nothing
+in it depends on which Brother is in the building.
 
-**Not mainly to learn the identifiers.** The policy in §4.3 matches on vendor alone, and should:
-`getPairedDevices()` in `src/kiosk/printing/index.ts` filters `navigator.usb.getDevices()` to vendor
-`0x04f9` and *not* by model, so a policy that pinned `product_id` would be narrower than the kiosk's
-own filter — and it would throw away the thing the pre-grant is for, that "a replacement printer
-needs no visit". A QL-700 swapped for a QL-820NWB on a Sunday morning should need no policy edit.
+Three consequences, and the church has exactly the shape of problem they solve:
 
-Connect first for three better reasons:
+- **No printer is needed at staging.** A tablet is provisioned, the constant is pasted, and
+  `chrome://policy` confirms the rule parsed — all with nothing plugged in. Policy validation is
+  about the rule, not about device presence. With one printer and several tablets, this is the
+  difference between a workable afternoon and carrying the printer round the building.
+- **Put it on every tablet, printing or not.** Only a kiosk bound to a gathering with a
+  `labelTemplate` ever touches WebUSB, so strictly only the printing tablet needs this. Do them all
+  anyway: it is one paste, it is the same paste, and it means the one printer can be moved to any
+  tablet on a busy Sunday — or a spare swapped in for a dead one — with no staging trip at all.
+  A grant that is unit-independent is only useful if every tablet carries it.
+- **A replacement printer needs no policy edit** as long as it is a Brother. If the church might
+  ever buy something else, list the vendors side by side now; it costs nothing and covers the swap
+  in advance:
+
+  ```json
+  [{ "devices": [{ "vendor_id": 1273 }, { "vendor_id": 2655 }, { "vendor_id": 2338 }],
+     "urls": ["https://tally.example.org"] }]
+  ```
+
+  Brother, Zebra and Dymo. Broader still is available — omitting `vendor_id` matches every vendor —
+  but there is no reason to take it when the vendors are knowable, and the grant is only as narrow
+  as its narrowest honest description.
+
+#### Step 0 — prove the printer path once, not once per tablet
+
+An earlier draft of this section had somebody connect the printer before staging **each** tablet.
+That was wrong for a church with one printer, and it is wrong in general: what connecting proves is
+a property of the *hardware model*, not of the individual tablet. Prove it once per tablet model —
+in practice, once — and stage everything else printer-free.
+
+So, once, on one tablet, on an unmanaged device, today: plug the printer in, open the kiosk, connect
+it through the ordinary chooser exactly as [`label-printing.md`](label-printing.md) describes, and
+print one label. It needs no device owner, no adb and no decisions.
+
+What that buys:
 
 - **One unknown at a time.** If the policy goes on first and `getDevices()` comes back empty, the
   cause is one of: a malformed rule (§4.3), the tablet not doing USB host, an unpowered or passive
@@ -445,10 +484,11 @@ Connect first for three better reasons:
   first leaves exactly one.
 - **It is free and early.** This is the only step that needs nothing managed, so it can happen
   before anyone factory-resets anything or reads §2. If WebUSB to the Brother does not work on this
-  tablet at all, no policy on earth fixes it, and the whole exercise stops here for the price of an
-  afternoon rather than after three enrolments.
-- **You get the real numbers as a cross-check.** §4.3's table does not list every Brother model, and
-  the church's unit may not be on it.
+  tablet model at all, no policy on earth fixes it, and the whole exercise stops here for the price
+  of an afternoon rather than after three enrolments.
+- **It confirms the constant.** Not because the value is unknown, but because a table in a document
+  is a weaker thing than the number the tablet reports. If the church's printer answers with a
+  vendor other than 1273, everything above needs re-reading.
 
 **Reading the identifiers needs no developer tools.** The kiosk already logs them: `describeDevice`
 at `src/kiosk/printing/index.ts:396-399` puts `vendorId` and `productId` into the printer event log,
@@ -458,12 +498,14 @@ nightly reload. Connect the printer, open the printer screen, and read
 glass.
 
 **Then revoke the manual grant before you test the policy, or you will get a false pass.** This is
-the trap in doing it in this order. Once you have connected through the chooser, Chrome holds a
-grant of its own, and `getDevices()` will return the printer *because of that grant* — not because
-the policy works. Clear it in Chrome's site settings (USB devices) and re-check from a cold start.
-(On Android the manual grant tends to evaporate on re-enumeration anyway, because Chrome cannot read
-the serial afterwards — [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5 — but
-that is a bug-shaped accident, not a test method. Revoke it deliberately.)
+the trap in doing it in this order, and it only applies to the one tablet that did step 0. Once you
+have connected through the chooser, Chrome holds a grant of its own, and `getDevices()` will return
+the printer *because of that grant* — not because the policy works. Clear it in Chrome's site
+settings (USB devices) and re-check from a cold start. (On Android the manual grant tends to
+evaporate on re-enumeration anyway, because Chrome cannot read the serial afterwards —
+[`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5 — but that is a bug-shaped
+accident, not a test method. Revoke it deliberately.) The printer-free tablets have no such grant to
+confuse them, which makes their `chrome://policy` check the cleaner evidence of the two.
 
 #### The runbook
 
