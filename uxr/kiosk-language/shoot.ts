@@ -72,6 +72,10 @@ const SCENES: {
   { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'] },
   { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'] },
   { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
+  /* Two letters of an English name the family knows only as a sound: the
+     rows carry the Chinese name the roster holds, which is what a reader who
+     cannot spell recognises. */
+  { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'] },
   { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], settle: 1900 },
   { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], settle: 1900 },

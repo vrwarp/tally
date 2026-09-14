@@ -1473,8 +1473,8 @@ const COPY: Record<
     orDigits: 'or the last 4 digits of your phone',
     thenTap: 'Then tap your child’s name.',
     noMatch: 'No match',
-    checkSpelling: 'Check the spelling, or try the last 4 digits of your phone.',
-    tryName: 'Try typing your child’s English name.',
+    checkSpelling: 'Try the last 4 digits of your phone, or ask a leader.',
+    tryName: 'Try typing your child’s English name, or ask a leader.',
     firstTime: 'First time here?',
   },
   'zh-Hans': {
@@ -1482,8 +1482,8 @@ const COPY: Record<
     orDigits: '或电话后 4 位',
     thenTap: '然后点一下您孩子的名字。',
     noMatch: '找不到',
-    checkSpelling: '请确认英文名字的拼写，或试试电话后 4 位。',
-    tryName: '试试输入孩子的英文名字。',
+    checkSpelling: '试试电话后 4 位，或找同工帮忙。',
+    tryName: '试试输入孩子的英文名字，或找同工帮忙。',
     firstTime: '第一次来吗？',
   },
   'zh-Hant': {
@@ -1491,8 +1491,8 @@ const COPY: Record<
     orDigits: '或電話後 4 碼',
     thenTap: '然後點一下您孩子的名字。',
     noMatch: '找不到',
-    checkSpelling: '請確認英文名字的拼法，或試試電話後 4 碼。',
-    tryName: '試試輸入孩子的英文名字。',
+    checkSpelling: '試試電話後 4 碼，或找同工幫忙。',
+    tryName: '試試輸入孩子的英文名字，或找同工幫忙。',
     firstTime: '第一次來嗎？',
   },
 };
@@ -1641,7 +1641,11 @@ function Cycle({
  * and the doors go quiet under the caption that used to be the heading.
  * While nobody has chosen a language the route is said in every language:
  * the father reached exactly this screen, in English, before he had tapped
- * anything. Chosen, it is single-language. Repetition is spent here on
+ * anything. Chosen, it is single-language. "Check the spelling" went in
+ * round 4 — advice a parent cannot take, since they do not know how the
+ * church spelled it — and the leader moved up into the route line, in every
+ * language, because with the phone data unreliable a person is often the
+ * right answer and it was the dimmest line on the panel. Repetition is spent here on
  * purpose — it is the failure state, and a sentence that changed while a
  * stuck parent was reading it would be the wrong kind of help.
  */
@@ -1698,7 +1702,6 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
           <WidenButton widening={widening} onWiden={onWiden} />
         </div>
       </div>
-      <div className="text-base text-ink-400 kiosk:text-lg">{t('orSeeALeader')}</div>
     </div>
   );
 }
@@ -1755,7 +1758,7 @@ function LanguageBarIdle({ backdrop, onChoose }: IdleProps) {
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
-      <div className="relative isolate flex flex-col items-center">
+      <div className={`relative isolate flex flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
         <IdleGround />
         <LanguageBar onChoose={onChoose} />
         <div className="mt-6 text-4xl leading-tight font-semibold text-balance text-ink-100 tall:mt-8 tall:text-5xl lg:mt-3">
@@ -1828,18 +1831,22 @@ function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
 /* ------------------------------------------------------------------------ */
 
 /**
- * The instruction in all three languages at once, each a door — said once
- * per language and nothing else said three times.
+ * The instruction in all three languages at once, each a door — each
+ * language saying its two lines once, and nothing said twice in any one.
  *
  * Rounds 1–3 settled the shape: three equal plates at rest, resting
  * language first, nothing highlighted; a tap turns the panel into the
- * chosen language's screen. Round 4 trims what the plates carry. The
- * sub-line each plate wore (the digits route) was the same sentence three
- * times under three sentences that were already the same sentence; it is
- * said once now, under the plates, in the resting language, with the next
- * step under that. The band's chips are gone while the plates are up. Six
- * language targets and two highlight rules on one screen became three and
- * none.
+ * chosen language's screen. Round 4 tried plates of one line each with the
+ * digits and the next step said once beneath, in the resting language, and
+ * both Chinese-reading parents found the digits route had gone missing for
+ * them — "my rescue route is written in the one language I cannot read" —
+ * while the English reader found the two Chinese headlines identical (they
+ * differ in one glyph, 输/輸) and read the screen as glitched. So each plate
+ * carries its own name line and its own digits line: the digits lines
+ * (后 4 位 / 後 4 碼) are what tell the two Chinese plates apart, and no
+ * language repeats what another said. The next step is said once, in the
+ * resting language, and steps aside on a portrait photo Sunday, where the
+ * canopy stops above it and the plate it wore read as a button.
  */
 function ThreeWelcomes(props: IdleProps) {
   const { backdrop, chosen, onChoose } = props;
@@ -1848,7 +1855,11 @@ function ThreeWelcomes(props: IdleProps) {
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
-      <div className="relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-3xl">
+      {/* One ground for every line while a photograph is up. The shipped plate
+          paints only on the landscape shelf; on the portrait shapes the
+          canopy stops above the panel's last lines, and a plate on one line
+          alone read as a button. Page token at 70%, framed by the picture. */}
+      <div className={`relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-3xl ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
         <IdleGround />
         <div className="flex w-full flex-col gap-2 lg:flex-row lg:gap-3">
           {ORDER.map((candidate: Locale) => (
@@ -1862,20 +1873,77 @@ function ThreeWelcomes(props: IdleProps) {
                 haptic(8);
                 onChoose(candidate);
               })}
-              className="flex min-h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-xl leading-tight font-semibold text-ink-100 active:bg-ink-600 tall:min-h-16 tall:text-3xl lg:flex-1"
+              className="flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 lg:flex-1"
               style={{ touchAction: 'manipulation' }}
             >
-              {COPY[candidate].name}
+              <span className="text-xl leading-tight font-semibold tall:text-3xl">{COPY[candidate].name}</span>
+              <span className="text-sm leading-tight text-ink-400 tall:text-lg">{COPY[candidate].orDigits}</span>
             </button>
           ))}
         </div>
         <div className={`pt-3 text-base kiosk:text-lg ${dim}`} lang={RESTING}>
+          {COPY[RESTING].thenTap}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* J — Two voices, both still                                                */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * The resting language leads, as today; one Chinese plate stands under it,
+ * still, in the script the congregation chose.
+ *
+ * What round 4's moving line taught: the second voice has to be on the
+ * glass from the first second (the father), it must not move (the
+ * grandmother: "a sign that stays still is a sign; a sign that changes is a
+ * television"), and the thing a thumb presses must never be the thing that
+ * changes (the father). So the line is a plate — the material this kiosk
+ * presses — carrying the name route and the digits route in one script,
+ * and it is the door: a tap makes the screen that language's, with the
+ * other script one tap away in the bar. Which script stands here is the
+ * congregation's decision, held in one constant; both scripts read each
+ * other well enough that the family of the other one loses nothing (the
+ * father: "either is fine").
+ *
+ * Five lines, one door, nothing moving, nothing said twice.
+ */
+const SECOND_VOICE: Locale = 'zh-Hant';
+
+function TwoVoices(props: IdleProps) {
+  const { backdrop, chosen, onChoose } = props;
+  const tap = useTap();
+  if (chosen) return <LanguageBarIdle {...props} />;
+  const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  return (
+    <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
+      <div className={`relative isolate flex w-full max-w-xl flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
+        <IdleGround />
+        <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl" lang={RESTING}>
+          {COPY[RESTING].name}
+        </div>
+        <button
+          type="button"
+          tabIndex={-1}
+          lang={SECOND_VOICE}
+          aria-label={LOCALE_LABELS[SECOND_VOICE]}
+          {...tap(() => {
+            haptic(8);
+            onChoose(SECOND_VOICE);
+          })}
+          className="mt-4 flex min-h-14 w-full max-w-md flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 lg:mt-3"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <span className="text-xl leading-tight font-semibold tall:text-3xl">{COPY[SECOND_VOICE].name}</span>
+          <span className="text-sm leading-tight text-ink-400 tall:text-lg">{COPY[SECOND_VOICE].orDigits}</span>
+        </button>
+        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].orDigits}
         </div>
-        <div
-          className={`mt-2 text-base kiosk:text-lg ${dim} ${backdrop ? 'rounded-lg bg-ink-950/75 px-3 py-1' : ''}`}
-          lang={RESTING}
-        >
+        <div className={`pt-2 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].thenTap}
         </div>
       </div>
@@ -1974,10 +2042,7 @@ function SecondVoice(props: IdleProps) {
         <div className={`pt-2 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].orDigits}
         </div>
-        <div
-          className={`mt-4 text-lg kiosk:text-xl lg:mt-2 ${dim} ${backdrop ? 'rounded-lg bg-ink-950/75 px-3 py-1' : ''}`}
-          lang={RESTING}
-        >
+        <div className={`mt-4 text-lg kiosk:text-xl lg:mt-2 ${dim} ${backdrop ? 'hidden lg:block' : ''}`} lang={RESTING}>
           {COPY[RESTING].thenTap}
         </div>
       </div>
@@ -1990,22 +2055,15 @@ function SecondVoice(props: IdleProps) {
 export const VARIANTS: Record<string, VariantSpec> = {
   'three-welcomes': {
     summary:
-      'A: three equal plates at rest — the name route in each language, each a door; the digits and the next step said once beneath. Chips only once something is typed.',
+      'A: three equal plates at rest, each the name route and the digits route in its own language, each a door; the next step once beneath. Chips only once something is typed.',
     Idle: ThreeWelcomes,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
-  'one-at-a-time': {
+  'two-voices': {
     summary:
-      'D: the bar as the control; under it one instruction that crossfades through the three languages, four seconds each. Chips only once something is typed.',
-    Idle: OneAtATime,
-    Picker: PromotedChips,
-    NoMatch: NoMatchPanel,
-  },
-  'second-voice': {
-    summary:
-      'H: the resting language leads as today; one Chinese line alternates between the two scripts beneath it and is the door. Chips only once something is typed.',
-    Idle: SecondVoice,
+      'J: the resting language leads as today; one still Chinese plate under it, in the congregation’s script, carrying the name and digits routes, is the door. Chips only once something is typed.',
+    Idle: TwoVoices,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
@@ -2013,6 +2071,24 @@ export const VARIANTS: Record<string, VariantSpec> = {
     summary:
       'B: one language leads under the pairing screen’s full-weight picker; the screen every candidate becomes once a language is chosen.',
     Idle: LanguageBarIdle,
+    Picker: PromotedChips,
+    NoMatch: NoMatchPanel,
+  },
+  /* Round 4's two moving candidates, kept for the record: every parent
+     rejected the cycling instruction, and the alternating line's lesson —
+     a second voice, present from the first second, still, and not the
+     thing you press — is `two-voices`. */
+  'one-at-a-time': {
+    summary:
+      'D (round 4): the bar as the control; under it one instruction that crossfades through the three languages, four seconds each.',
+    Idle: OneAtATime,
+    Picker: PromotedChips,
+    NoMatch: NoMatchPanel,
+  },
+  'second-voice': {
+    summary:
+      'H (round 4): the resting language leads; one Chinese line alternates between the two scripts beneath it and is the door.',
+    Idle: SecondVoice,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
