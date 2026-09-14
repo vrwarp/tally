@@ -12,8 +12,13 @@ This document answers one question: **can Tally be enhanced to manage those tabl
 The answer is *yes to the outcome, no to the ownership*. The tablets should be enrolled and
 policy-managed, and the policy they need is specific enough that only Tally can write it. But Tally
 should **emit** that policy, not **be** the thing that applies it. Google's own terms say so, the
-quota says so, and the blast radius says so. What follows is the argument, the policy itself, and
-the five small changes inside Tally that make a managed tablet worth having.
+quota says so, and the blast radius says so.
+
+The applier chosen here is **Google's own Test DPC** — free, accountless, and enough for a handful
+of tablets in one building, with two named gaps this document does not paper over. What follows is
+the argument (§2), the policy stated once in AMAPI's vocabulary (§4), the runbook that applies it
+and the bill that comes with it (§4.6–§4.9), and the five small changes inside Tally that make a
+managed tablet worth having (§6).
 
 ---
 
@@ -108,10 +113,23 @@ that is, and Tally's contribution is to know exactly what the policy should say.
 
 ---
 
-## 3. The shape that works: Tally writes the policy, a console applies it
+## 3. The shape that works: state the policy once, apply it with Test DPC
 
-Everything below is AMAPI. The church reaches AMAPI through a console that is already a validated
-EMM, which is the supported path and the only one with a quota.
+Tally states the policy. Something else applies it. **The chosen applier is Google's own Test DPC**
+(§4.6), for three reasons: it is free with no account, no quota and no third party holding
+device-owner authority over the church's hardware; it covers more of §1 than its reputation suggests
+(kiosk mode, lock task, managed configurations, keep-awake, an update window — all confirmed in its
+source, §4.7); and at three tablets the thing an EMM actually sells you, remote change, is a walk
+across the lobby.
+
+It is not free of cost, it is free of *money*. §4.8 is the bill: two of §1's seven wants are not
+delivered, and the rest is staged by hand on each tablet. Read it before committing, and read §4.9
+for the line at which this stops being the right answer.
+
+The alternatives are kept below, because the decision should be re-made when the ministry grows,
+when the first Sunday goes badly, or when somebody reading this has different facts. Everything
+except Test DPC and Headwind reaches the same policy through AMAPI, via a console that is already a
+validated EMM — the supported path, and the only one with a quota.
 
 | Route | What it costs | Notes |
 | --- | --- | --- |
@@ -121,7 +139,7 @@ EMM, which is the supported path and the only one with a quota.
 | Microsoft Intune | **no longer free.** Around $3–3.50 per device per month on the device-only subscription | Intune has first-class Android Enterprise dedicated-device support and a Chrome app-configuration designer, and the *device-only* subscription is the right licensing unit for a tablet nobody signs in to. But the ten-seat Microsoft 365 Business Premium grant that used to make this free for charities was **discontinued from 1 July 2025**, at each organisation's renewal. What remains granted is up to 300 seats of Business Basic, which does not include Intune, plus discounts of up to 75% on Business Premium. So this is now a paid route, and only worth it if the church already runs Intune for its staff laptops. Any guide that still calls it free — this document included, until now — predates the change. |
 | JumpCloud free tier | free for 10 users | A real EMM with dedicated-device policies. Its free tier counts *users*, which is an awkward unit for tablets nobody signs in to. |
 | Headwind MDM or another self-hosted EMM | a VM | Not AMAPI — a legacy Device Policy Controller. Works, but it is another server the church now runs. |
-| Google Test DPC (`afw#testdpc`) | free, unlimited, no account anywhere | **Not a deployment. An instrument** — see §4.6. It will set device owner and push Chrome's managed configuration, which is exactly enough to prove §4.3 on a bench tablet in twenty minutes. It is Google's own words a "testing application"; it has no remote anything, and the evidence that it can hold Chrome in an unattended boot-into-kiosk state is thin. Use it to learn, not to run Sundays. |
+| **Google Test DPC (`afw#testdpc`) — chosen** | free, unlimited, no account anywhere | The runbook is §4.6, the mapping from §4 is §4.7, the bill is §4.8. Google calls it "a testing application to flex the APIs", and that is a fair warning about its support story rather than about its capability: the source shows a real COSU dedicated-device mode, lock task, managed configurations, keep-awake and a system update policy. What it does not have is a persistent launcher, so a reboot drops out of kiosk. |
 | Miradore free tier | free, 50 devices | Looks like the obvious answer and is not: managed configurations and kiosk mode are both behind the paid tier, so the free plan can do neither thing this document needs. |
 | Screen pinning, by hand, on the device | free | Android's own single-app lock. No remote anything, no Wi-Fi push, no update window, and a volunteer can leave it with a long-press. Worth knowing about as the zero-effort floor, not as the answer. |
 | A kiosk-browser app (Fully Kiosk Browser and friends) | ~€7 once | **Fatal for a printing kiosk.** These render in Android's System WebView, and WebUSB is not exposed in WebView. The Brother QL simply is not reachable. Fine for a kiosk that never prints; nothing else. |
@@ -129,6 +147,11 @@ EMM, which is the supported path and the only one with a quota.
 ---
 
 ## 4. The policy
+
+Stated once, in AMAPI's vocabulary, because that is the durable form: it is what every console in
+§3 speaks, it is precise, and it survives a change of applier. §4.7 maps every line of it onto the
+Test DPC screens that actually apply it here — where two lines have no equivalent and are dropped,
+and one (the web app) is replaced by pointing Chrome at the kiosk instead.
 
 Two AMAPI objects. First the kiosk itself as a web app, because Tally's kiosk *is* a PWA and AMAPI
 can install one without any Play listing:
@@ -322,10 +345,11 @@ no printer. Do not reason about it — read the answer off the device, per §4.5
 
 ### 4.4 Enrolling
 
-Fully managed provisioning cannot be done to a tablet that is already set up. Each device is
-factory reset, and at the very first screen either the QR the console mints is scanned, or
-`afw#setup` is typed into the Google account field. Budget twenty minutes for the first tablet and
-five for each after.
+Fully managed provisioning cannot be done to a tablet that is already set up — device owner is only
+grantable during the setup wizard. Each device is factory reset, and at the very first screen either
+the QR the console mints is scanned, or a token is typed into the Google account field: `afw#setup`
+for a console-managed enrolment, **`afw#testdpc` for the route chosen here**. Budget twenty minutes
+for the first tablet and five for each after.
 
 Worth doing while the tablets are still on a desk: print the enrolment QR and leave a laminated copy
 at the check-in desk. A tablet that dies on a Sunday is then a factory reset, a scan and three
@@ -356,45 +380,121 @@ itself, both before the first Sunday:
 Reaching `chrome://policy` on a locked kiosk means unlocking it, so do both while the tablet is
 still being staged and before the kiosk profile is applied.
 
-### 4.6 Proving all of it on a bench tablet, for nothing
+### 4.6 Applying it with Test DPC — the runbook
 
-Before any of §3 is chosen, before a licence is bought and before a church is asked to enrol
-anything, every uncertain claim in this document can be settled on one spare Android tablet in about
-twenty minutes, with no account, no console, no quota and no money.
+**Test DPC** is the open-source reference Device Policy Controller Google publishes to exercise the
+Android Enterprise APIs. It is a real device owner with a settings UI instead of a cloud console.
+There is no account, no tenant, no quota and no subscription; the tablet answers to nobody but the
+person holding it.
 
-Google publishes **Test DPC**, the open-source reference Device Policy Controller it built to
-exercise the Android Enterprise APIs. On a factory-reset tablet, typing `afw#testdpc` into the
-Google account field at setup makes it the device owner. From there its *Manage app restrictions*
-screen writes Chrome's managed configuration directly — the same `RestrictionsManager` bundle a real
-EMM would push, arriving by a different road.
+Everything below was read out of [its source](https://github.com/googlesamples/android-testdpc)
+rather than inferred, because its documentation is thin and most write-ups about it are wrong in
+both directions.
 
-That is enough to answer everything §8 asks:
+**Stage 1 — provision.** Factory reset the tablet. At the setup wizard's Google account field, type
+`afw#testdpc`. Android fetches Test DPC and makes it device owner. Join the church Wi-Fi when asked.
 
-1. Set `WebUsbAllowDevicesForUrls` on `com.android.chrome` and check `chrome://policy` per §4.5.
-   Wrong encoding or a bad rule shows up here as *Status: Error* or as a missing policy, and you can
-   try the array and the string forms against each other in a minute — which settles §4.3 for real
-   rather than by reading vendor documentation.
-2. Plug the Brother in, open the kiosk in Chrome, run the `getDevices()` line from §4.5. This is the
-   whole premise of the pre-grant, tested.
-3. Then **install the kiosk to the home screen** — Tally already offers this itself, from
-   `src/kiosk/install.ts` — and run the same line again inside the installed app. Chrome mints a
-   WebAPK for it, which is the same rendering path an AMAPI web app uses, minted differently. If
-   `getDevices()` still returns the printer there, §8's first open question is closed and the web-app
-   kiosk in §4 is safe. If it comes back empty in the WebAPK but full in the tab, take the
-   Chrome-as-kiosk fallback instead.
+**Stage 2 — the COSU config.** Test DPC has a dedicated-device mode (COSU, *corporate-owned
+single-use*) driven by an XML file it downloads at provisioning time from a URL carried in the
+enrolment QR's admin extras (`com.afwsamples.testdpc.COSU_CONFIG` in the provisioning bundle). This
+is the closest thing to central configuration the route has, and it is worth using: one file, served
+from one place, and every tablet provisions identically.
 
-**What Test DPC will not do, and why it is not the deployment.** Nothing in it manages anything
-remotely: a changed Wi-Fi password, a new origin in `URLAllowlist`, a printer from a different
-vendor — each is a walk to each tablet and a JSON blob retyped on a touchscreen. Device owner can
-only be set during provisioning, so a tablet staged this way must be wiped to move to a real EMM
-later. And the kiosk half is doubtful: lock task mode requires the foreground app to call
-`startLockTask()`, Chrome does not call it on itself, and what makes a real dedicated device boot
-straight back into its app is the EMM's own launcher standing in as HOME — which is what AMAPI's
-`installType: KIOSK` provides and Test DPC, a settings-poking app rather than a launcher, does not
-appear to. Google calls it "a testing application to flex the APIs"; that is exactly what it is good
-for, and the reason it belongs in this section and not in §3.
+```xml
+<cosu-config mode="single">
+  <kiosk-apps>
+    <app package-name="com.android.chrome" />
+  </kiosk-apps>
+  <policies>
+    <global-setting name="stay_on_while_plugged_in" value="7" />
+    <disable-status-bar />
+    <disable-keyguard />
+    <disable-screen-capture />
+    <user-restriction name="no_factory_reset" />
+    <user-restriction name="no_safe_boot" />
+    <user-restriction name="no_debugging_features" />
+    <user-restriction name="no_install_unknown_sources" />
+  </policies>
+</cosu-config>
+```
 
----
+`mode="single"` launches the first kiosk app directly; `mode="custom"` shows Test DPC's own kiosk
+launcher with the listed apps on it, which is what you want if the printer utility ever needs to be
+reachable. `stay_on_while_plugged_in` is a bitmask — `7` is AC | USB | wireless, the direct
+equivalent of §4's `stayOnPluggedModes`, and it is the fix `wakeLock.ts` cannot make for itself.
+
+Tally can serve this file (§6.3). Firebase Hosting is already deployed, the URL is stable, and it
+puts the church's tablet configuration in the same repository as the thing it configures.
+
+**Stage 3 — the managed configuration, by hand.** The COSU XML has **no key for app restrictions** —
+`kiosk-apps`, `download-apps`, `hide-apps`, `user-restriction`, `global-setting` and the `disable-*`
+flags are the whole vocabulary. So `WebUsbAllowDevicesForUrls` and the rest of §4.2 are entered
+per-tablet, in Test DPC → **Managed configurations** → Chrome.
+
+Do not type them. The WebUSB value is a quote-heavy one-liner and a touchscreen keyboard is how
+§4.3's failure modes happen. Get it onto the tablet's clipboard instead — §6.3 is the proposal for
+Tally serving a paste-ready page for exactly this.
+
+**Stage 4 — the rest of the policy.** Test DPC's own screens carry it: *Manage lock task list* for
+the lock-task allowlist, *Kiosk mode → Start kiosk mode* to enter it, and the system update policy
+screen for §4.1's windowed maintenance window.
+
+**Stage 5 — verify.** §4.5, before you leave the tablet. `chrome://policy` will be unreachable
+afterwards.
+
+### 4.7 The same policy, in both vocabularies
+
+§4 is written in AMAPI's words because that is the durable statement of intent. This is how each
+line reaches a Test DPC tablet.
+
+| §4 intent | AMAPI | Test DPC |
+| --- | --- | --- |
+| Boot into the kiosk, cannot be left | `installType: KIOSK` | COSU `mode="single"` + `kiosk-apps`, **but see §4.8** |
+| Lock-task allowlist | implied by `KIOSK` | *Manage lock task list* |
+| The WebUSB pre-grant, and all of §4.2 | `managedConfiguration` | *Managed configurations* → Chrome, **by hand, per tablet** |
+| Screen never sleeps | `stayOnPluggedModes` | `<global-setting name="stay_on_while_plugged_in" value="7"/>` |
+| No lock screen | `keyguardDisabled` | `<disable-keyguard/>` |
+| No status bar or notifications | `kioskCustomization.statusBar` | `<disable-status-bar/>` |
+| No settings, no safe boot, no reset, no adb | `factoryResetDisabled`, `debuggingFeaturesAllowed`, `advancedSecurityOverrides` | `<user-restriction name="no_factory_reset"/>` and friends |
+| Update window (§4.1 — mandatory for a pinned app) | `systemUpdate: WINDOWED` | the system update policy screen |
+| Wi-Fi pushed centrally | `openNetworkConfiguration` | — join it by hand at provisioning |
+| Kiosk as its own app | `webApps` + `FULL_SCREEN` | — Chrome is the kiosk app; set `HomepageLocation` in the managed configuration |
+| Battery and health visible remotely | `statusReportingSettings` | — **§6.1 instead**, which is the better answer anyway |
+
+### 4.8 What you are accepting
+
+Two of §1's seven wants are not delivered, and pretending otherwise is how a Sunday goes wrong.
+
+- **A reboot leaves the kiosk.** This is the significant one. Nothing in Test DPC registers a
+  persistent HOME activity — there is no such control in the app, and its COSU code does not set one
+  — and its boot receiver only tells the device owner the user has unlocked. Kiosk mode is *entered*
+  by a person tapping *Start kiosk mode*. So after a power cut the tablet comes up on the stock
+  launcher and someone has to put it back. Mitigations, in order: keep the tablet on mains through
+  something that rides out a flicker; put "if the tablet restarted: open Test DPC → Start kiosk
+  mode" on a card beside the shelf; and test the full power-off/power-on cycle before the first
+  Sunday rather than discovering it on one. An EMM's `installType: KIOSK` is precisely what this
+  buys, and it is the honest reason to leave (§4.9).
+- **Nothing changes remotely.** A new Wi-Fi password, a new origin in `URLAllowlist`, a printer from
+  a different vendor: each is a walk to each tablet. At three tablets in one building this is a
+  ten-minute job a couple of times a year — the identifiers in §4.3 are static, and the origin
+  changes about never. At two campuses it is a car journey and the calculus inverts.
+
+And one structural fact worth knowing before you start: **device owner can only be set during
+provisioning.** Moving to an EMM later means factory-resetting every tablet. That is cheap here — a
+kiosk tablet holds nothing, and Tally's pairing is a code — but it is not free, and it is a reason
+to make the §4.9 call deliberately rather than by drift.
+
+### 4.9 When to stop using Test DPC
+
+Any one of these, and the answer becomes a real EMM from the §3 table:
+
+- More than one building, or tablets nobody on staff can walk to.
+- A second reboot incident that nobody noticed until a parent said something.
+- More than about six tablets, at which point per-device hand-staging stops being a morning.
+- Anyone other than the person who set it up needing to change the policy.
+
+None of these is a failure of the decision. They are the conditions under which it was never the
+right one, written down now while it is cheap to be honest about them.
 
 ## 5. What this buys, and what it does not
 
@@ -456,17 +556,29 @@ device, two numbers have to agree and only one of them is visible. Lift the hour
 (and, if a church ever needs it, to `config/settings`), so §4.1's window can be stated as "the same
 hour the kiosk reloads" rather than as a coincidence.
 
-### 6.3 Export the policy from Settings
+### 6.3 Serve the staging kit
 
-A card in Settings that emits §4 for *this* deployment: the real origin, the real Firebase and
-backend hosts for `URLAllowlist`, the printer vendor from the printing module, the maintenance
-window derived from the quiet hour, and the web app's `startUrl` and icon. Copy button, and the
-provisioning QR beside it.
+The Test DPC route has two things it wants from a server, and Tally is already a deployed one with a
+stable origin. Both are static, both are derived from configuration Tally already holds, and
+together they are the difference between staging a tablet in five minutes and staging one wrongly.
 
-This is the piece only Tally can write, and it is the honest form of "Tally supports tablet
-management": Tally produces a correct document, and the church's console applies it. It is a
-generator, not a control plane — no service account, no quota, no permissible-usage problem, and
-nothing that can reach a tablet on a bad day.
+1. **The COSU config, at a fixed URL.** `/kiosk/cosu.xml`, served by Firebase Hosting, which the
+   enrolment QR's admin extras point at (§4.6, stage 2). This is the one piece of the route that is
+   central rather than per-device, and putting it in this repository means the tablets' configuration
+   is reviewed and versioned like everything else here.
+2. **A paste-ready page for the managed configuration.** `/kiosk/setup`, staff-gated, showing each
+   §4.2 key with a copy button — the WebUSB value built from this deployment's real origin and the
+   printer vendor from the printing module rather than from a worked example, so §4.3's failure modes
+   cannot be typed in. Stage 3 of §4.6 becomes: open this page on the tablet, copy, paste, next key.
+
+The maintenance window comes from the quiet hour (§6.2), the origin from the deployment, the vendor
+from the code. Nothing here is a control plane — no service account, no quota, no permissible-usage
+problem, and nothing Tally can do to a tablet on a bad day. It is Tally knowing its own deployment
+well enough to write the configuration down correctly, which is the honest form of "Tally supports
+tablet management".
+
+If the church ever moves to an EMM (§4.9), the same generator emits the §4 policy JSON for its
+console. The inputs are identical; only the output format changes.
 
 ### 6.4 Zero-touch pairing through `startUrl`
 
@@ -475,11 +587,16 @@ Today a kiosk is paired by a code read off one screen and typed into another
 That is the right design for a volunteer with a tablet in their hands, and it is the wrong design
 for a tablet that has just been factory reset in an office.
 
-The web app's `startUrl` is per-policy, and a church has a handful of tablets, so it can be
-per-device: mint a pre-approved pairing from the app, and the console installs
-`https://tally.example.org/kiosk?pair=ABC123`. A reset tablet boots into a paired, bound kiosk with
-nobody standing over it. `src/kiosk/` reads no URL parameters at all today, so this is new code, but
-it is small — it is the existing handshake entered at step 3 instead of step 1.
+The kiosk's start URL is per-tablet either way — `HomepageLocation` in Chrome's managed
+configuration on the Test DPC route, the web app's `startUrl` on an EMM — so it can carry a token:
+mint a pre-approved pairing from the app and stage the tablet with
+`https://tally.example.org/kiosk?pair=ABC123`. A reset tablet comes up already paired and bound,
+with nobody standing over it. `src/kiosk/` reads no URL parameters at all today, so this is new
+code, but it is small — it is the existing handshake entered at step 3 instead of step 1.
+
+It is worth more on the Test DPC route than on any other, because staging there is already manual:
+this is the difference between a tablet that is finished when the QR is scanned and one that still
+needs a leader to walk over with a pairing code.
 
 Two things to hold onto if this is built. The token sits at rest in an EMM's policy store, so it
 must stay single-use and short-lived, and the pairing it yields is the one the rules already fence
@@ -516,12 +633,17 @@ tablets.
 
 ## 8. Open questions — things only a tablet can answer
 
-All but the last are answerable this week, on a spare tablet, for nothing. §4.6 is how.
+All are answerable on the first tablet, during staging, before any of this is relied on. §4.6 gets
+you there and §4.5 is the instrument.
 
-- Does `WebUsbAllowDevicesForUrls` reach a **WebAPK** context, or only tabs in Chrome proper? A
-  WebAPK runs on Chrome's engine and policy should apply, but this is inference, not a tested fact,
-  and the whole §4.2 case rests on it. §4.5 is how to find out in ten minutes, and §4's
-  Chrome-as-kiosk note is the fallback if the answer is no.
+- Does `WebUsbAllowDevicesForUrls` reach a **WebAPK** context, or only tabs in Chrome proper? Mostly
+  moot on the chosen route, since Chrome itself is the kiosk app there and the policy is applied to
+  the browser drawing the page. It matters again the day the church moves to an EMM and the web app
+  of §4 comes back. To settle it early: install the kiosk to the home screen — Tally offers this
+  itself, from `src/kiosk/install.ts` — and run §4.5's `getDevices()` line inside the installed app.
+- Does Test DPC's kiosk mode survive a reboot on the church's actual hardware? §4.8 says no, from
+  its source. Test the full power-off/power-on cycle anyway: it is the single most consequential
+  thing about this route, and the only one where being wrong is good news.
 - Which encoding does the chosen console send for `WebUsbAllowDevicesForUrls` — a real JSON array or
   a JSON string (§4.3)? Answered by `chrome://policy` on the first tablet, not by reading anybody's
   documentation.
