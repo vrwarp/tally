@@ -370,6 +370,20 @@ From which, in the order people trip over them:
 - **It overrides everything below it**: `DefaultWebUsbGuardSetting`, `WebUsbAskForUrls`,
   `WebUsbBlockedForUrls`, and the user's own choices.
 
+**It is not deprecated**, which is worth recording because the word appears in the definition and
+because this document now leans on the policy hard enough that its disappearance would be a
+problem. Chromium's [life of a policy](https://chromium.googlesource.com/chromium/src/+/main/docs/enterprise/life_of_a_policy.md)
+marks a deprecated policy with a top-level `deprecated` field and closes its `supported_on` range
+when support ends. `WebUsbAllowDevicesForUrls.yaml` has no `deprecated` field, its ranges are all
+open (`android:75-`, `chrome_os:74-`, `chrome.*:74-`), and it carries `future_on: fuchsia` — nobody
+plans a deprecated policy onto a new platform.
+
+What *is* deprecated is one legacy piece of syntax inside it: the old form that named a requesting
+origin and an embedding origin together in one `urls` entry. Modern Chromium grants the permission
+to the embedding origin and ignores the requesting one entirely. Tally's kiosk is its own top-level
+page and is not framed, so this never arises here — use a single bare origin, as above, and the
+deprecation is not yours to care about.
+
 For Tally's kiosk, matching the vendor and leaving the model open — which is not a shortcut but the
 correct choice, because it is exactly what the kiosk's own `getPairedDevices()` does, because a
 model-pinned rule would need editing the first time a printer is replaced, and because a rule with
