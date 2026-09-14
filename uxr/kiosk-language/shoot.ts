@@ -64,10 +64,15 @@ const SCENES: {
   drive?: readonly string[];
 }[] = [
   { id: 'idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
+  /* The same language, chosen: what a family sees after taking a door, in
+     every language including the resting one — the English door has to
+     commit like the other two. */
+  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'] },
+  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'] },
   { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall'] },
   { id: 'phone', query: 'buffer=7788', views: ['kiosktall'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'] },
-  { id: 'photo-idle', query: 'photo=1&icon=church', views: ['kiosktall'], settle: 1900 },
+  { id: 'photo-idle', query: 'photo=1&icon=church', views: ['kiosktall', 'kioskwide'], settle: 1900 },
 ];
 
 const args = process.argv.slice(2);

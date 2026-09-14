@@ -16,7 +16,7 @@
  * ported into `SearchScreen.tsx` and the catalogues; this stays as the record
  * of what else was on the table.
  */
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { haptic } from '@/lib/utils';
 import { gradeDescription, type GradeStrings } from '@/lib/grades';
 import { tallyRender } from '@/kiosk/renderTally';
@@ -457,6 +457,7 @@ const ResultRow = memo(function ResultRow({
 
 export function SearchScreenVariant({
   variant,
+  initialChosen = false,
   binding,
   buffer,
   onKey,
@@ -476,6 +477,8 @@ export function SearchScreenVariant({
 }: {
   /** Which candidate to draw — a key of `VARIANTS`. */
   variant: string;
+  /** The harness's `?chosen=1`: photograph the screen after a family has chosen. */
+  initialChosen?: boolean;
   binding: KioskBinding;
   buffer: string;
   onKey: (key: KioskKey) => void;
@@ -522,6 +525,24 @@ export function SearchScreenVariant({
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
   const tDoor = useTranslations('Door');
+  /*
+   * Whether a family has chosen a language this visit — its own fact, not
+   * inferred from the locale. Inferred (`locale !== RESTING`) the English
+   * door was a no-op: pressing it set the locale it already had and changed
+   * not one pixel, which is the round-1 grandmother failure handed to the
+   * English parent, who is most of the queue. In the app this flag lives in
+   * `KioskApp` beside the locale and resets on the same two clocks the
+   * locale does — `cameHome` and `LANGUAGE_RESET_MS`.
+   */
+  const [chosen, setChosen] = useState(initialChosen);
+  const { setLocale } = useLocaleControl();
+  const onChoose = useCallback(
+    (candidate: Locale) => {
+      setLocale(candidate);
+      setChosen(true);
+    },
+    [setLocale],
+  );
   // The kiosk's language, which the hours and the opens-at line are formatted
   // against — `Intl` would otherwise answer with the tablet's. See binding.ts.
   const locale = useLocale();
@@ -898,7 +919,7 @@ export function SearchScreenVariant({
             * cannot move.
             */}
           {outcome.mode === 'idle' && VARIANTS[variant]?.Idle && (
-            <VariantIdle variant={variant} backdrop={backdrop} onRegister={steadyRegister} />
+            <VariantIdle variant={variant} backdrop={backdrop} onRegister={steadyRegister} chosen={chosen} onChoose={onChoose} />
           )}
           {outcome.mode === 'idle' && !VARIANTS[variant]?.Idle && (
             <div className="flex flex-col items-center pt-6 text-center">
@@ -982,6 +1003,8 @@ export function SearchScreenVariant({
               widening={widening}
               onWiden={steadyWiden}
               onRegister={steadyRegister}
+              chosen={chosen}
+              onChoose={onChoose}
             />
           )}
           {nobody && !VARIANTS[variant]?.NoMatch && (
@@ -1282,7 +1305,7 @@ export function SearchScreenVariant({
             * the queue away from them.
             */}
           {VARIANTS[variant]?.Picker ? (
-            <VariantPicker variant={variant} />
+            <VariantPicker variant={variant} chosen={chosen} onChoose={onChoose} />
           ) : (
             <span className="absolute left-0">
               <LanguagePicker quiet />
@@ -1339,14 +1362,20 @@ export function SearchScreenVariant({
 /* ------------------------------------------------------------------------ */
 
 /** What the idle slot is handed: the same facts the shipped panel reads. */
-export interface IdleProps {
+/** A family's language choice this visit, and the way to make one. */
+export interface ChoiceProps {
+  chosen: boolean;
+  onChoose: (candidate: Locale) => void;
+}
+
+export interface IdleProps extends ChoiceProps {
   /** The gathering's photograph is mounted behind the screen. */
   backdrop: boolean;
   /** Opens the registration wizard — the standing offer's own handler. */
   onRegister: () => void;
 }
 
-export interface NoMatchProps {
+export interface NoMatchProps extends ChoiceProps {
   mode: KioskSearchOutcome['mode'];
   refresh: KioskRefresh;
   widening: boolean;
@@ -1366,7 +1395,7 @@ export interface VariantSpec {
    * `relative` box. Absent: the shipped quiet chips at its left edge. A
    * candidate that moves the control elsewhere returns `null` here.
    */
-  Picker?: () => React.ReactElement | null;
+  Picker?: (props: ChoiceProps) => React.ReactElement | null;
 }
 
 function VariantIdle({ variant, ...props }: IdleProps & { variant: string }) {
@@ -1374,9 +1403,9 @@ function VariantIdle({ variant, ...props }: IdleProps & { variant: string }) {
   return Idle ? <Idle {...props} /> : null;
 }
 
-function VariantPicker({ variant }: { variant: string }) {
+function VariantPicker({ variant, ...props }: ChoiceProps & { variant: string }) {
   const Picker = VARIANTS[variant]?.Picker;
-  return Picker ? <Picker /> : null;
+  return Picker ? <Picker {...props} /> : null;
 }
 
 
@@ -1433,12 +1462,12 @@ const COPY: Record<
     firstTime: '第一次来吗？',
   },
   'zh-Hant': {
-    digits: '輸入電話後四碼',
+    digits: '輸入電話後 4 碼',
     orName: '或輸入孩子的英文名字',
     thenTap: '然後點一下您孩子的名字。',
     noMatch: '找不到',
-    tryDigits: '試試輸入電話後四碼。',
-    tryAnother: '試試家中另一支電話的後四碼，或輸入英文名字。',
+    tryDigits: '試試輸入電話後 4 碼。',
+    tryAnother: '試試家中另一支電話的後 4 碼，或輸入英文名字。',
     firstTime: '第一次來嗎？',
   },
 };
@@ -1446,6 +1475,19 @@ const COPY: Record<
 function useCopy() {
   return COPY[useLocale() as Locale] ?? COPY.en;
 }
+
+/**
+ * What the kiosk rests in — `RESTING_LOCALE` in `src/kiosk/KioskApp.tsx`.
+ *
+ * A locale that differs from it is a family's choice for their visit; equal
+ * to it, nobody has chosen anything yet and the screen cannot know who is
+ * standing there. The panels below say the route in every language in that
+ * state and in the chosen language once there is one.
+ */
+const RESTING: Locale = 'en';
+
+/** The languages, resting language first. */
+const ORDER: Locale[] = [RESTING, ...LOCALES.filter((candidate) => candidate !== RESTING)];
 
 /* ------------------------------------------------------------------------ */
 /* Shared parts                                                              */
@@ -1461,10 +1503,13 @@ function useCopy() {
  * thing to a screen reader.
  */
 function FourBoxes({ size = 'md' }: { size?: 'md' | 'lg' }) {
+  /* Filled, like an empty key, rather than outlined: over a photograph a
+     thin ring against a pale sky was the first thing to go, and the boxes
+     are the one part of this panel that has to read with no words at all. */
   const box =
     size === 'lg'
-      ? 'h-14 w-11 rounded-lg ring-2 ring-ink-500 ring-inset kiosk:h-16 kiosk:w-12'
-      : 'h-10 w-8 rounded-md ring-2 ring-ink-600 ring-inset kiosk:h-12 kiosk:w-9';
+      ? 'h-14 w-11 rounded-lg bg-ink-800 ring-2 ring-ink-600 ring-inset kiosk:h-16 kiosk:w-12'
+      : 'h-10 w-8 rounded-md bg-ink-800 ring-2 ring-ink-600 ring-inset kiosk:h-12 kiosk:w-9';
   return (
     <div aria-hidden="true" className={`flex ${size === 'lg' ? 'gap-3' : 'gap-2.5'}`}>
       {[0, 1, 2, 3].map((index) => (
@@ -1498,17 +1543,60 @@ function IdleGround() {
  * Mode-aware: a four-digit search that found nobody is told to try another
  * number in the family, not the digits it just typed.
  */
-function NoMatchPanel({ mode, widening, onWiden, onRegister }: NoMatchProps) {
+function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchProps) {
   const t = useTranslations('Search');
-  const copy = useCopy();
+  const { locale } = useLocaleControl();
+  const copy = COPY[locale] ?? COPY.en;
   const tap = useTap();
+  const route = (candidate: Locale) =>
+    mode === 'phone' ? COPY[candidate].tryAnother : COPY[candidate].tryDigits;
+  /*
+   * Nobody has chosen a language, so the panel cannot know who typed the
+   * name that found nobody — and the round-1 father reached exactly this
+   * screen, in English, before he had tapped anything: "word for word what
+   * defeated me". So while the kiosk is at rest the route is said in every
+   * language, with the boxes, and the doors stay quiet under it.
+   */
+  const unchosen = !chosen;
+  /* 找不到 is the same string in both scripts, and printed twice it read as
+     a stutter. One line per distinct sentence, the first language to say it
+     keeping the credit. */
+  const distinct = (pick: (candidate: Locale) => string) =>
+    ORDER.filter((candidate, index) => ORDER.findIndex((other) => pick(other) === pick(candidate)) === index);
   return (
     <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
       <div className="mx-auto max-w-sm text-center text-3xl leading-tight font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
-        {copy.noMatch}
+        {unchosen ? (
+          <span className="flex flex-col items-center gap-1">
+            {distinct((candidate) => COPY[candidate].noMatch).map((candidate) => (
+              <span key={candidate} lang={candidate}>
+                {COPY[candidate].noMatch}
+              </span>
+            ))}
+          </span>
+        ) : (
+          copy.noMatch
+        )}
       </div>
-      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-balance text-ink-200 tall:max-w-md kiosk:text-2xl">
-        {mode === 'phone' ? copy.tryAnother : copy.tryDigits}
+      {/* The boxes in both states: the father found the panel gave him less
+          once he had tapped 简 — the boxes are what his thumb aims at. */}
+      <div className="flex justify-center pt-1">
+        <FourBoxes />
+      </div>
+      {/* The route, at the heading's own brightness: every parent on the
+          panel said the blue button was still the loudest thing on the
+          screen, and pressing bright blue things is what a rushed thumb
+          does. So the advice carries the weight and the doors go quiet. */}
+      <div className="mx-auto flex max-w-sm flex-col gap-1 text-center text-xl leading-snug text-balance text-ink-100 tall:max-w-md kiosk:text-2xl">
+        {unchosen ? (
+          distinct(route).map((candidate) => (
+            <span key={candidate} lang={candidate}>
+              {route(candidate)}
+            </span>
+          ))
+        ) : (
+          <span className="text-2xl kiosk:text-3xl">{route(locale)}</span>
+        )}
       </div>
       <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4">
         <div className="text-base text-ink-400 kiosk:text-lg">{copy.firstTime}</div>
@@ -1520,7 +1608,10 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister }: NoMatchProps) {
               haptic();
               onRegister();
             })}
-            className="flex h-14 items-center justify-center rounded-xl bg-brand-600 px-8 text-lg font-semibold text-white active:bg-brand-500 tall:h-16 kiosk:text-xl lg:flex-1"
+            /* The widen button's own weight — a door, not the answer. It
+               stays first, because it is still the newcomer's door and the
+               order is what the shipped screen taught. */
+            className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-xl lg:flex-1"
           >
             {t('registerYourChild')}
           </button>
@@ -1537,35 +1628,52 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister }: NoMatchProps) {
 /* ------------------------------------------------------------------------ */
 
 /**
- * The instruction in all three languages at once, each line a door.
+ * The instruction in all three languages at once, each line a door — and,
+ * once a door is taken, the chosen language leading.
  *
- * What both Chinese-reading parents asked for first: "put both languages on
- * the idle screen at the same time, so there is nothing to find". Each line
- * is the phone-first instruction in its own language and is also the button
- * that sets the kiosk to that language for the visit — so reading it costs
- * nothing and choosing it costs one tap that nobody has to make. The current
- * language's line is bright; the other two are a step down and still
- * legible at arm's length. Non-blocking, which is the English parent's one
- * condition: the keys work whatever is or is not pressed here.
+ * Round 1 settled the shape. At rest the three doors are three short signs
+ * at one weight: the Traditional reader "finds her script by its shape", the
+ * English reader never reads the top of the screen, and a highlighted door
+ * at rest asked a question nobody had answered yet. After a tap the panel
+ * becomes the language-bar screen — the chosen language big and alone, the
+ * next step under it, the other two languages one tap away in the bar —
+ * because a tap that only brightened one plate "barely changed the screen"
+ * and the grandmother pressed it again with people waiting. The English
+ * parent meets the same bar when the family ahead walked off mid-search:
+ * a whole-word English button they can hit without aiming.
  *
- * On the landscape tablet the three stand side by side, because that shape
- * has width and no height — the staff consultant's constraint that three
- * stacked instructions do not fit a results track under 300px.
+ * "Chosen" is the app's own distinction — `RESTING_LOCALE` in KioskApp.tsx
+ * is what the kiosk rests in, and a locale that differs from it is a family's
+ * choice for their visit. The doors stand in the resting language's order,
+ * resting language first, so a lobby that rests in Chinese (the staff ask)
+ * would lead with Chinese and offer English the same way.
+ *
+ * Opaque plates: a 70% plate over the page had the renderer fringing the
+ * Traditional glyphs in colour, and three plates at one fill read as one
+ * object rather than a busy one. Non-blocking, which is the English parent's
+ * one condition — the keys work whatever is or is not pressed here. On the
+ * landscape tablet the three stand side by side, because that shape has
+ * width and no height.
  */
-function ThreeWelcomes({ backdrop }: IdleProps) {
-  const { locale, setLocale } = useLocaleControl();
+function ThreeWelcomes(props: IdleProps) {
+  const { backdrop, chosen, onChoose } = props;
   const tap = useTap();
+  if (chosen) return <LanguageBarIdle {...props} />;
+  const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
       <div className="relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-5xl">
         <IdleGround />
         <FourBoxes />
-        {/* Side by side on the landscape tablet, in the type the width
-            allows: three stacked doors do not fit a track under 300px, and
-            three columns of a 672px measure do not fit a 3xl heading. */}
+        {/* Each plate carries its own name-route line. Round 1 found the two
+            Chinese sub-lines near-identical and dropped them; round 2 found
+            that the one sentence that would have stopped the father typing
+            pinyin — 英文名字, the child's *English* name — was then only on
+            the glass after a tap, for exactly the reader who cannot read the
+            English line. The plates are told apart by their headlines
+            (后 4 位 / 後 4 碼), not by these, so the sub-lines can match. */}
         <div className="mt-4 flex w-full flex-col gap-2 lg:mt-3 lg:flex-row lg:gap-3">
-          {LOCALES.map((candidate: Locale) => {
-            const current = candidate === locale;
+          {ORDER.map((candidate: Locale) => {
             const copy = COPY[candidate];
             return (
               <button
@@ -1574,35 +1682,26 @@ function ThreeWelcomes({ backdrop }: IdleProps) {
                 tabIndex={-1}
                 lang={candidate}
                 aria-label={LOCALE_LABELS[candidate]}
-                aria-pressed={current}
                 {...tap(() => {
-                  if (current) return;
                   haptic(8);
-                  setLocale(candidate);
+                  onChoose(candidate);
                 })}
-                className={`flex min-h-14 w-full flex-col items-center justify-center rounded-xl px-4 py-2 text-center tall:min-h-16 lg:flex-1 ${
-                  current
-                    ? 'bg-ink-800 text-ink-100'
-                    : /* 70%, the quiet widen button's own fill: at 40% the
-                         photograph showed through and took the Chinese
-                         sub-lines with it. */
-                      'bg-ink-800/70 text-ink-300 active:bg-ink-700 active:text-ink-100'
-                }`}
+                className="flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 lg:flex-1"
                 style={{ touchAction: 'manipulation' }}
               >
-                <span className="text-xl leading-tight font-semibold tall:text-3xl">
-                  {copy.digits}
-                </span>
-                <span
-                  className={`text-sm leading-tight tall:text-lg ${
-                    current ? (backdrop ? 'text-ink-300' : 'text-ink-400') : 'text-ink-400'
-                  }`}
-                >
-                  {copy.orName}
-                </span>
+                <span className="text-xl leading-tight font-semibold tall:text-3xl">{copy.digits}</span>
+                <span className="text-sm leading-tight text-ink-400 tall:text-lg">{copy.orName}</span>
               </button>
             );
           })}
+        </div>
+        {/* The next step, kept: a name row is a button that does not look
+            like one, and this is the sentence that stops a parent hunting
+            for a button and finding the register door — the staff's review
+            queue. In the resting language; the chosen screen says it in the
+            chosen one. */}
+        <div className={`pt-3 text-base kiosk:text-lg ${dim}`} lang={RESTING}>
+          {COPY[RESTING].thenTap}
         </div>
       </div>
     </div>
@@ -1625,18 +1724,24 @@ function ThreeWelcomes({ backdrop }: IdleProps) {
  * for the reader who needs them. Under it, the instruction in the current
  * language, phone-first. The band's quiet chips stay for the typed states.
  */
-function LanguageBarIdle({ backdrop }: IdleProps) {
+function LanguageBarIdle({ backdrop, onChoose }: IdleProps) {
   const copy = useCopy();
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
-      <LanguageBar />
-      {/* The landscape tablet's track is under 300px: the bar, the boxes and
+      {/* The bar stands inside the plate-and-halo block: as a sibling above
+          it, the halo's negative inset reached up behind the bar on the
+          landscape shelf and drew dark tails under the buttons. One mass,
+          one ground.
+          The landscape tablet's track is under 300px: the bar, the boxes and
           a one-line heading fit it at 4xl; the 5xl the portrait shelf wears
           wraps the phone-first sentence onto two lines and past the rule. */}
-      <div className="relative isolate mt-6 flex flex-col items-center tall:mt-8 lg:mt-3">
+      <div className="relative isolate flex flex-col items-center">
         <IdleGround />
-        <FourBoxes />
+        <LanguageBar onChoose={onChoose} />
+        <div className="mt-6 tall:mt-8 lg:mt-3">
+          <FourBoxes />
+        </div>
         <div className="mt-3 text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl lg:mt-2">
           {copy.digits}
         </div>
@@ -1654,9 +1759,9 @@ function LanguageBarIdle({ backdrop }: IdleProps) {
  * broke across two lines inside its own button. The implementation is a
  * label prop on `LanguagePicker`, not a second component.
  */
-function LanguageBar() {
+function LanguageBar({ onChoose }: { onChoose: (candidate: Locale) => void }) {
   const t = useTranslations('Common');
-  const { locale, setLocale } = useLocaleControl();
+  const { locale } = useLocaleControl();
   const tap = useTap();
   return (
     <div role="group" aria-label={t('language')} className="flex items-center gap-2">
@@ -1671,9 +1776,8 @@ function LanguageBar() {
             aria-label={LOCALE_LABELS[candidate]}
             aria-pressed={current}
             {...tap(() => {
-              if (current) return;
               haptic();
-              setLocale(candidate);
+              onChoose(candidate);
             })}
             className={`flex h-14 min-w-14 items-center justify-center rounded-xl px-4 text-lg font-semibold sm:min-w-24 sm:px-5 ${
               current
@@ -1706,36 +1810,38 @@ function LanguageBar() {
  * legible, plated — so it survives a photograph and a thumb.
  */
 function DigitsFirstIdle({ backdrop }: IdleProps) {
+  const { locale } = useLocaleControl();
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  /* The current language first and at full weight, the other two under it
+     at the quiet weight: round 1 found the block did not answer a tap at
+     all — English stayed first and bold whatever was chosen — and that the
+     scripts stood in a different order here than in the chips. One order,
+     one constant, current language first. */
+  const lead = locale in COPY ? locale : RESTING;
+  const rest = ORDER.filter((candidate) => candidate !== lead);
   return (
     <div className="flex flex-col items-center pt-6 text-center lg:pt-3">
       <div className="relative isolate flex flex-col items-center">
         <IdleGround />
-        <div className="flex items-center gap-4">
-          {/* U+260E with the text-presentation selector: a monochrome
-              telephone where the device has one, never the colour emoji —
-              which would be the only colour object on the glass. Whether
-              the church's tablet honours the selector is a thing to check
-              on the shelf, and the reason the boxes do not depend on it. */}
-          <span aria-hidden="true" className="text-4xl text-ink-400 kiosk:text-5xl">
-            {'\u260E\uFE0E'}
+        <FourBoxes size="lg" />
+        <div className="mt-4 flex flex-col items-center gap-1">
+          <span lang={lead} className="text-3xl leading-tight font-semibold text-ink-100 kiosk:text-4xl">
+            {COPY[lead].digits}
           </span>
-          <FourBoxes size="lg" />
+          {rest.map((candidate) => (
+            <span key={candidate} lang={candidate} className={`text-lg leading-snug kiosk:text-xl ${dim}`}>
+              {COPY[candidate].digits}
+            </span>
+          ))}
         </div>
-        <div className="mt-4 flex flex-col gap-0.5 text-xl leading-snug font-semibold text-ink-200 kiosk:text-2xl">
-          <span lang="en">{COPY.en.digits}</span>
-          <span lang="zh-Hant">{COPY['zh-Hant'].digits}</span>
-          <span lang="zh-Hans">{COPY['zh-Hans'].digits}</span>
+        {/* Said once, in the current language: the trilingual footnote ran
+            wider than the plate that was meant to ground it and washed into
+            the photograph, and the name route is the slow one. */}
+        <div className={`pt-4 text-base leading-snug kiosk:text-lg ${dim}`} lang={lead}>
+          {COPY[lead].orName}
         </div>
-        {/* Three short lines on a phone, one line with separators where
-            the glass is wide enough: inline on 390px it broke mid-phrase and
-            mixed the two scripts across the wrap. */}
-        <div className={`flex flex-col gap-0.5 pt-4 text-base leading-snug kiosk:text-lg sm:flex-row sm:gap-2 ${dim}`}>
-          <span lang="en">{COPY.en.orName}</span>
-          <span aria-hidden="true" className="hidden sm:inline">·</span>
-          <span lang="zh-Hant">{COPY['zh-Hant'].orName}</span>
-          <span aria-hidden="true" className="hidden sm:inline">·</span>
-          <span lang="zh-Hans">{COPY['zh-Hans'].orName}</span>
+        <div className={`pt-3 text-base leading-snug kiosk:text-lg ${dim}`} lang={lead}>
+          {COPY[lead].thenTap}
         </div>
       </div>
     </div>
@@ -1743,12 +1849,25 @@ function DigitsFirstIdle({ backdrop }: IdleProps) {
 }
 
 /** The band's chips at 44px, every one legible, plated — the same glyphs. */
-function PromotedChips() {
+function PromotedChips({ onChoose }: ChoiceProps) {
   const t = useTranslations('Common');
-  const { locale, setLocale } = useLocaleControl();
+  const { locale } = useLocaleControl();
   const tap = useTap();
   return (
-    <span role="group" aria-label={t('language')} className="absolute left-0 flex items-center gap-1">
+    /* Where in the band, stated as a rule for both neighbours. On a tablet
+       the register offer is centred and narrower than the glass, so the
+       chips at the left edge are horizontally clear of it, and they sit at
+       the band's top: the dead zone above the keys is then 44px on the
+       tablet on end and 28px on its side — wider than any gutter on the
+       board — which is what answered the English parent's brushed-thumb
+       finding. On a phone the offer spans the glass and the chips sit under
+       it, so an upward miss would open the wizard; there they centre in the
+       band instead, 10px clear of the offer and 18px clear of the keys. */
+    <span
+      role="group"
+      aria-label={t('language')}
+      className="absolute left-0 flex items-center gap-1 sm:top-0"
+    >
       {LOCALES.map((candidate: Locale) => {
         const current = candidate === locale;
         return (
@@ -1760,9 +1879,8 @@ function PromotedChips() {
             aria-label={LOCALE_LABELS[candidate]}
             aria-pressed={current}
             {...tap(() => {
-              if (current) return;
               haptic(8);
-              setLocale(candidate);
+              onChoose(candidate);
             })}
             className={`flex h-11 min-w-11 items-center justify-center rounded-lg px-2 text-base font-semibold ${
               current
@@ -1779,24 +1897,26 @@ function PromotedChips() {
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- the table is
-// the file's subject; the harness reads it beside the components it names.
+/* The table is the file's subject; the harness reads it beside the components it names. */
+// eslint-disable-next-line react-refresh/only-export-components
 export const VARIANTS: Record<string, VariantSpec> = {
   'three-welcomes': {
     summary:
-      'A: the phone-first instruction in all three languages at once, each line a door that sets the language; band chips as shipped.',
+      'A: at rest, the phone-first instruction in all three languages as three equal doors; once a door is taken, the chosen language leads under the language bar (B). Band chips promoted.',
     Idle: ThreeWelcomes,
+    Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
   'language-bar': {
     summary:
-      'B: one language leads; the pairing screen’s full-weight picker at the top of the idle region; phone-first instruction under it.',
+      'B: one language leads; the pairing screen’s full-weight picker at the top of the idle region; phone-first instruction under it. Band chips promoted.',
     Idle: LanguageBarIdle,
+    Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
   'digits-first': {
     summary:
-      'C: four big boxes and a telephone, trilingual captions at one quiet weight, the name route as a footnote; band chips promoted to 44px and plated.',
+      'C: four big boxes, the instruction led by the current language with the other two quiet under it, the name route said once; no language doors; band chips promoted to 44px and plated.',
     Idle: DigitsFirstIdle,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
