@@ -47,6 +47,8 @@
     // name is seen only by the wrong environment.
     "uxr/kiosk-live/main.tsx",
     "uxr/kiosk-keyboard/Keyboard.variants.tsx",
+    "uxr/kiosk-language/main.tsx",
+    "uxr/kiosk-language/SearchScreen.variants.tsx",
     "uxr/kiosk-editor-live/main.tsx",
     "uxr/kiosk-setup-live/main.tsx",
     "uxr/kiosk-setup-live/scene.tsx",
