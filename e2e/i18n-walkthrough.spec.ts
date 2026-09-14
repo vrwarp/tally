@@ -1,5 +1,5 @@
 /**
- * The same app, three times over, photographed from the live stack.
+ * The same app, four times over, photographed from the live stack.
  *
  * Not a test — a documentation build, like `walkthrough.spec.ts` and
  * `theme-walkthrough.spec.ts`. Every frame is the real application against the
@@ -16,16 +16,20 @@
  *   - that on the lobby glass language is not a preference but access, since a
  *     parent who cannot read English cannot ask anybody to read it for them at
  *     the moment they are being asked for their child's allergies;
- *   - that the two honest constraints are visible rather than hidden: the kiosk
+ *   - that the honest constraints are visible rather than hidden: the kiosk
  *     asks for an English name *and says so in Chinese*, because its keyboard
  *     has no IME; and a Chinese name it cannot type it can still *find*;
+ *   - that where a constraint could be answered on the glass instead of in the
+ *     wording it was: the lobby keyboard grows an Ñ when the room is set to
+ *     Spanish, because Muñoz written Munoz is a different surname on a
+ *     sticker;
  *   - that a kiosk's language belongs to the tablet on the wall and a
  *     counselor's to the counselor, in the same browser, at the same time.
  *
  * ## Why the frames are shaped the way they are
  *
  * Staff screens are photographed at phone size, which is what Tally is: a
- * counselor is holding one at a door. Three phone frames also sit across a page
+ * counselor is holding one at a door. Four phone frames still sit across a page
  * at a readable size, and side-by-side is the only arrangement in which the
  * "all the way down" claim can be checked rather than believed.
  *
@@ -52,13 +56,16 @@ const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'i18n');
 const KIOSK_VIEWPORT = { width: 1280, height: 800 };
 
 /*
- * The three languages, in the order the page shows them: the source of truth
- * first, then the two scripts. `label` is what the picker's button says, and it
- * is deliberately NOT translated — a control for changing language that renamed
- * its own options would be unusable by exactly the person reaching for it.
+ * The four languages, in the order the page shows them — which is the order the
+ * picker shows them in, which is `LOCALES` in `src/lib/locales.ts`: the source
+ * of truth first, then the language most of this lobby speaks, then the two
+ * scripts. `label` is what the picker's button says, and it is deliberately NOT
+ * translated — a control for changing language that renamed its own options
+ * would be unusable by exactly the person reaching for it.
  */
 const LOCALES = [
   { id: 'en', label: 'English', name: 'English' },
+  { id: 'es-MX', label: 'Español', name: 'Mexican Spanish' },
   { id: 'zh-Hans', label: '简体中文', name: 'Simplified Chinese' },
   { id: 'zh-Hant', label: '繁體中文', name: 'Traditional Chinese' },
 ] as const;
@@ -254,7 +261,7 @@ test('capture the i18n walkthrough', async ({ page, browser, signedInAs }) => {
     // registration questions in act 4 the real ones.
     await bindTo(kiosk, /nursery/i);
 
-    /* ---- Act 3: the kiosk at rest, three times -------------------------- */
+    /* ---- Act 3: the kiosk at rest, four times --------------------------- */
 
     for (const locale of LOCALES) {
       await chooseLanguage(kiosk, locale.label);
@@ -273,13 +280,43 @@ test('capture the i18n walkthrough', async ({ page, browser, signedInAs }) => {
       });
     }
 
-    /* ---- Act 4: a name this keyboard cannot type ------------------------ */
+    /* ---- Act 4: a letter this keyboard did not have --------------------- */
 
     /*
-     * Left in Traditional, because the frame's whole subject is a Chinese
-     * screen asking for an English name. In English the label reads "First
-     * name" and there is nothing to see.
+     * Spanish first, and then back out to the search screen before act 5 puts
+     * the kiosk into Chinese. A reload rather than a Cancel: the kiosk's
+     * language lives in `localStorage`, so it boots straight back into Spanish,
+     * and there is no wizard-exit path to keep working.
      */
+    await chooseLanguage(kiosk, 'Español');
+    const spanish = kioskCatalogue('es-MX');
+    await typeOnKiosk(kiosk, 'Qxz');
+    await kiosk
+      .getByRole('button', { name: new RegExp(spanish.Search.registerYourChild) })
+      .first()
+      .click();
+
+    await capture(kiosk, {
+      act: 'A letter this keyboard did not have',
+      group: 'kiosk-enye',
+      title: 'The first question, in Spanish, over a keyboard with an Ñ',
+      locale: 'es-MX',
+      surface: 'kiosk',
+      caption:
+        'The home row runs A to L and then Ñ, and only when the lobby is set to Spanish. Ñ is a letter, not an accent, and that distinction is the whole of this frame: Muñoz typed as Munoz is a different surname on a child\'s sticker and in the church\'s database, where José typed as Jose is the same name with a mark left off — which is what half the US forms this family has ever filled in already say. So the one that changes a name got a key and the ones that do not were left alone, and the search side loses nothing either way, because `normalizeForSearch` folds the marks and RAMIREZ still finds Ramírez. It costs no geometry, which is why it could be here at all: the row is twenty half-cells, and nine letters with the half-key stagger at each end is exactly as wide as ten letters with none. Same board, same pitch, same 304 pixels, and the wizard\'s grade grid and phone pad still stand in the same footprint. This is the counterpart to the Chinese frame below, and the pair is the argument: where a constraint can be answered on the glass, answer it there; where it cannot, say it in the question.',
+    });
+
+    await kiosk.reload();
+    await expect(kiosk.locator('html')).toHaveAttribute('lang', 'es-MX');
+
+    /* ---- Act 5: a name this keyboard cannot type ------------------------ */
+
+    /*
+     * Into Traditional, because the frame's whole subject is a Chinese screen
+     * asking for an English name. In English the label reads "First name" and
+     * there is nothing to see.
+     */
+    await chooseLanguage(kiosk, '繁體中文');
     const hant = kioskCatalogue('zh-Hant');
     /*
      * Letters that match nobody. The obvious choice — a real surname's first
@@ -309,8 +346,6 @@ test('capture the i18n walkthrough', async ({ page, browser, signedInAs }) => {
       caption:
         'The label says 英文名字 — *English* first name — and it says it in Chinese. The kiosk keyboard is a fixed Latin QWERTY with no IME, so 蔡秉洲 is not a hard thing to type here, it is an impossible one; a form that asked for a name in Chinese and then offered no way to write one would strand the family at question one with no way to understand why. Six keys are pinned to this wording in both catalogues by `REQUIRED_WORDING` in `src/lib/translationState.ts`, so a future translator improving the phrasing cannot quietly drop the one word that makes the question answerable. The English catalogue is free — an English reader has no such problem. The constraint binds one direction more softly than it looks. A name this keyboard cannot *type* it can often still *find*: `withPinyin` widens the stored `searchName` before it is ever searched, so `benson “蔡秉洲” tsai` is indexed as `caibingzhou cbz choibingzhou chuabingzhou tbz tsaibingzhou` — the initials, the full reading, the Wade-Giles spelling on an older passport and the Cantonese one. *Often*, and the gap between that and *always* is data rather than code: the widening only fires for a child whose Chinese name somebody entered upstream, and nothing standardises that field. Which is why the search prompt on the previous screen states a fact about the keyboard and stops there. It used to offer pinyin, and a parent who took the offer and got nothing back would have been told by the screen that it would work.',
     });
-
-    /* ---- Act 5: …and the one it can find -------------------------------- */
 
     /* ---- Act 6: two devices, one browser, two languages ------------------ */
 

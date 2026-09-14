@@ -62,9 +62,24 @@ describe('negotiateLocale', () => {
     expect(negotiateLocale(['zh'])).toBe('zh-Hans');
   });
 
+  /*
+   * Every Spanish tag onto one catalogue, and `es-419` and `es-US` are the two
+   * that matter most here: a browser set to "Spanish (Latin America)" or to US
+   * Spanish is the common case in this lobby, and neither names Mexico.
+   * `es-ES` lands here too — a Spaniard gets ustedes where they would say
+   * vosotros, which is a far better failure than English.
+   */
+  it.each(['es', 'es-MX', 'es-US', 'es-419', 'es-SV', 'es-GT', 'es-ES'])(
+    'reads %s as Spanish',
+    (tag) => {
+      expect(negotiateLocale([tag])).toBe('es-MX');
+    },
+  );
+
   it('is case-insensitive, because a header is not', () => {
     expect(negotiateLocale(['ZH-TW'])).toBe('zh-Hant');
     expect(negotiateLocale(['EN-US'])).toBe('en');
+    expect(negotiateLocale(['ES-419'])).toBe('es-MX');
     expect(negotiateLocale(['Zh-Hans'])).toBe('zh-Hans');
   });
 
@@ -86,6 +101,10 @@ describe('negotiateLocale', () => {
   it('passes over a tag it does not speak', () => {
     expect(negotiateLocale(['de', 'fr'])).toBe(DEFAULT_LOCALE);
     expect(negotiateLocale(['zho'])).toBe(DEFAULT_LOCALE);
+    // Portuguese is not Spanish, and a three-letter `spa` is not a tag Tally
+    // speaks — reading either as `es-MX` would be guessing.
+    expect(negotiateLocale(['pt-BR'])).toBe(DEFAULT_LOCALE);
+    expect(negotiateLocale(['spa'])).toBe(DEFAULT_LOCALE);
     expect(negotiateLocale(['english'])).toBe(DEFAULT_LOCALE);
   });
 
@@ -104,6 +123,11 @@ describe('detectLocale', () => {
   it('reads the browser’s preference list', () => {
     vi.stubGlobal('navigator', { languages: ['zh-HK', 'en-GB'] });
     expect(detectLocale()).toBe('zh-Hant');
+  });
+
+  it('opens a phone set to US Spanish in Spanish', () => {
+    vi.stubGlobal('navigator', { languages: ['es-US', 'en-US'] });
+    expect(detectLocale()).toBe('es-MX');
   });
 
   /*
@@ -144,8 +168,18 @@ describe('the language names', () => {
   it('names every language, in that language', () => {
     // Never translated — the reader who needs a language switcher is by
     // definition not reading the words around it.
-    expect(LOCALE_LABELS).toEqual({ en: 'English', 'zh-Hans': '简体中文', 'zh-Hant': '繁體中文' });
-    expect(LOCALE_SHORT_LABELS).toEqual({ en: 'EN', 'zh-Hans': '简', 'zh-Hant': '繁' });
+    expect(LOCALE_LABELS).toEqual({
+      en: 'English',
+      'es-MX': 'Español',
+      'zh-Hans': '简体中文',
+      'zh-Hant': '繁體中文',
+    });
+    expect(LOCALE_SHORT_LABELS).toEqual({
+      en: 'EN',
+      'es-MX': 'ES',
+      'zh-Hans': '简',
+      'zh-Hant': '繁',
+    });
   });
 
   it('has a name and a badge for each of them, and nothing spare', () => {

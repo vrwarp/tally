@@ -14,11 +14,11 @@
  * after extraction is telling you the extraction changed a string, which is
  * exactly the signal wanted. The Chinese catalogues are exercised by their own
  * parity test and by `e2e/i18n.spec.ts`, not by re-running the whole suite in
- * three languages.
+ * four languages.
  *
  * A caller that needs a different locale passes one:
- * `render(<Thing />, { locale: 'zh-Hant' })`, and gets that catalogue — all
- * three are ordinary imports here, where there is no byte budget to answer to.
+ * `render(<Thing />, { locale: 'zh-Hant' })`, and gets that catalogue — every
+ * one is an ordinary import here, where there is no byte budget to answer to.
  *
  * The wrapper also supplies `LocaleContext`, and supplies it with real state:
  * the language switcher is a component like any other, and a test that taps it
@@ -39,11 +39,13 @@ import { IntlProvider } from 'use-intl';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/locales';
 import { LocaleContext, type LocaleControl } from '@/i18n/localeContext';
 import en from '../../messages/en.json';
+import esMX from '../../messages/es-MX.json';
 import hans from '../../messages/zh-Hans.json';
 import hant from '../../messages/zh-Hant.json';
 
 const CATALOGS: Record<Locale, typeof en> = {
   en,
+  'es-MX': esMX,
   'zh-Hans': hans,
   'zh-Hant': hant,
 };

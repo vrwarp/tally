@@ -41,7 +41,7 @@ const OUT = 'docs/walkthrough/i18n';
 const SHOTS = join(OUT, 'shots');
 const WEB = join(OUT, 'web');
 
-type LocaleId = 'en' | 'zh-Hans' | 'zh-Hant';
+type LocaleId = 'en' | 'es-MX' | 'zh-Hans' | 'zh-Hant';
 
 interface Shot {
   file: string;
@@ -56,6 +56,7 @@ interface Shot {
 /** What each language is called on the page, in English prose. */
 const LOCALE_NAMES: Record<LocaleId, string> = {
   en: 'English',
+  'es-MX': 'Español · es-MX',
   'zh-Hans': '简体中文 · Simplified',
   'zh-Hant': '繁體中文 · Traditional',
 };
@@ -173,20 +174,21 @@ const groups = groupShots(shots);
 /* The Markdown GitHub renders                                                 */
 /* -------------------------------------------------------------------------- */
 
-const PREAMBLE = `# Tally, in three languages
+const PREAMBLE = `# Tally, in four languages
 
 Every frame below is the real application, captured by Playwright against a live
 Firebase Emulator Suite and a seeded ministry. Nothing is a mockup and nothing is
 a paste: each language was chosen through the control a person would press, and
-the Chinese is what the catalogues actually contain.
+the Spanish and the Chinese are what the catalogues actually contain.
 
 The frames are grouped rather than listed, because the claim is a comparison. An
 i18n pass that has translated the shell and left the content in English looks
 perfect one screenshot at a time; it only fails in a row.
 
-**No bilingual reviewer has read this Chinese.** Every key in
-\`messages/zh-Hans.json\` and \`messages/zh-Hant.json\` is marked \`machine\`,
-never \`reviewed\` — the review gate is real, and it is still open.
+**No bilingual reviewer has read any of this.** Every key in
+\`messages/es-MX.json\`, \`messages/zh-Hans.json\` and \`messages/zh-Hant.json\`
+is marked \`machine\`, never \`reviewed\` — the review gate is real, and it is
+still open.
 
 Regenerate with:
 
@@ -204,7 +206,7 @@ for (const group of groups) {
   }
   markdown.push(`### ${group.title}\n`);
   if (group.caption) markdown.push(`${group.caption}\n`);
-  const width = group.surface === 'kiosk' ? 620 : 260;
+  const width = group.surface === 'kiosk' ? 620 : 228;
   for (const shot of group.shots) {
     const label = `${shot.title} — ${LOCALE_NAMES[shot.locale]}`;
     markdown.push(
@@ -289,7 +291,7 @@ figure img {
   display: block; width: 100%; height: auto; border-radius: 10px;
   border: 1px solid var(--rule); background: var(--card);
 }
-.row.app figure { width: 300px; }
+.row.app figure { width: 264px; }
 .row.kiosk figure { width: 540px; }
 figcaption {
   margin-top: 9px; font-size: 0.83rem; color: var(--muted);
@@ -312,12 +314,12 @@ footer {
 const body: string[] = [];
 body.push('<div class="wrap">');
 body.push('<header>');
-body.push('<h1>Tally, in three languages</h1>');
+body.push('<h1>Tally, in four languages</h1>');
 body.push(
   '<p>Every frame is the real application, captured by Playwright against a live Firebase ' +
     'Emulator Suite and a seeded ministry. Nothing is a mockup and nothing is a paste: each ' +
-    'language was chosen through the control a person would press, and the Chinese is what the ' +
-    'catalogues actually contain.</p>',
+    'language was chosen through the control a person would press, and the Spanish and the ' +
+    'Chinese are what the catalogues actually contain.</p>',
 );
 body.push(
   '<p>The frames are grouped rather than listed, because the claim is a comparison. An i18n ' +
@@ -325,9 +327,9 @@ body.push(
     'screenshot at a time; it only fails in a row.</p>',
 );
 body.push(
-  '<div class="note"><strong>No bilingual reviewer has read this Chinese.</strong> Every key ' +
-    'in the two catalogues is marked <code>machine</code>, never <code>reviewed</code> — the ' +
-    'review gate is real, and it is still open.</div>',
+  '<div class="note"><strong>No bilingual reviewer has read any of this.</strong> Every key ' +
+    'in the three translated catalogues is marked <code>machine</code>, never ' +
+    '<code>reviewed</code> — the review gate is real, and it is still open.</div>',
 );
 body.push('</header>');
 
@@ -359,7 +361,7 @@ body.push(
 );
 body.push('</div>');
 
-const fragment = `<title>Tally, in three languages</title>\n<style>${STYLE}</style>\n${body.join('\n')}\n`;
+const fragment = `<title>Tally, in four languages</title>\n<style>${STYLE}</style>\n${body.join('\n')}\n`;
 
 await writeFile(
   join(OUT, 'i18n.html'),
@@ -369,7 +371,7 @@ await writeFile(
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    '<title>Tally, in three languages</title>',
+    '<title>Tally, in four languages</title>',
     `<style>${STYLE}</style>`,
     '</head>',
     '<body>',

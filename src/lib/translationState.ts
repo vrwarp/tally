@@ -39,9 +39,13 @@ export interface StateEntry {
    * all unresolvable from the word alone.
    */
   context?: string;
+  'es-MX'?: TranslationStatus;
   'zh-Hans'?: TranslationStatus;
   'zh-Hant'?: TranslationStatus;
 }
+
+/** The locales this file's per-locale maps are keyed by — every one but `en`. */
+export type TargetLocale = 'es-MX' | 'zh-Hans' | 'zh-Hant';
 
 export type TranslationState = Record<string, StateEntry>;
 
@@ -92,7 +96,7 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
   /*
    * The same thing said to the same reader from two places.
    *
-   * Every group below already renders identically in all three catalogues —
+   * Every group below already renders identically in every catalogue —
    * pinning them costs no translation, it only stops them drifting apart. That
    * is worth doing because drift here is invisible: a reviewer editing a toast
    * on the dashboard has no way to know the student page raises the same toast,
@@ -148,13 +152,15 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
  *
  * **Different readers.** `Auth.errorTitle` is read by a counselor and
  * `Register.titleError` by a family at the lobby kiosk, and both are "Something
- * went wrong" today — but the kiosk addresses a parent as 您 and the staff app
- * says 你, so pinning them would force one register on both audiences. Same for
- * `Confirm.anotherChild` / `Register.titleAnotherChild`.
+ * went wrong" today — but the kiosk addresses a parent as 您 and *usted*, where
+ * the staff app says 你 and *tú*, so pinning them would force one register on
+ * both audiences. English has no second person to give away, which is exactly
+ * why this list has to exist. Same for `Confirm.anotherChild` /
+ * `Register.titleAnotherChild`.
  *
  * **Coincidence.** `Recurrence.monthlyOn` is a summary sentence and
- * `monthlyOnWeekdayOption` is a `<select>` option; Chinese may reasonably want
- * a shorter form inside a dropdown. Likewise `Incomplete.metaWithGrade` /
+ * `monthlyOnWeekdayOption` is a `<select>` option; Chinese and Spanish may
+ * both reasonably want a shorter form inside a dropdown. Likewise `Incomplete.metaWithGrade` /
  * `OneOff.metaWithGrade`, `DangerZone.consequenceCheckIns` /
  * `Import.checkInCount`, `Staff.nameCount` / `Search.matchCount`,
  * `LabelTemplate.sampleEvent` / `KioskTheme.previewTitle` (both sample data),
@@ -219,10 +225,22 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
  * satisfy it — and a locale left out is unconstrained. Enforced by the parity
  * test once a translation exists, and fed to the drafting script as a
  * `mustContain`, which rejects a draft that drops it rather than shipping one.
+ *
+ * **`es-MX` is deliberately absent, and that is a decision rather than a gap.**
+ * Spanish hit the same wall and it was answered on the glass instead: the
+ * lobby board grows an Ñ key when the kiosk is set to Spanish (see
+ * `src/kiosk/components/Keyboard.tsx`), because Muñoz written Munoz is a
+ * different surname on a sticker and in the church's database. What is left is
+ * the accented vowels, and those are not worth a warning on six fields: José
+ * written Jose is the same name with a mark dropped, which is what most US
+ * forms this family has filled in already say, and `normalizeForSearch` folds
+ * the marks so Ramírez is found by typing RAMIREZ regardless. A question that
+ * said *sin acentos* would spend a line of a parent's attention on a
+ * constraint that costs them nothing.
  */
 export const REQUIRED_WORDING: readonly {
   key: string;
-  text: Readonly<Record<string, string>>;
+  text: Partial<Readonly<Record<TargetLocale, string>>>;
   why: string;
 }[] = (
   [

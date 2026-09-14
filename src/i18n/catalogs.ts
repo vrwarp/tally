@@ -1,13 +1,13 @@
 /**
  * Where a locale's messages come from.
  *
- * English is bundled and the Chinese catalogues are not, and the asymmetry is
- * the point. English is the default and the fallback: something has to be
- * renderable on the first frame, before any network or any `import()` has
- * resolved, or the app flashes an empty shell at every reader who has never
- * chosen a language. The other two arrive behind a dynamic import, which Vite
- * emits as its own chunk — so a reader who has never switched away from English
- * downloads neither.
+ * English is bundled and the others are not, and the asymmetry is the point.
+ * English is the default and the fallback: something has to be renderable on
+ * the first frame, before any network or any `import()` has resolved, or the
+ * app flashes an empty shell at every reader who has never chosen a language.
+ * The rest arrive behind a dynamic import, which Vite emits as its own chunk —
+ * so a reader who has never switched away from English downloads none of
+ * them.
  *
  * The kiosk needs a stricter version of this again; see `src/kiosk/messages.ts`
  * and docs/i18n.md §4. This module is the main app's.
@@ -42,10 +42,23 @@ export async function loadCatalog(locale: Locale): Promise<Catalog> {
   const hit = cache.get(locale);
   if (hit) return hit;
   try {
-    const loaded =
-      locale === 'zh-Hans'
-        ? ((await import('../../messages/zh-Hans.json')).default as Catalog)
-        : ((await import('../../messages/zh-Hant.json')).default as Catalog);
+    /*
+     * A `switch` over literal specifiers rather than a template one. Vite needs
+     * the path statically to emit a chunk per catalogue, and
+     * `import(`../../messages/${locale}.json`)` would bundle every file in that
+     * directory into one — including `translation-state.json`, which is 400 kB
+     * of pipeline bookkeeping no browser should ever see.
+     */
+    const loaded = await (async (): Promise<Catalog> => {
+      switch (locale) {
+        case 'es-MX':
+          return (await import('../../messages/es-MX.json')).default as Catalog;
+        case 'zh-Hans':
+          return (await import('../../messages/zh-Hans.json')).default as Catalog;
+        default:
+          return (await import('../../messages/zh-Hant.json')).default as Catalog;
+      }
+    })();
     cache.set(locale, loaded);
     return loaded;
   } catch {

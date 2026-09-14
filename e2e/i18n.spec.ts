@@ -26,7 +26,7 @@
  */
 import type { Page } from '@playwright/test';
 import { gotoReady } from './support/auth';
-import { openKiosk, pairKiosk } from './support/kiosk';
+import { bindTo, openKiosk, pairKiosk } from './support/kiosk';
 import { expect, test } from './support/fixtures';
 import { readFileSync } from 'node:fs';
 
@@ -87,6 +87,23 @@ test.describe('the app speaks more than English', () => {
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hant');
     expect(await page.evaluate(() => localStorage.getItem('tally:locale'))).toBe('zh-Hant');
+  });
+
+  /*
+   * Spanish through the same control, because it is the largest non-English
+   * language in this lobby and the one whose chunk is a different `import()`
+   * arm — a `switch` that fell through to the wrong specifier would render a
+   * Chinese screen at a Spanish reader and nothing else here would notice.
+   */
+  test('a counselor can choose Spanish, and the document says so', async ({ page }) => {
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+
+    await chooseLanguage(page, 'Español');
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX');
+    expect(await page.evaluate(() => localStorage.getItem('tally:locale'))).toBe('es-MX');
+    expect(await visibleText(page)).not.toMatch(MESSAGE_KEY);
   });
 
   test('the choice survives a reload, and the catalogue with it', async ({ page }) => {
@@ -159,6 +176,60 @@ test.describe('the kiosk speaks the lobby it is in', () => {
       await pairKiosk(kiosk, staff, zhHantKiosk.Chooser.question);
       await expect(kiosk.locator('html')).toHaveAttribute('lang', 'zh-Hant');
       expect(await visibleText(kiosk)).not.toMatch(MESSAGE_KEY);
+    } finally {
+      await context.close();
+    }
+  });
+
+  /*
+   * The one place a language changes something other than words.
+   *
+   * The lobby board is a fixed Latin QWERTY with no IME, and Ñ is a letter
+   * rather than an accent — Muñoz typed Munoz is a different surname on a
+   * child's sticker and in the church's database. So the home row grows an Ñ
+   * when the tablet is set to Spanish and keeps its half-key stagger when it is
+   * not. Asserted end-to-end rather than only in `haptics.test.tsx` because the
+   * thing that could break it is the locale reaching the component at all:
+   * `Keyboard` is memoized against a stable `onKey` precisely so that typing
+   * never re-renders it, and a provider that did not publish the language would
+   * leave an English board under Spanish questions.
+   */
+  test('the lobby keyboard grows an Ñ when the room is set to Spanish', async ({
+    browser,
+    signedInAs,
+  }) => {
+    const staff = await signedInAs('counselor');
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      /*
+       * Paired and bound in English first, and both halves of that matter. The
+       * pairing screen carries the language picker but no keyboard — the board
+       * this test is about exists only once a gathering is chosen — and
+       * `bindTo` waits on the English search prompt, so the switch has to come
+       * after the binding rather than before it.
+       */
+      await pairKiosk(kiosk, staff);
+      await bindTo(kiosk, /nursery/i);
+
+      const enye = kiosk.getByRole('button', { name: 'Ñ', exact: true });
+      const gaps = kiosk.locator('[data-gap]');
+      await expect(enye).toBeHidden();
+      // Two half-key staggers on the home row, and the Z row's leading spacer.
+      await expect(gaps).toHaveCount(3);
+
+      await chooseLanguage(kiosk, 'Español');
+
+      await expect(kiosk.locator('html')).toHaveAttribute('lang', 'es-MX');
+      await expect(enye).toBeVisible();
+      // The stagger goes with it — ten letters fill the row on their own — and
+      // only the Z row's spacer is left, which is what keeps the board's width.
+      await expect(gaps).toHaveCount(1);
+
+      await chooseLanguage(kiosk, 'English');
+
+      await expect(enye).toBeHidden();
+      await expect(gaps).toHaveCount(3);
     } finally {
       await context.close();
     }

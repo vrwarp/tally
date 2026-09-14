@@ -13,8 +13,8 @@
  * whenever the lobby wifi has an opinion, and it is expected to show a roster
  * before the network answers — which is what `KIOSK_KEYS.roster` and
  * `participation` are for. A language is the same kind of fact. So a kiosk that
- * has been switched to Chinese keeps its slice in `localStorage` and paints
- * Chinese on the *first frame*, with no import and no fetch between the parent
+ * has been switched to Spanish keeps its slice in `localStorage` and paints
+ * Spanish on the *first frame*, with no import and no fetch between the parent
  * and the words. English is bundled, because something has to be renderable
  * before any of that (docs/i18n.md §4.1).
  *
@@ -95,10 +95,17 @@ export async function loadCatalog(locale: Locale): Promise<KioskCatalog> {
   const held = cachedCatalog(locale);
   if (held) return held;
   try {
-    const loaded =
-      locale === 'zh-Hans'
-        ? ((await import('../../messages/kiosk/zh-Hans.json')).default as KioskCatalog)
-        : ((await import('../../messages/kiosk/zh-Hant.json')).default as KioskCatalog);
+    /* Literal specifiers, one per locale — see `src/i18n/catalogs.ts`. */
+    const loaded = await (async (): Promise<KioskCatalog> => {
+      switch (locale) {
+        case 'es-MX':
+          return (await import('../../messages/kiosk/es-MX.json')).default as KioskCatalog;
+        case 'zh-Hans':
+          return (await import('../../messages/kiosk/zh-Hans.json')).default as KioskCatalog;
+        default:
+          return (await import('../../messages/kiosk/zh-Hant.json')).default as KioskCatalog;
+      }
+    })();
     memory.set(locale, loaded);
     if (locale !== DEFAULT_LOCALE) {
       writeJson(KIOSK_KEYS.messages, { locale, shape: EN_SHAPE, messages: loaded });

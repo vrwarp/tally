@@ -1,7 +1,7 @@
 /**
  * The translation pipeline for `messages/*.json` — `npm run translate [-- flags]`.
  *
- *   (default)      draft the missing keys in each Chinese catalogue with Claude
+ *   (default)      draft the missing keys in each catalogue with Claude
  *   --todo         no model: fill missing keys with the English text, so they
  *                  render as a readable fallback and are tracked as "todo"
  *   --stale        also re-draft keys whose English changed since the last run
@@ -17,7 +17,7 @@
  * `messages/translation-state.json`. No later run overwrites it without
  * `--force`. Rewording the English flips the staleness gate in
  * `tests/messages.test.ts` until this script has been run again — which is what
- * stops a Chinese screen from confidently saying what the English used to say.
+ * stops a translated screen from confidently saying what the English used to say.
  *
  * Ported from `vrwarp/numbers`. The one substantive change is the model call:
  * Tally has no AI provider plumbing of its own, so this talks to Claude
@@ -39,6 +39,7 @@ import {
   unflatten,
   type Messages,
   type StateEntry,
+  type TargetLocale,
   type TranslationState,
   type TranslationStatus,
 } from '../src/lib/translationState';
@@ -48,21 +49,41 @@ import { write as writeKioskSlices } from './sync-kiosk-messages.mjs';
 
 const MESSAGES_DIR = path.join(process.cwd(), 'messages');
 const STATE_FILE = path.join(MESSAGES_DIR, 'translation-state.json');
-const TARGET_LOCALES = ['zh-Hans', 'zh-Hant'] as const;
-type TargetLocale = (typeof TARGET_LOCALES)[number];
+const TARGET_LOCALES = ['es-MX', 'zh-Hans', 'zh-Hant'] as const satisfies readonly TargetLocale[];
 
 /**
  * Who each catalogue is for, in the words the drafting prompt uses.
  *
- * The Traditional line names Taiwan vocabulary explicitly because that is the
- * failure this whole two-catalogue setup exists to prevent: a model asked for
- * "Traditional Chinese" will happily hand back a character-converted 登錄 where
- * a Taiwanese reader expects 登入.
+ * Each line names the failure that catalogue exists to prevent, because a bare
+ * language name invites exactly that failure. Asked for "Traditional Chinese" a
+ * model will happily hand back a character-converted 登錄 where a Taiwanese
+ * reader expects 登入; asked for "Mexican Spanish" it will reach for
+ * regionalisms that read as a joke to the Salvadoran quarter of this lobby.
  */
 const LANGUAGE_NAMES: Record<TargetLocale, string> = {
+  'es-MX':
+    'Mexican Spanish (audience: families in Hayward, California — about three in four of Mexican origin, most of the rest Salvadoran or Guatemalan, and their children are in US schools). Use Mexican vocabulary where the region agrees — computadora, celular, configuración, eliminar — and neutral Latin American wording wherever Mexico is alone, so nothing reads as foreign to a Salvadoran mother. Never peninsular Spanish: no vosotros, no ordenador, no móvil, no ajustes. School grades follow the US system a child here actually attends (6.º grado … 12.º grado), never the Mexican primaria/secundaria/preparatoria ladder.',
   'zh-Hans': 'Simplified Chinese (audience: families from mainland China)',
   'zh-Hant':
     'Traditional Chinese (audience: families from Taiwan and Hong Kong; Taiwan vocabulary — 登入, 儲存, 套用, 載入中)',
+};
+
+/**
+ * The grammar note each language needs, and the one thing English gives a
+ * translator no help with.
+ *
+ * Chinese has no plural branches to fill and Spanish has both of them plus
+ * gender agreement English never asked about — and gender is the one that
+ * actually reaches a screen here, because the thing being agreed with is
+ * usually a student whose name is in the row beside it.
+ */
+const GRAMMAR_NOTES: Record<TargetLocale, string> = {
+  'es-MX':
+    'Spanish needs BOTH plural branches — `one` and `other` — wherever English has them. Where English is genderless about a person, Spanish must not guess: these strings sit beside a student\'s name and the app does not know whether that student is a girl or a boy, so prefer a verb over a participle ("ya llegó", not "registrado") and a genderless noun over an adjective. Address a parent at the lobby kiosk as *usted*; address staff inside the app as *tú*. Spanish runs 20-25% longer than English by default and this app has no room for it, so use the compression a Spanish UI already uses: a noun phrase rather than a sentence ("Kiosco sin impresora", not "Este kiosco no tiene ninguna impresora"), no copula in short lines ("Comando no disponible"), and no article a label can live without ("Guardar cambios", never "Guardar los cambios").',
+  'zh-Hans':
+    'Chinese needs no plural branches — `{count, plural, other {...}}` alone is correct. Drop the copula and the pronoun wherever the screen supplies them, and let the aspect markers (已, 中, 过) do the work English spends a tense on: a status chip is 已签到, not a clause. Chinese renders about three quarters of the English width, so there is room — do not spend it explaining. A label names its state; the explanation belongs in the tooltip key beside it.',
+  'zh-Hant':
+    'Chinese needs no plural branches — `{count, plural, other {...}}` alone is correct. Drop the copula and the pronoun wherever the screen supplies them, and let the aspect markers (已, 中, 過) do the work English spends a tense on: a status chip is 已簽到, not a clause. Chinese renders about three quarters of the English width, so there is room — do not spend it explaining. A label names its state; the explanation belongs in the tooltip key beside it.',
 };
 
 const MODEL = 'claude-opus-5';
@@ -183,12 +204,25 @@ async function draft(
     const prompt = [
       `Translate these UI strings for a church youth-ministry attendance app into ${LANGUAGE_NAMES[locale]}.`,
       '',
+      /*
+       * The philosophy before the rules, because the rules are downstream of it.
+       * Every defect this pipeline has actually shipped was a formally faithful
+       * translation that did the wrong job on the screen: a chip rendered as a
+       * sentence, a button rendered as its dictionary gloss, a status line that
+       * swallowed its own tooltip. See messages/GLOSSARY.md §"How we translate".
+       */
+      'PHILOSOPHY — dynamic equivalence, not word-for-word.',
+      'Translate the JOB the string does, not the words it is made of. Ask: what is this on the screen (button, chip, status, refusal, reassurance), and what would a native app in this language already say in that slot? That is the translation. Reproduce the effect on the reader, not the English forms.',
+      '',
       'Rules:',
-      '- Follow the glossary below EXACTLY for its terms.',
-      '- Keep every ICU argument ({name}, {count, plural, ...}) and every rich-text tag (<link>, <strong>) verbatim; translate only the surrounding text. Chinese needs no plural branches — `{count, plural, other {...}}` alone is correct.',
-      '- Keep leading and trailing punctuation and symbols (…, ·, —, +, %, →) in place.',
+      '- Follow the glossary below EXACTLY for its terms. The table wins over a better-sounding word: consistency across two thousand strings is part of the effect.',
+      '- KEEP THE SIZE CLASS. A chip must read as a chip, a button as a button. English is unusually terse and your language will not be terse by accident — use its own compression. Look at the English length: if it is two words, a clause is wrong even when the clause is more accurate.',
+      '- CARRY EXACTLY THE FACTS THE ENGLISH CARRIES — no more and no fewer. This is the one place literalism wins: change the form freely, never add a fact, a second sentence, a product name or an instruction the English does not contain, and never drop one. A fluent invention is the worst defect this pipeline can ship.',
+      '- Keep every ICU argument ({name}, {count, plural, ...}) and every rich-text tag (<link>, <strong>) verbatim; translate only the surrounding text.',
+      `- ${GRAMMAR_NOTES[locale]}`,
+      '- Keep leading and trailing punctuation and symbols (…, ·, —, +, %, →) in place. Do not carry English exclamation marks over unless the line is genuinely an exclamation, and drop "please" wherever the target language would.',
       '- "previous" is the prior translation of an older English source — preserve its terminology where it is still accurate.',
-      '- "context" is a translator note about where the string appears and what it pairs with.',
+      '- "context" is a translator note about where the string appears and what it pairs with. It answers "what does this do for the reader" — read it before translating, and prefer it over the English wording when the two pull apart.',
       '- "mustContain" is wording this string must carry — the current translation of a UI element it quotes, or a word the device makes true. It must appear VERBATIM inside your translation, worked into natural phrasing rather than appended.',
       '- Never translate a person\'s name, an event title somebody typed, or a {{token}}.',
       '',

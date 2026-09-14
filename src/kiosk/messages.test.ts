@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KIOSK_KEYS } from './storage';
 
 const HANS = { Search: { title: '搜索' } };
+const HANT = { Search: { title: '搜尋' } };
+const ES = { Search: { title: 'Buscar' } };
 
 async function freshModule() {
   vi.resetModules();
@@ -18,6 +20,8 @@ async function freshModule() {
 beforeEach(() => {
   localStorage.clear();
   vi.doUnmock('../../messages/kiosk/zh-Hans.json');
+  vi.doUnmock('../../messages/kiosk/zh-Hant.json');
+  vi.doUnmock('../../messages/kiosk/es-MX.json');
 });
 
 describe('cachedCatalog', () => {
@@ -90,6 +94,27 @@ describe('loadCatalog', () => {
       locale: 'zh-Hans',
       messages: HANS,
     });
+  });
+
+  /*
+   * One arm of the `switch` per language, because a locale is the one thing
+   * here that decides which file is fetched — and nothing else in this suite
+   * would notice a kiosk set to Spanish being handed the Traditional slice.
+   * `es-MX` is a named arm and `zh-Hant` is the default one; both are asserted
+   * so neither can be rewritten into the other.
+   */
+  it('fetches the Spanish slice for a lobby set to Spanish', async () => {
+    const { loadCatalog } = await freshModule();
+    vi.doMock('../../messages/kiosk/es-MX.json', () => ({ default: ES }));
+
+    await expect(loadCatalog('es-MX')).resolves.toEqual(ES);
+  });
+
+  it('fetches the Traditional slice, which is the arm nothing names', async () => {
+    const { loadCatalog } = await freshModule();
+    vi.doMock('../../messages/kiosk/zh-Hant.json', () => ({ default: HANT }));
+
+    await expect(loadCatalog('zh-Hant')).resolves.toEqual(HANT);
   });
 
   it('never stores English, which is already in the bundle', async () => {
