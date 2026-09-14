@@ -10,7 +10,9 @@
  * control to stand in the readout band instead of the shipped quiet chips —
  * chosen by `?variant=<id>` in `uxr/kiosk-language/main.tsx`. A candidate that
  * leaves a slot empty gets the shipped part, so every frame of every candidate
- * is the real screen around exactly the thing being argued about.
+ * is the real screen around exactly the thing being argued about. Round 7
+ * added a language the kiosk does not speak yet — see `Lang`, below the
+ * imports — and a per-lobby list of the languages pinned at rest (`pins`).
  *
  * Working file: this is what the loop edits between rounds. What it settles is
  * ported into `SearchScreen.tsx` and the catalogues; this stays as the record
@@ -36,7 +38,29 @@ import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '@/kiosk
 import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
 import { useLocaleControl } from '@/i18n/localeContext';
-import { LOCALES, LOCALE_LABELS, LOCALE_SHORT_LABELS, type Locale } from '@/lib/locales';
+import { LOCALES, LOCALE_LABELS, LOCALE_SHORT_LABELS, isLocale, type Locale } from '@/lib/locales';
+
+/**
+ * The languages this round argues over: the three the kiosk speaks, and
+ * Spanish, which it is about to.
+ *
+ * Spanish has no catalogue yet. The owner asked for the bare minimum the
+ * prototypes need, so it lives only in this file: a name, a badge, and the
+ * words of the panels under argument. Choosing it changes those words and
+ * nothing else — the keyboard, the rows and the doors stay English, as they
+ * will until `messages/kiosk/es.json` exists — and `isLocale` is the seam:
+ * a choice the provider knows is set on the provider, one it does not is
+ * kept here.
+ */
+export type Lang = Locale | 'es';
+// eslint-disable-next-line react-refresh/only-export-components
+export const LANGS: readonly Lang[] = [...LOCALES, 'es'];
+const LABELS: Record<Lang, string> = { ...LOCALE_LABELS, es: 'Español' };
+const SHORT: Record<Lang, string> = { ...LOCALE_SHORT_LABELS, es: 'ES' };
+/** The languages typed on this keyboard as they are spelled — no door needed to type a name. */
+const LATIN: readonly Lang[] = ['en', 'es'];
+/** What this lobby pins beside English at rest, until `?pins=` says otherwise. */
+const DEFAULT_PINS: Lang[] = ['zh-Hant', 'es'];
 
 function gradeLabel(grades: GradeStrings, grade: number | null): string {
   return grade === null ? '' : gradeDescription(grades, grade);
@@ -457,7 +481,8 @@ const ResultRow = memo(function ResultRow({
 
 export function SearchScreenVariant({
   variant,
-  initialChosen = false,
+  initialChosen = null,
+  pins = DEFAULT_PINS,
   phase,
   binding,
   buffer,
@@ -478,8 +503,14 @@ export function SearchScreenVariant({
 }: {
   /** Which candidate to draw — a key of `VARIANTS`. */
   variant: string;
-  /** The harness's `?chosen=1`: photograph the screen after a family has chosen. */
-  initialChosen?: boolean;
+  /** The harness's `?chosen=`: photograph the screen after a family has chosen this language. */
+  initialChosen?: Lang | null;
+  /**
+   * The languages this lobby speaks at rest beside English — a per-kiosk
+   * setting made at pairing (the round-5 staff condition), `?pins=` in the
+   * harness. What a candidate does with the list is the candidate.
+   */
+  pins?: Lang[];
   /** The harness's `?phase=`: pin a cycling greeting to one of its moments. */
   phase?: number;
   binding: KioskBinding;
@@ -529,8 +560,9 @@ export function SearchScreenVariant({
   const t = useTranslations('Search');
   const tDoor = useTranslations('Door');
   /*
-   * Whether a family has chosen a language this visit — its own fact, not
-   * inferred from the locale. Inferred (`locale !== RESTING`) the English
+   * Which language a family has chosen this visit, or null — its own fact,
+   * not inferred from the locale, which for Spanish cannot hold it (see
+   * `Lang`). Inferred (`locale !== RESTING`) the English
    * door was a no-op: pressing it set the locale it already had and changed
    * not one pixel, which is the round-1 grandmother failure handed to the
    * English parent, who is most of the queue. In the app this flag lives in
@@ -542,12 +574,12 @@ export function SearchScreenVariant({
    * timer whenever `chosen` is true, whatever the locale; clear both
    * together.
    */
-  const [chosen, setChosen] = useState(initialChosen);
+  const [chosen, setChosen] = useState<Lang | null>(initialChosen);
   const { setLocale } = useLocaleControl();
   const onChoose = useCallback(
-    (candidate: Locale) => {
-      setLocale(candidate);
-      setChosen(true);
+    (candidate: Lang) => {
+      if (isLocale(candidate)) setLocale(candidate);
+      setChosen(candidate);
     },
     [setLocale],
   );
@@ -933,6 +965,7 @@ export function SearchScreenVariant({
               onRegister={steadyRegister}
               chosen={chosen}
               onChoose={onChoose}
+              pins={pins}
               phase={phase}
             />
           )}
@@ -1020,6 +1053,7 @@ export function SearchScreenVariant({
               onRegister={steadyRegister}
               chosen={chosen}
               onChoose={onChoose}
+              pins={pins}
             />
           )}
           {nobody && !VARIANTS[variant]?.NoMatch && (
@@ -1320,7 +1354,7 @@ export function SearchScreenVariant({
             * the queue away from them.
             */}
           {VARIANTS[variant]?.Picker ? (
-            <VariantPicker variant={variant} chosen={chosen} onChoose={onChoose} idle={outcome.mode === 'idle'} />
+            <VariantPicker variant={variant} chosen={chosen} onChoose={onChoose} pins={pins} idle={outcome.mode === 'idle'} />
           ) : (
             <span className="absolute left-0">
               <LanguagePicker quiet />
@@ -1382,8 +1416,11 @@ export function SearchScreenVariant({
 /** What the idle slot is handed: the same facts the shipped panel reads. */
 /** A family's language choice this visit, and the way to make one. */
 export interface ChoiceProps {
-  chosen: boolean;
-  onChoose: (candidate: Locale) => void;
+  /** The language a family chose this visit; null while nobody has. */
+  chosen: Lang | null;
+  onChoose: (candidate: Lang) => void;
+  /** The languages pinned beside the resting one at rest, in the order they stand. */
+  pins: Lang[];
 }
 
 export interface IdleProps extends ChoiceProps {
@@ -1445,23 +1482,32 @@ function VariantNoMatch({ variant, ...props }: NoMatchProps & { variant: string 
  * phone-number association in the church's data is not good, so the
  * four-digit route cannot lead — a family sent to it first lands on "no
  * match" more often than not, which for a reader who cannot read the
- * screen is the worst place to land. The child's English name is the
- * reliable route and is said first; the digits are the second line. The
- * rest is as the earlier rounds settled it: "the child's English name"
- * rather than 姓名 (whose name?), and a no-match panel whose first answer is
- * a route rather than "are you new?".
+ * screen is the worst place to land. The child's name is the reliable
+ * route and is said first; the digits are the second line.
+ *
+ * Round 7 added Spanish and took "English" out of the English and Spanish
+ * lines: a reader of either types a Latin-alphabet name without being told
+ * to, so the word was a cost with no reader. It stays in the Chinese lines,
+ * 英文名字, where it is the instruction — the roster holds the child's
+ * English name and the keyboard has no other way in. The rest is as the
+ * earlier rounds settled it: "the child's name" rather than 姓名 (whose
+ * name?), and a no-match panel whose first answer is a route rather than
+ * "are you new?".
  *
  * Literals because the prototype is thrown away; what ships goes through
- * `messages/kiosk/*.json` and the drafting pipeline, and the Chinese below
- * is a draft for the congregation's own reviewers. Vocabulary follows
- * `messages/GLOSSARY.md` and the shipped catalogue.
+ * `messages/kiosk/*.json` and the drafting pipeline, and the Chinese and
+ * Spanish below are drafts for the congregations' own reviewers. The
+ * Spanish is the usted register, as church signage is, and says "su hijo";
+ * the panel's Spanish-speaking readers are asked about both. Vocabulary
+ * follows `messages/GLOSSARY.md` and the shipped catalogue.
  */
 const COPY: Record<
-  Locale,
+  Lang,
   {
     name: string;
     orDigits: string;
     thenTap: string;
+    tapHere: string;
     noMatch: string;
     routeDigits: string;
     routeName: string;
@@ -1471,12 +1517,13 @@ const COPY: Record<
   }
 > = {
   en: {
-    name: 'Type your child’s English name',
+    name: 'Type your child’s name',
     orDigits: 'or the last 4 digits of your phone',
     thenTap: 'Then tap your child’s name.',
+    tapHere: 'Tap here',
     noMatch: 'No match',
     routeDigits: 'Try the last 4 digits of your phone, or ask a leader.',
-    routeName: 'Try typing your child’s English name, or ask a leader.',
+    routeName: 'Try typing your child’s name, or ask a leader.',
     firstTime: 'First time here?',
     register: 'Register your child',
     widen: 'Search everyone',
@@ -1485,6 +1532,7 @@ const COPY: Record<
     name: '输入孩子的英文名字',
     orDigits: '或电话后 4 位',
     thenTap: '然后点一下您孩子的名字。',
+    tapHere: '按这里',
     noMatch: '找不到',
     routeDigits: '试试电话后 4 位，或找同工帮忙。',
     routeName: '试试输入孩子的英文名字，或找同工帮忙。',
@@ -1496,6 +1544,7 @@ const COPY: Record<
     name: '輸入孩子的英文名字',
     orDigits: '或電話後 4 碼',
     thenTap: '然後點一下您孩子的名字。',
+    tapHere: '按這裡',
     noMatch: '找不到',
     routeDigits: '試試電話後 4 碼，或找同工幫忙。',
     routeName: '試試輸入孩子的英文名字，或找同工幫忙。',
@@ -1503,10 +1552,28 @@ const COPY: Record<
     register: '為您的孩子登記',
     widen: '搜尋所有人',
   },
+  es: {
+    name: 'Escriba el nombre de su hijo',
+    orDigits: 'o los últimos 4 dígitos de su teléfono',
+    thenTap: 'Luego toque el nombre de su hijo.',
+    tapHere: 'Toque aquí',
+    noMatch: 'No se encontró',
+    routeDigits: 'Pruebe con los últimos 4 dígitos de su teléfono, o pida ayuda a un líder.',
+    routeName: 'Pruebe escribiendo el nombre de su hijo, o pida ayuda a un líder.',
+    firstTime: '¿Primera vez aquí?',
+    register: 'Registre a su hijo',
+    widen: 'Buscar a todos',
+  },
 };
 
-function useCopy() {
-  return COPY[useLocale() as Locale] ?? COPY.en;
+/**
+ * The language the panels speak: the family's choice this visit, else the
+ * kiosk's. The choice is read first because Spanish can be chosen and
+ * cannot be the locale.
+ */
+function usePanelLang(chosen: Lang | null): Lang {
+  const locale = useLocale() as Lang;
+  return chosen ?? locale;
 }
 
 /**
@@ -1516,10 +1583,13 @@ function useCopy() {
  * to it, nobody has chosen anything yet and the screen cannot know who is
  * standing there.
  */
-const RESTING: Locale = 'en';
+const RESTING: Lang = 'en';
 
-/** The languages, resting language first. */
-const ORDER: Locale[] = [RESTING, ...LOCALES.filter((candidate) => candidate !== RESTING)];
+/** Every language, resting language first — what round 4's cycling candidates ran through. */
+const ORDER: Lang[] = [RESTING, ...LANGS.filter((candidate) => candidate !== RESTING)];
+
+/** The languages a lobby speaks at rest: the resting one, then its pins. */
+const voicesOf = (pins: Lang[]): Lang[] => [RESTING, ...pins.filter((candidate) => candidate !== RESTING)];
 
 /* ------------------------------------------------------------------------ */
 /* Shared parts                                                              */
@@ -1586,10 +1656,10 @@ function Cycle({
   className,
   onChoose,
 }: {
-  items: { locale: Locale; text: string }[];
+  items: { locale: Lang; text: string }[];
   phase?: number;
   className?: string;
-  onChoose?: (candidate: Locale) => void;
+  onChoose?: (candidate: Lang) => void;
 }) {
   const tap = useTap();
   const startedAt = useRef(Date.now());
@@ -1625,7 +1695,7 @@ function Cycle({
     <button
       type="button"
       tabIndex={-1}
-      aria-label={LOCALE_LABELS[showing().locale]}
+      aria-label={LABELS[showing().locale]}
       {...tap(() => {
         haptic(8);
         onChoose(showing().locale);
@@ -1647,8 +1717,9 @@ function Cycle({
  * is the outcome, the next line is what to do about it — check the spelling,
  * or the digits as a second try, now that the digits are the second route —
  * and the doors go quiet under the caption that used to be the heading.
- * While nobody has chosen a language the route is said in every language:
- * the father reached exactly this screen, in English, before he had tapped
+ * While nobody has chosen a language the route is said in every language
+ * the lobby speaks at rest — the resting one and its pins: the father
+ * reached exactly this screen, in English, before he had tapped
  * anything. Chosen, it is single-language. "Check the spelling" went in
  * round 4 — advice a parent cannot take, since they do not know how the
  * church spelled it — and the leader moved up into the route line, in every
@@ -1657,19 +1728,25 @@ function Cycle({
  * purpose — it is the failure state, and a sentence that changed while a
  * stuck parent was reading it would be the wrong kind of help.
  */
-function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchProps) {
+function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen, pins }: NoMatchProps) {
   const t = useTranslations('Search');
-  const { locale } = useLocaleControl();
-  const copy = COPY[locale] ?? COPY.en;
+  const lang = usePanelLang(chosen);
+  const copy = COPY[lang];
   const tap = useTap();
-  const route = (candidate: Locale) =>
+  const voices = voicesOf(pins);
+  const route = (candidate: Lang) =>
     mode === 'phone' ? COPY[candidate].routeName : COPY[candidate].routeDigits;
-  const unchosen = !chosen;
-  const distinct = (pick: (candidate: Locale) => string) =>
-    ORDER.filter((candidate, index) => ORDER.findIndex((other) => pick(other) === pick(candidate)) === index);
+  const unchosen = chosen === null;
+  const distinct = (pick: (candidate: Lang) => string) =>
+    voices.filter((candidate, index) => voices.findIndex((other) => pick(other) === pick(candidate)) === index);
+  /* Four voices at once — the ceiling a lobby can pin — overflowed the
+     region's top on portrait, and a panel whose first line is off the glass
+     has failed at its one job. A step down in size and gap for that case
+     only; three voices keep the round-5 sizes. */
+  const crowded = unchosen && voices.length > 3;
   return (
-    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
-      <div className="mx-auto max-w-sm text-center text-3xl leading-tight font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
+    <div className={`mx-auto flex h-full w-full max-w-xs flex-col items-stretch text-center tall:max-w-md tall:justify-end lg:max-w-2xl ${crowded ? 'gap-2 pt-2' : 'gap-3 pt-6 tall:gap-4'}`}>
+      <div className={`mx-auto max-w-sm text-center leading-tight font-semibold text-balance text-ink-100 tall:max-w-md ${crowded ? 'text-2xl kiosk:text-3xl' : 'text-3xl kiosk:text-4xl'}`}>
         {unchosen ? (
           <span className="flex flex-col items-center gap-1">
             {distinct((candidate) => COPY[candidate].noMatch).map((candidate) => (
@@ -1682,7 +1759,7 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
           copy.noMatch
         )}
       </div>
-      <div className="mx-auto flex max-w-sm flex-col gap-1 text-center text-xl leading-snug text-balance text-ink-100 tall:max-w-md kiosk:text-2xl">
+      <div className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-balance text-ink-100 tall:max-w-md ${crowded ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'}`}>
         {unchosen ? (
           distinct(route).map((candidate) => (
             <span key={candidate} lang={candidate}>
@@ -1690,10 +1767,10 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
             </span>
           ))
         ) : (
-          <span className="text-2xl kiosk:text-3xl">{route(locale)}</span>
+          <span className="text-2xl kiosk:text-3xl">{route(lang)}</span>
         )}
       </div>
-      <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4">
+      <div className={`mt-auto flex flex-col items-stretch tall:mt-0 ${crowded ? 'gap-2 pt-2' : 'gap-3 pt-6 tall:gap-4'}`}>
         <div className="text-base text-ink-400 kiosk:text-lg">
           {unchosen ? distinct((candidate) => COPY[candidate].firstTime).map((candidate) => (
             <span key={candidate} lang={candidate} className="mx-1.5 inline-block">{COPY[candidate].firstTime}</span>
@@ -1706,8 +1783,8 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
               did not. Chosen, the shipped doors, one language. */}
           {unchosen ? (
             <>
-              <Door onPress={onRegister} pick={(candidate) => COPY[candidate].register} />
-              <Door onPress={onWiden} pick={(candidate) => COPY[candidate].widen} />
+              <Door voices={voices} onPress={onRegister} pick={(candidate) => COPY[candidate].register} />
+              <Door voices={voices} onPress={onWiden} pick={(candidate) => COPY[candidate].widen} />
             </>
           ) : (
             <>
@@ -1731,11 +1808,19 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
   );
 }
 
-/** A quiet door labelled in every language, for the panel nobody has chosen a language on. */
-function Door({ onPress, pick }: { onPress: () => void; pick: (candidate: Locale) => string }) {
+/** A quiet door labelled in every language the lobby speaks at rest, for the panel nobody has chosen a language on. */
+function Door({
+  onPress,
+  pick,
+  voices,
+}: {
+  onPress: () => void;
+  pick: (candidate: Lang) => string;
+  voices: Lang[];
+}) {
   const tap = useTap();
-  const distinct = ORDER.filter(
-    (candidate, index) => ORDER.findIndex((other) => pick(other) === pick(candidate)) === index,
+  const distinct = voices.filter(
+    (candidate, index) => voices.findIndex((other) => pick(other) === pick(candidate)) === index,
   );
   return (
     <button
@@ -1766,21 +1851,21 @@ function Door({ onPress, pick }: { onPress: () => void; pick: (candidate: Locale
  * across the glass (`sm:` and up), the one-glyph badges on a phone. The
  * implementation is a label prop on `LanguagePicker`.
  */
-function LanguageBar({ onChoose }: { onChoose: (candidate: Locale) => void }) {
+function LanguageBar({ onChoose, chosen }: { onChoose: (candidate: Lang) => void; chosen: Lang | null }) {
   const t = useTranslations('Common');
-  const { locale } = useLocaleControl();
+  const lang = usePanelLang(chosen);
   const tap = useTap();
   return (
     <div role="group" aria-label={t('language')} className="flex items-center gap-2">
-      {LOCALES.map((candidate: Locale) => {
-        const current = candidate === locale;
+      {LANGS.map((candidate: Lang) => {
+        const current = candidate === lang;
         return (
           <button
             key={candidate}
             type="button"
             tabIndex={-1}
             lang={candidate}
-            aria-label={LOCALE_LABELS[candidate]}
+            aria-label={LABELS[candidate]}
             aria-pressed={current}
             {...tap(() => {
               haptic();
@@ -1793,8 +1878,8 @@ function LanguageBar({ onChoose }: { onChoose: (candidate: Locale) => void }) {
             }`}
             style={{ touchAction: 'manipulation' }}
           >
-            <span className="sm:hidden">{LOCALE_SHORT_LABELS[candidate]}</span>
-            <span className="hidden sm:inline">{LOCALE_LABELS[candidate]}</span>
+            <span className="sm:hidden">{SHORT[candidate]}</span>
+            <span className="hidden sm:inline">{LABELS[candidate]}</span>
           </button>
         );
       })}
@@ -1807,14 +1892,14 @@ function LanguageBar({ onChoose }: { onChoose: (candidate: Locale) => void }) {
  * in the current language — the name first, the digits second, the next
  * step last.
  */
-function LanguageBarIdle({ backdrop, onChoose }: IdleProps) {
-  const copy = useCopy();
+function LanguageBarIdle({ backdrop, onChoose, chosen }: IdleProps) {
+  const copy = COPY[usePanelLang(chosen)];
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
       <div className={`relative isolate flex flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
         <IdleGround />
-        <LanguageBar onChoose={onChoose} />
+        <LanguageBar onChoose={onChoose} chosen={chosen} />
         <div className="mt-6 text-4xl leading-tight font-semibold text-balance text-ink-100 tall:mt-8 tall:text-5xl lg:mt-3">
           {copy.name}
         </div>
@@ -1840,9 +1925,9 @@ function LanguageBarIdle({ backdrop, onChoose }: IdleProps) {
  * top, 44px (on end) or 28px (on its side) above the number row; on a
  * phone they centre in the band at the shipped width.
  */
-function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
+function PromotedChips({ onChoose, chosen, idle }: ChoiceProps & { idle: boolean }) {
   const t = useTranslations('Common');
-  const { locale } = useLocaleControl();
+  const lang = usePanelLang(chosen);
   const tap = useTap();
   if (idle) return null;
   return (
@@ -1851,15 +1936,15 @@ function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
       aria-label={t('language')}
       className="absolute right-0 flex items-center gap-1 sm:top-0"
     >
-      {LOCALES.map((candidate: Locale) => {
-        const current = candidate === locale;
+      {LANGS.map((candidate: Lang) => {
+        const current = candidate === lang;
         return (
           <button
             key={candidate}
             type="button"
             tabIndex={-1}
             lang={candidate}
-            aria-label={LOCALE_LABELS[candidate]}
+            aria-label={LABELS[candidate]}
             aria-pressed={current}
             {...tap(() => {
               haptic(8);
@@ -1872,7 +1957,7 @@ function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
             }`}
             style={{ touchAction: 'manipulation' }}
           >
-            {LOCALE_SHORT_LABELS[candidate]}
+            {SHORT[candidate]}
           </button>
         );
       })}
@@ -1881,12 +1966,15 @@ function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* A — Three welcomes, trimmed                                               */
+/* A — Welcomes: every voice an equal plate                                 */
 /* ------------------------------------------------------------------------ */
 
 /**
- * The instruction in all three languages at once, each a door — each
- * language saying its two lines once, and nothing said twice in any one.
+ * The instruction in every language the lobby speaks at rest, each an equal
+ * plate and a door — each language saying its two lines once, and nothing
+ * said twice in any one. Round 7 made the set the lobby's pins rather than
+ * the kiosk's whole list: with Spanish the list is four, and four equal
+ * plates is the ceiling this candidate is shot at.
  *
  * Rounds 1–3 settled the shape: three equal plates at rest, resting
  * language first, nothing highlighted; a tap turns the panel into the
@@ -1902,8 +1990,9 @@ function PromotedChips({ onChoose, idle }: ChoiceProps & { idle: boolean }) {
  * resting language, and steps aside on a portrait photo Sunday, where the
  * canopy stops above it and the plate it wore read as a button.
  */
-function ThreeWelcomes(props: IdleProps) {
-  const { backdrop, chosen, onChoose } = props;
+function Welcomes(props: IdleProps) {
+  const { backdrop, chosen, onChoose, pins } = props;
+  const voices = voicesOf(pins);
   const tap = useTap();
   if (chosen) return <LanguageBarIdle {...props} />;
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
@@ -1916,13 +2005,13 @@ function ThreeWelcomes(props: IdleProps) {
       <div className={`relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-3xl ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
         <IdleGround />
         <div className="flex w-full flex-col gap-2 lg:flex-row lg:gap-3">
-          {ORDER.map((candidate: Locale) => (
+          {voices.map((candidate: Lang) => (
             <button
               key={candidate}
               type="button"
               tabIndex={-1}
               lang={candidate}
-              aria-label={LOCALE_LABELS[candidate]}
+              aria-label={LABELS[candidate]}
               {...tap(() => {
                 haptic(8);
                 onChoose(candidate);
@@ -1940,7 +2029,7 @@ function ThreeWelcomes(props: IdleProps) {
                   differ by one character in the big line, and a reader in a
                   hurry told them apart by the small line or not at all. */}
               <span aria-hidden="true" className="absolute top-1.5 right-2.5 text-xs font-semibold text-ink-500 tall:text-sm">
-                {LOCALE_SHORT_LABELS[candidate]}
+                {SHORT[candidate]}
               </span>
               <span className="text-xl leading-tight font-semibold tall:text-3xl">{COPY[candidate].name}</span>
               <span className="text-sm leading-tight text-ink-400 tall:text-lg">{COPY[candidate].orDigits}</span>
@@ -1956,34 +2045,79 @@ function ThreeWelcomes(props: IdleProps) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* J — Two voices, both still                                                */
+/* J — Voices: the resting language leads, one still plate per pin          */
 /* ------------------------------------------------------------------------ */
 
 /**
- * The resting language leads, as today; one Chinese plate stands under it,
- * still, in the script the congregation chose.
+ * One pinned language's plate: its name route and its digits route in its
+ * own script, and the door to its screen.
  *
- * What round 4's moving line taught: the second voice has to be on the
- * glass from the first second (the father), it must not move (the
- * grandmother: "a sign that stays still is a sign; a sign that changes is a
- * television"), and the thing a thumb presses must never be the thing that
- * changes (the father). So the line is a plate — the material this kiosk
- * presses — carrying the name route and the digits route in one script,
- * and it is the door: a tap makes the screen that language's, with the
- * other script one tap away in the bar. Which script stands here is the
- * congregation's decision, held in one constant; both scripts read each
- * other well enough that the family of the other one loses nothing (the
- * father: "either is fine").
- *
- * Five lines, one door, nothing moving, nothing said twice.
+ * What round 4's moving line taught, kept: the second voice is on the glass
+ * from the first second, it does not move, and the thing a thumb presses is
+ * never the thing that changes. The ring is the edge that keeps the plate a
+ * pressable object on the light ground, where ink-800 inverts to a pale tint
+ * inside a pale card. The corner badge is asked for by the caller once
+ * there is more than one plate: the two Chinese plates differ by one glyph
+ * in the big line, and a reader in a hurry told them apart by the small
+ * line or not at all.
  */
-const SECOND_VOICE: Locale = 'zh-Hant';
-
-function TwoVoices(props: IdleProps) {
-  const { backdrop, chosen, onChoose } = props;
+function Plate({
+  candidate,
+  onChoose,
+  badge,
+}: {
+  candidate: Lang;
+  onChoose: (candidate: Lang) => void;
+  badge: boolean;
+}) {
   const tap = useTap();
+  /* Han glyphs need more size than Latin at the same distance (round 5), and
+     the same rule is what keeps a Latin headline — "Escriba el nombre de su
+     hijo" — on one line in the plate's width instead of orphaning its last
+     word under the badge. */
+  const han = !LATIN.includes(candidate);
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      lang={candidate}
+      aria-label={LABELS[candidate]}
+      {...tap(() => {
+        haptic(8);
+        onChoose(candidate);
+      })}
+      className="relative flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16"
+      style={{ touchAction: 'manipulation' }}
+    >
+      {badge && (
+        <span aria-hidden="true" className="absolute top-1.5 right-2.5 text-xs font-semibold text-ink-500 tall:text-sm">
+          {SHORT[candidate]}
+        </span>
+      )}
+      <span className={`leading-tight font-semibold ${han ? 'text-xl tall:text-3xl' : 'text-lg tall:text-2xl'}`}>
+        {COPY[candidate].name}
+      </span>
+      <span className="text-base leading-tight text-ink-300 tall:text-lg">{COPY[candidate].orDigits}</span>
+    </button>
+  );
+}
+
+/**
+ * The resting language leads, as today; under it, one still plate per
+ * language the lobby has pinned, in the order staff pinned them.
+ *
+ * Round 5 settled this shape with one plate, the congregation's Chinese
+ * script. Round 7 asks what it becomes when the lobby has more than one
+ * second language, and the answer here is the plain one: a plate each, so
+ * that a third pin costs on the glass exactly what a third pin costs — two
+ * lines — and nothing is said twice in any language. Which languages stand
+ * here, and in what order, is the lobby's decision, made once at pairing.
+ */
+function Voices(props: IdleProps) {
+  const { backdrop, chosen, onChoose, pins } = props;
   if (chosen) return <LanguageBarIdle {...props} />;
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  const plates = pins.filter((candidate) => candidate !== RESTING);
   return (
     <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
       <div className={`relative isolate flex w-full max-w-xl flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
@@ -1997,27 +2131,140 @@ function TwoVoices(props: IdleProps) {
         <div className={`pt-1 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].orDigits}
         </div>
-        <button
-          type="button"
-          tabIndex={-1}
-          lang={SECOND_VOICE}
-          aria-label={LOCALE_LABELS[SECOND_VOICE]}
-          {...tap(() => {
-            haptic(8);
-            onChoose(SECOND_VOICE);
-          })}
-          /* A step on the landscape shelf too, and a floor: Han glyphs need
-             more size than Latin at the same distance, and on the wide shelf
-             the second line — the rescue route for the one family who cannot
-             read the rest — was the smallest thing in the frame. The ring is
-             the edge that keeps the plate a pressable object on the light
-             ground, where ink-800 inverts to a pale tint inside a pale card. */
-          className="mt-4 flex min-h-14 w-full max-w-md flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16 lg:mt-3 lg:min-h-16"
-          style={{ touchAction: 'manipulation' }}
-        >
-          <span className="text-xl leading-tight font-semibold tall:text-3xl lg:text-2xl">{COPY[SECOND_VOICE].name}</span>
-          <span className="text-base leading-tight text-ink-300 tall:text-lg lg:text-lg">{COPY[SECOND_VOICE].orDigits}</span>
-        </button>
+        <div className="mt-4 flex w-full max-w-md flex-col gap-2 lg:mt-3">
+          {plates.map((candidate) => (
+            <Plate key={candidate} candidate={candidate} onChoose={onChoose} badge={plates.length > 1} />
+          ))}
+        </div>
+        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
+          {COPY[RESTING].thenTap}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* K — Doors: the instruction once, and a named door per pin                */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * The instruction said once, in the resting language; under it a row of
+ * doors, one per pinned language, each carrying only that language's own
+ * name and the two words "tap here" in it.
+ *
+ * The least said of any candidate: nothing on the glass is repeated, and
+ * the doors are what every bilingual sign in the world already teaches — a
+ * language's name, in that language, is the one string its reader finds
+ * without reading anything else. The cost is a tap before the first
+ * instruction: the grandmother reads nothing about her child until she has
+ * pressed 繁體中文. Rounds 1–3 set the bar-first candidate aside for exactly
+ * that, with three languages; with four the arithmetic changes, which is
+ * why it stands again. "Tap here" is what makes a label a door — the
+ * shipped chips were labels, and nobody took them.
+ */
+function Doors(props: IdleProps) {
+  const { backdrop, chosen, onChoose, pins } = props;
+  const tap = useTap();
+  if (chosen) return <LanguageBarIdle {...props} />;
+  const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  const doors = pins.filter((candidate) => candidate !== RESTING);
+  return (
+    <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
+      <div className={`relative isolate flex w-full max-w-xl flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
+        <IdleGround />
+        <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl" lang={RESTING}>
+          {COPY[RESTING].name}
+        </div>
+        <div className={`pt-1 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
+          {COPY[RESTING].orDigits}
+        </div>
+        <div className="mt-4 flex w-full max-w-md flex-row gap-2 lg:mt-3">
+          {doors.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              tabIndex={-1}
+              lang={candidate}
+              aria-label={LABELS[candidate]}
+              {...tap(() => {
+                haptic(8);
+                onChoose(candidate);
+              })}
+              className="flex min-h-14 flex-1 flex-col items-center justify-center rounded-xl bg-ink-800 px-3 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16"
+              style={{ touchAction: 'manipulation' }}
+            >
+              <span className="text-xl leading-tight font-semibold tall:text-2xl">{LABELS[candidate]}</span>
+              <span className="text-sm leading-tight text-ink-300 tall:text-base">{COPY[candidate].tapHere}</span>
+            </button>
+          ))}
+        </div>
+        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
+          {COPY[RESTING].thenTap}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* M — Latin together: Latin voices as lines, Han voices as plates           */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * The owner's observation, made into a shape: a Spanish reader types a
+ * Latin-alphabet name on this keyboard exactly as an English reader does,
+ * and needs no door to do it. So the Latin voices share the top of the
+ * panel as lines — English first at the shipped size, Spanish a step under
+ * it, then each language's digits line — and only the Han voice, whose
+ * reader needs the whole screen to change, is a plate and a door.
+ *
+ * Two things follow. The screen says less: two voices in one block instead
+ * of a heading and two plates. And it ships before the Spanish catalogue
+ * does — a Spanish family can read the route, type, and tap their child on
+ * a kiosk that speaks no Spanish anywhere else; the Spanish rows, no-match
+ * panel and register door come with `es.json`, and the chips are where the
+ * Spanish screen is reached once something is typed. The cost is the one
+ * the English parent pays: her instruction has a second line she does not
+ * read, in a script she does.
+ */
+function LatinTogether(props: IdleProps) {
+  const { backdrop, chosen, onChoose, pins } = props;
+  if (chosen) return <LanguageBarIdle {...props} />;
+  const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  const latin = pins.filter((candidate) => candidate !== RESTING && LATIN.includes(candidate));
+  const han = pins.filter((candidate) => candidate !== RESTING && !LATIN.includes(candidate));
+  return (
+    <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
+      <div className={`relative isolate flex w-full max-w-xl flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
+        <IdleGround />
+        <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl" lang={RESTING}>
+          {COPY[RESTING].name}
+        </div>
+        {latin.map((candidate) => (
+          <div
+            key={candidate}
+            className="pt-1 text-2xl leading-tight font-semibold text-balance text-ink-200 tall:text-3xl"
+            lang={candidate}
+          >
+            {COPY[candidate].name}
+          </div>
+        ))}
+        <div className={`pt-2 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
+          {COPY[RESTING].orDigits}
+        </div>
+        {latin.map((candidate) => (
+          <div key={candidate} className={`text-base kiosk:text-lg ${dim}`} lang={candidate}>
+            {COPY[candidate].orDigits}
+          </div>
+        ))}
+        {han.length > 0 && (
+          <div className="mt-4 flex w-full max-w-md flex-col gap-2 lg:mt-3">
+            {han.map((candidate) => (
+              <Plate key={candidate} candidate={candidate} onChoose={onChoose} badge={han.length > 1} />
+            ))}
+          </div>
+        )}
         <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].thenTap}
         </div>
@@ -2046,13 +2293,13 @@ function TwoVoices(props: IdleProps) {
 function OneAtATime({ backdrop, onChoose, chosen, phase, ...rest }: IdleProps) {
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   if (chosen) return <LanguageBarIdle backdrop={backdrop} onChoose={onChoose} chosen={chosen} {...rest} />;
-  const items = (pick: (candidate: Locale) => string) =>
+  const items = (pick: (candidate: Lang) => string) =>
     ORDER.map((candidate) => ({ locale: candidate, text: pick(candidate) }));
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
       <div className="relative isolate flex w-full flex-col items-center">
         <IdleGround />
-        <LanguageBar onChoose={onChoose} />
+        <LanguageBar onChoose={onChoose} chosen={chosen} />
         <div className="mt-6 w-full max-w-xl tall:mt-8 lg:mt-3">
           <Cycle
             items={items((candidate) => COPY[candidate].name)}
@@ -2128,17 +2375,31 @@ function SecondVoice(props: IdleProps) {
 /* The table is the file's subject; the harness reads it beside the components it names. */
 // eslint-disable-next-line react-refresh/only-export-components
 export const VARIANTS: Record<string, VariantSpec> = {
-  'three-welcomes': {
+  voices: {
     summary:
-      'A: three equal plates at rest, each the name route and the digits route in its own language, each a door; the next step once beneath. Chips only once something is typed.',
-    Idle: ThreeWelcomes,
+      'J: the resting language leads as today; one still plate per pinned language under it, each carrying its own name route and digits route, each a door. Chips only once something is typed.',
+    Idle: Voices,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
-  'two-voices': {
+  doors: {
     summary:
-      'J: the resting language leads as today; one still Chinese plate under it, in the congregation’s script, carrying the name and digits routes, is the door. Chips only once something is typed.',
-    Idle: TwoVoices,
+      'K: the instruction once, in the resting language; under it a door per pinned language carrying only that language’s own name and “tap here”. Chips only once something is typed.',
+    Idle: Doors,
+    Picker: PromotedChips,
+    NoMatch: NoMatchPanel,
+  },
+  'latin-together': {
+    summary:
+      'M: the Latin voices as lines in one block — English at the shipped size, Spanish a step under it, each with its digits line — and the Han voices as plates that are doors. Chips only once something is typed.',
+    Idle: LatinTogether,
+    Picker: PromotedChips,
+    NoMatch: NoMatchPanel,
+  },
+  welcomes: {
+    summary:
+      'A: every language the lobby speaks at rest as an equal plate, the resting one first, each the name route and the digits route, each a door; the next step once beneath. Chips only once something is typed.',
+    Idle: Welcomes,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
@@ -2152,10 +2413,10 @@ export const VARIANTS: Record<string, VariantSpec> = {
   /* Round 4's two moving candidates, kept for the record: every parent
      rejected the cycling instruction, and the alternating line's lesson —
      a second voice, present from the first second, still, and not the
-     thing you press — is `two-voices`. */
+     thing you press — is `voices`. */
   'one-at-a-time': {
     summary:
-      'D (round 4): the bar as the control; under it one instruction that crossfades through the three languages, four seconds each.',
+      'D (round 4): the bar as the control; under it one instruction that crossfades through every language, four seconds each.',
     Idle: OneAtATime,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,

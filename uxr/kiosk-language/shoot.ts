@@ -8,14 +8,22 @@
  * be answered on the English frame *and* on the frame they arrive at.
  *
  *   npx tsx uxr/kiosk-language/shoot.ts [--out uxr/renders/lang-r00]
- *                                       [--lang en,zh-Hant,zh-Hans]
- *                                       [--variant shipped,welcome-three]
- *                                       [--only idle]
+ *                                       [--lang en,zh-Hant,zh-Hans,es]
+ *                                       [--view kiosktall]
+ *                                       [--variant shipped,voices@zh-Hant+es]
+ *                                       [--only idle,nomatch]
  *
  * Frames are `<scene>--<view>--<lang>--<variant>-fold.png`, with an
  * `index.json` beside them, so a round reads like every other round.
  * `shipped` is the real component; anything else is a row of
- * `SearchScreen.variants.tsx`.
+ * `SearchScreen.variants.tsx`, and `@` after it names the languages the
+ * lobby pins beside English at rest (`+`-joined), which becomes `?pins=`.
+ * Round 7 narrowed the study to the portrait tablet, so `--view` defaults
+ * to it; `--view phone,kiosktall,kioskwide` widens it again. `--lang` is a
+ * filter over what each scene asks for: the resting scenes are shot in the
+ * kiosk's own language, the chosen ones in each language a family can
+ * choose. Spanish is a language the kiosk does not speak yet, so a frame
+ * of it waits for the provider to settle in English, which it does.
  *
  * Every frame is checked for sideways scroll on the way past, as the kiosk
  * shooter checks it: a fixed-height row wider than the glass takes the whole
@@ -28,6 +36,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
 import { createServer } from 'vite';
+import { isLocale } from '../../src/lib/locales';
 
 const executablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ??
@@ -47,38 +56,37 @@ type ViewportName = keyof typeof VIEWPORTS;
 /**
  * The states a home screen has to be right in.
  *
- * `idle` is the frame in the complaint: what a parent walks up to. `typed`
- * and `phone` are where the idle panel's replacement has to hold — a design
- * that helps the empty screen must not cost the one with rows on it — and
- * `phone` is the route that needs no reading at all. `nomatch` is the other
- * panel that lives in the results track. `photo-idle` is the idle screen on a
- * gathering that wears a photograph, which every idle-panel change has to
- * survive.
+ * `idle` is the frame in the complaint: what a parent walks up to, in the
+ * kiosk's own resting language. `chosen` is the frame they arrive at, once
+ * per language a family can choose. `typed` and `nomatch` are where the
+ * idle panel's replacement has to hold — a design that helps the empty
+ * screen must not cost the one with rows on it — and `chosen-typed` and
+ * `chosen-nomatch` are the same two after a choice. `photo-idle` is the
+ * idle screen on a gathering that wears a photograph, which every
+ * idle-panel change has to survive; `photo-light` the same on the light
+ * ground. `langs` is what a scene asks for; `--lang` narrows it.
  */
 const SCENES: {
   id: string;
   query: string;
   views: readonly ViewportName[];
+  langs: readonly string[];
   settle?: number;
   /** Presses to run before the shot — `data-key` values or button labels. */
   drive?: readonly string[];
 }[] = [
-  /* Every idle scene pins the cycling candidates to their first moment, so a
-     frame is a known moment; `phase-1` and `phase-2` are the other two. The
-     static candidates ignore the knob. */
-  { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'phase-1', query: 'phase=1', views: ['kiosktall'] },
-  { id: 'phase-2', query: 'phase=2', views: ['kiosktall'] },
-  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'] },
-  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'] },
-  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
+  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
+  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'es'] },
+  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
   /* Two letters of an English name the family knows only as a sound: the
      rows carry the Chinese name the roster holds, which is what a reader who
      cannot spell recognises. */
-  { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'] },
-  { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'] },
-  { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], settle: 1900 },
-  { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], settle: 1900 },
+  { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'], langs: ['en'] },
+  { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'es'] },
+  { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['en'] },
+  { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], langs: ['en'], settle: 1900 },
+  { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], langs: ['en'], settle: 1900 },
 ];
 
 const args = process.argv.slice(2);
@@ -86,8 +94,9 @@ const flag = (name: string): string | null => {
   const at = args.indexOf(name);
   return at === -1 ? null : (args[at + 1] ?? null);
 };
-const only = flag('--only');
-const langs = flag('--lang')?.split(',').filter(Boolean) ?? ['en', 'zh-Hant', 'zh-Hans'];
+const only = flag('--only')?.split(',').filter(Boolean) ?? null;
+const langs = flag('--lang')?.split(',').filter(Boolean) ?? ['en', 'zh-Hant', 'zh-Hans', 'es'];
+const views = (flag('--view')?.split(',').filter(Boolean) ?? ['kiosktall']) as ViewportName[];
 const variants = flag('--variant')?.split(',').filter(Boolean) ?? ['shipped'];
 const outDir = resolve(flag('--out') ?? 'uxr/renders/kiosk-language');
 await mkdir(outDir, { recursive: true });
@@ -132,10 +141,13 @@ async function drive(page: Page, presses: readonly string[]): Promise<void> {
 }
 
 for (const variant of variants) {
-  for (const lang of langs) {
-    for (const scene of SCENES) {
-      if (only && !scene.id.includes(only)) continue;
-      for (const view of scene.views) {
+  /* `voices@zh-Hant+es`: the candidate, and the lobby's pins. */
+  const [id, pinned] = variant.split('@') as [string, string | undefined];
+  const pins = pinned?.split('+').filter(Boolean).join(',');
+  for (const scene of SCENES) {
+    if (only && !only.some((needle) => scene.id.includes(needle))) continue;
+    for (const lang of scene.langs.filter((candidate) => langs.includes(candidate))) {
+      for (const view of scene.views.filter((candidate) => views.includes(candidate))) {
         const { width, height, scale } = VIEWPORTS[view];
         const context = await browser.newContext({
           viewport: { width, height },
@@ -146,7 +158,12 @@ for (const variant of variants) {
           locale: lang,
         });
         const page = await context.newPage();
-        const query = [scene.query, `lang=${lang}`, variant === 'shipped' ? '' : `variant=${variant}`]
+        const query = [
+          scene.query,
+          `lang=${lang}`,
+          id === 'shipped' ? '' : `variant=${id}`,
+          pins ? `pins=${pins}` : '',
+        ]
           .filter(Boolean)
           .join('&');
         await page.goto(`${base}?${query}`, { waitUntil: 'networkidle' });
@@ -156,7 +173,10 @@ for (const variant of variants) {
          * tick the import starts on, and the words follow the import; waiting
          * for both is what keeps an English frame from being filed as Chinese.
          */
-        await page.waitForFunction((expected) => document.documentElement.lang === expected, lang);
+        await page.waitForFunction(
+          (expected) => document.documentElement.lang === expected,
+          isLocale(lang) ? lang : 'en',
+        );
         await page.waitForLoadState('networkidle');
         await page.waitForTimeout(scene.settle ?? 300);
         if (scene.drive) await drive(page, scene.drive);
