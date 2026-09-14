@@ -1502,14 +1502,19 @@ const ORDER: Locale[] = [RESTING, ...LOCALES.filter((candidate) => candidate !==
  * keys under it. `aria-hidden`, because the sentence beside it says the same
  * thing to a screen reader.
  */
-function FourBoxes({ size = 'md' }: { size?: 'md' | 'lg' }) {
+function FourBoxes({ size = 'md', plain = false }: { size?: 'md' | 'lg'; plain?: boolean }) {
   /* Filled, like an empty key, rather than outlined: over a photograph a
      thin ring against a pale sky was the first thing to go, and the boxes
      are the one part of this panel that has to read with no words at all. */
+  /* `plain` is the no-match panel's: no photograph can be behind that
+     state, and filled there the boxes read as four empty keys waiting for a
+     finger — the grandmother would have poked one. Outlined, they are a
+     picture beside the sentence. */
+  const fill = plain ? 'ring-2 ring-ink-600 ring-inset' : 'bg-ink-800 ring-2 ring-ink-600 ring-inset';
   const box =
     size === 'lg'
-      ? 'h-14 w-11 rounded-lg bg-ink-800 ring-2 ring-ink-600 ring-inset kiosk:h-16 kiosk:w-12'
-      : 'h-10 w-8 rounded-md bg-ink-800 ring-2 ring-ink-600 ring-inset kiosk:h-12 kiosk:w-9';
+      ? `h-14 w-11 rounded-lg ${fill} kiosk:h-16 kiosk:w-12`
+      : `h-10 w-8 rounded-md ${fill} kiosk:h-12 kiosk:w-9`;
   return (
     <div aria-hidden="true" className={`flex ${size === 'lg' ? 'gap-3' : 'gap-2.5'}`}>
       {[0, 1, 2, 3].map((index) => (
@@ -1581,7 +1586,7 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
       {/* The boxes in both states: the father found the panel gave him less
           once he had tapped 简 — the boxes are what his thumb aims at. */}
       <div className="flex justify-center pt-1">
-        <FourBoxes />
+        <FourBoxes plain />
       </div>
       {/* The route, at the heading's own brightness: every parent on the
           panel said the blue button was still the loudest thing on the
@@ -1700,7 +1705,15 @@ function ThreeWelcomes(props: IdleProps) {
             for a button and finding the register door — the staff's review
             queue. In the resting language; the chosen screen says it in the
             chosen one. */}
-        <div className={`pt-3 text-base kiosk:text-lg ${dim}`} lang={RESTING}>
+        {/* On the tablet on end the photograph's canopy stops above this
+            line, and at ink-300 over the picture's brightest patch it was a
+            ghost — the one sentence the round added was the one nobody could
+            read. Its own page-token plate while the picture is up (the
+            register chip's own trick); nothing on a plain kiosk. */}
+        <div
+          className={`mt-3 text-base kiosk:text-lg ${dim} ${backdrop ? 'rounded-lg bg-ink-950/75 px-3 py-1' : ''}`}
+          lang={RESTING}
+        >
           {COPY[RESTING].thenTap}
         </div>
       </div>
@@ -1882,7 +1895,11 @@ function PromotedChips({ onChoose }: ChoiceProps) {
               haptic(8);
               onChoose(candidate);
             })}
-            className={`flex h-11 min-w-11 items-center justify-center rounded-lg px-2 text-base font-semibold ${
+            /* 44px tall everywhere; 36px wide on a phone, as the shipped chips
+               are, because the band's buffer inset (px-24) is measured for
+               that width and a 44px third chip ran into the typed word.
+               Tablets have the room and get the full 44. */
+            className={`flex h-11 min-w-9 items-center justify-center rounded-lg px-1.5 text-base font-semibold sm:min-w-11 sm:px-2 ${
               current
                 ? 'bg-ink-700 text-ink-50'
                 : 'bg-ink-800/70 text-ink-300 active:bg-ink-700 active:text-ink-100'
