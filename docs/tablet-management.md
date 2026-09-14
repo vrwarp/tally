@@ -442,9 +442,25 @@ pre-grant is the durable half, and only the durable half is needed.**
 `PasswordManagerEnabled`, `AutofillAddressEnabled`, `BrowserSignin` — are cheap and worth it on a
 tablet that takes parents' phone numbers).
 
-Do not type the WebUSB value. It is a quote-heavy one-liner and a touchscreen keyboard is precisely
-how §4.3's failure modes happen. Put it on the tablet's clipboard — §6.3 is the proposal for Tally
-serving a page that does this properly.
+*All of this happens on the tablet, in your hands, before the tablet is a kiosk.* Test DPC is an
+Android app with text fields; the only clipboard that can reach them is the tablet's own. So the
+sequence is: open the value in Chrome **on the tablet**, copy, switch to Test DPC, long-press,
+paste. Three things follow from that, and they are the difference between a smooth staging and a
+bricked afternoon.
+
+- **What you type is the URL, not the value.** A short path you can type without error gets you a
+  long value you must not. That is the whole trick, and §6.3 is Tally serving that page.
+- **`URLBlocklist` and `URLAllowlist` go last.** Paste `["*"]` into the blocklist early and you have
+  just cut off the page you are still copying from. WebUSB first, privacy keys next, the two URL
+  lists at the very end — and make sure the allowlist includes wherever the setup page lives if you
+  ever want to reach it again.
+- **Whether you paste at all depends on how Chrome declares the policy.** §4.3's unsettled question
+  surfaces here in its most concrete form. If Chrome's app-restriction schema declares
+  `WebUsbAllowDevicesForUrls` as a string, Test DPC renders one text box and you paste the JSON into
+  it. If it declares it as a nested bundle, Test DPC renders a small structured editor instead —
+  and then there is nothing to paste, because you are typing `1273` into an integer field and the
+  origin into a string field. Either is fine. The second is arguably *better*, since a typed integer
+  cannot be a malformed JSON document. Look at the screen before deciding you have a problem.
 
 **3. Keep the screen on.** Test DPC → *Keep the device on while plugged in*. One toggle, and it is
 the fix `src/kiosk/wakeLock.ts` cannot make for itself: a wake lock is a request Android refuses on
@@ -592,14 +608,26 @@ hour the kiosk reloads" rather than as a coincidence.
 
 ### 6.3 Serve the value that must not be mistyped
 
-This shrinks to one page, because the route shrank. The COSU XML of §4.6's optional half needs
-hosting only if the kiosk lockdown is taken; the thing that is always needed is a way to get
-`WebUsbAllowDevicesForUrls` onto a tablet's clipboard without anyone typing it.
+One static page, at a path short enough to type on a tablet's on-screen keyboard: each §4.2 key with
+a copy button, the WebUSB value built from **this deployment's** real origin and the printer vendor
+read from the printing module rather than from a worked example. Step 2 of §4.6 becomes: open it in
+Chrome on the tablet, copy, paste into Test DPC, next key. Ordered so the two URL lists come last,
+because pasting the blocklist early cuts off the page itself.
 
-`/kiosk/setup`, staff-gated: each §4.2 key with a copy button, the WebUSB value built from **this
-deployment's** real origin and the printer vendor read from the printing module rather than from a
-worked example. Step 2 of §4.6 becomes: open this page on the tablet, copy, paste into Test DPC,
-next key.
+**It should not be staff-gated, and the reason is worth being precise about.** An earlier draft of
+this section said it should be. That was wrong twice over. First, there is nothing secret in it: a
+USB vendor id is published by Brother, and the origin is the URL printed on the tablet's own screen
+— gating public facts buys nothing. Second, and worse, a login here would mean signing a staff
+Google account into the browser on a tablet about to be handed to the public, which is the exact
+thing Tally's whole pairing design exists to avoid: *"a kiosk is a browser on a shelf: nobody signs
+in to Google on it"* (`functions/src/kiosk/pairing.ts`). A staging page that makes you break that
+rule to follow it is a bad page.
+
+So: public, static, cacheable, no auth. The one thing that must **not** appear on it is §6.4's
+pairing token, which is a credential. That belongs on its own path, shown once, gated, and treated
+like the pairing code it replaces — and if one is ever pasted on a tablet, the clipboard should be
+cleared before the tablet goes out, because a clipboard on a public device is a place secrets do not
+belong.
 
 That is a small page, and it is the difference between a staging step that works and one that fails
 silently — every failure mode in §4.3 is a typo, and a typo produces no error, just a kiosk that
@@ -607,8 +635,8 @@ asks for a printer it was supposed to already have. Tally is the only thing that
 answer for a given deployment, so it is the right thing to say it out loud.
 
 If the church ever moves to an EMM (§4.9), the same generator emits §4's policy JSON for its
-console, and the COSU XML for the optional half in the meantime. The inputs are identical; only the
-output format changes.
+console, and the COSU XML for §4.6's optional half in the meantime. The inputs are identical; only
+the output format changes.
 
 ### 6.4 Zero-touch pairing through `startUrl`
 
