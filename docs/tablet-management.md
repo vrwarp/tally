@@ -396,8 +396,8 @@ itself, both before the first Sunday:
    `navigator.usb` being `undefined` means the page is not in Chrome proper — a WebView container, or
    an insecure origin.
 
-Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both while the tablet is
-still being staged, before anything in §4.6's optional half is applied.
+Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both
+while the tablet is still being staged, before anything in §4.6's optional half is applied.
 
 ### 4.6 The part that actually needs a managed device
 
