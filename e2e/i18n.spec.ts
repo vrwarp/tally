@@ -26,7 +26,7 @@
  */
 import type { Page } from '@playwright/test';
 import { gotoReady } from './support/auth';
-import { openKiosk, pairKiosk } from './support/kiosk';
+import { bindTo, openKiosk, pairKiosk } from './support/kiosk';
 import { expect, test } from './support/fixtures';
 import { readFileSync } from 'node:fs';
 
@@ -194,20 +194,42 @@ test.describe('the kiosk speaks the lobby it is in', () => {
    * never re-renders it, and a provider that did not publish the language would
    * leave an English board under Spanish questions.
    */
-  test('the lobby keyboard grows an Ñ when the room is set to Spanish', async ({ browser }) => {
+  test('the lobby keyboard grows an Ñ when the room is set to Spanish', async ({
+    browser,
+    signedInAs,
+  }) => {
+    const staff = await signedInAs('counselor');
     const { context, page: kiosk } = await openKiosk(browser);
 
     try {
-      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeHidden();
+      /*
+       * Paired and bound in English first, and both halves of that matter. The
+       * pairing screen carries the language picker but no keyboard — the board
+       * this test is about exists only once a gathering is chosen — and
+       * `bindTo` waits on the English search prompt, so the switch has to come
+       * after the binding rather than before it.
+       */
+      await pairKiosk(kiosk, staff);
+      await bindTo(kiosk, /nursery/i);
+
+      const enye = kiosk.getByRole('button', { name: 'Ñ', exact: true });
+      const gaps = kiosk.locator('[data-gap]');
+      await expect(enye).toBeHidden();
+      // Two half-key staggers on the home row, and the Z row's leading spacer.
+      await expect(gaps).toHaveCount(3);
 
       await chooseLanguage(kiosk, 'Español');
 
       await expect(kiosk.locator('html')).toHaveAttribute('lang', 'es-MX');
-      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeVisible();
+      await expect(enye).toBeVisible();
+      // The stagger goes with it — ten letters fill the row on their own — and
+      // only the Z row's spacer is left, which is what keeps the board's width.
+      await expect(gaps).toHaveCount(1);
 
       await chooseLanguage(kiosk, 'English');
 
-      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeHidden();
+      await expect(enye).toBeHidden();
+      await expect(gaps).toHaveCount(3);
     } finally {
       await context.close();
     }
