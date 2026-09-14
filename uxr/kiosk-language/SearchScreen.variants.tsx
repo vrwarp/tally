@@ -1463,9 +1463,11 @@ const COPY: Record<
     orDigits: string;
     thenTap: string;
     noMatch: string;
-    checkSpelling: string;
-    tryName: string;
+    routeDigits: string;
+    routeName: string;
     firstTime: string;
+    register: string;
+    widen: string;
   }
 > = {
   en: {
@@ -1473,27 +1475,33 @@ const COPY: Record<
     orDigits: 'or the last 4 digits of your phone',
     thenTap: 'Then tap your child’s name.',
     noMatch: 'No match',
-    checkSpelling: 'Try the last 4 digits of your phone, or ask a leader.',
-    tryName: 'Try typing your child’s English name, or ask a leader.',
+    routeDigits: 'Try the last 4 digits of your phone, or ask a leader.',
+    routeName: 'Try typing your child’s English name, or ask a leader.',
     firstTime: 'First time here?',
+    register: 'Register your child',
+    widen: 'Search everyone',
   },
   'zh-Hans': {
     name: '输入孩子的英文名字',
     orDigits: '或电话后 4 位',
     thenTap: '然后点一下您孩子的名字。',
     noMatch: '找不到',
-    checkSpelling: '试试电话后 4 位，或找同工帮忙。',
-    tryName: '试试输入孩子的英文名字，或找同工帮忙。',
+    routeDigits: '试试电话后 4 位，或找同工帮忙。',
+    routeName: '试试输入孩子的英文名字，或找同工帮忙。',
     firstTime: '第一次来吗？',
+    register: '为您的孩子登记',
+    widen: '搜索所有人',
   },
   'zh-Hant': {
     name: '輸入孩子的英文名字',
     orDigits: '或電話後 4 碼',
     thenTap: '然後點一下您孩子的名字。',
     noMatch: '找不到',
-    checkSpelling: '試試電話後 4 碼，或找同工幫忙。',
-    tryName: '試試輸入孩子的英文名字，或找同工幫忙。',
+    routeDigits: '試試電話後 4 碼，或找同工幫忙。',
+    routeName: '試試輸入孩子的英文名字，或找同工幫忙。',
     firstTime: '第一次來嗎？',
+    register: '為您的孩子登記',
+    widen: '搜尋所有人',
   },
 };
 
@@ -1655,7 +1663,7 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
   const copy = COPY[locale] ?? COPY.en;
   const tap = useTap();
   const route = (candidate: Locale) =>
-    mode === 'phone' ? COPY[candidate].tryName : COPY[candidate].checkSpelling;
+    mode === 'phone' ? COPY[candidate].routeName : COPY[candidate].routeDigits;
   const unchosen = !chosen;
   const distinct = (pick: (candidate: Locale) => string) =>
     ORDER.filter((candidate, index) => ORDER.findIndex((other) => pick(other) === pick(candidate)) === index);
@@ -1686,23 +1694,69 @@ function NoMatchPanel({ mode, widening, onWiden, onRegister, chosen }: NoMatchPr
         )}
       </div>
       <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4">
-        <div className="text-base text-ink-400 kiosk:text-lg">{copy.firstTime}</div>
+        <div className="text-base text-ink-400 kiosk:text-lg">
+          {unchosen ? distinct((candidate) => COPY[candidate].firstTime).map((candidate) => (
+            <span key={candidate} lang={candidate} className="mx-1.5 inline-block">{COPY[candidate].firstTime}</span>
+          )) : copy.firstTime}
+        </div>
         <div className="flex flex-col items-stretch gap-3 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
-          <button
-            type="button"
-            tabIndex={-1}
-            {...tap(() => {
-              haptic();
-              onRegister();
-            })}
-            className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-xl lg:flex-1"
-          >
-            {t('registerYourChild')}
-          </button>
-          <WidenButton widening={widening} onWiden={onWiden} />
+          {/* The doors, in every language while nobody has chosen: the father
+              found "the care stops halfway down" on the one screen where being
+              stuck hurts — the message spoke to him and two grey rectangles
+              did not. Chosen, the shipped doors, one language. */}
+          {unchosen ? (
+            <>
+              <Door onPress={onRegister} pick={(candidate) => COPY[candidate].register} />
+              <Door onPress={onWiden} pick={(candidate) => COPY[candidate].widen} />
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                tabIndex={-1}
+                {...tap(() => {
+                  haptic();
+                  onRegister();
+                })}
+                className="flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-xl lg:flex-1"
+              >
+                {t('registerYourChild')}
+              </button>
+              <WidenButton widening={widening} onWiden={onWiden} />
+            </>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** A quiet door labelled in every language, for the panel nobody has chosen a language on. */
+function Door({ onPress, pick }: { onPress: () => void; pick: (candidate: Locale) => string }) {
+  const tap = useTap();
+  const distinct = ORDER.filter(
+    (candidate, index) => ORDER.findIndex((other) => pick(other) === pick(candidate)) === index,
+  );
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      {...tap(() => {
+        haptic();
+        onPress();
+      })}
+      className="flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-6 py-2 text-ink-100 active:bg-ink-700 tall:min-h-16 lg:flex-1"
+    >
+      {distinct.map((candidate, index) => (
+        <span
+          key={candidate}
+          lang={candidate}
+          className={index === 0 ? 'text-lg leading-tight font-semibold kiosk:text-xl' : 'text-sm leading-tight text-ink-300 kiosk:text-base'}
+        >
+          {pick(candidate)}
+        </span>
+      ))}
+    </button>
   );
 }
 
@@ -1873,9 +1927,21 @@ function ThreeWelcomes(props: IdleProps) {
                 haptic(8);
                 onChoose(candidate);
               })}
-              className="flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 lg:flex-1"
+              /* The resting plate takes more of the shelf's row: three equal
+                 columns wrapped its sentence onto three lines with "phone"
+                 alone on the last, and made the one instruction most
+                 families read the smallest thing in the row. */
+              className={`relative flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 ${
+                candidate === RESTING ? 'lg:flex-[1.5]' : 'lg:flex-1'
+              }`}
               style={{ touchAction: 'manipulation' }}
             >
+              {/* The chip's own glyph in the corner: the two Chinese plates
+                  differ by one character in the big line, and a reader in a
+                  hurry told them apart by the small line or not at all. */}
+              <span aria-hidden="true" className="absolute top-1.5 right-2.5 text-xs font-semibold text-ink-500 tall:text-sm">
+                {LOCALE_SHORT_LABELS[candidate]}
+              </span>
               <span className="text-xl leading-tight font-semibold tall:text-3xl">{COPY[candidate].name}</span>
               <span className="text-sm leading-tight text-ink-400 tall:text-lg">{COPY[candidate].orDigits}</span>
             </button>
@@ -1925,6 +1991,12 @@ function TwoVoices(props: IdleProps) {
         <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl" lang={RESTING}>
           {COPY[RESTING].name}
         </div>
+        {/* The resting language's two lines stay together as one thought —
+            the English parent's route is the digits, and it had slipped under
+            a plate she cannot read. */}
+        <div className={`pt-1 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
+          {COPY[RESTING].orDigits}
+        </div>
         <button
           type="button"
           tabIndex={-1}
@@ -1934,16 +2006,19 @@ function TwoVoices(props: IdleProps) {
             haptic(8);
             onChoose(SECOND_VOICE);
           })}
-          className="mt-4 flex min-h-14 w-full max-w-md flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 active:bg-ink-600 tall:min-h-16 lg:mt-3"
+          /* A step on the landscape shelf too, and a floor: Han glyphs need
+             more size than Latin at the same distance, and on the wide shelf
+             the second line — the rescue route for the one family who cannot
+             read the rest — was the smallest thing in the frame. The ring is
+             the edge that keeps the plate a pressable object on the light
+             ground, where ink-800 inverts to a pale tint inside a pale card. */
+          className="mt-4 flex min-h-14 w-full max-w-md flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16 lg:mt-3 lg:min-h-16"
           style={{ touchAction: 'manipulation' }}
         >
-          <span className="text-xl leading-tight font-semibold tall:text-3xl">{COPY[SECOND_VOICE].name}</span>
-          <span className="text-sm leading-tight text-ink-400 tall:text-lg">{COPY[SECOND_VOICE].orDigits}</span>
+          <span className="text-xl leading-tight font-semibold tall:text-3xl lg:text-2xl">{COPY[SECOND_VOICE].name}</span>
+          <span className="text-base leading-tight text-ink-300 tall:text-lg lg:text-lg">{COPY[SECOND_VOICE].orDigits}</span>
         </button>
         <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
-          {COPY[RESTING].orDigits}
-        </div>
-        <div className={`pt-2 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].thenTap}
         </div>
       </div>
