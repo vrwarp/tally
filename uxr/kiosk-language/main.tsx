@@ -24,6 +24,8 @@
  *   ?variant=<id>              a candidate home screen from `SearchScreen.variants.tsx`;
  *                              absent means the shipping component, byte for byte
  *   ?pins=zh-Hant,es           the languages this lobby pins beside English at rest
+ *   ?speaks=es                 a language the kiosk will have a catalogue for — photographs
+ *                              the day it lands, when a pinned line becomes a plate
  *   ?buffer=Alva               what has been typed
  *   ?present=1,2               ids already checked in
  *   ?nomatch=1                 the search finished and found nobody
@@ -38,7 +40,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/index.css';
 import { findEventIcon } from '@/lib/eventIcons';
-import { KIOSK_LOCALE_STORAGE_KEY, isLocale } from '@/lib/locales';
+import { KIOSK_LOCALE_STORAGE_KEY, LOCALES, isLocale } from '@/lib/locales';
 import type { KioskBinding } from '@/kiosk/binding';
 import { Backdrop } from '@/kiosk/components/Backdrop';
 import type { KioskKey } from '@/kiosk/components/Keyboard';
@@ -63,6 +65,7 @@ const isLang = (value: string | null): value is Lang => (LANGS as readonly strin
 /* The lobby's pins and the family's choice, both in the candidates' own
    language list rather than the provider's, so that Spanish can be either. */
 const pins = params.get('pins')?.split(',').filter(isLang);
+const speaks: Lang[] = [...LOCALES, ...(params.get('speaks')?.split(',').filter(isLang) ?? [])];
 const chosenParam = params.get('chosen');
 const chosen: Lang | null =
   chosenParam === '1' ? (isLang(lang) ? lang : null) : isLang(chosenParam) ? chosenParam : null;
@@ -177,6 +180,7 @@ export function Kiosk() {
           variant={variant}
           initialChosen={chosen}
           pins={pins}
+          speaks={speaks}
           phase={params.has('phase') ? Number(params.get('phase')) : undefined}
           {...props}
         />

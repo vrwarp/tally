@@ -12,6 +12,7 @@
  *                                       [--view kiosktall]
  *                                       [--variant shipped,voices@zh-Hant+es]
  *                                       [--only idle,nomatch]
+ *                                       [--speaks es]
  *
  * Frames are `<scene>--<view>--<lang>--<variant>-fold.png`, with an
  * `index.json` beside them, so a round reads like every other round.
@@ -23,7 +24,9 @@
  * filter over what each scene asks for: the resting scenes are shot in the
  * kiosk's own language, the chosen ones in each language a family can
  * choose. Spanish is a language the kiosk does not speak yet, so a frame
- * of it waits for the provider to settle in English, which it does.
+ * of it waits for the provider to settle in English, which it does;
+ * `--speaks es` photographs the day it will, when a pinned line becomes a
+ * plate and a chosen-Spanish screen exists to shoot.
  *
  * Every frame is checked for sideways scroll on the way past, as the kiosk
  * shooter checks it: a fixed-height row wider than the glass takes the whole
@@ -83,7 +86,7 @@ const SCENES: {
      rows carry the Chinese name the roster holds, which is what a reader who
      cannot spell recognises. */
   { id: 'typed-zh', query: 'buffer=Be', views: ['phone', 'kiosktall'], langs: ['en'] },
-  { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'es'] },
+  { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['en'] },
   { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], langs: ['en'], settle: 1900 },
   { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], langs: ['en'], settle: 1900 },
@@ -98,6 +101,7 @@ const only = flag('--only')?.split(',').filter(Boolean) ?? null;
 const langs = flag('--lang')?.split(',').filter(Boolean) ?? ['en', 'zh-Hant', 'zh-Hans', 'es'];
 const views = (flag('--view')?.split(',').filter(Boolean) ?? ['kiosktall']) as ViewportName[];
 const variants = flag('--variant')?.split(',').filter(Boolean) ?? ['shipped'];
+const speaks = flag('--speaks');
 const outDir = resolve(flag('--out') ?? 'uxr/renders/kiosk-language');
 await mkdir(outDir, { recursive: true });
 
@@ -163,6 +167,7 @@ for (const variant of variants) {
           `lang=${lang}`,
           id === 'shipped' ? '' : `variant=${id}`,
           pins ? `pins=${pins}` : '',
+          speaks ? `speaks=${speaks}` : '',
         ]
           .filter(Boolean)
           .join('&');
