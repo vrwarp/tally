@@ -69,7 +69,6 @@ import {
   type CachedPulse,
 } from './storage';
 import { keepScreenAwake } from './wakeLock';
-import { usePinnedCatalogs } from './voices';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
@@ -428,31 +427,13 @@ export function KioskApp() {
   /**
    * The languages this lobby offers beside English — the tablet's own setting
    * (`readPins`), chosen on the pairing screen, and the names on the idle
-   * screen's switch. Their words are fetched at boot so the failure panel can
-   * speak them before anybody has chosen one.
+   * screen's switch.
    */
   const [pins, setPinsState] = useState<Locale[]>(() => readPins());
   const setPins = useCallback((next: Locale[]) => {
     writePins(next);
     setPinsState(next);
   }, []);
-  const voices = usePinnedCatalogs(pins);
-  /**
-   * Whether the language on the glass is one a family chose, as opposed to
-   * the one the kiosk rests in. English is both, and the difference is real:
-   * a family who pressed **English** on the switch has started, so the
-   * failure panel stops speaking every language at them — and the clock below
-   * has to give the screen back for the family after, exactly as it would had
-   * they pressed 中文.
-   */
-  const [chosen, setChosen] = useState(false);
-  const chooseLocale = useCallback(
-    (next: Locale) => {
-      setLocale(next);
-      setChosen(true);
-    },
-    [setLocale],
-  );
   const [students, setStudents] = useState<KioskStudent[]>(
     () => readCachedRoster()?.students ?? [],
   );
@@ -604,21 +585,11 @@ export function KioskApp() {
   useEffect(() => {
     const cameHome = awayRef.current && !away;
     awayRef.current = away;
-    if (phase === 'ready' && cameHome) {
-      setLocale(RESTING_LOCALE);
-      setChosen(false);
-    }
+    if (phase === 'ready' && cameHome) setLocale(RESTING_LOCALE);
   }, [away, phase, setLocale]);
 
   useEffect(() => {
-    /*
-     * Armed on the chosen fact, not on the language: pressing **English** on
-     * the switch leaves the locale where it rests and still has to be undone
-     * for the next family, whose failure panel should speak every language
-     * again. The other half of the condition covers a language the kiosk
-     * woke up in — a reload mid-visit — which nobody standing here chose.
-     */
-    if (phase !== 'ready' || away || (!chosen && locale === RESTING_LOCALE)) return;
+    if (phase !== 'ready' || away || locale === RESTING_LOCALE) return;
     /*
      * Re-armed rather than polled: a touch moves the deadline without causing a
      * render, so the timer has to re-read `touchedAtRef` when it fires and wait
@@ -629,14 +600,13 @@ export function KioskApp() {
       const since = Date.now() - touchedAtRef.current;
       if (since >= LANGUAGE_RESET_MS) {
         setLocale(RESTING_LOCALE);
-        setChosen(false);
         return;
       }
       timer = setTimeout(check, LANGUAGE_RESET_MS - since);
     };
     timer = setTimeout(check, LANGUAGE_RESET_MS);
     return () => clearTimeout(timer);
-  }, [away, chosen, locale, phase, setLocale]);
+  }, [away, locale, phase, setLocale]);
 
   /**
    * The pulse revisions this kiosk last acted on — seeded from disk, so the
@@ -2778,9 +2748,6 @@ export function KioskApp() {
          */
         onStaffGate={onStaffGate}
         pins={pins}
-        chosen={chosen}
-        onChooseLanguage={chooseLocale}
-        voices={voices}
       />
       </>
     );

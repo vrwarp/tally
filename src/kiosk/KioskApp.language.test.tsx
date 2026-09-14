@@ -22,7 +22,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
-import { loadCatalog } from '@/kiosk/messages';
 import type { Locale } from '@/lib/locales';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
@@ -124,13 +123,9 @@ async function mountInChinese(bound: KioskBinding | null = binding()): Promise<v
   await mountIn('zh-Hant', bound);
 }
 
-/**
- * A lobby that has said what it speaks, with those languages' words already
- * on the device — as they are on any kiosk after its first boot with them.
- */
-async function pin(...pins: Locale[]): Promise<void> {
+/** A lobby that has said what it speaks. */
+function pin(...pins: Locale[]): void {
   localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(pins));
-  for (const locale of pins) await loadCatalog(locale, { store: false });
 }
 
 const clearKey = () => document.querySelector<HTMLButtonElement>('[data-key="clear"]')!;
@@ -269,38 +264,34 @@ describe('a family’s language does not outlive their visit', () => {
  * every visit ends the same way the language does.
  */
 describe('the lobby’s own languages', () => {
-  it('speaks every pinned language on the failure panel until a family chooses one', async () => {
-    await pin('zh-Hant');
+  it('offers the pinned languages over the instruction, in their own names', async () => {
+    pin('zh-Hant', 'es-MX');
     await mountIn('en');
-    // The switch, over the instruction, in the languages' own names.
-    expect(screen.getByRole('button', { name: '繁體中文' })).toBeTruthy();
+    const cells = within(screen.getByTestId('language-switch')).getAllByRole('button');
+    expect(cells.map((cell) => cell.textContent)).toEqual(['English', '繁體中文', 'Español']);
     expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
-
-    await type('zz');
-    // Nobody has chosen, so the panel speaks both: the family it is for has,
-    // by definition, not found the switch.
-    expect(screen.getByText(/^No match$/)).toBeTruthy();
-    expect(screen.getByText('找不到')).toBeTruthy();
   });
 
-  it('treats the English cell as a choice too — the next family meets every language again', async () => {
-    await pin('zh-Hant');
+  it('speaks one language on the failure panel — the kiosk’s own — however many are pinned', async () => {
+    pin('zh-Hant', 'es-MX');
     await mountIn('en');
-    await tap('English');
     await type('zz');
-    // English was chosen, so the panel speaks English alone.
     expect(screen.getByText(/^No match$/)).toBeTruthy();
+    expect(screen.getByText(/or ask a leader/)).toBeTruthy();
     expect(screen.queryByText('找不到')).toBeNull();
+    expect(screen.queryByText('No lo encontramos')).toBeNull();
 
     await tapClear();
-    await idle();
+    await tap('Español');
     await type('zz');
-    // A minute untouched, and the choice has gone home with the family.
-    expect(screen.getByText('找不到')).toBeTruthy();
+    expect(screen.getByText('No lo encontramos')).toBeTruthy();
+    expect(screen.getByText('Buscar entre todos')).toBeTruthy();
+    expect(screen.queryByText(/^No match$/)).toBeNull();
+    expect(screen.queryByText('Search everyone')).toBeNull();
   });
 
   it('gives the screen back to English after a family chose Spanish and walked away', async () => {
-    await pin('es-MX');
+    pin('es-MX');
     await mountIn('en');
     await tap('Español');
     expect(screen.getByText('Escriba el nombre de su hijo o hija')).toBeTruthy();
@@ -308,25 +299,8 @@ describe('the lobby’s own languages', () => {
     expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
   });
 
-  it('keeps the doors’ words in the language a family chose', async () => {
-    await pin('es-MX');
-    await mountIn('en');
-    await type('zz');
-    // Before a choice, each door carries both languages.
-    expect(screen.getByText('Search everyone')).toBeTruthy();
-    expect(screen.getByText('Buscar entre todos')).toBeTruthy();
-
-    await tapClear();
-    await tap('Español');
-    await type('zz');
-    expect(screen.getByText('No lo encontramos')).toBeTruthy();
-    expect(screen.queryByText(/^No match$/)).toBeNull();
-    expect(screen.getByText('Buscar entre todos')).toBeTruthy();
-    expect(screen.queryByText('Search everyone')).toBeNull();
-  });
-
   it('brings the chips beside the keys back only once the switch has gone', async () => {
-    await pin('zh-Hant');
+    pin('zh-Hant');
     await mountIn('en');
     // At rest the switch is the control; the same languages a hand's width
     // lower would be a second copy of it.

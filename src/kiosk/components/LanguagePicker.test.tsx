@@ -8,7 +8,7 @@
  * a lobby's language is a property of the tablet on the wall, and must never
  * be written to the key a counselor's phone reads.
  */
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@/test/rtl';
 import { useLocaleControl } from '@/i18n/localeContext';
 import { LanguagePicker } from './LanguagePicker';
@@ -106,22 +106,4 @@ describe('LanguagePicker', () => {
     expect(screen.queryByRole('button', { name: '简体中文' })).toBeNull();
   });
 
-  /*
-   * The search screen routes a press through the kiosk's own record of "a
-   * family chose this", which is what arms the clock that gives the screen
-   * back. The picker then sets nothing itself.
-   */
-  it('lets the screen own the choice, when it asks to', () => {
-    const onChoose = vi.fn();
-    const seen: string[] = [];
-    function Owned() {
-      const { locale } = useLocaleControl();
-      seen.push(locale);
-      return <LanguagePicker quiet onChoose={onChoose} />;
-    }
-    render(<Owned />);
-    press('繁體中文');
-    expect(onChoose).toHaveBeenCalledWith('zh-Hant');
-    expect(seen).toEqual(['en']);
-  });
 });

@@ -41,7 +41,6 @@ import { useTap } from './tapGuard';
 export function LanguagePicker({
   quiet,
   only,
-  onChoose,
 }: {
   quiet?: boolean;
   /**
@@ -50,17 +49,10 @@ export function LanguagePicker({
    * language nobody in this room reads is one more thing on the glass.
    */
   only?: readonly Locale[];
-  /**
-   * Who sets the language, when it is not simply the provider. The search
-   * screen routes a press through the kiosk's own record of *a family chose
-   * this*, which is what arms the clock that gives the screen back.
-   */
-  onChoose?: (locale: Locale) => void;
 }) {
   const t = useTranslations('Common');
   const { locale, setLocale } = useLocaleControl();
   const tap = useTap();
-  const choose = onChoose ?? setLocale;
 
   return (
     <div
@@ -85,7 +77,7 @@ export function LanguagePicker({
             {...tap(() => {
               if (current) return;
               haptic(quiet ? 8 : undefined);
-              choose(candidate);
+              setLocale(candidate);
             })}
             className={
               quiet

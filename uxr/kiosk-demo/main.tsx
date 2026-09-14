@@ -4,10 +4,10 @@
  *
  * Real components — `SearchScreen`, `PairingScreen`, `StaffScreen` — over a
  * fixture roster and no network, with the few things `KioskApp` owns rebuilt
- * here in miniature: the typed buffer, the lobby's pins, the chosen fact and
- * the clock that gives the screen back. The strip along the top is the
- * demo's, not the kiosk's: it moves between the three screens and says what
- * the language clock is doing, which on a real tablet is invisible by design.
+ * here in miniature: the typed buffer, the lobby's pins, and the clock that
+ * gives the screen back. The strip along the top is the demo's, not the
+ * kiosk's: it moves between the three screens and says what the language
+ * clock is doing, which on a real tablet is invisible by design.
  *
  * Knobs, all optional, for the walkthrough's frames and deep links:
  *
@@ -16,8 +16,7 @@
  *   ?photo=1                        a photograph behind the idle screen
  *   ?buffer=Alva                    letters already typed
  *   ?nomatch=1                      the roster finds nobody, whatever is typed
- *   ?lang=zh-Hant                   the language the kiosk is in
- *   ?chosen=1                       …and a family chose it this visit
+ *   ?lang=zh-Hant                   the language a family chose
  *   ?bare=1                         no strip — the kiosk alone, for frames
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,7 +33,6 @@ import { PairingScreen } from '@/kiosk/screens/PairingScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
 import { sanitizePins } from '@/kiosk/storage';
-import { usePinnedCatalogs } from '@/kiosk/voices';
 import {
   DEFAULT_LOCALE,
   KIOSK_LOCALE_STORAGE_KEY,
@@ -131,9 +129,7 @@ export function Demo() {
   const { locale, setLocale } = useLocaleControl();
   const [screen, setScreen] = useState<Screen>(INITIAL_SCREEN);
   const [pins, setPins] = useState<Locale[]>(INITIAL_PINS);
-  const voices = usePinnedCatalogs(pins);
   const [buffer, setBuffer] = useState(params.get('buffer') ?? '');
-  const [chosen, setChosen] = useState(params.get('chosen') === '1');
   const [photo, setPhoto] = useState(params.get('photo') === '1');
   const [present, setPresent] = useState<Set<string>>(EMPTY);
   const [widening, setWidening] = useState(false);
@@ -162,18 +158,9 @@ export function Demo() {
     setBuffer('');
     setRefresh('idle');
     setLocale(DEFAULT_LOCALE);
-    setChosen(false);
   }, [setLocale]);
 
-  const chooseLocale = useCallback(
-    (next: Locale) => {
-      setLocale(next);
-      setChosen(true);
-    },
-    [setLocale],
-  );
-
-  const armed = screen === 'checkin' && (chosen || locale !== DEFAULT_LOCALE);
+  const armed = screen === 'checkin' && locale !== DEFAULT_LOCALE;
   useEffect(() => {
     if (!armed) {
       setLeft(null);
@@ -183,7 +170,6 @@ export function Demo() {
       const since = Date.now() - touchedAt.current;
       if (since >= LANGUAGE_RESET_MS) {
         setLocale(DEFAULT_LOCALE);
-        setChosen(false);
         setLeft(null);
         return;
       }
@@ -312,9 +298,6 @@ export function Demo() {
               onRegister={() => say('The registration wizard is not part of this demo.')}
               onStaffGate={() => setScreen('staff')}
               pins={pins}
-              chosen={chosen}
-              onChooseLanguage={chooseLocale}
-              voices={voices}
             />
           </>
         )}

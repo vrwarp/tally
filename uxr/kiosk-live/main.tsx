@@ -612,9 +612,6 @@ export function Kiosk() {
       onRegister={() => {}}
       onStaffGate={() => {}}
       pins={[]}
-      chosen={false}
-      onChooseLanguage={() => {}}
-      voices={{}}
     />
     </>
   );

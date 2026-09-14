@@ -541,18 +541,25 @@ clutter critic preferred the bar to the end and called the second row a blocker,
 which is why the cap on pins exists and why the row count, not the cell height,
 is what the layout is sized around.
 
-The conditions the rounds attached to shipping it, all carried into the code:
-the idle reset arms on the chosen fact whatever the language, so pressing
-**English** is undone for the next family too; a staff-gate row that puts the
-kiosk back to English only; pins per kiosk, at pairing, at most three, ordered,
-none by default, with a preview; a name that never wraps; the failure panel
-speaking every pinned language until one is chosen, one route per voice with
-four faint keys after the first, the wider search first and brighter, the
-register door quieter and carrying its own question, one Chinese script at a
-time; chips at the band's left end at 44px, only for the languages the lobby
-offers, hidden at rest while the switch stands. And copy: *Type your child's
-name* with no "English" for Latin readers and 英文 for Chinese ones, *su hijo o
-hija*, *No lo encontramos*, *voluntario* for the person at the table.
+The conditions the rounds attached to shipping it, carried into the code: a
+staff-gate row that puts the kiosk back to English only; pins per kiosk, at
+pairing, at most three, ordered, none by default, with a preview; a name that
+never wraps; the failure panel's route line saying what to try next by what
+missed, with four faint keys after it, the wider search first and brighter, the
+register door quieter and carrying its own question; chips at the band's left
+end at 44px, only for the languages the lobby offers, hidden at rest while the
+switch stands. And copy: *Type your child's name* with no "English" for Latin
+readers and 英文 for Chinese ones, *su hijo o hija*, *No lo encontramos*,
+*voluntario* for the person at the table.
+
+One condition did not survive contact with the owner. The rounds had the
+failure panel speak every pinned language until a family chose one — three
+headings, three route lines, doors carrying three voices — for the reader who
+had typed without finding the switch. Shown live, it was turned down on sight
+as too much on the glass, and the panel speaks the kiosk's current language
+only, which is what the switch above it is for. The clock that gives the screen
+back stayed on the language, as it was, rather than on a "chosen" fact built
+for that panel.
 
 The photograph earned its own round. The grid's cells broke Chinese names on a
 photo Sunday until they were forbidden to wrap, four empty boxes standing for

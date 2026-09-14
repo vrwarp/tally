@@ -51,11 +51,9 @@ import {
   type KioskBinding,
 } from '../binding';
 import { MAX_RESULTS, type KioskSearchOutcome, type KioskStudent } from '../search';
-import { EN_KIOSK_CATALOG } from '../messages';
-import { spokenLanguages, type Voices } from '../voices';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/locales';
 import { useGrades } from '@/hooks/usePureStrings';
-import { createTranslator, useLocale, useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 function gradeLabel(grades: GradeStrings, grade: number | null): string {
   return grade === null ? '' : gradeDescription(grades, grade);
@@ -422,81 +420,45 @@ function DigitsCue() {
   );
 }
 
-/** The `Search` strings the failure panel says, in one language. */
-interface SearchVoice {
-  (key: 'noMatch' | 'afterNameMiss' | 'afterPhoneMiss' | 'searchEveryone' | 'offerFirstTime'): string;
-  rich(key: 'stillNoMatch', values: { pulse: (chunks: ReactNode) => ReactNode }): ReactNode;
-}
-
-interface VoiceWords {
-  locale: Locale;
-  heading: ReactNode;
-  route: string;
-  widen: string;
-  register: string;
-}
-
 /**
- * One door, in every language the panel is speaking.
+ * One door of the failure panel.
  *
- * The first voice sets the label; the others follow underneath, smaller and
- * dimmer, so that a family who chose nothing still meets a button they can
- * read. Duplicate words — two scripts that spell a door the same — collapse
- * to one line. The widen door keeps `WidenButton`'s manners: a spinner over an
- * invisible label, so the button is one width in both states, and an
- * `aria-label` so it keeps its name while its face is a spinner.
+ * The wider search keeps `WidenButton`'s manners — a spinner over an invisible
+ * label, so the button is one width in both states, and an `aria-label` so it
+ * keeps its name while its face is a spinner — and leads at the brighter
+ * weight; the register door follows, quieter, carrying its own question.
  */
-function VoiceDoor({
-  voices,
-  pick,
+function Door({
+  label,
   onPress,
   primary = false,
   busy = false,
-  label,
+  name,
 }: {
-  voices: readonly VoiceWords[];
-  pick: (voice: VoiceWords) => string;
+  label: string;
   onPress: () => void;
   primary?: boolean;
   busy?: boolean;
-  label?: string;
+  /** The accessible name, for the door whose face is sometimes a spinner. */
+  name?: string;
 }) {
   const tap = useTap();
-  const lines = voices.filter(
-    (voice, index) => voices.findIndex((other) => pick(other) === pick(voice)) === index,
-  );
   return (
     <button
       type="button"
       tabIndex={-1}
-      aria-label={label}
+      aria-label={name}
       aria-busy={busy}
       {...tap(() => {
         haptic();
         onPress();
       })}
-      className={`relative flex min-h-14 w-full flex-col items-center justify-center rounded-xl px-6 py-2 text-ink-100 tall:min-h-16 lg:flex-1 ${
+      className={`relative flex h-14 w-full items-center justify-center rounded-xl px-6 text-lg font-semibold text-ink-100 tall:h-16 kiosk:text-xl lg:flex-1 ${
         primary ? 'bg-ink-700 ring-1 ring-ink-500 active:bg-ink-600' : 'bg-ink-800 active:bg-ink-700'
       }`}
       style={{ touchAction: 'manipulation' }}
     >
-      <span className="flex flex-col items-center">
-        {lines.map((voice, index) => (
-          <span
-            key={voice.locale}
-            lang={voice.locale}
-            className={`${busy ? 'invisible ' : ''}${
-              index === 0
-                ? lines.length > 1
-                  ? 'text-base leading-tight font-semibold kiosk:text-lg'
-                  : 'text-lg leading-tight font-semibold kiosk:text-xl'
-                : 'text-sm leading-tight text-ink-300 kiosk:text-base'
-            }`}
-          >
-            {pick(voice)}
-          </span>
-        ))}
-      </span>
+      <span className={busy ? 'invisible' : undefined}>{label}</span>
       {busy && (
         <span className="absolute block h-6 w-6 animate-spin rounded-full border-2 border-ink-600 border-t-ink-100" />
       )}
@@ -505,15 +467,14 @@ function VoiceDoor({
 }
 
 /**
- * Nothing matched, said in every language the lobby offers.
+ * Nothing matched, in the language the kiosk is in.
  *
- * The family this panel is for has, by definition, not found the language
- * switch — they typed, and the kiosk answered in a language they may not
- * read. So until somebody chooses a language it speaks all of them: a heading
- * per voice, then the way forward per voice, then the two doors carrying every
- * voice at once. Repetition is spent here on purpose; it is the failure state,
- * and the one screen whose reader has already failed to read. Once a language
- * is chosen the panel speaks only that one, in the shipped shape.
+ * One language, whatever the lobby has pinned — the study built a panel that
+ * spoke every pinned language at once, for the family who had not found the
+ * switch, and the owner turned it down on sight as too much on the glass. The
+ * switch at the top of the idle screen is where a family finds their
+ * language; this panel says what happened in the language they are already
+ * reading.
  *
  * The way forward depends on what missed. After a name, the phone's four
  * digits — with the four faint keys, for the reader who cannot read the
@@ -537,109 +498,51 @@ function NoMatchPanel({
   widening,
   onWiden,
   onRegister,
-  spoken,
-  voices,
 }: {
   mode: 'phone' | 'name';
   refresh: KioskRefresh;
   widening: boolean;
   onWiden: () => void;
   onRegister: () => void;
-  spoken: readonly Locale[];
-  voices: Voices;
 }) {
   const t = useTranslations('Search');
-  const locale = useLocale();
-  const pulse = useCallback(
-    (chunks: ReactNode) => <span className="animate-word-pulse text-ink-100">{chunks}</span>,
-    [],
-  );
-  const words = useMemo<VoiceWords[]>(
-    () =>
-      spoken.flatMap((candidate) => {
-        const own = candidate === locale;
-        const messages = candidate === DEFAULT_LOCALE ? EN_KIOSK_CATALOG : voices[candidate];
-        // A pinned language whose words have not arrived yet is one voice
-        // fewer, never a key on the glass.
-        if (!own && !messages) return [];
-        const voice: SearchVoice =
-          own || !messages
-            ? t
-            : createTranslator({ locale: candidate, messages, namespace: 'Search' });
-        return [
-          {
-            locale: candidate,
-            /*
-             * "Still" is the one word that carries the whole answer after the
-             * roster has been refreshed, and the one a parent watching their
-             * own finger did not see change. It brightens three times and
-             * stops: long enough to catch an eye coming back up from the
-             * button, short enough that a lobby screen is not blinking at
-             * anybody. The word is what changed, so the word is what moves.
-             */
-            heading: refresh === 'done' ? voice.rich('stillNoMatch', { pulse }) : voice('noMatch'),
-            route: voice(mode === 'phone' ? 'afterPhoneMiss' : 'afterNameMiss'),
-            widen: voice('searchEveryone'),
-            register: voice('offerFirstTime'),
-          },
-        ];
-      }),
-    [spoken, voices, locale, t, refresh, mode, pulse],
-  );
-  const many = words.length > 1;
-  const first = words[0];
-  const routes = words.filter(
-    (voice, index) => words.findIndex((other) => other.route === voice.route) === index,
-  );
-
   return (
-    /* The lines take the sign's measure on a portrait tablet rather than the
-       doors' column: at the doors' width two of three route sentences broke
-       into two rows apiece, and the panel read as three paragraphs rather than
-       three lines. Tighter steps while it speaks more than one language, so
-       three headings and three routes still clear the region's top. */
-    <div
-      className={`mx-auto flex h-full w-full max-w-xs flex-col items-stretch text-center tall:max-w-xl tall:justify-end lg:max-w-2xl ${
-        many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'
-      }`}
-    >
-      <div
-        className={`mx-auto flex max-w-sm flex-col items-center gap-1 text-center leading-tight font-semibold text-balance text-ink-100 tall:max-w-xl ${
-          many ? 'text-2xl' : 'text-3xl kiosk:text-4xl'
-        }`}
-      >
-        {words.map((voice) => (
-          <span key={voice.locale} lang={voice.locale}>
-            {voice.heading}
-          </span>
-        ))}
+    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-md tall:justify-end tall:gap-4 lg:max-w-2xl">
+      {/* Its own measure, wider than the doors under it, and balanced:
+          inheriting the button column broke the sentence inside its own
+          phrase on a phone. */}
+      <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-md kiosk:text-4xl">
+        {refresh === 'done' ? (
+          /*
+           * "Still" is the one word that carries the whole answer after the
+           * roster has been refreshed, and the one a parent watching their
+           * own finger did not see change. It brightens three times and
+           * stops: long enough to catch an eye coming back up from the
+           * button, short enough that a lobby screen is not blinking at
+           * anybody. The word is what changed, so the word is what moves.
+           */
+          t.rich('stillNoMatch', {
+            pulse: (chunks: ReactNode) => (
+              <span className="animate-word-pulse text-ink-100">{chunks}</span>
+            ),
+          })
+        ) : (
+          t('noMatch')
+        )}
       </div>
-      <div
-        className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-ink-100 tall:max-w-xl ${
-          many ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'
-        }`}
-      >
-        {routes.map((voice) => (
-          <span key={voice.locale} lang={voice.locale}>
-            {voice.route}
-            {voice === first && mode !== 'phone' && <DigitsCue />}
-          </span>
-        ))}
+      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-ink-100 tall:max-w-md kiosk:text-2xl">
+        {t(mode === 'phone' ? 'afterPhoneMiss' : 'afterNameMiss')}
+        {mode !== 'phone' && <DigitsCue />}
       </div>
-      <div
-        className={`mt-auto flex flex-col items-stretch tall:mt-0 lg:flex-row lg:justify-center lg:gap-4 ${
-          many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'
-        }`}
-      >
-        <VoiceDoor
-          voices={words}
-          pick={(voice) => voice.widen}
+      <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
+        <Door
+          label={t('searchEveryone')}
+          name={t('searchEveryone')}
           onPress={onWiden}
           primary
           busy={widening}
-          label={t('searchEveryone')}
         />
-        <VoiceDoor voices={words} pick={(voice) => voice.register} onPress={onRegister} />
+        <Door label={t('offerFirstTime')} onPress={onRegister} />
       </div>
       {refresh === 'failed' && (
         <div className="text-base text-ink-500 kiosk:text-lg">{t('networkFailed')}</div>
@@ -742,9 +645,6 @@ export function SearchScreen({
   onRegister,
   onStaffGate,
   pins,
-  chosen,
-  onChooseLanguage,
-  voices,
 }: {
   binding: KioskBinding;
   buffer: string;
@@ -790,14 +690,6 @@ export function SearchScreen({
   onStaffGate: () => void;
   /** The languages this lobby offers beside English, in its order — `readPins`. */
   pins: readonly Locale[];
-  /**
-   * Whether the language on the glass is one a family chose. The failure
-   * panel speaks every offered language until then; see `NoMatchPanel`.
-   */
-  chosen: boolean;
-  onChooseLanguage: (locale: Locale) => void;
-  /** The pinned languages' words, as far as they have arrived — `usePinnedCatalogs`. */
-  voices: Voices;
 }) {
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
@@ -858,7 +750,6 @@ export function SearchScreen({
     (outcome.mode === 'phone' || outcome.mode === 'name') && outcome.results.length === 0;
   // English first, then the lobby's pins in their order: the switch's names.
   const offered = useMemo<Locale[]>(() => [DEFAULT_LOCALE, ...pins], [pins]);
-  const spoken = useMemo(() => spokenLanguages(locale, pins, chosen), [locale, pins, chosen]);
 
   /*
    * Whether there is a search here to widen at all.
@@ -1224,7 +1115,7 @@ export function SearchScreen({
                   */}
                 {pins.length > 0 && (
                   <div className="w-full pb-6 tall:pb-8">
-                    <LanguageSwitch names={offered} current={locale} onChoose={onChooseLanguage} />
+                    <LanguageSwitch names={offered} />
                   </div>
                 )}
                 {/* Two voices, not three. The instruction and its alternative
@@ -1279,8 +1170,6 @@ export function SearchScreen({
               widening={widening}
               onWiden={onWiden}
               onRegister={onRegister}
-              spoken={spoken}
-              voices={voices}
             />
           )}
           {outcome.results.slice(0, MAX_RESULTS).map((student) => (
@@ -1463,11 +1352,7 @@ export function SearchScreen({
               rest, because they are then the only way out. */}
           {(pins.length === 0 || outcome.mode !== 'idle') && (
             <span className="absolute left-0">
-              <LanguagePicker
-                quiet
-                only={pins.length > 0 ? offered : undefined}
-                onChoose={onChooseLanguage}
-              />
+              <LanguagePicker quiet only={pins.length > 0 ? offered : undefined} />
             </span>
           )}
           {buffer && (

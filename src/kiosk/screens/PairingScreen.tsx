@@ -306,7 +306,7 @@ export function PairingScreen({
           {pins.length > 0 && (
             <div className="flex w-full flex-col items-center gap-2 pt-2">
               <div className="text-sm text-ink-500">{t('pinPreview')}</div>
-              <LanguageSwitch names={[DEFAULT_LOCALE, ...pins]} current={DEFAULT_LOCALE} preview />
+              <LanguageSwitch names={[DEFAULT_LOCALE, ...pins]} preview />
             </div>
           )}
         </div>

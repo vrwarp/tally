@@ -17,11 +17,14 @@
  * and a longer one would show as a sideways overflow in the harness, not as a
  * hyphen.
  *
- * `preview` is the pairing screen's miniature of the same object: the volunteer
- * choosing the pins sees what the family will.
+ * Persistence is the provider's, as it is for `LanguagePicker`: the switch
+ * asks the tree above it, and the kiosk's provider writes against the tablet.
+ * `preview` is the pairing screen's miniature of the same object — the
+ * volunteer choosing the pins sees what the family will, with English lit.
  */
 import { haptic } from '@/lib/utils';
-import { LOCALE_LABELS, type Locale } from '@/lib/locales';
+import { DEFAULT_LOCALE, LOCALE_LABELS, type Locale } from '@/lib/locales';
+import { useLocaleControl } from '@/i18n/localeContext';
 import { useTranslations } from 'use-intl';
 import { useTap } from './tapGuard';
 
@@ -34,18 +37,16 @@ const COLUMNS: Record<number, string> = {
 
 export function LanguageSwitch({
   names,
-  current,
-  onChoose,
   preview = false,
 }: {
   /** English first, then the pins in their order. */
   names: readonly Locale[];
-  current: Locale;
-  onChoose?: (locale: Locale) => void;
   preview?: boolean;
 }) {
   const t = useTranslations('Common');
+  const { locale, setLocale } = useLocaleControl();
   const tap = useTap();
+  const current = preview ? DEFAULT_LOCALE : locale;
 
   return (
     <div
@@ -67,15 +68,12 @@ export function LanguageSwitch({
             aria-label={LOCALE_LABELS[candidate]}
             aria-pressed={lit}
             disabled={preview}
-            /* The lit cell presses too. A family who presses **English** on
-               a kiosk resting in English has chosen as surely as one who
-               presses 中文: the failure panel stops speaking every language
-               at them, and the clock that gives the screen back is armed. */
             {...(preview
               ? {}
               : tap(() => {
+                  if (lit) return;
                   haptic();
-                  onChoose?.(candidate);
+                  setLocale(candidate);
                 }))}
             className={`flex items-center justify-center rounded-xl px-2 leading-none font-semibold whitespace-nowrap ${
               preview ? 'h-12 text-xl' : 'h-20 text-3xl tall:h-24 tall:text-4xl'
