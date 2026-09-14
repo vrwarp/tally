@@ -531,8 +531,13 @@ export function SearchScreenVariant({
    * door was a no-op: pressing it set the locale it already had and changed
    * not one pixel, which is the round-1 grandmother failure handed to the
    * English parent, who is most of the queue. In the app this flag lives in
-   * `KioskApp` beside the locale and resets on the same two clocks the
-   * locale does — `cameHome` and `LANGUAGE_RESET_MS`.
+   * `KioskApp` beside the locale and clears with it on `cameHome` — but it
+   * needs its own arming of the idle clock: the `LANGUAGE_RESET_MS` effect
+   * returns early while `locale === RESTING_LOCALE`, so a family who took
+   * the English door and walked off would never be reset by it and the next
+   * family would meet the chosen screen, not the three welcomes. Arm the
+   * timer whenever `chosen` is true, whatever the locale; clear both
+   * together.
    */
   const [chosen, setChosen] = useState(initialChosen);
   const { setLocale } = useLocaleControl();
@@ -1335,7 +1340,10 @@ export function SearchScreenVariant({
             * letters off centre or move a row.
             */}
           {matchCount > 0 && (
-            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base">
+            /* The count swaps edges with the chips (see PromotedChips): both
+               are absolute, both cheap to move, and the count is the one
+               that cannot be pressed by mistake. */
+            <span className={`absolute ${VARIANTS[variant]?.Picker ? 'left-0' : 'right-0'} text-sm text-ink-400 kiosk:text-base`}>
               {/*
                 * A number while the list is all of it, a sentence when it is
                 * not. `MAX_RESULTS` is eight, and "8 names" over a list that
@@ -1511,10 +1519,12 @@ function FourBoxes({ size = 'md', plain = false }: { size?: 'md' | 'lg'; plain?:
      finger — the grandmother would have poked one. Outlined, they are a
      picture beside the sentence. */
   const fill = plain ? 'ring-2 ring-ink-600 ring-inset' : 'bg-ink-800 ring-2 ring-ink-600 ring-inset';
+  /* Steps by height (`tall:`), not by `kiosk:`, so the landscape shelf —
+     whose results track is under 300px — keeps the small box. */
   const box =
     size === 'lg'
-      ? `h-14 w-11 rounded-lg ${fill} kiosk:h-16 kiosk:w-12`
-      : `h-10 w-8 rounded-md ${fill} kiosk:h-12 kiosk:w-9`;
+      ? `h-14 w-11 rounded-lg ${fill} tall:h-16 tall:w-12 lg:h-10 lg:w-8`
+      : `h-10 w-8 rounded-md ${fill} tall:h-12 tall:w-9`;
   return (
     <div aria-hidden="true" className={`flex ${size === 'lg' ? 'gap-3' : 'gap-2.5'}`}>
       {[0, 1, 2, 3].map((index) => (
@@ -1667,7 +1677,12 @@ function ThreeWelcomes(props: IdleProps) {
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
-      <div className="relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-5xl">
+      {/* `lg:max-w-3xl`, not the list's 5xl: at the wider measure the plate
+          behind the doors ran from bezel to bezel over the photograph — the
+          exact geometry `.kiosk-idle-plate` gives as the reason it paints
+          nothing on portrait — and the picture a leader chose was wallpaper
+          behind a sign board. Narrower, the photograph frames the plate. */}
+      <div className="relative isolate flex w-full max-w-xl flex-col items-center lg:max-w-3xl">
         <IdleGround />
         <FourBoxes />
         {/* Each plate carries its own name-route line. Round 1 found the two
@@ -1833,27 +1848,32 @@ function DigitsFirstIdle({ backdrop }: IdleProps) {
   const lead = locale in COPY ? locale : RESTING;
   const rest = ORDER.filter((candidate) => candidate !== lead);
   return (
-    <div className="flex flex-col items-center pt-6 text-center lg:pt-3">
+    <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
       <div className="relative isolate flex flex-col items-center">
         <IdleGround />
         <FourBoxes size="lg" />
-        <div className="mt-4 flex flex-col items-center gap-1">
-          <span lang={lead} className="text-3xl leading-tight font-semibold text-ink-100 kiosk:text-4xl">
+        {/* The two quiet lines stand side by side on the landscape shelf:
+            stacked, the block's last line — the next step — fell off the
+            bottom of a track under 300px on the shape the tablet stands in. */}
+        <div className="mt-4 flex flex-col items-center gap-1 lg:mt-2">
+          <span lang={lead} className="text-3xl leading-tight font-semibold text-ink-100 tall:text-4xl">
             {COPY[lead].digits}
           </span>
-          {rest.map((candidate) => (
-            <span key={candidate} lang={candidate} className={`text-lg leading-snug kiosk:text-xl ${dim}`}>
-              {COPY[candidate].digits}
-            </span>
-          ))}
+          <div className="flex flex-col items-center gap-1 lg:flex-row lg:gap-5">
+            {rest.map((candidate) => (
+              <span key={candidate} lang={candidate} className={`text-lg leading-snug kiosk:text-xl ${dim}`}>
+                {COPY[candidate].digits}
+              </span>
+            ))}
+          </div>
         </div>
         {/* Said once, in the current language: the trilingual footnote ran
             wider than the plate that was meant to ground it and washed into
             the photograph, and the name route is the slow one. */}
-        <div className={`pt-4 text-base leading-snug kiosk:text-lg ${dim}`} lang={lead}>
+        <div className={`pt-4 text-base leading-snug kiosk:text-lg lg:pt-2 ${dim}`} lang={lead}>
           {COPY[lead].orName}
         </div>
-        <div className={`pt-3 text-base leading-snug kiosk:text-lg ${dim}`} lang={lead}>
+        <div className={`pt-3 text-base leading-snug kiosk:text-lg lg:pt-1 ${dim}`} lang={lead}>
           {COPY[lead].thenTap}
         </div>
       </div>
@@ -1867,19 +1887,22 @@ function PromotedChips({ onChoose }: ChoiceProps) {
   const { locale } = useLocaleControl();
   const tap = useTap();
   return (
-    /* Where in the band, stated as a rule for both neighbours. On a tablet
-       the register offer is centred and narrower than the glass, so the
-       chips at the left edge are horizontally clear of it, and they sit at
-       the band's top: the dead zone above the keys is then 44px on the
-       tablet on end and 28px on its side — wider than any gutter on the
-       board — which is what answered the English parent's brushed-thumb
-       finding. On a phone the offer spans the glass and the chips sit under
-       it, so an upward miss would open the wizard; there they centre in the
-       band instead, 10px clear of the offer and 18px clear of the keys. */
+    /* Where in the band, stated against what the console row above is
+       holding. Idle, the row is one centred offer; with rows on screen it is
+       two buttons — the register door on the left, **Search everyone** on
+       the right — and whichever edge the chips take, one of those is above
+       them. So they take the right edge: an upward miss lands on the retry,
+       which costs a second, never on the door that makes a review-queue
+       card. Below them, on tablets they sit at the band's top so the dead
+       zone above the keys is 44px on the tablet on end and 28px on its side
+       — wider than any gutter on the board — which is what answered the
+       English parent's brushed-thumb finding; on a phone they centre in the
+       band, 10px clear of the row above and 18px clear of the keys. The
+       count swaps to the left edge to make room. */
     <span
       role="group"
       aria-label={t('language')}
-      className="absolute left-0 flex items-center gap-1 sm:top-0"
+      className="absolute right-0 flex items-center gap-1 sm:top-0"
     >
       {LOCALES.map((candidate: Locale) => {
         const current = candidate === locale;

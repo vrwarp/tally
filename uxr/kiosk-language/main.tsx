@@ -27,6 +27,7 @@
  *   ?title=…  ?icon=groups     the gathering's name and mark
  *   ?photo=1                   the gathering's photograph behind the idle screen
  *   ?chosen=1                  a family has chosen a language this visit (with ?lang=)
+ *   ?ground=light              the light ground, as a light-themed gathering wears it
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -49,6 +50,12 @@ const lang = params.get('lang');
 if (isLocale(lang)) localStorage.setItem(KIOSK_LOCALE_STORAGE_KEY, lang);
 
 const variant = params.get('variant');
+
+/* The ground, worn the way `applyKioskTheme` wears it: `data-theme` on the
+   root. A leader's first decision in the theme editor, and the ramp flips
+   wholesale for it, so every plate and chip here has to be looked at on
+   both. */
+if (params.get('ground') === 'light') document.documentElement.dataset.theme = 'light';
 
 const photoUrl = params.get('photo') === '1' ? '/uxr/kiosk-live/backdrop-demo.svg' : null;
 

@@ -69,10 +69,16 @@ const SCENES: {
      commit like the other two. */
   { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'] },
   { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'] },
-  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall'] },
+  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'phone', query: 'buffer=7788', views: ['kiosktall'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'] },
   { id: 'photo-idle', query: 'photo=1&icon=church', views: ['kiosktall', 'kioskwide'], settle: 1900 },
+  /* After a door is taken, over the photograph — the frame the halo fix is
+     actually visible in, under its own name. */
+  { id: 'photo-chosen', query: 'photo=1&icon=church&chosen=1', views: ['kiosktall', 'kioskwide'], settle: 1900 },
+  /* The light ground, which the theme editor offers first and which flips
+     every token these panels are built from. */
+  { id: 'photo-light', query: 'photo=1&icon=church&ground=light', views: ['kiosktall', 'kioskwide'], settle: 1900 },
 ];
 
 const args = process.argv.slice(2);
