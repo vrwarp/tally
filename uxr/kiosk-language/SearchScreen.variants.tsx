@@ -1921,7 +1921,7 @@ function LanguageBar({
               haptic();
               onChoose(candidate);
             })}
-            className={`flex h-14 min-w-14 items-center justify-center rounded-xl px-4 text-lg font-semibold sm:min-w-24 sm:px-5 ${
+            className={`flex h-14 min-w-14 items-center justify-center rounded-xl px-4 text-lg font-semibold sm:min-w-24 sm:px-5 tall:h-16 tall:text-xl ${
               current
                 ? 'bg-ink-700 text-ink-50'
                 : 'bg-ink-800/70 text-ink-400 active:bg-ink-700 active:text-ink-100'
@@ -1939,12 +1939,23 @@ function LanguageBar({
 
 /**
  * The chosen screen, and B's resting screen: the bar, then the instruction
- * in the current language — the name first, the digits second, the next
- * step last.
+ * in the current language — the name first, the digits second — and, while
+ * nobody has chosen, one line per pinned language the kiosk cannot speak
+ * yet. Nothing else.
+ *
+ * Round 9 made this a resting candidate again, at the owner's word: of
+ * everything shown, the screen with a pronounced switcher was the one that
+ * did not look cluttered. One instruction and one switch is the least a
+ * multilingual sign can say, and a bar of language names at full weight is
+ * the switch nobody misses — the shipped chips were the same control at a
+ * size nobody found. At rest English is lit; a tap makes the same screen
+ * another language's, so the kiosk has one shape for every state. The
+ * next-step line is gone: the keyboard and the rows say it.
  */
-function LanguageBarIdle({ backdrop, onChoose, chosen, speaks }: IdleProps) {
+function LanguageBarIdle({ backdrop, onChoose, chosen, pins, speaks }: IdleProps) {
   const copy = COPY[usePanelLang(chosen)];
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
+  const { lines } = partition(pins, speaks);
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
       <div className={`relative isolate flex flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
@@ -1954,7 +1965,7 @@ function LanguageBarIdle({ backdrop, onChoose, chosen, speaks }: IdleProps) {
           {copy.name}
         </div>
         <div className={`pt-1 text-lg kiosk:text-xl ${dim}`}>{copy.orDigits}</div>
-        <div className={`pt-4 text-lg kiosk:text-xl lg:pt-2 ${dim}`}>{copy.thenTap}</div>
+        {chosen === null && lines.map((candidate) => <Line key={candidate} candidate={candidate} />)}
       </div>
     </div>
   );
@@ -2046,7 +2057,6 @@ function Welcomes(props: IdleProps) {
   const { backdrop, chosen, onChoose, pins } = props;
   const voices = voicesOf(pins);
   if (chosen) return <LanguageBarIdle {...props} />;
-  const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
   return (
     <div className="flex flex-col items-center pt-4 text-center tall:pt-6 lg:pt-2">
       {/* One ground for every line while a photograph is up. The shipped plate
@@ -2057,11 +2067,8 @@ function Welcomes(props: IdleProps) {
         <IdleGround />
         <div className="flex w-full flex-col gap-2 lg:flex-row lg:gap-3">
           {voices.map((candidate: Lang) => (
-            <Plate key={candidate} candidate={candidate} onChoose={onChoose} />
+            <Plate key={candidate} candidate={candidate} onChoose={onChoose} named />
           ))}
-        </div>
-        <div className={`pt-3 text-base kiosk:text-lg ${dim}`} lang={RESTING}>
-          {COPY[RESTING].thenTap}
         </div>
       </div>
     </div>
@@ -2085,13 +2092,21 @@ function Welcomes(props: IdleProps) {
  *
  * The name on top is round 7's: the corner badge did nothing for either
  * Chinese reader ("the same little grey mark as the chip I never found"),
- * two Chinese plates at the ceiling read as a double print, and to the
- * Spanish mother a plate of text was "a sign taped to a wall, not a button".
- * A door names the language it will set (staff, round 4) — 繁體中文 over
- * 简体中文 is a difference anyone can see across a lobby, and a language's
- * name on a plate is what makes it a language button.
+ * and two Chinese plates at the ceiling read as a double print. Round 9 cut
+ * it back to where it earns its line — two Han plates, or a screen where
+ * every voice is a plate — because on the lobby's own screen, with one
+ * Chinese plate, it was a fourth object on a box that needed two.
  */
-function Plate({ candidate, onChoose }: { candidate: Lang; onChoose: (candidate: Lang) => void }) {
+function Plate({
+  candidate,
+  onChoose,
+  named,
+}: {
+  candidate: Lang;
+  onChoose: (candidate: Lang) => void;
+  /** The language's own name on top — asked for only where two Han plates stand, or where every voice is a plate. */
+  named: boolean;
+}) {
   const tap = useTap();
   /* Han glyphs need more size than Latin at the same distance (round 5), and
      the same rule is what keeps a Latin headline on one line in the plate's
@@ -2110,7 +2125,7 @@ function Plate({ candidate, onChoose }: { candidate: Lang; onChoose: (candidate:
       className="relative flex min-h-14 w-full flex-col items-center justify-center rounded-xl bg-ink-800 px-4 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16"
       style={{ touchAction: 'manipulation' }}
     >
-      <span className="text-sm leading-tight text-ink-300 tall:text-base">{LABELS[candidate]}</span>
+      {named && <span className="text-sm leading-tight text-ink-300 tall:text-base">{LABELS[candidate]}</span>}
       <span className={`leading-tight font-semibold ${han ? 'text-xl tall:text-3xl' : 'text-lg tall:text-2xl'}`}>
         {COPY[candidate].name}
       </span>
@@ -2120,20 +2135,22 @@ function Plate({ candidate, onChoose }: { candidate: Lang; onChoose: (candidate:
 }
 
 /**
- * A pinned language the kiosk cannot speak yet, as lines: its name route a
- * step under the resting language's, its digits route under that. No plate,
- * no door, no badge — it promises nothing beyond the words on the glass.
+ * A pinned language the kiosk cannot speak yet, as one line: its name route,
+ * a step under the resting language's. No digits line (round 9's cut: the
+ * route the church's data cannot carry does not earn a second line in a
+ * second language), no plate, no door, no badge — it promises nothing
+ * beyond the words on the glass.
  */
-function Lines({ candidate, dim }: { candidate: Lang; dim: string }) {
+function Line({ candidate }: { candidate: Lang }) {
   return (
-    <div className="flex flex-col items-center pt-3" lang={candidate}>
-      <div className="text-2xl leading-tight font-semibold text-balance text-ink-200 tall:text-3xl">
-        {COPY[candidate].name}
-      </div>
-      <div className={`pt-1 text-base kiosk:text-lg ${dim}`}>{COPY[candidate].orDigits}</div>
+    <div className="pt-3 text-2xl leading-tight font-semibold text-balance text-ink-200 tall:text-3xl" lang={candidate}>
+      {COPY[candidate].name}
     </div>
   );
 }
+
+/** Two Han plates on one screen need their names; one does not. */
+const twoHan = (plates: Lang[]): boolean => plates.filter((candidate) => !LATIN.includes(candidate)).length > 1;
 
 /** The resting screen's partition of the pins: doors for what the kiosk speaks, lines for what it cannot yet. */
 function partition(pins: Lang[], speaks: readonly Lang[]) {
@@ -2182,18 +2199,15 @@ function Voices(props: IdleProps) {
           {COPY[RESTING].orDigits}
         </div>
         {lines.map((candidate) => (
-          <Lines key={candidate} candidate={candidate} dim={dim} />
+          <Line key={candidate} candidate={candidate} />
         ))}
         {plates.length > 0 && (
           <div className="mt-4 flex w-full max-w-xl flex-col gap-2 lg:mt-3">
             {plates.map((candidate) => (
-              <Plate key={candidate} candidate={candidate} onChoose={onChoose} />
+              <Plate key={candidate} candidate={candidate} onChoose={onChoose} named={twoHan(plates)} />
             ))}
           </div>
         )}
-        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
-          {COPY[RESTING].thenTap}
-        </div>
       </div>
     </div>
   );
@@ -2246,13 +2260,10 @@ function Sign(props: IdleProps) {
         {plates.length > 0 && (
           <div className="mt-4 flex w-full max-w-xl flex-col gap-2 lg:mt-3">
             {plates.map((candidate) => (
-              <Plate key={candidate} candidate={candidate} onChoose={onChoose} />
+              <Plate key={candidate} candidate={candidate} onChoose={onChoose} named={twoHan(plates)} />
             ))}
           </div>
         )}
-        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
-          {COPY[RESTING].thenTap}
-        </div>
       </div>
     </div>
   );
@@ -2274,15 +2285,17 @@ function Sign(props: IdleProps) {
  * instruction: the grandmother reads nothing about her child until she has
  * pressed 繁體中文. Rounds 1–3 set the bar-first candidate aside for exactly
  * that, with three languages; with four the arithmetic changes, which is
- * why it stands again. "Tap here" is what makes a label a door — the
- * shipped chips were labels, and nobody took them.
+ * why it stands again. Round 9 cut the "tap here" whisper: a language's
+ * name at this size on a plate is a button, and the whisper was a second
+ * line on an object that needed one. The pinned languages the kiosk cannot
+ * speak yet are one line each above the doors, as everywhere.
  */
 function Doors(props: IdleProps) {
-  const { backdrop, chosen, onChoose, pins } = props;
+  const { backdrop, chosen, onChoose, pins, speaks } = props;
   const tap = useTap();
   if (chosen) return <LanguageBarIdle {...props} />;
   const dim = backdrop ? 'text-ink-300' : 'text-ink-400';
-  const doors = pins.filter((candidate) => candidate !== RESTING);
+  const { lines, plates: doors } = partition(pins, speaks);
   return (
     <div className="flex flex-col items-center pt-6 text-center lg:pt-2">
       <div className={`relative isolate flex w-full max-w-xl flex-col items-center ${backdrop ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5' : ''}`}>
@@ -2293,29 +2306,30 @@ function Doors(props: IdleProps) {
         <div className={`pt-1 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
           {COPY[RESTING].orDigits}
         </div>
-        <div className="mt-4 flex w-full max-w-md flex-row gap-2 lg:mt-3">
-          {doors.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              tabIndex={-1}
-              lang={candidate}
-              aria-label={LABELS[candidate]}
-              {...tap(() => {
-                haptic(8);
-                onChoose(candidate);
-              })}
-              className="flex min-h-14 flex-1 flex-col items-center justify-center rounded-xl bg-ink-800 px-3 py-2 text-center text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16"
-              style={{ touchAction: 'manipulation' }}
-            >
-              <span className="text-xl leading-tight font-semibold tall:text-2xl">{LABELS[candidate]}</span>
-              <span className="text-sm leading-tight text-ink-300 tall:text-base">{COPY[candidate].tapHere}</span>
-            </button>
-          ))}
-        </div>
-        <div className={`pt-3 text-lg kiosk:text-xl ${dim}`} lang={RESTING}>
-          {COPY[RESTING].thenTap}
-        </div>
+        {lines.map((candidate) => (
+          <Line key={candidate} candidate={candidate} />
+        ))}
+        {doors.length > 0 && (
+          <div className="mt-5 flex w-full max-w-md flex-row gap-3 lg:mt-3">
+            {doors.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                tabIndex={-1}
+                lang={candidate}
+                aria-label={LABELS[candidate]}
+                {...tap(() => {
+                  haptic(8);
+                  onChoose(candidate);
+                })}
+                className="flex min-h-14 flex-1 items-center justify-center rounded-xl bg-ink-800 px-3 py-2 text-center text-xl leading-tight font-semibold text-ink-100 ring-1 ring-ink-600 active:bg-ink-600 tall:min-h-16 tall:text-2xl"
+                style={{ touchAction: 'manipulation' }}
+              >
+                {LABELS[candidate]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2425,7 +2439,7 @@ function SecondVoice(props: IdleProps) {
 export const VARIANTS: Record<string, VariantSpec> = {
   voices: {
     summary:
-      'J: the resting language leads as today; a pinned language the kiosk cannot speak yet is lines in the same block, one it can speak is a still plate under it, named, carrying its own name route and digits route, and the door. Chips only once something is typed, only for languages the kiosk speaks.',
+      'J: the resting language leads as today; a pinned language the kiosk cannot speak yet is one line in the same block, one it can speak is a still plate under it carrying its own name route and digits route, and the door. Nothing else. Chips only once something is typed, only for languages the kiosk speaks.',
     Idle: Voices,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
@@ -2446,21 +2460,16 @@ export const VARIANTS: Record<string, VariantSpec> = {
   },
   'language-bar': {
     summary:
-      'B: one language leads under the pairing screen’s full-weight picker; the screen every candidate becomes once a language is chosen.',
+      'B: one instruction under one pronounced switcher — the bar of language names at full weight, English lit at rest — and one line per pinned language the kiosk cannot speak yet. The screen every candidate becomes once a language is chosen, made the resting screen too: one shape for every state.',
     Idle: LanguageBarIdle,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
   },
-  /* Round 7's door-only candidate, kept for the record: the least said of
-     any screen and the English parent's first choice, but every other
-     reader met a door that said where to press and not what would be asked
-     of them, and both Spanish readers rejected the tap it makes compulsory.
-     Its lesson — a door names the language it will set — is the name on
-     J's plate. Round 7's `latin-together` (Spanish as lines, no door) became
-     J's rule rather than a candidate. */
+  /* Round 7's `latin-together` (Spanish as lines, no door) became J's rule
+     rather than a candidate. */
   doors: {
     summary:
-      'K (round 7): the instruction once, in the resting language; under it a door per pinned language carrying only that language’s own name and “tap here”.',
+      'K: the instruction once, in the resting language; one line per pinned language the kiosk cannot speak yet; under them a door per language it can, carrying only that language’s own name. Nothing else.',
     Idle: Doors,
     Picker: PromotedChips,
     NoMatch: NoMatchPanel,
