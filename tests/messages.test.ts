@@ -3,8 +3,8 @@
  *
  * `messages/en.json` is the source of truth; every other catalogue must mirror
  * its key set and each message's ICU arguments exactly. A missing translation
- * is a red build, not a silent English word on a Chinese screen — or worse, a
- * stale Chinese one saying what the English used to say.
+ * is a red build, not a silent English word on a Spanish screen — or worse, a
+ * stale Spanish one saying what the English used to say.
  *
  * `messages/translation-state.json` (written by `npm run translate`) records the
  * verbatim English each translation was made from, so rewording English without
@@ -27,6 +27,7 @@ import {
   flatten,
   messageArguments,
   type Messages,
+  type TargetLocale,
   type TranslationState,
 } from '@/lib/translationState';
 
@@ -182,9 +183,9 @@ describe('message catalogues', () => {
       for (const [locale, catalog] of catalogs) {
         const flat = flatten(catalog);
         for (const { key, text, why } of REQUIRED_WORDING) {
-          const wanted = text[locale];
+          const wanted = text[locale as TargetLocale];
           if (wanted === undefined) continue;
-          if ((state[key]?.[locale as 'zh-Hans' | 'zh-Hant'] ?? 'todo') === 'todo') continue;
+          if ((state[key]?.[locale as TargetLocale] ?? 'todo') === 'todo') continue;
           expect(
             flat.get(key)?.includes(wanted),
             `${locale}: ${key} must contain ${JSON.stringify(wanted)} — ${why}`,

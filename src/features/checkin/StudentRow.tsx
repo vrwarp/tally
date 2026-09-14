@@ -343,7 +343,7 @@ export const StudentRow = memo(function StudentRow({
                   */}
                   {gone ? (
                     <span className="text-[11px] font-medium tabular-nums text-ink-400">
-                      Out {time.clock(attendance!.checkedOutAt!)}
+                      {t('checkedOutAt', { time: time.clock(attendance!.checkedOutAt!) })}
                     </span>
                   ) : null}
                   {showHint && !unavailable ? (
@@ -351,7 +351,7 @@ export const StudentRow = memo(function StudentRow({
                       className="text-[11px] font-medium tabular-nums text-ink-500"
                       title={t('recentTitle', { hits: recentHits, window: recentWindow })}
                     >
-                      {recentHits} of {recentWindow}
+                      {t('recentHits', { hits: recentHits, window: recentWindow })}
                     </span>
                   ) : null}
                   {warnings.map((warning) =>

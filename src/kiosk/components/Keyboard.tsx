@@ -74,7 +74,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { haptic } from '@/lib/utils';
 import { tallyRender } from '../renderTally';
 import { HOLD_DELAY_MS, HOLD_MS } from './HoldButton';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 
 export type KioskKey =
   | { kind: 'char'; value: string }
@@ -97,6 +97,43 @@ const ROWS: string[][] = [
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
   ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
 ];
+
+/**
+ * The home row with Ñ on the end of it, for a lobby set to Spanish.
+ *
+ * Ñ is a letter, not an accent, and that distinction is the whole of this.
+ * Muñoz typed as Munoz is a different surname on a child's sticker and in the
+ * church's database; José typed as Jose is the same name with a mark left off,
+ * which is what half the forms this family has ever filled in already say.
+ * Three Hayward families in four with a Spanish surname are of Mexican origin,
+ * so the second is a compromise a parent has made before and the first is the
+ * app spelling their name wrong.
+ *
+ * It costs no geometry, which is why it can be here at all. The row is
+ * twenty half-cells; nine letters plus the half-key stagger at each end is
+ * twenty, and so is ten letters with no stagger — the same board, the same
+ * pitch, the same 304px, and the wizard's grade grid and phone pad still stand
+ * in the same footprint. It is the one letter that fits, and it is also the
+ * only one worth having: the accented vowels would need a row the board has no
+ * height for, and `normalizeForSearch` folds them anyway, so a parent hunting
+ * for Ramírez finds them by typing RAMIREZ either way.
+ *
+ * Keyed to the *kiosk's* language rather than to the wizard, because a keyboard
+ * that changes shape halfway through a check-in is a keyboard nobody trusts.
+ * Every phone does exactly this when its language changes, which is the
+ * behaviour a parent is already carrying in their pocket.
+ */
+const SPANISH_ROWS: string[][] = ROWS.map((row, index) =>
+  index === 2 ? [...row, 'Ñ'] : row,
+);
+
+/** The letters this language writes names with. */
+function rowsFor(locale: string): string[][] {
+  return locale === 'es-MX' ? SPANISH_ROWS : ROWS;
+}
+
+/** A letter row that fills the track on its own has no stagger to draw. */
+const STAGGERED = 10;
 
 const KEY_CLASS =
   /* `tall:` steps the keys up on a screen stood on end — see the variant's
@@ -170,6 +207,12 @@ export const Keyboard = memo(function Keyboard({
 }) {
   tallyRender('Keyboard');
   const t = useTranslations('Door');
+  /*
+   * The one thing on this board that is not fixed. Subscribing costs a render
+   * of forty buttons exactly when somebody presses a language chip, which is
+   * the frame they are already expecting every word on the screen to change.
+   */
+  const rows = rowsFor(useLocale());
   const tCommon = useTranslations('Common');
   // The latest handler behind a stable identity, so this subtree's memo holds
   // even if a parent re-creates its callback.
@@ -261,12 +304,12 @@ export const Keyboard = memo(function Keyboard({
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >
-      {ROWS.map((row, i) => (
+      {rows.map((row, i) => (
         <div key={i} className={ROW_CLASS}>
           {/* Stagger the letter rows the way every keyboard does. `data-gap`
               names the glass a finger can land on that does nothing, so the
               tests can find it without knowing how wide it is. */}
-          {i === 2 && <div data-gap className="col-span-1" />}
+          {i === 2 && row.length < STAGGERED && <div data-gap className="col-span-1" />}
           {/* The Z row's leading slot: a spacer where there is no shift key,
               the shift key where there is. Same width either way, so the
               letters under a thumb sit in the same place on both screens. */}
@@ -292,7 +335,7 @@ export const Keyboard = memo(function Keyboard({
               {capitals ? key : key.toLowerCase()}
             </button>
           ))}
-          {i === 2 && <div data-gap className="col-span-1" />}
+          {i === 2 && row.length < STAGGERED && <div data-gap className="col-span-1" />}
           {i === 3 && (
             <button
               type="button"

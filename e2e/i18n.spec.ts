@@ -89,6 +89,23 @@ test.describe('the app speaks more than English', () => {
     expect(await page.evaluate(() => localStorage.getItem('tally:locale'))).toBe('zh-Hant');
   });
 
+  /*
+   * Spanish through the same control, because it is the largest non-English
+   * language in this lobby and the one whose chunk is a different `import()`
+   * arm — a `switch` that fell through to the wrong specifier would render a
+   * Chinese screen at a Spanish reader and nothing else here would notice.
+   */
+  test('a counselor can choose Spanish, and the document says so', async ({ page }) => {
+    await page.goto('/login');
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
+
+    await chooseLanguage(page, 'Español');
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'es-MX');
+    expect(await page.evaluate(() => localStorage.getItem('tally:locale'))).toBe('es-MX');
+    expect(await visibleText(page)).not.toMatch(MESSAGE_KEY);
+  });
+
   test('the choice survives a reload, and the catalogue with it', async ({ page }) => {
     await page.goto('/login');
     await chooseLanguage(page, '简体中文');
@@ -159,6 +176,38 @@ test.describe('the kiosk speaks the lobby it is in', () => {
       await pairKiosk(kiosk, staff, zhHantKiosk.Chooser.question);
       await expect(kiosk.locator('html')).toHaveAttribute('lang', 'zh-Hant');
       expect(await visibleText(kiosk)).not.toMatch(MESSAGE_KEY);
+    } finally {
+      await context.close();
+    }
+  });
+
+  /*
+   * The one place a language changes something other than words.
+   *
+   * The lobby board is a fixed Latin QWERTY with no IME, and Ñ is a letter
+   * rather than an accent — Muñoz typed Munoz is a different surname on a
+   * child's sticker and in the church's database. So the home row grows an Ñ
+   * when the tablet is set to Spanish and keeps its half-key stagger when it is
+   * not. Asserted end-to-end rather than only in `haptics.test.tsx` because the
+   * thing that could break it is the locale reaching the component at all:
+   * `Keyboard` is memoized against a stable `onKey` precisely so that typing
+   * never re-renders it, and a provider that did not publish the language would
+   * leave an English board under Spanish questions.
+   */
+  test('the lobby keyboard grows an Ñ when the room is set to Spanish', async ({ browser }) => {
+    const { context, page: kiosk } = await openKiosk(browser);
+
+    try {
+      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeHidden();
+
+      await chooseLanguage(kiosk, 'Español');
+
+      await expect(kiosk.locator('html')).toHaveAttribute('lang', 'es-MX');
+      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeVisible();
+
+      await chooseLanguage(kiosk, 'English');
+
+      await expect(kiosk.getByRole('button', { name: 'Ñ', exact: true })).toBeHidden();
     } finally {
       await context.close();
     }

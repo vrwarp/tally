@@ -27,7 +27,7 @@ const OUT = join(MESSAGES, 'kiosk');
 const KIOSK_SRC = join(ROOT, 'src', 'kiosk');
 
 /** The languages every catalogue is sliced for. Mirrors `src/lib/locales.ts`. */
-export const LOCALES = ['en', 'zh-Hans', 'zh-Hant'];
+export const LOCALES = ['en', 'es-MX', 'zh-Hans', 'zh-Hant'];
 
 /**
  * The namespaces a lobby screen can reach.

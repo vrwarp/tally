@@ -214,6 +214,57 @@ describe('the kiosk keyboard’s geometry', () => {
     expect(keyboardHeight(container, false)).toBe(304);
     expect(keyboardHeight(container, true)).toBe(344);
   });
+
+  /*
+   * The Ñ, and the arithmetic that let it in.
+   *
+   * Ñ is a letter rather than an accent, and Muñoz typed Munoz is a different
+   * surname on a child's sticker — so a lobby set to Spanish gets a key for it.
+   * What makes that affordable is that nine letters plus the half-key stagger
+   * at each end is the same twenty cells as ten letters with no stagger: the
+   * board does not move, and neither does anything standing in its footprint.
+   * These are the two halves of that claim, asserted rather than believed.
+   */
+  it('gives a Spanish lobby an Ñ, on the same twenty cells and the same height', () => {
+    const { container } = render(<Keyboard onKey={vi.fn()} />, { locale: 'es-MX' });
+
+    expect(screen.getByText('Ñ')).toBeInTheDocument();
+    // The home row filled the track itself, so its stagger is gone with it.
+    const homeRow = screen.getByText('Ñ').parentElement!;
+    expect([...homeRow.children].map(span).reduce((a, b) => a + b, 0)).toBe(20);
+    expect(homeRow.querySelector('[data-gap]')).toBeNull();
+    for (const row of container.firstElementChild!.children) {
+      expect([...row.children].map(span).reduce((a, b) => a + b, 0)).toBe(20);
+    }
+    expect(keyboardHeight(container, false)).toBe(304);
+    expect(keyboardHeight(container, true)).toBe(344);
+  });
+
+  /*
+   * And nowhere else, which is the other half of the decision: the stagger is
+   * how every other keyboard a parent has ever used is shaped, and it is not
+   * given up for a letter that language does not write.
+   */
+  it.each(['en', 'zh-Hans', 'zh-Hant'] as const)('leaves the %s board alone', (locale) => {
+    render(<Keyboard onKey={vi.fn()} />, { locale });
+
+    expect(screen.queryByText('Ñ')).toBeNull();
+    expect(screen.getByText('L').parentElement!.querySelectorAll('[data-gap]')).toHaveLength(2);
+  });
+
+  /*
+   * The lower case the shift key produces, because what is typed here is
+   * written to the roster and printed on a sticker: a key showing ñ that typed
+   * Ñ would put MUÑOZ on a name tag whatever the parent could see.
+   */
+  it('types the ñ in the case the key is showing', () => {
+    const onKey = vi.fn();
+    render(<Keyboard onKey={onKey} shift="off" />, { locale: 'es-MX' });
+
+    press(screen.getByText('ñ'));
+
+    expect(onKey).toHaveBeenCalledWith({ kind: 'char', value: 'ñ' });
+  });
 });
 
 describe('confirming at the kiosk', () => {

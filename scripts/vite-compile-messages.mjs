@@ -44,7 +44,7 @@ import compile from 'icu-minify/compile';
  * never rendered. Compiling it would corrupt the record and break the staleness
  * test that reads it.
  */
-const CATALOGUE = /[\\/]messages[\\/](kiosk[\\/])?(en|zh-Hans|zh-Hant)\.json(\?|$)/;
+const CATALOGUE = /[\\/]messages[\\/](kiosk[\\/])?(en|es-MX|zh-Hans|zh-Hant)\.json(\?|$)/;
 
 /** Compile every leaf of a catalogue, leaving its namespace shape alone. */
 function compileTree(node, path) {

@@ -1,20 +1,30 @@
 /**
  * The languages Tally speaks.
  *
- * Script subtags rather than regions, deliberately: the Traditional-Chinese
- * families at this church span Taiwan *and* Hong Kong, and `zh-Hant` names the
- * script without picking one. A `zh-TW` browser and a `zh-HK` browser both
- * negotiate onto it.
+ * Script subtags rather than regions for Chinese, deliberately: the
+ * Traditional-Chinese families at this church span Taiwan *and* Hong Kong, and
+ * `zh-Hant` names the script without picking one. A `zh-TW` browser and a
+ * `zh-HK` browser both negotiate onto it.
  *
  * Simplified and Traditional are separate catalogues, never a character-level
  * conversion of one another. The pairs that matter differ by *vocabulary*:
  * Taiwan says 登入 where the mainland says 登录, 儲存 where it says 保存. A
  * transliterated 登錄 is a word, and it is the wrong one.
  *
+ * Spanish is the opposite shape and takes a region tag for it. There is no
+ * script to name and no second catalogue to keep apart: this church is in
+ * Hayward, where three families in four with a Spanish surname are of Mexican
+ * origin and most of the rest are Salvadoran or Guatemalan. `es-MX` names whose
+ * Spanish the catalogue is written in — Mexican, because that is the room —
+ * while `negotiateLocale` lands *every* `es-*` browser on it, and the copy is
+ * held to vocabulary a Salvadoran mother also uses. See
+ * `messages/GLOSSARY.md`, which is where the regionalisms that were rejected
+ * are written down.
+ *
  * Imports nothing, on purpose. Both entry points, the kiosk and the pipeline
  * script all read this, and the kiosk pays for every byte it loads.
  */
-export const LOCALES = ['en', 'zh-Hans', 'zh-Hant'] as const;
+export const LOCALES = ['en', 'es-MX', 'zh-Hans', 'zh-Hant'] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = 'en';
@@ -33,16 +43,26 @@ export const LOCALE_STORAGE_KEY = 'tally:locale';
  */
 export const KIOSK_LOCALE_STORAGE_KEY = 'tally:kiosk:locale';
 
-/** Self-named — a language's own name is never translated. */
+/**
+ * Self-named — a language's own name is never translated.
+ *
+ * `es-MX` wears the bare word **Español** and not "Español (México)". The tag
+ * is a statement about which Spanish the catalogue was written in; the chip is
+ * a question put to whoever is standing at the glass, and a quarter of the
+ * families it is for are Salvadoran, Guatemalan or Puerto Rican. A country in
+ * the label would answer that question wrong for them.
+ */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: 'English',
+  'es-MX': 'Español',
   'zh-Hans': '简体中文',
   'zh-Hant': '繁體中文',
 };
 
-/** One-glyph badges, for places too narrow to carry a language's whole name. */
+/** Short badges, for places too narrow to carry a language's whole name. */
 export const LOCALE_SHORT_LABELS: Record<Locale, string> = {
   en: 'EN',
+  'es-MX': 'ES',
   'zh-Hans': '简',
   'zh-Hant': '繁',
 };
@@ -62,6 +82,12 @@ export function isLocale(value: unknown): value is Locale {
  * is the one to keep if the list ever grows: an unqualified `zh` is Simplified
  * far more often than not, and a reader who wanted Traditional will find the
  * switcher, whereas a reader shown a script they cannot read may not.
+ *
+ * Every `es-*` maps onto `es-MX`, and there is nothing to decide there — one
+ * Spanish catalogue, so `es`, `es-US`, `es-419`, `es-SV` and `es-ES` all reach
+ * it. It is written for the first four; a Spaniard gets *ustedes* where they
+ * would say *vosotros* and — like a Taiwanese reader handed Simplified — has a
+ * switcher, which is a far better failure than English.
  */
 export function negotiateLocale(preferences: readonly string[] | null | undefined): Locale {
   for (const preference of preferences ?? []) {
@@ -71,6 +97,7 @@ export function negotiateLocale(preferences: readonly string[] | null | undefine
       return 'zh-Hant';
     }
     if (tag === 'zh' || tag.startsWith('zh-')) return 'zh-Hans';
+    if (tag === 'es' || tag.startsWith('es-')) return 'es-MX';
     if (tag === 'en' || tag.startsWith('en-')) return 'en';
   }
   return DEFAULT_LOCALE;
