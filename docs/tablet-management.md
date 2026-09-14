@@ -332,7 +332,9 @@ in the order people trip over them:
   different policy and *does* take paths — the two look alike and behave differently.)
 - **Both `urls` and `devices` are mandatory.** A dictionary missing either is dropped.
 
-For Tally's kiosk, matching the vendor and leaving the model open:
+For Tally's kiosk, matching the vendor and leaving the model open — which is not a shortcut but the
+correct choice, because it is exactly what the kiosk's own `getPairedDevices()` does, and because a
+model-pinned rule would need editing the first time a printer is replaced:
 
 ```json
 [{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
@@ -419,6 +421,49 @@ That last point is what makes this route work where §4.8 previously said it wou
 Test DPC cannot hold across a reboot is *lock task mode*, which is entered by a running activity and
 is session state. The WebUSB grant is not that. **Kiosk lockdown is the fragile half and the
 pre-grant is the durable half, and only the durable half is needed.**
+
+#### Step 0 — connect the printer the ordinary way first
+
+Do this before anything else in this section, on an unmanaged tablet, today. It needs no device
+owner, no adb and no decisions.
+
+Plug the printer in, open the kiosk, and connect it through the ordinary chooser exactly as
+[`label-printing.md`](label-printing.md) describes. Print one label.
+
+**Not mainly to learn the identifiers.** The policy in §4.3 matches on vendor alone, and should:
+`getPairedDevices()` in `src/kiosk/printing/index.ts` filters `navigator.usb.getDevices()` to vendor
+`0x04f9` and *not* by model, so a policy that pinned `product_id` would be narrower than the kiosk's
+own filter — and it would throw away the thing the pre-grant is for, that "a replacement printer
+needs no visit". A QL-700 swapped for a QL-820NWB on a Sunday morning should need no policy edit.
+
+Connect first for three better reasons:
+
+- **One unknown at a time.** If the policy goes on first and `getDevices()` comes back empty, the
+  cause is one of: a malformed rule (§4.3), the tablet not doing USB host, an unpowered or passive
+  hub, a cable, or the printer sitting in Editor Lite mode — which presents as mass storage and
+  cannot be printed to at all. That is five suspects for one symptom. Proving the hardware path
+  first leaves exactly one.
+- **It is free and early.** This is the only step that needs nothing managed, so it can happen
+  before anyone factory-resets anything or reads §2. If WebUSB to the Brother does not work on this
+  tablet at all, no policy on earth fixes it, and the whole exercise stops here for the price of an
+  afternoon rather than after three enrolments.
+- **You get the real numbers as a cross-check.** §4.3's table does not list every Brother model, and
+  the church's unit may not be on it.
+
+**Reading the identifiers needs no developer tools.** The kiosk already logs them: `describeDevice`
+at `src/kiosk/printing/index.ts:396-399` puts `vendorId` and `productId` into the printer event log,
+and the printer screen shows that log — *Recent printer events*, with a Copy button, kept across the
+nightly reload. Connect the printer, open the printer screen, and read
+`usb devices cause="boot" count=1 hasSerial=true vendorId=1273 productId=8347` straight off the
+glass.
+
+**Then revoke the manual grant before you test the policy, or you will get a false pass.** This is
+the trap in doing it in this order. Once you have connected through the chooser, Chrome holds a
+grant of its own, and `getDevices()` will return the printer *because of that grant* — not because
+the policy works. Clear it in Chrome's site settings (USB devices) and re-check from a cold start.
+(On Android the manual grant tends to evaporate on re-enumeration anyway, because Chrome cannot read
+the serial afterwards — [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5 — but
+that is a bug-shaped accident, not a test method. Revoke it deliberately.)
 
 #### The runbook
 
@@ -661,13 +706,28 @@ must stay single-use and short-lived, and the pairing it yields is the one the r
 to a single gathering's chain. And the parameter must be stripped from the URL the moment it is
 claimed, or it survives in the kiosk's own history for weeks.
 
-### 6.5 Notice the pre-grant
+### 6.5 Notice the pre-grant, and hand back the policy line
 
-With `WebUsbAllowDevicesForUrls` in force the printer appears in `getDevices()` with no chooser ever
-shown. The printer screen's copy — argued at length in
+Two small things on the printer screen, both of which fall out of the device object it already
+holds.
+
+**Notice the pre-grant.** With `WebUsbAllowDevicesForUrls` in force the printer appears in
+`getDevices()` with no chooser ever shown. The printer screen's copy — argued at length in
 [`kiosk-printer-setup.md`](kiosk-printer-setup.md) — currently assumes somebody must connect one. It
 should be able to tell the difference and say *the printer is set by policy* instead of offering a
 button that opens an empty chooser.
+
+**Hand back the policy line.** Step 0 of §4.6 has somebody connect the printer and then go reading
+`vendorId=1273` out of the event log. The screen knows that number the moment it is connected, so it
+can simply show the finished rule for *this* printer, with a copy button:
+
+```json
+[{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
+```
+
+That is better than §6.3's generated page in the one way that matters — it is derived from the
+hardware actually in the building rather than from configuration and a lookup table — and it makes
+the pre-flight and the policy one continuous action instead of two screens and a transcription.
 
 ---
 
