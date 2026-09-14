@@ -108,8 +108,9 @@ EMM, which is the supported path and the only one with a quota.
 
 | Route | What it costs | Notes |
 | --- | --- | --- |
-| A small commercial EMM that speaks dedicated devices (TinyMDM, Esper, Scalefusion, Hexnode, Miradore …) | roughly £1–3 per device per month; several have free tiers under ~10–30 devices | The realistic answer for a ministry with one to six tablets. Most accept an AMAPI policy JSON more or less verbatim, or expose the same fields as toggles. |
-| Google Workspace endpoint management | included with most Workspace editions the church may already have (nonprofits get Workspace free) | Its Android company-owned support is *fully managed*. **Unverified:** I could not establish that the Admin console exposes the dedicated-device/kiosk solution set — kiosk app assignment and `kioskCustomization` appear not to be surfaced there. Check before committing to it. |
+| ManageEngine Mobile Device Manager Plus, free edition | free permanently, up to 25 devices | The recommendation for a church. Binds to managed Google Play with an ordinary Google account, has a form for Chrome's managed configuration and a raw-JSON box beside it, and does single-app kiosk. A ministry with three tablets never leaves the free tier. |
+| A small commercial EMM that speaks dedicated devices (TinyMDM, Esper, Scalefusion, Hexnode, Miradore …) | roughly £1–3 per device per month; several have free tiers under ~10–30 devices | Also fine. Most accept an AMAPI policy JSON more or less verbatim, or expose the same fields as toggles. |
+| Google Workspace endpoint management | included, but **not at the tier a church is likely on** | Settled: managed app configuration is listed as *Android app settings*, an **Advanced** mobile management feature, and Advanced needs Business Plus or better. Basic — which is what Business Starter, Cloud Identity Free and the donated Google Workspace for Nonprofits grant come with — enforces lock screens and account wipes and cannot push a Chrome configuration at all. Dedicated-device/kiosk mode is not in the Workspace feature set at any tier. So an existing Workspace subscription is very unlikely to be the answer, which is worth knowing before somebody spends an afternoon in the Admin console. |
 | Headwind MDM or another self-hosted EMM | a VM | Not AMAPI — a legacy Device Policy Controller. Works, but it is another server the church now runs. |
 | Screen pinning, by hand, on the device | free | Android's own single-app lock. No remote anything, no Wi-Fi push, no update window, and a volunteer can leave it with a long-press. Worth knowing about as the zero-effort floor, not as the answer. |
 | A kiosk-browser app (Fully Kiosk Browser and friends) | ~€7 once | **Fatal for a printing kiosk.** These render in Android's System WebView, and WebUSB is not exposed in WebView. The Brother QL simply is not reachable. Fine for a kiosk that never prints; nothing else. |
@@ -135,6 +136,15 @@ can install one without any Play listing:
 `FULL_SCREEN` is the right display mode and matches what `public/kiosk.webmanifest` already asks
 for in `display_override`. The generated `com.google.enterprise.webapp.x…` package name is what the
 policy refers to.
+
+**The alternative, and why it is not obviously worse.** Some consoles skip the web app and make
+`com.android.chrome` itself the `KIOSK` package, pointing it at the kiosk with `HomepageLocation`
+and `RestoreOnStartup`. It is less tidy — the kiosk is visibly a browser in a locked cage rather
+than an app — but it removes the one uncertainty this whole document rests on (§8: does Chrome's
+managed configuration reach a WebAPK's rendering context?). With Chrome as the kiosk app there is
+no WebAPK and no question: the policy is applied to the browser that is drawing the page. If the
+first tablet shows `WebUsbAllowDevicesForUrls` as *OK* in `chrome://policy` but `getDevices()` still
+comes back empty inside the web app, this is the fallback, and it costs nothing to switch to.
 
 Then the device policy:
 
@@ -235,7 +245,7 @@ engine, and because these keys are how the browser underneath the kiosk is made 
 
 | Key | Value | Why |
 | --- | --- | --- |
-| `WebUsbAllowDevicesForUrls` | `[{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]` | Vendor `0x04f9` = 1273 decimal, Brother. The pre-grant [`label-printing.md`](label-printing.md#skipping-the-chooser-entirely) already documents: the chooser disappears, a replacement printer needs no visit, and the grant is matched by vendor/product rather than serial, so it survives the Android re-attach. Supported on Android 75+ **and only on a managed device** — this row is the reason this whole document exists. |
+| `WebUsbAllowDevicesForUrls` | see §4.3 — it has more failure modes than the rest of the table put together | The pre-grant [`label-printing.md`](label-printing.md#skipping-the-chooser-entirely) already documents: the chooser disappears, a replacement printer needs no visit, and the grant is matched by vendor/product rather than serial, so it survives the Android re-attach. Supported on Android 75+ **and only on a managed device** — this row is the reason this whole document exists. |
 | `URLBlocklist` | `["*"]` | Whatever else happens, the tablet is not a browser. |
 | `URLAllowlist` | `["https://tally.example.org/kiosk", "<firebase and backend origins>"]` | The kiosk's own origin and what it talks to. Getting this list wrong is the commonest way to ship a blank kiosk; start permissive on the origin, then tighten. |
 | `IncognitoModeAvailability` | `1` (disabled) | |
@@ -253,12 +263,87 @@ it blocks file transfer to a host and leaves ordinary USB device connections alo
 this policy should be told that in one sentence, because it is the single change most likely to be
 made later, by somebody tidying up, months after anyone remembers why.
 
-### 4.3 Enrolling
+### 4.3 The WebUSB rule, which is fussier than it looks
+
+Every other key in §4.2 is a boolean or a list of strings. This one is a nested structure with a
+schema validator behind it, and **a rule that fails validation is dropped silently** — Chrome falls
+back to prompting, the kiosk looks merely un-configured, and nothing anywhere says why. The rules,
+in the order people trip over them:
+
+- **Identifiers are base-10 integers, never hex.** `0x04f9` is the number Brother publishes and the
+  number every other document uses; the policy wants `1273`. A hex string fails the schema and takes
+  the whole rule with it. This is the single commonest mistake.
+- **`product_id` cannot appear without `vendor_id`.** A rule carrying only a product id is invalid.
+  The reverse is fine and is what you usually want: `vendor_id` alone matches every model that
+  vendor makes, which is how a QL-700 swapped for a QL-820NWB on a Sunday morning needs no policy
+  edit at all.
+- **Origins must be `https://`, and only the origin is read.** Scheme, host and port; a path such as
+  `/kiosk` is ignored during matching, and wildcards are rejected. (`URLAllowlist`, one row up, is a
+  different policy and *does* take paths — the two look alike and behave differently.)
+- **Both `urls` and `devices` are mandatory.** A dictionary missing either is dropped.
+
+For Tally's kiosk, matching the vendor and leaving the model open:
+
+```json
+[{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
+```
+
+The decimal identifiers for the printers a church check-in desk actually has:
+
+| Printer | Hex VID / PID | `vendor_id` | `product_id` |
+| --- | --- | --- | --- |
+| Brother QL-820NWB | `0x04F9` / `0x209B` | 1273 | 8347 |
+| Brother QL-700 | `0x04F9` / `0x2042` | 1273 | 8258 |
+| Zebra ZD410 / ZD420 | `0x0A5F` / `0x011A` | 2655 | 282 |
+| Dymo LabelWriter 450 | `0x0922` / `0x0020` | 2338 | 32 |
+
+**How the value is encoded depends on the console, and this is not settled.** Chrome's Android
+managed-configuration schema takes simple list policies (`URLBlocklist`, `URLAllowlist`) as real
+string arrays, but complex policies whose items are dictionaries are commonly carried as a *JSON
+string* instead:
+
+```json
+"WebUsbAllowDevicesForUrls": "[{\"devices\":[{\"vendor_id\":1273}],\"urls\":[\"https://tally.example.org\"]}]"
+```
+
+Consoles disagree about which form they send, and the failure looks identical either way: no error,
+no printer. Do not reason about it — read the answer off the device, per §4.5.
+
+### 4.4 Enrolling
 
 Fully managed provisioning cannot be done to a tablet that is already set up. Each device is
 factory reset, and at the very first screen either the QR the console mints is scanned, or
 `afw#setup` is typed into the Google account field. Budget twenty minutes for the first tablet and
 five for each after.
+
+Worth doing while the tablets are still on a desk: print the enrolment QR and leave a laminated copy
+at the check-in desk. A tablet that dies on a Sunday is then a factory reset, a scan and three
+minutes, done by whoever is standing there, rather than a phone call.
+
+### 4.5 Reading the answer off the device
+
+Neither §4.2 nor §4.3 should be believed until the tablet says so. Two checks, both on the tablet
+itself, both before the first Sunday:
+
+1. **`chrome://policy`**, with *Reload policies* tapped. `WebUsbAllowDevicesForUrls` must be present,
+   its **Status** must read *OK*, and its value must be the array you meant. A *Status: Error* is the
+   schema validator rejecting §4.3 — usually hex, usually a lone `product_id`. A policy that is
+   absent entirely means the managed configuration never arrived, which is a different problem in a
+   different place.
+2. **`navigator.usb.getDevices()`** from the kiosk's own origin, with the printer plugged in. It must
+   resolve to an array containing the printer, with no chooser having appeared. This is the actual
+   claim being made — that the kiosk's own `getPairedDevices()` at `src/kiosk/printing/index.ts` will
+   find the printer on a cold boot with nobody standing there — and it is one line to check:
+
+   ```js
+   navigator.usb.getDevices().then((d) => console.log(d.length, d.map((x) => x.productName)));
+   ```
+
+   `navigator.usb` being `undefined` means the page is not in Chrome proper — a WebView container, or
+   an insecure origin.
+
+Reaching `chrome://policy` on a locked kiosk means unlocking it, so do both while the tablet is
+still being staged and before the kiosk profile is applied.
 
 ---
 
@@ -277,6 +362,19 @@ It buys the six wants in §1 and nothing more. Three things it specifically does
   `WebAppInstallForceList`. There is no Android path. §6.4 is the Android-shaped substitute.
 - **Anything about the printer's own firmware or power.** Auto Power Off is still a setting on the
   Brother ([`label-printing.md`](label-printing.md)).
+
+And two physical constraints no policy reaches, both of which look like software faults when they
+bite:
+
+- **The tablet must be a USB host and stay charged at the same time.** A passive OTG splitter runs
+  the battery down over a morning, and a tablet at 4% starts refusing the Screen Wake Lock — which
+  presents as the kiosk sleeping, not as a power problem. An active USB-C hub with Power Delivery
+  pass-through is the fix, and it is the same powered hub Phase 5 of
+  [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) already asks for.
+- **Doze suspends the USB host controller.** Android idling the device can cut power to the
+  peripheral, and the kiosk finds out as a `disconnect` it did nothing to cause. `stayOnPluggedModes`
+  in §4 covers most of it; exempting `com.android.chrome` from battery optimisation covers the rest,
+  and that exemption is a per-device setting most consoles can push.
 
 ---
 
@@ -371,9 +469,11 @@ tablets.
 
 - Does `WebUsbAllowDevicesForUrls` reach a **WebAPK** context, or only tabs in Chrome proper? A
   WebAPK runs on Chrome's engine and policy should apply, but this is inference, not a tested fact,
-  and the whole §4.2 case rests on it. Test before buying licences.
-- Does Google Workspace endpoint management expose the dedicated-device solution set at all? §3
-  marks this unverified.
+  and the whole §4.2 case rests on it. §4.5 is how to find out in ten minutes, and §4's
+  Chrome-as-kiosk note is the fallback if the answer is no.
+- Which encoding does the chosen console send for `WebUsbAllowDevicesForUrls` — a real JSON array or
+  a JSON string (§4.3)? Answered by `chrome://policy` on the first tablet, not by reading anybody's
+  documentation.
 - With the pre-grant in force, how often does Android's own dialog actually appear in a week of
   real Sundays? Phase 5 predicts "on the first `open()` after a re-attach"; the printer event log
   the reliability work added is the instrument that can answer it.
@@ -381,3 +481,32 @@ tablets.
   for a volunteer at 9am with a frozen screen and no admin. `networkEscapeHatchEnabled` covers the
   Wi-Fi case; the frozen-app case is what `systemErrorWarnings: ERROR_AND_WARNINGS_MUTED` is for,
   and it should be watched rather than assumed.
+
+---
+
+## 9. A note on the brief this came from
+
+This page was written against a research brief on deploying `WebUsbAllowDevicesForUrls` to church
+check-in tablets. Most of §4.3, the decimal identifier table, the ManageEngine route, the Workspace
+tiering and the physical constraints in §5 come from it and are good. Two things in it are wrong in
+ways that would cost a weekend, and they are recorded here because the brief is the kind of document
+that gets forwarded:
+
+- **"AMAPI … includes a default project quota supporting 500 to 1,000 enrolled endpoints."** It does
+  not. [Google's own page](https://developers.google.com/android/management/permissible-usage) puts
+  the default at **zero devices**; *up to* 500 requires "a full business justification" and a review
+  measured in weeks. The brief presents AMAPI-direct as the free, self-serve option for larger
+  fleets. It is neither free of process nor self-serve, and a church that follows its Methodology 2
+  will get through the whole `curl` sequence and then fail to enrol a single tablet.
+- **The brief does not mention Permissible Usage at all**, and its Methodology 2 — the church stands
+  up its own Cloud project, service account and enterprise — is the pattern that policy names as not
+  allowed ("solutions developed and used exclusively for first party in-house applications"). See
+  §2.1. This is the reason this document routes through a validated EMM instead.
+
+One smaller correction: the brief's policy sets `stayOnWhilePluggedIn`. The AMAPI field is
+`stayOnPluggedModes`; `stayOnWhilePluggedIn` is the Android settings key underneath it and is
+rejected by the API. And its remedy for Android's "Open Chrome to handle this device?" dialog —
+`defaultPermissionPolicy: GRANT` — is doubtful: that grants Android *runtime permissions*, and USB
+device access is not one. The **Always allow** checkbox during staging is the part of that remedy
+that works, and [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5, which was
+written against the Chromium sources, remains the more trustworthy account.
