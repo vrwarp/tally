@@ -1834,8 +1834,11 @@ function NoMatchPanel({ mode, onWiden, onRegister, chosen, pins }: NoMatchProps)
      has failed at its one job. */
   const many = spoken.length > 1;
   return (
-    <div className={`mx-auto flex h-full w-full max-w-xs flex-col items-stretch text-center tall:max-w-md tall:justify-end lg:max-w-2xl ${many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'}`}>
-      <div className={`mx-auto flex max-w-sm flex-col items-center gap-1 text-center leading-tight font-semibold text-ink-100 tall:max-w-md ${many ? 'text-2xl' : 'text-3xl kiosk:text-4xl'}`}>
+    /* The sign's width rather than the doors' (the clutter critic, round 10):
+       at 448px two of three route sentences broke into two rows apiece and
+       the panel read as three paragraphs rather than three lines. */
+    <div className={`mx-auto flex h-full w-full max-w-xs flex-col items-stretch text-center tall:max-w-xl tall:justify-end lg:max-w-2xl ${many ? 'gap-2 pt-4 tall:gap-3' : 'gap-3 pt-6 tall:gap-4'}`}>
+      <div className={`mx-auto flex max-w-sm flex-col items-center gap-1 text-center leading-tight font-semibold text-ink-100 tall:max-w-xl ${many ? 'text-2xl' : 'text-3xl kiosk:text-4xl'}`}>
         {distinct((candidate) => COPY[candidate].noMatch).map((candidate) => (
           <span key={candidate} lang={candidate}>
             {COPY[candidate].noMatch}
@@ -1848,7 +1851,7 @@ function NoMatchPanel({ mode, onWiden, onRegister, chosen, pins }: NoMatchProps)
           already has, and the line is the one that says a person will help
           and the phone's four digits will do. Repetition is spent here on
           purpose — it is the failure state. */}
-      <div className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-balance text-ink-100 tall:max-w-md ${many ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'}`}>
+      <div className={`mx-auto flex max-w-sm flex-col gap-1 text-center leading-snug text-ink-100 tall:max-w-xl ${many ? 'text-lg kiosk:text-xl' : 'text-xl kiosk:text-2xl'}`}>
         {distinct(route).map((candidate) => (
           <span key={candidate} lang={candidate}>
             {route(candidate)}
