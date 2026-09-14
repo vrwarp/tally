@@ -403,7 +403,8 @@ a killing test (`node scripts/mutate.mjs src/kiosk/printing/log.ts` / `index.ts`
   a managed device (an EMM pushing Chrome's managed configuration) and Chrome still raises the OS
   "Allow access" dialog on the first `open()` after a re-attach — but the kiosk can then raise it
   by itself from the `connect` event, so the fix becomes "tap Allow" rather than a trip through the
-  staff screens. Worth doing if the tablet is or can be enrolled.
+  staff screens. Worth doing if the tablet is or can be enrolled — enrolment, the whole kiosk
+  policy and who should apply it are [tablet management](tablet-management.md).
 - If the log shows §2.5 recurring, prefer ChromeOS for the printing kiosk: it keeps the grant across
   re-attaches and reconnects silently.
 
