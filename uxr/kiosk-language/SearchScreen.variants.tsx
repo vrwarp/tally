@@ -1610,7 +1610,7 @@ const COPY: Record<
     routeDigits: '找同工帮忙，或试试电话后 4 位。',
     routeName: '试试输入您孩子的英文名字，或找同工帮忙。',
     offerFirstTime: '第一次来？为您的孩子登记',
-    offerNotYours: '不是您家的？为您的孩子登记',
+    offerNotYours: '不是您家的孩子吗？为您的孩子登记',
     widen: '搜索所有人',
   },
   'zh-Hant': {
@@ -1626,14 +1626,13 @@ const COPY: Record<
     widen: '搜尋所有人',
   },
   es: {
-    name: 'Escriba el nombre de su niño o niña',
+    name: 'Escriba el nombre de su hijo o hija',
     orDigits: 'o los últimos 4 dígitos de su teléfono',
-    thenTap: 'Luego toque el nombre de su niño o niña.',
+    thenTap: 'Luego toque el nombre de su hijo o hija.',
     tapHere: 'Toque aquí',
     noMatch: 'No encontramos ese nombre',
-    routeDigits: 'Pida ayuda a un voluntario, o pruebe los últimos 4 dígitos de su teléfono.',
-    routeDigitsAlone: 'Los acentos no importan. Pida ayuda a un voluntario, o pruebe los últimos 4 dígitos de su teléfono.',
-    routeName: 'Pruebe escribiendo el nombre de su niño o niña, o pida ayuda a un voluntario.',
+    routeDigits: 'Los acentos no importan. Pruebe los últimos 4 dígitos de su teléfono, o pida ayuda a un voluntario.',
+    routeName: 'Pruebe escribiendo el nombre de su hijo o hija, o pida ayuda a un voluntario.',
     offerFirstTime: '¿Primera vez? Inscríbalos aquí',
     offerNotYours: '¿No es su familia? Inscríbalos aquí',
     widen: 'Buscar en toda la iglesia',
@@ -1853,6 +1852,10 @@ function NoMatchPanel({ mode, onWiden, onRegister, chosen, pins }: NoMatchProps)
         {distinct(route).map((candidate) => (
           <span key={candidate} lang={candidate}>
             {route(candidate)}
+            {/* The four digits once, after the first line: the one screen where
+                reading has already failed is the one that had no wordless route
+                (staff, round 10). */}
+            {candidate === spoken[0] && mode !== 'phone' && <DigitsCue />}
           </span>
         ))}
       </div>
@@ -1998,9 +2001,9 @@ function LanguageBarIdle({ backdrop, onChoose, chosen, pins, speaks }: IdleProps
         </div>
         <div className={`pt-1 text-lg kiosk:text-xl ${dim}`}>
           {copy.orDigits}
-          {chosen === null && <DigitsCue />}
+          <DigitsCue />
         </div>
-        {chosen === null && lines.map((candidate) => <Line key={candidate} candidate={candidate} />)}
+        {chosen === null && lines.map((candidate) => <Line key={candidate} candidate={candidate} dim={dim} />)}
       </div>
     </div>
   );
@@ -2171,33 +2174,48 @@ function Plate({
 }
 
 /**
- * A pinned language the kiosk cannot speak yet, as one line: its name route,
- * a step under the resting language's. No digits line (round 9's cut: the
- * route the church's data cannot carry does not earn a second line in a
- * second language), no plate, no door, no badge — it promises nothing
- * beyond the words on the glass.
+ * A pinned language the kiosk cannot speak yet, as the sign's second
+ * language: its name route a step under the resting language's, and its
+ * digits route small beneath with the cue. Round 9 cut the digits line;
+ * round 10's Spanish mother asked for it back — "the one thing they are told
+ * at rest that I am not" — and the cue crosses languages. No plate, no
+ * door, no badge: it promises nothing beyond the words on the glass.
  */
-function Line({ candidate }: { candidate: Lang }) {
+function Line({ candidate, dim }: { candidate: Lang; dim: string }) {
   return (
-    <div className="pt-3 text-2xl leading-tight font-semibold text-balance text-ink-200 tall:text-3xl" lang={candidate}>
-      {COPY[candidate].name}
+    <div className="flex flex-col items-center pt-3" lang={candidate}>
+      <div className="text-2xl leading-tight font-semibold text-balance text-ink-200 tall:text-3xl">
+        {COPY[candidate].name}
+      </div>
+      <div className={`pt-1 text-base kiosk:text-lg ${dim}`}>
+        {COPY[candidate].orDigits}
+        <DigitsCue />
+      </div>
     </div>
   );
 }
 
 /**
- * Four empty boxes after the resting language's digits line: the route
- * that needs no reading, shown without one. The grandmother, who reads no
- * English and cannot spell "Benson", asked for exactly this once the
- * switcher candidates put 或電話後 4 碼 behind a press — "even just the four
- * numbers shown as an example under the English line would do it". At rest
- * only; a chosen screen's digits line is readable.
+ * Four faint digits in key-shaped boxes after a digits line: the route that
+ * needs no reading, shown without one. The grandmother, who reads no English
+ * and cannot spell "Benson", asked for exactly this once the switcher
+ * candidates put 或電話後 4 碼 behind a press — "even just the four numbers
+ * shown as an example under the English line would do it". Round 10 filled
+ * the boxes: empty, both she and the Spanish mother read them as characters
+ * that failed to print (豆腐字). After every digits line the switcher
+ * candidates show, in any language (the father: "four squares means four
+ * numbers, in any language").
  */
 function DigitsCue() {
   return (
     <span aria-hidden="true" className="ml-2 inline-flex items-center gap-1 align-middle">
-      {[0, 1, 2, 3].map((box) => (
-        <span key={box} className="inline-block h-4 w-3 rounded-sm ring-1 ring-ink-500 tall:h-5 tall:w-3.5" />
+      {['1', '2', '3', '4'].map((digit) => (
+        <span
+          key={digit}
+          className="inline-flex h-5 w-4 items-center justify-center rounded-sm bg-ink-800 text-xs leading-none font-semibold text-ink-500 ring-1 ring-ink-600 tall:h-6 tall:w-5 tall:text-sm"
+        >
+          {digit}
+        </span>
       ))}
     </span>
   );
@@ -2264,7 +2282,7 @@ function Voices(props: IdleProps) {
           {COPY[RESTING].orDigits}
         </div>
         {lines.map((candidate) => (
-          <Line key={candidate} candidate={candidate} />
+          <Line key={candidate} candidate={candidate} dim={dim} />
         ))}
         {plates.length > 0 && (
           <div className="mt-4 flex w-full max-w-xl flex-col gap-2 lg:mt-3">
@@ -2388,13 +2406,19 @@ function Grid({ backdrop, onChoose, chosen, pins, speaks, size }: IdleProps & { 
                 lang={candidate}
                 aria-pressed={current}
                 {...tap(() => {
-                  haptic(8);
+                  haptic();
                   onChoose(candidate);
                 })}
-                className={`flex items-center justify-center rounded-xl px-2 leading-none font-semibold ${GRID_CELL[size]} ${
+                /* `whitespace-nowrap`: a language's name never comes apart
+                   (every reader, round 10 — a word snapped in half is what a
+                   broken machine looks like). If a size cannot hold the names
+                   whole, the frame scrolls sideways and the shooter says so:
+                   that size is not the size. The unlit tokens are the bar's,
+                   one switch, one palette (staff). */
+                className={`flex items-center justify-center rounded-xl px-2 leading-none font-semibold whitespace-nowrap ${GRID_CELL[size]} ${
                   current
                     ? 'bg-ink-700 text-ink-50 ring-2 ring-ink-400'
-                    : 'bg-ink-800 text-ink-200 ring-1 ring-ink-600 active:bg-ink-600'
+                    : 'bg-ink-800 text-ink-300 ring-1 ring-ink-600 active:bg-ink-600'
                 }`}
                 style={{ touchAction: 'manipulation' }}
               >
@@ -2408,13 +2432,13 @@ function Grid({ backdrop, onChoose, chosen, pins, speaks, size }: IdleProps & { 
         </div>
         <div className={`pt-1 text-lg kiosk:text-xl ${dim}`} lang={lang}>
           {copy.orDigits}
-          {chosen === null && <DigitsCue />}
+          <DigitsCue />
         </div>
         {/* The sign's second language while the kiosk cannot speak it: both
             Spanish-speaking readers asked for a sentence they can read at
             rest, and the grid's Español cell is a door to a room that is
             half built until `es.json` lands. */}
-        {chosen === null && lines.map((candidate) => <Line key={candidate} candidate={candidate} />)}
+        {chosen === null && lines.map((candidate) => <Line key={candidate} candidate={candidate} dim={dim} />)}
       </div>
     </div>
   );
@@ -2462,7 +2486,7 @@ function Doors(props: IdleProps) {
           {COPY[RESTING].orDigits}
         </div>
         {lines.map((candidate) => (
-          <Line key={candidate} candidate={candidate} />
+          <Line key={candidate} candidate={candidate} dim={dim} />
         ))}
         {doors.length > 0 && (
           <div className="mt-5 flex w-full max-w-md flex-row gap-3 lg:mt-3">

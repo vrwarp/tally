@@ -80,7 +80,7 @@ const SCENES: {
 }[] = [
   { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
   { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
-  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'es'] },
+  { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es'] },
   { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
   /* Two letters of an English name the family knows only as a sound: the
      rows carry the Chinese name the roster holds, which is what a reader who
