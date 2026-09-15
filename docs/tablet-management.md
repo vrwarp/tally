@@ -741,10 +741,10 @@ hour the kiosk reloads" rather than as a coincidence.
 
 ### 6.3 Serve the value that must not be mistyped
 
-**Built: `/setup`.** One static page, at a path short enough to type on a tablet's on-screen keyboard: each §4.2 key with
-a copy button, the WebUSB value built from **this deployment's** real origin and the printer vendor
-read from the printing module rather than from a worked example. Step 2 of §4.6 becomes: open it in
-Chrome on the tablet, copy, paste into Test DPC, next key. Ordered so the two URL lists come last,
+**Built: `/setup`.** One static page, at a path short enough to type on a tablet's on-screen
+keyboard: each §4.2 key with a copy button, the WebUSB value built from **this deployment's** real
+origin and the printer vendor read from the printing module rather than from a worked example.
+Step 2 of §4.6 becomes: open it in Chrome on the tablet, copy, paste into Test DPC, next key. Ordered so the two URL lists come last,
 because pasting the blocklist early cuts off the page itself.
 
 **It should not be staff-gated, and the reason is worth being precise about.** An earlier draft of
