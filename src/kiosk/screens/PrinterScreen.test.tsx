@@ -18,7 +18,14 @@ import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import type { KioskPrinting } from '@/kiosk/KioskApp';
-import type { Label, PrinterDetection, PrinterLogEntry, PrinterStatus } from '@/kiosk/printing';
+import type {
+  Label,
+  PrinterConfig,
+  PrinterDetection,
+  PrinterLogEntry,
+  PrinterState,
+  PrinterStatus,
+} from '@/kiosk/printing';
 import { describeAge, describeEntry } from '@/kiosk/printing/log';
 
 /**
@@ -84,7 +91,7 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
 
 function mount(
   printing: KioskPrinting,
-  config = { model: 'QL-800', label: '62' },
+  config: PrinterConfig = { model: 'QL-800', label: '62' },
   extra: Partial<ComponentProps<typeof PrinterScreen>> = {},
 ) {
   render(
@@ -127,10 +134,12 @@ async function pressText(text: string): Promise<void> {
 }
 
 /** The same handle, stuck in a state where the printer is not currently there. */
-function handleUnpaired() {
+function handleUnpaired(): KioskPrinting {
   const printing = handleWith(null);
-  printing.currentState = () => ({ kind: 'unpaired' as const, searching: false });
-  return printing;
+  return {
+    ...printing,
+    currentState: (): PrinterState => ({ kind: 'unpaired', searching: false }),
+  } as unknown as KioskPrinting;
 }
 
 describe('a printer the tablet policy granted', () => {
