@@ -2408,7 +2408,8 @@
     "reprintNeedsPrinter": "Conecta la impresora para reimprimir una etiqueta.",
     "checksNeedPrinter": "Revisar y probar necesitan la impresora conectada. Una reimpresión intentará reconectarla primero y avisará si no pudo.",
     "autoPowerOff": "En la Printer Setting Tool de Brother, deja Auto Power Off en None. Una impresora que se apaga sola tiene que conectarse otra vez desde esta pantalla.",
-    "backToGatherings": "Volver a las reuniones"
+    "backToGatherings": "Volver a las reuniones",
+    "setByPolicy": "La configuración de esta tableta le da la impresora a Tally, así que no hubo ningún paso de configuración que se pudiera olvidar. Una impresora de reemplazo funciona igual, sin volver a esta pantalla."
   },
   "Pairing": {
     "title": "Vincula este kiosco",

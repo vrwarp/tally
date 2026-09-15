@@ -711,6 +711,7 @@ async function adoptPolicyGrant(): Promise<PrinterConfig | null> {
       model: modelFromProductName(found.device?.productName) ?? DEFAULT_PRINTER_MODEL,
       label: DEFAULT_PRINTER_LABEL,
       guessed: true,
+      viaPolicy: true,
     };
     log.record('kiosk', 'policy-grant', identity(found.device));
     writePrinterConfig(granted);
@@ -1028,8 +1029,13 @@ export async function pairPrinter(next: PrinterConfig): Promise<PrinterDetection
 
 /** Change the model or media without re-pairing. */
 export async function configure(next: PrinterConfig): Promise<PrinterState> {
-  writePrinterConfig(next);
-  config = next;
+  // How the printer got here survives a change to what is in it. Every caller
+  // builds `next` from a model and a roll, so without this the first time
+  // anybody picked the other spindle a policy-granted printer would start
+  // describing itself as one somebody paired by hand.
+  const carried: PrinterConfig = config?.viaPolicy ? { ...next, viaPolicy: true } : next;
+  writePrinterConfig(carried);
+  config = carried;
   if (printer) printer.model = next.model;
   log.record('kiosk', 'configure', { model: next.model, label: next.label });
   await reopen('configure');
@@ -1134,7 +1140,15 @@ export async function checkPrinter(): Promise<PrinterDetection | null> {
   const guessed =
     status === null ? config?.guessed === true : detected === null || matched.length !== 1;
   if (guessed !== (config?.guessed === true)) {
-    const settled: PrinterConfig = { model, label, ...(guessed ? { guessed: true } : {}) };
+    const settled: PrinterConfig = {
+      model,
+      label,
+      ...(guessed ? { guessed: true } : {}),
+      // Settling the roll answers a question about the media, not about how the
+      // printer got here. Dropping this would quietly relabel a policy-granted
+      // printer as one somebody paired, the first time the screen is opened.
+      ...(config?.viaPolicy ? { viaPolicy: true } : {}),
+    };
     writePrinterConfig(settled);
     config = settled;
   }

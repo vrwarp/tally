@@ -13902,6 +13902,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.setByPolicy": {
+    "source": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen.",
+    "context": "Reference note on the lobby kiosk’s printer screen, shown only when the printer was granted to Tally by the tablet’s own device-management policy rather than connected by hand. It exists to stop a volunteer hunting for a set-up step that does not exist. “This tablet’s own settings” means the managed configuration an administrator put on the device, not anything inside Tally.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Pairing.title": {
     "source": "Pair this kiosk",
     "es-MX": "machine",

@@ -610,6 +610,21 @@ export function PrinterScreen({
     } else if (state.kind === 'trouble') {
       primarySays.push(<Say key="then">{t('troubleThenLookAgain')}</Say>);
     } else {
+      /*
+       * A kiosk whose printer came from the tablet's policy has no set-up step,
+       * and the absence of one reads as a step somebody skipped. Said here
+       * rather than beside *ready* because this is the state that sends a
+       * volunteer looking: the printer is not there at the moment, the screen
+       * is offering a chooser, and the useful fact is that plugging the printer
+       * back in is the whole of the repair. `ink-400`, a reference note — it is
+       * true of the kiosk rather than a consequence of the last press.
+       */
+      if (config.viaPolicy)
+        primarySays.push(
+          <Say key="policy" tone="text-ink-400">
+            {t('setByPolicy')}
+          </Say>,
+        );
       if (stillLooking) primarySays.push(<Say key="wait">{t('mayConnectItself')}</Say>);
       else if (state.kind === 'unpaired' && !attemptFailed)
         primarySays.push(<Say key="cable">{t('checkPowerAndCable')}</Say>);

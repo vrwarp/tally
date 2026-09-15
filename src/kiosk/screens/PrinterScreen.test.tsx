@@ -126,6 +126,42 @@ async function pressText(text: string): Promise<void> {
   });
 }
 
+/** The same handle, stuck in a state where the printer is not currently there. */
+function handleUnpaired() {
+  const printing = handleWith(null);
+  printing.currentState = () => ({ kind: 'unpaired' as const, searching: false });
+  return printing;
+}
+
+describe('a printer the tablet policy granted', () => {
+  /*
+   * A managed kiosk has no set-up step, and on the screen where one would have
+   * been that reads as a step somebody skipped. The note exists to say the
+   * absence is the design — and to say it in the state that sends a volunteer
+   * looking, which is the one where the printer is not currently answering.
+   */
+
+  it('says so when the printer is not there, so nobody hunts for a missed step', () => {
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29', viaPolicy: true });
+
+    expect(screen.getByText(/no set-up step to miss/i)).toBeInTheDocument();
+  });
+
+  it('says nothing of the sort on a kiosk somebody paired by hand', () => {
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29' });
+
+    expect(screen.queryByText(/no set-up step to miss/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the advice that is actually actionable in place beside it', () => {
+    // The note is a reference line, not a replacement: plugging the printer
+    // back in is still the repair, and the screen still says so.
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29', viaPolicy: true });
+
+    expect(screen.getByText(/power and cable/i)).toBeInTheDocument();
+  });
+});
+
 describe('connecting a printer', () => {
   it('asks the printer what it is, rather than taking what the screen showed', async () => {
     const printing = handleWith(detection());

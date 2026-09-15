@@ -53,6 +53,22 @@ export interface PrinterConfig {
    * that refuses to load.
    */
   guessed?: boolean;
+  /**
+   * Whether this printer arrived from the tablet's policy rather than from
+   * somebody pressing *Connect*.
+   *
+   * On a managed tablet Chrome's `WebUsbAllowDevicesForUrls` grants the printer
+   * to this origin with no chooser at all, and the kiosk adopts it at boot
+   * (`adoptPolicyGrant`). That is worth saying on the printer screen for one
+   * practical reason rather than for provenance's sake: a volunteer looking at
+   * a kiosk nobody set up needs to know that the absence of a setup step is the
+   * design and not a thing they forgot, and that a replacement printer will
+   * behave the same way without a visit.
+   *
+   * Optional for the same reason `guessed` is: every config written before this
+   * existed lacks it, and absent has to read as "paired the ordinary way".
+   */
+  viaPolicy?: boolean;
 }
 
 /**

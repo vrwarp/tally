@@ -207,7 +207,8 @@
     "reprintNeedsPrinter": "Connect the printer first to reprint a name tag.",
     "checksNeedPrinter": "Check and test need the printer connected. A reprint will try to reconnect first, and say if it could not.",
     "autoPowerOff": "In Brother’s Printer Setting Tool, set Auto Power Off to None. A printer that switches itself off has to be connected again from this screen.",
-    "backToGatherings": "Back to the gatherings"
+    "backToGatherings": "Back to the gatherings",
+    "setByPolicy": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen."
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",

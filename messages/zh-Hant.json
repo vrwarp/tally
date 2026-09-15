@@ -2408,7 +2408,8 @@
     "reprintNeedsPrinter": "要重印名牌，請先連接印表機。",
     "checksNeedPrinter": "檢查和測試需要先連接印表機。重印會先嘗試重新連接，連不上會告訴你。",
     "autoPowerOff": "在 Brother 的 Printer Setting Tool 裡，把 Auto Power Off 設為 None。會自動關機的印表機，必須從這個畫面重新連接一次。",
-    "backToGatherings": "回到聚會列表"
+    "backToGatherings": "回到聚會列表",
+    "setByPolicy": "這臺平板的設定已將印表機交給 Tally，因此沒有可遺漏的設定步驟。更換印表機後同樣可用，無需再回到此頁面。"
   },
   "Pairing": {
     "title": "配對這台簽到台",
