@@ -1090,6 +1090,24 @@ export const approveKioskPairing = httpsCallable<
 >(functions, 'approveKioskPairing');
 
 /**
+ * A pairing minted ready, for a tablet that will come up with nobody at it.
+ *
+ * The same act of vouching as `approveKioskPairing`, in the other order: the
+ * code and secret are made here and go into a managed tablet's start URL, so a
+ * device that was factory reset in an office boots straight into a paired
+ * kiosk. See `docs/tablet-management.md` §6.4.
+ *
+ * What comes back is a credential. It is shown once, it lives an hour, and it
+ * does not belong on the public staging page — only in the one field of the
+ * device policy that carries the kiosk's URL.
+ */
+export const createKioskPairingLink = httpsCallable<
+  void,
+  | { status: 'created'; code: string; secret: string; expiresInSeconds: number }
+  | { status: 'busy' }
+>(functions, 'createKioskPairingLink');
+
+/**
  * Rebuilds the kiosk's search-by-phone index from the backends' household
  * numbers. Only the last four digits of anything are ever stored — see
  * docs/data-model.md. The kiosk also triggers this itself when it finds the

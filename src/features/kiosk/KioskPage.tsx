@@ -36,6 +36,7 @@ import { useNow } from '@/hooks/useNow';
 import { cn } from '@/lib/utils';
 import {
   approveKioskPairing,
+  createKioskPairingLink,
   getKioskStatus,
   refreshKioskPhoneIndex,
   type KioskStatus,
@@ -117,6 +118,7 @@ export function KioskPage() {
         <div className="flex flex-col gap-6 border-t border-ink-800 pt-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start lg:gap-8">
           <SigningSection {...signing} />
           <div className="flex flex-col gap-6">
+            <StagingLinkSection />
             <StuckKioskSection granted={signing.status?.state !== 'denied'} />
             <PhoneSearchSection />
           </div>
@@ -247,6 +249,105 @@ function PairForm({ blocked }: { blocked: boolean }) {
           {verdict ? t(verdict.line) : t('codeHint')}
         </p>
       </form>
+    </section>
+  );
+}
+
+/**
+ * A pairing link for a tablet that will come up with nobody standing at it.
+ *
+ * The pairing form above assumes a volunteer holding a tablet that is already
+ * showing six characters. A managed tablet is the other shape entirely — reset
+ * in an office, staged from `docs/tablet-management.md`, booting into the kiosk
+ * by itself — so the pairing is minted ready and travels in the tablet's start
+ * URL instead.
+ *
+ * Core and up only, not because the act needs more authority than approving a
+ * code does (it does not — both are `requireMember` on the server) but because
+ * staging tablets is their job and this page is already dense for everyone
+ * else.
+ *
+ * The link is held in state and never anywhere else. It is a credential: it
+ * signs a kiosk in as whoever pressed the button, and the warning under it says
+ * so in those words rather than in security language nobody reads.
+ */
+function StagingLinkSection() {
+  const t = useTranslations('KioskPair');
+  const [link, setLink] = useState<string | null>(null);
+  const [problem, setProblem] = useState<'busy' | 'failed' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const make = async () => {
+    if (busy) return;
+    setBusy(true);
+    setProblem(null);
+    setCopied(false);
+    try {
+      const { data } = await createKioskPairingLink();
+      if (data.status === 'busy') {
+        setLink(null);
+        setProblem('busy');
+        return;
+      }
+      setLink(`${window.location.origin}/kiosk?pair=${data.code}.${data.secret}`);
+    } catch {
+      setLink(null);
+      setProblem('failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      // The value is on screen and selectable. A failed copy is not a failure
+      // worth a red line on a page somebody is using to set a tablet up.
+    }
+  };
+
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-semibold text-ink-200">{t('stagingHeading')}</h2>
+      <p className="max-w-prose text-sm text-ink-400">{t('stagingWhat')}</p>
+
+      {link ? (
+        <>
+          {/* `break-all` because it is one unbroken token and a lobby laptop is
+              not wide. `select-all` so a failed clipboard still leaves one tap
+              between the reader and the value. */}
+          <code className="block rounded-lg bg-ink-800 px-3 py-2 font-mono text-xs break-all select-all text-ink-100">
+            {link}
+          </code>
+          <p className="max-w-prose text-xs leading-relaxed text-warn-400">
+            {t('stagingShownOnce')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void copy()}>
+              {copied ? t('stagingCopied') : t('stagingCopy')}
+            </Button>
+            <Button variant="ghost" disabled={busy} onClick={() => void make()}>
+              {busy ? t('stagingMaking') : t('stagingAgain')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div>
+          <Button variant="secondary" disabled={busy} onClick={() => void make()}>
+            {busy ? t('stagingMaking') : t('stagingMake')}
+          </Button>
+        </div>
+      )}
+
+      {problem ? (
+        <p aria-live="polite" className="max-w-prose text-sm text-danger-400">
+          {t(problem === 'busy' ? 'stagingBusy' : 'stagingFailed')}
+        </p>
+      ) : null}
     </section>
   );
 }

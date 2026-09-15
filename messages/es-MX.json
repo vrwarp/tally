@@ -966,7 +966,17 @@
     "phoneSearchNote": "De los números de una casa, en Tally solo se guardan los últimos cuatro dígitos. El índice se reconstruye solo cada noche; usa esto cuando el número de una familia haya cambiado hoy.",
     "rebuildIndex": "Reconstruir índice de teléfonos",
     "rebuilt": "Se reconstruyó la búsqueda por teléfono: {students} estudiantes, {entries} terminaciones de número.",
-    "rebuildFailed": "No se pudo reconstruir el índice de teléfonos del kiosco. ¿Se puede conectar con el directorio de tu iglesia?"
+    "rebuildFailed": "No se pudo reconstruir el índice de teléfonos del kiosco. ¿Se puede conectar con el directorio de tu iglesia?",
+    "stagingHeading": "Configurar una tableta sin código",
+    "stagingWhat": "Para una tableta administrada que inicia sola en el quiosco, sin nadie que lea un código. Pon el enlace en la URL de inicio de la tableta.",
+    "stagingMake": "Crear un enlace",
+    "stagingMaking": "Creando…",
+    "stagingAgain": "Crear otro",
+    "stagingShownOnce": "Se muestra una sola vez y dura una hora. Inicia sesión en el quiosco como tú, así que trátalo como una contraseña: ponlo directamente en la configuración de la tableta y en ningún otro lugar.",
+    "stagingBusy": "Hay demasiados emparejamientos abiertos ahora mismo. Inténtalo de nuevo en unos minutos.",
+    "stagingFailed": "No funcionó. Inténtalo de nuevo.",
+    "stagingCopy": "Copiar el enlace",
+    "stagingCopied": "Copiado"
   },
   "EventEditor": {
     "titleEdit": "Editar el evento",

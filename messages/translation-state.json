@@ -14122,5 +14122,75 @@
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "KioskPair.stagingHeading": {
+    "source": "Set up a tablet with no code",
+    "context": "Heading of a section on the kiosk page, visible to core team and admins only. \"Code\" means the six-character pairing code a kiosk normally displays.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingWhat": {
+    "source": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
+    "context": "Explains who the section is for: a tablet under device-management policy that starts the kiosk automatically. \"Start URL\" is the field in that policy naming the page the tablet opens.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingMake": {
+    "source": "Make a link",
+    "context": "Button that creates a one-time pairing link.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingMaking": {
+    "source": "Making…",
+    "context": "The same button while the request is in flight. Keep the ellipsis.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingAgain": {
+    "source": "Make another",
+    "context": "The same button after a link has already been made.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingShownOnce": {
+    "source": "Shown once, and good for an hour. It signs a kiosk in as you, so treat it like a password: put it straight into the tablet’s settings and nowhere else.",
+    "context": "Warning under a freshly created pairing link. It is a credential; the point is that it will not be shown again and should not be stored anywhere but the tablet policy.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingBusy": {
+    "source": "Too many pairings are open at the moment. Try again in a few minutes.",
+    "context": "Shown when the server refuses because too many pairings are already open. Not an error the reader caused.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingFailed": {
+    "source": "That didn’t work. Try again.",
+    "context": "Shown when the request failed for any other reason.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingCopy": {
+    "source": "Copy the link",
+    "context": "Button that copies the pairing link to the clipboard.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingCopied": {
+    "source": "Copied",
+    "context": "The copy button just after it worked.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   }
 }

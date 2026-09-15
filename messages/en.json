@@ -966,7 +966,17 @@
     "phoneSearchNote": "Only the last four digits of a household's numbers are ever stored in Tally. The index rebuilds nightly on its own; use this when a family's number changed today.",
     "rebuildIndex": "Rebuild phone search index",
     "rebuilt": "Phone search rebuilt: {students} students, {entries} number endings.",
-    "rebuildFailed": "Could not rebuild the kiosk phone index. Is your church directory reachable?"
+    "rebuildFailed": "Could not rebuild the kiosk phone index. Is your church directory reachable?",
+    "stagingHeading": "Set up a tablet with no code",
+    "stagingWhat": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
+    "stagingMake": "Make a link",
+    "stagingMaking": "Making…",
+    "stagingAgain": "Make another",
+    "stagingShownOnce": "Shown once, and good for an hour. It signs a kiosk in as you, so treat it like a password: put it straight into the tablet’s settings and nowhere else.",
+    "stagingBusy": "Too many pairings are open at the moment. Try again in a few minutes.",
+    "stagingFailed": "That didn’t work. Try again.",
+    "stagingCopy": "Copy the link",
+    "stagingCopied": "Copied"
   },
   "EventEditor": {
     "titleEdit": "Edit event",

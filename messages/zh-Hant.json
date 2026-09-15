@@ -966,7 +966,17 @@
     "phoneSearchNote": "Tally 裡只會存下一個家庭電話號碼的後四碼。索引每晚會自己重建；只有在某個家庭今天改了號碼時才需要用這個。",
     "rebuildIndex": "重建電話搜尋索引",
     "rebuilt": "電話搜尋已重建：{students} 名學生，{entries} 組號碼結尾。",
-    "rebuildFailed": "無法重建簽到台的電話索引。教會名錄連得上嗎？"
+    "rebuildFailed": "無法重建簽到台的電話索引。教會名錄連得上嗎？",
+    "stagingHeading": "無需驗證碼設定平板",
+    "stagingWhat": "適用於自行啟動進入自助機、現場無人讀取驗證碼的受管平板。請將連結填入平板的啟動網址。",
+    "stagingMake": "產生連結",
+    "stagingMaking": "產生中…",
+    "stagingAgain": "再產生一個",
+    "stagingShownOnce": "僅顯示一次，有效期一小時。它會以你的身分登入自助機，請像對待密碼一樣：直接填入平板的設定，不要放在別處。",
+    "stagingBusy": "目前開啟的配對過多。請幾分鐘後再試。",
+    "stagingFailed": "操作失敗。請重試。",
+    "stagingCopy": "複製連結",
+    "stagingCopied": "已複製"
   },
   "EventEditor": {
     "titleEdit": "編輯活動",

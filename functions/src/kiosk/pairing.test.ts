@@ -14,6 +14,7 @@ import {
   CODE_ALPHABET,
   CODE_LENGTH,
   MAX_LIVE_PAIRINGS,
+  PAIRING_LINK_TTL_MS,
   PAIRING_TTL_MS,
   type StartPairingResult,
 } from './pairing.js';
@@ -50,6 +51,77 @@ describe('startPairing', () => {
     expect(db.get(`kioskPairings/${stale.code}`)).toBeUndefined();
 
     expect(await startPairing(db, LATER)).toBe('busy');
+  });
+});
+
+describe('startPairing, pre-approved for a staging link', () => {
+  /*
+   * The managed-tablet shape: nobody is standing at the device, so the pairing
+   * is minted already vouched for and the two halves go into the tablet's start
+   * URL. It has to be the same handshake entered at its last step rather than a
+   * second way in, or the rules have two doors to reason about.
+   */
+
+  it('is born approved, so the kiosk can claim it without anybody typing a code', async () => {
+    const db = new FakeFirestore();
+    const result = await startPairing(db, NOW, 'leader-1');
+    if (result === 'busy') throw new Error('unexpected busy');
+
+    const stored = db.get(`kioskPairings/${result.code}`)!;
+    expect(stored.status).toBe('approved');
+    expect(stored.approvedBy).toBe('leader-1');
+    expect(stored.approvedAt).not.toBeNull();
+
+    // And it really does claim, in one step, to the approver's uid.
+    expect(await claimPairing(db, result.code, result.secret, NOW)).toEqual({
+      status: 'ready',
+      uid: 'leader-1',
+    });
+  });
+
+  it('still stores only a hash of the secret', async () => {
+    // The link is a credential that travels in a URL and sits in a management
+    // console. What is at rest here must not be the thing that opens it.
+    const db = new FakeFirestore();
+    const result = await startPairing(db, NOW, 'leader-1');
+    if (result === 'busy') throw new Error('unexpected busy');
+
+    expect(JSON.stringify(db.get(`kioskPairings/${result.code}`))).not.toContain(result.secret);
+  });
+
+  it('lives an hour, because a factory reset happens in between', async () => {
+    const db = new FakeFirestore();
+    const result = await startPairing(db, NOW, 'leader-1');
+    if (result === 'busy') throw new Error('unexpected busy');
+    expect(result.expiresInSeconds).toBe(Math.floor(PAIRING_LINK_TTL_MS / 1000));
+
+    // Well past the ordinary ten minutes, and still good.
+    const halfway = new Date(NOW.getTime() + PAIRING_TTL_MS * 3);
+    expect(await claimPairing(db, result.code, result.secret, halfway)).toMatchObject({
+      status: 'ready',
+    });
+
+    // And stale by the afternoon, so one left in somebody's notes is no use.
+    const tomorrow = new Date(NOW.getTime() + PAIRING_LINK_TTL_MS + 1);
+    expect(await claimPairing(db, result.code, result.secret, tomorrow)).toEqual({
+      status: 'expired',
+    });
+  });
+
+  it('leaves the ordinary pairing exactly as it was', async () => {
+    const db = new FakeFirestore();
+    const plain = await started(db);
+    expect(db.get(`kioskPairings/${plain.code}`)!.status).toBe('pending');
+    expect(plain.expiresInSeconds).toBe(Math.floor(PAIRING_TTL_MS / 1000));
+    expect(await claimPairing(db, plain.code, plain.secret, NOW)).toEqual({ status: 'pending' });
+  });
+
+  it('counts against the same live cap as any other pairing', async () => {
+    // It is not a back door around the rate limit on an endpoint anyone can
+    // reach; it is one more live pairing.
+    const db = new FakeFirestore();
+    for (let i = 0; i < MAX_LIVE_PAIRINGS; i += 1) await started(db);
+    expect(await startPairing(db, NOW, 'leader-1')).toBe('busy');
   });
 });
 

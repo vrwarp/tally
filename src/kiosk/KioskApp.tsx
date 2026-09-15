@@ -52,6 +52,7 @@ import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
 import { isQuietHour } from '@/lib/kioskQuietHour';
 import { hasGrantedPrinter } from './policyGrant';
+import { takePairLink } from './pairLink';
 import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
@@ -750,6 +751,31 @@ export function KioskApp() {
          */
         clearBinding();
         setBinding(null);
+
+        /*
+         * Unless the tablet was staged with a pairing in its start URL, which
+         * is how a managed tablet arrives: reset in an office, booted into the
+         * kiosk with nobody in the room, and no volunteer to read six
+         * characters to. `takePairLink` removes it from the address before we
+         * do anything with it — it is a credential, and this page is going to
+         * stay open for weeks.
+         *
+         * Failure is not an error state. An expired or spent link, or a wifi
+         * blip, lands on the pairing screen, which is where this boot was going
+         * anyway and which still works by hand.
+         */
+        const link = takePairLink();
+        if (link) {
+          const claimed = await loaded.pollPairing(link.code, link.secret).catch(() => 'gone');
+          if (cancelled) return;
+          if (typeof claimed === 'object') {
+            setUid(claimed.uid);
+            setPairingReason(null);
+            setPhase('choosing');
+            return;
+          }
+        }
+
         setPairingReason(restored.reason === 'updated' ? { kind: 'updated' } : null);
         setPhase('pairing');
         return;
