@@ -113,6 +113,23 @@ const STATUSES: Record<KioskStatus['state'], KioskStatus> = {
 /* The writes resolve without doing anything: a frame is a state, not a session. */
 export const getKioskStatus = async () => ({ data: STATUSES[state] });
 export const approveKioskPairing = async () => ({ data: { status: 'approved' as const } });
+
+/**
+ * A staging link, as the server would mint one.
+ *
+ * Fixed rather than random, because the shooter photographs this screen and a
+ * value that changed every run would make every frame a diff. The shape is what
+ * matters: a six-character code, a 32-character secret, and a URL long enough
+ * to wrap on a laptop — see `docs/tablet-management.md` §6.4.
+ */
+export const createKioskPairingLink = async () => ({
+  data: {
+    status: 'created' as const,
+    code: 'K7MQ2X',
+    secret: '4f1c0a9d2b6e8375c1a04fe29b7d6350',
+    expiresInSeconds: 3600,
+  },
+});
 export const refreshKioskPhoneIndex = async () => ({
   data: { students: 125, entries: 96, builtAt: new Date().toISOString() },
 });

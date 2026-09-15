@@ -16,7 +16,7 @@
  *
  * These assert on the words a leader reads, not on the component's shape.
  */
-import { render, screen, waitFor } from '@/test/rtl';
+import { cleanup, render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -25,10 +25,12 @@ import type { KioskStatus } from '@/services/functions';
 
 const getKioskStatus = vi.fn();
 const approveKioskPairing = vi.fn();
+const createKioskPairingLink = vi.fn();
 
 vi.mock('@/services/functions', () => ({
   getKioskStatus: (...args: unknown[]) => getKioskStatus(...args),
   approveKioskPairing: (...args: unknown[]) => approveKioskPairing(...args),
+  createKioskPairingLink: (...args: unknown[]) => createKioskPairingLink(...args),
   refreshKioskPhoneIndex: vi.fn(),
 }));
 
@@ -107,6 +109,51 @@ describe('who the kiosk screen is for', () => {
     renderAs('core', OK);
     expect(await screen.findByText('Ready to pair')).toBeInTheDocument();
     expect(screen.getByText('Rebuild phone search index')).toBeInTheDocument();
+  });
+});
+
+describe('a staging link, for a tablet nobody will be standing at', () => {
+  const LINK = { status: 'created', code: 'K7MQ2X', secret: 'a'.repeat(32), expiresInSeconds: 3600 };
+
+  it('is offered to the core team and not to a counselor', async () => {
+    renderAs('core', OK);
+    expect(await screen.findByRole('button', { name: 'Make a link' })).toBeInTheDocument();
+
+    cleanup();
+    renderAs('counselor', OK);
+    expect(screen.queryByRole('button', { name: 'Make a link' })).not.toBeInTheDocument();
+  });
+
+  it('shows the whole URL the tablet needs, with the warning that it is a credential', async () => {
+    createKioskPairingLink.mockResolvedValue({ data: LINK });
+    renderAs('core', OK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Make a link' }));
+
+    expect(
+      await screen.findByText(`${window.location.origin}/kiosk?pair=K7MQ2X.${'a'.repeat(32)}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/treat it like a password/i)).toBeInTheDocument();
+  });
+
+  it('says so when the server is holding too many pairings, without blaming the reader', async () => {
+    createKioskPairingLink.mockResolvedValue({ data: { status: 'busy' } });
+    renderAs('core', OK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Make a link' }));
+
+    expect(await screen.findByText(/Too many pairings are open/i)).toBeInTheDocument();
+    expect(screen.queryByText(/pair=/)).not.toBeInTheDocument();
+  });
+
+  it('says so when the call fails, and shows no half a link', async () => {
+    createKioskPairingLink.mockRejectedValue(new Error('offline'));
+    renderAs('core', OK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Make a link' }));
+
+    expect(await screen.findByText(/didn’t work/i)).toBeInTheDocument();
+    expect(screen.queryByText(/pair=/)).not.toBeInTheDocument();
   });
 });
 

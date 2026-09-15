@@ -954,6 +954,22 @@ export interface KioskDeviceDoc {
   boundTo: string | null;
   /** The chain it is bound to — the whole of its reach in the rules. */
   boundChain: string | null;
+  /**
+   * The tablet's charge, 0–1, as of its last report — and whether it is on
+   * mains.
+   *
+   * Reported by the kiosk itself on the same write as `lastSeenAt`, from the
+   * Battery Status API, which only Chromium still has. Optional twice over:
+   * absent on every engine that dropped the API, and absent on every row
+   * written before this existed. Absent has to read as "this tablet does not
+   * say" rather than as a flat battery.
+   *
+   * Here because `lastSeenAt` answers "was it alive" and the question somebody
+   * can actually act on before Sunday is "has it been off its charger since
+   * Thursday" — see `docs/tablet-management.md` §6.1.
+   */
+  batteryLevel?: number;
+  charging?: boolean;
   retiredAt: Timestamp | null;
   retiredBy: string | null;
 }

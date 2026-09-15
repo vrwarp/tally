@@ -207,7 +207,12 @@
     "reprintNeedsPrinter": "Conecta la impresora para reimprimir una etiqueta.",
     "checksNeedPrinter": "Revisar y probar necesitan la impresora conectada. Una reimpresión intentará reconectarla primero y avisará si no pudo.",
     "autoPowerOff": "En la Printer Setting Tool de Brother, deja Auto Power Off en None. Una impresora que se apaga sola tiene que conectarse otra vez desde esta pantalla.",
-    "backToGatherings": "Volver a las reuniones"
+    "backToGatherings": "Volver a las reuniones",
+    "setByPolicy": "La configuración de esta tableta le da la impresora a Tally, así que no hubo ningún paso de configuración que se pudiera olvidar. Una impresora de reemplazo funciona igual, sin volver a esta pantalla.",
+    "tabletPolicy": "Configuración de impresora de la tableta",
+    "tabletPolicyHint": "Esta tableta está administrada, así que se le puede dar la impresora a Chrome de una vez por todas. Pega la línea de abajo en la lista de configuraciones de Chrome de la app de administración de la tableta.",
+    "tabletPolicyMore": "El resto de la configuración de la tableta, y para qué sirve cada parte, está en {url}.",
+    "policyCopied": "Configuración de impresora copiada"
   },
   "Register": {
     "couldNotSave": "Tally no pudo terminar esto. Prueba otra vez o busque a un líder.",

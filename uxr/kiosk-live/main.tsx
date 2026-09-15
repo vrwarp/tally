@@ -42,6 +42,8 @@
  *   ?cancelled=1              the chooser after a browser device list that came back empty
  *   ?rooms=long               the rooms named the way a church names them — "Fellowship Hall",
  *                             "Room 201, upstairs" — so the meta line's wrap is photographed
+ *   ?policy=1                 the printer arrived from the tablet's device-management policy,
+ *                             so there was no set-up step to miss
  *   ?detected=plain|guessed|unknown
  *                             what "Check the printer" comes back with on the printer screen —
  *                             a clean read-off, a roll the packet could not choose between, or a
@@ -248,8 +250,19 @@ function chooserEntries(): KioskEventEntry[] {
   });
 }
 
-/** The printer this kiosk was set up with, when it was set up with one. */
-const PRINTER_CONFIG = { model: 'QL-810W', label: '62x29' };
+/**
+ * The printer this kiosk was set up with, when it was set up with one.
+ *
+ * `?policy=1` says it arrived from the tablet's device-management policy rather
+ * than from somebody pressing *Connect* — the managed-tablet case, where there
+ * was no set-up step at all and the screen has to say so rather than let the
+ * absence read as a step somebody skipped. See `docs/tablet-management.md`.
+ */
+const PRINTER_CONFIG = {
+  model: 'QL-810W',
+  label: '62x29',
+  ...(params.get('policy') === '1' ? { viaPolicy: true } : {}),
+};
 
 /**
  * What the printer is doing, by `?printer=`.

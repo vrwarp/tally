@@ -32,6 +32,10 @@
         "destination": "/kiosk.html"
       },
       {
+        "source": "/setup",
+        "destination": "/setup.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -913,6 +913,7 @@
     "kiosksNotLoaded": "No se pudieron revisar los kioscos.",
     "kioskLive": "Está anotando {gathering} ahora mismo",
     "kioskIdle": "Se vinculó {when} · no está anotando",
+    "kioskOffCharger": "Con batería · {percent}%",
     "kioskRetiredOn": "Se dio de baja {when}",
     "retireKiosk": "Dar de baja",
     "retireLiveWarning": "Este kiosco está anotando {gathering} ahora mismo. Darlo de baja detiene eso en el siguiente toque, y un líder va a tener que registrar a los niños desde un teléfono hasta que se vuelva a vincular.",
@@ -965,7 +966,17 @@
     "phoneSearchNote": "De los números de una casa, en Tally solo se guardan los últimos cuatro dígitos. El índice se reconstruye solo cada noche; usa esto cuando el número de una familia haya cambiado hoy.",
     "rebuildIndex": "Reconstruir índice de teléfonos",
     "rebuilt": "Se reconstruyó la búsqueda por teléfono: {students} estudiantes, {entries} terminaciones de número.",
-    "rebuildFailed": "No se pudo reconstruir el índice de teléfonos del kiosco. ¿Se puede conectar con el directorio de tu iglesia?"
+    "rebuildFailed": "No se pudo reconstruir el índice de teléfonos del kiosco. ¿Se puede conectar con el directorio de tu iglesia?",
+    "stagingHeading": "Configurar una tableta sin código",
+    "stagingWhat": "Para una tableta administrada que inicia sola en el quiosco, sin nadie que lea un código. Pon el enlace en la URL de inicio de la tableta.",
+    "stagingMake": "Crear un enlace",
+    "stagingMaking": "Creando…",
+    "stagingAgain": "Crear otro",
+    "stagingShownOnce": "Se muestra una sola vez y dura una hora. Inicia sesión en el quiosco como tú, así que trátalo como una contraseña: ponlo directamente en la configuración de la tableta y en ningún otro lugar.",
+    "stagingBusy": "Hay demasiados emparejamientos abiertos ahora mismo. Inténtalo de nuevo en unos minutos.",
+    "stagingFailed": "No funcionó. Inténtalo de nuevo.",
+    "stagingCopy": "Copiar el enlace",
+    "stagingCopied": "Copiado"
   },
   "EventEditor": {
     "titleEdit": "Editar el evento",
@@ -2408,7 +2419,12 @@
     "reprintNeedsPrinter": "Conecta la impresora para reimprimir una etiqueta.",
     "checksNeedPrinter": "Revisar y probar necesitan la impresora conectada. Una reimpresión intentará reconectarla primero y avisará si no pudo.",
     "autoPowerOff": "En la Printer Setting Tool de Brother, deja Auto Power Off en None. Una impresora que se apaga sola tiene que conectarse otra vez desde esta pantalla.",
-    "backToGatherings": "Volver a las reuniones"
+    "backToGatherings": "Volver a las reuniones",
+    "setByPolicy": "La configuración de esta tableta le da la impresora a Tally, así que no hubo ningún paso de configuración que se pudiera olvidar. Una impresora de reemplazo funciona igual, sin volver a esta pantalla.",
+    "tabletPolicy": "Configuración de impresora de la tableta",
+    "tabletPolicyHint": "Esta tableta está administrada, así que se le puede dar la impresora a Chrome de una vez por todas. Pega la línea de abajo en la lista de configuraciones de Chrome de la app de administración de la tableta.",
+    "tabletPolicyMore": "El resto de la configuración de la tableta, y para qué sirve cada parte, está en {url}.",
+    "policyCopied": "Configuración de impresora copiada"
   },
   "Pairing": {
     "title": "Vincula este kiosco",

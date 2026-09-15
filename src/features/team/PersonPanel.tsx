@@ -442,6 +442,22 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                               when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
                             })}
                     </span>
+                    {/*
+                      Said only when it is worth saying. A shelf tablet lives on
+                      mains, so "87%, charging" is a fact nobody can act on and
+                      one more line on a screen that is already dense — but a
+                      kiosk running on its battery means somebody unplugged it,
+                      and that is worth finding out before Sunday rather than
+                      during. A retired row says nothing: it is not expected to
+                      be anywhere.
+                    */}
+                    {!device.retiredAt && device.charging === false && device.batteryLevel != null && (
+                      <span className="block text-xs text-warn-400">
+                        {t('kioskOffCharger', {
+                          percent: Math.round(device.batteryLevel * 100),
+                        })}
+                      </span>
+                    )}
                   </span>
 
                   {device.retiredAt ? null : armedRetire === device.id ? (

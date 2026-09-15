@@ -31,6 +31,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
+import { WEB_USB_POLICY_KEY, webUsbPolicyJson } from '@/lib/printerVendor';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
 import type { KioskPrinting } from '../KioskApp';
@@ -68,6 +69,15 @@ const MAX_EVENTS_SHOWN = 40;
 const COPY_FEEDBACK_MS = 2500;
 
 type CopyState = 'idle' | 'copied' | 'failed';
+
+/**
+ * Which of the two copyable blocks a piece of feedback belongs to.
+ *
+ * One `copied` flag with two Copy buttons under it put "Copied" on both, which
+ * reads as a claim about the wrong text — and on this screen the wrong text is
+ * a printer log where somebody expected a policy line.
+ */
+type CopySlot = 'events' | 'policy';
 
 function orderedModels(printing: KioskPrinting): string[] {
   const all = printing.modelIdentifiers();
@@ -282,7 +292,10 @@ export function PrinterScreen({
   const [detection, setDetection] = useState<PrinterDetection | null>(null);
   const [busy, setBusy] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [copied, setCopied] = useState<CopyState>('idle');
+  /** Which block the flag above is about. Meaningless while it is `idle`. */
+  const [copySlot, setCopySlot] = useState<CopySlot>('events');
   /**
    * The browser's device list came back with nothing picked.
    *
@@ -329,31 +342,47 @@ export function PrinterScreen({
     };
   }, []);
 
-  const flash = (next: CopyState) => {
+  const flash = (slot: CopySlot, next: CopyState) => {
+    setCopySlot(slot);
     setCopied(next);
     if (copyTimer.current) clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopied('idle'), COPY_FEEDBACK_MS);
   };
 
+  /** What one block's own feedback says: nothing, unless the flag is its. */
+  const copyStateOf = (slot: CopySlot): CopyState => (copySlot === slot ? copied : 'idle');
+
   /**
-   * The record, onto the clipboard.
+   * One of the two blocks below, onto the clipboard.
    *
-   * Absent on http origins and inside a few in-app browsers. Say so rather than
-   * doing nothing, and put the text on the screen where it can be selected by
-   * hand — the same shape as the debug details in the main app.
+   * `navigator.clipboard` is absent on http origins and inside a few in-app
+   * browsers. Say so rather than doing nothing, and put the text on the screen
+   * where it can be selected by hand — the same shape as the debug details in
+   * the main app.
    */
-  const copyEvents = async () => {
+  const copy = async (slot: CopySlot, text: string) => {
     if (!navigator.clipboard) {
-      flash('failed');
+      flash(slot, 'failed');
       return;
     }
     try {
-      await navigator.clipboard.writeText(printing.printerLogText());
-      flash('copied');
+      await navigator.clipboard.writeText(text);
+      flash(slot, 'copied');
     } catch {
-      flash('failed');
+      flash(slot, 'failed');
     }
   };
+
+  /*
+   * The tablet's own printer setting, written for wherever this is served from.
+   *
+   * Composed at render rather than configured anywhere: it is three published
+   * vendor ids (`src/lib/printerVendor.ts`) and this page's origin, so a kiosk
+   * moved to another domain hands out the value for the new domain without
+   * anybody having to remember that it would need to.
+   */
+  const policyValue = webUsbPolicyJson(window.location.origin);
+  const setupUrl = `${window.location.origin}/setup`;
 
   const available = printing.labelsForModel(model);
   // A model change can leave the stored media unprintable on the new head —
@@ -610,6 +639,21 @@ export function PrinterScreen({
     } else if (state.kind === 'trouble') {
       primarySays.push(<Say key="then">{t('troubleThenLookAgain')}</Say>);
     } else {
+      /*
+       * A kiosk whose printer came from the tablet's policy has no set-up step,
+       * and the absence of one reads as a step somebody skipped. Said here
+       * rather than beside *ready* because this is the state that sends a
+       * volunteer looking: the printer is not there at the moment, the screen
+       * is offering a chooser, and the useful fact is that plugging the printer
+       * back in is the whole of the repair. `ink-400`, a reference note — it is
+       * true of the kiosk rather than a consequence of the last press.
+       */
+      if (config.viaPolicy)
+        primarySays.push(
+          <Say key="policy" tone="text-ink-400">
+            {t('setByPolicy')}
+          </Say>,
+        );
       if (stillLooking) primarySays.push(<Say key="wait">{t('mayConnectItself')}</Say>);
       else if (state.kind === 'unpaired' && !attemptFailed)
         primarySays.push(<Say key="cable">{t('checkPowerAndCable')}</Say>);
@@ -1039,19 +1083,19 @@ export function PrinterScreen({
                 <button
                   type="button"
                   tabIndex={-1}
-                  {...tap(() => void copyEvents())}
+                  {...tap(() => void copy('events', printing.printerLogText()))}
                   className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
                 >
-                  {copied === 'copied' ? 'Copied' : 'Copy'}
+                  {copyStateOf('events') === 'copied' ? 'Copied' : 'Copy'}
                 </button>
-                {copied === 'failed' && (
+                {copyStateOf('events') === 'failed' && (
                   <span className="text-xs text-ink-500 kiosk:text-sm">{t('copyBlocked')}</span>
                 )}
                 <span aria-live="polite" className="sr-only">
-                  {copied === 'copied' ? t('eventsCopied') : ''}
+                  {copyStateOf('events') === 'copied' ? t('eventsCopied') : ''}
                 </span>
               </div>
-              {copied === 'failed' && (
+              {copyStateOf('events') === 'failed' && (
                 <textarea
                   readOnly
                   aria-label={t('events')}
@@ -1060,6 +1104,63 @@ export function PrinterScreen({
                   className="w-full rounded-lg bg-ink-950 p-3 font-mono text-xs text-ink-300"
                 />
               )}
+            </div>
+          </details>
+
+          {/*
+            * The one tablet setting that cannot be worked out from the tablet.
+            *
+            * A managed tablet is handed its printer by Chrome's
+            * `WebUsbAllowDevicesForUrls` rather than by anybody touching this
+            * screen (`docs/tablet-management.md` §4.6), and the value is a
+            * quote-heavy one-liner that fails silently when it is mistyped. So
+            * it is here to be copied, because here is where the person setting
+            * it is standing: the management app is one task-switch away on this
+            * same tablet, and a value that lives only on a page they would have
+            * to open on a laptop is a value that gets typed by hand.
+            *
+            * Folded and last, because a volunteer at 9:03 on a Sunday must
+            * never meet it, and unconditional, because the tablet that most
+            * needs it is the one where nothing about the printer works yet.
+            */}
+          <details
+            className="shrink-0 rounded-xl bg-ink-900"
+            onToggle={(event) => setPolicyOpen((event.target as HTMLDetailsElement).open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0 truncate">{t('tabletPolicy')}</span>
+              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
+                {policyOpen ? 'Hide' : 'Show'}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              <div className="text-sm text-ink-400 kiosk:text-base">{t('tabletPolicyHint')}</div>
+              {/* `select-text`, because the copy button is allowed to fail and
+                  the whole value is short enough to read and to select by hand
+                  — which is why this block has no textarea fallback under it. */}
+              <div className="flex flex-col gap-1 rounded-lg bg-ink-950 p-3 font-mono text-xs break-all text-ink-300 select-text kiosk:text-sm">
+                <span className="text-ink-500">{WEB_USB_POLICY_KEY}</span>
+                <span>{policyValue}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  {...tap(() => void copy('policy', policyValue))}
+                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                >
+                  {copyStateOf('policy') === 'copied' ? 'Copied' : 'Copy'}
+                </button>
+                {copyStateOf('policy') === 'failed' && (
+                  <span className="text-xs text-ink-500 kiosk:text-sm">{t('copyBlocked')}</span>
+                )}
+                <span aria-live="polite" className="sr-only">
+                  {copyStateOf('policy') === 'copied' ? t('policyCopied') : ''}
+                </span>
+              </div>
+              <div className="text-xs text-ink-500 kiosk:text-sm">
+                {t('tabletPolicyMore', { url: setupUrl })}
+              </div>
             </div>
           </details>
 

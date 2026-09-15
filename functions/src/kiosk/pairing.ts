@@ -50,6 +50,19 @@ export const CODE_LENGTH = 6;
 export const PAIRING_TTL_MS = 10 * 60_000;
 
 /**
+ * How long a *staging link* lives — longer, because of what happens in between.
+ *
+ * The ordinary pairing is a code on a screen with somebody standing at it, and
+ * ten minutes is generous. A link is minted in an office and then has to
+ * survive a factory reset, a setup wizard, joining the church wifi and Android
+ * fetching a device policy controller, which is twenty unhurried minutes before
+ * the kiosk first loads. An hour covers that with room to be interrupted, and
+ * is still short enough that a link left in somebody's notes is stale by the
+ * afternoon. Minting another costs one press.
+ */
+export const PAIRING_LINK_TTL_MS = 60 * 60_000;
+
+/**
  * The most unexpired pairings allowed to exist at once. The ministry owns a
  * handful of kiosks; twenty simultaneous pairings is not a busy night, it is
  * somebody's script hammering an unauthenticated endpoint.
@@ -123,6 +136,14 @@ export interface StartPairingResult {
 export async function startPairing(
   db: FirestoreLike,
   now: Date,
+  /**
+   * When set, the pairing is born approved by this uid and lives for
+   * `PAIRING_LINK_TTL_MS` — the staging-link case, where there is no screen to
+   * read a code off and no volunteer to type it. Everything else is identical,
+   * deliberately: the link path is the ordinary handshake entered at its last
+   * step, not a second way in with its own rules.
+   */
+  approvedBy: string | null = null,
 ): Promise<StartPairingResult | 'busy'> {
   const snapshot = await db.collection(PAIRING_COLLECTION).get();
 
@@ -138,7 +159,8 @@ export async function startPairing(
   if (live >= MAX_LIVE_PAIRINGS) return 'busy';
 
   const secret = randomBytes(16).toString('hex');
-  const expiresAt = new Date(now.getTime() + PAIRING_TTL_MS);
+  const ttl = approvedBy === null ? PAIRING_TTL_MS : PAIRING_LINK_TTL_MS;
+  const expiresAt = new Date(now.getTime() + ttl);
 
   // `create()` is the collision check: the odds of two live pairings drawing
   // the same six characters are astronomical, but astronomical is not zero and
@@ -148,14 +170,14 @@ export async function startPairing(
     try {
       await db.doc(`${PAIRING_COLLECTION}/${code}`).create({
         secretHash: hashSecret(secret),
-        status: 'pending',
+        status: approvedBy === null ? 'pending' : 'approved',
         createdAt: Timestamp.fromDate(now),
         expiresAt: Timestamp.fromDate(expiresAt),
-        approvedBy: null,
-        approvedAt: null,
+        approvedBy,
+        approvedAt: approvedBy === null ? null : Timestamp.fromDate(now),
         claimedAt: null,
       });
-      return { code, secret, expiresInSeconds: Math.floor(PAIRING_TTL_MS / 1000) };
+      return { code, secret, expiresInSeconds: Math.floor(ttl / 1000) };
     } catch (error) {
       if (!isAlreadyExists(error)) throw error;
     }

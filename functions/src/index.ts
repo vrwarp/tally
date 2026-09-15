@@ -3175,6 +3175,37 @@ export const approveKioskPairing = onCall<
 });
 
 /**
+ * A pairing minted ready, for a tablet nobody will be standing at.
+ *
+ * The ordinary handshake assumes a volunteer holding a tablet that is already
+ * showing a code. Staging a managed tablet is the other shape: the device is
+ * factory reset in an office, comes up into the kiosk by itself, and there is
+ * nobody there to read six characters to. So this mints both halves at once,
+ * approves the pairing in the caller's name on the spot, and hands back the
+ * two values to put in the tablet's start URL — see `docs/tablet-management.md`
+ * §6.4.
+ *
+ * `requireMember`, matching `approveKioskPairing`, because it is the same act:
+ * vouching that a tablet is the church's. What it is *not* is a way to widen
+ * anybody's reach — the kiosk still ends up with an identity of its own, fenced
+ * to one gathering's chain by the rules, exactly as a typed code would give it.
+ *
+ * The result is a credential and is shown once. It lives an hour
+ * (`PAIRING_LINK_TTL_MS`) rather than the usual ten minutes, because a factory
+ * reset and a setup wizard sit between minting it and the kiosk first loading.
+ */
+export const createKioskPairingLink = onCall<
+  undefined,
+  Promise<{ status: 'created'; code: string; secret: string; expiresInSeconds: number } | { status: 'busy' }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireMember(request.auth?.uid);
+
+  const started = await startPairing(db(), new Date(), request.auth!.uid);
+  if (started === 'busy') return { status: 'busy' };
+  return { status: 'created', ...started };
+});
+
+/**
  * UNAUTHENTICATED — polled by the kiosk until the approval lands. The secret
  * is what stands between the code on the lobby screen and the token: only the
  * device that started the pairing holds it.

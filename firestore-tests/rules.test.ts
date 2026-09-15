@@ -3027,6 +3027,37 @@ describe('kiosk', () => {
       await assertFails(updateDoc(own(), { retiredAt: serverTimestamp(), retiredBy: KIOSK }));
     });
 
+    it("takes the tablet's charge alongside the report, and does not require it", async () => {
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: 0.42, charging: false }),
+      );
+      // The boundaries, because a level is a fraction and not a percentage.
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: 0, charging: true }),
+      );
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: 1, charging: true }),
+      );
+      // And the case that must keep working forever: an engine with no Battery
+      // Status API, and every kiosk built before these fields existed.
+      await assertSucceeds(updateDoc(own(), { lastSeenAt: serverTimestamp() }));
+    });
+
+    it('refuses a charge that is not one', async () => {
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: 87 }),
+      );
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: -0.1 }),
+      );
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: '42%' }),
+      );
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), charging: 'yes' }),
+      );
+    });
+
     it('refuses a kiosk touching any row but its own', async () => {
       const kiosk = asKioskDevice(env, DEVICE.live);
       await assertFails(

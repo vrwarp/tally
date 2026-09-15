@@ -5095,6 +5095,13 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Team.kioskOffCharger": {
+    "source": "On battery · {percent}%",
+    "context": "Shown on the team screen under a lobby kiosk that is running on its battery rather than on mains. A shelf tablet is meant to be plugged in at all times, so this line is a warning that somebody unplugged it, not a routine status. {percent} is a whole number, 0 to 100.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Team.kioskRetiredOn": {
     "source": "Retired {when}",
     "es-MX": "machine",
@@ -13902,6 +13909,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.setByPolicy": {
+    "source": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen.",
+    "context": "Reference note on the lobby kiosk’s printer screen, shown only when the printer was granted to Tally by the tablet’s own device-management policy rather than connected by hand. It exists to stop a volunteer hunting for a set-up step that does not exist. “This tablet’s own settings” means the managed configuration an administrator put on the device, not anything inside Tally.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Pairing.title": {
     "source": "Pair this kiosk",
     "es-MX": "machine",
@@ -14105,6 +14119,104 @@
   },
   "Birthday.keepingYear": {
     "source": "{date}, keeping {year}.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingHeading": {
+    "source": "Set up a tablet with no code",
+    "context": "Heading of a section on the kiosk page, visible to core team and admins only. \"Code\" means the six-character pairing code a kiosk normally displays.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingWhat": {
+    "source": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
+    "context": "Explains who the section is for: a tablet under device-management policy that starts the kiosk automatically. \"Start URL\" is the field in that policy naming the page the tablet opens.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingMake": {
+    "source": "Make a link",
+    "context": "Button that creates a one-time pairing link.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingMaking": {
+    "source": "Making…",
+    "context": "The same button while the request is in flight. Keep the ellipsis.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingAgain": {
+    "source": "Make another",
+    "context": "The same button after a link has already been made.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingShownOnce": {
+    "source": "Shown once, and good for an hour. It signs a kiosk in as you, so treat it like a password: put it straight into the tablet’s settings and nowhere else.",
+    "context": "Warning under a freshly created pairing link. It is a credential; the point is that it will not be shown again and should not be stored anywhere but the tablet policy.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingBusy": {
+    "source": "Too many pairings are open at the moment. Try again in a few minutes.",
+    "context": "Shown when the server refuses because too many pairings are already open. Not an error the reader caused.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingFailed": {
+    "source": "That didn’t work. Try again.",
+    "context": "Shown when the request failed for any other reason.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingCopy": {
+    "source": "Copy the link",
+    "context": "Button that copies the pairing link to the clipboard.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.stagingCopied": {
+    "source": "Copied",
+    "context": "The copy button just after it worked.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicy": {
+    "source": "Tablet printer setting",
+    "context": "Label on a folded section at the bottom of the lobby kiosk’s printer screen, seen only by staff. Behind it is the one Chrome setting an administrator must put on a managed tablet so the kiosk can reach the label printer. “Tablet” is the physical device the kiosk runs on.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicyHint": {
+    "source": "This tablet is managed, so Chrome can be handed the printer once and for good. Paste the line below into the Chrome settings list in the tablet's management app.",
+    "context": "One line of instruction inside that folded section, addressed to whoever is setting up a managed tablet while standing at it. “Managed” means an administrator controls the device through a management app; “the line below” is the Chrome policy value shown underneath, which is copied and pasted rather than typed.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicyMore": {
+    "source": "The rest of the tablet settings, and what each one is for, are at {url}.",
+    "context": "A quieter line under the copy button, pointing at Tally’s own page listing every other tablet setting. {url} is a web address and must be left exactly as it is.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCopied": {
+    "source": "Printer setting copied to the clipboard",
+    "context": "Announced to screen readers when the Chrome printer setting has been copied to the clipboard. Not shown on screen.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

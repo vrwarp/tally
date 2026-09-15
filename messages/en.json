@@ -913,6 +913,7 @@
     "kiosksNotLoaded": "Couldn’t check the kiosks.",
     "kioskLive": "Recording {gathering} right now",
     "kioskIdle": "Paired {when} · not recording",
+    "kioskOffCharger": "On battery · {percent}%",
     "kioskRetiredOn": "Retired {when}",
     "retireKiosk": "Retire",
     "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
@@ -965,7 +966,17 @@
     "phoneSearchNote": "Only the last four digits of a household's numbers are ever stored in Tally. The index rebuilds nightly on its own; use this when a family's number changed today.",
     "rebuildIndex": "Rebuild phone search index",
     "rebuilt": "Phone search rebuilt: {students} students, {entries} number endings.",
-    "rebuildFailed": "Could not rebuild the kiosk phone index. Is your church directory reachable?"
+    "rebuildFailed": "Could not rebuild the kiosk phone index. Is your church directory reachable?",
+    "stagingHeading": "Set up a tablet with no code",
+    "stagingWhat": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
+    "stagingMake": "Make a link",
+    "stagingMaking": "Making…",
+    "stagingAgain": "Make another",
+    "stagingShownOnce": "Shown once, and good for an hour. It signs a kiosk in as you, so treat it like a password: put it straight into the tablet’s settings and nowhere else.",
+    "stagingBusy": "Too many pairings are open at the moment. Try again in a few minutes.",
+    "stagingFailed": "That didn’t work. Try again.",
+    "stagingCopy": "Copy the link",
+    "stagingCopied": "Copied"
   },
   "EventEditor": {
     "titleEdit": "Edit event",
@@ -2408,7 +2419,12 @@
     "reprintNeedsPrinter": "Connect the printer first to reprint a name tag.",
     "checksNeedPrinter": "Check and test need the printer connected. A reprint will try to reconnect first, and say if it could not.",
     "autoPowerOff": "In Brother’s Printer Setting Tool, set Auto Power Off to None. A printer that switches itself off has to be connected again from this screen.",
-    "backToGatherings": "Back to the gatherings"
+    "backToGatherings": "Back to the gatherings",
+    "setByPolicy": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen.",
+    "tabletPolicy": "Tablet printer setting",
+    "tabletPolicyHint": "This tablet is managed, so Chrome can be handed the printer once and for good. Paste the line below into the Chrome settings list in the tablet's management app.",
+    "tabletPolicyMore": "The rest of the tablet settings, and what each one is for, are at {url}.",
+    "policyCopied": "Printer setting copied to the clipboard"
   },
   "Pairing": {
     "title": "Pair this kiosk",

@@ -913,6 +913,7 @@
     "kiosksNotLoaded": "Couldn’t check the kiosks.",
     "kioskLive": "Recording {gathering} right now",
     "kioskIdle": "Paired {when} · not recording",
+    "kioskOffCharger": "使用電池 · {percent}%",
     "kioskRetiredOn": "Retired {when}",
     "retireKiosk": "Retire",
     "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
@@ -965,7 +966,17 @@
     "phoneSearchNote": "Tally 裡只會存下一個家庭電話號碼的後四碼。索引每晚會自己重建；只有在某個家庭今天改了號碼時才需要用這個。",
     "rebuildIndex": "重建電話搜尋索引",
     "rebuilt": "電話搜尋已重建：{students} 名學生，{entries} 組號碼結尾。",
-    "rebuildFailed": "無法重建簽到台的電話索引。教會名錄連得上嗎？"
+    "rebuildFailed": "無法重建簽到台的電話索引。教會名錄連得上嗎？",
+    "stagingHeading": "無需驗證碼設定平板",
+    "stagingWhat": "適用於自行啟動進入自助機、現場無人讀取驗證碼的受管平板。請將連結填入平板的啟動網址。",
+    "stagingMake": "產生連結",
+    "stagingMaking": "產生中…",
+    "stagingAgain": "再產生一個",
+    "stagingShownOnce": "僅顯示一次，有效期一小時。它會以你的身分登入自助機，請像對待密碼一樣：直接填入平板的設定，不要放在別處。",
+    "stagingBusy": "目前開啟的配對過多。請幾分鐘後再試。",
+    "stagingFailed": "操作失敗。請重試。",
+    "stagingCopy": "複製連結",
+    "stagingCopied": "已複製"
   },
   "EventEditor": {
     "titleEdit": "編輯活動",
@@ -2408,7 +2419,12 @@
     "reprintNeedsPrinter": "要重印名牌，請先連接印表機。",
     "checksNeedPrinter": "檢查和測試需要先連接印表機。重印會先嘗試重新連接，連不上會告訴你。",
     "autoPowerOff": "在 Brother 的 Printer Setting Tool 裡，把 Auto Power Off 設為 None。會自動關機的印表機，必須從這個畫面重新連接一次。",
-    "backToGatherings": "回到聚會列表"
+    "backToGatherings": "回到聚會列表",
+    "setByPolicy": "這臺平板的設定已將印表機交給 Tally，因此沒有可遺漏的設定步驟。更換印表機後同樣可用，無需再回到此頁面。",
+    "tabletPolicy": "平板的印表機設定",
+    "tabletPolicyHint": "這臺平板受管理，因此可以一次性把印表機交給 Chrome。請把下面這行內容貼到平板管理應用程式中的 Chrome 設定清單裡。",
+    "tabletPolicyMore": "其餘的平板設定，以及每一項的用途，請見 {url}。",
+    "policyCopied": "印表機設定已複製到剪貼簿"
   },
   "Pairing": {
     "title": "配對這台簽到台",

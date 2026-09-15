@@ -226,6 +226,29 @@ export const ACCESS: Map<string, EventAccess> = new Map([
  * are also the duplicate-row shape that makes a mis-tap likely.
  */
 export const KIOSK_DEVICES: KioskDevice[] = [
+  /*
+   * A third tablet, on its battery.
+   *
+   * The two below are the states the screen has always had — recording now, and
+   * long retired — and neither exercises the line a kiosk draws when it reports
+   * its own charge. A shelf tablet lives on mains, so this row is somebody
+   * having unplugged one, which is the only battery state worth a line at all:
+   * "87%, charging" is a fact nobody can act on. See `docs/tablet-management.md`
+   * §6.1.
+   */
+  {
+    id: 'lobby-ipad-4a90',
+    approvedBy: 'user-1',
+    approvedByName: 'Miriam Achebe',
+    pairedAt: new Date(NOW - 12 * DAY),
+    lastSeenAt: new Date(NOW - 45_000),
+    boundTo: 'Wednesday Night',
+    boundChain: CHAINS.sundaySchool,
+    batteryLevel: 0.37,
+    charging: false,
+    retiredAt: null,
+    retiredBy: null,
+  },
   {
     id: 'lobby-ipad-2f7c',
     approvedBy: 'user-1',

@@ -319,6 +319,59 @@ describe('PersonPanel — the kiosks they paired', () => {
     expect(screen.queryByRole('button', { name: 'Retire' })).not.toBeInTheDocument();
   });
 
+  it('says when a shelf tablet is running on its battery', () => {
+    // Somebody unplugged it. That is worth finding out before Sunday rather
+    // than during, and it is the whole reason the kiosk reports its charge.
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ batteryLevel: 0.37, charging: false })]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(screen.getByText('On battery · 37%')).toBeInTheDocument();
+  });
+
+  it('says nothing about a tablet that is plugged in, however full', () => {
+    // A shelf tablet lives on mains, so "87%, charging" is a fact nobody can
+    // act on and one more line on a screen that is already dense.
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ batteryLevel: 0.87, charging: true })]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(screen.queryByText(/On battery/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing about a tablet that does not report a battery at all', () => {
+    // Every engine that dropped the API, and every row written before the
+    // kiosk started reporting one. Absent is not flat.
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device()]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(screen.queryByText(/On battery/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing about a retired tablet, which is not expected to be anywhere', () => {
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([
+        device({
+          retiredAt: new Date('2026-09-02T12:00:00Z'),
+          retiredBy: MIRIAM.id,
+          batteryLevel: 0.05,
+          charging: false,
+        }),
+      ]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(screen.queryByText(/On battery/)).not.toBeInTheDocument();
+  });
+
   it('says the read failed rather than claiming there are none', () => {
     subscribeKioskDevices.mockImplementation(
       (_next: unknown, onError: (error: Error) => void) => {
