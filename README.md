@@ -197,6 +197,7 @@ with the same ground photographed from the running app:
 | — | [the lobby registration wizard](docs/walkthrough/registration/README.md) |
 | — | [a parent at the kiosk](docs/walkthrough/parents/README.md) |
 | — | [light and dark](docs/walkthrough/themes/README.md) |
+| [docs/tablet-management.md](docs/tablet-management.md) — enrolling the shelf tablet, and the `/setup` page that generates its policy | [frame by frame](docs/walkthrough/tablet/README.md) |
 | — | [the long tour](docs/walkthrough/tour/README.md) |
 
 **How it got there.** Enough history to explain the odd-looking decisions,

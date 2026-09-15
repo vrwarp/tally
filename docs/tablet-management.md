@@ -909,7 +909,9 @@ before a line of code is written, and so that every phase after it is independen
 phase depends on a later one. Phases 1–2 are the ones that pay for themselves on the WebUSB
 priority; 3–6 are the rest of §6.
 
-> **Phases 1–6 are built.** What follows is kept as written, because the reasoning is the argument
+> **Phases 1–6 are built**, and photographed frame by frame in
+> [the walkthrough](walkthrough/tablet/README.md). What follows is kept as written, because the
+> reasoning is the argument
 > for the code rather than a plan waiting to be executed, with a note under each phase saying where
 > it landed. **Phase 0 is not done and cannot be by anyone who is not holding a tablet** — it is
 > still the step that decides whether any of this works in the building.
