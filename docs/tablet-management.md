@@ -462,9 +462,10 @@ while the tablet is still being staged, before anything in §4.6's optional half
 
 **On a tablet with no printer attached, check 1 is the whole verification, and that is fine.** The
 policy either parsed or it did not, and that question has nothing to do with whether a device is
-plugged in. Check 2 needs the printer and is therefore run once, on the tablet that did §4.6's step
-0 — it proves the *rule works*, which is a claim about the rule rather than about a tablet. Every
-other tablet carries the identical rule, so *Status: OK* is the evidence that matters there.
+plugged in. Check 2 needs the printer and is therefore run once, on the tablet that has it — it
+proves the *rule works*, which is a claim about the rule rather than about a tablet. Every other
+tablet carries the identical rule, so *Status: OK* is the evidence that matters there. On that one
+tablet, revoke its old chooser grant first (§4.6) or the check passes for the wrong reason.
 
 ### 4.6 The part that actually needs a managed device
 
@@ -487,88 +488,67 @@ Test DPC cannot hold across a reboot is *lock task mode*, which is entered by a 
 is session state. The WebUSB grant is not that. **Kiosk lockdown is the fragile half and the
 pre-grant is the durable half, and only the durable half is needed.**
 
-#### The policy value is a constant, so staging needs no printer
+#### The value is published, so nothing needs connecting
 
-Worth stating before the runbook, because it removes the most awkward-looking step in it: **the
-value in §4.3 can be written today, without the printer, and it is the same string on every
-tablet.**
+**The rule in §4.3 can be written today, without the printer, and it is the same string on every
+tablet.** An earlier revision opened this runbook by connecting the printer through the chooser
+first. That step is gone, and why it is gone is the same reason the rest of the route is cheap.
 
-`1273` is `0x04F9`, Brother Industries' USB vendor id — a global constant assigned by the USB-IF, the
-same number on every Brother product ever made. It is not a property of the church's unit, its
-model, or its serial. And because the rule omits `product_id` (which it should, per §4.3), nothing
-in it depends on which Brother is in the building.
+**The identifiers are published, not discovered.** They are USB-IF vendor assignments, listed in the
+[USB ID Repository](http://www.linux-usb.org/usb.ids):
 
-That a vendor-only rule is legal is not an inference from a worked example. Chromium's policy
-definition says it outright — *"Omitting the `product_id` field will create a policy matching any
-device with the given vendor ID"* — and neither identifier appears in the schema's `required` list.
-§4.3 quotes both.
+| Vendor | Hex | `vendor_id` |
+| --- | --- | --- |
+| Brother Industries, Ltd | `0x04F9` | 1273 |
+| Zebra Technologies | `0x0A5F` | 2655 |
+| Dymo-CoStar Corp. | `0x0922` | 2338 |
 
-Three consequences, and the church has exactly the shape of problem they solve:
+`1273` is the same number on every Brother product ever made — not a property of the church's unit,
+its model or its serial. And because the rule omits `product_id` (which it should, per §4.3),
+nothing in it depends on which Brother is in the building. That a vendor-only rule is legal is not
+an inference from a worked example: Chromium's definition says it outright — *"Omitting the
+`product_id` field will create a policy matching any device with the given vendor ID"* — and neither
+identifier appears in the schema's `required` list.
 
-- **No printer is needed at staging.** A tablet is provisioned, the constant is pasted, and
+**The hardware path is already proven, in production, for months.** The reason this document exists
+is [`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) — an investigation into a lobby
+kiosk that prints name tags over WebUSB, on an Android tablet, with the printer on an OTG hub. USB
+host mode, the hub, the cable, the power and the Brother's own configuration are all long since
+settled by the thing that runs every Sunday. Re-proving them as a staging step would be theatre.
+
+**So list the vendors rather than checking the hardware.** If nothing empirically confirms which
+printer is on the shelf, the cheap insurance is to stop needing to know:
+
+```json
+[{ "devices": [{ "vendor_id": 1273 }, { "vendor_id": 2655 }, { "vendor_id": 2338 }],
+   "urls": ["https://tally.example.org"] }]
+```
+
+Three entries, no maintenance, and a printer bought in a hurry to replace a dead one is covered
+whatever the label on the box says. A fourth vendor later is a one-line edit. (Omitting `vendor_id`
+entirely would match every device and is still declined: the grant should be as narrow as its
+narrowest honest description, and these three are honest.)
+
+Two consequences, and the church has exactly the shape of problem they solve:
+
+- **No printer is needed at staging.** A tablet is provisioned, the value is pasted, and
   `chrome://policy` confirms the rule parsed — all with nothing plugged in. Policy validation is
   about the rule, not about device presence. With one printer and several tablets, this is the
   difference between a workable afternoon and carrying the printer round the building.
 - **Put it on every tablet, printing or not.** Only a kiosk bound to a gathering with a
   `labelTemplate` ever touches WebUSB, so strictly only the printing tablet needs this. Do them all
-  anyway: it is one paste, it is the same paste, and it means the one printer can be moved to any
-  tablet on a busy Sunday — or a spare swapped in for a dead one — with no staging trip at all.
-  A grant that is unit-independent is only useful if every tablet carries it.
-- **A replacement printer needs no policy edit** as long as it is a Brother. If the church might
-  ever buy something else, list the vendors side by side now; it costs nothing and covers the swap
-  in advance:
+  anyway: it is one paste, it is the same paste, and it means the one printer can move to any tablet
+  on a busy Sunday — or a spare swap in for a dead one — with no staging trip at all. A grant that
+  is unit-independent is only useful if every tablet carries it.
 
-  ```json
-  [{ "devices": [{ "vendor_id": 1273 }, { "vendor_id": 2655 }, { "vendor_id": 2338 }],
-     "urls": ["https://tally.example.org"] }]
-  ```
+**One check does survive, on one tablet.** The kiosk that prints today holds a *manual* chooser
+grant, and that grant will make `getDevices()` return the printer whether or not the policy works.
+Revoke it in Chrome's site settings (USB devices) before believing §4.5's second check there. Every
+other tablet is staged printer-free and has no such grant to confuse the evidence, which makes its
+`chrome://policy` check the cleaner of the two.
 
-  Brother, Zebra and Dymo. Broader still is available — omitting `vendor_id` matches every vendor —
-  but there is no reason to take it when the vendors are knowable, and the grant is only as narrow
-  as its narrowest honest description.
-
-#### Step 0 — prove the printer path once, not once per tablet
-
-An earlier draft of this section had somebody connect the printer before staging **each** tablet.
-That was wrong for a church with one printer, and it is wrong in general: what connecting proves is
-a property of the *hardware model*, not of the individual tablet. Prove it once per tablet model —
-in practice, once — and stage everything else printer-free.
-
-So, once, on one tablet, on an unmanaged device, today: plug the printer in, open the kiosk, connect
-it through the ordinary chooser exactly as [`label-printing.md`](label-printing.md) describes, and
-print one label. It needs no device owner, no adb and no decisions.
-
-What that buys:
-
-- **One unknown at a time.** If the policy goes on first and `getDevices()` comes back empty, the
-  cause is one of: a malformed rule (§4.3), the tablet not doing USB host, an unpowered or passive
-  hub, a cable, or the printer sitting in Editor Lite mode — which presents as mass storage and
-  cannot be printed to at all. That is five suspects for one symptom. Proving the hardware path
-  first leaves exactly one.
-- **It is free and early.** This is the only step that needs nothing managed, so it can happen
-  before anyone factory-resets anything or reads §2. If WebUSB to the Brother does not work on this
-  tablet model at all, no policy on earth fixes it, and the whole exercise stops here for the price
-  of an afternoon rather than after three enrolments.
-- **It confirms the constant.** Not because the value is unknown, but because a table in a document
-  is a weaker thing than the number the tablet reports. If the church's printer answers with a
-  vendor other than 1273, everything above needs re-reading.
-
-**Reading the identifiers needs no developer tools.** The kiosk already logs them: `describeDevice`
-at `src/kiosk/printing/index.ts:396-399` puts `vendorId` and `productId` into the printer event log,
-and the printer screen shows that log — *Recent printer events*, with a Copy button, kept across the
-nightly reload. Connect the printer, open the printer screen, and read
-`usb devices cause="boot" count=1 hasSerial=true vendorId=1273 productId=8347` straight off the
-glass.
-
-**Then revoke the manual grant before you test the policy, or you will get a false pass.** This is
-the trap in doing it in this order, and it only applies to the one tablet that did step 0. Once you
-have connected through the chooser, Chrome holds a grant of its own, and `getDevices()` will return
-the printer *because of that grant* — not because the policy works. Clear it in Chrome's site
-settings (USB devices) and re-check from a cold start. (On Android the manual grant tends to
-evaporate on re-enumeration anyway, because Chrome cannot read the serial afterwards —
-[`kiosk-printer-reliability.md`](kiosk-printer-reliability.md) §2.5 — but that is a bug-shaped
-accident, not a test method. Revoke it deliberately.) The printer-free tablets have no such grant to
-confuse them, which makes their `chrome://policy` check the cleaner evidence of the two.
+And if the policy somehow does not take, nothing that works today breaks: the chooser still works,
+and the kiosk falls back to asking for a printer exactly as it does now.
 
 #### The runbook
 
@@ -821,9 +801,11 @@ holds.
 should be able to tell the difference and say *the printer is set by policy* instead of offering a
 button that opens an empty chooser.
 
-**Hand back the policy line.** Step 0 of §4.6 has somebody connect the printer and then go reading
-`vendorId=1273` out of the event log. The screen knows that number the moment it is connected, so it
-can simply show the finished rule for *this* printer, with a copy button:
+**Hand back the policy line.** The rule is written from published identifiers (§4.6), so this is not
+how anyone discovers it — but the screen holds the connected device, and a rule derived from the
+hardware actually in the building beats one transcribed from a table. It is also the fastest way to
+answer "did we get the right vendor?" if a printer is ever replaced with something unexpected. Show
+the finished rule with a copy button:
 
 ```json
 [{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
@@ -924,27 +906,29 @@ priority; 3–6 are the rest of §6.
 
 ### Phase 0 — the field trial. No code.
 
-The only phase that can invalidate the others, so it goes first, and it needs nothing merged.
+The only phase that can invalidate the others, so it goes first, and it needs nothing merged. There
+is no connect-the-printer step: the identifiers are published and the hardware has been printing for
+months (§4.6).
 
-1. **Prove the printer path** on one tablet, unmanaged, with the chooser (§4.6 step 0). Print a
-   label. Read `vendorId`/`productId` off *Recent printer events* on the printer screen and check
-   them against §4.3 — this is also the first real use of the log as an instrument rather than as a
-   post-mortem.
-2. **Provision that tablet to device owner**, whichever of §4.6's two routes suits (`afw#testdpc`
-   from a reset, or `dpm set-device-owner` over adb with the accounts removed).
-3. **Revoke the manual grant** in Chrome's site settings. This is the step that makes the rest a
-   test rather than a rehearsal; skip it and the pass is false.
-4. **Set `WebUsbAllowDevicesForUrls`** in Test DPC → Managed configurations → Chrome, vendor-only.
-   Note which editor Test DPC renders — one text box or a nested bundle — because that is the
-   answer to the last live question in §8, and it decides how Phase 3's page should present the
-   value.
-5. **Verify per §4.5**: `chrome://policy` shows *Status: OK*, then `getDevices()` returns the
+1. **Provision one tablet to device owner** — whichever of §4.6's two routes suits (`afw#testdpc`
+   from a reset, or `dpm set-device-owner` over adb with the accounts removed). Start with the
+   tablet that already prints, because it is the only one that can prove the second check below.
+2. **Revoke its manual chooser grant** in Chrome's site settings. Skip this and the pass is false —
+   `getDevices()` will return the printer on the strength of the old grant.
+3. **Set `WebUsbAllowDevicesForUrls`** in Test DPC → Managed configurations → Chrome, with the
+   three-vendor value from §4.6. Note which editor Test DPC renders — one text box or a nested
+   bundle — because that is the answer to the last live question in §8, and it decides how Phase 3
+   presents the value.
+4. **Verify per §4.5**: `chrome://policy` shows *Status: OK*, then `getDevices()` returns the
    printer with no chooser. Reboot, edit the value, reboot again — the Android 14 caution in §4.6.
-6. **Toggle keep-awake**, and leave the tablet running with the printer attached for a week.
+5. **Toggle keep-awake**, and leave it running with the printer attached for a week.
+6. **Stage a second tablet printer-free** and confirm *Status: OK* alone. This is the step that
+   proves the deployment shape actually works — one printer, several tablets, no carrying anything
+   around the building.
 
-**What Phase 0 decides.** If step 5 fails, nothing below matters and §7 (ChromeOS) is the
-conversation instead. If it passes, Phases 1–2 become worth building and the remaining phases are
-ordinary product work.
+**What Phase 0 decides.** If step 4 fails, nothing below matters and §7 (ChromeOS) is the
+conversation instead; the chooser still works in the meantime, so nothing that works today breaks.
+If it passes, Phases 1–2 become worth building and the rest is ordinary product work.
 
 ### Phase 1 — the kiosk notices a pre-grant
 
@@ -993,7 +977,8 @@ holds.
   printer; it should not offer *Connect a printer* to a kiosk whose printer is pre-granted, and
   should say so rather than going quiet.
 - **Hand back the policy line.** Once connected, show the finished rule for *this* printer with a
-  copy button — §6.5. This is what makes §4.6 step 0 and the policy one continuous action.
+  copy button — §6.5. Not how the rule is discovered (§4.6 writes it from published identifiers), but
+  the fastest check that the printer on the shelf is the one the rule covers.
 
 **Strings.** Every new line needs an entry in `messages/kiosk/en.json` and its three siblings
 (`es-MX`, `zh-Hans`, `zh-Hant`), plus a `messages/translation-state.json` record carrying a
