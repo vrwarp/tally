@@ -64,6 +64,10 @@ export default defineConfig({
          */
         globIgnores: [
           'kiosk.html',
+          // Precaching this would pin a staging page to whatever shipped the day
+          // somebody last opened Tally on the tablet, and its whole value is
+          // being current for the deployment in front of you.
+          'setup.html',
           'kiosk-sw.js',
           'kiosk.webmanifest',
           'kiosk-icon.svg',
@@ -74,7 +78,7 @@ export default defineConfig({
         // The kiosk entry is its own page, deliberately outside the PWA: a
         // device that once loaded the main app must not have that navigation
         // answered with index.html from the service worker.
-        navigateFallbackDenylist: [/^\/__/, /^\/kiosk/],
+        navigateFallbackDenylist: [/^\/__/, /^\/kiosk/, /^\/setup/],
         runtimeCaching: [],
       },
       devOptions: {
@@ -115,6 +119,11 @@ export default defineConfig({
         // The self-serve check-in kiosk: its own tiny page, sharing this build
         // so the two entries split vendor chunks instead of shipping two copies.
         kiosk: fileURLToPath(new URL('./kiosk.html', import.meta.url)),
+        // Staging a managed tablet: a static page of values to paste into the
+        // device's Chrome configuration. Its own entry for the same reason the
+        // kiosk has one — it is opened on a tablet that is not yet a kiosk and
+        // should not pull the app in to render a list of strings.
+        setup: fileURLToPath(new URL('./setup.html', import.meta.url)),
       },
       output: {
         /*
