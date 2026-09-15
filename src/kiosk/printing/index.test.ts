@@ -26,6 +26,7 @@ import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 import type { LabelJob, QueueOptions, RasterResult } from '@/kiosk/printing/queue';
 import { KIOSK_KEYS } from '@/kiosk/storage';
+import { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL } from '@/kiosk/printing/device';
 import { testGrades } from '@/test/translator';
 
 const grades = testGrades();
@@ -2091,6 +2092,84 @@ describe('what the record says, exactly', () => {
     const unsupported = await load();
     await unsupported.ready();
     expect(said(unsupported)).toEqual(['state unsupported cause="boot"']);
+  });
+
+  describe('a printer the tablet policy granted, that nobody here set up', () => {
+    /*
+     * The managed-tablet case. `WebUsbAllowDevicesForUrls` grants the printer to
+     * this origin, so `getDevices()` answers on a kiosk that has never been
+     * through a chooser and has no stored config. Before this existed, `ready`
+     * read the absent config and returned idle without asking the bus, and the
+     * pre-grant was invisible to the one kiosk it was set up for.
+     */
+
+    it('adopts it, and writes down what it had to guess', async () => {
+      tables.models = ['QL-800', 'QL-810W', 'QL-820NWB'];
+      const device = makeDevice();
+      device.device.productName = 'Brother QL-820NWB';
+      usb.paired = [device];
+      // No `configured()`. That is the whole point.
+      const printing = await load();
+      const state = await printing.ready();
+
+      expect(state.kind).toBe('ready');
+      expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toEqual({
+        model: 'QL-820NWB',
+        label: DEFAULT_PRINTER_LABEL,
+        // The roll was never read. The chooser's strip reads this and colours
+        // the printer amber rather than claiming a media size it invented.
+        guessed: true,
+      });
+      // The record names the grant, so a volunteer reading the printer screen's
+      // log can tell a printer the policy handed over from one somebody paired.
+      expect(said(printing)[0]).toBe(
+        'kiosk policy-grant hasSerial=true vendorId=1273 productId=8347 ' +
+          'productName="Brother QL-820NWB"',
+      );
+    });
+
+    it('falls back to the default model when the bus offers no name', async () => {
+      const device = makeDevice();
+      device.device.productName = null;
+      usb.paired = [device];
+      const printing = await load();
+      await printing.ready();
+
+      expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer) ?? 'null')).toMatchObject({
+        model: DEFAULT_PRINTER_MODEL,
+      });
+    });
+
+    it('leaves an unmanaged kiosk exactly as it was', async () => {
+      // The common case, and the one that must not change: nothing granted,
+      // nothing configured, nothing written, no state transition to report.
+      usb.paired = [];
+      const printing = await load();
+      const state = await printing.ready();
+
+      expect(state.kind).toBe('idle');
+      expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
+      expect(said(printing)).toEqual([]);
+    });
+
+    it('does not ask a browser that has no bus to answer', async () => {
+      usb.supported = false;
+      usb.paired = [makeDevice()];
+      const printing = await load();
+      const state = await printing.ready();
+
+      expect(state.kind).toBe('idle');
+      expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
+    });
+
+    it('treats a bus that will not answer as no printer, not as a crash', async () => {
+      const printing = await load();
+      (await pairedDevices()).mockRejectedValueOnce(new Error('bus busy'));
+      await expect(printing.ready()).resolves.toMatchObject({ kind: 'idle' });
+
+      expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
+      expect(said(printing).join('\n')).toContain('policy-grant-failed');
+    });
   });
 
   it('boot, with nothing listed, and the search that follows', async () => {

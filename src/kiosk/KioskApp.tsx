@@ -50,6 +50,8 @@ import { useOrphanClickGuard } from './components/tapGuard';
 import { tallyRender } from './renderTally';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
+import { isQuietHour } from '@/lib/kioskQuietHour';
+import { hasGrantedPrinter } from './policyGrant';
 import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
@@ -363,12 +365,6 @@ function newArrivalId(): string {
   return `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/** ~4am local: reclaim memory and pick up deploys, but only while idle. */
-function isQuietHour(): boolean {
-  const hour = new Date().getHours();
-  return hour === 4;
-}
-
 export function KioskApp() {
   tallyRender('KioskApp');
   const tDoor = useTranslations('Door');
@@ -398,6 +394,16 @@ export function KioskApp() {
    * first press rather than fetched by it.
    */
   const [chooserPrints, setChooserPrints] = useState(false);
+  /**
+   * Whether a printer is already granted to this origin by tablet policy.
+   *
+   * Asked once, at boot, and never again: a policy grant is not something that
+   * appears mid-evening, and the `connect` watcher the printing module installs
+   * covers the printer being plugged back in. False until the probe answers,
+   * which costs a warm managed kiosk nothing — the chunk it unlocks is fetched
+   * asynchronously either way.
+   */
+  const [policyGranted, setPolicyGranted] = useState(false);
   /**
    * The row the chooser has picked, held here so it survives the printer door.
    *
@@ -815,8 +821,34 @@ export function KioskApp() {
    * connect in the chooser's foot is live by the time a finger reaches it. A
    * kiosk whose day has no printing row still never fetches it.
    */
+  /*
+   * `policyGranted` is the clause that reaches a *managed* tablet. A kiosk
+   * staged from `docs/tablet-management.md` has the printer granted to the
+   * origin by Chrome policy and no config of its own, so none of the four
+   * clauses above fire on a warm boot into a bound gathering: the chooser is
+   * not up to report a printing row, and the config it would have written does
+   * not exist yet. The probe is a bare `getDevices()` and never the chunk —
+   * see `policyGrant.ts`, and the budget gate it is written around.
+   */
   const wantsPrinting =
-    phase === 'printer' || overlay?.kind === 'printer' || printerConfig !== null || chooserPrints;
+    phase === 'printer' ||
+    overlay?.kind === 'printer' ||
+    printerConfig !== null ||
+    chooserPrints ||
+    policyGranted;
+
+  useEffect(() => {
+    // Only worth asking while the answer could still change anything: a kiosk
+    // that already has a config is loading the chunk regardless.
+    if (printerConfig !== null) return;
+    let cancelled = false;
+    void hasGrantedPrinter().then((granted) => {
+      if (!cancelled && granted) setPolicyGranted(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [printerConfig]);
 
   useEffect(() => {
     if (!wantsPrinting) return;

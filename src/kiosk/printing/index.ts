@@ -67,6 +67,8 @@ import {
 import { matchLabels, modelFromProductName, preferredLabel } from './detect';
 import { tokenValuesFor } from './tokens';
 import {
+  DEFAULT_PRINTER_LABEL,
+  DEFAULT_PRINTER_MODEL,
   readPrinterConfig,
   writePrinterConfig,
   type PrinterConfig,
@@ -672,13 +674,64 @@ async function adopt(
 }
 
 /**
+ * A printer this kiosk was never set up with, granted to the origin anyway.
+ *
+ * On a managed tablet, Chrome's `WebUsbAllowDevicesForUrls` pre-grants the
+ * printer to this origin without anybody touching a chooser — see
+ * `docs/tablet-management.md`. That makes a state this module did not used to
+ * have: the device is *present* while the config is *absent*. `ready()` read
+ * the absent config, concluded there was no printer, and returned `idle`
+ * without ever asking the bus — so the pre-grant was invisible to precisely the
+ * kiosk it was configured for, and a shelf tablet staged printer-free came up
+ * asking a volunteer to connect a printer that was already connected.
+ *
+ * So: look before concluding. Returns the config to carry on with, or null when
+ * this really is a kiosk with no printer, which is still the common case.
+ *
+ * The roll is a guess and is flagged as one. `checkPrinter` settles it against
+ * what the printer reports the next time the screen is opened, and until then
+ * the chooser's strip reads the flag and colours the printer amber rather than
+ * green — the same treatment a chooser-paired printer gets when its media could
+ * not be read. Inventing a media size and calling it a fact is how a nursery
+ * gets a sheet of labels cropped down the middle.
+ */
+async function adoptPolicyGrant(): Promise<PrinterConfig | null> {
+  if (!isWebUsbSupported()) return null;
+  try {
+    // Brother only, deliberately. The policy pre-grants three vendors because a
+    // grant is free and a replacement printer is not, but this transport speaks
+    // one of them — see `src/lib/printerVendor.ts`.
+    const paired = await BrotherQLPrinterCore.getPairedDevices({
+      model: DEFAULT_PRINTER_MODEL,
+      diagnostics: tracer,
+    });
+    const found = paired[0];
+    if (!found) return null;
+    const granted: PrinterConfig = {
+      model: modelFromProductName(found.device?.productName) ?? DEFAULT_PRINTER_MODEL,
+      label: DEFAULT_PRINTER_LABEL,
+      guessed: true,
+    };
+    log.record('kiosk', 'policy-grant', identity(found.device));
+    writePrinterConfig(granted);
+    return granted;
+  } catch (error) {
+    // A bus that will not answer is not a printer that is not there, and this
+    // path has no screen to colour: `ready` falls back to `idle`, which is what
+    // it would have done a moment ago anyway.
+    log.record('kiosk', 'policy-grant-failed', errorInfo(error));
+    return null;
+  }
+}
+
+/**
  * Reopen the printer this kiosk was set up with, if it is there.
  *
  * No user gesture: `getDevices` returns what the origin has already been granted,
  * which is exactly the case a kiosk that rebooted at 4am is in.
  */
 export async function ready(): Promise<PrinterState> {
-  const stored = readPrinterConfig();
+  const stored = readPrinterConfig() ?? (await adoptPolicyGrant());
   if (!stored) {
     setState({ kind: 'idle' }, 'boot');
     return state;
