@@ -208,7 +208,11 @@
     "checksNeedPrinter": "Check and test need the printer connected. A reprint will try to reconnect first, and say if it could not.",
     "autoPowerOff": "In Brother’s Printer Setting Tool, set Auto Power Off to None. A printer that switches itself off has to be connected again from this screen.",
     "backToGatherings": "Back to the gatherings",
-    "setByPolicy": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen."
+    "setByPolicy": "This tablet's own settings give Tally the printer, so there was no set-up step to miss. A replacement printer works the same way, with no visit to this screen.",
+    "tabletPolicy": "Tablet printer setting",
+    "tabletPolicyHint": "This tablet is managed, so Chrome can be handed the printer once and for good. Paste the line below into the Chrome settings list in the tablet's management app.",
+    "tabletPolicyMore": "The rest of the tablet settings, and what each one is for, are at {url}.",
+    "policyCopied": "Printer setting copied to the clipboard"
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",

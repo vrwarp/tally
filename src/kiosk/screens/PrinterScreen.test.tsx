@@ -13,7 +13,7 @@
  * silently chosen is exactly the wrong-roll Sunday the detection was supposed
  * to prevent.
  */
-import { act, fireEvent, render, screen } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
@@ -116,12 +116,25 @@ function mount(
  * control's box, and jsdom lays nothing out — every `getBoundingClientRect` is
  * a zero-sized box at 0,0, so 0,0 is the only point inside one.
  */
-async function press(name: RegExp): Promise<void> {
-  const button = screen.getByRole('button', { name });
+async function press(name: RegExp, scope?: HTMLElement): Promise<void> {
+  const button = (scope ? within(scope) : screen).getByRole('button', { name });
   await act(async () => {
     fireEvent.pointerDown(button, { pointerId: 1, clientX: 0, clientY: 0 });
     fireEvent.pointerUp(button, { pointerId: 1, clientX: 0, clientY: 0 });
   });
+}
+
+/**
+ * The fold whose summary reads this, as something to search inside.
+ *
+ * Two of them now carry a **Copy** button, and a query across the whole screen
+ * cannot say which — which is the test noticing the same thing a volunteer
+ * would, so the answer is to name the section rather than to number the button.
+ */
+function fold(summary: string): HTMLElement {
+  const details = screen.getByText(summary).closest('details');
+  if (!details) throw new Error(`no fold titled ${summary}`);
+  return details;
 }
 
 /** The same, for a control found by its words rather than its role. */
@@ -432,18 +445,113 @@ describe('what has happened to the printer', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     mount(handleWith(detection(), events));
 
-    await press(/^Copy$/);
+    await press(/^Copy$/, fold('Recent printer events'));
 
     expect(writeText).toHaveBeenCalledWith('the whole record');
-    expect(screen.getByRole('button', { name: /^Copied$/ })).toBeInTheDocument();
+    expect(
+      within(fold('Recent printer events')).getByRole('button', { name: /^Copied$/ }),
+    ).toBeInTheDocument();
   });
 
   it('shows the text to select by hand where copying is blocked', async () => {
     mount(handleWith(detection(), events));
 
-    await press(/^Copy$/);
+    await press(/^Copy$/, fold('Recent printer events'));
 
     expect(screen.getByText(/Copying is blocked on this device/)).toBeInTheDocument();
     expect(screen.getByLabelText('Printer events')).toHaveValue('the whole record');
+  });
+});
+
+describe('the setting that gives a managed tablet its printer', () => {
+  /*
+   * The value goes into Chrome's configuration on the tablet, so it is offered
+   * on the tablet: the management app is one task-switch away from this screen,
+   * and anything that lives only on a laptop page gets typed by hand instead —
+   * a quote-heavy one-liner, on an on-screen keyboard, that fails silently when
+   * it is wrong.
+   */
+  const ORIGIN = window.location.origin;
+  const VALUE = `[{"devices":[{"vendor_id":1273},{"vendor_id":2655},{"vendor_id":2338}],"urls":["${ORIGIN}"]}]`;
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  it('shows the key and the value, written for wherever this kiosk is served from', () => {
+    mount(handleWith(detection()));
+
+    const section = fold('Tablet printer setting');
+    expect(within(section).getByText('WebUsbAllowDevicesForUrls')).toBeInTheDocument();
+    expect(within(section).getByText(VALUE)).toBeInTheDocument();
+  });
+
+  it('offers it on the unpaired screen too, which is the tablet that needs it', () => {
+    // The kiosk this is for is the one where nothing about the printer works
+    // yet, so the fold cannot be conditional on a printer answering.
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29' });
+
+    expect(within(fold('Tablet printer setting')).getByText(VALUE)).toBeInTheDocument();
+  });
+
+  it('copies the value rather than the printer log', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    mount(handleWith(detection()));
+
+    await press(/^Copy$/, fold('Tablet printer setting'));
+
+    expect(writeText).toHaveBeenCalledWith(VALUE);
+  });
+
+  it('does not let one Copy button answer for the other', async () => {
+    // Two buttons under one flag said "Copied" together, which is a claim about
+    // text nobody copied — and here the wrong text is a printer log where
+    // somebody is watching for a policy line.
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    mount(handleWith(detection()));
+
+    await press(/^Copy$/, fold('Tablet printer setting'));
+    expect(
+      within(fold('Tablet printer setting')).getByRole('button', { name: /^Copied$/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(fold('Recent printer events')).getByRole('button', { name: /^Copy$/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not let it answer the other way either', async () => {
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    mount(handleWith(detection()));
+
+    await press(/^Copy$/, fold('Recent printer events'));
+
+    expect(
+      within(fold('Tablet printer setting')).getByRole('button', { name: /^Copy$/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves the value readable where copying is blocked', async () => {
+    // No clipboard, and no textarea either: the whole value is on screen and
+    // short enough to select by hand, which is what `select-text` is for.
+    mount(handleWith(detection()));
+
+    const section = fold('Tablet printer setting');
+    await press(/^Copy$/, section);
+
+    expect(within(section).getByText(/Copying is blocked on this device/)).toBeInTheDocument();
+    expect(within(section).getByText(VALUE)).toBeInTheDocument();
+  });
+
+  it('says where the rest of the tablet settings are', () => {
+    mount(handleWith(detection()));
+
+    expect(
+      within(fold('Tablet printer setting')).getByText(
+        `The rest of the tablet settings, and what each one is for, are at ${ORIGIN}/setup.`,
+      ),
+    ).toBeInTheDocument();
   });
 });

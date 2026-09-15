@@ -2420,7 +2420,11 @@
     "checksNeedPrinter": "檢查和測試需要先連接印表機。重印會先嘗試重新連接，連不上會告訴你。",
     "autoPowerOff": "在 Brother 的 Printer Setting Tool 裡，把 Auto Power Off 設為 None。會自動關機的印表機，必須從這個畫面重新連接一次。",
     "backToGatherings": "回到聚會列表",
-    "setByPolicy": "這臺平板的設定已將印表機交給 Tally，因此沒有可遺漏的設定步驟。更換印表機後同樣可用，無需再回到此頁面。"
+    "setByPolicy": "這臺平板的設定已將印表機交給 Tally，因此沒有可遺漏的設定步驟。更換印表機後同樣可用，無需再回到此頁面。",
+    "tabletPolicy": "平板的印表機設定",
+    "tabletPolicyHint": "這臺平板受管理，因此可以一次性把印表機交給 Chrome。請把下面這行內容貼到平板管理應用程式中的 Chrome 設定清單裡。",
+    "tabletPolicyMore": "其餘的平板設定，以及每一項的用途，請見 {url}。",
+    "policyCopied": "印表機設定已複製到剪貼簿"
   },
   "Pairing": {
     "title": "配對這台簽到台",

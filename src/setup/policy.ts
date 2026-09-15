@@ -14,7 +14,7 @@
  * page is correct wherever it is served from without being configured at all.
  */
 import { quietWindowMinutes } from '@/lib/kioskQuietHour';
-import { webUsbPolicyJson } from '@/lib/printerVendor';
+import { WEB_USB_POLICY_KEY, webUsbPolicyJson } from '@/lib/printerVendor';
 
 /** How badly a kiosk breaks if this row is skipped, or entered wrong. */
 export type Weight =
@@ -45,7 +45,7 @@ export interface PolicyRow {
 export function policyRows(origin: string): PolicyRow[] {
   return [
     {
-      key: 'WebUsbAllowDevicesForUrls',
+      key: WEB_USB_POLICY_KEY,
       value: webUsbPolicyJson(origin),
       weight: 'required',
       note:

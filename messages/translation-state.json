@@ -14192,5 +14192,33 @@
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicy": {
+    "source": "Tablet printer setting",
+    "context": "Label on a folded section at the bottom of the lobby kiosk’s printer screen, seen only by staff. Behind it is the one Chrome setting an administrator must put on a managed tablet so the kiosk can reach the label printer. “Tablet” is the physical device the kiosk runs on.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicyHint": {
+    "source": "This tablet is managed, so Chrome can be handed the printer once and for good. Paste the line below into the Chrome settings list in the tablet's management app.",
+    "context": "One line of instruction inside that folded section, addressed to whoever is setting up a managed tablet while standing at it. “Managed” means an administrator controls the device through a management app; “the line below” is the Chrome policy value shown underneath, which is copied and pasted rather than typed.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.tabletPolicyMore": {
+    "source": "The rest of the tablet settings, and what each one is for, are at {url}.",
+    "context": "A quieter line under the copy button, pointing at Tally’s own page listing every other tablet setting. {url} is a web address and must be left exactly as it is.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCopied": {
+    "source": "Printer setting copied to the clipboard",
+    "context": "Announced to screen readers when the Chrome printer setting has been copied to the clipboard. Not shown on screen.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   }
 }

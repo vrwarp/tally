@@ -36,19 +36,25 @@ The shelf tablet, stood on end, which is where this is actually used: Chrome on 
 
 ![The same page, on the glass it is read from](web/03-setup-tablet.jpg)
 
+### The same value, on the glass it has to be pasted from
+
+The page above is the right thing for a laptop and the wrong thing for the moment that matters. The paste target is Test DPC — an Android app on *this* tablet — and the only clipboard that can reach it is this tablet’s own. So the one required value is also here, folded, on the screen already open on the device: hold *Clear*, printer screen, unfold, copy, switch apps, paste. Nothing is typed, not even a URL. It is composed from this page’s own origin and three published vendor ids, so it is right by construction wherever Tally is deployed — which is why the frame shows `localhost`: the harness is serving it, and the value says so.
+
+![The same value, on the glass it has to be pasted from](web/04-kiosk-policy.jpg)
+
 ## A volunteer at the kiosk
 
 ### No set-up step was missed
 
 A managed kiosk whose printer is not answering at this moment. Before the change this screen offered *Connect the printer* and said nothing else, and on a tablet nobody ever set up the absence of a set-up step reads as a step somebody skipped. The reference line says the tablet’s own settings supplied the printer and a replacement will work the same way — and the advice that is actually actionable, power and cable, stays exactly where it was. A test pins that it stays.
 
-![No set-up step was missed](web/04-printer-policy.jpg)
+![No set-up step was missed](web/05-printer-policy.jpg)
 
 ### And nothing of the sort on a kiosk somebody paired
 
 The same screen, same state, on an ordinary kiosk. The line is absent, because it would be untrue: somebody did connect this printer by hand, and there was a set-up step. Provenance is carried on the stored config and survives both places that rewrite it — `configure()`, which every roll change goes through, and `checkPrinter`’s settle. Without that carry, the first time anybody picked the other spindle a policy-granted printer would start describing itself as one somebody paired.
 
-![And nothing of the sort on a kiosk somebody paired](web/05-printer-paired.jpg)
+![And nothing of the sort on a kiosk somebody paired](web/06-printer-paired.jpg)
 
 ## A leader, staging in the office
 
@@ -56,7 +62,7 @@ The same screen, same state, on an ordinary kiosk. The line is absent, because i
 
 The ordinary handshake wants a volunteer holding a tablet that is already showing six characters. A managed tablet is the other shape entirely — reset in an office, booting into the kiosk by itself — so the pairing is minted ready and travels in the tablet’s start URL. Shown once, good for an hour, and the warning is written as *treat it like a password* rather than in security language nobody reads. The kiosk strips it out of the address before it makes any network call, and unconditionally: a link that failed is no less a credential than one that worked.
 
-![A pairing for a tablet nobody will be standing at](web/06-staging-link.jpg)
+![A pairing for a tablet nobody will be standing at](web/07-staging-link.jpg)
 
 ## Whoever notices before Sunday
 
@@ -64,4 +70,4 @@ The ordinary handshake wants a volunteer holding a tablet that is already showin
 
 The one thing on the tablet-management list that never needed a device-management product at all. `lastSeenAt` already said a kiosk was alive on Tuesday; it did not say the tablet has been off its charger since Thursday, which is the sentence somebody can act on. Said only when it is worth saying — a plugged-in tablet and a retired row both stay silent, because "87%, charging" is a fact nobody can act on and one more line on a screen that is already dense. Four tests pin each of those silences.
 
-![Somebody unplugged the lobby tablet](web/07-battery.jpg)
+![Somebody unplugged the lobby tablet](web/08-battery.jpg)

@@ -48,6 +48,16 @@ export const LABEL_PRINTER_VENDOR_IDS = [
   DYMO_VENDOR_ID,
 ] as const;
 
+/**
+ * Chrome's own name for the setting these ids go into.
+ *
+ * Spelled once, because it is entered by hand at both ends: the staging page
+ * lists it beside the value, and the printer screen on the tablet shows it to
+ * whoever is switching between Tally and the management app. A typo in it is
+ * silent — Chrome ignores a key it does not know.
+ */
+export const WEB_USB_POLICY_KEY = 'WebUsbAllowDevicesForUrls';
+
 /** One entry of Chrome's `WebUsbAllowDevicesForUrls`. */
 export interface WebUsbPolicyEntry {
   devices: { vendor_id: number }[];

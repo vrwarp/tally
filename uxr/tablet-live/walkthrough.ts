@@ -196,7 +196,23 @@ const SCENES: Scene[] = [
       'The shelf tablet, stood on end, which is where this is actually used: Chrome on one side of the screen and Test DPC’s managed-configuration editor on the other. Copy, switch, long-press, paste, next key. The copy button falls back to selecting the value when the clipboard API is refused — which it is on an insecure origin — because a button that silently does nothing during staging is worse than no button at all.',
   },
   {
-    id: '04-printer-policy',
+    id: '04-kiosk-policy',
+    server: 'kiosk',
+    path: '/uxr/kiosk-live/index.html?screen=printer&printer=unpaired',
+    viewport: 'tablet',
+    journey: 'Staging a tablet',
+    title: 'The same value, on the glass it has to be pasted from',
+    caption:
+      'The page above is the right thing for a laptop and the wrong thing for the moment that matters. The paste target is Test DPC — an Android app on *this* tablet — and the only clipboard that can reach it is this tablet’s own. So the one required value is also here, folded, on the screen already open on the device: hold *Clear*, printer screen, unfold, copy, switch apps, paste. Nothing is typed, not even a URL. It is composed from this page’s own origin and three published vendor ids, so it is right by construction wherever Tally is deployed — which is why the frame shows `localhost`: the harness is serving it, and the value says so.',
+    prepare: async (page) => {
+      const fold = page.getByText('Tablet printer setting');
+      await fold.click();
+      await fold.scrollIntoViewIfNeeded();
+      await page.mouse.wheel(0, 200);
+    },
+  },
+  {
+    id: '05-printer-policy',
     server: 'kiosk',
     path: '/uxr/kiosk-live/index.html?screen=printer&printer=unpaired&policy=1',
     viewport: 'tablet',
@@ -206,7 +222,7 @@ const SCENES: Scene[] = [
       'A managed kiosk whose printer is not answering at this moment. Before the change this screen offered *Connect the printer* and said nothing else, and on a tablet nobody ever set up the absence of a set-up step reads as a step somebody skipped. The reference line says the tablet’s own settings supplied the printer and a replacement will work the same way — and the advice that is actually actionable, power and cable, stays exactly where it was. A test pins that it stays.',
   },
   {
-    id: '05-printer-paired',
+    id: '06-printer-paired',
     server: 'kiosk',
     path: '/uxr/kiosk-live/index.html?screen=printer&printer=unpaired',
     viewport: 'tablet',
@@ -216,7 +232,7 @@ const SCENES: Scene[] = [
       'The same screen, same state, on an ordinary kiosk. The line is absent, because it would be untrue: somebody did connect this printer by hand, and there was a set-up step. Provenance is carried on the stored config and survives both places that rewrite it — `configure()`, which every roll change goes through, and `checkPrinter`’s settle. Without that carry, the first time anybody picked the other spindle a policy-granted printer would start describing itself as one somebody paired.',
   },
   {
-    id: '06-staging-link',
+    id: '07-staging-link',
     server: 'pair',
     path: '/uxr/kiosk-setup-live/index.html',
     viewport: 'desktop',
@@ -230,7 +246,7 @@ const SCENES: Scene[] = [
     },
   },
   {
-    id: '07-battery',
+    id: '08-battery',
     server: 'team',
     path: '/uxr/team-live/index.html',
     viewport: 'desktop',

@@ -582,8 +582,20 @@ sequence is: open the value in Chrome **on the tablet**, copy, switch to Test DP
 paste. Three things follow from that, and they are the difference between a smooth staging and a
 bricked afternoon.
 
-- **What you type is the URL, not the value.** A short path you can type without error gets you a
-  long value you must not. That is the whole trick, and §6.3 is Tally serving that page.
+- **Copy it from the kiosk itself, if this tablet is already a kiosk.** The printer screen behind
+  the staff menu carries the finished WebUSB value with a copy button (§6.5): hold *Clear*, open the
+  printer screen, unfold **Tablet printer setting**, copy, switch to Test DPC, paste. Nothing is
+  typed at all — not even a URL — and the value is composed from the page's own origin, so it is
+  right by construction on whatever domain this deployment lives at.
+
+  That is an argument for **staging in this order**: factory reset, device owner, open the kiosk,
+  pair it, *then* set the policy. The pairing screen is what an unpaired kiosk shows and the only
+  thing it shows, so the printer screen is not reachable before pairing anyway — and doing it this
+  way proves the tablet works as a kiosk before anything about it is locked down.
+- **Otherwise what you type is the URL, not the value.** A short path you can type without error
+  gets you a long value you must not. That is the whole trick, and §6.3 is Tally serving that page —
+  which is still the place to go for the other ten keys of §4.2, and for a tablet being staged
+  before anybody has paired it.
 - **`URLBlocklist` and `URLAllowlist` go last.** Paste `["*"]` into the blocklist early and you have
   just cut off the page you are still copying from. WebUSB first, privacy keys next, the two URL
   lists at the very end — and make sure the allowlist includes wherever the setup page lives if you
@@ -806,19 +818,27 @@ holds.
 should be able to tell the difference and say *the printer is set by policy* instead of offering a
 button that opens an empty chooser.
 
-**Hand back the policy line.** The rule is written from published identifiers (§4.6), so this is not
-how anyone discovers it — but the screen holds the connected device, and a rule derived from the
-hardware actually in the building beats one transcribed from a table. It is also the fastest way to
-answer "did we get the right vendor?" if a printer is ever replaced with something unexpected. Show
-the finished rule with a copy button:
+**Hand back the policy line.** Show the finished rule, folded, with a copy button:
 
 ```json
-[{ "devices": [{ "vendor_id": 1273 }], "urls": ["https://tally.example.org"] }]
+[{ "devices": [{ "vendor_id": 1273 }, { "vendor_id": 2655 }, { "vendor_id": 2338 }],
+   "urls": ["https://tally.example.org"] }]
 ```
 
-That is better than §6.3's generated page in the one way that matters — it is derived from the
-hardware actually in the building rather than from configuration and a lookup table — and it makes
-the pre-flight and the policy one continuous action instead of two screens and a transcription.
+An earlier draft of this section argued for it on the grounds that the screen holds the *connected
+device*, so the rule could be derived from the hardware actually in the building. §4.6 took that
+argument away: the rule is written from published vendor identifiers and this page's origin, and
+needs no printer at all.
+
+The reason it belongs here anyway is a better one, and it is about **where the person is standing**.
+The paste target is Test DPC, an Android app on this tablet, and the only clipboard that can reach
+it is this tablet's own. The kiosk is already the page open on that tablet. A value that lives only
+on §6.3's page is a value somebody reaches by typing a URL, on an on-screen keyboard, while holding
+the device — or, more often, by reading it off a laptop across the room and typing the whole
+quote-heavy one-liner by hand, which is the one failure mode this whole section exists to prevent.
+
+So both, deliberately, and they are not redundant: the kiosk carries the one required key for the
+tablet in your hands, and §6.3 carries all eleven for the person planning a rollout on a laptop.
 
 ---
 
@@ -985,12 +1005,19 @@ with no printer does not pull the chunk.
 
 ### Phase 2 — the printer screen says what it knows
 
-**Shipped, narrowed.** `PrinterConfig.viaPolicy` carries the provenance — through `configure()` and
-`checkPrinter`'s settle, both of which rewrite the config and would otherwise drop it — and the
-screen says so in the state that actually sends somebody looking. The second half, handing back the
-finished rule, was **dropped from this screen and moved to Phase 3**: it belonged here while the
-rule was derived from the connected device, and since §4.6 it is written from published identifiers
-and the origin, so it needs no printer and no kiosk.
+**Shipped, both halves.** `PrinterConfig.viaPolicy` carries the provenance — through `configure()`
+and `checkPrinter`'s settle, both of which rewrite the config and would otherwise drop it — and the
+screen says so in the state that actually sends somebody looking.
+
+The second half, handing back the finished rule, was dropped from this screen when §4.6 stopped
+needing a connected printer to write it, and then **put back**, because the argument for dropping it
+was about where the value comes *from* and the argument for keeping it is about where it has to
+*go*. It goes into an Android app on this tablet, reachable only from this tablet's clipboard, and
+this screen is already open on it. A folded **Tablet printer setting** section now carries
+`WebUsbAllowDevicesForUrls` and the value from `webUsbPolicyJson(location.origin)`, with the same
+copy-button-and-selectable-text shape as the event log above it, and a line pointing at `/setup` for
+the other ten keys. Unconditional, because the tablet that most needs it is the one where nothing
+about the printer works yet.
 
 Two small things on `src/kiosk/screens/PrinterScreen.tsx`, both from the device object it already
 holds.
@@ -1000,9 +1027,9 @@ holds.
   [`kiosk-printer-setup.md`](kiosk-printer-setup.md), currently assumes somebody must connect a
   printer; it should not offer *Connect a printer* to a kiosk whose printer is pre-granted, and
   should say so rather than going quiet.
-- **Hand back the policy line.** Once connected, show the finished rule for *this* printer with a
-  copy button — §6.5. Not how the rule is discovered (§4.6 writes it from published identifiers), but
-  the fastest check that the printer on the shelf is the one the rule covers.
+- **Hand back the policy line.** Show the rule with a copy button — §6.5. Not how the rule is
+  discovered (§4.6 writes it from published identifiers and the origin), but the one screen already
+  open on the tablet whose clipboard has to carry it into Test DPC.
 
 **Strings.** Every new line needs an entry in `messages/kiosk/en.json` and its three siblings
 (`es-MX`, `zh-Hans`, `zh-Hant`), plus a `messages/translation-state.json` record carrying a
