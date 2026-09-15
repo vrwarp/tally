@@ -51,6 +51,7 @@ import {
 import type { KioskGround, KioskPalette } from '@/lib/kioskTheme';
 import { sanitizeLabelTemplate, type LabelTemplate } from '@/lib/labelTemplate';
 import { paths } from '@/lib/paths';
+import { readBattery } from './battery';
 import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import {
   attendancePayload,
@@ -343,11 +344,23 @@ export async function reportStanding(
   bound: Pick<KioskBinding, 'title' | 'chain'> | null,
 ): Promise<StandingOutcome> {
   const deviceId = ensureDeviceId();
+  /*
+   * Charge rides along on the report rather than getting a write of its own.
+   * It is the same question — is this tablet alright? — and a second write per
+   * poll to say "87%" is a second chance to fail at the thing the first write
+   * is the oracle for.
+   *
+   * Omitted entirely when the tablet will not say, which is most engines and
+   * every older kiosk: the rules take these fields as optional, and a kiosk
+   * that has never heard of them must keep writing exactly what it always did.
+   */
+  const battery = await readBattery();
   try {
     await updateDoc(doc(db, paths.kioskDevice(deviceId)), {
       lastSeenAt: serverTimestamp(),
       boundTo: bound?.title ?? null,
       boundChain: bound?.chain ?? null,
+      ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
     });
     return 'live';
   } catch (error) {

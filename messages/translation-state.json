@@ -5095,6 +5095,13 @@
     "zh-Hans": "todo",
     "zh-Hant": "todo"
   },
+  "Team.kioskOffCharger": {
+    "source": "On battery · {percent}%",
+    "context": "Shown on the team screen under a lobby kiosk that is running on its battery rather than on mains. A shelf tablet is meant to be plugged in at all times, so this line is a warning that somebody unplugged it, not a routine status. {percent} is a whole number, 0 to 100.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Team.kioskRetiredOn": {
     "source": "Retired {when}",
     "es-MX": "machine",

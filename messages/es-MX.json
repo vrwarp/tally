@@ -913,6 +913,7 @@
     "kiosksNotLoaded": "No se pudieron revisar los kioscos.",
     "kioskLive": "Está anotando {gathering} ahora mismo",
     "kioskIdle": "Se vinculó {when} · no está anotando",
+    "kioskOffCharger": "Con batería · {percent}%",
     "kioskRetiredOn": "Se dio de baja {when}",
     "retireKiosk": "Dar de baja",
     "retireLiveWarning": "Este kiosco está anotando {gathering} ahora mismo. Darlo de baja detiene eso en el siguiente toque, y un líder va a tener que registrar a los niños desde un teléfono hasta que se vuelva a vincular.",

@@ -68,6 +68,10 @@ function toKioskDevice(snapshot: {
     lastSeenAt: toDateOrNull(data.lastSeenAt),
     boundTo: typeof data.boundTo === 'string' ? data.boundTo : null,
     boundChain: typeof data.boundChain === 'string' ? data.boundChain : null,
+    // Left off the object entirely when the tablet does not report them, so
+    // "does not say" and "flat" stay different things on the way to the screen.
+    ...(typeof data.batteryLevel === 'number' ? { batteryLevel: data.batteryLevel } : {}),
+    ...(typeof data.charging === 'boolean' ? { charging: data.charging } : {}),
     retiredAt: toDateOrNull(data.retiredAt),
     retiredBy: typeof data.retiredBy === 'string' ? data.retiredBy : null,
   };

@@ -1433,11 +1433,22 @@ service cloud.firestore {
     match /kioskDevices/{deviceId} {
       function validKioskReport() {
         let d = request.resource.data;
+        // `batteryLevel` and `charging` are optional in both directions: an
+        // engine without the Battery Status API never writes them, and neither
+        // does any kiosk built before they existed. A missing field has to mean
+        // "this tablet does not say" — the report is also the liveness oracle
+        // (`StandingOutcome`), so refusing it over a battery would turn a
+        // browser's privacy decision into a kiosk that believes it was retired.
         return d.lastSeenAt is timestamp
           && (d.get('boundTo', null) == null
               || (d.boundTo is string && d.boundTo.size() <= 120))
           && (d.get('boundChain', null) == null
-              || (d.boundChain is string && d.boundChain.size() <= 200));
+              || (d.boundChain is string && d.boundChain.size() <= 200))
+          && (d.get('batteryLevel', null) == null
+              || (d.batteryLevel is number
+                  && d.batteryLevel >= 0
+                  && d.batteryLevel <= 1))
+          && (d.get('charging', null) == null || d.charging is bool);
       }
 
       function validRetirement() {
@@ -1451,7 +1462,8 @@ service cloud.firestore {
                         && request.auth.token.get('deviceId', '') == deviceId
                         && request.auth.uid == 'kiosk_' + deviceId
                         && resource.data.get('retiredAt', null) == null
-                        && touchesOnly(['lastSeenAt', 'boundTo', 'boundChain'])
+                        && touchesOnly(['lastSeenAt', 'boundTo', 'boundChain',
+                                        'batteryLevel', 'charging'])
                         && validKioskReport())
                     || (isCore() && !isKioskSession()
                         && touchesOnly(['retiredAt', 'retiredBy'])

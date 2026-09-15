@@ -913,6 +913,7 @@
     "kiosksNotLoaded": "Couldn’t check the kiosks.",
     "kioskLive": "Recording {gathering} right now",
     "kioskIdle": "Paired {when} · not recording",
+    "kioskOffCharger": "使用电池 · {percent}%",
     "kioskRetiredOn": "Retired {when}",
     "retireKiosk": "Retire",
     "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
