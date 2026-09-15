@@ -168,7 +168,7 @@ happens when a family asks to be removed — is **[docs/minors-data.md](docs/min
 | [docs/fuzzing.md](docs/fuzzing.md) | The property suite, its invariants, and how to replay a failure |
 | [docs/mutation-testing.md](docs/mutation-testing.md) | Whether the tests would notice a wrong answer — the score, the loop, and what it found |
 | [docs/kiosk-performance.md](docs/kiosk-performance.md) | The kiosk benchmark: what it measures, what it found, and the budgets it holds |
-| [docs/tablet-management.md](docs/tablet-management.md) | Enrolling the shelf tablet: the kiosk policy, applying it with Test DPC and what that costs, and what changes inside Tally |
+| [docs/tablet-management.md](docs/tablet-management.md) | Enrolling the shelf tablet: the kiosk policy, applying it with Test DPC and what that costs, and the `/setup` page that generates it |
 | [e2e/README.md](e2e/README.md) | Running and writing end-to-end tests |
 | [docker/README.md](docker/README.md) | The containerised end-to-end runner |
 | [tools/pco-simulator/README.md](tools/pco-simulator/README.md) | The Planning Center API simulator |

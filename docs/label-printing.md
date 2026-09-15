@@ -410,7 +410,9 @@ first open afterwards, but the kiosk raises that by itself from the connect
 event, so the visit becomes a tap on *Allow*. Supported on ChromeOS, desktop
 Chrome and Android (75+); on Android it needs a managed device — what enrolling one
 involves, and the rest of the policy a shelf tablet wants, is
-[tablet management](tablet-management.md).
+[tablet management](tablet-management.md). Tally generates the exact value for this
+deployment at **`/setup`**, and a kiosk whose printer arrived this way adopts it at
+boot with no set-up step and says so on the printer screen.
 
 ## If a label comes out wrong
 

@@ -457,6 +457,10 @@ itself, both before the first Sunday:
    `navigator.usb` being `undefined` means the page is not in Chrome proper — a WebView container, or
    an insecure origin.
 
+   The kiosk now runs this check for itself at boot and adopts whatever it finds (§6.5), so the
+   quicker version is simply to open the kiosk: a pre-granted printer arrives with no setup step and
+   the printer screen says where it came from.
+
 Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both
 while the tablet is still being staged, before anything in §4.6's optional half is applied.
 
@@ -737,7 +741,7 @@ hour the kiosk reloads" rather than as a coincidence.
 
 ### 6.3 Serve the value that must not be mistyped
 
-One static page, at a path short enough to type on a tablet's on-screen keyboard: each §4.2 key with
+**Built: `/setup`.** One static page, at a path short enough to type on a tablet's on-screen keyboard: each §4.2 key with
 a copy button, the WebUSB value built from **this deployment's** real origin and the printer vendor
 read from the printing module rather than from a worked example. Step 2 of §4.6 becomes: open it in
 Chrome on the tablet, copy, paste into Test DPC, next key. Ordered so the two URL lists come last,
@@ -904,6 +908,11 @@ before a line of code is written, and so that every phase after it is independen
 phase depends on a later one. Phases 1–2 are the ones that pay for themselves on the WebUSB
 priority; 3–6 are the rest of §6.
 
+> **Phases 1–6 are built.** What follows is kept as written, because the reasoning is the argument
+> for the code rather than a plan waiting to be executed, with a note under each phase saying where
+> it landed. **Phase 0 is not done and cannot be by anyone who is not holding a tablet** — it is
+> still the step that decides whether any of this works in the building.
+
 ### Phase 0 — the field trial. No code.
 
 The only phase that can invalidate the others, so it goes first, and it needs nothing merged. There
@@ -931,6 +940,11 @@ conversation instead; the chooser still works in the meantime, so nothing that w
 If it passes, Phases 1–2 become worth building and the rest is ordinary product work.
 
 ### Phase 1 — the kiosk notices a pre-grant
+
+**Shipped.** `src/lib/printerVendor.ts`, `src/kiosk/policyGrant.ts`, and `adoptPolicyGrant()` in
+`src/kiosk/printing/index.ts`. One thing the plan did not foresee: the adopted config has to be
+written `guessed: true`, because the roll was never read and the chooser's strip would otherwise
+show a green tick over an invented media size.
 
 The one code change the WebUSB priority actually needs, and it is not where you would expect.
 
@@ -968,6 +982,13 @@ with no printer does not pull the chunk.
 
 ### Phase 2 — the printer screen says what it knows
 
+**Shipped, narrowed.** `PrinterConfig.viaPolicy` carries the provenance — through `configure()` and
+`checkPrinter`'s settle, both of which rewrite the config and would otherwise drop it — and the
+screen says so in the state that actually sends somebody looking. The second half, handing back the
+finished rule, was **dropped from this screen and moved to Phase 3**: it belonged here while the
+rule was derived from the connected device, and since §4.6 it is written from published identifiers
+and the origin, so it needs no printer and no kiosk.
+
 Two small things on `src/kiosk/screens/PrinterScreen.tsx`, both from the device object it already
 holds.
 
@@ -987,6 +1008,10 @@ JSON itself is not translated and must not be — it is a machine value in a `<c
 
 ### Phase 3 — the staging page
 
+**Shipped** as `/setup` (`setup.html`, `src/setup/`), a third Vite entry with a hosting rewrite and
+an exclusion from the service worker's precache. 7 KB of HTML, 4 KB of script, no framework and no
+sign-in.
+
 A third Vite entry beside `index` and `kiosk` (`vite.config.ts:112-117`): `setup.html`, public, no
 auth, no framework.
 
@@ -1000,6 +1025,10 @@ Not staff-gated, for the reasons in §6.3: there is nothing secret on it, and a 
 signing a staff Google account into the browser of a tablet about to face the public.
 
 ### Phase 4 — battery and charging on the device row
+
+**Shipped.** `src/kiosk/battery.ts`, the report in `services.ts`, the two optional fields through
+`KioskDeviceDoc`, `toKioskDevice` and `validKioskReport`, and one line on the team screen shown only
+when the tablet is on battery — a plugged-in tablet and a retired row both say nothing.
 
 Independent of everything above; do it whether or not a single tablet is ever enrolled.
 
@@ -1018,11 +1047,18 @@ without failing, because the report is also the kiosk's liveness oracle
 
 ### Phase 5 — the quiet hour, said out loud
 
+**Shipped** as `src/lib/kioskQuietHour.ts`, which also gives `quietWindowMinutes()` to the staging
+page so the window a console is told and the hour the kiosk reloads in come from one constant.
+
 `isQuietHour()` is a hard-coded `4` inside `src/kiosk/KioskApp.tsx:367`. Lift it to a named export
 so §4.1's maintenance window can be stated as *the same hour the kiosk reloads* rather than as a
 coincidence. Small, and it stops two numbers that must agree from being invisible to each other.
 
 ### Phase 6 — zero-touch pairing
+
+**Shipped.** `startPairing` takes an optional approver, `createKioskPairingLink` mints one,
+`src/kiosk/pairLink.ts` reads it out of the URL and strips it before any network call, and core and
+up get a section on the kiosk page that shows one once.
 
 `src/kiosk/` reads no URL parameters today. Add `?pair=` to the kiosk boot, entering the existing
 `startKioskPairing` → `approveKioskPairing` → `claimKioskToken` handshake
