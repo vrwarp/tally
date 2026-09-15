@@ -49,12 +49,34 @@ type UsbAccess = { getDevices?: () => Promise<GrantedDevice[]> };
  * with nowhere to put an error.
  */
 export async function hasGrantedPrinter(): Promise<boolean> {
+  /*
+   * Three failures, each caught where it happens rather than by one `try`
+   * around the lot.
+   *
+   * The single wrapper was tidier to read and impossible to test: with the
+   * guard below removed, calling `getDevices` on nothing threw into the same
+   * catch and returned the same `false`, so no test could tell a missing API
+   * from a refused one and the mutation run said as much. A catch wide enough
+   * to hide a bug in the code it wraps has stopped being a safety net.
+   */
+  let usb: UsbAccess | undefined;
   try {
-    const usb = (navigator as Navigator & { usb?: UsbAccess }).usb;
-    if (!usb?.getDevices) return false;
-    const devices = await usb.getDevices();
-    return devices.some((device) => device.vendorId === BROTHER_VENDOR_ID);
+    // Reading the accessor can itself throw — a permissions policy on the
+    // document refuses at the property, not at the call.
+    usb = (navigator as Navigator & { usb?: UsbAccess }).usb;
   } catch {
-    return false;
+    // Nothing to do: `usb` stays undefined and the guard below is what answers.
+    // A `return false` here would be a second way of saying the same thing.
   }
+
+  const getDevices = usb?.getDevices;
+  if (!getDevices) return false;
+
+  // `.catch` on the promise rather than a block around it, so a bus that
+  // rejects is handled while a mistake in this function still surfaces — and
+  // the whole answer, not a placeholder to unwrap afterwards.
+  return getDevices
+    .call(usb)
+    .then((devices) => devices.some((device) => device.vendorId === BROTHER_VENDOR_ID))
+    .catch(() => false);
 }

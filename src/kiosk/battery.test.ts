@@ -70,6 +70,18 @@ describe('readBattery', () => {
     expect(calls).toBe(1);
   });
 
+  it('reports a flat battery, which is a reading and not an absence', async () => {
+    // The boundary matters: 0 is "this tablet is about to die", which is the
+    // single most worth-saying thing this module can report.
+    withGetBattery(async () => ({ level: 0, charging: false }));
+    await expect(readBattery()).resolves.toEqual({ level: 0, charging: false });
+  });
+
+  it('reports a full battery too', async () => {
+    withGetBattery(async () => ({ level: 1, charging: true }));
+    await expect(readBattery()).resolves.toEqual({ level: 1, charging: true });
+  });
+
   it('refuses a level that is not a level', async () => {
     for (const level of [-0.1, 1.5, Number.NaN, '80%' as unknown as number]) {
       resetBatteryForTests();

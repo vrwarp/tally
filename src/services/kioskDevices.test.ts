@@ -127,6 +127,107 @@ describe('subscribeKioskDevices', () => {
     });
   });
 
+  it('carries the charge through when the tablet reported one', () => {
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'lobby-tablet',
+          data: () => ({
+            approvedBy: 'uid-miriam',
+            lastSeenAt: new Timestamp(1_767_610_800, 0),
+            batteryLevel: 0.37,
+            charging: false,
+          }),
+        },
+      ],
+    });
+
+    expect(held[0]).toMatchObject({ batteryLevel: 0.37, charging: false });
+  });
+
+  it('carries a flat battery and a charging one, which are both readings', () => {
+    // 0 and `true` are the two values a falsy test would drop on the floor, and
+    // 0% is the single most worth-saying thing this field can carry.
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'lobby-tablet',
+          data: () => ({ approvedBy: 'uid-miriam', batteryLevel: 0, charging: true }),
+        },
+      ],
+    });
+
+    expect(held[0]).toMatchObject({ batteryLevel: 0, charging: true });
+  });
+
+  it('leaves the charge off entirely when the tablet does not report one', () => {
+    /*
+     * The distinction the whole field rests on. Every engine that dropped the
+     * Battery Status API reports nothing, and so does every row written before
+     * the kiosk started sending it — "does not say" has to stay different from
+     * "flat", because the team screen draws a warning for one and silence for
+     * the other.
+     */
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [{ id: 'lobby-tablet', data: () => ({ approvedBy: 'uid-miriam' }) }],
+    });
+
+    expect(held[0]).not.toHaveProperty('batteryLevel');
+    expect(held[0]).not.toHaveProperty('charging');
+  });
+
+  it('drops a charge stored as the wrong type rather than passing it on', () => {
+    // A string percentage would reach `Math.round(level * 100)` on the team
+    // screen and put NaN% under somebody's name.
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+
+    onNext({
+      docs: [
+        {
+          id: 'lobby-tablet',
+          data: () => ({ approvedBy: 'uid-miriam', batteryLevel: '37%', charging: 'no' }),
+        },
+      ],
+    });
+
+    expect(held[0]).not.toHaveProperty('batteryLevel');
+    expect(held[0]).not.toHaveProperty('charging');
+  });
+
   it('answers the defaults for a field stored as the wrong type', () => {
     let held: KioskDevice[] = [];
     subscribeKioskDevices((next) => {

@@ -44,6 +44,17 @@ const CODE_PATTERN = /^[A-Z0-9]{6}$/;
 const SECRET_PATTERN = /^[0-9a-f]{32}$/;
 
 /**
+ * `CODE.SECRET`, split at the first dot and only the first.
+ *
+ * A hand-rolled `indexOf('.')` and two slices did the same job and hid a dead
+ * branch while doing it: with its `=== -1` guard removed, a value with no dot
+ * still failed the two patterns below, so nothing could tell the guard was
+ * there. One pattern says the shape once, and the code that follows cannot be
+ * right by accident.
+ */
+const LINK_PATTERN = /^([^.]+)\.(.+)$/;
+
+/**
  * Parse `CODE.SECRET`, or null.
  *
  * Validated rather than trusted, because the alternative is sending whatever
@@ -53,10 +64,10 @@ const SECRET_PATTERN = /^[0-9a-f]{32}$/;
  */
 export function parsePairLink(raw: string | null): PairLink | null {
   if (!raw) return null;
-  const separator = raw.indexOf('.');
-  if (separator === -1) return null;
-  const code = raw.slice(0, separator).trim().toUpperCase();
-  const secret = raw.slice(separator + 1).trim().toLowerCase();
+  const halves = LINK_PATTERN.exec(raw.trim());
+  if (!halves) return null;
+  const code = halves[1].toUpperCase();
+  const secret = halves[2].toLowerCase();
   if (!CODE_PATTERN.test(code)) return null;
   if (!SECRET_PATTERN.test(secret)) return null;
   return { code, secret };

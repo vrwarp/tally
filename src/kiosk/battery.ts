@@ -50,21 +50,32 @@ export function resetBatteryForTests(): void {
  * to omit the fields, not to decide which kind of nothing this was.
  */
 export async function readBattery(): Promise<BatteryReading | null> {
-  try {
-    if (manager === undefined) {
+  /*
+   * The `try` covers the call and nothing else, deliberately.
+   *
+   * Wrapped around the whole function it also swallowed the validation below,
+   * which made the guards unfalsifiable: remove `if (!manager)` and the
+   * destructure throws into the same catch and returns the same null, so no
+   * test could tell the difference and the mutation run said so. A catch that
+   * hides bugs in the code it wraps is doing the opposite of its job.
+   */
+  if (manager === undefined) {
+    try {
       const getBattery = (navigator as BatteryCapable).getBattery;
       manager = getBattery ? ((await getBattery.call(navigator)) ?? null) : null;
+    } catch {
+      // Asked once, refused once: do not keep asking on every report.
+      manager = null;
     }
-    if (!manager) return null;
-    const { level, charging } = manager;
-    // A level outside 0–1 is not a battery, it is a bug somewhere else, and
-    // writing it would put a nonsense percentage on the team screen.
-    if (typeof level !== 'number' || !Number.isFinite(level) || level < 0 || level > 1) return null;
-    if (typeof charging !== 'boolean') return null;
-    return { level, charging };
-  } catch {
-    // Asked once, refused once: do not keep asking on every report.
-    manager = null;
-    return null;
   }
+  if (!manager) return null;
+
+  const { level, charging } = manager;
+  // A level outside 0–1 is not a battery, it is a bug somewhere else, and
+  // writing it would put a nonsense percentage on the team screen. `isFinite`
+  // is the type check too — it is false for every value that is not a number,
+  // so a `typeof` beside it tests nothing.
+  if (!Number.isFinite(level) || level < 0 || level > 1) return null;
+  if (typeof charging !== 'boolean') return null;
+  return { level, charging };
 }
