@@ -595,7 +595,7 @@
   "Errors.provisionUnknown": {
     "source": "Could not check your access. Try again.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Errors.sessionExpired": {
@@ -607,8 +607,8 @@
   "Errors.accessNotActive": {
     "source": "Your access to Tally is not active.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.rosterRateLimited": {
     "source": "Your church directory asked Tally to slow down. The roster finishes loading on its own in a moment.",
@@ -619,7 +619,7 @@
   "Errors.noPeopleBackend": {
     "source": "Tally has not been told where to read your people from. An admin can connect it in Settings.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Errors.rosterUnreachable": {
@@ -694,8 +694,8 @@
     "source": "Your access to Tally is not active.",
     "context": "Refusal: this person is known to Tally but somebody switched their access off. Not a wrong password. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.auth.googleOnly": {
     "source": "Tally only accepts Google sign-in.",
@@ -825,8 +825,8 @@
   "Errors.backend.credentialsRejected": {
     "source": "{backend} rejected Tally’s credentials. A leader needs to check the connection in Settings.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Errors.backend.noLists": {
     "source": "{backend} does not have lists.",
@@ -873,7 +873,7 @@
   "Errors.backend.unreachable.lists": {
     "source": "Could not reach {backend} to load your Planning Center lists.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Errors.backend.unreachable.listMembers": {
@@ -885,7 +885,7 @@
   "Errors.backend.unreachable.eventList": {
     "source": "Could not reach {backend} to list your Check-Ins events.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Errors.backend.unreachable.eventImport": {
@@ -1455,7 +1455,7 @@
   "Auth.checkingTitle": {
     "source": "Checking your access",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Auth.checkingAria": {
@@ -1485,13 +1485,13 @@
   "Auth.grantedBody": {
     "source": "Your access is set up.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Auth.grantedBodyWithRole": {
     "source": "You're on the team as {role}. Your access is set up.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Auth.placed": {
@@ -1521,7 +1521,7 @@
   "Auth.stuckBody": {
     "source": "Tally is having trouble opening on this device. Your access is fine — reloading normally sorts it out.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Auth.openingAria": {
@@ -1635,7 +1635,7 @@
   "Auth.popupBlocked": {
     "source": "The sign-in window was blocked. Allow popups for this site, or try again.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Auth.browserUnsupported": {
@@ -2313,13 +2313,13 @@
   "Release.consequenceDeparted": {
     "source": "Marking {name} “left the ministry” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Release.consequenceDepartedUnseen": {
     "source": "{name} has not been seen at any gathering since {date}. Marking {name} “left the ministry” means Tally stops asking about them: they leave this list and will not appear on any other. Checking them in here again undoes it.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Release.consequenceMovedOn": {
@@ -2949,7 +2949,7 @@
   "CheckIn.archivedNote": {
     "source": "This night is older than the few months Tally keeps loaded, so it opens as a record of what happened rather than a roster.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "CheckIn.archivedEmptyTitle": {
@@ -3799,7 +3799,7 @@
   "Backends.pcoDescription": {
     "source": "Where Tally reads your people from. It keeps no copy of them.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.pcoChecking": {
@@ -3871,12 +3871,12 @@
   "Backends.pcoUnresolved": {
     "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Planning Center — deleted or merged there.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.pcoQueuedWriteOff": {
     "source": "{count, plural, one {# student has} other {# students have}} no Planning Center person yet — and none will be created while write-back is off.",
-    "es-MX": "machine",
+    "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -3967,19 +3967,19 @@
   "Backends.a32Unresolved": {
     "source": "{count, plural, one {# student is} other {# students are}} on the roster but can no longer be read from Attendees — removed there.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.a32NothingConnected": {
     "source": "Nothing is connected yet. Run the setup command on your Attendees server, put its token in Secret Manager, then enter the addresses and slugs it prints under Change.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Backends.tokenNote": {
     "source": " The token itself lives in Secret Manager and is not editable from the app.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.newStudentsDescription": {
@@ -4009,7 +4009,7 @@
   "Backends.notMoved": {
     "source": "Students already matched to a directory are not moved by this — it decides only where a brand-new student is created.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.heldForReview": {
@@ -4213,13 +4213,13 @@
   "Backends.a32ApiAddressHint": {
     "source": "Where your Attendees server lives. Every request carries this church's token, so any other address sends it somewhere else — admins only, and only for a server you run.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Backends.a32EditorDescription": {
     "source": "Everything except the token. Changes apply to every counselor's next read.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Backends.pcoEditorDescription": {
@@ -5195,13 +5195,13 @@
   "KioskPair.retire": {
     "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "KioskPair.retireCore": {
     "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "KioskPair.blocked": {
@@ -5375,7 +5375,7 @@
   "KioskPair.stuckDeactivated": {
     "source": "A kiosk that was retired, or one paired before kiosks got sign-ins of their own, goes back to its pairing screen by itself. Read the new code off it and approve it again.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "KioskPair.phoneSearchHeading": {
@@ -6345,7 +6345,7 @@
     "source": "{count, plural, one {# person} other {# people}} — everybody else sees it locked.",
     "es-MX": "machine",
     "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hant": "reviewed"
   },
   "Access.workingOut": {
     "source": "Working out who has been taking attendance here…",
@@ -7567,13 +7567,13 @@
   "Events.notYoursPrefix": {
     "source": "Not yours · ",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Events.notYoursChain": {
     "source": "Not yours · {count, plural, one {# gathering} other {# gatherings}} · ",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Events.leadSuffix": {
@@ -7693,13 +7693,13 @@
   "Events.notYoursCount": {
     "source": "{count, plural, one {Not yours · # today} other {Not yours · # today}}",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Events.notYoursCountMore": {
     "source": "{count, plural, one {Not yours · # more today} other {Not yours · # more today}}",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Events.notOnGatherings": {
@@ -9200,7 +9200,7 @@
   "PastGatherings.notYours": {
     "source": "not yours",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "PastGatherings.nobody": {
@@ -9572,13 +9572,13 @@
   "SyncStrip.recreateIn": {
     "source": "Re-create them in {backend}",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "SyncStrip.opensThemIn": {
     "source": "Opens them in {backend}.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "JobChip.queuedLong": {
@@ -9669,7 +9669,7 @@
     "source": "Changed elsewhere",
     "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). A conflict: somebody changed the same field on the other side, so the value now stored is one nobody typed. Needs a person — it will not resolve itself. *Long* is the row form and may be a phrase.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "JobChip.differsShort": {
@@ -9704,7 +9704,7 @@
     "source": "The person you edited was merged into somebody else in your church directory. Your correction landed on them, under a different id.",
     "context": "Tooltip on the merged chip. The edit did land — on a different record than the one the reader picked.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "JobChip.failedLong": {
@@ -9854,7 +9854,7 @@
   "Students.exportBlockedError": {
     "source": "The roster could not be read, so an export would not be a true list.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Students.namePlaceholder": {
@@ -9909,7 +9909,7 @@
   "Students.rosterErrorTitle": {
     "source": "The roster could not be read.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Students.rosterErrorBody": {
@@ -9933,7 +9933,7 @@
   "Students.emptyFilteredBody": {
     "source": "Widen the search, or add the student if this is their first time.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Students.emptyBody": {
@@ -9988,7 +9988,7 @@
   "Students.inactivePress": {
     "source": "{name} is inactive — put them back on the roster",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Students.noBirthdayTitle": {
@@ -10036,7 +10036,7 @@
   "Students.queuedPress": {
     "source": "{name} is not in {backend} yet — send them now",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Students.badgeQueued": {
@@ -10073,13 +10073,13 @@
   "StudentDetail.notReadableBody": {
     "source": "Their name and grade come from the connected directory, which Tally cannot reach.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "StudentDetail.notFoundBody": {
     "source": "They may have been removed, or the link is stale.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "StudentDetail.backToStudents": {
@@ -10121,7 +10121,7 @@
   "StudentDetail.removeHint": {
     "source": "Keeps every gathering they attended; they just stop appearing at the door.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "StudentDetail.removeHintUpstream": {
@@ -10199,7 +10199,7 @@
   "StudentDetail.openTheirProfile": {
     "source": "Open their profile",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.missedInARow": {
@@ -10229,7 +10229,7 @@
   "StudentDetail.recreateFailed": {
     "source": "Could not re-create them in {backend}.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.backOnRoster": {
@@ -10319,7 +10319,7 @@
   "StudentDetail.worstRun": {
     "source": "{scope}, their worst run",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.historyError": {
@@ -10385,7 +10385,7 @@
   "StudentDetail.streakNoGatheringYet": {
     "source": "no gathering of their own yet",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.lastSeenNever": {
@@ -10445,7 +10445,7 @@
   "StudentDetail.notOneTheyComeTo": {
     "source": "Not one they come to",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.atMostRecent": {
@@ -10508,7 +10508,7 @@
   "StudentDetail.notAGatheringTheyComeTo": {
     "source": "not a gathering they come to",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.notOnThisTrip": {
@@ -10594,7 +10594,7 @@
   "StudentDetail.recreateIn": {
     "source": "Re-create in {backend}",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentDetail.contactHeading": {
@@ -10986,7 +10986,7 @@
   },
   "RowBadge.birthdayUpstreamOnly": {
     "source": "Birthdays are {backend}'s field, and write-back is not on — add or correct it in {backend} itself.",
-    "es-MX": "machine",
+    "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -10999,7 +10999,7 @@
   "RowBadge.inactiveUpstreamNote": {
     "source": " {backend} may say inactive too, in which case the next roster read will set it back.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "RowBadge.makeActiveAgain": {
@@ -11017,7 +11017,7 @@
   "RowBadge.queuedExplain": {
     "source": "{name} exists in Tally only. Attendance is being recorded either way — this is about their entry in your church directory, not about the counting.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "RowBadge.queuedBadge": {
@@ -11107,7 +11107,7 @@
   "StudentEditor.descriptionAdd": {
     "source": "Added to the roster now. Tally adds them to your church directory too, wherever it is allowed to write there.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentEditor.saveChanges": {
@@ -11149,7 +11149,7 @@
   "StudentEditor.gradeAddsThere": {
     "source": "{backend} holds no grade for them. Choosing one adds it there.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentEditor.allergies": {
@@ -11179,8 +11179,8 @@
   "StudentEditor.notesHint": {
     "source": "Visible to the core team. Keep it to what a leader needs to know.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "StudentEditor.status": {
     "source": "Status",
@@ -11191,7 +11191,7 @@
   "StudentEditor.statusLinkedHint": {
     "source": "Whether they are on the roster is set with Remove from roster.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentEditor.statusHint": {
@@ -11305,7 +11305,7 @@
   "StudentEditor.contactLater": {
     "source": "Once this student reaches {backend}, their contact details are added there.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "StudentEditor.contactReading": {
@@ -11473,7 +11473,7 @@
   "ParentContact.householdNote": {
     "source": "Putting them in this household keeps one entry for this adult. Two entries for the same person have to be joined up by hand later.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "ParentContact.modalTitle": {
@@ -11569,7 +11569,7 @@
   "EarlierAttendance.title": {
     "source": "Every gathering they came to",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "EarlierAttendance.sourceNote": {
@@ -11588,7 +11588,7 @@
   "EarlierAttendance.noCheckIns": {
     "source": "Tally has no check-ins on record for them.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "EarlierAttendance.allLoaded": {
@@ -11606,7 +11606,7 @@
   "EarlierAttendance.showMoreAria": {
     "source": "Show every gathering they came to",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "EarlierAttendance.readFailed": {
@@ -12212,7 +12212,7 @@
   "Review.retryCaption": {
     "source": "Tries {name} again. The last attempt was refused, and nothing about the refusal has changed on its own.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Review.adultOnlyCaption": {
@@ -12278,7 +12278,7 @@
   "Review.yesForgetNumber": {
     "source": "Yes, forget the number",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Review.yesTakeThemOff": {
@@ -12290,13 +12290,13 @@
   "Review.discardAdultCaption": {
     "source": "Forgets {number} for good. {names} stays on the roster.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Review.discardWithPhoneCaption": {
     "source": "Takes {names} off the roster and forgets {number} for good.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Review.discardNoPhoneCaption": {
@@ -12308,14 +12308,14 @@
   "Review.forgetTheNumber": {
     "source": "Forget the number",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Review.notOurs": {
     "source": "Not ours",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Review.withoutAdultCaption": {
     "source": "Adds {names} with no adult attached, and forgets {number}. Somebody has to join them to a household in the church’s database afterwards.",
@@ -12464,8 +12464,8 @@
   "Door.notThisGathering": {
     "source": "If you are here for something else, please see a leader.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Door.tapToCarryOn": {
     "source": "Tap anywhere to continue",
@@ -12595,7 +12595,7 @@
   },
   "Confirm.addNewChild": {
     "source": "Not on the list? Add a new child",
-    "es-MX": "machine",
+    "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -12963,15 +12963,15 @@
     "source": "Try the last 4 digits of your phone, or ask a leader.",
     "context": "Under Search.noMatch after a parent typed letters (a name) that matched nobody: the ways forward. 'Leader' is the volunteer at the lobby table. One sentence, addressed as usted / 您; Chinese may put the person before the digits, since a reader who cannot type an English name is best served by one.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Search.afterPhoneMiss": {
     "source": "Try typing your child’s name, or ask a leader.",
     "context": "Under Search.noMatch after a parent typed 4 digits (a phone) that matched nobody: the ways forward. Sibling of Search.afterNameMiss; Chinese must say English name (英文名字), as Search.typeChildsName does.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Search.moreNames": {
     "source": "More names than fit — keep typing.",
@@ -13133,7 +13133,7 @@
   "Chooser.nothingWasPicked": {
     "source": "Nothing was picked from the browser’s list. Press {connect} and pick the QL — if it is not listed, plug it in and switch it on.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Chooser.connectThePrinter": {
@@ -13169,15 +13169,15 @@
   "Register.couldNotSave": {
     "source": "Tally could not finish that just now. Try again, or see a leader.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Register.saveTakingLonger": {
     "source": "Please check with a leader before you go. Your name tags have printed, but this is not finished.",
     "context": "The whole of the error body when the app gave up waiting rather than being refused — the family's name tags have already printed and nobody knows yet whether the registration was saved. It must not say the save failed, because half the time it did not. The instruction is the point: find a leader before leaving.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Register.takingAWhile": {
     "source": "Taking a while",
@@ -13201,8 +13201,8 @@
   "Register.maxChildren": {
     "source": "That is the most this screen can add. A leader can add the rest.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Register.joiningNamed": {
     "source": "Joining {names}.",
@@ -13286,7 +13286,7 @@
   },
   "Register.titleChildNumber": {
     "source": "Child {number}",
-    "es-MX": "machine",
+    "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -13329,8 +13329,8 @@
   "Register.subtitleAllergies": {
     "source": "Any allergies the leaders should know about?",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Register.subtitlePhone": {
     "source": "This is how you check in next time.",
@@ -13473,7 +13473,7 @@
   "Printer.troubleUnplugged": {
     "source": "The printer was unplugged.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Printer.advicePlugBackIn": {
@@ -13828,13 +13828,13 @@
   "Printer.mayConnectItself": {
     "source": "It may connect on its own in a few seconds — or press Connect this printer again to hurry it.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Printer.troubleThenLookAgain": {
     "source": "If it is plugged in and switched on and nothing changes, press Look again.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Printer.selectionCancelled": {
@@ -13864,7 +13864,7 @@
   "Printer.stillWaiting": {
     "source": "The kiosk is still waiting to be set — Back to the gatherings.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Printer.pickTheRoll": {
@@ -13876,7 +13876,7 @@
   "Printer.rollPicked": {
     "source": "Print a test label — it should come out the full width with nothing cut off — then go back and set the kiosk.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "Printer.modelPending": {
@@ -13943,8 +13943,8 @@
   "Pairing.stuck": {
     "source": "This kiosk has its code, but the pairing isn’t completing. If a leader has already approved it, they should open Tally, tap their name and choose Check-in kiosk, which will say whether anything needs fixing.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
+    "zh-Hans": "reviewed",
+    "zh-Hant": "reviewed"
   },
   "Pairing.updated": {
     "source": "Tally was updated, so this kiosk needs pairing once more. Any leader can do it.",
@@ -13962,7 +13962,7 @@
     "source": "Languages families here speak",
     "context": "Caption over the language chips on the kiosk's pairing screen: the volunteer setting the tablet up taps the languages families in this lobby read, and the check-in screen then offers those at its top. Addresses the volunteer as tú / 你, like the rest of Pairing.",
     "es-MX": "machine",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "Pairing.pinHint": {
@@ -14134,7 +14134,7 @@
     "source": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
     "context": "Explains who the section is for: a tablet under device-management policy that starts the kiosk automatically. \"Start URL\" is the field in that policy naming the page the tablet opens.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
   "KioskPair.stagingMake": {
@@ -14162,7 +14162,7 @@
     "source": "Shown once, and good for an hour. It signs a kiosk in as you, so treat it like a password: put it straight into the tablet’s settings and nowhere else.",
     "context": "Warning under a freshly created pairing link. It is a credential; the point is that it will not be shown again and should not be stored anywhere but the tablet policy.",
     "es-MX": "reviewed",
-    "zh-Hans": "machine",
+    "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
   "KioskPair.stagingBusy": {
