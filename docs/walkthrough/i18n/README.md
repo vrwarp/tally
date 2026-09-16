@@ -9,10 +9,7 @@ The frames are grouped rather than listed, because the claim is a comparison. An
 i18n pass that has translated the shell and left the content in English looks
 perfect one screenshot at a time; it only fails in a row.
 
-**No bilingual reviewer has read any of this.** Every key in
-`messages/es-MX.json`, `messages/zh-Hans.json` and `messages/zh-Hant.json`
-is marked `machine`, never `reviewed` — the review gate is real, and it is
-still open.
+The review gate is real. Keys marked `reviewed` in `messages/translation-state.json` have been read against the English and the glossary; the rest are machine drafts nobody has read. At this build: Español · es-MX: 113 of 2307 · 简体中文 · Simplified: 370 of 2307 · 繁體中文 · Traditional: 326 of 2307.
 
 Regenerate with:
 

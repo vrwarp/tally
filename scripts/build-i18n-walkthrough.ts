@@ -34,6 +34,7 @@
  * Run `npm run walkthrough:i18n`.
  */
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -51,6 +52,39 @@ interface Shot {
   locale: LocaleId;
   surface: 'app' | 'kiosk';
   caption?: string;
+}
+
+/**
+ * How much of each catalogue a reviewer has signed off, read from
+ * `messages/translation-state.json` at build time so the page can never claim
+ * a review status the state file does not hold. The first build of this page
+ * hard-coded "every key is machine", which was true for exactly one commit.
+ */
+function reviewStatus(): { locale: LocaleId; reviewed: number; total: number }[] {
+  const state = JSON.parse(readFileSync('messages/translation-state.json', 'utf8')) as Record<
+    string,
+    Partial<Record<LocaleId, 'todo' | 'machine' | 'reviewed'>>
+  >;
+  const entries = Object.values(state);
+  return (['es-MX', 'zh-Hans', 'zh-Hant'] as const).map((locale) => ({
+    locale,
+    reviewed: entries.filter((entry) => entry[locale] === 'reviewed').length,
+    total: entries.length,
+  }));
+}
+
+/** The review paragraph, as Markdown or HTML. */
+function reviewNote(html: boolean): string {
+  const rows = reviewStatus().map(
+    ({ locale, reviewed, total }) => `${LOCALE_NAMES[locale]}: ${reviewed} of ${total}`,
+  );
+  const code = (text: string) => (html ? `<code>${text}</code>` : `\`${text}\``);
+  return (
+    `The review gate is real. Keys marked ${code('reviewed')} in ` +
+    `${code('messages/translation-state.json')} have been read against the English and ` +
+    `the glossary; the rest are machine drafts nobody has read. At this build: ` +
+    `${rows.join(' · ')}.`
+  );
 }
 
 /** What each language is called on the page, in English prose. */
@@ -185,10 +219,7 @@ The frames are grouped rather than listed, because the claim is a comparison. An
 i18n pass that has translated the shell and left the content in English looks
 perfect one screenshot at a time; it only fails in a row.
 
-**No bilingual reviewer has read any of this.** Every key in
-\`messages/es-MX.json\`, \`messages/zh-Hans.json\` and \`messages/zh-Hant.json\`
-is marked \`machine\`, never \`reviewed\` — the review gate is real, and it is
-still open.
+${reviewNote(false)}
 
 Regenerate with:
 
@@ -327,9 +358,7 @@ body.push(
     'screenshot at a time; it only fails in a row.</p>',
 );
 body.push(
-  '<div class="note"><strong>No bilingual reviewer has read any of this.</strong> Every key ' +
-    'in the three translated catalogues is marked <code>machine</code>, never ' +
-    '<code>reviewed</code> — the review gate is real, and it is still open.</div>',
+  `<div class="note">${reviewNote(true)}</div>`,
 );
 body.push('</header>');
 

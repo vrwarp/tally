@@ -63,6 +63,8 @@ of `zh-Hans`: 登录→登錄 is a real word and the wrong one — Taiwan says �
 | student | estudiante | 学生 | 學生 | 6th–12th grade; the app also serves children's ministry |
 | visitor / new face | visita | 新朋友 | 新朋友 | church register, warm — **never *visitante***, which is a guest of the building |
 | counselor | líder | 辅导 | 輔導 | the adult who runs a gathering. **Never *consejero*** — that is a therapist or a board member |
+| leader | líder | 辅导 | 輔導 | English's everyday word for the counselor row above — one role, one term. *Ask a leader* is 请找辅导 / 請找輔導, at the kiosk and in the app alike. **Never** 负责同工, 同工负责人 or 同工领袖, which invent a rank the English does not have |
+| team member / somebody on the team | integrante del equipo | 同工 | 同工 | the generic word when the English says *somebody*, *anybody on this gathering*, *volunteer*. Not a rendering of *leader* |
 | core team | equipo central | 核心同工 | 核心同工 |  |
 | admin | administrador | 管理员 | 管理員 |  |
 | grade | grado | 年级 | 年級 | the **US** ladder these children actually attend — 6.º grado … 12.º grado. Never *secundaria* / *preparatoria* |
@@ -90,6 +92,12 @@ of `zh-Hans`: 登录→登錄 is a real word and the wrong one — Taiwan says �
 | search | buscar | 搜索 | 搜尋 | vocabulary divergence |
 | export | exportar | 导出 | 匯出 | vocabulary divergence |
 | settings | configuración | 设置 | 設定 | never *ajustes*, which is peninsular |
+| household | familia | 家庭 | 家庭 | the church database's grouping; *casa* is the building |
+| write-back | sincronización hacia {backend} | 写回 | 寫回 | Tally writing edits into the directory; never *escritura de vuelta* |
+| token (an API credential) | token | 令牌 | token | zh-Hans translates it; zh-Hant keeps the English word, as Taiwan software does |
+| QR code | código QR | 二维码 | 行動條碼 | vocabulary divergence |
+| nursery (the ministry) | guardería | 幼儿组 | 幼兒組 | a group in the church, not a daycare institution — never 托儿所 |
+| not yours (a gathering) | no es tuya | 非你负责 | 非你負責 | the chip on a gathering the reader is not on |
 | Planning Center | Planning Center | Planning Center | Planning Center | a product name; never translated |
 
 The **no longer expected** row is the one place the catalogues use different
@@ -149,6 +157,20 @@ A masculine plural over a mixed group (*12 registrados*) is ordinary Spanish and
 is allowed where the string is genuinely about a count. A masculine singular
 over one unknown child is not, and is the thing to catch in review.
 
+The rule is about **people**, and stops there. A gathering is *reunión* and an
+edit is *cambio*; both have a grammatical gender the app does know, so *reunión
+cancelada*, *cuenta como cancelada* and a chip reading *Cancelado* are correct
+and stay. A review pass once rewrote them all as *que se canceló* to dodge a
+participle nobody needed to dodge, and left the sync chips (*En cola*,
+*Guardado*, *Cambiado*, *Combinado*) with one verb among the participles.
+
+**The kiosk's word for a child is *hijo o hija*.** The parent is being spoken to
+about their own child, so *Su hijo o hija*, *Otro hijo o hija*, *Hijo o hija 2*,
+*Inscriba a su hijo o hija* — never *Otro niño* or *Niño 2*. Staff screens,
+which speak about a child the reader does not own, use *menor* (*Otro menor*)
+or *el niño o la niña* in a validation line. Three devices, each on its own
+surface; do not mix them within one screen.
+
 **Address.** *usted* at the lobby kiosk, *tú* inside the app — exactly the split
 `zh-Hans` and `zh-Hant` make with 您 and 你, and for the same reason. A family
 at the kiosk is a guest being spoken to directly, and in this lobby *usted* to a
@@ -170,6 +192,9 @@ clauses:
   comando no está disponible*.
 - **Drop the article a label can live without.** *Guardar cambios*, *Borrar
   búsqueda*, *Copiar número*, *Quitar filtros* — never *Guardar los cambios*.
+  The exception is the article that *is* the fact: *Check in all {count}* is
+  *Registrar a los {count}*, because *los* is what says *all*. *Registrar a 3*
+  says something else.
 - **The act is *registrar*; *entrada* only earns its place beside *salida*.**
   *Registrar a {name}*, not *Registrar la entrada de {name}* — which was twenty-
   two characters where English spends eight.
@@ -187,7 +212,9 @@ reader strings (`*Aria`, `*Label`, `spoken*`) are exempt: nothing there is
 competing for pixels, and clarity wins.
 
 **Never peninsular.** No *vosotros*, no *ordenador*, no *móvil*, no *ajustes*,
-no *coger*. The plural *you* is **ustedes** everywhere.
+no *coger*, and no *probar a* + infinitive (*Prueba a agregar otra vez*) — the
+retry line is *Prueba otra vez*, full stop. The plural *you* is **ustedes**
+everywhere.
 
 **Mexican, but not only Mexican.** Three families in four here are of Mexican
 origin and most of the rest are Salvadoran or Guatemalan, so where the region
@@ -201,6 +228,30 @@ mother that the screen was not written for her.
 Register: parents at the kiosk are addressed as 您 and *usted* — they are guests
 in the lobby and the screen is speaking to them directly. Staff-facing screens
 use 你 and *tú*.
+
+## The English is chatty on purpose; the Chinese need not be
+
+The English catalogue is written the way a colleague talks — *That didn't
+work*, *a personal Gmail is fine*, *go and find a leader*. That is a choice
+about English, where a plain written register reads as cold. Written Chinese
+does not have that problem: 亦可, 均可, 皆, 其, 尚未 are the ordinary register
+of a well-made app, and a translation that reaches for them is not being
+stiff, it is being Chinese. So the Chinese catalogues sit one notch more formal
+than the English, and a reviewer should not pull them back toward the English's
+colloquialism. The limits are the ones from §"How we translate": a chip is still
+a chip, the facts are still exactly the English facts, and a string whose
+`context` says it addresses the reader as 你 keeps the 你 (*點你的名字*, not
+*點選個人姓名*).
+
+Two mechanical conventions that came out of the same review:
+
+- **Quotation marks follow the script.** zh-Hans quotes a button name with
+  “ ”, zh-Hant with 「 」. A 「 in the Simplified catalogue is a defect.
+- **A word the two Chinese catalogues render differently is a decision, not a
+  drift.** *Not ours* is 非本教会家庭 / 非本教會家庭 in both; *has not recorded
+  anything* is 任何数据 / 任何資料 in both. When one catalogue is reworded, the
+  other is re-read against it, and the table above gets a row if the word is
+  load-bearing.
 
 Never translated: **Tally**, **Planning Center**, student and adult names, event
 titles a leader typed, label-template `{{tokens}}`, Material icon names
