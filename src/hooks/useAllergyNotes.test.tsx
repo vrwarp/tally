@@ -23,6 +23,7 @@ vi.mock('@/services/functions', () => ({ getAllergyNotes }));
 function entry(student: Student): RosterEntry {
   return {
     student,
+    former: false,
     isRecent: false,
     hasParticipated: false,
     attendance: null,

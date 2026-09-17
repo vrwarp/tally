@@ -74,7 +74,10 @@ which makes the roster ternary: absent, in the room, checked out. The header lea
 count rather than the head count (`12 in room · 18 checked in`), the two filter chips become "In
 room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
-checking children out is the gesture repeated forty times a morning. A parent can also check out their
+checking children out is the gesture repeated forty times a morning. Both numbers are read off the
+register itself, so a record whose student has since left the roster still counts, and shows as a
+"Former student" row that can be undone, checked out or handed to the right child — exactly as the
+event page lists it. A parent can also check out their
 own child at the lobby kiosk, with the same single tap the arrival costs. It held for two seconds
 for a while — a stray check-in corrects itself when the child walks in anyway, while a stray pickup
 claims somebody left the building — and the gesture came off because that argument never weighed

@@ -101,7 +101,11 @@ export interface StudentRowProps {
  */
 function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
   return (
-    a.student === b.student &&
+    // A former row's placeholder is minted afresh on every rebuild, so for it
+    // the id is the identity — the fields are all derived from the record,
+    // and the record's own changes are compared below.
+    (a.student === b.student || (a.former && b.former && a.student.id === b.student.id)) &&
+    a.former === b.former &&
     (a.attendance?.checkedInAt.getTime() ?? null) ===
       (b.attendance?.checkedInAt.getTime() ?? null) &&
     // A field this comparator does not read is a row that never repaints, and
@@ -147,8 +151,10 @@ export const StudentRow = memo(function StudentRow({
   const grades = useGrades();
   const t = useTranslations('StudentRow');
   const tCommon = useTranslations('Common');
-  const { student, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
-  const name = studentFullName(student);
+  // The archived-night list and the event page call this row the same thing.
+  const tCheckIn = useTranslations('CheckIn');
+  const { student, former, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
+  const name = former ? tCheckIn('formerStudent') : studentFullName(student);
   const grade = gradeLabel(grades, student);
   const showHint = showRecentHint && isRecent && recentWindow > 0;
 
@@ -297,7 +303,7 @@ export const StudentRow = memo(function StudentRow({
                 here ? 'bg-present-500/20 text-present-400' : 'bg-ink-800 text-ink-300',
               )}
             >
-              {initials(student.firstName, student.lastName)}
+              {former ? '?' : initials(student.firstName, student.lastName)}
             </span>
 
             <span className="min-w-0 flex-1">
@@ -310,13 +316,28 @@ export const StudentRow = memo(function StudentRow({
                 twenty-four rows or gave up and typed.
               */}
               <span className="flex items-baseline gap-2">
-                <span className="min-w-0 truncate text-base text-ink-50">
-                  <span className="font-semibold">{student.firstName}</span>{' '}
-                  <span className="font-normal text-ink-300">{student.lastName}</span>
-                </span>
-                <span className="shrink-0 text-xs font-medium text-ink-500">
-                  {grade ?? grades('none')}
-                </span>
+                {former ? (
+                  /*
+                    No name to lead with and no grade to trail it: the record
+                    is all that is known, and the row says exactly that, in
+                    the words the event page prints for the same record.
+                    Muted, because it is a label standing where a name would
+                    be, not a name.
+                  */
+                  <span className="min-w-0 truncate text-base font-semibold text-ink-300">
+                    {name}
+                  </span>
+                ) : (
+                  <>
+                    <span className="min-w-0 truncate text-base text-ink-50">
+                      <span className="font-semibold">{student.firstName}</span>{' '}
+                      <span className="font-normal text-ink-300">{student.lastName}</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-medium text-ink-500">
+                      {grade ?? grades('none')}
+                    </span>
+                  </>
+                )}
               </span>
 
               {warnings.length > 0 || showHint || unavailable || gone ? (
@@ -543,7 +564,9 @@ export const StudentRow = memo(function StudentRow({
               {tCommon('undo')}
             </button>
 
-            {canOpenProfile ? (
+            {/* Nothing to open for a former student: the id names a record,
+                not a profile. */}
+            {canOpenProfile && !former ? (
               <Link
                 to={`/students/${student.id}`}
                 aria-label={t('ariaOpenProfile', { name })}

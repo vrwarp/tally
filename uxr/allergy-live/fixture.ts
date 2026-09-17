@@ -94,6 +94,7 @@ function studentOf(seat: Seat): Student {
 /** The roster as it stands before anybody has arrived. */
 export const ROSTER: readonly RosterEntry[] = SEATS.map((seat) => ({
   student: studentOf(seat),
+  former: false,
   attendance: null,
   rsvp: null,
   isRecent: true,

@@ -50,11 +50,15 @@ export type Grade = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
  * exactly the shape of thing that should not be spelled out at a comparison
  * three files away from the reason.
  */
+/* Stryker disable next-line all: static — see docs/mutation-testing.md. */
 export const PRE_K = -1 satisfies Grade;
 
 export const GRADES: readonly Grade[] = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 export function isGrade(value: unknown): value is Grade {
+  // Stryker disable next-line ConditionalExpression: `includes` compares with
+  // `===`, so nothing that is not a number is in `GRADES` and the `typeof`
+  // refuses nothing it would let through. It is here for the narrowing.
   return typeof value === 'number' && GRADES.includes(value as Grade);
 }
 
@@ -82,10 +86,14 @@ export type StudentStatus = 'active' | 'inactive';
  */
 export type Role = 'counselor' | 'core' | 'admin';
 
+/* Stryker disable next-line all: static — see docs/mutation-testing.md. */
 export const ROLE_RANK: Record<Role, number> = { counselor: 1, core: 2, admin: 3 };
 
 /** True when `role` meets or exceeds `required`. */
 export function roleAtLeast(role: Role | null | undefined, required: Role): boolean {
+  // Stryker disable next-line ConditionalExpression: nobody has a rank of
+  // `undefined`, and `undefined >= n` is already false, so the guard refuses
+  // nothing the comparison would let through. It is here so the lookup is typed.
   if (!role) return false;
   return ROLE_RANK[role] >= ROLE_RANK[required];
 }
@@ -614,8 +622,10 @@ export function buildSearchName(firstName: string, lastName: string): string {
  * The student editor is the one place that needs the halves back: it offers the
  * same two boxes Planning Center's own edit form does.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 const NICKNAME_OPEN = '“';
 const NICKNAME_CLOSE = '”';
+/* Stryker restore all */
 
 /**
  * The two halves, joined. A nickname equal to the first name is dropped rather
@@ -644,7 +654,13 @@ export function splitFirstName(value: string): { firstName: string; nickname: st
   const match = /^(.*?)\s*[“"]([^”"]*)[”"]\s*$/.exec(value.trim());
   if (!match) return { firstName: value.trim(), nickname: null };
 
+  // Stryker disable next-line OptionalChaining, StringLiteral, MethodExpression:
+  // neither group is optional in the pattern, so once it has matched both are
+  // strings, and the `?.` and the fallback are for `noUncheckedIndexedAccess`
+  // rather than for a value. The trim is a no-op too: the input was trimmed,
+  // and the greedy `\s*` before the quote leaves this half nothing at its end.
   const legal = match[1]?.trim() ?? '';
+  // Stryker disable next-line OptionalChaining, StringLiteral: as above.
   const nickname = match[2]?.trim() ?? '';
   if (nickname.length === 0) return { firstName: legal, nickname: null };
   // `“Benji”` with nothing in front of it is just a name in quotes.
@@ -1131,10 +1147,12 @@ export type TransitionReason = 'moved-on' | 'departed';
  * module is data shared by four screens and cannot call a hook, while the
  * words differ per language. Storage keeps the short values either way.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 export const TRANSITION_REASON_LABEL: Record<TransitionReason, 'reasonMovedOn' | 'reasonDeparted'> = {
   'moved-on': 'reasonMovedOn',
   departed: 'reasonDeparted',
 };
+/* Stryker restore all */
 
 /**
  * One gathering no longer expects one student.
@@ -1200,6 +1218,7 @@ export interface AppSettings extends Omit<AppSettingsDoc, 'updatedAt' | 'updated
   updatedBy: string | null;
 }
 
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 export const DEFAULT_SETTINGS: AppSettings = {
   predictiveMinAttended: 2,
   predictiveOfLastN: 3,
@@ -1208,6 +1227,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   updatedAt: null,
   updatedBy: null,
 };
+/* Stryker restore all */
 
 /* -------------------------------------------------------------------------- */
 /* Planning Center                                                             */
@@ -1759,10 +1779,12 @@ export { parseStudentId };
 export type { BackendId };
 
 /** What screens call each backend. Sentences build around these. */
+/* Stryker disable all: static — see docs/mutation-testing.md. */
 export const BACKEND_LABELS: Record<BackendId, string> = {
   pco: 'Planning Center',
   a32: 'Attendees',
 };
+/* Stryker restore all */
 
 /** A student, in whatever shape the linkage has reached this screen in. */
 export type LinkableStudent = Pick<Student, 'id' | 'pcoPersonId'> & {
@@ -1835,6 +1857,16 @@ export type RosterWarning = 'incomplete-profile' | 'allergy' | 'record-missing';
 
 export interface RosterEntry {
   student: Student;
+  /**
+   * True for a record whose student is not on the roster.
+   *
+   * The register outlives the roster: a student merged or removed upstream
+   * since the night was taken still has their attendance document, and it is
+   * still a head count. `student` is then a placeholder built from the record
+   * — no name, no grade — and the row reads "Former student", exactly as the
+   * event page and an archived night list it. See `formerStudent`.
+   */
+  former: boolean;
   /**
    * True when the prediction expects this student tonight — they attended at
    * least `predictiveMinAttended` of the last `predictiveOfLastN` instances of

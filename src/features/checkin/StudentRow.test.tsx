@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { StudentRow, type StudentRowProps } from '@/features/checkin/StudentRow';
+import { formerStudent } from '@/features/roster/predictiveRoster';
 import { makeAttendance, makeStudent } from '../../../tests/factories';
 import type { AttendanceRecord, RosterEntry, Student } from '@/types';
 
@@ -26,6 +27,7 @@ const JORDAN = makeStudent({ id: 'jordan-reyes', firstName: 'Jordan', lastName: 
 function entryFor(student: Student, attendance: AttendanceRecord | null = null): RosterEntry {
   return {
     student,
+    former: false,
     attendance,
     rsvp: null,
     isRecent: false,
@@ -427,5 +429,54 @@ describe('StudentRow: check-out', () => {
     );
 
     expect(screen.getByText(/^Out \d/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * A record whose student is gone from the roster — see `formerStudent`. The row
+ * stands in for the record, so every correction that acts on the record stays,
+ * and the one thing that needs a student — the profile — goes.
+ */
+describe('StudentRow: a former student', () => {
+  const record = makeAttendance({
+    studentId: 'gone-1',
+    checkedInAt: new Date('2026-02-13T19:04:00'),
+  });
+  const former = (): RosterEntry => ({ ...entryFor(formerStudent(record), record), former: true });
+
+  it('says what it is instead of a name, and claims no grade', () => {
+    show(former());
+
+    expect(screen.getByText('Former student')).toBeInTheDocument();
+    expect(screen.queryByText(/no grade/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^More actions for Former student, checked in at/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps undo and "wrong person", and drops the profile', async () => {
+    const { onUndo, onSwap } = show(former(), { expanded: true, canOpenProfile: true });
+
+    expect(screen.queryByRole('link', { name: /profile/i })).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Undo the check-in for Former student' }),
+    );
+    expect(onUndo).toHaveBeenCalled();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Wrong person — move Former student/ }),
+    );
+    expect(onSwap).toHaveBeenCalled();
+  });
+
+  it('can be checked out like anybody else', async () => {
+    const onCheckOut = vi.fn();
+    show(former(), { tracksCheckOut: true, onCheckOut });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Check out Former student, checked in at/ }),
+    );
+    expect(onCheckOut).toHaveBeenCalled();
   });
 });
