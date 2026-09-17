@@ -14,6 +14,7 @@ import {
   computeWarnings,
   countRecentHits,
   effectiveThreshold,
+  formerStudent,
   isEligible,
   type BuildRosterInput,
   type RosterView,
@@ -1501,5 +1502,155 @@ describe('buildRoster: check-out', () => {
       expect(view.focus).toBe('all');
       expect(view.entries).toHaveLength(2);
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* A record whose student is gone                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The register outlives the roster. A student merged or removed upstream after
+ * the night was taken keeps their attendance document, and every other reader
+ * of that document — the catch-up list, the event page, Insights — counts it.
+ * This screen used to count roster rows instead, and read one short.
+ */
+describe('buildRoster: a record whose student is gone', () => {
+  const ada = makeStudent({ id: 'ada', firstName: 'Ada', lastName: 'Abara' });
+  const bo = makeStudent({ id: 'bo', firstName: 'Bo', lastName: 'Brook' });
+
+  /** Checked in on the night, and off the roster since. */
+  const gone = makeAttendance({
+    studentId: 'gone-1',
+    eventId: tonight.id,
+    checkedInAt: new Date('2026-02-13T19:04:00'),
+  });
+  const adaHere = makeAttendance({ studentId: ada.id, eventId: tonight.id });
+
+  it("counts the record, so the head count is the register's", () => {
+    const view = roster({ students: [ada, bo], attendance: [adaHere, gone] });
+
+    expect(view.counts.present).toBe(2);
+    // Checked in is eligible, whoever it is — the same rule `isEligible`
+    // applies to a student checked in by mistake.
+    expect(view.counts.eligible).toBe(3);
+    expect(view.counts.absent).toBe(1);
+  });
+
+  it('lists it as a former student, after everybody with a name', () => {
+    const view = roster({ students: [bo, ada], attendance: [gone] });
+
+    expect(ids(view.entries)).toEqual(['ada', 'bo', 'gone-1']);
+
+    const former = view.entries.at(-1)!;
+    expect(former.former).toBe(true);
+    expect(former.attendance).toBe(gone);
+    expect(former.hasParticipated).toBe(true);
+    expect(former.warnings).toEqual([]);
+    expect(view.entries.slice(0, 2).every((entry) => !entry.former)).toBe(true);
+  });
+
+  it('keeps it on every focus that shows who is here', () => {
+    for (const focus of ['all', 'checkedIn', 'recent', 'participated'] as const) {
+      const view = roster({ students: [ada, bo], attendance: [gone], filters: { focus } });
+
+      expect(ids(view.entries)).toContain('gone-1');
+    }
+  });
+
+  it('splits the room by the record, on a gathering that hands children back', () => {
+    const nursery = makeEvent({ id: 'nursery-1', seriesId: 'sunday', requiresCheckOut: true });
+    const stillHere = makeAttendance({ studentId: 'gone-1', eventId: nursery.id });
+    const collected = makeAttendance({
+      studentId: 'gone-2',
+      eventId: nursery.id,
+      checkedOutAt: new Date('2026-02-15T10:15:00'),
+    });
+    const input = {
+      event: nursery,
+      students: [ada],
+      attendance: [makeAttendance({ studentId: ada.id, eventId: nursery.id }), stillHere, collected],
+      rsvps: [],
+      history: [],
+      settings: makeSettings(),
+    };
+
+    const view = buildRoster(input);
+    expect(view.counts.present).toBe(3);
+    expect(view.counts.inRoom).toBe(2);
+    expect(view.counts.checkedOut).toBe(1);
+
+    expect(ids(buildRoster({ ...input, filters: { focus: 'inRoom' } }).entries)).toEqual([
+      'ada',
+      'gone-1',
+    ]);
+    expect(ids(buildRoster({ ...input, filters: { focus: 'checkedOut' } }).entries)).toEqual([
+      'gone-2',
+    ]);
+  });
+
+  it('files two of them by arrival, whatever order the register came in', () => {
+    const later = makeAttendance({
+      studentId: 'gone-0',
+      eventId: tonight.id,
+      checkedInAt: new Date('2026-02-13T19:30:00'),
+    });
+
+    expect(ids(roster({ students: [], attendance: [later, gone] }).entries)).toEqual([
+      'gone-1',
+      'gone-0',
+    ]);
+    expect(ids(roster({ students: [], attendance: [gone, later] }).entries)).toEqual([
+      'gone-1',
+      'gone-0',
+    ]);
+  });
+
+  it('is one row for one id, however many documents say so', () => {
+    const view = roster({ students: [], attendance: [gone, { ...gone }] });
+
+    expect(ids(view.entries)).toEqual(['gone-1']);
+    expect(view.counts.present).toBe(1);
+  });
+
+  it('has no name to search for, and the header keeps counting it', () => {
+    const view = roster({ students: [ada], attendance: [gone], filters: { query: 'ad' } });
+
+    expect(ids(view.entries)).toEqual(['ada']);
+    expect(view.counts.present).toBe(1);
+  });
+
+  it('is in no grade, so narrowing to one leaves it out of the slice', () => {
+    const view = roster({ students: [ada], attendance: [gone], filters: { grades: [8] } });
+
+    expect(ids(view.entries)).toEqual(['ada']);
+    expect(view.counts.present).toBe(0);
+    expect(view.counts.eligible).toBe(1);
+  });
+
+  it('never stands in for a student who is on the roster', () => {
+    const view = roster({ students: [ada], attendance: [adaHere] });
+
+    expect(view.entries).toHaveLength(1);
+    expect(view.entries[0]!.former).toBe(false);
+    expect(view.entries[0]!.student).toBe(ada);
+  });
+
+  it('claims nothing about them but the record', () => {
+    const student = formerStudent(gone);
+
+    expect(student).toMatchObject({
+      id: 'gone-1',
+      firstName: '',
+      lastName: '',
+      grade: null,
+      status: 'inactive',
+      hasAllergies: false,
+      profileComplete: null,
+      searchName: '',
+      pcoPersonId: null,
+      createdAt: gone.checkedInAt,
+    });
+    expect(computeWarnings(student)).toEqual([]);
   });
 });

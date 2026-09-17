@@ -23,6 +23,7 @@ import type { AttendanceRecord, RosterEntry, Student } from '@/types';
 function entryFor(student: Student, attendance: AttendanceRecord | null = null): RosterEntry {
   return {
     student,
+    former: false,
     attendance,
     rsvp: null,
     isRecent: false,

@@ -50,7 +50,7 @@ import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { RosterList } from '@/features/checkin/RosterList';
 import { SearchBar } from '@/features/checkin/SearchBar';
-import { buildRoster, type RosterFocus } from '@/features/roster/predictiveRoster';
+import { buildRoster, formerStudent, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
@@ -369,9 +369,15 @@ export function CheckInPage() {
   const swapSource = useMemo(() => {
     if (!swapForId) return null;
     const record = attendance.find((item) => item.studentId === swapForId);
+    if (!record) return null;
     const student = students.find((item) => item.id === swapForId);
-    if (!record || !student) return null;
-    return { record, student };
+    // A record whose student is gone from the roster is the one this mode is
+    // most useful for: filed under an id nobody answers to any more, and
+    // waiting to be handed to the child who was actually there. Its row is
+    // the placeholder `buildRoster` drew, so the picker marks the same row.
+    return student
+      ? { record, student, former: false }
+      : { record, student: formerStudent(record), former: true };
   }, [swapForId, attendance, students]);
 
   useEffect(() => {
@@ -661,10 +667,22 @@ export function CheckInPage() {
     [event, user, query, flash, write, refuseFrozen, noteRefusal, t],
   );
 
+  /**
+   * What a toast or an announcement calls a row.
+   *
+   * A former student's placeholder has no name to say — see `formerStudent` —
+   * and "Undid " with nothing after it is a sentence about nobody.
+   */
+  const nameOf = useCallback(
+    (entry: Pick<RosterEntry, 'student' | 'former'>): string =>
+      entry.former ? t("formerStudent") : studentFullName(entry.student),
+    [t],
+  );
+
   const handleUndo = useCallback(
     async (entry: RosterEntry) => {
       if (!event) return;
-      const name = studentFullName(entry.student);
+      const name = nameOf(entry);
 
       // No confirm dialog: a mistaken undo costs one more tap, whereas a modal
       // costs every counselor a beat on every correction.
@@ -675,7 +693,7 @@ export function CheckInPage() {
         show(t("toastUndid", { name }), { tone: "info" });
       });
     },
-    [event, show, write, t],
+    [event, show, write, nameOf, t],
   );
 
   const handleCheckOut = useCallback(
@@ -684,7 +702,7 @@ export function CheckInPage() {
       // The rules refuse a check-out on a frozen student just as they refuse a
       // check-in, so say why rather than letting it die on a generic toast.
       if (refuseFrozen(entry)) return;
-      const name = studentFullName(entry.student);
+      const name = nameOf(entry);
 
       setExpandedId(null);
       await write([entry.student.id], t("errorCheckOut", { name }), async () => {
@@ -695,14 +713,14 @@ export function CheckInPage() {
         await checkOut(event.id, entry.student.id, user.uid);
       });
     },
-    [event, user, write, refuseFrozen, t],
+    [event, user, write, refuseFrozen, nameOf, t],
   );
 
   const handleUndoCheckOut = useCallback(
     async (entry: RosterEntry) => {
       if (!event) return;
       if (refuseFrozen(entry)) return;
-      const name = studentFullName(entry.student);
+      const name = nameOf(entry);
 
       setExpandedId(null);
       await write([entry.student.id], t("errorUndoCheckOut", { name }), async () => {
@@ -711,7 +729,7 @@ export function CheckInPage() {
         await undoCheckOut(event.id, entry.student.id);
       });
     },
-    [event, write, refuseFrozen, t],
+    [event, write, refuseFrozen, nameOf, t],
   );
 
   /**
@@ -727,7 +745,7 @@ export function CheckInPage() {
       if (!event || !user || !swapSource) return;
       if (refuseFrozen(entry)) return;
       const from = swapSource;
-      const wrong = studentFullName(from.student);
+      const wrong = nameOf(from);
       const right = studentFullName(entry.student);
       const when = time.clock(from.record.checkedInAt);
 
@@ -751,7 +769,7 @@ export function CheckInPage() {
         },
       );
     },
-    [event, user, swapSource, flash, show, write, refuseFrozen, t, time],
+    [event, user, swapSource, flash, show, write, refuseFrozen, nameOf, t, time],
   );
 
   /**
@@ -1067,7 +1085,7 @@ export function CheckInPage() {
                 </span>
                 <span className="block text-xs leading-snug text-ink-300">
                   {t('swapBody', {
-                    name: studentFullName(swapSource.student),
+                    name: nameOf(swapSource),
                     time: time.clock(swapSource.record.checkedInAt),
                   })}
                 </span>

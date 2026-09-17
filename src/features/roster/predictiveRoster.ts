@@ -120,6 +120,10 @@ export interface RosterView {
     /**
      * Checked in. This is attendance, and check-out does not touch it: a
      * missed pickup must never reduce a head count.
+     *
+     * Every record on the register, whether or not its student is still on
+     * the roster — the same head count the catch-up list and Insights read
+     * off `presentStudentIds`, so the two never disagree. See `formerStudent`.
      */
     present: number;
     /** Checked in and not checked out. `inRoom + checkedOut === present`. */
@@ -393,6 +397,18 @@ export interface BuildRosterInput {
 const EMPTY_PINNED: ReadonlySet<string> = new Set();
 
 /**
+ * Earlier arrival first, then id. Only ever asked about two former rows, whose
+ * records are what the rows were built from — see `buildRoster`'s sort.
+ */
+function arrivalOrder(a: RosterEntry, b: RosterEntry): number {
+  const arrived = (entry: RosterEntry) => entry.attendance?.checkedInAt.getTime() ?? 0;
+  return (
+    arrived(a) - arrived(b) ||
+    (a.student.id < b.student.id ? -1 : a.student.id > b.student.id ? 1 : 0)
+  );
+}
+
+/**
  * Whether a requested focus can actually be honoured, and what to show instead.
  *
  * `recent` is the default the check-in screen opens on, so it has to fail
@@ -441,6 +457,52 @@ function resolveFocus(
   return wanted;
 }
 
+/**
+ * The row for a record whose student is not on the roster.
+ *
+ * The roster is the backend's people plus Tally's own documents, and either
+ * can stop answering for somebody after the night was taken: a duplicate
+ * merged away in Planning Center, a child taken off the list, a kiosk
+ * visitor whose linked person now answers under another id. Their attendance
+ * document is still there, and it is still a head count — the catch-up list,
+ * the event page and Insights all read it — so the check-in screen has to
+ * count it and show it too, or the same night reads "9 checked in" on one
+ * screen and "8" on the next.
+ *
+ * Nothing here is known but the record, so nothing here claims more: no name
+ * (the row prints "Former student"), no grade, no allergy, no profile, and
+ * `inactive` because they are not on the roster. The id is the record's, which
+ * is what lets undo, check-out and "Wrong person" act on the record itself.
+ */
+export function formerStudent(
+  record: Pick<AttendanceRecord, 'studentId' | 'checkedInAt' | 'checkedInBy'>,
+): Student {
+  return {
+    id: record.studentId,
+    firstName: '',
+    lastName: '',
+    grade: null,
+    notes: null,
+    status: 'inactive',
+    isVisitor: false,
+    fromPlanningCenter: false,
+    // `null`, not `false`: "nobody has looked", so no incomplete-profile
+    // badge on a row that has no profile to complete.
+    profileComplete: null,
+    hasAllergies: false,
+    birthday: null,
+    searchName: '',
+    firstAttendedAt: null,
+    lastAttendedAt: null,
+    pcoPersonId: null,
+    upstreamPushPending: false,
+    createdAt: record.checkedInAt,
+    updatedAt: record.checkedInAt,
+    createdBy: record.checkedInBy,
+    updatedBy: null,
+  };
+}
+
 export function buildRoster(input: BuildRosterInput): RosterView {
   const { event, students, attendance, rsvps, settings } = input;
   const filters = input.filters ?? {};
@@ -479,13 +541,18 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   let recentTotal = 0;
   let participatedTotal = 0;
 
-  for (const student of students) {
+  /**
+   * One pass over one person — a student on the roster, or the placeholder
+   * for a record the roster cannot account for. One function so the two are
+   * counted, filtered and searched by exactly the same rules.
+   */
+  const consider = (student: Student, former: boolean): void => {
     const record = attendanceByStudent.get(student.id) ?? null;
     const rsvp = rsvpByStudent.get(student.id);
 
     const isPinned = pinned.has(student.id);
 
-    if (!isEligible(student, event, rsvp, record !== null || isPinned)) continue;
+    if (!isEligible(student, event, rsvp, record !== null || isPinned)) return;
 
     // Which grades tonight's roster covers, collected *before* the grade
     // filter narrows it — otherwise picking 6th would leave the dropdown
@@ -498,9 +565,9 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     // Somebody with no grade is in no grade — narrowing to 6th must not hand
     // a counselor the adult volunteers, or the nursery.
     if (grades.length > 0 && (student.grade === null || !grades.includes(student.grade))) {
-      continue;
+      return;
     }
-    if (filters.incompleteOnly && student.profileComplete !== false) continue;
+    if (filters.incompleteOnly && student.profileComplete !== false) return;
 
     const recentHits = countRecentHits(student.id, history);
     const isRecent = recentHits >= threshold;
@@ -530,10 +597,11 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     if (isRecent) recentTotal += 1;
     if (hasParticipated) participatedTotal += 1;
 
-    if (!matcher.matches(student.searchName)) continue;
+    if (!matcher.matches(student.searchName)) return;
 
     matched.push({
       student,
+      former,
       isRecent,
       hasParticipated,
       attendance: record,
@@ -542,6 +610,20 @@ export function buildRoster(input: BuildRosterInput): RosterView {
       recentHits,
       recentWindow: historyWindow,
     });
+  };
+
+  for (const student of students) consider(student, false);
+
+  /*
+   * Then the records the roster cannot account for.
+   *
+   * Read off the map rather than the array, so two documents for one id —
+   * which the id scheme rules out, and a fuzzed input does not — become one
+   * row, as they do for a student on the roster.
+   */
+  const known = new Set(students.map((student) => student.id));
+  for (const record of attendanceByStudent.values()) {
+    if (!known.has(record.studentId)) consider(formerStudent(record), true);
   }
 
   const focus = resolveFocus(filters.focus ?? 'all', {
@@ -580,7 +662,16 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   entries.sort(
     (a, b) =>
       (isFiltered ? matcher.rank(a.student) - matcher.rank(b.student) : 0) ||
-      sortByName(a.student, b.student),
+      // A row with no name to file under goes after every row that has one:
+      // the list is read by name, and a "Former student" between Maya and
+      // Noah is a row in a place nobody would look for it.
+      Number(a.former) - Number(b.former) ||
+      sortByName(a.student, b.student) ||
+      // Two such rows tie on their empty names; they go in order of arrival,
+      // and then by id so the order is total. Only for them — a named pair
+      // that ties keeps the roster's own order, which a check-in must not
+      // disturb.
+      (a.former ? arrivalOrder(a, b) : 0),
   );
 
   return {

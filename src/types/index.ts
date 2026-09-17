@@ -1836,6 +1836,16 @@ export type RosterWarning = 'incomplete-profile' | 'allergy' | 'record-missing';
 export interface RosterEntry {
   student: Student;
   /**
+   * True for a record whose student is not on the roster.
+   *
+   * The register outlives the roster: a student merged or removed upstream
+   * since the night was taken still has their attendance document, and it is
+   * still a head count. `student` is then a placeholder built from the record
+   * — no name, no grade — and the row reads "Former student", exactly as the
+   * event page and an archived night list it. See `formerStudent`.
+   */
+  former: boolean;
+  /**
    * True when the prediction expects this student tonight — they attended at
    * least `predictiveMinAttended` of the last `predictiveOfLastN` instances of
    * this series. Deliberately independent of `attendance`: checking someone in
