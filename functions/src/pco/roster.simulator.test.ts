@@ -56,11 +56,40 @@ interface Harness {
   store: SimulatorStore;
   cache: TtlCache;
   requests: string[];
+  /**
+   * The most requests that were ever outstanding at the same moment.
+   *
+   * Counted by wrapping the promise rather than the URL, because the URLs
+   * cannot tell the two apart: sixty reads made one after another and sixty
+   * made four at a time send exactly the same list of requests, and the whole
+   * difference between them is *when*. A pool that quietly went back to being
+   * serial would pass every other assertion in this file.
+   */
+  flight: { inFlight: number; max: number };
+  /**
+   * Person ids whose individual read is answered `403` without ever reaching
+   * the simulator.
+   *
+   * The store's own fault injection is "the next N requests, whichever they
+   * turn out to be", and that cannot say what the escape-path test needs to
+   * say: *this* person's read fails while its neighbours' reads succeed. With
+   * four workers racing on one cursor, which request arrives next is the very
+   * thing under test, so a fault that lands by arrival order would arm itself
+   * against a different request every time the pool changed.
+   *
+   * `403` rather than `500` because the client replays a 5xx: a retry ladder
+   * would add requests to the log these tests count, and the point being made
+   * is about a refusal that is not a deleted person, which 403 makes as well
+   * as 500 does.
+   */
+  forbidden: Set<string>;
 }
 
 function harness(options: SimulatorOptions = {}, ttlMs = 30_000): Harness {
   const store = new SimulatorStore(options);
   const requests: string[] = [];
+  const flight = { inFlight: 0, max: 0 };
+  const forbidden = new Set<string>();
   const simulator = createSimulatorFetch(store);
 
   const client = createPcoClient({
@@ -68,13 +97,26 @@ function harness(options: SimulatorOptions = {}, ttlMs = 30_000): Harness {
     secret: DEFAULT_SECRET,
     baseUrl: SIMULATOR_ORIGIN,
     sleep: async () => {},
-    fetchImpl: (input, init) => {
-      requests.push(typeof input === 'string' ? input : String(input));
-      return simulator(input, init);
+    fetchImpl: async (input, init) => {
+      const url = typeof input === 'string' ? input : String(input);
+      requests.push(url);
+      flight.inFlight += 1;
+      flight.max = Math.max(flight.max, flight.inFlight);
+      try {
+        if (forbidden.has(new URL(url).pathname.split('/').pop() ?? '')) {
+          return new Response(JSON.stringify({ errors: [{ status: '403', title: 'Forbidden' }] }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return await simulator(input, init);
+      } finally {
+        flight.inFlight -= 1;
+      }
     },
   });
 
-  return { client, store, cache: createTtlCache({ ttlMs }), requests };
+  return { client, store, cache: createTtlCache({ ttlMs }), requests, flight, forbidden };
 }
 
 describe('student ids', () => {
@@ -266,6 +308,155 @@ describe('fetchRoster', () => {
     });
 
     expect(people).toHaveLength(YOUTH_IDS.length);
+  });
+
+  /**
+   * The people the `where[child]=true` sweep does not answer for.
+   *
+   * A hand-picked roster carries them by design: the adults on it, the senior
+   * who graduated in May, anybody upstream never flagged as a child. They cost
+   * a request each, and doing sixty of those one after another put seven
+   * seconds of nothing but waiting in front of a counselor at a door — and, in
+   * a rate-limited minute, sixty retry ladders end to end.
+   */
+  describe('the straggler pool', () => {
+    /** Somebody the child sweep will never return, because upstream calls them an adult. */
+    const straggler = (lastName: string): string =>
+      world.store.createPerson({ first_name: 'Straggler', last_name: lastName, child: false }).id;
+
+    it('looks stragglers up four at a time rather than one after another', async () => {
+      const ids = ['Ames', 'Bell', 'Cole', 'Dunn', 'Eames', 'Ford', 'Grey', 'Hume'].map(straggler);
+
+      const { people } = await fetchRoster({ ...world, config: baseConfig(), personIds: ids });
+
+      expect(people).toHaveLength(ids.length);
+      // Four exactly. A serial loop never reaches two, and an unbounded
+      // fan-out is the other way to get this wrong: against an API that
+      // rate-limits it buys one fast roster read and then a minute of 429s.
+      expect(world.flight.max).toBe(4);
+    });
+
+    it('reports unresolved stragglers in the roster’s order, not the order the answers landed', async () => {
+      /*
+       * The pool finishes out of order on purpose — that is what a shared
+       * cursor is for — and the roster must not. The first id here is a merge
+       * chain that ends in a deleted keeper, so it costs three more requests
+       * before it knows, and a version that reported each straggler as its
+       * answer arrived would put it last. A list that reshuffles between reads
+       * is the same complaint as a roster that reshuffles: somebody is reading
+       * it down a phone.
+       */
+      const chained = '4209100';
+      world.store.buryPerson(chained, '4209201');
+      world.store.buryPerson('4209201', '4209202');
+      world.store.buryPerson('4209202', null);
+      const plain = ['4209101', '4209102', '4209103', '4209104', '4209105', '4209106', '4209107'];
+
+      const { unresolved, missing } = await fetchRoster({
+        ...world,
+        config: baseConfig(),
+        personIds: [...plain].reverse().concat(chained),
+      });
+
+      expect(unresolved).toEqual([chained, ...plain]);
+      // Known gone, all of them: the caller freezes check-ins on this list, so
+      // the distinction from could-not-look survives the pool too.
+      expect(missing).toEqual([chained, ...plain]);
+    });
+
+    it('still follows a merged straggler to the record the church kept', async () => {
+      const dup = world.store.createPerson({
+        first_name: 'Rowan', last_name: 'Vasquez-Old', child: false,
+      });
+      const kept = world.store.createPerson({
+        first_name: 'Rowan', last_name: 'Vasquez', child: false,
+      });
+      world.store.buryPerson(dup.id, kept.id);
+      const alongside = ['Ames', 'Bell', 'Cole'].map(straggler);
+
+      const { people, relinks, unresolved } = await fetchRoster({
+        ...world,
+        config: baseConfig(),
+        personIds: [dup.id, ...alongside],
+      });
+
+      // Two more requests than its neighbours cost, run inside a worker that
+      // its neighbours are not waiting on, and the same answer as before.
+      expect(relinks).toEqual([{ fromPersonId: dup.id, toPersonId: kept.id }]);
+      expect(people.map((person) => person.pcoPersonId)).toContain(kept.id);
+      expect(unresolved).toEqual([]);
+    });
+
+    it('keeps the Attendees alias a straggler carries', async () => {
+      /*
+       * The alias arrives side-loaded on the individual reply, not on the
+       * sweep, so it only survives if each worker carries its `included` home
+       * for the ordered replay to collect. Losing it would not fail a roster
+       * read at all — it would quietly stop the cross-backend dedup from
+       * recognising this person, and one human would become two rows.
+       */
+      const uuid = '8c1f02a7-6d54-4a0d-9d2e-2b5f3a1c7e90';
+      const adult = world.store.createPerson({
+        first_name: 'Rosa', last_name: 'Iyer', child: false,
+      });
+      world.store.linkToAttendees(adult.id, uuid);
+      const alongside = ['Ames', 'Bell', 'Cole', 'Dunn'].map(straggler);
+
+      const result = await fetchRoster({
+        ...world,
+        config: baseConfig(),
+        personIds: [adult.id, ...alongside],
+      });
+
+      expect(result.a32Aliases).toEqual({ [adult.id]: uuid });
+    });
+
+    it('stops drawing new stragglers once a lookup fails outright', async () => {
+      /*
+       * A 403 on the mirror read of a merge target is not a person who is
+       * gone, so it escapes and fails the whole roster read — deliberately,
+       * and unchanged here. What the pool added was a bill: `Promise.all`
+       * rejects on the first throw, but the other three workers were never
+       * told, and they went on taking targets until the list was empty. The
+       * serial loop this replaced stopped at the straggler that threw, so the
+       * new version spent up to sixty requests on a read that was already lost
+       * — aimed at the Planning Center that had just refused one.
+       *
+       * The request count is the only assertion that can tell those apart:
+       * both versions reject, with the same error, in the same time, and every
+       * other observable about this read is identical.
+       */
+      const dup = world.store.createPerson({
+        first_name: 'Rowan', last_name: 'Vasquez-Old', child: false,
+      });
+      const kept = world.store.createPerson({
+        first_name: 'Rowan', last_name: 'Vasquez', child: false,
+      });
+      world.store.buryPerson(dup.id, kept.id);
+      // Not a deleted person: Planning Center refusing to answer for one.
+      world.forbidden.add(kept.id);
+      const rest = Array.from({ length: 29 }, (_, i) => straggler(`Ames-${i}`));
+      const ids = [dup.id, ...rest];
+
+      await expect(
+        fetchRoster({ ...world, config: baseConfig(), personIds: ids }),
+      ).rejects.toMatchObject({ status: 403 });
+
+      // The workers that were mid-request when the read threw are nobody's
+      // promise any more, so let the queue drain before counting: otherwise
+      // this measures how fast the assertion ran, not what the pool did.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const read = ids.filter((id) =>
+        world.requests.some((url) => new URL(url).pathname.endsWith(`/people/${id}`)),
+      );
+      // Ten of thirty here, against thirty of thirty before the pool learned to
+      // stop. The exact number is timing and not worth pinning: the failing
+      // straggler costs two round trips before anyone can know, and the
+      // neighbours finish the reads they had already started. What must not
+      // happen is the pool walking the rest of the list.
+      expect(read.length).toBeLessThan(ids.length / 2);
+    });
   });
 
   describe('caching', () => {

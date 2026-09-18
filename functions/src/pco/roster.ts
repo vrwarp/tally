@@ -195,6 +195,22 @@ const MAX_HOUSEHOLD_FETCHES = 8;
  */
 const MAX_INDIVIDUAL_LOOKUPS = 60;
 
+/**
+ * Straggler lookups in flight at once.
+ *
+ * Deliberately the same number as `ALLERGY_CONCURRENCY` further down, and for
+ * the same reason: a few requests overlapping turn a queue of round trips into
+ * something that reads as one wait, while a wide fan-out against an API that
+ * rate-limits only converts the queue into 429s and a longer wait.
+ *
+ * The serial version this replaces was measured against the simulator with
+ * 120ms of injected latency: sixty stragglers added 7.2 seconds of pure
+ * serialisation to a read a counselor is standing at a door waiting on. Worse,
+ * in a rate-limited minute it laid sixty retry ladders end to end, because the
+ * client sleeps on `Retry-After` inside the request.
+ */
+const STRAGGLER_CONCURRENCY = 4;
+
 /* -------------------------------------------------------------------------- */
 /* The roster                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -286,6 +302,34 @@ export function rosterPersonFrom(
 }
 
 /**
+ * What one straggler lookup learned — and nothing it did.
+ *
+ * The lookups run a few at a time (see `STRAGGLER_CONCURRENCY`), so a worker
+ * must not touch the hydration it is contributing to: whichever request came
+ * back first would decide what the roster looks like, and two reads of the same
+ * roster would then differ. Every variant here is data, applied afterwards in
+ * roster order.
+ *
+ * `included` is the raw side-loaded array from the response it came in, kept so
+ * alias collection can be replayed in that same order — `collectAliases`
+ * overwrites, so which record wins for an Attendees UUID two people both claim
+ * has to stay a question about the roster and not about the network. It rides
+ * on the variants that carry no person too, because a body whose `data` was
+ * empty can still side-load the `field_data` the serial loop collected off it.
+ */
+type StragglerOutcome =
+  | { kind: 'found'; personId: string; person: PcoPerson; included?: readonly JsonApiResource[] }
+  | {
+      kind: 'relink';
+      fromPersonId: string;
+      person: PcoPerson;
+      /** The keeper's body. The read of the merged id threw, so it has none. */
+      included?: readonly JsonApiResource[];
+    }
+  | { kind: 'unresolved'; personId: string; included?: readonly JsonApiResource[] }
+  | { kind: 'missing'; personId: string };
+
+/**
  * Turns the Planning Center ids on Tally's roster into people.
  *
  * The membership itself is Tally's — a `students/{id}` document exists for
@@ -340,15 +384,18 @@ async function hydratePeople(
   const missing: string[] = [];
   const relinks: Array<{ fromPersonId: string; toPersonId: string }> = [];
 
-  for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
+  const targets = stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS);
+  const outcomes: StragglerOutcome[] = new Array(targets.length);
+
+  /** One straggler, read and reported. See `StragglerOutcome` for why it applies nothing. */
+  const lookUp = async (personId: string): Promise<StragglerOutcome> => {
     try {
       const body = await client.get<PcoPerson>(`/people/${encodeURIComponent(personId)}`, {
         include: includes,
       });
       const person = Array.isArray(body.data) ? body.data[0] : body.data;
-      collectAliases(body.included);
-      if (person) found.set(personId, person);
-      else unresolved.push(personId);
+      if (person) return { kind: 'found', personId, person, included: body.included };
+      return { kind: 'unresolved', personId, included: body.included };
     } catch (error) {
       /*
        * A deleted person is the ordinary case here — a thing to report, not a
@@ -358,33 +405,85 @@ async function hydratePeople(
        * the caller to make permanent. Only a trail that ends dead — the
        * production log showed a keeper deleted minutes after absorbing seven
        * people — falls through to unresolved.
+       *
+       * A `followPersonLink` that throws is still left to escape, and failing
+       * the whole roster read on it is the deliberate part: that is not a
+       * person who is gone, it is Planning Center refusing to answer, and a
+       * roster that quietly reported half the students as unresolved would be
+       * an outage wearing the clothes of a tidy-up. The pool stops drawing new
+       * stragglers when it happens — see `failed` below.
        */
-      if (!isPersonGoneError(error)) {
-        unresolved.push(personId);
-        continue;
-      }
+      if (!isPersonGoneError(error)) return { kind: 'unresolved', personId };
       const link = await followPersonLink(client, personId, error);
-      if (link.outcome === 'gone') {
-        unresolved.push(personId);
-        missing.push(personId);
-        continue;
-      }
+      if (link.outcome === 'gone') return { kind: 'missing', personId };
       try {
         const keeper = await client.get<PcoPerson>(
           `/people/${encodeURIComponent(link.personId)}`,
           { include: includes },
         );
         const person = Array.isArray(keeper.data) ? keeper.data[0] : keeper.data;
-        collectAliases(keeper.included);
         if (person) {
-          found.set(person.id, person);
-          relinks.push({ fromPersonId: personId, toPersonId: person.id });
-        } else {
-          unresolved.push(personId);
+          return { kind: 'relink', fromPersonId: personId, person, included: keeper.included };
         }
+        return { kind: 'unresolved', personId, included: keeper.included };
       } catch {
-        unresolved.push(personId);
+        return { kind: 'unresolved', personId };
       }
+    }
+  };
+
+  /*
+   * A shared cursor rather than a slice each, so a worker that draws a merged
+   * straggler — two or three requests where its neighbours cost one — does not
+   * hold up a share of the roster it happens to have been dealt.
+   *
+   * `failed` is what keeps the escape path as cheap as the serial version's
+   * was. A `followPersonLink` that throws fails the whole roster read (see
+   * `lookUp` above), and the loop this replaces stopped dead at the straggler
+   * that threw. Workers drawing from a cursor have no such instinct: the throw
+   * rejects `Promise.all` and the read is already lost, but the other three
+   * keep taking targets and read every remaining id — up to sixty more
+   * requests fired at a Planning Center that has just refused to answer, which
+   * is both the least useful moment to spend them and the moment most likely
+   * to turn a bad minute into a rate-limited one. The flag stops new work being
+   * picked up; the throw still propagates, so the read fails exactly as it did
+   * before; and the cost on the way out is the three neighbours finishing the
+   * lookup each had already started, not the rest of the list.
+   */
+  let nextTarget = 0;
+  let failed = false;
+  const lookUpFromCursor = async (): Promise<void> => {
+    while (nextTarget < targets.length && !failed) {
+      const index = nextTarget;
+      nextTarget += 1;
+      try {
+        outcomes[index] = await lookUp(targets[index]);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(STRAGGLER_CONCURRENCY, targets.length) }, lookUpFromCursor),
+  );
+
+  // In roster order, and in the order the serial version did it: the aliases
+  // this body carried, then the person, then what is reported about them.
+  for (const outcome of outcomes) {
+    if (outcome.kind === 'missing') {
+      unresolved.push(outcome.personId);
+      missing.push(outcome.personId);
+      continue;
+    }
+    collectAliases(outcome.included);
+    if (outcome.kind === 'found') {
+      found.set(outcome.personId, outcome.person);
+    } else if (outcome.kind === 'relink') {
+      found.set(outcome.person.id, outcome.person);
+      relinks.push({ fromPersonId: outcome.fromPersonId, toPersonId: outcome.person.id });
+    } else {
+      unresolved.push(outcome.personId);
     }
   }
   unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
@@ -838,7 +937,11 @@ export function allergyNoteCacheKey(baseUrl: string, personId: string): string {
  */
 const MAX_ALLERGY_LOOKUPS = 100;
 
-/** Enough to make a handful of reads feel like one; gentle on a rate limit. */
+/**
+ * Enough to make a handful of reads feel like one; gentle on a rate limit. The
+ * roster's straggler pool is the same number for the same reason — see
+ * `STRAGGLER_CONCURRENCY`, and move them together if either ever moves.
+ */
 const ALLERGY_CONCURRENCY = 4;
 
 /**
