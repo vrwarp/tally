@@ -12,6 +12,7 @@ import {
   format,
   isSameDay,
 } from 'date-fns';
+import { dateFormat, relativeFormat } from '@/lib/intlCache';
 import { chainKey } from '@/lib/materialize';
 import type { EventSeries, TallyEvent } from '@/types';
 
@@ -169,23 +170,11 @@ export interface TimeStrings {
   ) => string;
 }
 
-/**
- * `Intl.DateTimeFormat` is not cheap to construct and these run per row.
- *
- * Keyed on the locale and the option set, which between them are the whole of
- * a formatter's identity. Bounded by the handful of shapes below times three
- * locales, so there is no eviction to think about.
+/*
+ * The formatter cache that used to live here is now `@/lib/intlCache`, imported
+ * above. It moved because `birthday.ts` needed the same bargain and is a leaf
+ * module; the reasoning is written out there.
  */
-const formatters = new Map<string, Intl.DateTimeFormat>();
-
-function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
-  const key = `${locale}|${JSON.stringify(options)}`;
-  const hit = formatters.get(key);
-  if (hit) return hit;
-  const made = new Intl.DateTimeFormat(locale, options);
-  formatters.set(key, made);
-  return made;
-}
 
 /**
  * "Today", "Tomorrow", or the day itself — relative to `now` and nothing else.
@@ -320,7 +309,7 @@ export function formatClock(strings: TimeStrings, date: Date): string {
 export function formatRelative(strings: TimeStrings, date: Date, now: Date = new Date()): string {
   const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
   const magnitude = Math.abs(seconds);
-  const relative = new Intl.RelativeTimeFormat(strings.locale, { numeric: 'always' });
+  const relative = relativeFormat(strings.locale);
 
   if (magnitude < 60) return relative.format(seconds, 'second');
   const minutes = Math.round(seconds / 60);

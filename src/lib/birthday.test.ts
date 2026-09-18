@@ -2,7 +2,7 @@
  * Dates are built with `new Date(y, m, d)` so the suite asserts local
  * wall-clock behaviour and passes in any timezone, like the rest of `lib`.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   birthdayParts,
   birthdayState,
@@ -95,6 +95,37 @@ describe('formatting a birthday', () => {
   it('has nothing to say when there is no birthday', () => {
     expect(formatBirthdayShort(LOCALE, null, MARCH_14)).toBeNull();
     expect(formatBirthdayLong(LOCALE, null)).toBeNull();
+  });
+
+  it('builds one `DateTimeFormat` per shape, not one per row', () => {
+    /*
+     * The roster draws a birthday badge on every row, so a formatter built
+     * inside these two used to be a formatter built five hundred times a
+     * scroll. They go through the cache in `@/lib/intlCache` now.
+     *
+     * A locale nothing else in this file uses, because that cache is
+     * module-level and outlives an `it`: a warm entry would let this pass even
+     * with the construction moved back inline. Six calls across three option
+     * shapes, so three constructions is the right answer — fewer would mean two
+     * shapes had collapsed onto one key and a year had stopped printing.
+     *
+     * The spy forwards through a `function` expression rather than an arrow:
+     * vitest 4 invokes a mocked constructor with `Reflect.construct`, and a
+     * bare `vi.spyOn` hands back an instance with no `format` on it.
+     */
+    const real = globalThis.Intl.DateTimeFormat;
+    const spy = vi
+      .spyOn(globalThis.Intl, 'DateTimeFormat')
+      .mockImplementation(function (locale?: unknown, options?: unknown) {
+        return new real(locale as Intl.LocalesArgument, options as Intl.DateTimeFormatOptions);
+      } as unknown as typeof Intl.DateTimeFormat);
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      expect(formatBirthdayShort('en-NZ', '03-14', MARCH_14)).toBe('14 Mar');
+      expect(formatBirthdayLong('en-NZ', '03-14')).toBe('14 March');
+      expect(formatBirthdayLong('en-NZ', '2011-03-14')).toBe('14 March 2011');
+    }
+    expect(spy).toHaveBeenCalledTimes(3);
   });
 });
 
