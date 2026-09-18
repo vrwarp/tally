@@ -296,6 +296,17 @@ export function useProfileHistory(
 
     return () => {
       cancelled = true;
+      // Released here as well as in the `finally`, which never runs for a
+      // cancelled read: without this, a profile closed mid-read keeps the
+      // sentinel forever and opening the same student again is silently
+      // ignored — a page that loads nothing and never stops saying so.
+      //
+      // Releasing it *here* is safe in a way it is not in `useEventSnapshots`,
+      // which had to do the same job from its `finally` instead. This effect
+      // depends on `key` alone, so it only ever re-runs for a different
+      // question, and freeing the sentinel cannot put the read that is still
+      // out back on the wire.
+      inFlight.current = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

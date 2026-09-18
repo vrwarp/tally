@@ -26,14 +26,34 @@ const cache = new Map<string, EventAttendanceIds>();
  */
 const refused = new Set<string>();
 
+/**
+ * Counts the times this session has been told to forget what it read.
+ *
+ * A read is asked of the world as it was when the question went out, and it can
+ * land long after `invalidateSnapshotCache` fired — somebody editing a past
+ * register on another device is exactly that shape. Writing the registers such a
+ * read is carrying would put the very rows the invalidation was meant to drop
+ * straight back into the cache, where they would be believed for the rest of the
+ * session. So the epoch is captured with the request and compared when the
+ * answer lands: the same number means the answer is still about the world the
+ * question was asked of.
+ */
+let epoch = 0;
+
 /** Drops cached history — call after editing attendance for a past event. */
 export function invalidateSnapshotCache(eventId?: string): void {
   if (eventId) {
     cache.delete(eventId);
     refused.delete(eventId);
+    /* Stryker disable next-line AssignmentOperator: which way the number moves
+     * does not matter — nothing reads it, only whether it is still the one the
+     * request in flight was issued under. */
+    epoch += 1;
   } else {
     cache.clear();
     refused.clear();
+    /* Stryker disable next-line AssignmentOperator: any change, as above. */
+    epoch += 1;
   }
 }
 
@@ -102,24 +122,63 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
     inFlight.current = key;
 
     let cancelled = false;
+    const startedAt = epoch;
     setLoading(true);
 
     fetchAttendanceByEvent(missing)
       .then((result) => {
+        /*
+         * Written down even when nobody is waiting for it any more.
+         *
+         * `cancelled` says the caller's list moved on, which is not the same
+         * question as whether what landed is true. Treating it as if it were
+         * threw away a register that had already been paid for, so the next
+         * screen to ask about that night — the same one scrolling back, or the
+         * grid reopened — paid for it a second time. What actually makes an
+         * answer stale is the cache having been dropped underneath it, and the
+         * epoch is what says that: see the note on it above.
+         */
+        let wrote = false;
+        if (epoch === startedAt) {
+          for (const [eventId, ids] of result.byEvent) {
+            cache.set(eventId, ids);
+            wrote = true;
+          }
+          // Remembered so the next render does not ask again. Nothing is written
+          // to `cache` for these: an absent register and an empty one must not
+          // become the same thing.
+          for (const eventId of result.denied) {
+            refused.add(eventId);
+            wrote = true;
+          }
+        }
         if (cancelled) return;
-        for (const [eventId, ids] of result.byEvent) cache.set(eventId, ids);
-        // Remembered so the next render does not ask again. Nothing is written
-        // to `cache` for these: an absent register and an empty one must not
-        // become the same thing.
-        for (const eventId of result.denied) refused.add(eventId);
         // Stryker disable next-line StringLiteral: anything that is not a
         // request key lets the next failure have its retry, which is the point.
         failedKey.current = '';
         setError(null);
+        /*
+         * Only when the answer moved something, which is not a formality.
+         *
+         * The bump is a dependency of the effect, so it puts this straight back
+         * on the same question — and `missing` is worked out from the cache, so
+         * a read that came back saying nothing about anything it was asked for
+         * leaves `missing` exactly as it was and the whole thing goes round
+         * again, at Firestore's expense, on a screen nobody is watching. That
+         * is the loop the catch below is so careful about, reached from the
+         * happy path.
+         *
+         * `fetchAttendanceByEvent` answers every id with a register or a
+         * refusal, so nothing in this app reaches it. A stub or a service that
+         * stopped keeping that promise would, and the right response to being
+         * told nothing is to stop asking rather than to ask faster. Until the
+         * sentinel was released for an abandoned read this was unreachable for
+         * a second reason, and that reason was a bug.
+         */
         // Stryker disable next-line ArithmeticOperator: this is a dependency
         // of the effect and the memo below and nothing else, so any change
         // re-runs them and the direction is arbitrary.
-        setVersion((current) => current + 1);
+        if (wrote) setVersion((current) => current + 1);
       })
       .catch((cause: Error) => {
         if (cancelled) return;
@@ -149,9 +208,38 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
         }
       })
       .finally(() => {
-        if (cancelled) return;
-        /* Stryker disable next-line StringLiteral: a sentinel, as above. */
-        inFlight.current = '';
+        /*
+         * Released for a read whose caller moved on as well, which it was not.
+         *
+         * The sentinel says a read for this question is genuinely out, and this
+         * is the moment it stops being out. Returning above this left it set
+         * for the rest of the session, so asking the same question again — the
+         * attendance grid shut mid-read and opened again is one mis-tap — was
+         * dropped on the floor: no read, no spinner, and a screen that sits
+         * empty while claiming to have finished.
+         *
+         * Only if it is still this request's, because a later run may have
+         * claimed it for a question that is still in flight, and clearing that
+         * one would send the same read out twice.
+         */
+        if (inFlight.current === key) {
+          /* Stryker disable next-line StringLiteral: a sentinel, as above. */
+          inFlight.current = '';
+        }
+        if (cancelled) {
+          /*
+           * And run the effect again now that it is free, because by here the
+           * caller may well have come back to this very question and been
+           * turned away at the sentinel. This is the only bump that can happen
+           * while another read is out, and it is safe: the run it wakes asks
+           * the sentinel first, so a question still being read is not read
+           * twice. On a hook that has since unmounted it is a no-op in React
+           * 18 and later.
+           */
+          /* Stryker disable next-line ArithmeticOperator: any change, as above. */
+          setVersion((current) => current + 1);
+          return;
+        }
         setLoading(false);
       });
 
