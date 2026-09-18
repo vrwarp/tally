@@ -65,9 +65,10 @@ const UNDO_MS = 8000;
 /**
  * What the add-students dialog works from while it is shut.
  *
- * One shared array rather than a fresh `[]` on every closed render, so the two
- * memos below hand back the same reference each time and nothing downstream
- * mistakes "still shut" for "the list changed".
+ * One shared array rather than a fresh `[]` on every closed render. Nothing
+ * downstream compares these by identity, so this buys an allocation rather
+ * than a correctness property — but a dialog that is shut almost all the time
+ * may as well hand back the same empty list it handed back last time.
  */
 const EMPTY_STUDENTS: readonly Student[] = [];
 

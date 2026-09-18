@@ -1984,16 +1984,19 @@ describe('a release and the chain MIA row', () => {
     expect(computeMia([student], snapshots, settings, [], [release])).toEqual([]);
   });
 
-  it('is asked last of the four guards, and the answer is the same at either end', () => {
+  it('resolves a released student whether or not the thresholds reach the check', () => {
     /*
      * The release check is the only one of `computeMiaFor`'s four guards that
      * reads the release record; the other three are arithmetic over nights
      * already in hand, and on a full directory they discard all but a handful
-     * of the roster. So it is asked after them. That is safe only because all
+     * of the roster. So it is asked after them, which is safe only because all
      * four are pure predicates over `continue` and a conjunction has the same
-     * answer in any order, and this pins both ends of it: the released student
-     * the thresholds drop before the check is ever reached, and the released
-     * student who reaches it.
+     * answer in any order.
+     *
+     * What this can see is the answer, not the order — nothing observable says
+     * which guard ran first. So it pins both ends: the released student the
+     * thresholds drop before the check is ever reached, and the released
+     * student who reaches it. Reordering the guards has to leave both alone.
      */
     const events = fridays(4);
     const releaseFor = (id: string) =>

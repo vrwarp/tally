@@ -102,9 +102,11 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
    * There are 24 of them and each one is a whole palette rotation — an oklch
    * round trip through `kioskPalette` for a single hex. This field lives inside
    * the event editor's form, which re-renders on every keystroke in the name
-   * box, so typing a gathering's name was paying for 24 rotations per character
-   * on a phone that is already slow. Nothing about the swatches depends on what
-   * is being typed, so they are cached on the theme instead.
+   * box, so *with the picker open* typing a gathering's name was paying for 24
+   * rotations per character on a phone that is already slow. Shut, the grid is
+   * not rendered at all and never was, so it cost nothing then and costs
+   * nothing now. Nothing about the swatches depends on what is being typed, so
+   * they are cached on the theme instead.
    *
    * `open` is in the callback rather than around the hook because a hook cannot
    * be called conditionally, and the grid only exists inside the `open ?` branch

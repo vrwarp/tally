@@ -100,8 +100,10 @@ describe('formatting a birthday', () => {
   it('builds one `DateTimeFormat` per shape, not one per row', () => {
     /*
      * The roster draws a birthday badge on every row, so a formatter built
-     * inside these two used to be a formatter built five hundred times a
-     * scroll. They go through the cache in `@/lib/intlCache` now.
+     * inside these two used to be a formatter built five hundred times per
+     * render of the list — and the list re-renders on every keystroke in
+     * search, since there is no virtualisation and nothing is debounced. They
+     * go through the cache in `@/lib/intlCache` now.
      *
      * A locale nothing else in this file uses, because that cache is
      * module-level and outlives an `it`: a warm entry would let this pass even

@@ -150,10 +150,11 @@ function ContactAdultButton({
       {/*
         Mounted only while it is open, which is about the list rather than the
         dialog. A closed `Modal` still builds its whole subtree — the digits,
-        Copy number, three `ActionLink`s and the eight interpolated aria
-        strings behind them — and a call list is ten of these rows at once, so
-        ten leaders' worth of hidden dialog was being rendered on a phone to
-        produce one that somebody eventually opened.
+        Copy number, an `ActionLink` per way of reaching the adult, and the
+        nine translation lookups behind them, four of which interpolate — and a
+        call list is ten of these rows at once, so ten leaders' worth of hidden
+        dialog was being rendered on a phone to produce one that somebody
+        eventually opened.
 
         `open` as a bare literal, the way `ReleaseDialog` and the students page
         write it, rather than `open={open}` inside the branch: there is then no

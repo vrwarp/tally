@@ -177,9 +177,11 @@ describe('the add-students sheet', () => {
     await user.click(screen.getByRole('button', { name: 'Add students' }));
 
     expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
-    // And the list the sheet reads is the whole list on that very first render,
-    // not a placeholder that fills in a frame later — a leader who opens this
-    // with students left to add must never be told everybody is already on it.
+    // And a leader who opens this with students left to add is not told that
+    // everybody is already on the list. (What pins the list being there in the
+    // opening render rather than a frame later is `addOpen` being a dependency
+    // of the memo, not this assertion — Testing Library flushes effects before
+    // it runs, so a one-frame placeholder would slip past it.)
     expect(screen.queryByText('Everyone is already on the list')).not.toBeInTheDocument();
     // Opening still puts the caret in the search box: `Modal` looks for the
     // first field in a layout effect keyed on `open`, which runs after the

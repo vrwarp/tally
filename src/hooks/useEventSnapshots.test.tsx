@@ -241,9 +241,9 @@ describe('useEventSnapshots', () => {
      * answer, on a screen nobody is watching.
      *
      * `fetchAttendanceByEvent` answers every id with a register or a refusal,
-     * so nothing in this app produces that answer. A stub does, and until an
-     * abandoned read released the sentinel this was unreachable for a second
-     * reason, and that reason was a bug.
+     * so nothing in this app produces that answer — a stub does. The loop is
+     * real all the same: this exact test against the code before the guard
+     * went in reads five hundred times in fifty milliseconds.
      */
     fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set<string>() });
 
@@ -737,20 +737,65 @@ describe('useEventSnapshots', () => {
       await act(async () => {
         land({
           byEvent: new Map([['evt_1', { present: new Set(['stale_1']), checkedOut: new Set() }]]),
-        denied: new Set<string>(),
+          denied: new Set<string>(),
         });
       });
+
+      /*
+       * The hook that asked is still on screen, and this is the half that was
+       * missed: dropping the answer leaves the night unread, and nothing else
+       * is going to ask on its behalf — the list has not changed, so the effect
+       * has no reason to run again. It has to go back for it itself, or it sits
+       * at `loading: false` with nothing to show for the rest of the session.
+       */
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(first.result.current.snapshots).toHaveLength(1));
+      expect(first.result.current.snapshots[0]!.presentStudentIds.has('stale_1')).toBe(false);
       first.unmount();
 
-      // Nothing of that read survived, so the next screen to ask about the
-      // night pays for it — and is shown the register as it is now, not the one
+      // And nothing of the discarded read survived into the cache, so a screen
+      // arriving later is shown the register as it is now rather than the one
       // the invalidation existed to throw away.
       const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
 
       await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
-      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
       expect(result.current.snapshots[0]!.presentStudentIds.has('stale_1')).toBe(false);
       expect(result.current.snapshots[0]!.presentStudentIds.has('student-of-evt_1')).toBe(true);
+    });
+
+    it('goes back for a night dropped by an invalidation about some other one', async () => {
+      /*
+       * The realistic shape, and the one that makes the case above more than a
+       * curiosity. The epoch is one number for the whole cache, but
+       * `invalidateSnapshotCache` is called with a single id: a counselor
+       * tapping a name fires `forgetCachedHistory` for *tonight*, and any
+       * history read for past nights that happens to be in the air is thrown
+       * away with it. Those nights are still wanted, so the hook has to ask
+       * again rather than quietly give up on them.
+       */
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+
+      const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      invalidateSnapshotCache('evt_tonight');
+
+      await act(async () => {
+        land({
+          byEvent: new Map([['evt_1', { present: new Set(['stale_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+      });
+
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
+      expect(result.current.loading).toBe(false);
     });
 
     it('shows what it wrote to a hook that has come back to that night', async () => {

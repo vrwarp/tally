@@ -158,27 +158,37 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
         failedKey.current = '';
         setError(null);
         /*
-         * Only when the answer moved something, which is not a formality.
+         * When the answer moved something, or when it was thrown away.
          *
          * The bump is a dependency of the effect, so it puts this straight back
-         * on the same question — and `missing` is worked out from the cache, so
-         * a read that came back saying nothing about anything it was asked for
-         * leaves `missing` exactly as it was and the whole thing goes round
-         * again, at Firestore's expense, on a screen nobody is watching. That
-         * is the loop the catch below is so careful about, reached from the
-         * happy path.
+         * on the same question. Two very different cases want that and one
+         * badly does not, so the condition has to tell them apart.
          *
+         * A discarded answer — the epoch moved while it was out — has left the
+         * cache exactly as it was, so the night is still unread and nobody is
+         * going to ask again on its behalf: `key` has not changed, and the
+         * effect only re-runs when `key` or `version` does. Without the bump
+         * the hook sits at `loading: false` with no snapshots for the rest of
+         * the session, which is the very wedge the sentinel fix above exists to
+         * prevent. It is reachable from an ordinary tap: `forgetCachedHistory`
+         * on the check-in screen invalidates tonight's gathering, and the epoch
+         * is one number for the whole cache, so a history read for *past*
+         * nights that happens to be in the air is discarded with it.
+         *
+         * An answer that moved nothing while the epoch held still is the case
+         * that must not bump. `missing` is worked out from the cache, so it
+         * comes back identical and the effect asks the same question again
+         * immediately, at Firestore's expense, on a screen nobody is watching.
          * `fetchAttendanceByEvent` answers every id with a register or a
-         * refusal, so nothing in this app reaches it. A stub or a service that
-         * stopped keeping that promise would, and the right response to being
-         * told nothing is to stop asking rather than to ask faster. Until the
-         * sentinel was released for an abandoned read this was unreachable for
-         * a second reason, and that reason was a bug.
+         * refusal so nothing in this app produces it, but the right response to
+         * being told nothing is to stop asking rather than to ask faster — and
+         * a stub that answers nothing reads five hundred times in fifty
+         * milliseconds without this.
          */
         // Stryker disable next-line ArithmeticOperator: this is a dependency
         // of the effect and the memo below and nothing else, so any change
         // re-runs them and the direction is arbitrary.
-        if (wrote) setVersion((current) => current + 1);
+        if (wrote || epoch !== startedAt) setVersion((current) => current + 1);
       })
       .catch((cause: Error) => {
         if (cancelled) return;

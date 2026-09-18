@@ -151,10 +151,11 @@ describe('KioskThemeField', () => {
   /**
    * This field sits inside the event editor's form, which re-renders on every
    * keystroke in the title box. The swatch grid is 24 circles and each one was
-   * a fresh `painted()` — 24 palette rotations per character typed, on the
-   * phones a leader actually fills this form in on. Nothing about a swatch
-   * depends on what is being typed, so the right number of rotations for a
-   * keystroke is none.
+   * a fresh `painted()` — so with the picker open, 24 palette rotations per
+   * character typed, on the phones a leader actually fills this form in on.
+   * With it shut the grid is not rendered and the cost was always zero, which
+   * is why this test opens it first. Nothing about a swatch depends on what is
+   * being typed, so the right number of rotations for a keystroke is none.
    */
   it('does not repaint the grid when something else in the form changes', async () => {
     const user = userEvent.setup();
