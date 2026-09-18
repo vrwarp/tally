@@ -18,7 +18,7 @@ import path from 'node:path';
 import { LOCALES } from '@/lib/locales';
 // @ts-expect-error — plain Node ESM, deliberately untyped: it has to run
 // standalone as `--check` with no toolchain around it.
-import { KIOSK_NAMESPACES, stale as staleKioskSlices, usedNamespaces } from '../scripts/sync-kiosk-messages.mjs';
+import { APP_EXCLUDED_NAMESPACES, KIOSK_NAMESPACES, stale as staleSlices, usedNamespaces } from '../scripts/sync-kiosk-messages.mjs';
 import {
   DELIBERATELY_UNPINNED,
   QUOTED_IN,
@@ -225,7 +225,7 @@ describe('message catalogues', () => {
  */
 describe('the kiosk message slice', () => {
   it('is in sync with the catalogues it is cut from', () => {
-    expect(staleKioskSlices()).toEqual([]);
+    expect(staleSlices('kiosk')).toEqual([]);
   });
 
   it('carries every namespace the kiosk actually asks for', () => {
@@ -238,6 +238,84 @@ describe('the kiosk message slice', () => {
     for (const namespace of KIOSK_NAMESPACES as string[]) {
       expect(en, `KIOSK_NAMESPACES lists ${namespace}`).toHaveProperty(namespace);
     }
+  });
+});
+
+/**
+ * The app's slice of the catalogue.
+ *
+ * `messages/app/*.json` is the other half of the same cut: the catalogue minus
+ * the namespaces only a lobby screen renders. The whole English catalogue is
+ * 132 kB of compiled messages in the entry chunk, about half of `main-*.js`,
+ * and Vite cannot tree-shake keys out of a JSON module — so the only way not to
+ * ship a string is not to put it in the file.
+ *
+ * Cutting bytes out of what a screen can render is the kind of saving that pays
+ * for itself right up until it doesn't, so the direction that matters here is
+ * the third test: a namespace on the excluded list that some non-kiosk screen
+ * turns out to reach would render `Register.labelFirstName` at a counselor
+ * mid-check-in. That is the failure this block exists to prevent.
+ */
+describe('the app message slice', () => {
+  it('is in sync with the catalogues it is cut from', () => {
+    expect(staleSlices('app')).toEqual([]);
+  });
+
+  /*
+   * Between them the two slices have to account for the whole catalogue. A
+   * namespace on neither list is a namespace no shipped catalogue carries: it
+   * would still type-check, because `src/types/messages.d.ts` types keys
+   * against the full `messages/en.json`, and it would still pass every parity
+   * test — and then render its own key at whoever opened that screen.
+   */
+  it('leaves no namespace out of both slices', () => {
+    const carried = new Set([
+      ...Object.keys(en!).filter(
+        (namespace) => !(APP_EXCLUDED_NAMESPACES as string[]).includes(namespace),
+      ),
+      ...(KIOSK_NAMESPACES as string[]),
+    ]);
+    const orphans = Object.keys(en!).filter((namespace) => !carried.has(namespace));
+    expect(orphans, 'namespaces in neither the app slice nor the kiosk slice').toEqual([]);
+  });
+
+  it('excludes only namespaces the main app never reaches', () => {
+    /*
+     * `src/lib/translationState.ts` is skipped, and only it. That module is the
+     * translation pipeline's own bookkeeping — `SAME_VALUE_GROUPS` and
+     * `QUOTED_IN` name keys across the whole catalogue as *data*, so every one
+     * of these namespaces appears there as a quoted string while nothing in it
+     * ever renders a message. Scanning it would make this test unable to fail.
+     */
+    const SKIPPED = path.join('src', 'lib', 'translationState.ts');
+
+    function sources(dir: string, found: string[] = []): string[] {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (full.endsWith(path.join('src', 'kiosk'))) continue;
+          sources(full, found);
+        } else if (/\.tsx?$/.test(entry.name) && !full.endsWith(SKIPPED)) {
+          found.push(full);
+        }
+      }
+      return found;
+    }
+
+    const files = sources(path.join(process.cwd(), 'src'));
+    const reached: string[] = [];
+    for (const namespace of APP_EXCLUDED_NAMESPACES as string[]) {
+      const asks = new RegExp(`useTranslations\\(\\s*'${namespace}'`);
+      const literal = new RegExp(`'${namespace}\\.`);
+      for (const file of files) {
+        const source = fs.readFileSync(file, 'utf8');
+        if (asks.test(source) || literal.test(source)) {
+          reached.push(`${namespace} — ${path.relative(process.cwd(), file)}`);
+        }
+      }
+    }
+
+    expect(reached, 'excluded from messages/app but reached outside src/kiosk').toEqual([]);
   });
 });
 
