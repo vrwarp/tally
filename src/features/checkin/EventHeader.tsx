@@ -22,7 +22,7 @@
  * reason to open the same sheet — a gathering that has refused three check-ins
  * — and two sheets for one question would be two answers.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge, EventIcon } from '@/components/ui';
 import { useData } from '@/context/dataContext';
@@ -66,7 +66,23 @@ export interface EventHeaderProps {
   onAccessSheetChange: (event: TallyEvent | null) => void;
 }
 
-export function EventHeader({
+/**
+ * Memoised, because the bar sits beside the search box.
+ *
+ * Every keystroke a counselor types re-renders the page that owns both, and
+ * this header is not cheap to reconcile: it carries the select over every
+ * gathering on the calendar and, below it, the whole access sheet — which is
+ * mounted shut and stays that way for almost every render of almost every
+ * night. None of that depends on what is in the search box, so the comparison
+ * is worth its cost. The props are the page's own state and a handful of
+ * counts; `onAccessSheetChange` is the one that has to stay stable for this to
+ * hold, and it does.
+ *
+ * Kept as a named function expression so it is still `EventHeader` in a stack
+ * trace and in the profiler, which is the house form — see `StudentRow` and
+ * `RosterList`.
+ */
+export const EventHeader = memo(function EventHeader({
   event,
   selectableEvents,
   now,
@@ -365,4 +381,4 @@ export function EventHeader({
       />
     </div>
   );
-}
+});
