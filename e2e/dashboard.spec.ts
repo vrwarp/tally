@@ -105,11 +105,13 @@ test.describe('dashboard', () => {
        *
        * The first of those used to be the Call and Text links themselves, on
        * the row. They live in a dialog now — the row carries one button, so a
-       * call list stays a list at 390px — and `Modal` keeps its children
-       * mounted inside a closed `<dialog>`, which is exactly the shape of a
-       * false pass: the links are *in the DOM* on every row and visible on
-       * none. So the row's claim is the button, and the claim that the button
-       * leads somewhere is made once, below, by opening it.
+       * call list stays a list at 390px — and the row does not render that
+       * dialog until somebody opens it, so there is nothing of it in the DOM
+       * to assert against here in the first place. The claim a row makes is
+       * its button: that there is a way to reach this family and one tap gets
+       * to it. That the tap arrives somewhere is a claim about the
+       * dialog rather than about any particular row, so it is made once,
+       * below, by opening one.
        */
       const reachOut = block.getByRole('button', { name: `Contact the adult for ${name}` });
       const addOne = block.getByRole('button', {

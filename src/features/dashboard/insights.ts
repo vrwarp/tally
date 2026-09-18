@@ -372,17 +372,6 @@ export function computeMiaFor(
   for (const student of students) {
     if (student.status !== 'active') continue;
 
-    /*
-     * A standing release resolves the row, unconditionally — whatever the
-     * dates of the misses. The release is the answer to the question the row
-     * asks, and the act is usually performed *late*, from the row itself, so
-     * scoping this to misses after `releasedAt` would make the primary
-     * gesture fail in the primary case. The student's own attendance at or
-     * after the release stands it down (`isInertRelease`), which is what
-     * restores them to this computation when they come back.
-     */
-    if (standingReleaseIn(gathering, student, transitions)) continue;
-
     const { consecutiveMisses, lastAttended, eligible, wasRegular } = standingIn(
       gathering,
       student,
@@ -395,6 +384,22 @@ export function computeMiaFor(
     // Sunday School, and everyone who dropped in on one Sunday is missing from
     // the seven Sundays they never intended to be at.
     if (!wasRegular || !lastAttended) continue;
+
+    /*
+     * A standing release resolves the row, unconditionally — whatever the
+     * dates of the misses. The release is the answer to the question the row
+     * asks, and the act is usually performed *late*, from the row itself, so
+     * scoping this to misses after `releasedAt` would make the primary
+     * gesture fail in the primary case. The student's own attendance at or
+     * after the release stands it down (`isInertRelease`), which is what
+     * restores them to this computation when they come back.
+     *
+     * Asked last of the four, because it is the only one that scans the
+     * release record: the other three are arithmetic over nights already in
+     * hand and discard all but a handful of the roster, and a conjunction of
+     * pure predicates has the same answer in any order.
+     */
+    if (standingReleaseIn(gathering, student, transitions)) continue;
 
     results.push({
       student,
@@ -465,16 +470,37 @@ export function computeUnseen(
   const oneOffs = oneOffSnapshots(snapshots);
   const gatherings = groupByGathering(snapshots);
   const byChain = new Map(gatherings.map((gathering) => [gathering.key, gathering.snapshots]));
+  /*
+   * Which students the release record says anything at all about, built once
+   * for the whole call rather than rediscovered per student.
+   *
+   * The block below is the expensive one — a filter over every transition, an
+   * `isInertRelease` scan of a chain's nights for each survivor, and a sort —
+   * and on a 500-name directory it ran for all 500 to find the handful who
+   * have ever been released. Ids only, so the membership test mirrors
+   * `transitionsFor`'s own `new Set([student.id, ...mergedFromStudentIds])`
+   * exactly, merged-id asymmetry included.
+   */
+  const releasedIds = new Set(transitions.map((transition) => transition.studentId));
 
   const results: MiaStudent[] = [];
 
   for (const student of students) {
     if (student.status !== 'active') continue;
 
-    const standing = transitionsFor(student, transitions)
-      .filter((release) => !isInertRelease(release, byChain.get(release.chainKey), student.id))
-      .sort((a, b) => b.releasedAt.getTime() - a.releasedAt.getTime());
-    const governing = standing[0] ?? null;
+    const hasRelease =
+      releasedIds.has(student.id) ||
+      (student.mergedFromStudentIds ?? []).some((id) => releasedIds.has(id));
+    /*
+     * Null in exactly the cases the filter would have produced an empty array
+     * from — a student no transition names has nothing to be governed by — so
+     * skipping the work is not a shortcut through a different answer.
+     */
+    const governing = hasRelease
+      ? (transitionsFor(student, transitions)
+          .filter((release) => !isInertRelease(release, byChain.get(release.chainKey), student.id))
+          .sort((a, b) => b.releasedAt.getTime() - a.releasedAt.getTime())[0] ?? null)
+      : null;
 
     // Resolved. Somebody said this family is no longer with us, and a resolved
     // family must not reappear on a call list next September because their old

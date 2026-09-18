@@ -147,73 +147,91 @@ function ContactAdultButton({
         {t('contactAdult')}
       </Button>
 
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={heading}
-        description={t('about', { name })}
-        size="sm"
-        /*
-          The way out is the quietest thing here, not the loudest.
+      {/*
+        Mounted only while it is open, which is about the list rather than the
+        dialog. A closed `Modal` still builds its whole subtree — the digits,
+        Copy number, three `ActionLink`s and the eight interpolated aria
+        strings behind them — and a call list is ten of these rows at once, so
+        ten leaders' worth of hidden dialog was being rendered on a phone to
+        produce one that somebody eventually opened.
 
-          `Modal`'s footer gives its last child double width, so a lone
-          `secondary` Close became the widest, lowest, most thumb-reachable
-          object in the sheet — on a dialog whose whole job is producing a phone
-          call, with Call and Text as two half-width pills above it. Ghost, and
-          the header's × offers the same escape.
-        */
-        footer={
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            {tCommon('close')}
-          </Button>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          {phone ? (
-            <div className="flex flex-col gap-3">
-              {/* Selectable, and the largest thing in the dialog: on a laptop
-                  this is the answer, not a fallback for one — which is also why
-                  it can be taken in one press rather than triple-clicked into a
-                  softphone. */}
-              <p className="text-center text-xl font-semibold tabular-nums text-ink-50">
-                {formatPhone(phone)}
-              </p>
-              <Button variant="ghost" size="sm" onClick={copyNumber}>
-                {t('copyNumber')}
-              </Button>
-              <div className="flex gap-2 [&>*]:flex-1">
+        `open` as a bare literal, the way `ReleaseDialog` and the students page
+        write it, rather than `open={open}` inside the branch: there is then no
+        state in which a mounted `Modal` is told it is closed, and the two ways
+        out become one. `Modal`'s layout-effect cleanup closes the `<dialog>`
+        and arms the trailing-click guard while the element is still in the
+        document — the case `Modal` documents for `ReleaseDialog` — so
+        unmounting dismisses exactly as `open={false}` did.
+      */}
+      {open ? (
+        <Modal
+          open
+          onClose={() => setOpen(false)}
+          title={heading}
+          description={t('about', { name })}
+          size="sm"
+          /*
+            The way out is the quietest thing here, not the loudest.
+
+            `Modal`'s footer gives its last child double width, so a lone
+            `secondary` Close became the widest, lowest, most thumb-reachable
+            object in the sheet — on a dialog whose whole job is producing a phone
+            call, with Call and Text as two half-width pills above it. Ghost, and
+            the header's × offers the same escape.
+          */
+          footer={
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              {tCommon('close')}
+            </Button>
+          }
+        >
+          <div className="flex flex-col gap-4">
+            {phone ? (
+              <div className="flex flex-col gap-3">
+                {/* Selectable, and the largest thing in the dialog: on a laptop
+                    this is the answer, not a fallback for one — which is also why
+                    it can be taken in one press rather than triple-clicked into a
+                    softphone. */}
+                <p className="text-center text-xl font-semibold tabular-nums text-ink-50">
+                  {formatPhone(phone)}
+                </p>
+                <Button variant="ghost" size="sm" onClick={copyNumber}>
+                  {t('copyNumber')}
+                </Button>
+                <div className="flex gap-2 [&>*]:flex-1">
+                  <ActionLink
+                    href={`tel:${dialable(phone)}`}
+                    label={t('callAria', { contact: inSentence, name, phone: formatPhone(phone) })}
+                    icon="📞"
+                  >
+                    {tCommon('call')}
+                  </ActionLink>
+                  <ActionLink
+                    href={`sms:${dialable(phone)}`}
+                    label={t('textAria', { contact: inSentence, name, phone: formatPhone(phone) })}
+                    icon="💬"
+                  >
+                    {tCommon('text')}
+                  </ActionLink>
+                </div>
+              </div>
+            ) : null}
+
+            {email ? (
+              <div className="flex flex-col gap-3">
+                <p className="break-all text-center text-sm text-ink-200">{email}</p>
                 <ActionLink
-                  href={`tel:${dialable(phone)}`}
-                  label={t('callAria', { contact: inSentence, name, phone: formatPhone(phone) })}
-                  icon="📞"
+                  href={`mailto:${email}`}
+                  label={t('emailAria', { contact: inSentence, name, email })}
+                  icon="✉"
                 >
-                  {tCommon('call')}
-                </ActionLink>
-                <ActionLink
-                  href={`sms:${dialable(phone)}`}
-                  label={t('textAria', { contact: inSentence, name, phone: formatPhone(phone) })}
-                  icon="💬"
-                >
-                  {tCommon('text')}
+                  {tCommon('email')}
                 </ActionLink>
               </div>
-            </div>
-          ) : null}
-
-          {email ? (
-            <div className="flex flex-col gap-3">
-              <p className="break-all text-center text-sm text-ink-200">{email}</p>
-              <ActionLink
-                href={`mailto:${email}`}
-                label={t('emailAria', { contact: inSentence, name, email })}
-                icon="✉"
-              >
-                {tCommon('email')}
-              </ActionLink>
-            </div>
-          ) : null}
-        </div>
-      </Modal>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 }
