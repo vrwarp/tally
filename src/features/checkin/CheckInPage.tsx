@@ -364,9 +364,11 @@ export function CheckInPage() {
    * still holds the old one's records — and without the filter that render
    * would pin the previous gathering's students onto this one.
    *
-   * Rebuilding the set only when something is actually added keeps the
-   * identity stable, so a snapshot that says nothing new does not rebuild the
-   * roster underneath it.
+   * Copied only when something is actually added, so the set keeps its
+   * identity across a snapshot that says nothing new. That is thrift in this
+   * derivation alone and nothing more: `useAttendance` hands the roster memo a
+   * fresh array on every snapshot regardless, so the rebuild below happens
+   * either way.
    */
   const pinnedRef = useRef<{ eventId: string | null; ids: ReadonlySet<string> }>({
     eventId: null,

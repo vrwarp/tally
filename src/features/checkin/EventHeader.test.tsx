@@ -311,3 +311,116 @@ describe('the select', () => {
     expect(within(dialog()).getByText('Sam Okafor')).toBeInTheDocument();
   });
 });
+
+/**
+ * The memo, proven by counting rather than by looking at the wrapper.
+ *
+ * This header sits beside the search box on the check-in screen, so every
+ * letter a counselor types re-renders its parent — and the header carries the
+ * select over the whole calendar and the access sheet below it. The bail-out
+ * is what keeps that off the keystroke path, and nothing about the rendered
+ * output says whether it happened, so the tests below need something the
+ * header asks for once it has started rendering.
+ *
+ * `canWork` is that something: the select asks it about every gathering it is
+ * offered, on every render, to decide which ones go under "Not yours". Its
+ * call count is therefore a render counter, and what these assert is the
+ * shape of the count — that it stops growing when nothing this component was
+ * given has changed — rather than any particular number of calls per render.
+ */
+describe('the memo', () => {
+  /*
+   * The props are module constants and the context values are built once,
+   * outside the component that re-renders. That is the whole point of the
+   * harness: a memo only holds if the parent hands back the same props, and a
+   * `selectableEvents={[...]}` literal or a fresh context object rebuilt on
+   * each tick would defeat it here in a way it is not defeated on the page —
+   * where `CheckInPage` holds all of these steady.
+   */
+  const everyGathering = [friday, sunday, wednesday];
+
+  function mountBesideARepaintingParent() {
+    const canWork = vi.fn(() => true);
+    const data = {
+      access: new Map<string, EventAccess>(),
+      events: everyGathering,
+      canWork,
+    } as unknown as DataContextValue;
+    const auth = {
+      user: { uid: 'miriam' },
+      profile: team[0],
+      can: () => true,
+    } as unknown as AuthContextValue;
+    const toast: ToastContextValue = { toasts: [], show: toastShown, dismiss: vi.fn() };
+
+    /** Stands in for the search box: state of the parent's that is not the header's. */
+    let type: (() => void) | null = null;
+    /** And one prop of the header's own, so the counter is shown to move at all. */
+    let arrive: (() => void) | null = null;
+
+    function Page() {
+      const [query, setQuery] = useState('');
+      const [present, setPresent] = useState(3);
+      const [accessSheet, setAccessSheet] = useState<TallyEvent | null>(null);
+      type = () => setQuery((current) => `${current}a`);
+      arrive = () => setPresent((current) => current + 1);
+      return (
+        <>
+          <input aria-label="Search" value={query} readOnly />
+          <EventHeader
+            event={friday}
+            selectableEvents={everyGathering}
+            now={NOW}
+            present={present}
+            eligible={12}
+            accessSheet={accessSheet}
+            onAccessSheetChange={setAccessSheet}
+          />
+        </>
+      );
+    }
+
+    render(
+      <AuthContext.Provider value={auth}>
+        <DataContext.Provider value={data}>
+          <ToastContext.Provider value={toast}>
+            <MemoryRouter>
+              <Page />
+            </MemoryRouter>
+          </ToastContext.Provider>
+        </DataContext.Provider>
+      </AuthContext.Provider>,
+    );
+
+    return {
+      canWork,
+      type: () => act(() => type?.()),
+      arrive: () => act(() => arrive?.()),
+    };
+  }
+
+  it('sits out a parent render that changes none of its props', () => {
+    const { canWork, type } = mountBesideARepaintingParent();
+    const drawn = canWork.mock.calls.length;
+    expect(drawn).toBeGreaterThan(0);
+
+    type();
+
+    // The parent really did re-render — the letter is on screen — and the
+    // header did not go round again for it.
+    expect(screen.getByLabelText('Search')).toHaveValue('a');
+    expect(canWork.mock.calls.length).toBe(drawn);
+  });
+
+  it('still redraws when a count it is given actually changes', () => {
+    const { canWork, arrive } = mountBesideARepaintingParent();
+    const drawn = canWork.mock.calls.length;
+
+    arrive();
+
+    // The other half of the claim: a memo that never re-rendered would pass
+    // the test above while leaving the header reading "3 of 12" all night.
+    expect(canWork.mock.calls.length).toBeGreaterThan(drawn);
+    expect(screen.getByText('4 of 12 students checked in')).toBeInTheDocument();
+  });
+});
