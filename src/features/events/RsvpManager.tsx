@@ -62,6 +62,15 @@ const STATUS_OPTIONS: { value: RsvpStatus; label: 'statusYes' | 'statusMaybe' | 
  */
 const UNDO_MS = 8000;
 
+/**
+ * What the add-students dialog works from while it is shut.
+ *
+ * One shared array rather than a fresh `[]` on every closed render, so the two
+ * memos below hand back the same reference each time and nothing downstream
+ * mistakes "still shut" for "the list changed".
+ */
+const EMPTY_STUDENTS: readonly Student[] = [];
+
 interface RsvpRow {
   rsvp: Rsvp;
   /** Null when the student record is gone but the RSVP document survived. */
@@ -87,8 +96,21 @@ function AddStudentsModal({
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [saving, setSaving] = useState(false);
 
-  const matcher = createSearchMatcher(query);
-  const visible = candidates.filter((student) => matcher.matches(student.searchName));
+  /*
+   * Nothing is filtered, and nothing below is rendered, until somebody opens this.
+   *
+   * The `<dialog>` stays mounted so `Modal` keeps its layout effect, its
+   * dirty-tracking listener and its trailing-click guard — but a mounted shut
+   * dialog was still building a matcher and walking all ~500 candidates on every
+   * render of the RSVP card, including every status tap on a row, for a list
+   * nobody was looking at. On the old Androids this runs on that is real time
+   * spent on the one screen that has to stay quick.
+   */
+  const visible = useMemo(() => {
+    if (!open) return EMPTY_STUDENTS;
+    const matcher = createSearchMatcher(query);
+    return candidates.filter((student) => matcher.matches(student.searchName));
+  }, [open, candidates, query]);
 
   const toggle = (studentId: string) => {
     setSelected((current) => {
@@ -138,72 +160,85 @@ function AddStudentsModal({
         </>
       }
     >
-      <div className="flex flex-col gap-3">
-        <input
-          type="search"
-          inputMode="search"
-          autoCapitalize="off"
-          autoCorrect="off"
-          autoComplete="off"
-          spellCheck={false}
-          aria-label={t('searchAria')}
-          placeholder={t('searchPlaceholder')}
-          value={query}
-          onChange={(changed) => setQuery(changed.target.value)}
-          className="min-h-12 w-full rounded-xl bg-ink-950 px-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
-        />
+      {/*
+        The whole sheet, only once it is up.
 
-        {visible.length === 0 ? (
-          <EmptyState
-            title={candidates.length === 0 ? t('allAddedTitle') : t('noMatchTitle')}
-            description={
-              candidates.length === 0
-                ? undefined
-                : t('allAddedBody')
-            }
+        `Modal` itself stays mounted — it owns the `showModal()`/`close()`
+        pairing, the dirty-tracking listener and the trailing-click guard, and
+        taking it out from under itself would change all three. Its contents are
+        another matter: ~500 candidate rows were being built into a shut dialog on
+        every render of the RSVP card. The caret still lands in the search box on
+        open, because `Modal` hunts for the first field in a layout effect keyed on
+        `open`, which runs after the render that put the input there.
+      */}
+      {open ? (
+        <div className="flex flex-col gap-3">
+          <input
+            type="search"
+            inputMode="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={t('searchAria')}
+            placeholder={t('searchPlaceholder')}
+            value={query}
+            onChange={(changed) => setQuery(changed.target.value)}
+            className="min-h-12 w-full rounded-xl bg-ink-950 px-3 text-ink-100 ring-1 ring-ink-700 placeholder:text-ink-500 focus:outline-none focus:ring-2 focus:ring-brand-400"
           />
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {visible.map((student) => {
-              const checked = selected.has(student.id);
-              return (
-                <li key={student.id}>
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={checked}
-                    onClick={() => toggle(student.id)}
-                    className={cn(
-                      'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 transition-colors',
-                      checked
-                        ? 'bg-brand-500/15 ring-brand-500/40'
-                        : 'bg-ink-950 ring-ink-800 active:bg-ink-800',
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
+
+          {visible.length === 0 ? (
+            <EmptyState
+              title={candidates.length === 0 ? t('allAddedTitle') : t('noMatchTitle')}
+              description={
+                candidates.length === 0
+                  ? undefined
+                  : t('allAddedBody')
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {visible.map((student) => {
+                const checked = selected.has(student.id);
+                return (
+                  <li key={student.id}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={checked}
+                      onClick={() => toggle(student.id)}
                       className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-bold ring-1',
+                        'flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 transition-colors',
                         checked
-                          ? 'bg-brand-500 text-white ring-brand-400'
-                          : 'bg-ink-900 text-transparent ring-ink-700',
+                          ? 'bg-brand-500/15 ring-brand-500/40'
+                          : 'bg-ink-950 ring-ink-800 active:bg-ink-800',
                       )}
                     >
-                      ✓
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
-                      {studentFullName(student)}
-                    </span>
-                    <span className="shrink-0 text-xs text-ink-500">
-                      {gradeLabel(grades, student) ?? grades('none')}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-bold ring-1',
+                          checked
+                            ? 'bg-brand-500 text-white ring-brand-400'
+                            : 'bg-ink-900 text-transparent ring-ink-700',
+                        )}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-100">
+                        {studentFullName(student)}
+                      </span>
+                      <span className="shrink-0 text-xs text-ink-500">
+                        {gradeLabel(grades, student) ?? grades('none')}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </Modal>
   );
 }
@@ -255,12 +290,28 @@ export function RsvpManager({ event }: RsvpManagerProps) {
     [rows],
   );
 
+  /*
+   * Who is left to add — worked out only once the dialog that asks is up.
+   *
+   * Sorting ~500 names by surname is the expensive half, and until the dialog
+   * opens nobody can see the result: the sheet is not rendered while shut. So
+   * the work moves to the tap that opens it, which is one frame the leader is
+   * already waiting on, and off every roster update and status tap, which are
+   * frames they are not.
+   *
+   * The gate cannot change what that leader reads on the way in. `addOpen` is a
+   * dependency, so the first render with the sheet up is also the first render
+   * with the real list in hand — the "everybody is already on the list" title,
+   * which branches on `candidates.length === 0`, is decided from the full list
+   * and not from the placeholder.
+   */
   const candidates = useMemo(() => {
+    if (!addOpen) return EMPTY_STUDENTS;
     const onList = new Set(rsvps.map((rsvp) => rsvp.studentId));
     return students
       .filter((student) => student.status === 'active' && !onList.has(student.id))
       .sort(sortByName);
-  }, [students, rsvps]);
+  }, [addOpen, students, rsvps]);
 
   const run = async (key: string, action: () => Promise<void>, failure: string) => {
     if (!user || inFlight.current.has(key)) return;

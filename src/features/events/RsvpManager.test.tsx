@@ -21,7 +21,7 @@ import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
 import { ToastContext, type Toast, type ToastContextValue } from '@/context/toastContext';
 import { RsvpManager } from '@/features/events/RsvpManager';
-import type { Rsvp, RsvpStatus, TallyEvent } from '@/types';
+import type { Rsvp, RsvpStatus, Student, TallyEvent } from '@/types';
 import { makeEvent, makeRsvp, makeStudent } from '../../../tests/factories';
 
 type Write = (...args: unknown[]) => Promise<void>;
@@ -45,13 +45,18 @@ vi.mock('@/hooks/useAttendance', () => ({
 
 const ada = makeStudent({ id: 'student-ada', firstName: 'Ada', lastName: 'Lovelace' });
 
-function show(status: RsvpStatus = 'maybe', event: TallyEvent = makeEvent({ mode: 'oneoff' })) {
+function show(
+  status: RsvpStatus = 'maybe',
+  event: TallyEvent = makeEvent({ mode: 'oneoff' }),
+  /** Students on the roster but not on this event's list — i.e. candidates. */
+  others: Student[] = [],
+) {
   rsvps = [makeRsvp({ studentId: ada.id, eventId: event.id, status })];
 
   // Only the three fields this card reads; the context itself is broader and
   // still growing, and a full literal here would be a test that breaks on
   // fields it never looks at.
-  const data = { students: [ada] } as unknown as DataContextValue;
+  const data = { students: [ada, ...others] } as unknown as DataContextValue;
   const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
 
   const toasts: { message: string; action?: Toast['action'] }[] = [];
@@ -146,5 +151,39 @@ describe('the going / maybe / no control', () => {
     // warning that is always on is not a warning.
     show('no', makeEvent({ mode: 'oneoff' }));
     expect(screen.queryByText('Not on the check-in roster.')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The sheet costs nothing until it is asked for.
+ *
+ * It is one `<dialog>` that stays mounted, so on a ministry with ~500 students
+ * every render of this card — every status tap, every roster update — used to
+ * sort the whole roster and build 500 rows into a dialog nobody had opened.
+ * What is pinned here is the visible half of that: the names are not there
+ * until the tap, and the tap still lands the leader where it always did.
+ */
+describe('the add-students sheet', () => {
+  const grace = makeStudent({ id: 'student-grace', firstName: 'Grace', lastName: 'Hopper' });
+
+  it('renders no candidate until somebody opens it', async () => {
+    const user = userEvent.setup();
+    show('maybe', makeEvent({ mode: 'oneoff' }), [grace]);
+
+    // Grace is active and has no RSVP on this event, so she is a candidate —
+    // and while the sheet is shut that costs the card nothing.
+    expect(screen.queryByText('Grace Hopper')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add students' }));
+
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+    // And the list the sheet reads is the whole list on that very first render,
+    // not a placeholder that fills in a frame later — a leader who opens this
+    // with students left to add must never be told everybody is already on it.
+    expect(screen.queryByText('Everyone is already on the list')).not.toBeInTheDocument();
+    // Opening still puts the caret in the search box: `Modal` looks for the
+    // first field in a layout effect keyed on `open`, which runs after the
+    // render that gates the sheet in.
+    expect(screen.getByRole('searchbox', { name: 'Search students by name' })).toHaveFocus();
   });
 });

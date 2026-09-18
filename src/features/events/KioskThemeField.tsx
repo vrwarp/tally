@@ -96,6 +96,38 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
   const theme = value ?? DEFAULT_KIOSK_THEME;
   const colours = useMemo(() => painted(theme), [theme]);
 
+  /*
+   * Every circle in the grid, resolved once per theme instead of once per render.
+   *
+   * There are 24 of them and each one is a whole palette rotation — an oklch
+   * round trip through `kioskPalette` for a single hex. This field lives inside
+   * the event editor's form, which re-renders on every keystroke in the name
+   * box, so typing a gathering's name was paying for 24 rotations per character
+   * on a phone that is already slow. Nothing about the swatches depends on what
+   * is being typed, so they are cached on the theme instead.
+   *
+   * `open` is in the callback rather than around the hook because a hook cannot
+   * be called conditionally, and the grid only exists inside the `open ?` branch
+   * below — so the read site never sees `null`. The `?.` is there because
+   * TypeScript cannot narrow the memo from that branch, and `background:
+   * undefined` would be a no-op even if it somehow did. Hue names are unique
+   * within each list, so `slot:name` cannot collide.
+   */
+  const swatches = useMemo(
+    () =>
+      open
+        ? new Map<string, string>(
+            SLOTS.flatMap(({ slot, offered }) =>
+              offered.map((hue): [string, string] => [
+                `${slot}:${hue.name}`,
+                swatch(theme, slot, hue.name),
+              ]),
+            ),
+          )
+        : null,
+    [open, theme],
+  );
+
   const summary = value
     ? t('summary', {
         ground: value.ground === 'light' ? t('groundLight') : t('groundDark'),
@@ -179,7 +211,7 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
                         'size-9 rounded-full ring-1 pointer-fine:size-7',
                         active ? 'ring-2 ring-ink-100' : 'ring-ink-700 active:opacity-80',
                       )}
-                      style={{ background: swatch(theme, slot, hue.name) }}
+                      style={{ background: swatches?.get(`${slot}:${hue.name}`) }}
                     >
                       <span className="sr-only">{t(hue.labelKey)}</span>
                     </button>
