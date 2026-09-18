@@ -9,7 +9,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { isGoogleSignIn, provisionAccessForCaller, redeemLinkForCaller } from './access.js';
+import { ChainAccessReader, partitionStudentHistory } from './eventAccess.js';
 import { createLink, mintToken } from './invitations.js';
 import { PATHS } from './firestore.js';
 import { emailKey } from './pco/mapping.js';
@@ -638,3 +640,147 @@ describe('who let somebody in, stamped once', () => {
   });
 });
 
+/* -------------------------------------------------------------------------- */
+/* Reading the fence: how many times, and what a history call does with it      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The narrowest thing `ChainAccessReader` will take.
+ *
+ * It holds the full Admin SDK handle rather than the `FirestoreLike` the rest
+ * of the suite fakes, because the callables that build it need `collectionGroup`
+ * and `getAll`. All it asks of that handle is `doc(path).get()`, so this is a
+ * stub of exactly that, recording every path it is asked for — the recording is
+ * the point, because what these tests pin is the *number* of reads.
+ */
+function accessStore(documents: Record<string, Record<string, unknown>>): {
+  firestore: Firestore;
+  reads: string[];
+} {
+  const reads: string[] = [];
+  const firestore = {
+    doc: (path: string) => ({
+      get: async () => {
+        reads.push(path);
+        const stored = documents[path];
+        return { exists: stored !== undefined, data: () => stored };
+      },
+    }),
+  } as unknown as Firestore;
+
+  return { firestore, reads };
+}
+
+describe('ChainAccessReader', () => {
+  it('reads each chain once however many callers ask at once', async () => {
+    /*
+     * The memo holds the promise, not the answer, so the second ask for a chain
+     * still in flight joins the first rather than starting a second read. That
+     * is what lets `getStudentAttendance` hand a year of nights to `partition`
+     * without paying for the same `eventAccess` document a hundred times, and
+     * it only holds under concurrency — a memo of resolved values would miss
+     * every overlap and read once per ask.
+     */
+    const { firestore, reads } = accessStore({
+      'eventAccess/sunday-school': { restricted: true, members: ['uid-dana'] },
+    });
+    const reader = new ChainAccessReader(firestore, 'uid-miriam', false);
+
+    const [split] = await Promise.all([
+      reader.partition(['sunday-school', 'friday', 'sunday-school']),
+      reader.canWork('sunday-school'),
+      reader.canWork('friday'),
+    ]);
+
+    expect([...reads].sort()).toEqual(['eventAccess/friday', 'eventAccess/sunday-school']);
+    // Friday has no document at all, which is the ordinary open gathering.
+    expect([...split.allowed]).toEqual(['friday']);
+    expect([...split.denied]).toEqual(['sunday-school']);
+  });
+
+  it('answers an admin without reading anything', async () => {
+    // The break-glass pass is decided on the role alone, which is exactly what
+    // lets the history callable skip resolving its events for an admin.
+    const { firestore, reads } = accessStore({
+      'eventAccess/sunday-school': { restricted: true, members: [] },
+    });
+    const reader = new ChainAccessReader(firestore, 'uid-dana', true);
+
+    expect(await reader.canWork('sunday-school')).toBe(true);
+    expect(await reader.partition(['sunday-school', 'friday'])).toMatchObject({
+      denied: new Set(),
+    });
+    expect(reads).toEqual([]);
+  });
+});
+
+describe('partitionStudentHistory', () => {
+  const chains = new Map([
+    ['sunday-2026-03-01', 'sunday-school'],
+    ['sunday-2026-03-08', 'sunday-school'],
+    ['friday-2026-03-06', 'friday-night'],
+    ['camp-2026-02-14', 'camp'],
+  ]);
+
+  it('keeps the nights in the order the records arrived, once each', () => {
+    // The query is newest first and there is one record per student per night,
+    // so the repeats here are the same night seen twice — a second record for
+    // the same event must not draw the night twice on the profile.
+    const result = partitionStudentHistory(
+      [
+        'sunday-2026-03-08',
+        'friday-2026-03-06',
+        'sunday-2026-03-08',
+        'sunday-2026-03-01',
+        'friday-2026-03-06',
+      ],
+      chains,
+      new Set(['sunday-school', 'friday-night']),
+    );
+
+    expect(result.eventIds).toEqual([
+      'sunday-2026-03-08',
+      'friday-2026-03-06',
+      'sunday-2026-03-01',
+    ]);
+    expect(result.withheld).toEqual([]);
+  });
+
+  it('names each withheld chain once, and none of the nights on it', () => {
+    const result = partitionStudentHistory(
+      ['camp-2026-02-14', 'sunday-2026-03-08', 'camp-2026-02-14', 'friday-2026-03-06'],
+      chains,
+      new Set(['sunday-school']),
+    );
+
+    expect(result.eventIds).toEqual(['sunday-2026-03-08']);
+    // The chain, not the event id: the profile shows "a night you cannot see"
+    // per gathering, and the client only ever asks whether a chain is in here.
+    expect(result.withheld).toEqual(['camp', 'friday-night']);
+  });
+
+  it('withholds a night whose event resolved to nothing, rather than showing it', () => {
+    /*
+     * A record pointing at an event document that is gone falls back to the
+     * event id standing for its own chain, which is what the callable does for
+     * a one-off with no series. Nobody is ever granted such a chain, so the
+     * night is withheld — the failure mode worth having, as against a gap in
+     * the map quietly reading as "allowed".
+     */
+    const result = partitionStudentHistory(
+      ['deleted-night', 'sunday-2026-03-01'],
+      chains,
+      new Set(['sunday-school']),
+    );
+
+    expect(result.eventIds).toEqual(['sunday-2026-03-01']);
+    expect(result.withheld).toEqual(['deleted-night']);
+  });
+
+  it('says nothing at all for a student with no records', () => {
+    expect(partitionStudentHistory([], chains, new Set())).toEqual({
+      eventIds: [],
+      withheld: [],
+    });
+  });
+});

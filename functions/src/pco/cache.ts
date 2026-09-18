@@ -127,6 +127,27 @@ export function createTtlCache(options: TtlCacheOptions): TtlCache {
       entries.set(key, entry);
       evictIfNeeded();
 
+      /*
+       * Only ever remove the entry this load installed. The forced-read branch
+       * above deliberately replaces whatever was in the map, so an older load
+       * settling afterwards would otherwise delete the *forced* caller's
+       * in-flight entry, and everyone arriving in the rest of that window would
+       * start their own full roster sweep instead of joining the flight — the
+       * single-flight promise this module makes unconditionally, TTL or no TTL.
+       * Invalidation and eviction reach the same end by taking the entry away
+       * rather than replacing it, and the guard covers those too.
+       *
+       * The reach of it is narrow: at the shipped TTL the superseded load has to
+       * reject to get here, which means Planning Center is already erroring and
+       * a stray extra sweep is the least of it. At `ttlMs = 0` the success path
+       * gets here as well. This protects an invariant rather than winning back
+       * any time on a good day. The guard is the one used before dropping a
+       * memoised load in index.ts and in roster.ts.
+       */
+      const drop = () => {
+        if (entries.get(key) === entry) entries.delete(key);
+      };
+
       try {
         const value = await inFlight;
         // Retention is the only part the TTL controls. At zero the entry is
@@ -136,14 +157,14 @@ export function createTtlCache(options: TtlCacheOptions): TtlCache {
           entry.expiresAt = now() + ttlMs;
           delete entry.inFlight;
         } else {
-          entries.delete(key);
+          drop();
         }
         return value;
       } catch (error) {
         // Never remember a failure. The next caller gets a real attempt, which
         // is what makes a Planning Center blip look like a slow tap rather than
         // a minute of identical errors.
-        entries.delete(key);
+        drop();
         throw error;
       }
     },

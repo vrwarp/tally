@@ -83,3 +83,55 @@ export class ChainAccessReader {
     return { allowed, denied };
   }
 }
+
+/**
+ * Which of a student's nights a caller may see, once the chains are in hand.
+ *
+ * Arithmetic on three arguments and nothing else: no reads, no callback that
+ * might read. It lives here because `getStudentAttendance` cannot be tested
+ * where it stands — that callable reaches for the raw `getFirestore()` to get
+ * `collectionGroup`, which the narrowed fake the rest of the suite runs on
+ * deliberately does not offer. The reading it does, and the "trust the event,
+ * not the record" argument that justifies it, stay in the callable, because
+ * that is what they are about.
+ *
+ * `eventIdsInOrder` is one entry per attendance document, newest first and with
+ * repeats; the result keeps the first appearance of each event and drops the
+ * rest, which is the order a profile draws its history in.
+ *
+ * `withheld` is rebuilt here in that same document order rather than taken from
+ * `partition`'s `denied`, whose order is whichever read happened to finish
+ * first. The caller only ever asks `withheld` whether it holds a chain, so the
+ * order is not load-bearing either way, but document order costs nothing and is
+ * what the one-read-per-record version used to return.
+ *
+ * An event id with no entry in `chainByEventId` stands for its own chain, the
+ * same fallback the callable applies to an event document that does not exist.
+ * A gap cannot quietly open the register: a chain nobody was granted is a chain
+ * `allowed` does not hold, so the night is withheld rather than shown.
+ */
+export function partitionStudentHistory(
+  eventIdsInOrder: Iterable<string>,
+  chainByEventId: ReadonlyMap<string, string>,
+  allowed: ReadonlySet<string>,
+): { eventIds: string[]; withheld: string[] } {
+  const eventIds: string[] = [];
+  const shown = new Set<string>();
+  const withheld: string[] = [];
+  const refused = new Set<string>();
+
+  for (const eventId of eventIdsInOrder) {
+    const chain = chainByEventId.get(eventId) ?? eventId;
+
+    if (allowed.has(chain)) {
+      if (shown.has(eventId)) continue;
+      shown.add(eventId);
+      eventIds.push(eventId);
+    } else if (!refused.has(chain)) {
+      refused.add(chain);
+      withheld.push(chain);
+    }
+  }
+
+  return { eventIds, withheld };
+}

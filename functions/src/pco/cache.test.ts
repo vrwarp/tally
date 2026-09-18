@@ -162,6 +162,67 @@ describe('createTtlCache', () => {
       expect(await forced).toBe('forced');
       expect(calls).toBe(2);
     });
+
+    it('does not let a superseded load that fails take the forced entry with it', async () => {
+      // The superseded load is the one Planning Center is already failing, so
+      // its cleanup must not reach past its own entry. If it drops the forced
+      // caller's flight instead, every ordinary caller for the rest of that
+      // window starts a fresh roster sweep rather than joining — a herd arriving
+      // precisely when upstream is unwell.
+      const cache = createTtlCache({ ttlMs: 30_000 });
+      const source = counter();
+      let fail!: (error: Error) => void;
+      const doomed = new Promise<string>((_, reject) => (fail = reject));
+
+      const superseded = cache.get('k', () => doomed);
+      const forced = cache.get('k', source.load, true);
+
+      fail(new Error('down'));
+      await expect(superseded).rejects.toThrow('down');
+      expect(await forced).toBe('value-1');
+      expect(cache.size).toBe(1);
+
+      // The forced answer is still there for whoever asks next, and nobody had
+      // to go and fetch it again.
+      expect(await cache.get('k', source.load)).toBe('value-1');
+      expect(source.calls).toBe(1);
+    });
+
+    it('does not let a superseded load settling take the forced flight with it at a zero TTL', async () => {
+      // With retention off, the ordinary success path is what tidies the entry
+      // away, so the same collision happens without Planning Center misbehaving
+      // at all. The third caller must join the forced flight, not open a third.
+      const cache = createTtlCache({ ttlMs: 0 });
+      let releaseFirst!: (value: string) => void;
+      const first = new Promise<string>((resolve) => (releaseFirst = resolve));
+      let releaseForced!: (value: string) => void;
+      const forcedValue = new Promise<string>((resolve) => (releaseForced = resolve));
+      let calls = 0;
+
+      const superseded = cache.get('k', () => {
+        calls += 1;
+        return first;
+      });
+      const forced = cache.get('k', () => {
+        calls += 1;
+        return forcedValue;
+      }, true);
+
+      releaseFirst('stale');
+      expect(await superseded).toBe('stale');
+
+      const joined = cache.get('k', () => {
+        calls += 1;
+        return Promise.resolve('third');
+      });
+      releaseForced('forced');
+
+      expect(await forced).toBe('forced');
+      expect(await joined).toBe('forced');
+      expect(calls).toBe(2);
+      // And single-flight is still not retention: nothing survives the settle.
+      expect(cache.size).toBe(0);
+    });
   });
 
   describe('failures', () => {
