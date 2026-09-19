@@ -432,6 +432,38 @@ describe('nameSortKey', () => {
   });
 
   /*
+   * The other half of the same rule, and the one that says the Chinese is
+   * looked for in the *given* name: a child with a Latin given name and a
+   * surname written in Han files under the given name, not under the
+   * romanization the server appended for the surname.
+   */
+  it('is the given name when only the surname is written in Chinese', () => {
+    expect(
+      nameSortKey({
+        firstName: 'Benson',
+        lastName: '蔡',
+        searchName: 'benson 蔡 cai choi chua tsai',
+      }),
+    ).toBe('Benson');
+  });
+
+  /*
+   * `buildSearchName` collapses runs of whitespace before it writes, so a name
+   * carrying a stray double space is one token narrower in `searchName` than
+   * it looks here. Counting it as written would read the surname as the
+   * romanization again.
+   */
+  it('counts the name the way buildSearchName wrote it, spaces collapsed', () => {
+    expect(
+      nameSortKey({
+        firstName: '蔡  秉洲',
+        lastName: 'Tsai',
+        searchName: '蔡 秉洲 tsai caibingzhou cbz',
+      }),
+    ).toBe('caibingzhou');
+  });
+
+  /*
    * A student created a moment ago, whose `searchName` the client rebuilt and
    * the trigger has not caught up with yet. They file under Han for a second,
    * which is where they already were — never at an undefined.

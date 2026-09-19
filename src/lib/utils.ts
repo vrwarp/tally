@@ -572,20 +572,21 @@ export function nameSortKey(person: {
   lastName?: string;
   searchName?: string;
 }): string {
-  if (!HAN.test(person.firstName)) return person.firstName;
-  if (LATIN.test(person.firstName)) return person.firstName;
+  // One condition rather than two guards, because there is one question: a
+  // name files under itself unless it is written in Han and nothing else.
+  if (LATIN.test(person.firstName) || !HAN.test(person.firstName)) return person.firstName;
 
   /*
    * Which token the romanization is, by position: `searchName` opens with the
-   * name itself — `buildSearchName` in `@/types`, lowercased and collapsed —
-   * and the server appends to it. So the first token past the name is the
-   * canonical reading, and the Latin surname sitting inside the name is not
-   * mistaken for it. (Counting rather than importing `buildSearchName`: this
-   * module is in the kiosk's bundle and carries no dependencies.)
+   * name itself — `buildSearchName` in `@/types` — and the server appends to
+   * it. So the first token past the name is the canonical reading, and the
+   * Latin surname sitting inside the name is not mistaken for it. The count
+   * repeats that function's own whitespace collapsing rather than importing
+   * it: this module is in the kiosk's bundle and carries no dependencies.
    */
-  const tokens = person.searchName?.split(' ').filter((token) => token !== '') ?? [];
-  const name = `${person.firstName} ${person.lastName ?? ''}`.trim().split(/\s+/).length;
-  const romanized = tokens[name];
+  const tokens = person.searchName?.split(' ') ?? [];
+  const name = `${person.firstName} ${person.lastName ?? ''}`.trim().replace(/\s+/g, ' ').split(' ');
+  const romanized = tokens[name.length];
   return romanized !== undefined && !HAN.test(romanized) ? romanized : person.firstName;
 }
 
