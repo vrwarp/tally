@@ -1281,30 +1281,27 @@ export function CheckInPage() {
                 // what it is filtered to matters less than what a tap now does.
                 swapSource
                   ? t("hintSwap")
-                  : appliedFocus === "recent" && counts.historyWindow > 0
-                    ? t("hintRecent", { count: counts.historyWindow })
-                    : appliedFocus === "participated"
-                      ? // Says which window, because "participated" is only ever
-                        // true of what the app loaded — and says which
-                        // *question*, because an event with no history of its
-                        // own is answering a weaker one. See
-                        // `ParticipationSource`.
-                        roster.participationSource === "gathering"
-                        ? t("hintParticipatedHere", { count: counts.participationWindow })
-                        : t("hintParticipatedEver")
-                      : appliedFocus === "checkedIn"
-                        ? t("hintCheckedIn")
-                        : appliedFocus === "inRoom"
-                          ? t("hintInRoom")
-                          : appliedFocus === "checkedOut"
-                            ? t("hintCheckedOut")
-                            : undefined
+                  : appliedFocus === "participated"
+                    ? // Says which window, because "participated" is only ever
+                      // true of what the app loaded — and says which
+                      // *question*, because an event with no history of its
+                      // own is answering a weaker one. See
+                      // `ParticipationSource`.
+                      roster.participationSource === "gathering"
+                      ? t("hintParticipatedHere", { count: counts.participationWindow })
+                      : t("hintParticipatedEver")
+                    : appliedFocus === "checkedIn"
+                      ? t("hintCheckedIn")
+                      : appliedFocus === "inRoom"
+                        ? t("hintInRoom")
+                        : appliedFocus === "checkedOut"
+                          ? t("hintCheckedOut")
+                          : undefined
               }
               emptyLabel={t(FOCUS_EMPTY[appliedFocus])}
               tone={
                 appliedFocus === "checkedIn" || appliedFocus === "inRoom" ? "present" : "default"
               }
-              showRecentHint={event.mode === "recurring"}
               onPress={onPress}
               onUndo={onUndo}
               onSwap={onSwap}

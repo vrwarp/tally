@@ -535,6 +535,9 @@ const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
 /** Han characters, the ones `Intl.Collator` cannot file under a letter. */
 const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 
+/** A letter the collator can file under, which is what the eye scans for. */
+const LATIN = /[A-Za-z]/u;
+
 /**
  * What to file a person under, when their name is not written in letters.
  *
@@ -546,22 +549,44 @@ const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
  *
  * Doing that means romanizing the name, and romanizing means a dictionary close
  * to a megabyte — which is exactly what `functions/src/names/pinyin.ts` refuses
- * to put in a bundle. So the server has already done it: `searchName` carries
- * the romanization, and by contract the canonical one is the token immediately
- * after the Chinese. This reads it back. A name with no Chinese in it costs one
- * failed regexp, which is nearly every name.
+ * to put in a bundle. So the server has already done it: `searchName` is
+ * `buildSearchName(firstName, lastName)` with the romanizations appended, the
+ * canonical reading first. This reads that first appended token back. A name
+ * with no Chinese in it costs one failed regexp, which is nearly every name.
+ *
+ * **Only a name with nothing Latin in it needs any of that.** Planning Center
+ * writes a child with a nickname as `Vera “章依彤” Chang`, and that composite is
+ * what `firstName` holds — so the row prints *Vera* first, in the heavy weight,
+ * and Vera is the word a counselor scanning the column lands on. Filing her
+ * under the romanization put her between Austin and Cici, in the C's, with
+ * nothing on the row to say why; the list read as unsorted to everyone holding
+ * it. The romanization is for the names that print no Latin at all, where there
+ * is no leading word to scan and any letter is better than none.
  *
  * Falls back to the name itself — a student written before the backfill ran, or
  * one whose `searchName` the client rebuilt a moment ago and the trigger has
  * not yet widened. They file under Han for a second, which is where they were.
  */
-export function nameSortKey(person: { firstName: string; searchName?: string }): string {
+export function nameSortKey(person: {
+  firstName: string;
+  lastName?: string;
+  searchName?: string;
+}): string {
   if (!HAN.test(person.firstName)) return person.firstName;
-  const tokens = person.searchName?.split(' ') ?? [];
-  for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    if (HAN.test(tokens[index]!)) return tokens[index + 1] ?? person.firstName;
-  }
-  return person.firstName;
+  if (LATIN.test(person.firstName)) return person.firstName;
+
+  /*
+   * Which token the romanization is, by position: `searchName` opens with the
+   * name itself — `buildSearchName` in `@/types`, lowercased and collapsed —
+   * and the server appends to it. So the first token past the name is the
+   * canonical reading, and the Latin surname sitting inside the name is not
+   * mistaken for it. (Counting rather than importing `buildSearchName`: this
+   * module is in the kiosk's bundle and carries no dependencies.)
+   */
+  const tokens = person.searchName?.split(' ').filter((token) => token !== '') ?? [];
+  const name = `${person.firstName} ${person.lastName ?? ''}`.trim().split(/\s+/).length;
+  const romanized = tokens[name];
+  return romanized !== undefined && !HAN.test(romanized) ? romanized : person.firstName;
 }
 
 export function sortByName<

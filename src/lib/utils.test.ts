@@ -360,6 +360,30 @@ describe('sortByName', () => {
       'Dana',
     ]);
   });
+
+  /*
+   * The composite Planning Center writes for a child with a nickname —
+   * `Vera “章依彤” Chang` — prints *Vera* first, so Vera is what the column is
+   * scanned by. It used to file under the surname the romanization happens to
+   * sit beside in `searchName`, which landed Vera between Austin and Cici and
+   * made the whole roster read as sorted by nothing at all.
+   */
+  it('files a nicknamed composite under the Latin name the row prints first', () => {
+    const people = [
+      { firstName: 'Austin', lastName: 'Hsieh', searchName: 'austin hsieh' },
+      {
+        firstName: 'Vera “章依彤”',
+        lastName: 'Chang',
+        searchName: 'vera “章依彤” chang zhangyitong zyt',
+      },
+      { firstName: 'Cici', lastName: 'Jia', searchName: 'cici jia' },
+    ];
+    expect([...people].sort(sortByName).map((p) => p.lastName)).toEqual([
+      'Hsieh',
+      'Jia',
+      'Chang',
+    ]);
+  });
 });
 
 describe('nameSortKey', () => {
@@ -372,9 +396,39 @@ describe('nameSortKey', () => {
    * immediately after the Chinese, and everything after that is an alternative
    * spelling.
    */
-  it('is the romanization the server wrote after the Chinese', () => {
+  it('is the romanization the server appended after the name', () => {
     expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲 caibingzhou cbz tsaibingzhou' }))
       .toBe('caibingzhou');
+  });
+
+  /*
+   * The romanizations go on the *end* of `searchName`, after the whole name —
+   * so on a child whose surname is written in letters the token beside the
+   * Chinese is that surname, and reading it as the romanization filed 蔡秉洲
+   * under T for Tsai.
+   */
+  it('reads past a Latin surname to the romanization', () => {
+    expect(
+      nameSortKey({
+        firstName: '蔡秉洲',
+        lastName: 'Tsai',
+        searchName: '蔡秉洲 tsai caibingzhou cbz tsaibingzhou',
+      }),
+    ).toBe('caibingzhou');
+  });
+
+  /*
+   * A name with letters in it needs no romanization: the letters are what the
+   * row prints first and what the reader scans.
+   */
+  it('is the name itself when the name carries Latin as well as Chinese', () => {
+    expect(
+      nameSortKey({
+        firstName: 'Vera “章依彤”',
+        lastName: 'Chang',
+        searchName: 'vera “章依彤” chang zhangyitong zyt',
+      }),
+    ).toBe('Vera “章依彤”');
   });
 
   /*
@@ -384,6 +438,9 @@ describe('nameSortKey', () => {
    */
   it('falls back to the name when nothing has romanized it yet', () => {
     expect(nameSortKey({ firstName: '蔡秉洲', searchName: '蔡秉洲' })).toBe('蔡秉洲');
+    expect(nameSortKey({ firstName: '蔡秉洲', lastName: 'Tsai', searchName: '蔡秉洲 tsai' })).toBe(
+      '蔡秉洲',
+    );
     expect(nameSortKey({ firstName: '蔡秉洲' })).toBe('蔡秉洲');
   });
 });

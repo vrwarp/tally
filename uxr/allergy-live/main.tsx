@@ -73,9 +73,7 @@ function App() {
         <div className="min-h-dvh bg-ink-950 px-3 py-4">
           <RosterList
             title="Regulars"
-            description="from the last 3 gatherings"
             entries={entries}
-            showRecentHint
             canOpenProfile
             expandedId={expandedId}
             allergyNotes={landed ? NOTES : NO_NOTES}

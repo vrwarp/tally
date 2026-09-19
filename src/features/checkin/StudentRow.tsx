@@ -67,12 +67,6 @@ export interface StudentRowProps {
   /** True while this row's own write is in flight, so a double-tap cannot fire twice. */
   busy?: boolean;
   /**
-   * Allow the "3 of 3" prediction hint. It still only renders on the rows the
-   * prediction actually picked out, which is what makes a regular legible in
-   * the unfiltered list now that they no longer sit in a block of their own.
-   */
-  showRecentHint?: boolean;
-  /**
    * Whether to offer `Profile` at all. The student pages are core-team only —
    * see `RequireRole` — and a button that lands a counselor on "Core team only"
    * is worse than no button.
@@ -97,7 +91,9 @@ export interface StudentRowProps {
  * `buildRoster` mints fresh entry objects on every rebuild, so identity alone
  * would let one check-in re-render every row on the screen — two hundred rows
  * repainted so that one could turn green. The fields compared are exactly the
- * ones the row renders; `rsvp` is on the entry but never drawn here.
+ * ones the row renders; `rsvp` and the prediction's own counts — `isRecent`,
+ * `recentHits`, `recentWindow` — are on the entry but never drawn here. They
+ * decide which students the list holds, which is `buildRoster`'s business.
  */
 function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
   return (
@@ -112,9 +108,6 @@ function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
     // a pickup that never appears on screen.
     (a.attendance?.checkedOutAt?.getTime() ?? null) ===
       (b.attendance?.checkedOutAt?.getTime() ?? null) &&
-    a.isRecent === b.isRecent &&
-    a.recentHits === b.recentHits &&
-    a.recentWindow === b.recentWindow &&
     sameItems(a.warnings, b.warnings)
   );
 }
@@ -140,7 +133,6 @@ export const StudentRow = memo(function StudentRow({
   expanded = false,
   flashing = false,
   busy = false,
-  showRecentHint = false,
   canOpenProfile = false,
   allergyNote,
   onCheckOut,
@@ -153,10 +145,9 @@ export const StudentRow = memo(function StudentRow({
   const tCommon = useTranslations('Common');
   // The archived-night list and the event page call this row the same thing.
   const tCheckIn = useTranslations('CheckIn');
-  const { student, former, attendance, warnings, isRecent, recentHits, recentWindow } = entry;
+  const { student, former, attendance, warnings } = entry;
   const name = former ? tCheckIn('formerStudent') : studentFullName(student);
   const grade = gradeLabel(grades, student);
-  const showHint = showRecentHint && isRecent && recentWindow > 0;
 
   const swapping = mode === 'swap';
   const here = attendance !== null;
@@ -340,18 +331,11 @@ export const StudentRow = memo(function StudentRow({
                 )}
               </span>
 
-              {warnings.length > 0 || showHint || unavailable || gone ? (
+              {warnings.length > 0 || unavailable || gone ? (
                 // `items-start`, because an expanded row lets the allergy badge
                 // be several lines tall: everything beside it should sit at its
                 // first line rather than halfway down it.
                 <span className="mt-1 flex flex-wrap items-start gap-1">
-                  {/*
-                    The ratio leads, badges trail. It is set in tabular numerals —
-                    somebody wanted it to line up — and a badge laid out ahead of it
-                    moved its column 75px to the right on the four rows that carry
-                    one, so the number a counselor compares down the list never
-                    appeared twice in the same place.
-                  */}
                   {unavailable ? (
                     <span className="text-[11px] font-medium text-ink-400">
                       {isSwapSource ? t('chipSwapSource') : t('chipAlreadyCheckedIn')}
@@ -365,14 +349,6 @@ export const StudentRow = memo(function StudentRow({
                   {gone ? (
                     <span className="text-[11px] font-medium tabular-nums text-ink-400">
                       {t('checkedOutAt', { time: time.clock(attendance!.checkedOutAt!) })}
-                    </span>
-                  ) : null}
-                  {showHint && !unavailable ? (
-                    <span
-                      className="text-[11px] font-medium tabular-nums text-ink-500"
-                      title={t('recentTitle', { hits: recentHits, window: recentWindow })}
-                    >
-                      {t('recentHits', { hits: recentHits, window: recentWindow })}
                     </span>
                   ) : null}
                   {warnings.map((warning) =>
@@ -603,7 +579,6 @@ export const StudentRow = memo(function StudentRow({
   prev.expanded === next.expanded &&
   prev.flashing === next.flashing &&
   prev.busy === next.busy &&
-  prev.showRecentHint === next.showRecentHint &&
   prev.canOpenProfile === next.canOpenProfile &&
   prev.allergyNote === next.allergyNote &&
   prev.onCheckOut === next.onCheckOut &&

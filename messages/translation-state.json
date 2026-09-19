@@ -2730,12 +2730,6 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "CheckIn.hintRecent": {
-    "source": "from the last {count, plural, one {# gathering} other {# gatherings}}",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "CheckIn.hintParticipatedHere": {
     "source": "been here in the last {count, plural, one {# gathering} other {# gatherings}}",
     "es-MX": "machine",
@@ -3051,19 +3045,6 @@
   "StudentRow.checkedOutAt": {
     "source": "Out {time}",
     "context": "Chip on a student's row once somebody has checked them out, giving the time they left, e.g. \"Out 8:40 PM\". Stated rather than flagged — a check-out is not an error — and short enough to sit beside a name.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "StudentRow.recentTitle": {
-    "source": "Attended {hits} of the last {window}",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "StudentRow.recentHits": {
-    "source": "{hits} of {window}",
-    "context": "The visible half of the \"Recent\" hint on a student's row: how many of the last few gatherings they came to, e.g. \"3 of 3\". Sits under the name in tiny tabular figures, so it has to stay short; the whole sentence is the title attribute beside it, StudentRow.recentTitle.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
