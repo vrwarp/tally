@@ -6,7 +6,7 @@
  * every keystroke.
  */
 import { describe, expect, it } from 'vitest';
-import { createSearchMatcher, formatPhone, formatPhoneInput, initials, matchesQuery, nameSortKey, normalizeForSearch, partition, sortByName } from '@/lib/utils';
+import { createSearchMatcher, formatPhone, formatPhoneInput, initials, matchesQuery, nameSortKey, normalizeForSearch, partition, sameItems, sortByName } from '@/lib/utils';
 
 describe('matchesQuery', () => {
   it('is case-insensitive in both directions', () => {
@@ -113,6 +113,50 @@ describe('matchesQuery: typos', () => {
     expect(matchesQuery('ana martinez', 'gabriel')).toBe(false);
     expect(matchesQuery('josé garcía', 'ibrahim')).toBe(false);
   });
+
+  /*
+   * The allowance steps up at seven characters, and the step is the whole
+   * point of it: two edits at six reaches too much of a roster, and one edit
+   * at ten is stingier than the typing actually is.
+   */
+  it('steps the allowance up at the seventh character', () => {
+    expect(matchesQuery('marcus lee', 'marxusz')).toBe(true);
+    expect(matchesQuery('marcus lee', 'marxuz')).toBe(false);
+    // One edit is still forgiven at six, so it is the second that costs.
+    expect(matchesQuery('marcus lee', 'marxus')).toBe(true);
+  });
+
+  it('charges for the last letter of the query, like every other one', () => {
+    // Two substitutions against "marcus" at six characters is over budget —
+    // and it would not be if the pass quietly stopped one letter early.
+    expect(matchesQuery('marcus lee', 'marcxy')).toBe(false);
+  });
+
+  it('will not stretch a query far longer than the name it is typed against', () => {
+    // One deletion, which is a typo.
+    expect(matchesQuery('lee', 'lees')).toBe(true);
+    // Six, which is a different name.
+    expect(matchesQuery('lee', 'leeleelee')).toBe(false);
+  });
+
+  /*
+   * The typo pass is quadratic and the search filters untrusted Firestore
+   * documents, where a "name" can be a pasted paragraph. Past the guard the
+   * pass is skipped rather than run, so the limit is where a match stops.
+   */
+  it('skips the typo pass on a name longer than the guard', () => {
+    const atTheLimit = `${'z'.repeat(58)}marcus`;
+    const pastIt = `${'z'.repeat(59)}marcus`;
+    expect(atTheLimit).toHaveLength(64);
+    expect(pastIt).toHaveLength(65);
+    expect(matchesQuery(atTheLimit, 'marcs')).toBe(true);
+    expect(matchesQuery(pastIt, 'marcs')).toBe(false);
+  });
+
+  it('skips it on a query longer than the guard, too', () => {
+    expect(matchesQuery('a'.repeat(63), 'a'.repeat(64))).toBe(true);
+    expect(matchesQuery('a'.repeat(64), 'a'.repeat(65))).toBe(false);
+  });
 });
 
 describe('matchesQuery: the pinyin ü', () => {
@@ -158,6 +202,19 @@ describe('matchesQuery: the pinyin ü', () => {
     expect(matchesQuery('hana yamamoto', 'lyu')).toBe(false);
   });
 
+  it('rewrites every ambiguous word in the query, not only the first', () => {
+    expect(matchesQuery('lu nu', 'lv nv')).toBe(true);
+  });
+
+  /*
+   * And stops. Each ambiguous word multiplies the spellings by three, so the
+   * cap is reached before the third one — which is the bound that keeps a
+   * pathological query from making the roster pass exponential.
+   */
+  it('stops rewriting once a query has more ambiguity than a name does', () => {
+    expect(matchesQuery('lu lu lu', 'lv lv lv')).toBe(false);
+  });
+
   it('leaves j, q, x and y alone — they have nothing to disambiguate', () => {
     // Xǔ folds to "xu" on the accent pass alone, and no "xyu" spelling exists.
     expect(matchesQuery('xǔ wei', 'xu')).toBe(true);
@@ -201,6 +258,40 @@ describe('createSearchMatcher: ranking the ü variants', () => {
     const wei = student('Wei', 'Lyu');
     expect(matcher.rank(wei)).toBe(matcher.rank(wei));
     expect(matcher.rank(wei)).toBe(createSearchMatcher('lu').rank(student('Wei', 'Lyu')));
+  });
+});
+
+describe('createSearchMatcher: why a result is in the list', () => {
+  const student = (firstName: string, lastName: string) => ({
+    firstName,
+    lastName,
+    searchName: `${firstName} ${lastName}`.toLowerCase(),
+  });
+
+  /*
+   * Four reasons, in the order a counselor expects them. Typing "ma" because
+   * Maya is at the front of the queue must not answer with five surnames that
+   * happen to contain those letters.
+   */
+  it('separates the four reasons, best first', () => {
+    const matcher = createSearchMatcher('mar');
+    expect(matcher.rank(student('Marcus', 'Lee'))).toBe(0);
+    expect(matcher.rank(student('Ana', 'Martinez'))).toBe(2);
+    expect(matcher.rank(student('Amara', 'Osei'))).toBe(4);
+    expect(matcher.rank(student('Hana', 'Yamamoto'))).toBe(6);
+  });
+
+  it('reads a surname from its start, not from its end', () => {
+    // "nez" ends Martinez without beginning it. That is a containment, and
+    // ranking it as a surname match would put every -ez above the Nezes.
+    expect(createSearchMatcher('nez').rank(student('Ana', 'Martinez'))).toBe(4);
+  });
+
+  it('ranks everybody as a given-name match while the query is empty', () => {
+    // The empty matcher is what the roster holds before anybody has typed, and
+    // a demotion there would reorder the whole list against A–Z.
+    expect(createSearchMatcher('').rank(student('Ana', 'Lee'))).toBe(0);
+    expect(createSearchMatcher('   ').rank(student('Wei', 'Lyu'))).toBe(0);
   });
 });
 
@@ -269,6 +360,12 @@ describe('formatPhone', () => {
     expect(formatPhone('+1 555 010 0123')).toBe('(555) 010-0123');
   });
 
+  it('keeps an 11-digit number that does not open with a country code', () => {
+    // Only a leading 1 is a country code. Anything else is a number Tally does
+    // not understand, and a number it does not understand is printed as given.
+    expect(formatPhone('25550100123')).toBe('25550100123');
+  });
+
   it('passes anything else through untouched', () => {
     expect(formatPhone('+44 20 7946 0958')).toBe('+44 20 7946 0958');
     expect(formatPhone('ext. 12')).toBe('ext. 12');
@@ -301,6 +398,14 @@ describe('formatPhoneInput', () => {
   it('reads an eleventh leading 1 as a country code', () => {
     expect(formatPhoneInput('15550100123')).toBe('555-010-0123');
     expect(formatPhoneInput('+1 (555) 010-0123')).toBe('555-010-0123');
+  });
+
+  it('only reads a leading 1 as a country code once there are eleven digits', () => {
+    // Mid-typing, a leading 1 is just the first digit of an area code — and a
+    // complete ten-digit number that opens with one is not a country code
+    // either.
+    expect(formatPhoneInput('15550')).toBe('155-50');
+    expect(formatPhoneInput('1555010012')).toBe('155-501-0012');
   });
 
   it('ignores digits past the tenth', () => {
@@ -474,6 +579,31 @@ describe('nameSortKey', () => {
       '蔡秉洲',
     );
     expect(nameSortKey({ firstName: '蔡秉洲' })).toBe('蔡秉洲');
+  });
+});
+
+describe('sameItems', () => {
+  /*
+   * This is what lets a memo hand back its previous array instead of a fresh
+   * one saying the same thing, so a wrong answer here is a list that stops
+   * re-rendering when it should — or one that re-renders on every tick.
+   */
+  it('is true only for the same items in the same order', () => {
+    const ada = { name: 'Ada' };
+    const bo = { name: 'Bo' };
+    const cyd = { name: 'Cyd' };
+    expect(sameItems([ada, bo], [ada, bo])).toBe(true);
+    expect(sameItems([], [])).toBe(true);
+    // Same length, same first item, different second: every item counts.
+    expect(sameItems([ada, bo], [ada, cyd])).toBe(false);
+    expect(sameItems([ada, bo], [bo, ada])).toBe(false);
+    expect(sameItems([ada, bo], [ada])).toBe(false);
+  });
+
+  it('compares by identity, so an equal-looking copy is a different item', () => {
+    // The inputs are identity-stable by construction — a row that genuinely
+    // changed arrives as a new object — and that is the whole check.
+    expect(sameItems([{ name: 'Ada' }], [{ name: 'Ada' }])).toBe(false);
   });
 });
 

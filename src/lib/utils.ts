@@ -14,6 +14,10 @@ export function haptic(pattern: number | number[] = 12): void {
   if (typeof navigator === 'undefined') return;
   const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
   try {
+    // Stryker disable next-line OptionalChaining: the catch below answers a
+    // browser with no `vibrate` exactly as this does — silently — so calling it
+    // unguarded refuses nothing the guard would let through. It is here so the
+    // absence reads as expected rather than as a thrown error somebody chased.
     nav.vibrate?.(pattern);
   } catch {
     /* Vibration is a nicety, never a failure path. */
@@ -119,7 +123,14 @@ function searchKeyOf(value: string): SearchKey {
   if (held) return held;
   const normalized = normalizeForSearch(value);
   const key: SearchKey = { normalized, compact: compact(normalized) };
+  // Stryker disable next-line ConditionalExpression,EqualityOperator: the cap is
+  // a memory bound, not a correctness one — clearing early, late or never
+  // changes how much the tab holds and nothing a caller can read back. See the
+  // comment above: a miss simply does the work.
   if (SEARCH_KEY_CACHE.size >= SEARCH_KEY_CACHE_MAX) SEARCH_KEY_CACHE.clear();
+  // Stryker disable next-line CallExpression: same argument the other way. A
+  // cache that never records anything is a cache that always misses, and a
+  // miss recomputes the identical key.
   SEARCH_KEY_CACHE.set(value, key);
   return key;
 }
@@ -359,6 +370,10 @@ export function createSearchMatcher(query: string): SearchMatcher {
         }
       }
 
+      // Stryker disable next-line CallExpression: `rank` is a pure function of
+      // the student and this query, so a memo that records nothing answers
+      // every repeat question with the same number it just computed. The memo
+      // is here for the sort comparators that ask O(n log n) times.
       ranked.set(student, answer);
       return answer;
     },

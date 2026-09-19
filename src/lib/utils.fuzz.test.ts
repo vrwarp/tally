@@ -191,12 +191,90 @@ describe('utility properties', () => {
   }), ({ a, b, c }) => {
     const ab = Math.sign(sortByName(a, b));
     const ba = Math.sign(sortByName(b, a));
-    expect(ab).toBe(-ba); // antisymmetric
+    // `===` rather than `toBe`, because two equal names give `0` and `-0` and
+    // `Object.is` tells those apart where this property does not care.
+    expect(ab === -ba).toBe(true); // antisymmetric
 
     const bc = Math.sign(sortByName(b, c));
     const ac = Math.sign(sortByName(a, c));
     if (ab < 0 && bc < 0) expect(ac).toBeLessThan(0); // transitive
     if (ab === 0 && bc === 0) expect(ac).toBe(0);
+  });
+
+  /*
+   * The typo pass, against a Damerau-Levenshtein written the obvious way.
+   *
+   * `approximatelyIncludes` is the one piece of this module that is optimized
+   * rather than merely written: three rolling rows of a shared `Uint16Array`,
+   * reused for the life of the tab, with the needle free to start at any offset
+   * and the answer taken from the smallest cell of the final row. Every one of
+   * those is a chance to be subtly wrong in a way no example test would show —
+   * a buffer not cleared far enough, an index reaching one row too far back, a
+   * loop bound that drops the last letter of the query.
+   *
+   * So this asks the same question of a full matrix, allocated per call and
+   * indexed plainly, and requires the two to agree. The alphabet is three
+   * letters so that near-misses and transpositions turn up constantly rather
+   * than by luck, and neither side is long enough to reach the length guards —
+   * `l` and `n` are absent, so no ü variant is in play either and what is left
+   * is the typo pass alone.
+   */
+  const FUZZY_ALPHABET = ['a', 'b', 'c'];
+
+  /** `editBudget`, which is not exported: how many typos a query that long buys. */
+  function budgetFor(length: number): number {
+    if (length < 4) return 0;
+    if (length < 7) return 1;
+    return 2;
+  }
+
+  /**
+   * Optimal string alignment distance from `needle` to the best window of
+   * `text` — row zero left at zero so the needle may start anywhere, and the
+   * answer read from the smallest value in the last row.
+   */
+  function bestWindowDistance(text: string, needle: string): number {
+    const m = needle.length;
+    const n = text.length;
+    const distance = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+    for (let i = 0; i <= m; i += 1) distance[i]![0] = i;
+
+    for (let i = 1; i <= m; i += 1) {
+      for (let j = 1; j <= n; j += 1) {
+        const substitute = distance[i - 1]![j - 1]! + (needle[i - 1] === text[j - 1] ? 0 : 1);
+        let best = Math.min(substitute, distance[i - 1]![j]! + 1, distance[i]![j - 1]! + 1);
+        if (i > 1 && j > 1 && needle[i - 1] === text[j - 2] && needle[i - 2] === text[j - 1]) {
+          best = Math.min(best, distance[i - 2]![j - 2]! + 1);
+        }
+        distance[i]![j] = best;
+      }
+    }
+    return Math.min(...distance[m]!);
+  }
+
+  const letters = (rng: Rng, min: number, max: number): string =>
+    Array.from({ length: rng.int(min, max) }, () => rng.pick(FUZZY_ALPHABET)).join('');
+
+  forAll('the typo pass agrees with a plainly written Damerau-Levenshtein', (rng) => ({
+    name: letters(rng, 1, 12),
+    query: letters(rng, 4, 8),
+  }), ({ name, query }) => {
+    const within = bestWindowDistance(name, query) <= budgetFor(query.length);
+    expect(matchesQuery(name, query)).toBe(within);
+  });
+
+  /*
+   * The rolling rows are module state shared by every call, so one search can
+   * only be wrong because of what the last one left behind. Alternating long
+   * and short names is what makes a buffer cleared one cell short show up.
+   */
+  forAll('a search is not changed by the search before it', (rng) => ({
+    first: { name: letters(rng, 8, 12), query: letters(rng, 4, 8) },
+    second: { name: letters(rng, 1, 6), query: letters(rng, 4, 8) },
+  }), ({ first, second }) => {
+    matchesQuery(first.name, first.query);
+    const within = bestWindowDistance(second.name, second.query) <= budgetFor(second.query.length);
+    expect(matchesQuery(second.name, second.query)).toBe(within);
   });
 
   forAll('partition keeps every item exactly once', (rng) =>
