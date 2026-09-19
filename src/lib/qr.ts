@@ -58,6 +58,14 @@ interface VersionSpec {
   blocks: readonly (readonly [blocks: number, dataCodewords: number])[];
 }
 
+/* Stryker disable all: static — see docs/mutation-testing.md. Every mutant in
+   this table is hybrid: the object is built when the module is imported, long
+   before Stryker can switch one on for a test, so all forty-four report as
+   survived however directly a test exercises the version. What a fixture would
+   have pinned is pinned in `qr.test.ts` instead — the codeword totals have to
+   agree with the modules each symbol leaves free, and every block has to
+   divide by its generator, both of which fail on a row typed one codeword
+   out. */
 const VERSIONS: Readonly<Record<number, VersionSpec>> = {
   1: { ecPerBlock: 10, blocks: [[1, 16]] },
   2: { ecPerBlock: 16, blocks: [[1, 28]] },
@@ -75,6 +83,7 @@ const VERSIONS: Readonly<Record<number, VersionSpec>> = {
   14: { ecPerBlock: 24, blocks: [[4, 40], [5, 41]] },
   15: { ecPerBlock: 24, blocks: [[5, 41], [5, 42]] },
 };
+/* Stryker restore all */
 
 /**
  * Where the alignment patterns sit, as coordinates on both axes.
@@ -82,6 +91,9 @@ const VERSIONS: Readonly<Record<number, VersionSpec>> = {
  * Every pair of these is a pattern centre, minus the three corners the finders
  * already occupy. Version 1 has none, which is why the table starts at 2.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md, and the note on
+   `VERSIONS` above. A wrong centre moves an alignment pattern into the data
+   region, which `qr.test.ts` catches through its own reading of the geometry. */
 const ALIGNMENT_CENTRES: Readonly<Record<number, readonly number[]>> = {
   1: [],
   2: [6, 18],
@@ -99,6 +111,7 @@ const ALIGNMENT_CENTRES: Readonly<Record<number, readonly number[]>> = {
   14: [6, 26, 46, 66],
   15: [6, 26, 48, 70],
 };
+/* Stryker restore all */
 
 /** Level M's two bits in the format information. L is 1, M is 0, Q is 3, H is 2. */
 const EC_LEVEL_M = 0;
@@ -116,6 +129,10 @@ const MODE_BYTE = 0b0100;
  * sum of two logarithms never has to be reduced modulo 255 at the call site.
  * The polynomial is 0x11D, which is the one the QR spec names.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. These two loops
+   run at import, so their mutants cannot be switched per test either. They are
+   not unwatched: a wrong table is a wrong error-correction codeword, and the
+   syndrome check in `qr.test.ts` evaluates every block at every root. */
 const EXP = new Uint8Array(512);
 const LOG = new Uint8Array(256);
 
@@ -126,9 +143,14 @@ for (let i = 0, x = 1; i < 255; i += 1) {
   if (x & 0x100) x ^= 0x11d;
 }
 for (let i = 255; i < 512; i += 1) EXP[i] = EXP[i - 255]!;
+/* Stryker restore all */
 
 function multiply(a: number, b: number): number {
   // Zero has no logarithm, and it is the one case the tables cannot answer.
+  // Stryker disable next-line ConditionalExpression: no caller passes zero as
+  // `a` — the generator's coefficients are all non-zero and the remainder is
+  // the other argument — so dropping that half of the guard is a mutant no
+  // test can tell apart from the guard itself.
   if (a === 0 || b === 0) return 0;
   return EXP[LOG[a]! + LOG[b]!]!;
 }
@@ -437,6 +459,11 @@ function drawCodewords(symbol: Grid, codewords: Uint8Array): void {
 }
 
 /** The eight masks, as the spec's conditions. A true condition flips the module. */
+/* Stryker disable ArrowFunction: static — replacing a whole mask is a change to
+   the array built at import, which cannot be switched on for one test (see
+   docs/mutation-testing.md). Only the eight function bodies are mutated here,
+   and those are runtime: `qr.test.ts` reads back a payload masked by each of
+   them. */
 const MASKS: readonly ((row: number, col: number) => boolean)[] = [
   (row, col) => (row + col) % 2 === 0,
   (row) => row % 2 === 0,
@@ -447,6 +474,7 @@ const MASKS: readonly ((row: number, col: number) => boolean)[] = [
   (row, col) => (((row * col) % 2) + ((row * col) % 3)) % 2 === 0,
   (row, col) => (((row + col) % 2) + ((row * col) % 3)) % 2 === 0,
 ];
+/* Stryker restore ArrowFunction */
 
 /** XOR in place. Called twice per candidate — once to try it, once to undo it. */
 function applyMask(symbol: Grid, mask: number): void {

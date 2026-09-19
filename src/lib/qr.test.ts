@@ -910,6 +910,35 @@ describe('encodeQr', () => {
     ]);
   });
 
+  it('reads back under every mask it can choose', () => {
+    /*
+     * The capacity boundaries above walk the version table; this walks the
+     * *masks*, which nothing else does. Which of the eight a payload gets is
+     * decided by a penalty score, so the only way to exercise all of them is a
+     * run of payloads — sixty lengths in a row turns out to use every one.
+     *
+     * What it protects is the half of masking a fixture cannot see: the symbol
+     * declares its mask in the format bits and the modules have to have been
+     * flipped by *that* mask. Change one mask's arithmetic and the symbols it
+     * wins decode to nothing, which is a QR that scans as garbage rather than
+     * one that fails to scan.
+     */
+    const masks = new Set<number>();
+    for (let length = 1; length <= 60; length += 1) {
+      const text = filler(length);
+      const decoded = decode(encodeQr(text).modules);
+      expect(decoded.text, `${length} bytes`).toBe(text);
+      masks.add(decoded.mask);
+    }
+    // The three payloads with fixtures, for the masks the run of lengths misses.
+    for (const text of [JOIN_URL, ...PER_VERSION.slice(0, 2).map((entry) => entry.text)]) {
+      const decoded = decode(encodeQr(text).modules);
+      expect(decoded.text).toBe(text);
+      masks.add(decoded.mask);
+    }
+    expect([...masks].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
   it('carries anything a URL can carry, including what is not ASCII', () => {
     // Byte mode is UTF-8 here, so the length in the symbol is a byte count and
     // not a character count — an encoder that confused the two would produce a
