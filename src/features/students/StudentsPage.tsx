@@ -7,8 +7,14 @@
  * second, because those are the only two lists the core team actually works.
  *
  * Filtering is a synchronous pass over the roster that is already in memory from
- * the shared snapshot, so there is no virtualisation and no debounce — just a
- * memoised filter and plain rows.
+ * the shared snapshot, so there is no virtualisation and no debounce — no
+ * keystroke is dropped and no timer stands between a letter being typed and the
+ * list answering for it. It is still a memoised filter and plain rows; what
+ * changed is only which copy of the query they read. On a five-hundred-name
+ * roster, re-filtering and re-mounting hundreds of rows inside the keystroke's
+ * own task made the character lag the key, so the list is rendered from a
+ * deferred copy of the query and React is free to paint the letter first and
+ * the rows a beat behind it. See `deferredQuery` below.
  *
  * Everything a row says is drawn from that same snapshot: last seen, the note
  * somebody typed, the allergy flag, the birthday. Nothing on this list waits on
@@ -17,7 +23,7 @@
  * an adult's phone number — happen for one student, when a badge is pressed. See
  * `RowBadgeModal`.
  */
-import { memo, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { memo, useCallback, useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Badge,
@@ -92,6 +98,24 @@ export function StudentsPage() {
   const { user } = useAuth();
 
   const [query, setQuery] = useState('');
+  /*
+   * What the roster is read through, one commit behind the box.
+   *
+   * The search field's `value` and its clear button stay on `query`, so the
+   * character lands on the keystroke that typed it rather than waiting for five
+   * hundred rows to be filtered and re-mounted first. Everything derived from
+   * the roster reads `deferredQuery` instead — the list, the chip counts, the
+   * empty state and the export — so the expensive half happens in a render
+   * React is allowed to schedule after the letter is on screen.
+   *
+   * Deferring the *whole* derived region rather than the list alone is the part
+   * that matters. A count, an empty state or an export filename taken from the
+   * live query while the rows still answer to the old one is this screen
+   * describing a list it is not showing, which is the one thing the counts on
+   * this page were rebuilt to make impossible. One query in, one coherent
+   * snapshot out, at every commit.
+   */
+  const deferredQuery = useDeferredValue(query);
   const [grade, setGrade] = useState<Grade | null>(null);
   // Inactive students are history, not roster: the default view hides them.
   const [status, setStatus] = useState<StatusFilter>('active');
@@ -158,7 +182,7 @@ export function StudentsPage() {
    * pressing it produces, or it is worse than no count at all.
    */
   const matching = useMemo(() => {
-    const matcher = createSearchMatcher(query);
+    const matcher = createSearchMatcher(deferredQuery);
     return students.filter((student) => {
       if (status !== 'all' && student.status !== status) return false;
       // Somebody with no grade is in no grade. Asking for 6th graders and
@@ -167,7 +191,7 @@ export function StudentsPage() {
       if (grade !== null && student.grade !== grade) return false;
       return matcher.matches(student.searchName);
     });
-  }, [students, status, grade, query]);
+  }, [students, status, grade, deferredQuery]);
 
   const inFlightCount = useMemo(
     () =>
@@ -216,8 +240,20 @@ export function StudentsPage() {
     [matching],
   );
 
+  /*
+   * `deferredQuery`, and this is the one that is easy to get wrong.
+   *
+   * It picks which of the two empty states the card shows and whether the
+   * export's filename says `filtered`, and both of those are statements *about
+   * `visible`* — which is filtered by the deferred query. Read from the live
+   * one, clearing a search that matched nobody gives a commit where the box is
+   * empty but the rows are still the old query's none: the card says "No
+   * students on the roster yet" and offers to import from Planning Center, over
+   * a roster of five hundred that is sitting right there. The export flag goes
+   * the same way, promising a filter the rows in the file were never subject to.
+   */
   const isFiltered =
-    query.trim().length > 0 || grade !== null || quick !== 'none' || status !== 'active';
+    deferredQuery.trim().length > 0 || grade !== null || quick !== 'none' || status !== 'active';
 
   const clearFilters = () => {
     setQuery('');

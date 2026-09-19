@@ -230,6 +230,32 @@ describe('useEventSnapshots', () => {
     expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
   });
 
+  it('stops asking about a night the read came back silent on', async () => {
+    /*
+     * The same hot loop as the retry above, reached from the happy path.
+     *
+     * The bump a successful read does on its way out is a dependency of the
+     * effect, and `missing` is worked out from the cache — so an answer that
+     * moved neither the cache nor the refusals puts the hook straight back on
+     * the same question and holds it there, reading as fast as Firestore will
+     * answer, on a screen nobody is watching.
+     *
+     * `fetchAttendanceByEvent` answers every id with a register or a refusal,
+     * so nothing in this app produces that answer — a stub does. The loop is
+     * real all the same: this exact test against the code before the guard
+     * went in reads five hundred times in fifty milliseconds.
+     */
+    fetchAttendanceByEvent.mockResolvedValue({ byEvent: new Map(), denied: new Set<string>() });
+
+    const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Settle, and confirm it stayed settled rather than spinning.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1);
+    expect(result.current.snapshots).toEqual([]);
+  });
+
   describe('what counts as the same answer', () => {
     /**
      * The three fields the identity check compares, moved one at a time.
@@ -400,6 +426,49 @@ describe('useEventSnapshots', () => {
       expect(result.current.snapshots[0]!.event).toBe(sunday);
     });
 
+    it('does not clear a failure with an answer nobody was waiting for', async () => {
+      /*
+       * The mirror of the test above, and the more dangerous direction. The
+       * window on screen failed and is saying so; the read for the window
+       * before it then lands, successfully. Taking the banner down on the
+       * strength of that tells a counselor the window in front of them has
+       * loaded and has nobody on it — which is the one reading this hook must
+       * never produce by accident.
+       */
+      const first = held();
+      fetchAttendanceByEvent.mockRejectedValue(new Error('offline'));
+      const friday = makeEvent({ id: 'evt_1' });
+      const sunday = makeEvent({ id: 'evt_2' });
+
+      // Every frame, not just the last one: the banner coming back a render
+      // later is still a banner that blinked off under somebody's thumb.
+      const seen: (string | null)[] = [];
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => {
+          const state = useEventSnapshots(events);
+          seen.push(state.error);
+          return state;
+        },
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      rerender({ events: [sunday] });
+      await waitFor(() => expect(result.current.error).toBe('offline'));
+      const failed = seen.length;
+
+      await act(async () => {
+        first.settle().resolve({
+          byEvent: new Map([['evt_1', { present: new Set(['pco_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+        await Promise.resolve();
+      });
+
+      expect(result.current.error).toBe('offline');
+      expect(seen.slice(failed)).not.toContain(null);
+    });
+
     it('does not take the spinner down for a read nobody is waiting on', async () => {
       // The same shape, one step earlier: the abandoned read settling must not
       // announce that the window on screen has finished loading.
@@ -434,6 +503,113 @@ describe('useEventSnapshots', () => {
       });
 
       await waitFor(() => expect(result.current.loading).toBe(false));
+    });
+
+    describe('a question abandoned and asked again', () => {
+      /*
+       * The sentinel that stops two identical reads going out at once is
+       * released in the `finally`, and the `finally` returns early for a read
+       * whose caller moved on. So a question abandoned mid-read kept it for the
+       * rest of the session, and asking that same question again was dropped on
+       * the floor. On CheckInPage the tell is `loading: false` with no snapshots
+       * at all, which leaves the predictive roster pending for as long as the
+       * counselor has the screen open.
+       */
+      it('goes and reads it, rather than sitting on a sentinel nobody released', async () => {
+        const first = held();
+        const friday = makeEvent({ id: 'evt_1' });
+
+        const { result, rerender } = renderHook(
+          ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+          { initialProps: { events: [friday] } },
+        );
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+        rerender({ events: [] });
+
+        // It lands carrying nothing for that night, so there is no register in
+        // the session to answer the question with when it comes back — this is
+        // the shape where the hook really does have to go and ask again.
+        await act(async () => {
+          first.settle().resolve({ byEvent: new Map(), denied: new Set<string>() });
+          await Promise.resolve();
+        });
+
+        rerender({ events: [friday] });
+
+        // The spinner, first: `loading: false` over an empty list is the wedge
+        // as the screen shows it.
+        expect(result.current.loading).toBe(true);
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      });
+
+      it('goes and reads it after a detour through a window it already holds', async () => {
+        // The same sentinel reached the other way round. The detour is a window
+        // the session holds outright, so the effect returns at the cache check,
+        // above the sentinel — nothing on that path was ever going to release
+        // it, and the dropped read is the only thing that can.
+        const friday = makeEvent({ id: 'evt_1' });
+        const sunday = makeEvent({ id: 'evt_2' });
+
+        const { result, rerender } = renderHook(
+          ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+          { initialProps: { events: [friday] } },
+        );
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        const dropped = held();
+        rerender({ events: [sunday] });
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+
+        rerender({ events: [friday] });
+        expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
+
+        // The phone loses it on the way back in. Nobody is waiting for that
+        // answer any more, so it is not news — but it is the end of the read.
+        await act(async () => {
+          dropped.settle().reject(new Error('offline'));
+          await Promise.resolve();
+        });
+
+        rerender({ events: [sunday] });
+
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(3));
+        expect(fetchAttendanceByEvent).toHaveBeenLastCalledWith(['evt_2']);
+        await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      });
+
+      it('goes and reads it when the grid is shut mid-read and opened again', async () => {
+        /*
+         * `AttendanceGridModal` asks with `open ? occurrences : EMPTY`, so
+         * shutting it hands this hook the same shared empty array every time and
+         * opening it hands back the very same `occurrences` array it had before.
+         * Shut and open is one mis-tap, and until the sentinel was released it
+         * left the grid empty for the rest of the session.
+         */
+        const CLOSED: TallyEvent[] = [];
+        const occurrences = [makeEvent({ id: 'evt_1' })];
+        const dropped = held();
+
+        const { result, rerender } = renderHook(
+          ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+          { initialProps: { events: occurrences } },
+        );
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+        // Shut on the read, which is left out there, and opened again while it
+        // still is. The grid is asking the question again by the time its
+        // first read dies on the way back in.
+        rerender({ events: CLOSED });
+        rerender({ events: occurrences });
+        await act(async () => {
+          dropped.settle().reject(new Error('offline'));
+          await Promise.resolve();
+        });
+
+        await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      });
     });
   });
 
@@ -490,7 +666,17 @@ describe('useEventSnapshots', () => {
   });
 
   describe('a read the caller stopped waiting for', () => {
-    it('is not written down when the list moved on before it landed', async () => {
+    it('is still written down, because the register it carries is true', async () => {
+      /*
+       * The list moving on says nobody is waiting for this answer. It does not
+       * say the answer is wrong — the register landed, it was paid for, and
+       * nothing has happened to the night it describes. Throwing it away made
+       * the hook ask for it all over again the moment the screen scrolled back,
+       * which on a term of Fridays is a read per step in each direction.
+       *
+       * What really would make it stale is the cache having been dropped while
+       * it was out, and that is the epoch's job, not `cancelled`'s.
+       */
       let land: (value: unknown) => void = () => {};
       fetchAttendanceByEvent.mockImplementationOnce(
         () =>
@@ -516,13 +702,144 @@ describe('useEventSnapshots', () => {
       // Only the gathering that is still being asked about.
       expect(result.current.snapshots.map((snapshot) => snapshot.event.id)).toEqual(['evt_2']);
 
-      // And nothing of it was written down: coming back to that night reads
-      // again rather than trusting an answer the hook had already disowned.
+      // And coming back to that night is answered out of the session rather
+      // than paid for a second time.
       const before = fetchAttendanceByEvent.mock.calls.length;
       rerender({ events: [makeEvent({ id: 'evt_1' })] });
-      await waitFor(() =>
-        expect(fetchAttendanceByEvent.mock.calls.length).toBe(before + 1),
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      expect(result.current.snapshots[0]!.presentStudentIds.has('pco_1')).toBe(true);
+      expect(fetchAttendanceByEvent.mock.calls.length).toBe(before);
+    });
+
+    it('is thrown away when the cache was dropped while it was out', async () => {
+      /*
+       * The other half of the same rule, and the reason `cancelled` could not
+       * be the one enforcing it. Somebody edits a past register on another
+       * device, the access stream clears that night out of the session — and a
+       * read issued before any of that lands holding the register as it was.
+       * Writing it back would restore exactly the rows the invalidation existed
+       * to drop, and every screen for the rest of the session would believe
+       * them.
+       */
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
       );
+
+      const first = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      invalidateSnapshotCache('evt_1');
+
+      await act(async () => {
+        land({
+          byEvent: new Map([['evt_1', { present: new Set(['stale_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+      });
+
+      /*
+       * The hook that asked is still on screen, and this is the half that was
+       * missed: dropping the answer leaves the night unread, and nothing else
+       * is going to ask on its behalf — the list has not changed, so the effect
+       * has no reason to run again. It has to go back for it itself, or it sits
+       * at `loading: false` with nothing to show for the rest of the session.
+       */
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(first.result.current.snapshots).toHaveLength(1));
+      expect(first.result.current.snapshots[0]!.presentStudentIds.has('stale_1')).toBe(false);
+      first.unmount();
+
+      // And nothing of the discarded read survived into the cache, so a screen
+      // arriving later is shown the register as it is now rather than the one
+      // the invalidation existed to throw away.
+      const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      expect(result.current.snapshots[0]!.presentStudentIds.has('stale_1')).toBe(false);
+      expect(result.current.snapshots[0]!.presentStudentIds.has('student-of-evt_1')).toBe(true);
+    });
+
+    it('goes back for a night dropped by an invalidation about some other one', async () => {
+      /*
+       * The realistic shape, and the one that makes the case above more than a
+       * curiosity. The epoch is one number for the whole cache, but
+       * `invalidateSnapshotCache` is called with a single id: a counselor
+       * tapping a name fires `forgetCachedHistory` for *tonight*, and any
+       * history read for past nights that happens to be in the air is thrown
+       * away with it. Those nights are still wanted, so the hook has to ask
+       * again rather than quietly give up on them.
+       */
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+
+      const { result } = renderHook(() => useEventSnapshots([makeEvent({ id: 'evt_1' })]));
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      invalidateSnapshotCache('evt_tonight');
+
+      await act(async () => {
+        land({
+          byEvent: new Map([['evt_1', { present: new Set(['stale_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+      });
+
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(2);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('shows what it wrote to a hook that has come back to that night', async () => {
+      /*
+       * Nothing re-renders when a read nobody is waiting for lands, so the
+       * registers it just wrote would sit in the cache unseen. The grid shut
+       * mid-read and opened again is exactly that shape: by the time the first
+       * read lands the hook is asking the same question a second time, and
+       * without a nudge it draws an empty night until something unrelated
+       * repaints it.
+       */
+      let land: (value: unknown) => void = () => {};
+      fetchAttendanceByEvent.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = resolve;
+          }),
+      );
+
+      const friday = makeEvent({ id: 'evt_1' });
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1));
+
+      // Away and straight back, while the read is still out.
+      rerender({ events: [] });
+      rerender({ events: [friday] });
+
+      await act(async () => {
+        land({
+          byEvent: new Map([['evt_1', { present: new Set(['pco_1']), checkedOut: new Set() }]]),
+          denied: new Set<string>(),
+        });
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+      expect(result.current.snapshots[0]!.presentStudentIds.has('pco_1')).toBe(true);
+      // And the night was answered by the read that was already out: nobody
+      // was sent back to Firestore for a register the session had in hand.
+      expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(1);
+      expect(result.current.loading).toBe(false);
     });
   });
 

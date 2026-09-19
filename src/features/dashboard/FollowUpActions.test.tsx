@@ -248,15 +248,27 @@ describe('FollowUpActions', () => {
     await screen.findByRole('button', { name: /Contact the adult/ });
 
     /*
-     * `Modal` keeps its children mounted and lets the `<dialog>` hide them, so
-     * the dialog's copy is in the DOM before it is opened. Exactly one copy,
-     * and it is that one.
+     * Not anywhere yet — not on the row, and not in a hidden `<dialog>` under
+     * it either. The row renders the dialog only once it is opened, so before
+     * the tap there is no dialog element at all; ten rows of a call list are
+     * ten buttons, not ten dialogs' worth of digits, links and aria strings
+     * built to be displayed to nobody.
      */
-    const copies = screen.getAllByText('(925) 336-6692');
-    expect(copies.filter((node) => node.closest('dialog') === null)).toHaveLength(0);
-    expect(copies.filter((node) => node.closest('dialog') !== null)).toHaveLength(1);
+    expect(screen.queryAllByText('(925) 336-6692')).toHaveLength(0);
+    expect(document.querySelector('dialog')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: /Contact the adult/ }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('(925) 336-6692');
+
+    // And everything the row gave up is there the moment it is asked for.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('(925) 336-6692');
+    expect(screen.getByRole('link', { name: /Call/ })).toHaveAttribute(
+      'href',
+      'tel:9253366692',
+    );
+    expect(screen.getByRole('link', { name: /Text/ })).toHaveAttribute(
+      'href',
+      'sms:9253366692',
+    );
   });
 });

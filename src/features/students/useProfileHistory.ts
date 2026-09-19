@@ -296,6 +296,21 @@ export function useProfileHistory(
 
     return () => {
       cancelled = true;
+      // Released here as well as in the `finally`, which never runs for a
+      // cancelled read: without this, a profile closed mid-read keeps the
+      // sentinel forever and opening the same student again is silently
+      // ignored — a page that loads nothing and never stops saying so.
+      //
+      // Releasing it *here* rather than in the `finally`, as
+      // `useEventSnapshots` does, because this effect depends on `key` alone:
+      // there is no `version` to bump, so a cleanup only ever runs because the
+      // question itself changed. What it costs is the case where the question
+      // changes and changes back while the first read is still out — closing a
+      // student and opening the same one again — which sends a second
+      // identical read. Both land, the later one wins, and the page is right
+      // either way; the same doubling happens on every mount in development,
+      // where StrictMode runs the effect twice on purpose.
+      inFlight.current = '';
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

@@ -176,8 +176,9 @@ describe('a gathering that has happened', () => {
     const register = screen.getByRole('heading', { name: /Attendance/ });
     expect(precedes(register, rsvps)).toBe(true);
     expect(screen.getByText('Checked in')).toBeInTheDocument();
-    // Scoped to the register: the same name is also a candidate in the RSVP
-    // card's add-students dialog, which is in the DOM whether it is open or not.
+    // Scoped to the register on purpose: the same name is also a candidate in
+    // the RSVP card's add-students dialog, so asking the page as a whole would
+    // stop saying anything about which card the name turned up in.
     const card = register.closest('section') as HTMLElement;
     expect(within(card).getByText('Ada Lovelace')).toBeInTheDocument();
   });

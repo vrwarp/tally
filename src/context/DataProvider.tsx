@@ -7,6 +7,7 @@ import { cachedRoster, fetchRoster, mergeRoster, rememberRosterPerson } from '@/
 import type { RosterBackendStatus } from '@/services/functions';
 import { ROSTER_DEADLINES_MS, ROSTER_RETRY_GAPS_MS } from '@/lib/rosterLadder';
 import { applyPendingEdits } from '@/features/roster/pendingEdits';
+import { reuseRows } from '@/features/roster/reuseRows';
 import { useDrainPokes } from '@/features/roster/useDrainPokes';
 import { subscribeUpstreamEdits } from '@/services/upstreamEdits';
 import { fromRosterPerson } from '@/services/converters';
@@ -242,10 +243,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [roster, setRoster] = useState<Student[]>(() => cachedRoster()?.students ?? []);
   const [rosterLoading, setRosterLoading] = useState(true);
   const [rosterSettled, setRosterSettled] = useState(false);
-  const [rosterError, setRosterError] = useState<PcoErrorReport | null>(null);
+  /**
+   * Whatever the last roster read threw, held raw rather than as a sentence.
+   *
+   * Wrapped in an object deliberately. A thrown value that happens to be a
+   * function would otherwise be taken by `useState` for a state updater and
+   * *run* — the one shape of failure this must not turn into a second failure.
+   *
+   * It is the cause rather than the finished sentence because the sentence
+   * depends on the reader's language, and the reader can change language while
+   * the banner is up. Translating at derivation is also what lets the read
+   * itself capture no translator at all — see the ladder's empty dependency
+   * lists below, and what having `tErrors` in them used to cost.
+   */
+  const [rosterCause, setRosterCause] = useState<{ cause: unknown } | null>(null);
   const [rosterOffline, setRosterOffline] = useState(() => cachedRoster() !== null);
   const [rosterFetchedAt, setRosterFetchedAt] = useState<Date | null>(null);
   const [rosterBackends, setRosterBackends] = useState<RosterBackendStatus[]>([]);
+
+  /**
+   * The failure a screen shows, written out of the cause above.
+   *
+   * Derived rather than stored for the same reason `streamErrors` is: a
+   * counselor who switches language while the roster banner is up has to see
+   * the banner switch with it. Reading the translator out of a ref at failure
+   * time would strand a live banner in the old language for as long as the
+   * ladder's next attempt is away, and the last rung of the ladder is up to ten
+   * minutes from the one before it.
+   */
+  const rosterError = useMemo(
+    () => (rosterCause === null ? null : rosterErrorReport(tErrors, tServer, rosterCause.cause)),
+    [rosterCause, tErrors, tServer],
+  );
 
   const [access, setAccess] = useState<Map<string, EventAccess>>(() => new Map());
 
@@ -257,15 +286,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
     access: false,
   });
   /**
-   * Which reads are broken, rather than only that something is.
+   * Which reads are broken, rather than only that something is — and *why*,
+   * in the words Firestore used, rather than in a sentence already written.
    *
    * It was a single string, written in one place and cleared in none — so a
    * stream that failed once and recovered kept its red bar until the tab was
    * closed, which is how a banner stops being read. Keyed by stream, a failure
    * can be taken down by the thing that caused it, and a screen can ask about
    * its own read instead of inheriting a sentence about somebody else's.
+   *
+   * What is stored is `cause.message` and not the finished sentence, so that
+   * the effect that opens the five listeners needs no translator and can
+   * therefore depend on nothing. Holding the sentence meant holding `tErrors`,
+   * and holding `tErrors` meant that one tap on the language switcher closed
+   * all five Firestore listeners, opened five more and spent a second full
+   * Planning Center read. A banner already up would have survived that — the
+   * resubscribe raises the same refusal again, and the sentence came back in
+   * the language just chosen — but a stream that was serving until a rules
+   * change mid-session would flicker on the way through. The sentence is built
+   * again below, from this, every time the language moves.
    */
-  const [streamErrors, setStreamErrors] = useState<StreamErrors>({});
+  const [streamFailures, setStreamFailures] = useState<Partial<Record<DataStream, string>>>({});
 
   useEffect(() => {
     const markReady = (key: DataStream) =>
@@ -282,7 +323,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
      */
     const land = (label: DataStream) => {
       markReady(label);
-      setStreamErrors((current) => {
+      setStreamFailures((current) => {
         if (current[label] === undefined) return current;
         const next = { ...current };
         delete next[label];
@@ -291,17 +332,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     const fail = (label: DataStream) => (cause: Error) => {
-      const said = tErrors('couldNotLoadStream', { stream: label, reason: cause.message });
-      /*
-       * One more sentence, once, for the one stream whose failure looks like
-       * nothing: `canWork` fails open when this collection cannot be read, so
-       * every gathering draws as the reader's and the first sign is a refused
-       * check-in. The sentence promises only what happens next — a leader can
-       * add them — and not an explanation nothing delivers.
-       */
-      const sentence = label === 'access' ? `${said} ${tErrors('accessStreamHint')}` : said;
-      setStreamErrors((current) =>
-        current[label] === sentence ? current : { ...current, [label]: sentence },
+      // The same guard the sentence used to carry, one step earlier: Firestore
+      // re-reports an identical refusal, and republishing it re-renders every
+      // screen reading `useData` for a banner that already says this.
+      setStreamFailures((current) =>
+        current[label] === cause.message ? current : { ...current, [label]: cause.message },
       );
       // Still mark ready — a permanently blocked stream must not wedge the app
       // behind a spinner forever. What that costs is every screen's empty state
@@ -342,10 +377,52 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   },
-  // Stryker disable next-line ArrayDeclaration: any constant array is the same
-  // array to React — the list is compared element by element against the last
-  // render's, and a literal that never changes never differs from itself.
-  [tErrors]);
+  /*
+   * Empty on purpose, and the emptiness is the fix rather than an accident of
+   * it. This effect opens five Firestore listeners; anything in this list is a
+   * thing that can close all five and open five more. `tErrors` was in it, so
+   * one tap on the language switcher did exactly that — and re-read the whole
+   * Planning Center roster on the way, because rebuilding `readRoster` rebuilds
+   * `refreshRoster` and re-runs the mount effect below. Nothing in the body
+   * reads a value that changes any more: the failures are stored raw and said
+   * in the reader's language further down.
+   */
+  // Stryker disable next-line ArrayDeclaration: the only edit there is to make
+  // to an empty list is to put a constant in it, and a constant list never
+  // differs from itself between renders — so the mutant opens the listeners
+  // exactly once, as this does, and no test can tell them apart.
+  []);
+
+  /**
+   * Which streams are broken, said in the reader's language.
+   *
+   * Derived rather than stored, so that a counselor who switches language while
+   * a banner is up sees the banner switch with it. The alternative — keeping
+   * the translator in a ref and reading it at failure time — leaves a live
+   * banner stranded in the old language until the stream fails again, and
+   * Firestore's error handler is terminal, so "again" can be never.
+   *
+   * Built over `STREAMS` rather than over the keys that happen to be present,
+   * for the reason `STREAMS` exists: two streams refused by one rules change
+   * must read the same way round every time.
+   */
+  const streamErrors = useMemo<StreamErrors>(() => {
+    const sentences: StreamErrors = {};
+    for (const label of STREAMS) {
+      const reason = streamFailures[label];
+      if (reason === undefined) continue;
+      const said = tErrors('couldNotLoadStream', { stream: label, reason });
+      /*
+       * One more sentence, once, for the one stream whose failure looks like
+       * nothing: `canWork` fails open when this collection cannot be read, so
+       * every gathering draws as the reader's and the first sign is a refused
+       * check-in. The sentence promises only what happens next — a leader can
+       * add them — and not an explanation nothing delivers.
+       */
+      sentences[label] = label === 'access' ? `${said} ${tErrors('accessStreamHint')}` : said;
+    }
+    return sentences;
+  }, [streamFailures, tErrors]);
 
   /**
    * The aggregate sentence, for the banner that has always shown one.
@@ -490,12 +567,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         backendReportSignature(current) === backendReportSignature(reported) ? current : reported,
       );
       setRosterOffline(false);
-      setRosterError(null);
+      setRosterCause(null);
     } catch (cause) {
       // Deliberately not clearing `roster`: whatever is already on screen is
       // more useful than nothing, and `rosterOffline` says where it came from.
       failed = true;
-      setRosterError(rosterErrorReport(tErrors, tServer, cause));
+      setRosterCause({ cause });
       setRosterOffline(true);
     } finally {
       inFlight.current = false;
@@ -525,10 +602,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     }
   },
-  // Stryker disable next-line ArrayDeclaration: any constant array is the same
-  // array to React — the list is compared element by element against the last
-  // render's, and a literal that never changes never differs from itself.
-  [tErrors, tServer]);
+  /*
+   * Empty on purpose. `tErrors` and `tServer` were in here to write the
+   * failure's sentence, and that made this a new function on every language
+   * change — which rebuilt `refreshRoster`, re-ran the mount effect below it,
+   * and so spent a whole uncached Planning Center read on a tap that changed
+   * nothing about who is on the roster. Nothing here says anything to anybody
+   * now: the cause is held raw and said in `rosterError` above.
+   */
+  // Stryker disable next-line ArrayDeclaration: the only edit there is to make
+  // to an empty list is to put a constant in it, and a constant list never
+  // differs from itself between renders — so the mutant rebuilds this callback
+  // exactly as often as this does, which is never, and no test can tell them
+  // apart.
+  []);
 
   /**
    * A read somebody or something deliberately asked for, and the start of a
@@ -660,16 +747,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
    */
   useDrainPokes(upstreamEdits);
 
+  /**
+   * The merged roster as last published, so an unchanged row can be handed back
+   * as the object it already was. See `reuseRows`.
+   *
+   * A ref mutated inside a `useMemo`, exactly as `lastCalendar` is below — the
+   * same shape for the same reason, which is that "what did this produce last
+   * time" is not state anything renders and putting it in `useState` would set
+   * state during a render.
+   */
+  const lastRoster = useRef<readonly Student[] | null>(null);
+
   /*
    * The overlay is applied *after* the merge, so identity is settled before
    * anything is painted over it: `mergeRoster` decides which document and which
    * backend row are the same person, and only then does a job get to say what
    * somebody is in the middle of changing about them.
+   *
+   * The reuse pass sits between the two, and it is there because a check-in
+   * writes a student document: Firestore echoes the whole collection back, the
+   * merge spreads `{ ...target, ... }` over every row that has a document of
+   * its own — nearly all of them, in a ministry a year in — and `StudentRow`'s
+   * `sameEntry` guard, whose first clause is `a.student === b.student`, then
+   * fails for all five hundred rows. One tap cost 82.76 ms of re-rendering
+   * instead of 8.69 ms, on the phones counselors actually hold at the door.
+   *
+   * Only the merge output is reconciled, and `documents` deliberately is not:
+   * the merge builds a fresh object for every document it merges anyway, so
+   * reusing the raw documents upstream of it would buy nothing the pass below
+   * does not already buy. `applyPendingEdits` needs nothing either — it returns
+   * its input array by reference when no edit is in flight, and when one is,
+   * `if (!edit) return student` leaves every other row's identity alone.
    */
-  const students = useMemo(
-    () => applyPendingEdits(mergeRoster(roster, documents), upstreamEdits),
-    [roster, documents, upstreamEdits],
-  );
+  const students = useMemo(() => {
+    const merged = reuseRows(lastRoster.current, mergeRoster(roster, documents));
+    lastRoster.current = merged;
+    return applyPendingEdits(merged, upstreamEdits);
+  }, [roster, documents, upstreamEdits]);
 
   /* ---- The calendar ------------------------------------------------------ */
 

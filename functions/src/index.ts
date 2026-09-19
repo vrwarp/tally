@@ -90,7 +90,7 @@ import {
 import { isDeviceId, kioskUid, readLiveDevice, recordPairedDevice } from './kiosk/devices.js';
 import type { ServerCode } from './generated/serverCodes.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
-import { ChainAccessReader } from './eventAccess.js';
+import { ChainAccessReader, partitionStudentHistory } from './eventAccess.js';
 import { checkInsRootEventId } from './pco/checkins.js';
 import {
   deleteEvents as removeEvents,
@@ -2924,19 +2924,20 @@ export const getStudentAttendance = onCall<
    * chain and walk a restricted register out through this callable, which is
    * the one place with no rules behind it.
    */
+  const chainIn = (eventId: string, data: FirebaseFirestore.DocumentData): string =>
+    typeof data.seriesId === 'string' && data.seriesId.length > 0
+      ? data.seriesId
+      : typeof data.recurrenceRootId === 'string' && data.recurrenceRootId.length > 0
+        ? data.recurrenceRootId
+        : eventId;
+
   const chains = new Map<string, string>();
   const chainOf = async (eventId: string): Promise<string> => {
     const held = chains.get(eventId);
     if (held !== undefined) return held;
 
     const snapshot = await firestore.doc(`events/${eventId}`).get();
-    const data = snapshot.exists ? (snapshot.data() ?? {}) : {};
-    const chain =
-      typeof data.seriesId === 'string' && data.seriesId.length > 0
-        ? data.seriesId
-        : typeof data.recurrenceRootId === 'string' && data.recurrenceRootId.length > 0
-          ? data.recurrenceRootId
-          : eventId;
+    const chain = chainIn(eventId, snapshot.exists ? (snapshot.data() ?? {}) : {});
 
     chains.set(eventId, chain);
     return chain;
@@ -2958,16 +2959,53 @@ export const getStudentAttendance = onCall<
       .orderBy('checkedInAt', 'desc')
       .get();
 
-    const eventIds: string[] = [];
+    const attended: string[] = [];
     for (const document of snapshot.docs) {
       const eventId = eventIdOf(document.ref);
-      if (!eventId) continue;
-      const chain = await chainOf(eventId);
-      if (await reader.canWork(chain)) eventIds.push(eventId);
-      else withheld.add(chain);
+      if (eventId) attended.push(eventId);
+    }
+    const distinct = [...new Set(attended)];
+
+    /*
+     * An admin is told yes before anything is read — `canWork` answers on the
+     * flag alone — so resolving these events would buy an answer already in
+     * hand, and nothing can end up withheld. A short circuit round the reads,
+     * not a permission check gone missing.
+     */
+    if (caller.role === 'admin') return { eventIds: distinct, withheld: [] };
+
+    /*
+     * The chains in one round trip per chunk, rather than one point read per
+     * record.
+     *
+     * Every row this query returns belongs to a different night: attendance
+     * lives at `events/{eventId}/attendance/{studentId}`, one document per
+     * student per event, and the query has already pinned the student. So the
+     * memo in `chainOf` had nothing to hit — a student on two weekly gatherings
+     * over a year is around a hundred rows and was around a hundred sequential
+     * `events/{id}` reads, one after another, before the profile could draw.
+     *
+     * `getAll` bills exactly the same reads. What changes is the shape of the
+     * wait: a chunk at a time, in waves rather than one by one or all at once,
+     * which is the argument `ATTENDANCE_READ_CONCURRENCY` makes on the client.
+     * Three hundred refs per call keeps the request comfortably small while
+     * leaving a year of history at one or two calls.
+     */
+    const CHAIN_LOOKUP_CHUNK = 300;
+    const chainByEventId = new Map<string, string>();
+    for (let from = 0; from < distinct.length; from += CHAIN_LOOKUP_CHUNK) {
+      const documents = await firestore.getAll(
+        ...distinct
+          .slice(from, from + CHAIN_LOOKUP_CHUNK)
+          .map((eventId) => firestore.doc(`events/${eventId}`)),
+      );
+      for (const document of documents) {
+        chainByEventId.set(document.id, chainIn(document.id, document.data() ?? {}));
+      }
     }
 
-    return { eventIds: [...new Set(eventIds)], withheld: [...withheld] };
+    const { allowed } = await reader.partition(chainByEventId.values());
+    return partitionStudentHistory(attended, chainByEventId, allowed);
   }
 
   /* ---- The paged form --------------------------------------------------- */

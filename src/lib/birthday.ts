@@ -20,6 +20,7 @@
  * upstream and is never sent back.
  */
 import { differenceInCalendarDays } from 'date-fns';
+import { dateFormat } from '@/lib/intlCache';
 
 export type BirthdayState =
   /** Today. */
@@ -231,7 +232,7 @@ export function formatBirthdayShort(
 ): string | null {
   const parsed = birthdayParts(birthday);
   if (!parsed) return null;
-  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
+  return dateFormat(locale, { month: 'short', day: 'numeric' }).format(
     nearestOccurrence(parsed, now),
   );
 }
@@ -253,7 +254,11 @@ export function formatBirthdayLong(
   if (!parsed) return null;
   // Any leap year, so 29 February is a real date to format rather than 1 March.
   const on = new Date(parsed.year ?? 2024, parsed.month - 1, parsed.day);
-  return new Intl.DateTimeFormat(locale, {
+  // The spread below is conditional, but the property order is not: the cache in
+  // `@/lib/intlCache` keys on `JSON.stringify(options)`, and these two shapes
+  // always serialise as `{month, day}` and `{month, day, year}`. Two entries per
+  // locale, which is why a dynamically built options object is safe to key on.
+  return dateFormat(locale, {
     month: 'long',
     day: 'numeric',
     ...(parsed.year === null ? {} : { year: 'numeric' }),

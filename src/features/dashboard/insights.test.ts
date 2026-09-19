@@ -1983,6 +1983,55 @@ describe('a release and the chain MIA row', () => {
 
     expect(computeMia([student], snapshots, settings, [], [release])).toEqual([]);
   });
+
+  it('resolves a released student whether or not the thresholds reach the check', () => {
+    /*
+     * The release check is the only one of `computeMiaFor`'s four guards that
+     * reads the release record; the other three are arithmetic over nights
+     * already in hand, and on a full directory they discard all but a handful
+     * of the roster. So it is asked after them, which is safe only because all
+     * four are pure predicates over `continue` and a conjunction has the same
+     * answer in any order.
+     *
+     * What this can see is the answer, not the order — nothing observable says
+     * which guard ran first. So it pins both ends: the released student the
+     * thresholds drop before the check is ever reached, and the released
+     * student who reaches it. Reordering the guards has to leave both alone.
+     */
+    const events = fridays(4);
+    const releaseFor = (id: string) =>
+      makeTransition({ chainKey: FRIDAY, studentId: id, releasedAt: NOW });
+
+    // Short of the thresholds — he was at the most recent night, so nothing
+    // about him is missing and the release never gets asked about him at all.
+    const present = makeStudent({ id: 'nate', createdAt: LONG_AGO });
+    expect(
+      computeMia(
+        [present],
+        [
+          held(events[0]!, [present.id]),
+          held(events[1]!),
+          held(events[2]!),
+          held(events[3]!, [present.id]),
+        ],
+        settings,
+        [],
+        [releaseFor(present.id)],
+      ),
+    ).toEqual([]);
+
+    // Past all three of them, so the release is the thing that resolves her.
+    const absent = makeStudent({ id: 'pia', createdAt: LONG_AGO });
+    expect(
+      computeMia(
+        [absent],
+        [held(events[0]!, [absent.id]), held(events[1]!), held(events[2]!), held(events[3]!)],
+        settings,
+        [],
+        [releaseFor(absent.id)],
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe('a release and the unseen list', () => {
@@ -2061,6 +2110,31 @@ describe('a release and the unseen list', () => {
       [movedOn()],
     );
     expect(landedAtOneOff).toEqual([]);
+  });
+
+  it('follows a merge: a release under an old id governs the winner’s row', () => {
+    /*
+     * `computeUnseen` decides in one cheap membership test whether a student
+     * has been released at all, so the whole of the governing-release work can
+     * be skipped for the ~all of a directory that has never been released. That
+     * test has to name the same ids `transitionsFor` does — the winner's own
+     * and every id merged into it — or a student whose release was recorded
+     * before a merge quietly stops being governed by it, which is the one case
+     * the record exists to survive. Two old ids, only one of them released,
+     * because "any of them" and "all of them" are not the same question.
+     */
+    const merged = makeStudent({
+      id: 'zoe',
+      createdAt: LONG_AGO,
+      lastAttendedAt: sundays[2]!.startAt,
+      mergedFromStudentIds: ['zoe-before-the-merge', 'zoe-older-still'],
+    });
+
+    const rows = computeUnseen([merged], baseline(), settings, [
+      movedOn({ studentId: 'zoe-before-the-merge' }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ release: { chainKey: SUNDAY, at: releasedAt } });
   });
 
   it('waits for the usual number of chances since the act — the gate is anchored there', () => {

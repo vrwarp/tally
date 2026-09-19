@@ -8,7 +8,7 @@
  * dynamic imports included, because the Firebase SDK deliberately loads
  * behind the first paint and a regression there must still fail the build.
  *
- * Four assertions:
+ * Six assertions:
  *
  *   1. Nothing reachable from kiosk.html is the full Firestore chunk — the
  *      chunk-splitting in vite.config.ts exists so the kiosk (firestore/lite
@@ -23,6 +23,14 @@
  *   3. Label printing stays inside a budget of its own.
  *   4. The install surface is present and still small — see the section at the
  *      bottom of this file.
+ *   5. The *main* app's first paint does not carry firestore/lite. That one is
+ *      not about the kiosk at all; it lives here because it defends the same
+ *      chunk-splitting, and because nothing else in the build looks at what a
+ *      built HTML entry pulls in. See the section near the foot of this file.
+ *   6. The main app's service worker precaches its own chunks and only its
+ *      own — it must not be handed the kiosk's. Also not about the kiosk's
+ *      bytes, and here for the same reason as the fifth: this file is what
+ *      already knows how to walk a built entry's graph.
  *
  * That third one exists because printing is a feature most kiosks do not have.
  * It loads behind `import()` gated on a localStorage key, so a lobby screen with
@@ -34,7 +42,7 @@
  *
  * Run after `npm run build`: `node scripts/check-kiosk-budget.mjs`.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -311,6 +319,119 @@ if (printing > PRINTING_BUDGET_GZIP_BYTES) {
   );
   process.exit(1);
 }
+
+/* ---- The main app's critical path ---------------------------------------- */
+
+/*
+ * The counselors' app must not load firestore/lite either, and nothing else
+ * here was watching it.
+ *
+ * The main app uses full Firestore and never calls the lite SDK, but both
+ * builds import `@firebase/webchannel-wrapper/dist/bloom-blob` for two small
+ * utilities. That module goes to whichever chunk group in vite.config.ts
+ * matches it first, and for a while none of them named it — so it was swept
+ * into `firestore-lite`, and the full Firestore chunk had to import the whole
+ * lite chunk to reach it. dist/index.html modulepreloaded 85.8 kB of an SDK the
+ * app never calls, and paid to parse it and run its `_registerComponent` call,
+ * before a counselor's first tap. The `firebase-bloom` group is the fix; this
+ * is what notices if it stops applying, which a webchannel-wrapper layout
+ * change would do silently.
+ *
+ * Deliberately measured over index.html's *static* references rather than its
+ * reachable graph. The invariant worth defending is that the critical path is
+ * clean, not that firestore/lite is unreachable: a lazy route that shares
+ * `src/kiosk/services.ts` would legitimately pull the lite chunk in behind an
+ * `import()`, and the kiosk diagnostics under src/features/kiosk are exactly
+ * that shape. Failing the build for those would teach people to delete this
+ * check rather than to keep the first paint honest.
+ */
+const mainStatic = staticRefsOf('index.html').map((ref) => basename(ref));
+
+const mainLite = mainStatic.filter((name) => /^firestore-lite-/.test(name));
+if (mainLite.length > 0) {
+  console.error(
+    `The main app's first paint carries the firestore/lite chunk: ${mainLite.join(', ')}\n` +
+      'The usual cause is not an import in src/ but a chunking one: bloom-blob is shared ' +
+      'by both Firestore builds and belongs to whichever group in vite.config.ts matches ' +
+      'it first, so if the firebase-bloom group stops matching, the full Firestore chunk ' +
+      'imports the whole lite chunk again to reach it. Fix the group rather than removing ' +
+      'this check.',
+  );
+  process.exit(1);
+}
+
+/* ---- The main app's precache --------------------------------------------- */
+
+/*
+ * The generated service worker must precache the main app's chunks and no
+ * others.
+ *
+ * Workbox globs `dist/`, which holds three apps' chunks in one `assets/`
+ * directory, so for a long time the counselors' worker precached the entire
+ * kiosk as well: the kiosk app, the Brother QL printing code and its raster
+ * worker, firestore/lite, the setup page — a quarter of a megabyte that
+ * `index.html` cannot reach by any path. `src/main.tsx` registers the worker
+ * with `immediate: true`, so a phone started downloading all of it as the
+ * roster opened, against the Firestore listeners the roster was waiting on,
+ * and then kept it. The fix is the reachability filter in vite.config.ts; this
+ * is the backstop that notices if that filter stops applying — a Vite upgrade
+ * changing what an HTML entry's `facadeModuleId` holds would do it silently,
+ * and the only visible symptom is a bigger number in a build log nobody reads.
+ *
+ * Checked in both directions, because the two failures are opposite and both
+ * plausible: precaching a chunk the app cannot reach is the bug above, and
+ * *dropping* one it can reach breaks the app offline. The second is the one to
+ * fear from a name-based filter — the kiosk's locale slices and the app's own
+ * are built under the same names (es-MX, zh-Hans, zh-Hant), so a pattern
+ * written to catch the kiosk's would take the counselors' translations with it
+ * and nothing would say so until a phone went offline in Spanish.
+ *
+ * Both sides are restricted to names that exist under dist/assets/ and end in
+ * .js. `walk` finds chunk names by matching string literals, and the built
+ * `main-*.js` contains the literal "sw.js" from its `registerSW` call — so
+ * without that restriction the walker reports `sw.js` as reachable, it is of
+ * course not in the precache, and a correct build fails on the second check.
+ */
+const emittedChunks = new Set(
+  readdirSync(join(DIST, 'assets')).filter((name) => name.endsWith('.js')),
+);
+
+const mainReachable = new Set(
+  [...walk(new Set(), staticRefsOf('index.html'))].filter((name) => emittedChunks.has(name)),
+);
+
+const precachedChunks = new Set(
+  [...readFileSync(join(DIST, 'sw.js'), 'utf8').matchAll(/url:\s*"([^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((url) => url.startsWith('assets/'))
+    .map((url) => basename(url))
+    .filter((name) => emittedChunks.has(name)),
+);
+
+const unreachable = [...precachedChunks].filter((name) => !mainReachable.has(name));
+if (unreachable.length > 0) {
+  console.error(
+    `The main app's service worker precaches chunks index.html cannot reach: ${unreachable.join(', ')}\n` +
+      'These are almost certainly the kiosk\'s. The precache manifest is filtered against ' +
+      'the main entry\'s chunk graph by the recordMainAppGraph plugin in vite.config.ts; if ' +
+      'that stopped applying, fix it there rather than relaxing this check.',
+  );
+  process.exit(1);
+}
+
+const unprecached = [...mainReachable].filter((name) => !precachedChunks.has(name));
+if (unprecached.length > 0) {
+  console.error(
+    `The main app's service worker is missing chunks index.html reaches: ${unprecached.join(', ')}\n` +
+      'The precache filter in vite.config.ts is dropping something the app needs, which is ' +
+      'an app that half-works offline. Check the manifestTransforms entry there.',
+  );
+  process.exit(1);
+}
+
+console.log(
+  `  main app precache: ${precachedChunks.size} of ${emittedChunks.size} emitted chunks`,
+);
 
 /* ---- The install surface ------------------------------------------------- */
 

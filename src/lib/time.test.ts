@@ -5,7 +5,7 @@
  * ISO strings so the suite asserts *local* wall-clock behaviour and passes in
  * any timezone — which is the whole point of the module.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   addMinutes,
   atTimeOfDay,
@@ -612,6 +612,42 @@ describe('the three ways a date is written on screen', () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
     expect(formatRelative(times, twoHoursAgo)).toBe('2 hours ago');
+  });
+
+  it('builds one `RelativeTimeFormat` for a locale, not one per call', () => {
+    /*
+     * The dashboard's MIA list renders this once per row under a `useNow()`
+     * tick and its row is not memoised, so a formatter built here is a
+     * formatter built sixty times a minute on a five-year-old phone. It goes
+     * through the cache in `@/lib/intlCache` for the same reason the date
+     * formatters always have.
+     *
+     * A locale nothing else in this suite uses, because that cache is
+     * module-level and outlives an `it`: a warm entry would let this pass with
+     * the construction moved back inline.
+     *
+     * The spy forwards to the real constructor through a `function` expression
+     * rather than an arrow. Vitest 4 invokes a mocked constructor with
+     * `Reflect.construct`, and a bare `vi.spyOn` hands back an instance with no
+     * `format` on it — "….format is not a function" — so the implementation has
+     * to build a real one and return it.
+     */
+    const real = globalThis.Intl.RelativeTimeFormat;
+    const spy = vi
+      .spyOn(globalThis.Intl, 'RelativeTimeFormat')
+      .mockImplementation(function (locale?: unknown, options?: unknown) {
+        return new real(
+          locale as Intl.LocalesArgument,
+          options as Intl.RelativeTimeFormatOptions,
+        );
+      } as unknown as typeof Intl.RelativeTimeFormat);
+
+    const kiwi: TimeStrings = { locale: 'en-NZ', t: times.t };
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    expect(formatRelative(kiwi, twoHoursAgo)).toBe('2 hours ago');
+    expect(formatRelative(kiwi, twoHoursAgo)).toBe('2 hours ago');
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
 

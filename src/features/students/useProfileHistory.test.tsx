@@ -11,10 +11,11 @@
  * `outcomeOf` is deliberately not mocked. It is the rule under test; only the
  * reads and writes around it are stubbed.
  */
-import { renderHook, waitFor } from '@/test/rtl';
+import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProfileHistory } from '@/features/students/useProfileHistory';
 import type * as SkippedNights from '@/services/skippedNights';
+import type { Student } from '@/types';
 import { makeEvent, makeStudent } from '../../../tests/factories';
 
 const fetchAttendanceByEvent = vi.hoisted(() => vi.fn());
@@ -313,6 +314,47 @@ describe('useProfileHistory, when a gathering is not the reader’s', () => {
     await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
     expect(result.current.withheld).toEqual(new Set(['sunday']));
     expect(fetchAttendanceByEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('useProfileHistory, when the profile is closed mid-read', () => {
+  it('reads it again when the same student is opened straight back up', async () => {
+    /*
+     * The sentinel that stops two identical reads going out at once is released
+     * in the `finally`, and the `finally` returns early for a read whose caller
+     * has moved on. So a profile closed while its year was still out kept the
+     * sentinel for the rest of the session, and opening that same student again
+     * — the ordinary thing to do after a mis-tap — was silently ignored: no
+     * read, no spinner, and a history that stays empty while claiming to have
+     * finished loading.
+     */
+    let land: (value: unknown) => void = () => {};
+    fetchSkippedNights.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
+    fetchSkippedNights.mockResolvedValue(read(covering()));
+
+    const { result, rerender } = renderHook(
+      ({ student }: { student: Student | null }) =>
+        useProfileHistory(student, [CAME, MISSED], WINDOW_START),
+      { initialProps: { student: STUDENT as Student | null } },
+    );
+    await waitFor(() => expect(fetchSkippedNights).toHaveBeenCalledTimes(1));
+
+    rerender({ student: null });
+
+    await act(async () => {
+      land(read(covering()));
+      await Promise.resolve();
+    });
+
+    rerender({ student: STUDENT });
+
+    await waitFor(() => expect(fetchSkippedNights).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(2));
   });
 });
 

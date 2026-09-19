@@ -251,6 +251,25 @@ export function CheckInPage() {
   const rosterList = useRef<HTMLUListElement | null>(null);
 
   /**
+   * The two values a tap needs to know but no tap handler may be rebuilt for.
+   *
+   * Refreshed every render and read at tap time, so the tap handlers do not
+   * have to be reborn on every keystroke and every attendance echo. The row
+   * memo in `StudentRow` compares callback identity before it compares the
+   * entry, so a handler that changes with `query` or `attendance.length`
+   * repaints the whole list to turn one row green — which is five hundred rows
+   * of work for a counselor who has just typed one letter.
+   *
+   * Written in place rather than reallocated, and written here rather than in
+   * an effect: the object is the handlers' window onto the current render, and
+   * a render that returned early below (archive, locked, no roster) without
+   * updating it would leave that window showing the render before it.
+   */
+  const latest = useRef({ query: '', attendanceCount: 0 });
+  latest.current.query = query;
+  latest.current.attendanceCount = attendance.length;
+
+  /**
    * The "Who's on" sheet, and which gathering it is open for.
    *
    * Lifted out of `EventHeader` because the page opens the same sheet from two
@@ -329,33 +348,62 @@ export function CheckInPage() {
    * costs nothing and covers the two cases a tap does not: a visitor arriving
    * already checked in from the quick-add modal, and a student the *other*
    * counselor's phone checked in a moment ago.
+   *
+   * An accumulator in a ref, read through a memo, rather than state: it is a
+   * running total of what the attendance stream has said, and holding it in
+   * state made every snapshot that added a record cost a second render pass
+   * and a second full roster rebuild for five hundred students — the stream
+   * lands, the effect sets the state, the roster is built twice for one tap.
+   * A memo folds it into the same render the records arrived in. A plain ref
+   * would do the accumulating but give the roster memo nothing to depend on;
+   * the memo is what makes "one more pinned id" a reason to rebuild.
+   *
+   * Filtered on the record's own `eventId`, which is what makes it safe to
+   * derive during render. `event.id` and `attendance` do not change in the
+   * same commit — for one render the new night is in hand while the stream
+   * still holds the old one's records — and without the filter that render
+   * would pin the previous gathering's students onto this one.
+   *
+   * Copied only when something is actually added, so the set keeps its
+   * identity across a snapshot that says nothing new. That is thrift in this
+   * derivation alone and nothing more: `useAttendance` hands the roster memo a
+   * fresh array on every snapshot regardless, so the rebuild below happens
+   * either way.
    */
-  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
+  const pinnedRef = useRef<{ eventId: string | null; ids: ReadonlySet<string> }>({
+    eventId: null,
+    ids: new Set(),
+  });
+  const pinned = useMemo(() => {
+    const id = event?.id ?? null;
+    const held = pinnedRef.current;
+    let ids = held.eventId === id ? held.ids : new Set<string>();
+    for (const record of attendance) {
+      if (id === null || record.eventId !== id) continue;
+      if (ids.has(record.studentId)) continue;
+      if (ids === held.ids) ids = new Set(ids);
+      (ids as Set<string>).add(record.studentId);
+    }
+    pinnedRef.current = { eventId: id, ids };
+    return ids;
+  }, [attendance, event?.id]);
 
   // A different gathering is a different queue: keep nothing from the last one.
   // Guarded on the id it was built for rather than run on mount, so opening the
-  // screen does not spend a second render clearing a set that is already empty.
+  // screen does not spend a second render clearing state that is already empty.
+  // The pinned ids are not reset here — they are keyed by gathering above, and
+  // an effect clearing them would land a frame after the new night's first
+  // roster had already been built with the old night's set.
   const pinnedFor = useRef(event?.id ?? null);
   useEffect(() => {
     const id = event?.id ?? null;
     if (pinnedFor.current === id) return;
     pinnedFor.current = id;
-    setPinned(new Set());
     // Both are statements about one row of one gathering, and neither survives
     // being pointed at a different night.
     setExpandedId(null);
     setSwapForId(null);
   }, [event?.id]);
-
-  useEffect(() => {
-    setPinned((current) => {
-      const added = attendance.filter((record) => !current.has(record.studentId));
-      if (added.length === 0) return current;
-      const next = new Set(current);
-      for (const record of added) next.add(record.studentId);
-      return next;
-    });
-  }, [attendance]);
 
   /**
    * The check-in being moved, read live rather than captured on the tap.
@@ -502,8 +550,13 @@ export function CheckInPage() {
    * attendance is read everywhere as cancelled, and somebody taking the register
    * for last Friday after the fact should see the dashboard agree without a
    * reload. Live events are untouched — their attendance comes from a listener.
+   *
+   * `attendanceCount` is handed in rather than read off the stream here,
+   * because this runs in a `finally` after the write has already echoed back
+   * through the listener. Reading it at that point would count the tap that is
+   * still being processed and move the "nearly empty" boundary below by one.
    */
-  const forgetCachedHistory = useCallback(() => {
+  const forgetCachedHistory = useCallback((attendanceCount: number) => {
     if (!event || event.checkInClosesAt >= new Date()) return;
     invalidateSnapshotCache(event.id);
 
@@ -526,10 +579,10 @@ export function CheckInPage() {
      * tap that worked — the next examination that finds this night held will
      * clear the entry anyway.
      */
-    if (attendance.length <= 3) {
+    if (attendanceCount <= 3) {
       void clearSkippedNight(chainKey(event), event.id).catch(() => {});
     }
-  }, [attendance.length, event]);
+  }, [event]);
 
   /**
    * Whether this student can be given a check-in at all, and a reason if not.
@@ -572,6 +625,15 @@ export function CheckInPage() {
       failure: string | ((cause: unknown) => string | null),
       work: () => Promise<void>,
     ) => {
+      /*
+       * Taken here, before anything else this function does, because the
+       * `finally` below runs after the write has echoed back through the
+       * attendance listener — by then the register has grown by the very tap
+       * being made, and `forgetCachedHistory` would be answering a different
+       * question than the one the tap asked.
+       */
+      const attendanceCount = latest.current.attendanceCount;
+
       if (ids.some((id) => inFlight.current.has(id))) return;
       for (const id of ids) {
         inFlight.current.add(id);
@@ -587,7 +649,7 @@ export function CheckInPage() {
           show(sentence, { tone: "error" });
         }
       } finally {
-        forgetCachedHistory();
+        forgetCachedHistory(attendanceCount);
         for (const id of ids) {
           inFlight.current.delete(id);
           setBusy(id, false);
@@ -623,7 +685,10 @@ export function CheckInPage() {
       if (!event || !user) return;
       if (refuseFrozen(entry)) return;
       const name = studentFullName(entry.student);
-      const searched = query.trim() !== "";
+      // Through the ref, not the closure: this handler is a prop on every row,
+      // and closing over `query` would rebuild it — and repaint the roster —
+      // on each of the three letters that led to this tap. See `latest`.
+      const searched = latest.current.query.trim() !== "";
 
       await write(
         [entry.student.id],
@@ -664,7 +729,7 @@ export function CheckInPage() {
         },
       );
     },
-    [event, user, query, flash, write, refuseFrozen, noteRefusal, t],
+    [event, user, flash, write, refuseFrozen, noteRefusal, t],
   );
 
   /**
@@ -1282,9 +1347,16 @@ export function CheckInPage() {
         )}
       </div>
 
-      {user ? (
+      {/* Rendered only while it is open, rather than mounted shut. `Modal`
+          supports both — it documents dismissal by rendering `null` as the
+          commoner of the two — and the closed form was costing this screen a
+          reconciliation of the whole dialog on every keystroke, since the
+          search box and the modal share a parent. Nothing is lost by
+          unmounting: the seeding effect inside clears every field on each
+          open, so a fresh mount and the old reset arrive at the same form. */}
+      {user && quickAddOpen ? (
         <QuickAddVisitorModal
-          open={quickAddOpen}
+          open
           onClose={() => setQuickAddOpen(false)}
           event={event}
           uid={user.uid}
@@ -1295,7 +1367,9 @@ export function CheckInPage() {
             // screen, so the filters need no nudging.
             setQuery("");
             setAnnouncement(t("announceAdded", { name }));
-            forgetCachedHistory();
+            // The register as it stands before this visitor's own record
+            // arrives, which is the count `forgetCachedHistory` asks about.
+            forgetCachedHistory(attendance.length);
           }}
         />
       ) : null}

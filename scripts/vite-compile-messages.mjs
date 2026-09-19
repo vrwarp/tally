@@ -43,8 +43,15 @@ import compile from 'icu-minify/compile';
  * was made from, the reviewer's status — and its "messages" are quoted source,
  * never rendered. Compiling it would corrupt the record and break the staleness
  * test that reads it.
+ *
+ * The generated slices under `kiosk/` and `app/` have to be named here too, and
+ * this pattern is the one place a new slice can be forgotten. A catalogue that
+ * slips past it is shipped as ICU source to a formatter with no parser in it,
+ * so `{count, plural, one {# kid} other {# kids}}` reaches a counselor's screen
+ * verbatim — which is exactly what adding `messages/app/` did until `app` was
+ * added to this alternation.
  */
-const CATALOGUE = /[\\/]messages[\\/](kiosk[\\/])?(en|es-MX|zh-Hans|zh-Hant)\.json(\?|$)/;
+const CATALOGUE = /[\\/]messages[\\/]((kiosk|app)[\\/])?(en|es-MX|zh-Hans|zh-Hant)\.json(\?|$)/;
 
 /** Compile every leaf of a catalogue, leaving its namespace shape alone. */
 function compileTree(node, path) {
