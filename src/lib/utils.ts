@@ -14,6 +14,10 @@ export function haptic(pattern: number | number[] = 12): void {
   if (typeof navigator === 'undefined') return;
   const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
   try {
+    // Stryker disable next-line OptionalChaining: the catch below answers a
+    // browser with no `vibrate` exactly as this does — silently — so calling it
+    // unguarded refuses nothing the guard would let through. It is here so the
+    // absence reads as expected rather than as a thrown error somebody chased.
     nav.vibrate?.(pattern);
   } catch {
     /* Vibration is a nicety, never a failure path. */
@@ -119,7 +123,14 @@ function searchKeyOf(value: string): SearchKey {
   if (held) return held;
   const normalized = normalizeForSearch(value);
   const key: SearchKey = { normalized, compact: compact(normalized) };
+  // Stryker disable next-line ConditionalExpression,EqualityOperator: the cap is
+  // a memory bound, not a correctness one — clearing early, late or never
+  // changes how much the tab holds and nothing a caller can read back. See the
+  // comment above: a miss simply does the work.
   if (SEARCH_KEY_CACHE.size >= SEARCH_KEY_CACHE_MAX) SEARCH_KEY_CACHE.clear();
+  // Stryker disable next-line CallExpression: same argument the other way. A
+  // cache that never records anything is a cache that always misses, and a
+  // miss recomputes the identical key.
   SEARCH_KEY_CACHE.set(value, key);
   return key;
 }
@@ -359,6 +370,10 @@ export function createSearchMatcher(query: string): SearchMatcher {
         }
       }
 
+      // Stryker disable next-line CallExpression: `rank` is a pure function of
+      // the student and this query, so a memo that records nothing answers
+      // every repeat question with the same number it just computed. The memo
+      // is here for the sort comparators that ask O(n log n) times.
       ranked.set(student, answer);
       return answer;
     },
@@ -535,6 +550,9 @@ const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
 /** Han characters, the ones `Intl.Collator` cannot file under a letter. */
 const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 
+/** A letter the collator can file under, which is what the eye scans for. */
+const LATIN = /[A-Za-z]/u;
+
 /**
  * What to file a person under, when their name is not written in letters.
  *
@@ -546,22 +564,45 @@ const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
  *
  * Doing that means romanizing the name, and romanizing means a dictionary close
  * to a megabyte — which is exactly what `functions/src/names/pinyin.ts` refuses
- * to put in a bundle. So the server has already done it: `searchName` carries
- * the romanization, and by contract the canonical one is the token immediately
- * after the Chinese. This reads it back. A name with no Chinese in it costs one
- * failed regexp, which is nearly every name.
+ * to put in a bundle. So the server has already done it: `searchName` is
+ * `buildSearchName(firstName, lastName)` with the romanizations appended, the
+ * canonical reading first. This reads that first appended token back. A name
+ * with no Chinese in it costs one failed regexp, which is nearly every name.
+ *
+ * **Only a name with nothing Latin in it needs any of that.** Planning Center
+ * writes a child with a nickname as `Vera “章依彤” Chang`, and that composite is
+ * what `firstName` holds — so the row prints *Vera* first, in the heavy weight,
+ * and Vera is the word a counselor scanning the column lands on. Filing her
+ * under the romanization put her between Austin and Cici, in the C's, with
+ * nothing on the row to say why; the list read as unsorted to everyone holding
+ * it. The romanization is for the names that print no Latin at all, where there
+ * is no leading word to scan and any letter is better than none.
  *
  * Falls back to the name itself — a student written before the backfill ran, or
  * one whose `searchName` the client rebuilt a moment ago and the trigger has
  * not yet widened. They file under Han for a second, which is where they were.
  */
-export function nameSortKey(person: { firstName: string; searchName?: string }): string {
-  if (!HAN.test(person.firstName)) return person.firstName;
+export function nameSortKey(person: {
+  firstName: string;
+  lastName?: string;
+  searchName?: string;
+}): string {
+  // One condition rather than two guards, because there is one question: a
+  // name files under itself unless it is written in Han and nothing else.
+  if (LATIN.test(person.firstName) || !HAN.test(person.firstName)) return person.firstName;
+
+  /*
+   * Which token the romanization is, by position: `searchName` opens with the
+   * name itself — `buildSearchName` in `@/types` — and the server appends to
+   * it. So the first token past the name is the canonical reading, and the
+   * Latin surname sitting inside the name is not mistaken for it. The count
+   * repeats that function's own whitespace collapsing rather than importing
+   * it: this module is in the kiosk's bundle and carries no dependencies.
+   */
   const tokens = person.searchName?.split(' ') ?? [];
-  for (let index = tokens.length - 1; index >= 0; index -= 1) {
-    if (HAN.test(tokens[index]!)) return tokens[index + 1] ?? person.firstName;
-  }
-  return person.firstName;
+  const name = `${person.firstName} ${person.lastName ?? ''}`.trim().replace(/\s+/g, ' ').split(' ');
+  const romanized = tokens[name.length];
+  return romanized !== undefined && !HAN.test(romanized) ? romanized : person.firstName;
 }
 
 export function sortByName<

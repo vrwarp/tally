@@ -34,8 +34,6 @@ export interface RosterListProps {
   /** Rendered instead of rows when `entries` is empty. */
   emptyLabel?: string;
   tone?: 'default' | 'present';
-  /** Show the "2 of 3" prediction hint on the rows the prediction picked out. */
-  showRecentHint?: boolean;
   onPress: (entry: RosterEntry) => void;
   /** The check mark on a checked-in row, and `Undo` in its action strip. */
   onUndo?: (entry: RosterEntry) => void;
@@ -98,7 +96,6 @@ export const RosterList = memo(function RosterList({
   description,
   emptyLabel,
   tone = 'default',
-  showRecentHint = false,
   onPress,
   onUndo,
   onSwap,
@@ -241,7 +238,6 @@ export const RosterList = memo(function RosterList({
               canOpenProfile={canOpenProfile}
               flashing={flashing.has(entry.student.id)}
               busy={busy.has(entry.student.id)}
-              showRecentHint={showRecentHint}
               allergyNote={allergyNotes.get(entry.student.id)}
             />
           ))}
