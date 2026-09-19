@@ -12,10 +12,16 @@
  * bytes only ever load on the press.
  *
  * Deliberately narrow. Byte mode only, error correction level M, versions 1
- * through 10 — 213 bytes, which is four times the longest join URL a
- * deployment can produce. Anything outside that throws rather than guessing,
+ * through 15 — 412 bytes. Anything outside that throws rather than guessing,
  * because a QR that encodes the wrong thing is indistinguishable from one that
  * encodes the right thing until somebody points a phone at it.
+ *
+ * It stopped at version 10 while the join URL was the only caller. The ceiling
+ * moved for the second one: `/setup` draws Test DPC's provisioning payload
+ * (`src/setup/policy.ts`), which is 355 bytes of JSON and needs a version 14
+ * symbol. 15 rather than 14 so that a deployment which hosts the Test DPC APK
+ * itself — the `appspot.com` caveat in `docs/tablet-management.md` §4.6 — has
+ * room for a longer download URL before this throws.
  *
  * Every step below is ISO/IEC 18004 as it is normally implemented. The reason
  * to trust it is not the comments: `qr.test.ts` compares whole matrices
@@ -27,13 +33,16 @@
  * The largest version this encodes, and why it stops there.
  *
  * A join URL is an origin plus `/join/` plus a 22-character token — 60-odd
- * bytes on a real deployment, which is a version 4 or 5 symbol. Version 10
- * holds 213 bytes at level M, so the ceiling is generous; going further would
- * mean carrying the whole 40-version block table for a case nobody has, and a
- * bigger symbol is a *worse* QR in the room anyway — the same phone camera has
- * to resolve more modules across the same screen.
+ * bytes on a real deployment, which is a version 4 or 5 symbol. The Test DPC
+ * payload is the large caller at 355 bytes, which is a version 14 symbol, and
+ * version 15 holds 412. Past that the table would be carried for a case
+ * nobody has, and a bigger symbol is a *worse* QR in the room anyway — the
+ * same camera has to resolve more modules across the same screen.
+ *
+ * Which is why nothing here picks a version: `pickVersion` takes the smallest
+ * one that fits, so a join URL is still the small square it always was.
  */
-const MAX_VERSION = 10;
+const MAX_VERSION = 15;
 
 /**
  * How many data codewords each version holds, and how they are grouped.
@@ -49,6 +58,14 @@ interface VersionSpec {
   blocks: readonly (readonly [blocks: number, dataCodewords: number])[];
 }
 
+/* Stryker disable all: static — see docs/mutation-testing.md. Every mutant in
+   this table is hybrid: the object is built when the module is imported, long
+   before Stryker can switch one on for a test, so all forty-four report as
+   survived however directly a test exercises the version. What a fixture would
+   have pinned is pinned in `qr.test.ts` instead — the codeword totals have to
+   agree with the modules each symbol leaves free, and every block has to
+   divide by its generator, both of which fail on a row typed one codeword
+   out. */
 const VERSIONS: Readonly<Record<number, VersionSpec>> = {
   1: { ecPerBlock: 10, blocks: [[1, 16]] },
   2: { ecPerBlock: 16, blocks: [[1, 28]] },
@@ -60,7 +77,13 @@ const VERSIONS: Readonly<Record<number, VersionSpec>> = {
   8: { ecPerBlock: 22, blocks: [[2, 38], [2, 39]] },
   9: { ecPerBlock: 22, blocks: [[3, 36], [2, 37]] },
   10: { ecPerBlock: 26, blocks: [[4, 43], [1, 44]] },
+  11: { ecPerBlock: 30, blocks: [[1, 50], [4, 51]] },
+  12: { ecPerBlock: 22, blocks: [[6, 36], [2, 37]] },
+  13: { ecPerBlock: 22, blocks: [[8, 37], [1, 38]] },
+  14: { ecPerBlock: 24, blocks: [[4, 40], [5, 41]] },
+  15: { ecPerBlock: 24, blocks: [[5, 41], [5, 42]] },
 };
+/* Stryker restore all */
 
 /**
  * Where the alignment patterns sit, as coordinates on both axes.
@@ -68,6 +91,9 @@ const VERSIONS: Readonly<Record<number, VersionSpec>> = {
  * Every pair of these is a pattern centre, minus the three corners the finders
  * already occupy. Version 1 has none, which is why the table starts at 2.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md, and the note on
+   `VERSIONS` above. A wrong centre moves an alignment pattern into the data
+   region, which `qr.test.ts` catches through its own reading of the geometry. */
 const ALIGNMENT_CENTRES: Readonly<Record<number, readonly number[]>> = {
   1: [],
   2: [6, 18],
@@ -79,7 +105,13 @@ const ALIGNMENT_CENTRES: Readonly<Record<number, readonly number[]>> = {
   8: [6, 24, 42],
   9: [6, 26, 46],
   10: [6, 28, 50],
+  11: [6, 30, 54],
+  12: [6, 32, 58],
+  13: [6, 34, 62],
+  14: [6, 26, 46, 66],
+  15: [6, 26, 48, 70],
 };
+/* Stryker restore all */
 
 /** Level M's two bits in the format information. L is 1, M is 0, Q is 3, H is 2. */
 const EC_LEVEL_M = 0;
@@ -97,6 +129,10 @@ const MODE_BYTE = 0b0100;
  * sum of two logarithms never has to be reduced modulo 255 at the call site.
  * The polynomial is 0x11D, which is the one the QR spec names.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. These two loops
+   run at import, so their mutants cannot be switched per test either. They are
+   not unwatched: a wrong table is a wrong error-correction codeword, and the
+   syndrome check in `qr.test.ts` evaluates every block at every root. */
 const EXP = new Uint8Array(512);
 const LOG = new Uint8Array(256);
 
@@ -107,9 +143,14 @@ for (let i = 0, x = 1; i < 255; i += 1) {
   if (x & 0x100) x ^= 0x11d;
 }
 for (let i = 255; i < 512; i += 1) EXP[i] = EXP[i - 255]!;
+/* Stryker restore all */
 
 function multiply(a: number, b: number): number {
   // Zero has no logarithm, and it is the one case the tables cannot answer.
+  // Stryker disable next-line ConditionalExpression: no caller passes zero as
+  // `a` — the generator's coefficients are all non-zero and the remainder is
+  // the other argument — so dropping that half of the guard is a mutant no
+  // test can tell apart from the guard itself.
   if (a === 0 || b === 0) return 0;
   return EXP[LOG[a]! + LOG[b]!]!;
 }
@@ -418,6 +459,11 @@ function drawCodewords(symbol: Grid, codewords: Uint8Array): void {
 }
 
 /** The eight masks, as the spec's conditions. A true condition flips the module. */
+/* Stryker disable ArrowFunction: static — replacing a whole mask is a change to
+   the array built at import, which cannot be switched on for one test (see
+   docs/mutation-testing.md). Only the eight function bodies are mutated here,
+   and those are runtime: `qr.test.ts` reads back a payload masked by each of
+   them. */
 const MASKS: readonly ((row: number, col: number) => boolean)[] = [
   (row, col) => (row + col) % 2 === 0,
   (row) => row % 2 === 0,
@@ -428,6 +474,7 @@ const MASKS: readonly ((row: number, col: number) => boolean)[] = [
   (row, col) => (((row * col) % 2) + ((row * col) % 3)) % 2 === 0,
   (row, col) => (((row + col) % 2) + ((row * col) % 3)) % 2 === 0,
 ];
+/* Stryker restore ArrowFunction */
 
 /** XOR in place. Called twice per candidate — once to try it, once to undo it. */
 function applyMask(symbol: Grid, mask: number): void {
@@ -554,13 +601,13 @@ function penalty(symbol: Grid): number {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The one thing this module exports                                           */
+/* What this module exports: a symbol, and a way to draw one                   */
 /* -------------------------------------------------------------------------- */
 
 export interface QrCode {
   /** Modules a side. A version 4 symbol is 33. */
   size: number;
-  /** The version chosen for the payload, 1 to 10. */
+  /** The version chosen for the payload, 1 to 15. */
   version: number;
   /** Row-major and square: `modules[row][col]` is true where the square is dark. */
   modules: boolean[][];
@@ -578,6 +625,33 @@ export interface QrCode {
  * catch it and fall back to the link, which is the half of the journey that
  * always works.
  */
+/**
+ * The dark modules as one SVG path, and the side of the box that holds them.
+ *
+ * One `<path>` rather than a rect per module: a version 14 symbol has 5,329 of
+ * them, and a few thousand DOM nodes is a real cost on a lobby tablet for a
+ * picture that never changes. Every module is a one-unit square in a viewBox
+ * measured in modules, so the drawn size is the caller's business and nothing
+ * here has to know about pixels.
+ *
+ * The quiet zone is not decoration. A symbol butted up against a border or a
+ * dark background is one a camera can fail to *find*, which looks exactly like
+ * a symbol that will not scan; four modules is what the spec asks for.
+ */
+export function qrPath(
+  modules: readonly (readonly boolean[])[],
+  quiet = 4,
+): { d: string; extent: number } {
+  const size = modules.length;
+  const parts: string[] = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      if (modules[row]![col]) parts.push(`M${col + quiet} ${row + quiet}h1v1h-1z`);
+    }
+  }
+  return { d: parts.join(''), extent: size + quiet * 2 };
+}
+
 export function encodeQr(text: string): QrCode {
   const bytes = new TextEncoder().encode(text);
   const version = pickVersion(bytes.length);

@@ -142,3 +142,40 @@ export function maintenanceWindow(): { startMinutes: number; endMinutes: number;
 /** The one command that avoids a factory reset, for a tablet already in service. */
 export const ADB_DEVICE_OWNER =
   'adb shell dpm set-device-owner "com.afwsamples.testdpc/.DeviceAdminReceiver"';
+
+/**
+ * What a factory-reset tablet is shown at its welcome screen, instead of typed.
+ *
+ * The third route to device owner in `docs/tablet-management.md` §4.6: tap the
+ * setup wizard's welcome screen six times and scan this, and Android fetches
+ * Test DPC and hands it the device. Nothing is typed on the tablet at all,
+ * which is the whole argument for it — `afw#testdpc` is nine characters into a
+ * field with an on-screen keyboard, and this is a camera pointed at a laptop.
+ *
+ * Published by Test DPC itself and identical on every deployment — unlike the
+ * rest of this file, none of it is derived from the origin. It is here rather
+ * than in the page's markup so that the checksum, which pins Test DPC's
+ * signing key, sits next to a test that says what it is.
+ *
+ * The download location is Google's, and a tablet that cannot reach it hangs
+ * on *configuring*. A deployment that hits this hosts the APK itself and
+ * changes the one value; `encodeQr` has room to version 15 so a longer URL
+ * still draws.
+ */
+export const TESTDPC_PROVISIONING: Readonly<Record<string, string>> = {
+  'android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME':
+    'com.afwsamples.testdpc/com.afwsamples.testdpc.DeviceAdminReceiver',
+  'android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM':
+    'gJD2YwtOiWJHkSMkkIfLRlj-quNqG1fb6v100QmzM9w=',
+  'android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION':
+    'https://testdpc-latest-apk.appspot.com',
+};
+
+/**
+ * The exact bytes the symbol carries.
+ *
+ * Minified, because every byte is a module a camera has to resolve: the pretty
+ * form of the same object is 130 bytes longer and pushes the symbol a version
+ * larger for nothing. The wizard parses JSON; it does not read it.
+ */
+export const TESTDPC_QR_PAYLOAD = JSON.stringify(TESTDPC_PROVISIONING);

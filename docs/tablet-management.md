@@ -425,7 +425,8 @@ still verifies, but it is verifying the *content* of the rule, not the shape of 
 Fully managed provisioning cannot be done to a tablet that is already set up — device owner is only
 grantable during the setup wizard. Each device is factory reset, and at the very first screen either
 the QR the console mints is scanned, or a token is typed into the Google account field: `afw#setup`
-for a console-managed enrolment, **`afw#testdpc` for the route chosen here**. Budget twenty minutes
+for a console-managed enrolment, **`afw#testdpc` for the route chosen here**. The chosen route has
+a QR of its own too — Test DPC publishes one, and §4.6 step 1 has its payload. Budget twenty minutes
 for the first tablet and five for each after.
 
 One exception, and it is the useful one for tablets already in service: device owner *can* be
@@ -556,10 +557,34 @@ and the kiosk falls back to asking for a printer exactly as it does now.
 
 #### The runbook
 
-**1. Get to device owner.** Two ways in; neither needs a console, an account or a network service.
+**1. Get to device owner.** Three ways in; none needs a console, an account or a network service.
 
 - **`afw#testdpc`** — factory reset, and at the setup wizard's Google account field type
   `afw#testdpc`. Android fetches Test DPC and makes it device owner.
+- **A QR code at the welcome screen** — factory reset, tap the setup wizard's welcome screen six
+  times to bring up the QR reader, and scan a code carrying Test DPC's published payload:
+
+  ```json
+  {
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME": "com.afwsamples.testdpc/com.afwsamples.testdpc.DeviceAdminReceiver",
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM": "gJD2YwtOiWJHkSMkkIfLRlj-quNqG1fb6v100QmzM9w=",
+    "android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION": "https://testdpc-latest-apk.appspot.com"
+  }
+  ```
+
+  It lands in the same place as `afw#testdpc`, with nothing typed on the tablet — which is the
+  argument for it. §4.4 already suggests laminating a console's enrolment QR and leaving it at the
+  check-in desk so a dead tablet is a reset and a scan; this is that, without a console.
+  [Test DPC's README](https://github.com/googlesamples/android-testdpc#qr-code-provisioning-device-owner-n-only)
+  carries the payload above and a pre-made code — and **`/setup` draws the same code itself**
+  (§6.3), so a laptop with that page open is a scannable one and nothing has to be generated
+  anywhere. Four things to know before relying on it. The code has to be on *another* screen or on
+  paper — the tablet scanning it is sitting at its own welcome screen. Android P and newer have
+  the reader already; O and older ask to join wifi first so the wizard can fetch one. The download
+  location is Google's `appspot.com` host, and a tablet that cannot reach it hangs on
+  *configuring* — the fix there is to host the APK somewhere you control and regenerate the code
+  with that URL. And the checksum pins Test DPC's signing key, so a code that stops being accepted
+  means the payload has moved on: take a fresh one from the README rather than from here.
 - **adb, without a factory reset** — if the tablets are already set up, this is usually quicker.
   Device owner can be granted post-setup *only* over adb and *only* while no accounts exist on the
   device, so remove every account in Settings first, then:
@@ -760,6 +785,15 @@ Step 2 of §4.6 becomes: open it in Chrome on the tablet, copy, paste into Test 
 Ordered so the two URL lists come last, because pasting the blocklist early cuts off the page
 itself.
 
+**And step 1's QR, drawn on the page.** The provisioning payload is 355 bytes of published JSON —
+the one thing here that is the same on every deployment — and the page draws it as a scannable
+symbol rather than printing it for somebody to feed to a QR generator. `src/lib/qr.ts` already
+encodes the invite QR, so this cost a ceiling: it stopped at version 10 and the payload needs a
+version 14 symbol. The code is for the *next* tablet, never the one showing it, and the page says
+so: whatever is displaying `/setup` is past its own setup wizard. Which makes this the one part of
+the page that wants a laptop or a printout rather than the tablet in your hands — and the reason
+§4.4's laminated-QR-at-the-desk trick now needs no console at all.
+
 **It should not be staff-gated, and the reason is worth being precise about.** An earlier draft of
 this section said it should be. That was wrong twice over. First, there is nothing secret in it: a
 USB vendor id is published by Brother, and the origin is the URL printed on the tablet's own screen
@@ -942,9 +976,10 @@ The only phase that can invalidate the others, so it goes first, and it needs no
 is no connect-the-printer step: the identifiers are published and the hardware has been printing for
 months (§4.6).
 
-1. **Provision one tablet to device owner** — whichever of §4.6's two routes suits (`afw#testdpc`
-   from a reset, or `dpm set-device-owner` over adb with the accounts removed). Start with the
-   tablet that already prints, because it is the only one that can prove the second check below.
+1. **Provision one tablet to device owner** — whichever of §4.6's three routes suits (`afw#testdpc`
+   from a reset, Test DPC's provisioning QR scanned at the welcome screen, or `dpm set-device-owner`
+   over adb with the accounts removed). Start with the tablet that already prints, because it is the
+   only one that can prove the second check below.
 2. **Revoke its manual chooser grant** in Chrome's site settings. Skip this and the pass is false —
    `getDevices()` will return the printer on the strength of the old grant.
 3. **Set `WebUsbAllowDevicesForUrls`** in Test DPC → Managed configurations → Chrome, with the

@@ -16,7 +16,14 @@
  *
  * The pairing token of §6.4 must never appear here. That one is a credential.
  */
-import { ADB_DEVICE_OWNER, maintenanceWindow, policyRows, type PolicyRow } from './policy';
+import { encodeQr, qrPath } from '@/lib/qr';
+import {
+  ADB_DEVICE_OWNER,
+  TESTDPC_QR_PAYLOAD,
+  maintenanceWindow,
+  policyRows,
+  type PolicyRow,
+} from './policy';
 
 const ORIGIN = window.location.origin;
 
@@ -65,6 +72,35 @@ function copyButton(value: string, target: HTMLElement): HTMLButtonElement {
   return button;
 }
 
+/**
+ * The provisioning code, drawn here rather than fetched.
+ *
+ * Imported outright and not behind `await import()`, which is the opposite of
+ * what the Team screen does with the same encoder — and for the same reason.
+ * There the bytes are avoided for the many people who never press QR; here the
+ * square is the section. A static import is preloaded from this page's own
+ * markup, so the encoder arrives alongside it rather than after it, which is
+ * what matters on a tablet four minutes into an unfamiliar network.
+ *
+ * `crispEdges` because a 232px box holding a 73-module symbol lands two or
+ * three pixels on each module, and an anti-aliased boundary at that size is a
+ * grey smear rather than an edge.
+ */
+function qrNode(text: string, label: string): SVGSVGElement {
+  const { d, extent } = qrPath(encodeQr(text).modules);
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${extent} ${extent}`);
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', label);
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', '#000');
+  svg.append(path);
+  return svg;
+}
+
 function rowNode(row: PolicyRow): HTMLElement {
   const section = el('section', `row ${row.weight}`);
   const head = el('div', 'head');
@@ -93,6 +129,29 @@ function render(): void {
   const adb = main.querySelector<HTMLElement>('.adb')!;
   adb.textContent = ADB_DEVICE_OWNER;
   adb.after(copyButton(ADB_DEVICE_OWNER, adb));
+
+  const payload = main.querySelector<HTMLElement>('.payload')!;
+  payload.textContent = TESTDPC_QR_PAYLOAD;
+  main.querySelector('.payload-copy')!.replaceWith(copyButton(TESTDPC_QR_PAYLOAD, payload));
+
+  /*
+   * The square is the one thing on this page that can fail to be drawn at all
+   * — a payload past the encoder's ceiling throws — and the page must not go
+   * blank for it. The JSON above is already on screen and is what a code
+   * generator would be fed, so the fallback is to say so and leave it there.
+   */
+  const square = main.querySelector<HTMLElement>('.qr')!;
+  try {
+    square.replaceChildren(qrNode(TESTDPC_QR_PAYLOAD, 'Test DPC provisioning code'));
+  } catch {
+    square.replaceWith(
+      el(
+        'p',
+        'note',
+        'This code could not be drawn here. Unfold the payload below and make a QR from it.',
+      ),
+    );
+  }
 }
 
 render();
