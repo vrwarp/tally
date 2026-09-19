@@ -12,10 +12,16 @@
  * bytes only ever load on the press.
  *
  * Deliberately narrow. Byte mode only, error correction level M, versions 1
- * through 10 — 213 bytes, which is four times the longest join URL a
- * deployment can produce. Anything outside that throws rather than guessing,
+ * through 15 — 412 bytes. Anything outside that throws rather than guessing,
  * because a QR that encodes the wrong thing is indistinguishable from one that
  * encodes the right thing until somebody points a phone at it.
+ *
+ * It stopped at version 10 while the join URL was the only caller. The ceiling
+ * moved for the second one: `/setup` draws Test DPC's provisioning payload
+ * (`src/setup/policy.ts`), which is 355 bytes of JSON and needs a version 14
+ * symbol. 15 rather than 14 so that a deployment which hosts the Test DPC APK
+ * itself — the `appspot.com` caveat in `docs/tablet-management.md` §4.6 — has
+ * room for a longer download URL before this throws.
  *
  * Every step below is ISO/IEC 18004 as it is normally implemented. The reason
  * to trust it is not the comments: `qr.test.ts` compares whole matrices
@@ -27,13 +33,16 @@
  * The largest version this encodes, and why it stops there.
  *
  * A join URL is an origin plus `/join/` plus a 22-character token — 60-odd
- * bytes on a real deployment, which is a version 4 or 5 symbol. Version 10
- * holds 213 bytes at level M, so the ceiling is generous; going further would
- * mean carrying the whole 40-version block table for a case nobody has, and a
- * bigger symbol is a *worse* QR in the room anyway — the same phone camera has
- * to resolve more modules across the same screen.
+ * bytes on a real deployment, which is a version 4 or 5 symbol. The Test DPC
+ * payload is the large caller at 355 bytes, which is a version 14 symbol, and
+ * version 15 holds 412. Past that the table would be carried for a case
+ * nobody has, and a bigger symbol is a *worse* QR in the room anyway — the
+ * same camera has to resolve more modules across the same screen.
+ *
+ * Which is why nothing here picks a version: `pickVersion` takes the smallest
+ * one that fits, so a join URL is still the small square it always was.
  */
-const MAX_VERSION = 10;
+const MAX_VERSION = 15;
 
 /**
  * How many data codewords each version holds, and how they are grouped.
@@ -60,6 +69,11 @@ const VERSIONS: Readonly<Record<number, VersionSpec>> = {
   8: { ecPerBlock: 22, blocks: [[2, 38], [2, 39]] },
   9: { ecPerBlock: 22, blocks: [[3, 36], [2, 37]] },
   10: { ecPerBlock: 26, blocks: [[4, 43], [1, 44]] },
+  11: { ecPerBlock: 30, blocks: [[1, 50], [4, 51]] },
+  12: { ecPerBlock: 22, blocks: [[6, 36], [2, 37]] },
+  13: { ecPerBlock: 22, blocks: [[8, 37], [1, 38]] },
+  14: { ecPerBlock: 24, blocks: [[4, 40], [5, 41]] },
+  15: { ecPerBlock: 24, blocks: [[5, 41], [5, 42]] },
 };
 
 /**
@@ -79,6 +93,11 @@ const ALIGNMENT_CENTRES: Readonly<Record<number, readonly number[]>> = {
   8: [6, 24, 42],
   9: [6, 26, 46],
   10: [6, 28, 50],
+  11: [6, 30, 54],
+  12: [6, 32, 58],
+  13: [6, 34, 62],
+  14: [6, 26, 46, 66],
+  15: [6, 26, 48, 70],
 };
 
 /** Level M's two bits in the format information. L is 1, M is 0, Q is 3, H is 2. */
@@ -554,13 +573,13 @@ function penalty(symbol: Grid): number {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The one thing this module exports                                           */
+/* What this module exports: a symbol, and a way to draw one                   */
 /* -------------------------------------------------------------------------- */
 
 export interface QrCode {
   /** Modules a side. A version 4 symbol is 33. */
   size: number;
-  /** The version chosen for the payload, 1 to 10. */
+  /** The version chosen for the payload, 1 to 15. */
   version: number;
   /** Row-major and square: `modules[row][col]` is true where the square is dark. */
   modules: boolean[][];
@@ -578,6 +597,33 @@ export interface QrCode {
  * catch it and fall back to the link, which is the half of the journey that
  * always works.
  */
+/**
+ * The dark modules as one SVG path, and the side of the box that holds them.
+ *
+ * One `<path>` rather than a rect per module: a version 14 symbol has 5,329 of
+ * them, and a few thousand DOM nodes is a real cost on a lobby tablet for a
+ * picture that never changes. Every module is a one-unit square in a viewBox
+ * measured in modules, so the drawn size is the caller's business and nothing
+ * here has to know about pixels.
+ *
+ * The quiet zone is not decoration. A symbol butted up against a border or a
+ * dark background is one a camera can fail to *find*, which looks exactly like
+ * a symbol that will not scan; four modules is what the spec asks for.
+ */
+export function qrPath(
+  modules: readonly (readonly boolean[])[],
+  quiet = 4,
+): { d: string; extent: number } {
+  const size = modules.length;
+  const parts: string[] = [];
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      if (modules[row]![col]) parts.push(`M${col + quiet} ${row + quiet}h1v1h-1z`);
+    }
+  }
+  return { d: parts.join(''), extent: size + quiet * 2 };
+}
+
 export function encodeQr(text: string): QrCode {
   const bytes = new TextEncoder().encode(text);
   const version = pickVersion(bytes.length);

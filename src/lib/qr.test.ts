@@ -13,6 +13,13 @@
  *    the wrong width: all of them come back as the wrong string.
  * 2. **It is pinned.** `JOIN_URL_MATRIX` is one whole symbol, module for
  *    module, so nothing here can drift without the fixture failing.
+ * 3. **Its error correction is checked as arithmetic.** A Reed-Solomon block
+ *    is divisible by its generator, so every block of every symbol is
+ *    evaluated at α⁰…α^(n-1) and has to come back zero. That is a property, not
+ *    a re-derivation: it holds whatever the block table says, which is what
+ *    makes it worth anything for versions 11 to 15 — the ones that arrived for
+ *    Test DPC's provisioning payload and have no pinned matrix, because
+ *    nothing outside this repository was available to draw one.
  *
  *    What that fixture was checked against, and what it was not: OpenCV's
  *    detector reads the rendered image back as the URL, and keeps reading it
@@ -33,7 +40,8 @@
  * preference rather than a fact.
  */
 import { describe, expect, it } from 'vitest';
-import { encodeQr } from '@/lib/qr';
+import { encodeQr, qrPath } from '@/lib/qr';
+import { TESTDPC_PROVISIONING, TESTDPC_QR_PAYLOAD } from '@/setup/policy';
 
 /* -------------------------------------------------------------------------- */
 /* A second implementation, for reading one back                               */
@@ -61,6 +69,11 @@ const ALIGNMENT: Readonly<Record<number, readonly number[]>> = {
   8: [6, 24, 42],
   9: [6, 26, 46],
   10: [6, 28, 50],
+  11: [6, 30, 54],
+  12: [6, 32, 58],
+  13: [6, 34, 62],
+  14: [6, 26, 46, 66],
+  15: [6, 26, 48, 70],
 };
 
 /** Data codewords per block, level M — written out from the spec's table again. */
@@ -75,7 +88,67 @@ const BLOCKS: Readonly<Record<number, readonly number[]>> = {
   8: [38, 38, 39, 39],
   9: [36, 36, 36, 37, 37],
   10: [43, 43, 43, 43, 44],
+  11: [50, 51, 51, 51, 51],
+  12: [36, 36, 36, 36, 36, 36, 37, 37],
+  13: [37, 37, 37, 37, 37, 37, 37, 37, 38],
+  14: [40, 40, 40, 40, 41, 41, 41, 41, 41],
+  15: [41, 41, 41, 41, 41, 42, 42, 42, 42, 42],
 };
+
+/** Error-correction codewords per block, level M — same table, other column. */
+const EC_PER_BLOCK: Readonly<Record<number, number>> = {
+  1: 10,
+  2: 16,
+  3: 26,
+  4: 18,
+  5: 24,
+  6: 16,
+  7: 18,
+  8: 22,
+  9: 22,
+  10: 26,
+  11: 30,
+  12: 22,
+  13: 22,
+  14: 24,
+  15: 24,
+};
+
+/* -------------------------------------------------------------------------- */
+/* GF(256), again, to check the error correction rather than reproduce it      */
+/* -------------------------------------------------------------------------- */
+
+const GF_EXP = new Uint8Array(512);
+const GF_LOG = new Uint8Array(256);
+for (let i = 0, x = 1; i < 255; i += 1) {
+  GF_EXP[i] = x;
+  GF_LOG[x] = i;
+  x <<= 1;
+  if (x & 0x100) x ^= 0x11d;
+}
+for (let i = 255; i < 512; i += 1) GF_EXP[i] = GF_EXP[i - 255]!;
+
+function gfMultiply(a: number, b: number): number {
+  if (a === 0 || b === 0) return 0;
+  return GF_EXP[GF_LOG[a]! + GF_LOG[b]!]!;
+}
+
+/**
+ * Whether a block really is a Reed-Solomon codeword.
+ *
+ * Data followed by its check bytes is a polynomial with α⁰…α^(n-1) among its
+ * roots, so evaluating it at each of them gives zero. Any other set of check
+ * bytes — a wrong generator, a wrong count, two blocks interleaved the wrong
+ * way round — gives something else. Horner, so each root is one pass.
+ */
+function syndromesClear(block: readonly number[], count: number): boolean {
+  for (let root = 0; root < count; root += 1) {
+    let value = 0;
+    for (const byte of block) value = gfMultiply(value, GF_EXP[root]!) ^ byte;
+    if (value !== 0) return false;
+  }
+  return true;
+}
 
 /** Every module a function pattern owns, worked out from the version alone. */
 function functionMap(version: number, size: number): boolean[][] {
@@ -127,6 +200,8 @@ interface Decoded {
   level: number;
   mask: number;
   text: string;
+  /** Every block as it was laid down: its data codewords, then its check bytes. */
+  blocks: number[][];
 }
 
 /** Reads a finished symbol the way a scanner would, minus the optics. */
@@ -186,8 +261,20 @@ function decode(modules: readonly boolean[][]): Decoded {
   }
   const data = blocks.flat();
 
-  // Mode, length, and the bytes themselves. Error correction is not applied —
-  // nothing here is damaged, and repairing it would only hide a mistake.
+  // The check bytes come after every data codeword, the same number per block
+  // and interleaved the same way. How many there are is not read from a table:
+  // it is whatever is left once the data has been taken, which makes it the
+  // symbol's own answer to a question `EC_PER_BLOCK` also answers.
+  const ecPerBlock = (codewords.length - cursor) / lengths.length;
+  const withEc = blocks.map((block) => [...block]);
+  for (let i = 0; i < ecPerBlock; i += 1) {
+    for (let block = 0; block < lengths.length; block += 1) withEc[block]!.push(codewords[cursor++]!);
+  }
+
+  // Mode, length, and the bytes themselves. Error correction is not *applied* —
+  // nothing here is damaged, and repairing it would only hide a mistake — but
+  // it is handed back for checking, because a symbol whose check bytes are
+  // wrong still decodes perfectly here and fails on the first thumbprint.
   let bit = 0;
   const take = (width: number) => {
     let value = 0;
@@ -202,7 +289,7 @@ function decode(modules: readonly boolean[][]): Decoded {
   const bytes = new Uint8Array(length);
   for (let i = 0; i < length; i += 1) bytes[i] = take(8);
 
-  return { level, mask, text: new TextDecoder().decode(bytes) };
+  return { level, mask, text: new TextDecoder().decode(bytes), blocks: withEc };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -262,7 +349,7 @@ const JOIN_URL_MATRIX = [
 /* -------------------------------------------------------------------------- */
 
 /**
- * Every version this encoder can produce, pinned module for module.
+ * Versions 1 to 10, pinned module for module.
  *
  * The round trip above cannot see a good deal of what this file decides. The
  * `decode` helper carries its *own* alignment table and ignores the error
@@ -280,6 +367,15 @@ const JOIN_URL_MATRIX = [
  * twelve rounds of Gaussian blur, sensor noise and a downscale to 55% — the
  * abuse a phone camera across a foyer applies. Regenerating one of these to
  * make a test pass is therefore not a repair; it is deleting the evidence.
+ *
+ * It stops at 10 because that is where the encoder stopped when these were
+ * made. Versions 11 to 15 came later, for Test DPC's provisioning payload, and
+ * no second encoder was available to draw them — so what a fixture would have
+ * pinned there is pinned instead by the two tests below it: the codeword total
+ * has to match the modules the symbol actually leaves free, and every block
+ * has to be a real Reed-Solomon codeword. Between them, a wrong block split
+ * and a wrong `ecPerBlock` have nowhere to hide. Pin these five the day an
+ * unrelated encoder is at hand.
  */
 const PER_VERSION: readonly { version: number; text: string; rows: readonly string[] }[] = [
   {
@@ -737,6 +833,42 @@ const PER_VERSION: readonly { version: number; text: string; rows: readonly stri
 const asRows = (modules: readonly boolean[][]) =>
   modules.map((row) => row.map((dark) => (dark ? '1' : '0')).join(''));
 
+/**
+ * The last payload each version holds at level M in byte mode.
+ *
+ * Every one of these is a boundary: one byte more and the next version is
+ * chosen, so an off-by-one anywhere in the capacity arithmetic lands on one of
+ * them.
+ */
+const CAPACITIES: readonly (readonly [version: number, bytes: number])[] = [
+  [1, 14],
+  [2, 26],
+  [3, 42],
+  [4, 62],
+  [5, 84],
+  [6, 106],
+  [7, 122],
+  [8, 152],
+  [9, 180],
+  [10, 213],
+  [11, 251],
+  [12, 287],
+  [13, 331],
+  [14, 362],
+  [15, 412],
+];
+
+/**
+ * A payload of exactly `length` bytes with no repetition in it, so a bit
+ * written twice or dropped cannot decode back to the same string by luck.
+ */
+function filler(length: number): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@';
+  return Array.from({ length }, (_, i) =>
+    alphabet.charAt((i * 7 + Math.floor(i / 11)) % alphabet.length),
+  ).join('');
+}
+
 describe('encodeQr', () => {
   it('draws the symbol an unrelated encoder draws for the same link', () => {
     expect(asRows(encodeQr(JOIN_URL).modules)).toEqual(JOIN_URL_MATRIX);
@@ -762,21 +894,20 @@ describe('encodeQr', () => {
     // One payload per version boundary at level M in byte mode: the last
     // length that fits, and the first that does not. Both are where an
     // off-by-one in the capacity table or the terminator shows up.
-    const lengths = [1, 14, 15, 26, 27, 42, 43, 62, 63, 84, 85, 106, 107, 122, 123, 152, 153, 180, 181, 213];
+    const lengths = [
+      1, 14, 15, 26, 27, 42, 43, 62, 63, 84, 85, 106, 107, 122, 123, 152, 153, 180, 181, 213, 214,
+      251, 252, 287, 288, 331, 332, 362, 363, 412,
+    ];
     const versions = new Set<number>();
     for (const length of lengths) {
-      // A payload with no repetition in it, so a bit written twice or dropped
-      // cannot decode back to the same string by luck.
-      const text = Array.from({ length }, (_, i) =>
-        'abcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@'.charAt(
-          (i * 7 + Math.floor(i / 11)) % 46,
-        ),
-      ).join('');
+      const text = filler(length);
       const code = encodeQr(text);
       versions.add(code.version);
       expect(decode(code.modules).text, `${length} bytes`).toBe(text);
     }
-    expect([...versions].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect([...versions].sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
   });
 
   it('carries anything a URL can carry, including what is not ASCII', () => {
@@ -803,9 +934,103 @@ describe('encodeQr', () => {
     for (const row of code.modules) expect(row).toHaveLength(code.size);
   });
 
+  it('fills exactly the modules the symbol leaves free, at every version', () => {
+    // What a pinned matrix would have caught for versions 11 to 15, caught
+    // from the geometry instead: a version's data and check codewords together
+    // are whatever fits in the modules its function patterns do not own.
+    // `functionMap` works those out from the size alone, so a block table
+    // typed one codeword out disagrees with the squares themselves.
+    for (const [version, capacity] of CAPACITIES) {
+      const code = encodeQr(filler(capacity));
+      expect(code.version, `${capacity} bytes`).toBe(version);
+      const free = functionMap(version, code.size)
+        .flat()
+        .filter((owned) => !owned).length;
+      const data = BLOCKS[version]!.reduce((sum, block) => sum + block, 0);
+      const ec = BLOCKS[version]!.length * EC_PER_BLOCK[version]!;
+      expect(data + ec, `version ${version}`).toBe(Math.floor(free / 8));
+    }
+  });
+
+  it('writes check bytes that are really check bytes, at every version', () => {
+    // The other half of the same job. The round trip never looks at the error
+    // correction — it reads the data and stops — so this is the only test that
+    // fails if the generator, the block split or the interleave is wrong in a
+    // way the data survives. It is arithmetic rather than a fixture: a block
+    // either divides by its generator or it does not.
+    for (const [version, capacity] of CAPACITIES) {
+      const decoded = decode(encodeQr(filler(capacity)).modules);
+      decoded.blocks.forEach((block, index) => {
+        const where = `version ${version}, block ${index}`;
+        expect(block.length - BLOCKS[version]![index]!, where).toBe(EC_PER_BLOCK[version]!);
+        expect(syndromesClear(block, EC_PER_BLOCK[version]!), where).toBe(true);
+      });
+    }
+  });
+
+  it('draws the provisioning payload the setup page shows a factory-reset tablet', () => {
+    // 355 bytes of JSON, and the reason the ceiling moved off version 10 at
+    // all. The scanner this has to satisfy is an Android setup wizard on a
+    // tablet with nothing installed on it yet, which is the least debuggable
+    // reader there is: if this square is wrong, the symptom is a welcome
+    // screen that does nothing.
+    const code = encodeQr(TESTDPC_QR_PAYLOAD);
+    expect(code.version).toBe(14);
+
+    const decoded = decode(code.modules);
+    expect(decoded.text).toBe(TESTDPC_QR_PAYLOAD);
+    // Read as the wizard reads it, not as a string: a symbol that decodes to
+    // JSON one byte short is still a symbol that provisions nothing.
+    expect(JSON.parse(decoded.text)).toEqual(TESTDPC_PROVISIONING);
+    decoded.blocks.forEach((block, index) => {
+      expect(block.length - BLOCKS[14]![index]!).toBe(EC_PER_BLOCK[14]!);
+      expect(syndromesClear(block, EC_PER_BLOCK[14]!)).toBe(true);
+    });
+  });
+
   it('refuses a payload it cannot hold rather than truncating it', () => {
     // The caller falls back to the link. A QR that encodes half a token is
     // indistinguishable from one that works until somebody scans it.
-    expect(() => encodeQr('a'.repeat(214))).toThrow(/Too long/);
+    expect(() => encodeQr('a'.repeat(413))).toThrow(/Too long/);
+  });
+});
+
+describe('qrPath', () => {
+  /**
+   * Reads the path back into a grid: every subpath is `M<col> <row>h1v1h-1z`,
+   * one unit square, which is the only shape this draws.
+   */
+  function gridOf(d: string, size: number, quiet: number): boolean[][] {
+    const grid = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
+    for (const [, col, row] of d.matchAll(/M(\d+) (\d+)h1v1h-1z/g)) {
+      grid[Number(row) - quiet]![Number(col) - quiet] = true;
+    }
+    return grid;
+  }
+
+  it('draws every dark module and nothing else', () => {
+    // The step between a correct symbol and a correct picture of one. Nothing
+    // else checks it: the encoder's tests stop at the grid, and by the time
+    // this is wrong it is a square on a screen that silently will not scan.
+    const { modules } = encodeQr(JOIN_URL);
+    const { d, extent } = qrPath(modules);
+    expect(gridOf(d, modules.length, 4)).toEqual(modules);
+    // Nothing but those subpaths: a stray command would draw over the symbol.
+    expect(d.replace(/M\d+ \d+h1v1h-1z/g, '')).toBe('');
+    expect(extent).toBe(modules.length + 8);
+  });
+
+  it('leaves the quiet zone the spec asks for, and takes it as an argument', () => {
+    // Four modules of nothing on every side. Without it a camera has nothing
+    // to find the symbol's edge against, which fails as "will not scan"
+    // rather than as anything legible.
+    const { modules } = encodeQr(JOIN_URL);
+    const offsets = [...qrPath(modules).d.matchAll(/M(\d+) (\d+)/g)].flatMap(([, col, row]) => [
+      Number(col),
+      Number(row),
+    ]);
+    expect(Math.min(...offsets)).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...offsets)).toBeLessThan(modules.length + 4);
+    expect(qrPath(modules, 0).extent).toBe(modules.length);
   });
 });

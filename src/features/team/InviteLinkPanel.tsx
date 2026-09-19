@@ -49,35 +49,30 @@ export interface MintedLink {
  * Black on white, always, whatever the app's theme is doing around it: a
  * scanner looks for a dark pattern on a light field, and an inverted QR is one
  * a good half of phone cameras will not read at all. The white border is the
- * quiet zone the spec requires — four modules of nothing, without which the
+ * quiet zone `qrPath` leaves — four modules of nothing, without which the
  * pattern has no edge to be found by.
  *
- * One `<path>` rather than a rectangle per module, because a version 10 symbol
- * is 3,481 of them and this draws inside a card that also holds a list.
+ * The path arrives already built, from the same dynamic import that drew the
+ * symbol: `qrPath` lives beside the encoder, and pulling it in statically here
+ * would put the encoder's bytes back into the bundle this import exists to
+ * keep them out of.
  *
  * A step smaller on a phone. At 224px the square's bottom edge landed on the
  * tab bar, so the thing being held out to somebody was cut off by the app's
  * own navigation; 192px is still about three pixels a module, which is a
  * comfortable read for a camera held at arm's length.
  */
-function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]; label: string }) {
-  const size = modules.length;
-  const quiet = 4;
-  const parts: string[] = [];
-  for (let row = 0; row < size; row += 1) {
-    for (let col = 0; col < size; col += 1) {
-      if (modules[row]![col]) parts.push(`M${col + quiet} ${row + quiet}h1v1h-1z`);
-    }
-  }
+function QrSquare({ path, label }: { path: { d: string; extent: number }; label: string }) {
+  const { d, extent } = path;
   return (
     <svg
       role="img"
       aria-label={label}
-      viewBox={`0 0 ${size + quiet * 2} ${size + quiet * 2}`}
+      viewBox={`0 0 ${extent} ${extent}`}
       className="h-48 w-48 rounded-xl bg-white sm:h-56 sm:w-56"
       shapeRendering="crispEdges"
     >
-      <path d={parts.join('')} fill="#000" />
+      <path d={d} fill="#000" />
     </svg>
   );
 }
@@ -86,7 +81,7 @@ function QrSquare({ modules, label }: { modules: readonly (readonly boolean[])[]
 type QrState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; modules: boolean[][] }
+  | { status: 'ready'; path: { d: string; extent: number } }
   | { status: 'failed' };
 
 export function InviteLinkPanel({
@@ -137,9 +132,9 @@ export function InviteLinkPanel({
     setQr({ status: 'loading' });
     void (async () => {
       try {
-        const { encodeQr } = await import('@/lib/qr');
+        const { encodeQr, qrPath } = await import('@/lib/qr');
         const { modules } = encodeQr(`${window.location.origin}/join/${minted.token}`);
-        if (live) setQr({ status: 'ready', modules });
+        if (live) setQr({ status: 'ready', path: qrPath(modules) });
       } catch {
         if (live) setQr({ status: 'failed' });
       }
@@ -203,8 +198,8 @@ export function InviteLinkPanel({
   const showQr = async () => {
     setQr({ status: 'loading' });
     try {
-      const { encodeQr } = await import('@/lib/qr');
-      setQr({ status: 'ready', modules: encodeQr(url).modules });
+      const { encodeQr, qrPath } = await import('@/lib/qr');
+      setQr({ status: 'ready', path: qrPath(encodeQr(url).modules) });
     } catch {
       setQr({ status: 'failed' });
     }
@@ -322,7 +317,7 @@ export function InviteLinkPanel({
           <p className="text-xs leading-snug text-ink-400">
             {minted.life === 'qr' ? t('qrExplain') : t('qrExplainLink')}
           </p>
-          <QrSquare modules={qr.modules} label={t('qrAlt', { label: minted.label })} />
+          <QrSquare path={qr.path} label={t('qrAlt', { label: minted.label })} />
         </div>
       ) : null}
 

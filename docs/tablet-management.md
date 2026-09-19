@@ -576,14 +576,15 @@ and the kiosk falls back to asking for a printer exactly as it does now.
   argument for it. §4.4 already suggests laminating a console's enrolment QR and leaving it at the
   check-in desk so a dead tablet is a reset and a scan; this is that, without a console.
   [Test DPC's README](https://github.com/googlesamples/android-testdpc#qr-code-provisioning-device-owner-n-only)
-  carries the payload above and a pre-made code, so printing one costs nothing. Four things to know
-  before relying on it. The code has to be on *another* screen or on paper — the tablet scanning it
-  is sitting at its own welcome screen. Android P and newer have the reader already; O and older
-  ask to join wifi first so the wizard can fetch one. The download location is Google's
-  `appspot.com` host, and a tablet that cannot reach it hangs on *configuring* — the fix there is to
-  host the APK somewhere you control and regenerate the code with that URL. And the checksum pins
-  Test DPC's signing key, so a code that stops being accepted means the payload has moved on: take a
-  fresh one from the README rather than from here.
+  carries the payload above and a pre-made code — and **`/setup` draws the same code itself**
+  (§6.3), so a laptop with that page open is a scannable one and nothing has to be generated
+  anywhere. Four things to know before relying on it. The code has to be on *another* screen or on
+  paper — the tablet scanning it is sitting at its own welcome screen. Android P and newer have
+  the reader already; O and older ask to join wifi first so the wizard can fetch one. The download
+  location is Google's `appspot.com` host, and a tablet that cannot reach it hangs on
+  *configuring* — the fix there is to host the APK somewhere you control and regenerate the code
+  with that URL. And the checksum pins Test DPC's signing key, so a code that stops being accepted
+  means the payload has moved on: take a fresh one from the README rather than from here.
 - **adb, without a factory reset** — if the tablets are already set up, this is usually quicker.
   Device owner can be granted post-setup *only* over adb and *only* while no accounts exist on the
   device, so remove every account in Settings first, then:
@@ -783,6 +784,15 @@ origin and the printer vendor read from the printing module rather than from a w
 Step 2 of §4.6 becomes: open it in Chrome on the tablet, copy, paste into Test DPC, next key.
 Ordered so the two URL lists come last, because pasting the blocklist early cuts off the page
 itself.
+
+**And step 1's QR, drawn on the page.** The provisioning payload is 355 bytes of published JSON —
+the one thing here that is the same on every deployment — and the page draws it as a scannable
+symbol rather than printing it for somebody to feed to a QR generator. `src/lib/qr.ts` already
+encodes the invite QR, so this cost a ceiling: it stopped at version 10 and the payload needs a
+version 14 symbol. The code is for the *next* tablet, never the one showing it, and the page says
+so: whatever is displaying `/setup` is past its own setup wizard. Which makes this the one part of
+the page that wants a laptop or a printout rather than the tablet in your hands — and the reason
+§4.4's laminated-QR-at-the-desk trick now needs no console at all.
 
 **It should not be staff-gated, and the reason is worth being precise about.** An earlier draft of
 this section said it should be. That was wrong twice over. First, there is nothing secret in it: a
