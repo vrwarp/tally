@@ -80,6 +80,7 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     configure: vi.fn(async () => {}),
     pairPrinter: vi.fn(async () => found),
     checkPrinter: vi.fn(async () => found),
+    forgetPrinter: vi.fn(async (): Promise<PrinterConfig | null> => null),
     testPrint: vi.fn(),
     printerLog: () => events,
     printerLogText: () => 'the whole record',
@@ -181,6 +182,116 @@ describe('a printer the tablet policy granted', () => {
     mount(handleUnpaired(), { model: 'QL-810W', label: '62x29', viaPolicy: true });
 
     expect(screen.getByText(/power and cable/i)).toBeInTheDocument();
+  });
+});
+
+describe('checking whether the tablet policy took', () => {
+  /*
+   * The one control on this screen aimed at a question rather than at a
+   * printer. A page cannot tell a policy grant from a chooser grant — the
+   * browser returns the same device for both — so the module infers it from
+   * "granted here, and nobody set one up", which a hand-paired kiosk has
+   * already spent. This puts the kiosk back in that position on purpose.
+   *
+   * What these pin is that the three answers stay three: granted, nothing, and
+   * could-not-ask. Collapsing the last two is how a tablet that is correctly
+   * staged gets staged again.
+   */
+
+  const GRANTED: PrinterConfig = {
+    model: 'QL-810W',
+    label: '62x29',
+    guessed: true,
+    viaPolicy: true,
+  };
+
+  function handleThatAnswers(answer: PrinterConfig | null) {
+    const printing = handleWith(detection());
+    printing.forgetPrinter = vi.fn(async () => answer);
+    return printing;
+  }
+
+  it('reports a grant as a grant', async () => {
+    mount(handleThatAnswers(GRANTED));
+
+    await press(/ask the tablet/i);
+
+    expect(screen.getByText(/handed the printer over/i)).toBeInTheDocument();
+  });
+
+  it('reports an empty answer without saying which cause it was', async () => {
+    mount(handleThatAnswers(null));
+
+    await press(/ask the tablet/i);
+
+    const said = screen.getByText(/Nothing came from the tablet/i);
+    expect(said).toBeInTheDocument();
+    // Not in force, or not plugged in. The screen cannot tell, and the one
+    // thing that can is named rather than guessed at.
+    expect(said).toHaveTextContent('chrome://policy');
+  });
+
+  it('says a check it could not run established nothing, rather than nothing found', async () => {
+    const printing = handleWith(detection());
+    printing.forgetPrinter = vi.fn(async () => {
+      throw new Error('the bus never answered');
+    });
+    mount(printing);
+
+    await press(/ask the tablet/i);
+
+    expect(screen.getByText(/could not be run/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing came from the tablet/i)).not.toBeInTheDocument();
+  });
+
+  it('carries the condition that makes the answer worth anything', () => {
+    // An old chooser grant produces a pass indistinguishable from the real
+    // one, and this screen cannot check whether it was revoked. Saying so is
+    // the whole difference between a check and a false pass.
+    mount(handleWith(detection()));
+
+    expect(screen.getByText(/Revoke this site's USB permission/i)).toBeInTheDocument();
+  });
+
+  it('answers the press while it is still asking', async () => {
+    let answer: (config: PrinterConfig | null) => void = () => {};
+    const printing = handleWith(detection());
+    printing.forgetPrinter = vi.fn(
+      () =>
+        new Promise<PrinterConfig | null>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    mount(printing);
+
+    await press(/ask the tablet/i);
+    expect(screen.getByText('Asking…')).toBeInTheDocument();
+
+    await act(async () => {
+      answer(GRANTED);
+    });
+    expect(screen.getByText(/handed the printer over/i)).toBeInTheDocument();
+  });
+
+  it('tells whoever holds the config that this kiosk no longer has one', async () => {
+    const onConfigChange = vi.fn();
+    mount(handleThatAnswers(null), { model: 'QL-800', label: '62' }, { onConfigChange });
+
+    await press(/ask the tablet/i);
+
+    // `hasConfig` is what stops the screen drawing a model and a roll it does
+    // not have. Nothing else this screen writes can take the config away, so
+    // nothing else has to report before Done.
+    expect(onConfigChange).toHaveBeenCalledWith(null);
+  });
+
+  it('adopts what came back rather than what the selects were holding', async () => {
+    mount(handleThatAnswers(GRANTED), { model: 'QL-800', label: '62' });
+
+    await press(/ask the tablet/i);
+
+    expect(screen.getByLabelText('Printer model')).toHaveValue('QL-810W');
+    expect(screen.getByLabelText('Loaded label')).toHaveValue('62x29');
   });
 });
 

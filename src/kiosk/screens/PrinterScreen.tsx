@@ -89,6 +89,17 @@ type CopyState = 'idle' | 'copied' | 'failed';
  */
 type CopySlot = 'events' | 'policy';
 
+/**
+ * How the tablet's answer to *ask the tablet* is going.
+ *
+ * `failed` is not `none`, and the difference is the whole reason this is five
+ * words rather than a boolean. "Nothing came from the tablet's settings" is a
+ * claim about the tablet; a check that could not be run has made no claim at
+ * all, and reporting one as the other is how a correctly staged tablet gets
+ * re-staged on a Tuesday afternoon for nothing.
+ */
+type GrantCheck = 'idle' | 'busy' | 'granted' | 'none' | 'failed';
+
 function orderedModels(printing: KioskPrinting): string[] {
   const all = printing.modelIdentifiers();
   const preferred = PREFERRED_MODELS.filter((model) => all.includes(model));
@@ -237,6 +248,7 @@ export function PrinterScreen({
   onPrintOwed,
   onReprint,
   onReprintByName,
+  onConfigChange,
   returnsTo = 'staff',
   onDone,
 }: {
@@ -307,6 +319,20 @@ export function PrinterScreen({
    */
   onReprintByName?: () => void;
   /**
+   * The stored config changed under this screen, so whoever holds it should
+   * re-read.
+   *
+   * Only the policy check below fires it, and only because it is the one
+   * control here that can take the config *away*. Everything else this screen
+   * writes — a pairing, a roll — leaves a config where there was one, so
+   * `hasConfig` going stale in the true direction costs nothing and `onDone`
+   * re-reading on the way out has always been enough. A kiosk that asked the
+   * tablet for a printer and was handed none has no config at all, and a screen
+   * still drawing the old model and roll from a prop nobody refreshed is the
+   * screen asserting exactly what `hasConfig` exists to stop it asserting.
+   */
+  onConfigChange?: (next: PrinterConfig | null) => void;
+  /**
    * Where **Done** goes, because the button has to say so.
    *
    * This screen has two ways in — the staff screen behind the hold on Clear,
@@ -335,6 +361,8 @@ export function PrinterScreen({
   const [eventsOpen, setEventsOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   const [copied, setCopied] = useState<CopyState>('idle');
+  /** What the policy fold's check has to report, if it has been pressed. */
+  const [grantCheck, setGrantCheck] = useState<GrantCheck>('idle');
   /** Which block the flag above is about. Meaningless while it is `idle`. */
   const [copySlot, setCopySlot] = useState<CopySlot>('events');
   /**
@@ -442,6 +470,41 @@ export function PrinterScreen({
     },
     [printing],
   );
+
+  /**
+   * Ask the tablet for a printer, having first put down the one this kiosk has.
+   *
+   * The only control on this screen aimed at a question rather than a printer:
+   * *is `WebUsbAllowDevicesForUrls` working?* — which a page cannot otherwise
+   * answer, because `getDevices()` returns the same device whether the grant
+   * came from the tablet's policy or from somebody tapping Chrome's chooser two
+   * Sundays ago. The printing module's adoption only runs on a kiosk with no
+   * stored config, since "granted here, yet nobody set one up" is the only
+   * evidence available; this spends the config to hand that evidence back. See
+   * `forgetPrinter` and `docs/tablet-management.md` §4.5.
+   *
+   * The local model and roll are re-seeded from whatever came back, because a
+   * re-adopted printer names its own model and defaults its roll — and the two
+   * selects below write whatever they are holding the next time either is
+   * touched.
+   */
+  const checkGrant = useCallback(async () => {
+    setGrantCheck('busy');
+    try {
+      const next = await printing.forgetPrinter();
+      if (next) {
+        setModel(next.model);
+        setLabel(next.label);
+      }
+      onConfigChange?.(next);
+      setGrantCheck(next?.viaPolicy === true ? 'granted' : 'none');
+    } catch {
+      // Reached only if the module rejects rather than reporting — the screen
+      // has no idea what the tablet would have said, and says so rather than
+      // reporting the tablet's silence as an answer.
+      setGrantCheck('failed');
+    }
+  }, [printing, onConfigChange]);
 
   /** Whatever the last press said about itself, cleared before the next one. */
   const forget = () => {
@@ -1294,6 +1357,59 @@ export function PrinterScreen({
               </div>
               <div className="text-xs text-ink-500 kiosk:text-sm">
                 {t('tabletPolicyMore', { url: setupUrl })}
+              </div>
+
+              {/*
+                * Whether the line above is actually in force, which is the one
+                * thing this screen could never say.
+                *
+                * It lives under the value rather than beside the printer's own
+                * state because it belongs to the errand, not to the evening:
+                * the person who presses it is the person who has just pasted
+                * that value into the management app and wants to know whether
+                * it took. Putting the answer anywhere else would mean pasting,
+                * leaving the fold, and reading a sentence that is about
+                * something else.
+                *
+                * The condition in the hint is load-bearing and cannot be
+                * checked from here: a chooser grant this tablet already holds
+                * produces a pass indistinguishable from the real one. Said in
+                * the hint rather than swallowed, because a confident false
+                * pass is worse than no check at all.
+                */}
+              <div className="flex flex-col gap-3 border-t border-ink-800 pt-3">
+                <div className="text-xs text-ink-500 kiosk:text-sm">{t('policyCheckHint')}</div>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  /* Never the `disabled` attribute, for the reason the
+                     secondary below carries: a dead control that answers a
+                     press with nothing is indistinguishable from a frozen
+                     tablet. The label already says it is working. */
+                  aria-disabled={grantCheck === 'busy'}
+                  {...tap(() => {
+                    if (grantCheck !== 'busy') void checkGrant();
+                  })}
+                  className="self-start rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                >
+                  {grantCheck === 'busy' ? t('policyCheckBusy') : t('policyCheck')}
+                </button>
+                {/* One region, always mounted, so a reader is told the answer
+                    rather than told that a region appeared. */}
+                <div
+                  aria-live="polite"
+                  className={`text-xs kiosk:text-sm ${
+                    grantCheck === 'granted' ? 'text-ink-300' : 'text-ink-500'
+                  }`}
+                >
+                  {grantCheck === 'granted'
+                    ? t('policyCheckFound')
+                    : grantCheck === 'none'
+                      ? t('policyCheckNone')
+                      : grantCheck === 'failed'
+                        ? t('policyCheckFailed')
+                        : ''}
+                </div>
               </div>
             </div>
           </details>

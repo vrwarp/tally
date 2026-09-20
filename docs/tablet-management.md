@@ -462,6 +462,17 @@ itself, both before the first Sunday:
    quicker version is simply to open the kiosk: a pre-granted printer arrives with no setup step and
    the printer screen says where it came from.
 
+   **On a tablet that has ever been paired by hand, the kiosk's own check is asleep**, and this is
+   the case every tablet already in a lobby is in. The adoption only fires on a kiosk with no stored
+   config, because "granted to this origin, and nobody here set one up" is the only evidence a
+   *page* can have that the grant came from the tablet — `getDevices()` returns the same device
+   whichever way permission was given, and Android Chrome exposes no provenance for a USB
+   permission. A hand-paired kiosk has spent that evidence for good. **Forget this printer and ask
+   the tablet**, in the same fold as the policy value (§6.5), hands it back: it drops the stored
+   config and re-runs the boot adoption, then says which of the three things happened — the tablet
+   granted a printer, nothing came back, or the check could not be run at all. Revoke the chooser
+   grant first, exactly as below, or it passes for the wrong reason and says so confidently.
+
 Reaching `chrome://policy` is easy on an unlocked tablet and a nuisance on a pinned one, so do both
 while the tablet is still being staged, before anything in §4.6's optional half is applied.
 
@@ -548,9 +559,11 @@ Two consequences, and the church has exactly the shape of problem they solve:
 
 **One check does survive, on one tablet.** The kiosk that prints today holds a *manual* chooser
 grant, and that grant will make `getDevices()` return the printer whether or not the policy works.
-Revoke it in Chrome's site settings (USB devices) before believing §4.5's second check there. Every
-other tablet is staged printer-free and has no such grant to confuse the evidence, which makes its
-`chrome://policy` check the cleaner of the two.
+Revoke it in Chrome's site settings (USB devices) before believing §4.5's second check there — and
+before pressing **Forget this printer and ask the tablet**, which is the same check run from inside
+the kiosk and is fooled by the same stale grant. Every other tablet is staged printer-free and has
+no such grant to confuse the evidence, which makes its `chrome://policy` check the cleaner of the
+two.
 
 And if the policy somehow does not take, nothing that works today breaks: the chooser still works,
 and the kiosk falls back to asking for a printer exactly as it does now.
@@ -851,6 +864,21 @@ holds.
 [`kiosk-printer-setup.md`](kiosk-printer-setup.md) — currently assumes somebody must connect one. It
 should be able to tell the difference and say *the printer is set by policy* instead of offering a
 button that opens an empty chooser.
+
+**And let somebody ask for that difference to be re-established.** The notice above is drawn from a
+flag the config carries, and the config only gets the flag on a kiosk that had none — so a tablet
+paired by hand before it was managed never sees it, however well the policy is working. That is the
+common case on any tablet already in a lobby, and it leaves the one question this whole section is
+about unanswerable from inside the app. **Forget this printer and ask the tablet** sits under the
+policy value, in the same fold, for the same reason the value does: the person pressing it has just
+pasted that value into the management app and is standing at the tablet. It drops the stored config,
+re-runs the adoption and reports which of *granted*, *nothing* and *could not ask* happened — three
+answers rather than two, because a check that could not run has established nothing and must not be
+read as a tablet that granted nothing.
+
+Its hint carries the condition, because the screen cannot enforce it: an old chooser grant makes
+the printer come back looking exactly like a policy grant. `chrome://policy` remains the check that
+needs nothing revoked and nothing plugged in, and it is still the one to reach for first (§4.5).
 
 **Hand back the policy line.** Show the finished rule, folded, with a copy button:
 

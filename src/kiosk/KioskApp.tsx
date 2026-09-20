@@ -2600,6 +2600,14 @@ export function KioskApp() {
         // defaults: two selects full of invented values on a kiosk that has
         // never had a printer is the screen asserting what it does not know.
         hasConfig={printerConfig !== null}
+        /*
+         * The policy check can leave this kiosk with no printer at all, and
+         * `hasConfig` is what stops the screen drawing two selects full of
+         * invented values on one. Every other write from that screen leaves a
+         * config where there was one, which is why this is the only thing it
+         * reports before `onDone`.
+         */
+        onConfigChange={setPrinterConfig}
         onDone={() => {
           // Re-read rather than trusting the screen: pairing writes the config,
           // and this is what makes the boot effect above pick up a printer that
@@ -2920,6 +2928,9 @@ export function KioskApp() {
               setSentId(null);
               setOverlay({ kind: 'reprint' });
             }}
+            /* As above: the policy check is the one write from this screen
+               that can leave the kiosk with no printer. */
+            onConfigChange={setPrinterConfig}
             returnsTo={overlay.from === 'home' ? 'check-in' : 'staff'}
             onDone={() => {
               setPrinterConfig(readPrinterConfig());
