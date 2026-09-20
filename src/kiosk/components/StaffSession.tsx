@@ -26,20 +26,42 @@
  * half-typed and worth protecting: everything behind this gate is one keystroke
  * to get back to, and the cost of holding it open is a lobby tablet that is not
  * a check-in screen.
+ *
+ * `returnMs` is the one exception to that reasoning, and the screen that needed
+ * it says why: the languages errand's natural next step is asking a human a
+ * question — *do you read 简体 or 繁體?* is not answerable from the glass — and a
+ * volunteer who turns to ask touches nothing while they listen. Forty-five
+ * seconds is shorter than that conversation. Nothing is lost when the clock
+ * fires there, because that screen writes on every tap; what it costs is
+ * another two-second hold with the queue still standing. Raising the default
+ * instead would hold every abandoned printer screen open twice as long, which
+ * is the thing this clock exists to stop.
  */
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 
 export const STAFF_RETURN_MS = 45_000;
 
-export function StaffSession({ onReturn, children }: { onReturn: () => void; children: ReactNode }) {
+/** What a screen gets when a volunteer has to ask somebody a question. */
+export const STAFF_ASKING_MS = 90_000;
+
+export function StaffSession({
+  onReturn,
+  returnMs = STAFF_RETURN_MS,
+  children,
+}: {
+  onReturn: () => void;
+  /** Defaults to {@link STAFF_RETURN_MS}; see the note above on the exception. */
+  returnMs?: number;
+  children: ReactNode;
+}) {
   const returnRef = useRef(onReturn);
   returnRef.current = onReturn;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const arm = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => returnRef.current(), STAFF_RETURN_MS);
-  }, []);
+    timerRef.current = setTimeout(() => returnRef.current(), returnMs);
+  }, [returnMs]);
 
   useEffect(() => {
     arm();

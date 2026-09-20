@@ -2228,6 +2228,8 @@
     "changeEvent": "Cambiar de reunión",
     "hideThePhoto": "Ocultar foto",
     "englishOnly": "Solo inglés",
+    "languages": "Idiomas",
+    "languagesAbout": "Los idiomas que ofrece este kiosco. Se quedan con la tableta, no con la reunión.",
     "reprintNoRegisterChange": "Desde aquí no se registra ninguna entrada ni salida.",
     "reprintPrinterAttention": "La impresora necesita atención.",
     "reprintInvitation": "Toca un nombre para ver lo que se imprime y confirma. La asistencia no cambia.",
@@ -2449,6 +2451,7 @@
     "retired": "Este kiosco se dio de baja en Tally a las {time} y desde entonces no ha registrado nada. Registra a los niños desde el teléfono de un líder hasta que se vuelva a vincular.",
     "pinLanguages": "Idiomas de las familias",
     "pinHint": "Toca hasta tres, en el orden en que aparecerán. El inglés siempre está.",
+    "pinFull": "Tres es el máximo. Quita uno para agregar otro.",
     "pinPreview": "Lo que verán las familias"
   },
   "Time": {

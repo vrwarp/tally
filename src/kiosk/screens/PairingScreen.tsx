@@ -11,11 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { KioskServices } from '../KioskApp';
 import { InstallPrompt } from '../components/InstallPrompt';
 import { LanguagePicker } from '../components/LanguagePicker';
-import { LanguageSwitch } from '../components/LanguageSwitch';
-import { useTap } from '../components/tapGuard';
-import { haptic } from '@/lib/utils';
-import { DEFAULT_LOCALE, LOCALES, LOCALE_LABELS, type Locale } from '@/lib/locales';
-import { MAX_PINS } from '../storage';
+import { LanguagePins } from '../components/LanguagePins';
+import type { Locale } from '@/lib/locales';
 import type { PairingReason } from '../session';
 import { useLocale, useTranslations } from 'use-intl';
 
@@ -82,7 +79,6 @@ export function PairingScreen({
 }) {
   const t = useTranslations('Pairing');
   const locale = useLocale();
-  const tap = useTap();
   const [code, setCode] = useState<string | null>(null);
   const [trouble, setTrouble] = useState<PairingTrouble | null>(null);
   const pairedRef = useRef(onPaired);
@@ -270,45 +266,14 @@ export function PairingScreen({
       {onPins && (
         <div className="flex w-full max-w-md flex-col items-center gap-3">
           <div className="text-base font-medium text-ink-300">{t('pinLanguages')}</div>
-          <div
-            role="group"
-            aria-label={t('pinLanguages')}
-            data-testid="language-pins"
-            className="flex flex-wrap items-center justify-center gap-2"
-          >
-            {LOCALES.filter((candidate) => candidate !== DEFAULT_LOCALE).map((candidate) => {
-              const pinned = pins.includes(candidate);
-              return (
-                <button
-                  key={candidate}
-                  type="button"
-                  tabIndex={-1}
-                  lang={candidate}
-                  aria-pressed={pinned}
-                  {...tap(() => {
-                    if (!pinned && pins.length >= MAX_PINS) return;
-                    haptic();
-                    onPins(pinned ? pins.filter((pin) => pin !== candidate) : [...pins, candidate]);
-                  })}
-                  className={`flex h-14 min-w-24 items-center justify-center rounded-xl px-5 text-lg font-semibold ${
-                    pinned
-                      ? 'bg-ink-700 text-ink-50 ring-2 ring-ink-400'
-                      : 'bg-ink-800/70 text-ink-400 ring-1 ring-ink-700 active:bg-ink-700 active:text-ink-100'
-                  }`}
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  {LOCALE_LABELS[candidate]}
-                </button>
-              );
-            })}
-          </div>
-          <div className="max-w-md text-sm leading-relaxed text-ink-400">{t('pinHint')}</div>
-          {pins.length > 0 && (
-            <div className="flex w-full flex-col items-center gap-2 pt-2">
-              <div className="text-sm text-ink-500">{t('pinPreview')}</div>
-              <LanguageSwitch names={[DEFAULT_LOCALE, ...pins]} preview />
-            </div>
-          )}
+          {/*
+            * The same control the staff gate opens onto — see `LanguagePins`.
+            * Shared rather than copied because the gate's copy is the one that
+            * has to stay true: a tablet staged with a pairing link in its
+            * start URL never draws this screen at all, so on a managed fleet
+            * that screen is the only one of the two that exists.
+            */}
+          <LanguagePins pins={pins} onPins={onPins} />
         </div>
       )}
 

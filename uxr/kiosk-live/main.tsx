@@ -590,7 +590,7 @@ export function Kiosk() {
         onChangeEvent={() => {}}
         onHideBackdrop={() => {}}
         pins={[]}
-        onEnglishOnly={() => {}}
+        onLanguages={() => {}}
         onStay={() => {}}
       />
     );

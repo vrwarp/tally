@@ -12857,6 +12857,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Staff.languages": {
+    "source": "Languages",
+    "context": "A row on the kiosk's staff screen (behind the held Clear key), beside Staff.hideThePhoto, and the title of the screen it opens. The screen sets which languages the check-in screen's language switch offers. A door label — not a status. Distinct from the setup language the pairing screen's own picker sets, so it is plural: this is a list, not a choice.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.languagesAbout": {
+    "source": "The languages this kiosk offers. They stay with the tablet, not with the gathering.",
+    "context": "One line under the title of the kiosk's Languages screen (staff-facing, behind the held Clear key). Says whose setting this is, because the pins live on the device: a tablet carried to another room brings the old room's languages with it, and a volunteer who cannot tell an intention from an inheritance reaches for the destructive control. Two facts, both required: what the list is, and that it belongs to the tablet rather than to the gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Staff.reprintNoRegisterChange": {
     "source": "Nobody is checked in or out from this screen.",
     "es-MX": "machine",
@@ -14143,6 +14157,13 @@
   "Pairing.pinHint": {
     "source": "Tap up to three, in the order they should appear. English is always offered.",
     "context": "Beneath Pairing.pinLanguages. Up to three languages may be offered, in the order tapped; English is on the switch whether or not it is tapped.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Pairing.pinFull": {
+    "source": "Three is the most. Tap one off to add another.",
+    "context": "Replaces Pairing.pinHint under the language chips once three languages are already chosen — the cap. Says why a fourth press does nothing and what to do instead; the chips themselves are drawn dimmed and inert at that point. Staff-facing, at the kiosk: the pairing screen and the staff gate's Languages screen both show it.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
