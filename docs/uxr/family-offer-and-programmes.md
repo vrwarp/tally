@@ -100,10 +100,23 @@ Three things A1 must carry, none of them optional:
 - **The offer keeps failing open.** A family who cannot find themselves is the
   worse failure, and the wide offer is what "+ Another child" exists to widen
   further.
-- **Pickup is untouched.** Its ticks come off the register — who actually walked
-  in together, stated by a thumb an hour ago — and it is the one screen where the
-  ticks are evidence rather than a guess. It should now say so out loud, because
-  pre-ticking has become the exceptional state.
+- **Pickup's code is untouched — but its data is not, and the third round caught
+  this campaign asserting otherwise.** Its ticks come off the register: the
+  check-out branch of `skippedFor` ticks exactly the children sharing the tapped
+  child's `arrivalId`. And `arrivalId` is minted **once per confirm press**
+  (`newArrivalId()`, stamped on everyone in `chosen`). So a fail-closed tick, which
+  by design turns one press into one press per child for a parent who taps and
+  walks, writes a *different* arrival id per child — and at 11:30 the pickup screen
+  ticks one child and offers the siblings unticked. The proposed reassurance line,
+  "these two arrived together at 9:12", then has nothing to say about a family the
+  record says did not arrive together.
+
+  The morning's last screen gets slower for exactly the families whose first screen
+  got slower, at the moment they have the fewest hands. Either widen the pickup
+  tick from one `arrivalId` to the arrivals inside a short window for one family —
+  the register already holds the minute — or take the cost deliberately and say so
+  in the release note. What must not happen is "pickup is untouched" standing
+  unqualified while the tick change dissolves the grouping pickup is computed from.
 
 ### The two things A1 breaks, which have to be fixed in the same release
 
@@ -112,7 +125,22 @@ Three things A1 must carry, none of them optional:
   line. Today a regular child below the fold is ticked and gets checked in
   unread; under A1 they are unticked and get *missed*. With `MAX_FAMILY_OFFER` at
   seven the worst case is eight names, so the list must not scroll at that size
-  on the real glass. At a check-out gathering the consequence compounds: the
+  on the real glass.
+
+  **And on one of the two real glasses it already does.** Walked at 1280×800
+  landscape — the `pb-[max(2rem,18vh)]` bottom pad, the commit, the back button —
+  the 1fr track leaves the list roughly 153px, which at a 72px pitch is *two* rows
+  of seven. Portrait (800×1280) holds all seven with room to spare. So on landscape
+  a fail-closed tick can leave five children who are in the building unticked below
+  a fold, with the "N more below" line the only thing that says so — and a single
+  wrapped button label takes landscape from two rows to one.
+
+  That makes the fold a **deliverable of release 1, measured on both devices**,
+  not a constraint to be asserted. If landscape cannot hold eight, the honest
+  answers are to lower `MAX_FAMILY_OFFER` for that viewport — `familyOf` already
+  returns `[]` above the cap, and the product doc already accepts that those
+  parents check in the way everyone did before the feature existed — or to hold
+  the tick change off landscape glass until it can. At a check-out gathering the consequence compounds: the
   child has no arrival record, and a parent tapping their name at 11:30 hits
   `intentFor` → `'check-in'` and writes an 11:30 arrival for a child who came at
   9:15.
@@ -141,6 +169,29 @@ Three things A1 must carry, none of them optional:
 
   The second receipt is physical and already exists: two children should be two
   stickers, counted with the hands at the shelf.
+
+  **The grammar is already solved; the geometry is not.** `commitLabel` in the
+  registration wizard already names up to two children and counts beyond, through
+  `Register.checkInOne` / `checkInTwo` / `checkInMany` — whole sentences, drafted
+  in all four catalogues ("Registrar a {first} y {second}"). Do not invent a "one
+  name and N others" hybrid; the artifact shows it is unnecessary and the copy
+  rules forbid assembling it.
+
+  What is open is the button itself. The confirm commit is
+  `w-full … p-7 text-3xl font-bold` with **no truncate, no `whitespace-nowrap`
+  and no fixed height**, inside a grid whose `--confirm-measure` has three
+  consumers and no producer — so the 28rem fallback always runs, about 392px of
+  usable width at 30px bold. "Check in Ada and Ethan" fits; "Registrar a Guadalupe
+  y Maximiliano" does not, and neither does a single composite name like
+  `Wei "鈴木偉"`, which `composeFirstName` puts inside `firstName`. A label that
+  wraps takes a second 36px line **out of the `minmax(0,1fr)` track the offer list
+  measures itself into** — so the button silently pays for itself in the visible
+  rows of the very list that must not hide anybody, and it breaks the screen's own
+  stated invariant that the commit never moves.
+
+  The fix is to take the wizard's physical contract along with its copy: its `Big`
+  button is `h-16` fixed with `min-w-0 truncate px-4`, which is why the same
+  sentence is safe there.
 
 ## Problem B — what the rounds settled
 
@@ -174,13 +225,44 @@ What survives is **label, never refuse**, in three parts:
   already does this for the allergy caption — because most gatherings have no
   room typed, and a line reading `Room: {{location}}` on one of them prints
   *Room:* and nothing after it, into a parent's hand.
-- **Put the other programme on the row.** The kiosk already caches
-  `kioskIndex/participation` for *every* chain and narrows it to its own, and
-  `getKioskEvents` already returns chain, title and location for every gathering
-  in the window. So "where has this child been going" is an in-memory lookup —
-  the only new data is a chain→title map persisted at bind time. A row for a
-  child the kiosk knows nothing about carries no second line, rather than a blank
-  where other rows have a word.
+
+  **And the sticker reaches nobody on the day the token ships.** `LABEL_TOKENS` is
+  a closed union and `DEFAULT_LABEL_TEMPLATE` is four lines with no room in them —
+  so every gathering that already prints has a template a leader wrote, and none of
+  them contains the new token. That is two Tuesday jobs, not one: type a room on
+  every gathering, *and* put the room line on every printing gathering's template.
+  Either add it to the default and offer a one-tap "add the room line" per
+  gathering, or ship the token beside a screen listing which printing gatherings do
+  not yet name their room.
+- **Do *not* put the other programme on the row — not this cycle.** The parent
+  wanted the line only where there is one; the newcomer said that when two rows
+  are on screen and one carries a room, they read it as "this child is expected
+  and mine is not" — about the toddler they are already anxious about handing
+  over. The third round ruled for neither, on a cost neither had: rows are `h-16`
+  with `ROW_HEIGHT`/`ROW_PITCH` as hard constants the measured `visibleRows`
+  arithmetic depends on, and a second line at any legible size takes portrait from
+  seven visible rows to five and landscape from two to one. The symmetry request
+  buys itself two hidden children at eight people, under exactly the fail-closed
+  tick that turns a hidden child into an omission.
+
+  It is also not yet honest. `KioskBinding` carries no `location`, and every ticked
+  child on this screen goes to the one bound gathering — so the only truthful
+  wording is the past tense, "Ethan has been going to Nursery": a standing claim
+  about a child, made in front of a stranger's parent, that is irrelevant to the
+  one decision on the screen. It becomes honest only under routing, because only
+  then does the line name where *this tap* sends *this child*.
+
+  Note the contradiction this ruling retires, so it is not re-derived later: "a row
+  the kiosk knows nothing about simply has no second line" is not a fix for the
+  newcomer's objection. Absence and a blank are the same signal at a glance. If a
+  row line ever ships it is every row or none, with a neutral form for the unknown
+  case — and budgeted at the existing 72px pitch (a right-hand column), never in
+  row height.
+
+  The data is there when it is wanted: the kiosk already caches
+  `kioskIndex/participation` for *every* chain, and `getKioskEvents` already
+  returns chain, title and location for every gathering in the window, so this is
+  an in-memory lookup plus a chain→title map persisted at bind time.
 - **And say it on the screen a new family actually reaches.** This is the round-2
   correction that matters most, and it was nearly missed: the registration
   callable returns `checkedIn`, so the wizard checks the whole family in itself
@@ -333,11 +415,44 @@ a list that does not scroll at eight, and two stickers counted with the hands ar
 not polish on the change; they are the thing that keeps its new failure from
 being silent.
 
-It also names the condition under which the question could be reopened. What
-corrupted the prediction was a population — adults on a children's roster with
-imported attendance. Once that population is gone, a confident tick is a
-different proposal than it is today, and could be argued again on its merits
-rather than inherited by default.
+It also names a condition under which the question could be reopened — and the
+third round showed that the condition this campaign first wrote, "once that
+population is gone", is not a gate that removing people from the roster can meet.
+`kioskIndex/participation` is built from attendance document ids rather than from
+roster membership, so an adult removed on Tuesday keeps passing "two of the last
+three" for the whole retention window.
+
+The narrower question that *is* arguable is not "should the tick come back" but
+"should a child that `recent` positively names arrive ticked" — the no-evidence
+branch can never legitimately reopen, because it would return first and hardest on
+a restricted nursery tablet, which is the tablet this whole campaign was raised
+about. Four gates, all measurable, before that argument is worth having again:
+
+1. the intake is fixed;
+2. the index has been rebuilt with the removed ids dropped;
+3. the retention window has rolled past the corrupted weeks;
+4. `presentIds` can shrink, so a wrong tick is correctable at the glass rather
+   than by a parent walking off in front of a queue.
+
+Which is a reason to put the index rebuild in the *same* release as the bulk
+removal rather than after it. Otherwise the gate can never be evaluated and the
+argument comes back as opinion.
+
+## And the failure nobody in the building is watching for
+
+Every mitigation above fires in the four seconds before a parent presses green:
+names on the button, a fold that holds eight, two stickers counted with the hands.
+The failure the parent named is downstream of all of them — a child who is present
+and on no list — and nothing in this proposal gives anybody an instrument that
+looks for it. The one reconciliation the product already has is the check-out
+gathering's header, which leads with the live room count against the head count,
+and that is a counselor's screen rather than anything a nursery volunteer at a
+shelf is holding.
+
+So either name the person expected to notice and give them that one number on a
+screen they can reach while standing in the room, or say plainly in the release
+note that nobody is watching for it this cycle. What should not happen is the
+dissent being answered by mitigations that all fire before the failure exists.
 
 ## Routing: the one thing the consultants split on
 
@@ -402,10 +517,18 @@ while steering their thumb. `SuccessScreen` already formats a list of children's
 names through `Intl.ListFormat` in every locale, so the mechanism exists and only
 moves.
 
-1. **The fail-closed tick, and names on the button, together.** Nothing else in
-   the release. The stale comment in `participation.ts` gets corrected in the same
-   commit, because the sentence it is wrong about is the reason this is urgent.
-   Nothing to configure; one sentence to volunteers.
+1. **Release 1 is four things that must not be split.** The fail-closed tick;
+   names on the commit button in the wizard's existing one/two/many shape; the
+   commit button given the wizard's *physical* contract — fixed height,
+   non-wrapping, truncating — so a label can never take a row off the offer; and
+   the fold measured on both real viewports, holding eight names or the cap
+   lowered for the one that cannot. Nothing else in the release. The stale comment
+   in `participation.ts` gets corrected in the same commit, because the sentence it
+   is wrong about is the reason this is urgent. Nothing to configure; one sentence
+   to volunteers.
+
+   Arm the MIA suppression *before* this release rather than after: the drift
+   starts on the first Friday.
 2. **Make `presentIds` shrink.** Before any receipt, and before the room reaches a
    sticker. It is also the only item that gives the volunteer coordinator
    something: a correction made on a phone reaches the glass within a minute.
@@ -424,9 +547,11 @@ moves.
    "Former student", and an undo live for the rest of the day. Close the gap
    between 5 and 7: in that window the adults are still on the roster and no
    longer being checked in, which is precisely the shape of a dashboard call list.
-8. **The cross-programme row line**, and only then, because it is the piece whose
-   honest wording depends on whether routing is ever coming.
-9. **A "move this check-in to another gathering" correction**, before anything
+8. **A "move this check-in to another gathering" correction**, before anything
    deliberately increases cross-programme traffic.
+9. **The cross-programme row line — deferred until routing is decided**, because
+   its only honest wording before then is a standing claim about a child, and it
+   costs two visible rows on a list that must not hide anybody. See the ruling
+   above.
 
 Routing is not on this list. See above.
