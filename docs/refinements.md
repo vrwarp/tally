@@ -602,3 +602,75 @@ photo Sunday until they were forbidden to wrap, four empty boxes standing for
 "digits" read as missing glyphs until digits were put in them, and the panel on
 a portrait tablet with three voices overran the region's top until it took a
 smaller step for its size and the sign's measure for its lines.
+
+## Changing a kiosk's languages after it is mounted — 1 design round, 1 frame round
+
+The [four-language home screen](#kiosk-home-screen-in-four-languages--10-rounds)
+above shipped with its setting in one place: the pairing screen, chosen by
+whoever mounted the tablet. Three consultants and a journey critic were asked
+where that setting should live once the tablet is on the wall, given five
+directions — a staff row opening a screen, that row *plus* the old one, an
+inline expander, a long press on the family-facing switch, and moving the whole
+thing to the web app.
+
+They converged on the first, and the argument that settled it was not taste.
+**A tablet staged with a pairing link in its start URL never draws the pairing
+screen at all** — `takePairLink` claims it at boot and goes straight to the
+chooser — so on the zero-touch fleet in
+[tablet-management.md §6.4](tablet-management.md) the picker was not rare, it
+was unreachable. Those kiosks could never have a language switch, and nobody
+would ever report it, because the screen looks exactly like the one that
+shipped.
+
+What each rejected direction died of:
+
+- **Both rows.** The staff menu is a centred column that did not scroll, and a
+  sixth row put **Keep checking in** off the glass. Measured rather than
+  argued: 832px against 800 on a 1280×800 shelf with a printer fault, a photo
+  and pins. That turned out to be a bug in the shipped screen too, and is fixed
+  here.
+- **An expander on the row.** It breaks the screen's own *a row is a row* rule
+  in the way that matters at speed — a press that changes a row's height and
+  shoves the rows under it is the "I pressed it and nothing happened" reading
+  the header comment already fought once.
+- **A long press on the language switch.** Two independent killers. The switch
+  is drawn only where there are pins, so the one state the door exists to fix
+  is the one state it is missing from; and it puts a staff gesture on the
+  largest, most-pressed buttons on parent-facing glass. The parent consultant
+  refused it outright — a toddler holding a bright word *is* a long press — and
+  this codebase already replaced one unfindable gesture with a labelled key.
+- **A setting in the web app.** A kiosk has no name. The device row is
+  `kiosk-` and 24 hex characters, nested under whoever approved the pairing, so
+  the Tuesday journey is choosing between two hex strings. Languages are a
+  property of a room and the director in the office is the person least able to
+  know which tablet is in which hallway this month. It also cannot answer the
+  9:05 errand with the hallway switch unplugged.
+
+What the rounds attached to shipping it:
+
+- The row is drawn **whether or not anything is pinned** — the empty kiosk is
+  the one that most needs it — and carries what is offered as its trailing
+  status, the names or the words *English only*.
+- **The words survive.** *English only* stays on the device as the quiet
+  control at the foot of the new screen, so the phone script a volunteer was
+  trained on still terminates: hold Clear, press Languages, press English only.
+  It is undoable for the first time.
+- **No Save button.** The staff session hands the kiosk back on a clock, and a
+  decision made out loud takes longer than a clock does; a screen that
+  collected an edit would lose it. Writes land on every tap and the preview is
+  the confirmation. The screen does get ninety seconds rather than
+  forty-five — its next step is usually a question put to the family.
+- **A pin fetches its words**, because the catalogue is a lazy import that
+  falls back to English in silence, and the family who meets that failure is
+  the one the pin was added for.
+- **The cap says so.** At three pins the remaining chips are drawn inert and
+  the note changes. A silent refusal was survivable at pairing, where nobody
+  starts at three; behind the gate the three-pinned swap is the usual errand.
+- **The pairing screen keeps its copy.** It is the only chance to make a new
+  kiosk's first family right, and the two moments are different: pairing is the
+  first paint, the gate is every correction after it.
+
+One thing changed that the round did not ask for. **Change gathering** moved to
+sit directly above **Keep checking in**: they are the same question answered
+two ways — stay on this gathering, or leave it — and were composed as unrelated
+while three rows apart.
