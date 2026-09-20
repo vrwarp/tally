@@ -285,6 +285,17 @@ named households, one child in each, and **there is no merge for households**: t
 emptied and deleted by hand. Tally now joins the household the parent already heads, and does not
 re-post a membership for one they are already in.
 
+Every membership Tally posts carries a `household_role`, and that field is a **closed enum
+upstream**: `parent_guardian`, `adult`, `other_adult`, `child_or_dependent`. The one that is not in
+it is the obvious one — `child`, which is the word Planning Center itself uses for the boolean flag
+on a Person and the word anybody writing this call reaches for. Posting it is a 422, *child is not a
+valid household role*, and it lands on the **last** write of a registration: the parent and the
+household are already there, so a family is left half-built and the review screen says only that the
+attempt did not finish. The value lives in `HOUSEHOLD_CHILD_ROLE`
+(`functions/src/pco/types.ts`) rather than at the write sites, and the simulator now answers an
+unknown role with the same 422 — it used to store whatever string it was handed, which is why the
+wrong one passed every test and every end-to-end run and was first seen in a lobby.
+
 A name Tally holds as `Benson “蔡秉洲”` is split back into `first_name` and `nickname` before any of
 this, because Planning Center stores those as two fields and its fuzzy search indexes them
 separately. Writing the composite into `first_name` would leave Planning Center holding
