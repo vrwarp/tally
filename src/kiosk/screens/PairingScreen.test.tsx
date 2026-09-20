@@ -19,6 +19,7 @@ import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PairingScreen, POLL_MS, TROUBLE_AFTER_FAILURES } from '@/kiosk/screens/PairingScreen';
 import type { KioskServices } from '@/kiosk/KioskApp';
+import type { Locale } from '@/lib/locales';
 
 function servicesWith(poll: KioskServices['pollPairing']): KioskServices {
   return {
@@ -270,6 +271,46 @@ describe('the lobby’s languages', () => {
     expect(within(pins).queryByRole('button', { name: 'English' })).toBeNull();
     // Nothing to preview until something is pinned.
     expect(screen.queryByTestId('language-switch')).toBeNull();
+  });
+
+  /*
+   * The cap, said rather than silently enforced. It used to be an early
+   * `return` inside the press: the chip flashed and nothing happened, which is
+   * the frozen-tablet reading this codebase removes wherever it finds it. It
+   * barely mattered here, where nobody starts at three — it matters behind the
+   * staff gate, where the three-pinned swap is the usual errand.
+   */
+  it('draws the fourth language inert once three are chosen, and says why', async () => {
+    const onPins = vi.fn();
+    render(
+      <PairingScreen
+        services={servicesWith(pending())}
+        onPaired={vi.fn()}
+        pins={['zh-Hant', 'es-MX', 'zh-Hans']}
+        onPins={onPins}
+      />,
+    );
+    await tick();
+    expect(screen.getByText(/three is the most/i)).toBeTruthy();
+    expect(screen.queryByText(/tap up to three/i)).toBeNull();
+  });
+
+  it('keeps every chosen language pressable at the cap, so a swap is possible', async () => {
+    const onPins = vi.fn();
+    const pins: Locale[] = ['zh-Hant', 'es-MX', 'zh-Hans'];
+    render(
+      <PairingScreen
+        services={servicesWith(pending())}
+        onPaired={vi.fn()}
+        pins={pins}
+        onPins={onPins}
+      />,
+    );
+    await tick();
+    const group = screen.getByTestId('language-pins');
+    // Taking one off is the way to make room, so it must still answer.
+    pressIn(group, '繁體中文');
+    expect(onPins).toHaveBeenCalledWith(['es-MX', 'zh-Hans']);
   });
 
   it('shows the volunteer the switch a family will see', async () => {
