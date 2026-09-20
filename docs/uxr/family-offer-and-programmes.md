@@ -14,8 +14,8 @@ line of it exists. The subject is two linked problems raised by the ministry:
 
 ## What the code actually does, before any argument about it
 
-Nine facts, each checked rather than remembered. Several of them changed the
-shape of the answer.
+Ten facts, each checked rather than remembered. Several of them changed the
+shape of the answer, and two of them corrected this campaign's own first draft.
 
 - **The tick already fails open.** `skippedFor` in `src/kiosk/KioskApp.tsx`
   returns an empty skip set when `scope.recent.size === 0`, which means *every*
@@ -199,21 +199,13 @@ What survives is **label, never refuse**, in three parts:
   are two. The wizard is already asking questions one at a time; one more, naming
   the two rooms, is the cheapest moment the answer will ever be available.
 
-### Routing (one kiosk, both programmes) — the right shape, not this cycle
+### Routing (one kiosk, both programmes)
 
 Binding a tablet to the gatherings that run *together* and routing each child to
 their own register is the only candidate that matches what a Sunday morning
-actually is: one family, one queue, one parent holding a toddler. It also fixes
-pickup, where a parent currently has to collect from two tablets.
-
-It is not a cheap change and should not be costed as one. `boundChain` is a
-single string on the device row and the whole of the kiosk's gate in
-`firestore.rules` — it gates reads as well as writes — so it becomes a set. The
-chooser becomes multi-select, the register poll becomes two registers, the print
-queue becomes plural, and there has to be an answer for what a family sees when
-one of two writes fails. `ConfirmScreen` also refuses, deliberately, to mix a
-check-in and a check-out under one button, which is exactly what a shared
-nursery/children's kiosk has to do at 11:30.
+actually is: one family, one queue, one parent holding a toddler. It is also the
+only one that fixes the end of the morning. It is not cheap, and the consultants
+split on it — see [below](#routing-the-one-thing-the-consultants-split-on).
 
 ### The guard that the security model currently forbids
 
@@ -359,14 +351,15 @@ is the single largest cost in this campaign for a split family, and it is the on
 routing fixes and nothing else does. The newcomer, asked to choose an end, chose
 pickup: *one screen at the end matters more to me than one screen at the start.*
 
-The staff's refusal is about the gate, not the feature. `kioskBoundTo` going from
-a string to a set is the only thing standing between a donated lobby tablet and
-every register in the church, and a mistake in it is either a tablet writing to
-gatherings it is not at, or a tablet that cannot write at all while a queue forms.
-Add two register polls, two print queues, a story for one-write-failed, and a
-confirm screen that today refuses on purpose to put a check-in and a check-out
-under one button — which is exactly what a shared nursery/children's tablet has
-to do at 11:30.
+The staff's refusal is about the gate, not the feature. `boundChain` is a single
+string on the device row and the whole of `kioskBoundTo` in `firestore.rules`,
+which gates reads as well as writes — the only thing standing between a donated
+lobby tablet and every register in the church. A mistake in it is either a tablet
+writing to gatherings it is not at, or a tablet that cannot write at all while a
+queue forms. Add a multi-select chooser, two register polls, two print queues, a
+story for one-write-failed, and a confirm screen that today refuses on purpose to
+put a check-in and a check-out under one button — which is exactly what a shared
+nursery/children's tablet has to do at 11:30.
 
 Both positions survive as: **not this cycle, and never inside a release that also
 changes what parents see.** If it comes back it comes back alone, with its own
