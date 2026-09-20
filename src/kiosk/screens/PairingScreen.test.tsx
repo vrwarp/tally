@@ -273,28 +273,6 @@ describe('the lobby’s languages', () => {
     expect(screen.queryByTestId('language-switch')).toBeNull();
   });
 
-  /*
-   * The cap, said rather than silently enforced. It used to be an early
-   * `return` inside the press: the chip flashed and nothing happened, which is
-   * the frozen-tablet reading this codebase removes wherever it finds it. It
-   * barely mattered here, where nobody starts at three — it matters behind the
-   * staff gate, where the three-pinned swap is the usual errand.
-   */
-  it('draws the fourth language inert once three are chosen, and says why', async () => {
-    const onPins = vi.fn();
-    render(
-      <PairingScreen
-        services={servicesWith(pending())}
-        onPaired={vi.fn()}
-        pins={['zh-Hant', 'es-MX', 'zh-Hans']}
-        onPins={onPins}
-      />,
-    );
-    await tick();
-    expect(screen.getByText(/three is the most/i)).toBeTruthy();
-    expect(screen.queryByText(/tap up to three/i)).toBeNull();
-  });
-
   it('keeps every chosen language pressable at the cap, so a swap is possible', async () => {
     const onPins = vi.fn();
     const pins: Locale[] = ['zh-Hant', 'es-MX', 'zh-Hans'];

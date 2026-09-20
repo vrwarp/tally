@@ -19,7 +19,7 @@
  * and leaving is one of its doors, so the prompt below is two taps away rather
  * than one, and everything that was true of it is still true when it arrives.
  */
-import { act, fireEvent, render, screen } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
@@ -361,7 +361,9 @@ describe('the lobby’s languages, from behind the gate', () => {
     await holdClear();
     // Named, so nobody presses it blind.
     const row = screen.getByText('Languages').closest('button')!;
-    expect(row.textContent).toContain('繁體中文 · Español');
+    // The catalogue's order, not the order they were tapped in — the pins are
+    // a set, and this row says what the switch will say.
+    expect(row.textContent).toContain('Español · 繁體中文');
 
     await tap('Languages');
     expect(screen.getByTestId('language-pins')).toBeTruthy();
@@ -402,18 +404,30 @@ describe('the lobby’s languages, from behind the gate', () => {
     expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual(['es-MX']);
   });
 
-  it('takes every language but English off, from the screen that can put them back', async () => {
+  it('takes every language but English off, where the mistake would be visible', async () => {
     localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['zh-Hant', 'es-MX']));
     await mount();
     await holdClear();
     await tap('Languages');
 
     await tap('English only');
-    // Back on the door, with English alone on it —
+    // Off the disk, so the ~4am reload keeps it that way.
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual([]);
+    /*
+     * And still on the screen. While this closed the overlay, a thumb that
+     * landed on it instead of Done produced exactly the confirmation Done
+     * would have — the idle screen — so the deletion was invisible until the
+     * next family. Staying put makes the control remove itself in front of
+     * the person who pressed it, and the undo one tap per language.
+     */
+    expect(screen.getByTestId('language-pins')).toBeTruthy();
+    // Gone as a control — it holds its box so the column does not jump, and
+    // `visibility: hidden` keeps it out of the accessibility tree.
+    expect(screen.queryByRole('button', { name: 'English only' })).toBeNull();
+
+    await tap('Done — back to check-in');
     expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
     expect(screen.queryByTestId('language-switch')).toBeNull();
-    // — and off the disk, so the ~4am reload keeps it that way.
-    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual([]);
   });
 
   it('offers no way to delete on a kiosk that has nothing to delete', async () => {
@@ -422,19 +436,25 @@ describe('the lobby’s languages, from behind the gate', () => {
     await tap('Languages');
     // A control that takes nothing off answers a press with nothing, which is
     // the frozen-tablet reading this codebase removes wherever it finds it.
-    expect(screen.queryByText('English only')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'English only' })).toBeNull();
   });
 
-  it('refuses a fourth language in words, not by doing nothing', async () => {
-    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['es-MX', 'zh-Hans']));
+  it('gives the same switch whichever way round the chips are tapped', async () => {
     await mount();
     await holdClear();
     await tap('Languages');
-    expect(screen.getByText(/tap up to three/i)).toBeTruthy();
-
     await tap('繁體中文');
-    // At the cap the sentence changes rather than the press silently failing.
-    expect(screen.getByText(/three is the most/i)).toBeTruthy();
+    await tap('Español');
+    /*
+     * Tapped Chinese first, and the switch still reads English · Español ·
+     * 繁體中文. There is no sequence to get wrong, to show, or to explain to
+     * somebody standing at a kiosk with a queue.
+     */
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual(['es-MX', 'zh-Hant']);
+
+    await tap('Done — back to check-in');
+    const cells = within(screen.getByTestId('language-switch')).getAllByRole('button');
+    expect(cells.map((cell) => cell.textContent)).toEqual(['English', 'Español', '繁體中文']);
   });
 
   it('rests the screen in English on the way in, not only on the way out', async () => {

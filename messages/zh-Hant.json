@@ -2229,7 +2229,7 @@
     "hideThePhoto": "隱藏照片",
     "englishOnly": "只用英文",
     "languages": "語言",
-    "languagesAbout": "這台簽到台提供的語言。跟著平板走，不跟著聚會走。",
+    "languagesAbout": "跟著平板走，不跟著聚會走。",
     "reprintNoRegisterChange": "這個畫面不會為任何人簽到或簽出。",
     "reprintPrinterAttention": "印表機需要處理。",
     "reprintInvitation": "點一個名字看看會印出什麼，然後確認。出席紀錄完全不受影響。",
@@ -2450,8 +2450,7 @@
     "updated": "Tally 已更新，此簽到台需要重新配對。任何輔導皆可進行配對。",
     "retired": "此簽到台已於 {time} 在 Tally 中停用，此後未再記錄任何資料。在重新配對前，請由輔導使用手機為孩子簽到。",
     "pinLanguages": "這裡的家庭使用的語言",
-    "pinHint": "最多點選三種，按想要顯示的順序。英文一定會有。",
-    "pinFull": "最多三種。先取消一個再加。",
+    "pinHint": "英文一定會有。",
     "pinPreview": "家庭會看到的畫面"
   },
   "Time": {

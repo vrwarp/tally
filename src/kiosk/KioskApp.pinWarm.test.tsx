@@ -31,8 +31,10 @@ import type { KioskStudent } from '@/kiosk/search';
 
 const { loadCatalog } = vi.hoisted(() => ({ loadCatalog: vi.fn(async () => ({})) }));
 
+/* Everything the real module exports, with the one fetch swapped out — the
+   provider still needs `cachedCatalog` and the bundled English slice. */
 vi.mock('@/kiosk/messages', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/kiosk/messages')>()),
+  ...(await importOriginal<Record<string, unknown>>()),
   loadCatalog,
 }));
 

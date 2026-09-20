@@ -651,6 +651,12 @@ What the rounds attached to shipping it:
 - The row is drawn **whether or not anything is pinned** — the empty kiosk is
   the one that most needs it — and carries what is offered as its trailing
   status, the names or the words *English only*.
+- **The pins are a set.** They kept tap order for one round, and the round
+  found what that cost: the chips are drawn in catalogue order, so the control
+  disagreed with the switch it was setting, and reordering meant unpinning
+  everything and starting again with nothing on the glass saying so. The
+  owner's call, and the right one — `sanitizePins` decides the order once, and
+  the question *does it matter which I press first* stops existing.
 - **The words survive.** *English only* stays on the device as the quiet
   control at the foot of the new screen, so the phone script a volunteer was
   trained on still terminates: hold Clear, press Languages, press English only.

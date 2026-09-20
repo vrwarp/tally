@@ -268,7 +268,9 @@ describe('the lobby’s own languages', () => {
     pin('zh-Hant', 'es-MX');
     await mountIn('en');
     const cells = within(screen.getByTestId('language-switch')).getAllByRole('button');
-    expect(cells.map((cell) => cell.textContent)).toEqual(['English', '繁體中文', 'Español']);
+    // English first, then the pins in the catalogue's order — not the order
+    // whoever mounted the tablet happened to tap them in. See `sanitizePins`.
+    expect(cells.map((cell) => cell.textContent)).toEqual(['English', 'Español', '繁體中文']);
     expect(screen.getByText(ENGLISH_PROMPT)).toBeTruthy();
   });
 

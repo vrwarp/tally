@@ -12865,8 +12865,8 @@
     "zh-Hant": "machine"
   },
   "Staff.languagesAbout": {
-    "source": "The languages this kiosk offers. They stay with the tablet, not with the gathering.",
-    "context": "One line under the title of the kiosk's Languages screen (staff-facing, behind the held Clear key). Says whose setting this is, because the pins live on the device: a tablet carried to another room brings the old room's languages with it, and a volunteer who cannot tell an intention from an inheritance reaches for the destructive control. Two facts, both required: what the list is, and that it belongs to the tablet rather than to the gathering.",
+    "source": "They stay with the tablet, not with the gathering.",
+    "context": "One line under the title of the kiosk's Languages screen (staff-facing, behind the held Clear key). Says whose setting this is: the pins live on the device, so a tablet carried to another room brings the old room's languages with it, and a volunteer who cannot tell an intention from an inheritance reaches for the destructive control. 'They' is the languages named by the chips below it — the sentence deliberately does not repeat the word, which the screen's title and the row that opened it both already say.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -14155,15 +14155,8 @@
     "zh-Hant": "machine"
   },
   "Pairing.pinHint": {
-    "source": "Tap up to three, in the order they should appear. English is always offered.",
-    "context": "Beneath Pairing.pinLanguages. Up to three languages may be offered, in the order tapped; English is on the switch whether or not it is tapped.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Pairing.pinFull": {
-    "source": "Three is the most. Tap one off to add another.",
-    "context": "Replaces Pairing.pinHint under the language chips once three languages are already chosen — the cap. Says why a fourth press does nothing and what to do instead; the chips themselves are drawn dimmed and inert at that point. Staff-facing, at the kiosk: the pairing screen and the staff gate's Languages screen both show it.",
+    "source": "English is always offered.",
+    "context": "Under the language chips on the kiosk's pairing screen and on its staff-gate Languages screen. Staff-facing. One fact, and the only one the chips cannot show: English is on the switch whatever is chosen, which is why there is no English chip. It used to add 'Tap up to three, in the order they should appear' — both halves dropped, because the build speaks exactly three languages besides English so the cap cannot be reached, and the pins are a set whose order the catalogue decides.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

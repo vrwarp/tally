@@ -41,6 +41,28 @@
  * centimetres a lobby tablet on a stand is read from — half of comfortable —
  * and the budget for the extra came off the word `Staff`, which nobody walked
  * over here to read.
+ *
+ * ## The type is a distance question; the box is a height one
+ *
+ * Which is why they are on different variants, and the split is the fix for a
+ * real measurement rather than a preference. `kiosk:` matches *either* axis —
+ * `min-height: 1000px` or `min-width: 1024px` — because it answers "is anybody
+ * holding this", and the answer is no on a tablet stood on end and no on one
+ * laid on its side. `tall:` answers "has this glass the room", and only the
+ * first of those two clears it.
+ *
+ * Hanging the row's *height* on `kiosk:` therefore gave a 1280×800 landscape
+ * shelf the 96px rows meant for a screen with 1280px to spend them in. With a
+ * printer fault (whose warning wraps to two lines), a photograph and the
+ * languages row, the menu came to 928px of content in 800px of glass and
+ * **Keep checking in** — the one control that gives the kiosk back to the
+ * queue — sat 96px below the fold, on a screen whose reader has no reason to
+ * suspect it scrolls.
+ *
+ * So the labels keep `kiosk:`, because the volunteer is at seventy centimetres
+ * either way and legibility is not the thing in short supply. The boxes move
+ * to `tall:`: 64px is still half again the 44px a thumb needs, and six of them
+ * at 30px labels fit the shelf with room over.
  */
 import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
@@ -59,7 +81,7 @@ import { useTap } from '../components/tapGuard';
  */
 const ROW =
   'flex h-16 w-full items-center justify-between gap-3 rounded-xl px-5 text-left ' +
-  'text-xl font-semibold kiosk:h-24 kiosk:px-6 kiosk:text-3xl';
+  'text-xl font-semibold kiosk:px-6 kiosk:text-3xl tall:h-24';
 
 /**
  * A fact, set as prose on the group's shared inset.
@@ -143,8 +165,9 @@ export function StaffScreen({
   /** Takes the photograph off this device for the rest of the binding. */
   onHideBackdrop: () => void;
   /**
-   * The languages this lobby offers beside English. Named on the row below,
-   * which is the only place a kiosk says out loud what it is offering.
+   * The languages this lobby offers beside English, in the order the switch
+   * stands in. Named on the row below, which is the only place a kiosk says
+   * out loud what it is offering.
    */
   pins: readonly Locale[];
   /** Opens the screen that sets them — see `LanguagesScreen`. */
@@ -357,9 +380,17 @@ export function StaffScreen({
           >
             {/* The label keeps its width and the names give way — three of
                 them at the row's size took the old label down to "Eng…", and a
-                door that cannot be read is a door pressed blind. */}
+                door that cannot be read is a door pressed blind.
+
+                One step under the row's label rather than two. The status is
+                the fact this row exists to report — *is Spanish already on* —
+                and at 20px in CJK it was the second-smallest thing on a
+                screen set for seventy centimetres, so the answer usually cost
+                the tap it was meant to save. Two names is the common case and
+                there is slack for it; three still give way, which is what the
+                rule above is for. */}
             <span className="shrink-0">{t('languages')}</span>
-            <span className="min-w-0 truncate text-base font-normal text-ink-400 kiosk:text-xl">
+            <span className="min-w-0 truncate text-base font-normal text-ink-400 kiosk:text-2xl">
               {/* The status the printer row's grammar asks for: what is set, and
                   never a count. With nothing pinned the true answer is the
                   sentence the old row's label was — English, and only English —
@@ -412,7 +443,7 @@ export function StaffScreen({
               haptic();
               onStay();
             })}
-            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:h-24 kiosk:text-3xl"
+            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:text-3xl tall:h-24"
           >
             {t('keepCheckingIn')}
           </button>

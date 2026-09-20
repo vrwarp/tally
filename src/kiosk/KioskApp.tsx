@@ -69,6 +69,7 @@ import {
   readCachedRoster,
   readJson,
   readPins,
+  sanitizePins,
   writePins,
   type CachedPulse,
 } from './storage';
@@ -477,8 +478,16 @@ export function KioskApp() {
    */
   const [pins, setPinsState] = useState<Locale[]>(() => readPins());
   const setPins = useCallback((next: Locale[]) => {
-    writePins(next);
-    setPinsState(next);
+    /*
+     * Through `sanitizePins` before either the disk or the screen sees it,
+     * because that is where the order is decided: the pins are a set, and the
+     * switch stands in catalogue order however the chips were tapped. Writing
+     * the raw list and holding the raw list would have left the glass in tap
+     * order until the next reload put it right.
+     */
+    const ordered = sanitizePins(next);
+    writePins(ordered);
+    setPinsState(ordered);
     /*
      * Fetch the words for anything just added, now.
      *
@@ -824,14 +833,17 @@ export function KioskApp() {
    * idle screen standing there in English is the confirmation.
    *
    * It used to be a row on the staff menu, one press from a queue and undoable
-   * only by an administrator retiring the device. It is the quiet control at
-   * the bottom of the screen that can also put them back — which is the same
-   * words in the same order for anyone told the old script over the phone.
+   * only by an administrator retiring the device. It is the quiet control on
+   * the screen that can also put them back — the same words in the same order
+   * for anyone told the old script over the phone.
+   *
+   * It no longer closes the overlay, and that is the safety rather than an
+   * oversight: while it did, a thumb that landed on it instead of **Done**
+   * produced exactly the confirmation **Done** would have — the idle screen —
+   * and the deletion was invisible until the next family. Staying put makes
+   * the mistake visible where it was made and the undo one tap per language.
    */
-  const englishOnly = useCallback(() => {
-    setPins([]);
-    setOverlay(null);
-  }, [setPins]);
+  const englishOnly = useCallback(() => setPins([]), [setPins]);
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 

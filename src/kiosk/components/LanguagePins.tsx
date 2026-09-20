@@ -1,8 +1,8 @@
 /**
  * Which languages this lobby offers, as a control.
  *
- * The fact it edits is `KIOSK_KEYS.pins` — up to three languages beside
- * English, in the order they will stand on the idle screen's switch. It is a
+ * The fact it edits is `KIOSK_KEYS.pins` — the languages this room reads
+ * beside English, at most three. It is a
  * property of the room rather than of whoever is holding the tablet, which is
  * why staff set it and a family never does: the switch a family presses
  * chooses *their* language out of this list and cannot change the list.
@@ -10,14 +10,24 @@
  * Two placements, one control, and the second is why this is a component
  * rather than markup inside a screen. It was built on the pairing screen,
  * where a tablet is mounted; it is now also behind the staff gate, for the
- * Sunday the room turns out to read something else. The two differ only in how
- * far away the reader is — `size` is that, and nothing else.
+ * Sunday the room turns out to read something else. They differ in how far
+ * away the reader is (`size`) and in whether the switch's own miniature is
+ * worth drawing (`preview`) — nothing else.
  *
  * A language's own name is never translated (`LOCALE_LABELS`), so the chips'
  * words come from `src/lib/locales.ts` and not from the catalogue. English is
  * not among them: it is the resting language and the switch's first cell
  * whatever the disk says, so a chip for it would be a control that does
  * nothing.
+ *
+ * ## Tapping is a set operation
+ *
+ * There is no first and no second. The pins used to keep the order they were
+ * tapped in, which bought nothing and cost a question nobody should have to
+ * answer at a kiosk with a queue — and the chips, drawn in catalogue order,
+ * then disagreed with the switch they were setting. `sanitizePins` decides
+ * the order now, once, from the catalogue. Pressing three chips in any
+ * sequence gives the same lobby the same glass.
  */
 import { haptic } from '@/lib/utils';
 import { DEFAULT_LOCALE, LOCALES, LOCALE_LABELS, type Locale } from '@/lib/locales';
@@ -50,31 +60,28 @@ export function LanguagePins({
   pins,
   onPins,
   size = 'setup',
+  preview = false,
 }: {
-  /** The lobby's languages beside English, in the order they will stand. */
+  /** The lobby's languages beside English. A set; `sanitizePins` orders it. */
   pins: readonly Locale[];
   onPins: (pins: Locale[]) => void;
   size?: LanguagePinsSize;
+  /**
+   * Whether to draw the switch's own miniature under the chips.
+   *
+   * On the pairing screen, yes: the idle screen it previews is several
+   * screens and an approval away, so the layout has to be shown rather than
+   * imagined. Behind the staff gate, no — the real thing is one press of
+   * **Done** away, and a second block of language-named plates 60px under the
+   * first was three critics' worst finding on that screen. The two disagreed
+   * about what a lit plate meant (pinned, above; the current language, below),
+   * the dead one was drawn brighter than the live one, and its cells are
+   * `disabled`, so the tap it invited returned nothing at all.
+   */
+  preview?: boolean;
 }) {
   const t = useTranslations('Pairing');
   const tap = useTap();
-  /*
-   * At the cap, and what that has to look like.
-   *
-   * `MAX_PINS` used to be enforced by an early `return` inside the press: the
-   * chip flashed its `active:` fill and then nothing happened — no haptic, no
-   * state, no sentence. That is the frozen-tablet reading `StaffScreen`'s own
-   * header comment removed from the disabled reprint row, and it barely
-   * mattered while this control only ever appeared at pairing, where nobody
-   * starts at three. Behind the staff gate the three-pinned swap is the
-   * *typical* errand, so the fourth press is the one a volunteer makes first.
-   *
-   * Dimming is the right signal here and only here: these chips really are
-   * unavailable, and the note below says why in a sentence. Absent would be
-   * wrong — a language that vanished from the row would read as one this
-   * build cannot speak.
-   */
-  const full = pins.length >= MAX_PINS;
 
   return (
     <>
@@ -92,7 +99,6 @@ export function LanguagePins({
       >
         {LOCALES.filter((candidate) => candidate !== DEFAULT_LOCALE).map((candidate) => {
           const pinned = pins.includes(candidate);
-          const spare = pinned || !full;
           return (
             <button
               key={candidate}
@@ -100,24 +106,28 @@ export function LanguagePins({
               tabIndex={-1}
               lang={candidate}
               aria-pressed={pinned}
-              aria-disabled={!spare || undefined}
-              {...(spare
-                ? tap(() => {
-                    haptic();
-                    onPins(
-                      pinned ? pins.filter((pin) => pin !== candidate) : [...pins, candidate],
-                    );
-                  })
-                : {})}
+              {...tap(() => {
+                // Unreachable while the build speaks three languages besides
+                // English and the cap is three — kept because the cap is a
+                // number in `storage.ts` and the catalogue is a list, and
+                // nothing makes them move together.
+                if (!pinned && pins.length >= MAX_PINS) return;
+                haptic();
+                onPins(pinned ? pins.filter((pin) => pin !== candidate) : [...pins, candidate]);
+              })}
+              /*
+               * Both states are objects on the glass. The unpinned plate was
+               * `ink-800/70` with an `ink-400` label — nineteen levels off the
+               * page and the same grey as the prose around it — so on the one
+               * screen whose entire content is this control, the control was
+               * the fourth thing the eye found. The difference between on and
+               * off is carried by the ring and one step of label ink, with
+               * both plates plainly above the background.
+               */
               className={`flex items-center justify-center rounded-xl font-semibold whitespace-nowrap ${CHIP[size]} ${
                 pinned
                   ? 'bg-ink-700 text-ink-50 ring-2 ring-ink-400'
-                  : spare
-                    ? 'bg-ink-800/70 text-ink-400 ring-1 ring-ink-700 active:bg-ink-700 active:text-ink-100'
-                    : /* Inert, and drawn inert. No `active:` fill, because a
-                         chip that lights under a thumb and then does nothing
-                         is the press a volunteer repeats. */
-                      'bg-ink-900 text-ink-600 ring-1 ring-ink-800'
+                  : 'bg-ink-800 text-ink-300 ring-1 ring-ink-600 active:bg-ink-600 active:text-ink-100'
               }`}
               style={{ touchAction: 'manipulation' }}
             >
@@ -127,22 +137,18 @@ export function LanguagePins({
         })}
       </div>
 
-      {/* One slot, two sentences: how to choose, or — once three are chosen —
-          why the fourth chip is dim and what to press instead. */}
-      <div className={`max-w-md leading-relaxed text-ink-400 ${NOTE[size]}`}>
-        {full ? t('pinFull') : t('pinHint')}
-      </div>
+      <div className={`max-w-md leading-relaxed text-ink-400 ${NOTE[size]}`}>{t('pinHint')}</div>
 
       {/*
         * A miniature of the switch as it will stand, once anything is chosen.
         *
         * Whoever is setting this is deciding what a family will see, and the
-        * honest way to show a layout is the layout — the cap on pins exists
-        * because a fourth name takes the switch to two rows and drops the
-        * instruction under it, which is a thing to be seen rather than read
-        * about. It is also the confirmation: nothing here has a Save button.
+        * honest way to show a layout is the layout — a third name takes the
+        * switch to two rows and drops the instruction under it, which is a
+        * thing to be seen rather than read about. See `preview` above for why
+        * the staff gate does without it.
         */}
-      {pins.length > 0 && (
+      {preview && pins.length > 0 && (
         <div className="flex w-full flex-col items-center gap-2 pt-2">
           <div className={`text-ink-500 ${NOTE[size]}`}>{t('pinPreview')}</div>
           <LanguageSwitch names={[DEFAULT_LOCALE, ...pins]} preview />

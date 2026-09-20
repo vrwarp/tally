@@ -310,9 +310,27 @@ describe('ensureDeviceId', () => {
  * button, so the reader is the one place a stale or hand-edited key is caught.
  */
 describe('readPins', () => {
-  it('reads back the languages a volunteer pinned, in the order they were pinned', () => {
+  it('reads back the languages a volunteer pinned', () => {
+    writePins(['es-MX', 'zh-Hant']);
+    expect(readPins()).toEqual(['es-MX', 'zh-Hant']);
+  });
+
+  /*
+   * A set, not a sequence. Tap order used to be the switch's order, which
+   * bought nothing and cost a question nobody should answer at a kiosk with a
+   * queue — and the chips, drawn in catalogue order, then disagreed with the
+   * switch they were setting.
+   */
+  it('offers the same switch however the chips were tapped', () => {
     writePins(['zh-Hant', 'es-MX']);
-    expect(readPins()).toEqual(['zh-Hant', 'es-MX']);
+    const oneWay = readPins();
+    writePins(['es-MX', 'zh-Hant']);
+    expect(readPins()).toEqual(oneWay);
+  });
+
+  it('puts them in the catalogue’s order, not the volunteer’s', () => {
+    writePins(['zh-Hant', 'zh-Hans', 'es-MX']);
+    expect(readPins()).toEqual(['es-MX', 'zh-Hans', 'zh-Hant']);
   });
 
   it('answers nothing for a kiosk nobody has pinned', () => {

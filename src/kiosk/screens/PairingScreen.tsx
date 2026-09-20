@@ -72,7 +72,7 @@ export function PairingScreen({
    */
   reason?: PairingReason | null;
   onPaired: (uid: string) => void;
-  /** The languages this lobby offers beside English, in the order it offers them. */
+  /** The languages this lobby offers beside English. Order is `sanitizePins`'. */
   pins?: readonly Locale[];
   /** Absent on a harness that only wants the code; the chips are drawn only with it. */
   onPins?: (pins: Locale[]) => void;
@@ -273,7 +273,7 @@ export function PairingScreen({
             * start URL never draws this screen at all, so on a managed fleet
             * that screen is the only one of the two that exists.
             */}
-          <LanguagePins pins={pins} onPins={onPins} />
+          <LanguagePins pins={pins} onPins={onPins} preview />
         </div>
       )}
 
