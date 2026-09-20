@@ -8,7 +8,7 @@
  * reboot.
  */
 import { isDeviceId } from '@/lib/kioskDevice';
-import { DEFAULT_LOCALE, LOCALES, isLocale, type Locale } from '@/lib/locales';
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '@/lib/locales';
 import { asGrade } from '@/types';
 import type { KioskStudent } from './search';
 
@@ -355,14 +355,26 @@ export const MAX_PINS = 3;
  */
 export function sanitizePins(value: unknown): Locale[] {
   if (!Array.isArray(value)) return [];
-  const asked = new Set<Locale>();
-  for (const entry of value) {
-    if (!isLocale(entry) || entry === DEFAULT_LOCALE) continue;
-    asked.add(entry);
-  }
-  return LOCALES.filter(
-    (locale) => locale !== DEFAULT_LOCALE && asked.has(locale),
-  ).slice(0, MAX_PINS);
+  /*
+   * Asked for, rather than accepted. The stored list is a question — *are
+   * these offered?* — and the catalogue answers it, which is what makes the
+   * set untyped: a tag from a build that spoke more languages, or a typo in a
+   * hand-edited key, is simply a question nothing says yes to. Sieving the
+   * input first and then sieving the catalogue would be the same filter
+   * written twice, and the second copy is the one that decides the order.
+   */
+  const asked = new Set<unknown>(value);
+  /*
+   * `slice` is the bound `MAX_PINS` exists for. It cannot fire while the
+   * catalogue holds exactly `MAX_PINS` languages besides English, so no test
+   * can reach it; it is here because the cap is a number and the catalogue is
+   * a list, and nothing makes them move together.
+   */
+  // Stryker disable next-line MethodExpression: the cap is unreachable — see above.
+  return LOCALES.filter((locale) => locale !== DEFAULT_LOCALE && asked.has(locale)).slice(
+    0,
+    MAX_PINS,
+  );
 }
 
 /** The languages this kiosk offers beside English, in the order it offers them. */
