@@ -50,6 +50,7 @@ import { useOrphanClickGuard } from './components/tapGuard';
 import { tallyRender } from './renderTally';
 import type { KioskKey } from './components/Keyboard';
 import { sortByName } from '@/lib/utils';
+import { gradeDescription } from '@/lib/grades';
 import { isQuietHour } from '@/lib/kioskQuietHour';
 import { hasGrantedPrinter } from './policyGrant';
 import { takePairLink } from './pairLink';
@@ -78,6 +79,9 @@ import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
 import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
 import { StaffSession } from './components/StaffSession';
 import { reprintOffer, reprintStanding, type ReprintStanding } from './reprintOffer';
+import { OWED_NOTICE_MS, OWED_QUIET_MS, offeredOwed, type OwedRow } from './owed';
+import { OwedScreen, type OwedGroup } from './screens/OwedScreen';
+import { useQuietGlass } from './components/useQuietGlass';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
 import { PairingScreen } from './screens/PairingScreen';
@@ -189,6 +193,17 @@ type PrinterOverlay = { kind: 'printer'; from: 'staff' | 'home' };
  */
 type ReprintFrom = 'reprint' | PrinterOverlay;
 
+/**
+ * The offer to print the name tags the printer owes — see `owed.ts`.
+ *
+ * One door onto it, which is why `from` is the printer overlay whole rather
+ * than a word: every way in goes through the printer screen (the amber dot,
+ * the staff menu's printer row, the notice on the front door), so Back is a
+ * return to the screen whose primary opened this, and the receipt for the
+ * press lands there too.
+ */
+type OwedOverlay = { kind: 'owed'; from: PrinterOverlay };
+
 type Overlay =
   | ConfirmOverlay
   | SiblingOverlay
@@ -210,6 +225,7 @@ type Overlay =
   | { kind: 'reprint' }
   | { kind: 'reprint-confirm'; student: KioskStudent; from: ReprintFrom }
   | PrinterOverlay
+  | OwedOverlay
   | { kind: 'success'; students: KioskStudent[]; intent: KioskIntent }
   /**
    * The refusal — a check-in offered to a gathering that has not opened yet.
@@ -316,6 +332,17 @@ const ABANDONED_MS = 2 * 60_000;
 const RESTING_LOCALE: Locale = 'en';
 
 /**
+ * How often the owed offer re-reads its own clock.
+ *
+ * The rows' ticks and the offer itself age (`owed.ts`), and nothing else on
+ * this screen re-renders on a clock, so a volunteer standing at an open offer
+ * would otherwise be looking at what was true when they opened it. Slow, and
+ * armed only while something is owed: on every evening nothing went wrong
+ * there is no interval at all.
+ */
+const OWED_TICK_POLL_MS = 30_000;
+
+/**
  * How long a language nobody is touching stays on the home screen.
  *
  * Long enough to read the screen it was chosen for — the chip sits on the
@@ -384,6 +411,8 @@ export function KioskApp() {
   const [printing, setPrinting] = useState<KioskPrinting | null>(null);
   const [printerConfig, setPrinterConfig] = useState<PrinterConfig | null>(() => readPrinterConfig());
   const [printerState, setPrinterState] = useState<PrinterState | null>(null);
+  /** The last kind the printing module published — see the subscribe below. */
+  const printerKindRef = useRef<PrinterState['kind'] | null>(null);
   /**
    * Whether today's list holds a gathering that prints and can still be bound.
    *
@@ -495,6 +524,45 @@ export function KioskApp() {
    */
   const [checkedInAtMs, setCheckedInAtMs] = useState<ReadonlyMap<string, number>>(new Map());
   const [reprintedIds, setReprintedIds] = useState<ReadonlySet<string>>(new Set());
+  /*
+   * The children this kiosk registered tonight.
+   *
+   * One reader: the owed confirm marks their rows *New tonight* and keeps them
+   * ticked however long it has been, because theirs is the sticker a room
+   * cannot do without — nobody in it has met the child. Ids only, and they go
+   * with the binding like everything else here.
+   */
+  const [registeredIds, setRegisteredIds] = useState<ReadonlySet<string>>(new Set());
+  /*
+   * Whose tag this press will print, while the owed confirm is open.
+   *
+   * Held here rather than inside the screen for the reason the confirm's
+   * `skipped` set is: a decision somebody made with their thumb outlives the
+   * screen they made it on, and this one survives the register poll, a printer
+   * state change and the age-out tick that all re-render underneath it.
+   */
+  const [owedTicked, setOwedTicked] = useState<ReadonlySet<string>>(new Set());
+  /*
+   * The batch this errand sent, for the printer screen's receipt — see there.
+   * Cleared when the staff flow ends, which is when the errand did.
+   */
+  const [owedSent, setOwedSent] = useState<{ count: number } | null>(null);
+  /*
+   * When the printer last came back, and whether somebody pressed to get it.
+   *
+   * Two readers, and they are the whole of the difference between the kiosk
+   * *offering* and the kiosk *interrupting*. The front door's notice stands
+   * for ten minutes from this moment — measured from the recovery rather than
+   * from the tags' age, because the nine children checked in while a tablet
+   * was carried to a bus door are twenty minutes old by the time it is docked.
+   * And the hand-off — the kiosk opening the offer by itself — happens only
+   * when `byPress` is true, which is only on the printer screen, which is only
+   * where somebody just asked the printer a question and is looking at the
+   * answer.
+   */
+  const [recovered, setRecovered] = useState<{ atMs: number; byPress: boolean } | null>(null);
+  /** Bumped by a slow interval so the owed offer's clock can land. */
+  const [owedTick, setOwedTick] = useState(0);
   /*
    * The child whose name tag just went to the printer, for the line on their
    * row. By id, never by rendered name: this list exists because a church has
@@ -892,6 +960,17 @@ export function KioskApp() {
   useEffect(
     () =>
       printing?.subscribe((next) => {
+        /*
+         * The edge into `ready`, which is the only transition anything here
+         * reacts to. A ref rather than the state it mirrors, because this runs
+         * outside React's own update and must not read a value a batched
+         * render has not committed yet.
+         */
+        const wasReady = printerKindRef.current === 'ready';
+        printerKindRef.current = next.kind;
+        if (next.kind === 'ready' && !wasReady) {
+          setRecovered({ atMs: Date.now(), byPress: next.cause === 'press' });
+        }
         setPrinterState(next);
         // Any emission is an answer, so the account of a press that produced
         // none does not outlive it.
@@ -1084,6 +1163,10 @@ export function KioskApp() {
     setArrivals(new Map());
     setCheckedInAtMs(new Map());
     setReprintedIds(new Set());
+    setRegisteredIds(new Set());
+    setOwedTicked(new Set());
+    setOwedSent(null);
+    setRecovered(null);
     setSentId(null);
     setPhase((current) => (current === 'ready' ? 'choosing' : current));
     // The row says idle rather than last Sunday. Fire and forget: a kiosk
@@ -1927,6 +2010,189 @@ export function KioskApp() {
     return printing?.printedTonight() ?? [];
   }, [printing, printTick]);
 
+  /*
+   * The name tags this kiosk still owes, and the rows it would offer for them.
+   *
+   * Two steps, and the split is the same one `printedTonight` makes: the
+   * printing module holds *what failed and nobody could fix* (see `owed` in
+   * `printing/index.ts`), and this file is the only place that knows the rest
+   * of the question — who is still in the room, who the roster can answer for,
+   * who was registered here tonight. `offeredOwed` puts the two together.
+   *
+   * `owedTick` is what makes the age-out land on a screen nobody is touching:
+   * the rows' ticks and the offer itself turn on a clock, and nothing else
+   * here re-renders on one.
+   */
+  const owedTags = useMemo(() => {
+    void printTick;
+    void printerState;
+    return printing?.owedLabels() ?? [];
+  }, [printing, printTick, printerState]);
+
+  const knownIds = useMemo(() => new Set(students.map((student) => student.id)), [students]);
+
+  const owedRows = useMemo(
+    () =>
+      offeredOwed({
+        owed: owedTags,
+        now: Date.now(),
+        requiresCheckOut: binding?.requiresCheckOut ?? false,
+        checkedOutIds,
+        knownIds,
+        newIds: registeredIds,
+      }),
+    // `owedTick` is a clock, not a value: it is in the deps so the age-out and
+    // the ticks recompute while somebody is looking at them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [owedTags, owedTick, binding, checkedOutIds, knownIds, registeredIds],
+  );
+
+  /*
+   * A slow clock, and only while there is something for it to change.
+   *
+   * The offer ages out and rows stop being ticked on their own, so a screen
+   * left open has to re-read them; a kiosk with nothing owed — every ordinary
+   * evening — installs no interval at all.
+   */
+  useEffect(() => {
+    if (owedTags.length === 0) return;
+    const timer = setInterval(() => setOwedTick((tick) => tick + 1), OWED_TICK_POLL_MS);
+    return () => clearInterval(timer);
+  }, [owedTags.length]);
+
+  /** The ids on the offer, for the printer screen's log rows. */
+  const owedIds = useMemo(
+    () => new Set(owedRows.map((row) => row.studentId)),
+    [owedRows],
+  );
+
+  /*
+   * The offer as the confirm draws it: words, and the groups they sit in.
+   *
+   * Every string is finished here — the name the roster displays, the grade
+   * through `gradeDescription`, the arrival through the kiosk's own clock
+   * format — so the screen renders what it is handed, the way the reprint
+   * confirm takes its "last printed at" ready-made.
+   *
+   * The groups follow the *policy's* answer rather than the live ticks, so a
+   * row a volunteer unticks stays where it is. A list that re-sorted under a
+   * thumb is the failure the check-in screen's first rule exists to prevent.
+   */
+  const owedGroups = useMemo<OwedGroup[]>(() => {
+    const byId = new Map(students.map((student) => [student.id, student]));
+    const display = (row: OwedRow) => {
+      const student = byId.get(row.studentId);
+      if (!student) return null;
+      return {
+        studentId: row.studentId,
+        name: `${student.firstName} ${student.lastName}`.trim(),
+        gradeLabel: student.grade === null ? '' : gradeDescription(grades, student.grade),
+        atLabel: new Date(row.atMs).toLocaleTimeString(locale, {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+        isNew: row.isNew,
+      };
+    };
+    const shown = <T,>(rows: (T | null)[]) => rows.filter((row): row is T => row !== null);
+    // One group where the register says who is still in the room, two where a
+    // clock has to stand in for it — see `owed.ts`.
+    if (binding?.requiresCheckOut) {
+      return [{ key: 'room' as const, rows: shown(owedRows.map(display)) }].filter(
+        (group) => group.rows.length > 0,
+      );
+    }
+    return [
+      { key: 'recent' as const, rows: shown(owedRows.filter((row) => row.recent).map(display)) },
+      { key: 'earlier' as const, rows: shown(owedRows.filter((row) => !row.recent).map(display)) },
+    ].filter((group) => group.rows.length > 0);
+  }, [owedRows, students, grades, locale, binding]);
+
+  /**
+   * Open the offer, with the ticks the rules say it opens with.
+   *
+   * Settled here rather than read on every render, for the reason
+   * `reprintStanding` is settled at the tap: the ticks are a decision a
+   * volunteer then edits, and a register poll or the age-out clock landing
+   * mid-thought must not put a row back under their thumb.
+   */
+  const openOwed = useCallback(
+    (from: PrinterOverlay) => {
+      setOwedTicked(new Set(owedRows.filter((row) => row.ticked).map((row) => row.studentId)));
+      setOverlay({ kind: 'owed', from });
+    },
+    [owedRows],
+  );
+
+  /**
+   * One press, and the whole question is answered.
+   *
+   * The ticked rows go to the printer and the rest are let go — both halves,
+   * because a volunteer who printed three of nine and walked away had settled
+   * nothing: the dot stayed lit, the menu still said nine, and the next person
+   * was asked again about children somebody had decided against. What can
+   * still bring one back is the one thing that should: a label that fails
+   * again is written down again.
+   *
+   * The labels spend the shared one-per-child counter, so a parent whose child
+   * is on this list meets `spent` on their own screen rather than a second
+   * hold that would put a second sticker on the tape.
+   */
+  const onOwedCommit = useCallback(
+    (printingIds: readonly string[], skippingIds: readonly string[]) => {
+      if (!binding || !printing) return;
+      const byId = new Map(students.map((student) => [student.id, student]));
+      const at = new Map(owedRows.map((row) => [row.studentId, row.atMs]));
+      const tags = printingIds
+        .map((studentId) => {
+          const student = byId.get(studentId);
+          return student ? { student, atMs: at.get(studentId) ?? Date.now() } : null;
+        })
+        .filter((tag): tag is { student: KioskStudent; atMs: number } => tag !== null);
+      if (tags.length > 0) {
+        try {
+          printing.printOwedLabels(grades, locale, binding, tags);
+        } catch {
+          // The same rule as every other label this file queues: a printer may
+          // never reach back into the screen that asked for one.
+        }
+        setReprintedIds((held) => {
+          const next = new Set(held);
+          for (const tag of tags) next.add(tag.student.id);
+          return next;
+        });
+      }
+      printing.settleOwed([...printingIds, ...skippingIds]);
+      setOwedSent(tags.length > 0 ? { count: tags.length } : null);
+      setPrintTick((tick) => tick + 1);
+    },
+    [binding, printing, students, owedRows, grades, locale],
+  );
+
+  /*
+   * The hand-off: the kiosk opening the offer by itself, once, and only here.
+   *
+   * The condition is deliberately the narrowest one that still reaches the
+   * person it is for. `byPress` is true only for the browser's chooser and for
+   * **Look again**, both of which are presses on the printer screen — so the
+   * volunteer is looking at the glass, and the modal the press opened
+   * guarantees their finger is off it when the screen changes. The overlay has
+   * to *be* the printer screen, which is what keeps this away from the two
+   * staff screens whose commit sits where this one's does: a `ready` from the
+   * recovery ladder landing on the reprint confirm would put *Print 4 name
+   * tags* under a thumb descending on *Print name tag*.
+   *
+   * Once per recovery, by the moment it carries: a second render with the same
+   * `recovered` is the same arrival.
+   */
+  const handedOffRef = useRef(0);
+  useEffect(() => {
+    if (!recovered?.byPress || recovered.atMs === handedOffRef.current) return;
+    if (overlay?.kind !== 'printer' || owedRows.length === 0) return;
+    handedOffRef.current = recovered.atMs;
+    openOwed(overlay);
+  }, [recovered, overlay, owedRows, openOwed]);
+
   /**
    * When this child's name tag last came out, and what the next one would say.
    *
@@ -1968,11 +2234,38 @@ export function KioskApp() {
    */
   const printerUnready = printerState !== null && printerState.kind !== 'ready';
 
+  /*
+   * The notice on the front door: the corner dot, said in words, for ten
+   * minutes after the printer comes back.
+   *
+   * Everything about when it appears is a guard, and each one answers a
+   * person. The printer must be *ready*, because a notice offering tags a jam
+   * would swallow is an errand that fails. Something must be owed. The kiosk
+   * must be calm and the glass untouched for a few seconds, so it is never
+   * what a parent correcting a typo watches arrive. And the recovery must be
+   * recent, because the person it is for is the volunteer who has just fixed
+   * the printer and is standing a metre away looking at it.
+   *
+   * What it is *not* is a second door. Its tap is `onPrinterDot`, the same
+   * screen the amber dot opens, so nothing on the parent's glass prints or
+   * settles anything and the offer stays two screens from a stray press.
+   */
+  const noticeWindow =
+    printerState?.kind === 'ready' &&
+    owedRows.length > 0 &&
+    recovered !== null &&
+    Date.now() - recovered.atMs < OWED_NOTICE_MS;
+  const quiet = useQuietGlass(Boolean(noticeWindow) && calm, OWED_QUIET_MS);
+  const owedNotice = noticeWindow && quiet ? owedRows.length : 0;
+
   /** Leaving the staff flow, by hand or by the gate's own clock. */
   const leaveStaff = useCallback(() => {
     setOverlay(null);
     setBuffer('');
     setSentId(null);
+    // The receipt for a batch belongs to the errand it was part of. A
+    // volunteer coming back an hour later is starting a new one.
+    setOwedSent(null);
   }, []);
 
   /**
@@ -2209,6 +2502,17 @@ export function KioskApp() {
           for (const student of added) next.set(student.id, checkedInAt);
           return next;
         });
+        /*
+         * And that the kiosk met them tonight, which is what marks their rows
+         * *New tonight* on the owed offer and keeps those rows ticked however
+         * long it has been. Theirs are the tags a room cannot do without: the
+         * volunteer in it has never seen the child.
+         */
+        setRegisteredIds((held) => {
+          const next = new Set(held);
+          for (const student of added) next.add(student.id);
+          return next;
+        });
       }
 
       /*
@@ -2437,6 +2741,7 @@ export function KioskApp() {
       overlay?.kind === 'reprint' ||
       overlay?.kind === 'reprint-confirm' ||
       overlay?.kind === 'printer' ||
+      overlay?.kind === 'owed' ||
       overlay?.kind === 'unbind'
     ) {
       const staffScreen =
@@ -2492,6 +2797,7 @@ export function KioskApp() {
                   ? 'ready'
                   : 'trouble'
             }
+            owed={owedRows.length}
             trouble={printerState?.kind === 'trouble' ? printerState.message : null}
             backdrop={!!binding.kioskBackdropId}
             onHideBackdrop={hideBackdrop}
@@ -2523,6 +2829,40 @@ export function KioskApp() {
             }}
             onDone={leaveStaff}
           />
+        ) : overlay.kind === 'owed' ? (
+          <OwedScreen
+            groups={owedGroups}
+            ticked={owedTicked}
+            onToggleRow={(studentId) => {
+              setOwedTicked((held) => {
+                const next = new Set(held);
+                if (!next.delete(studentId)) next.add(studentId);
+                return next;
+              });
+            }}
+            onToggleGroup={(key) => {
+              const rows = owedGroups.find((group) => group.key === key)?.rows ?? [];
+              // To *all* unless the group is already all on, which is the
+              // useful direction: the leader back from a walk is ticking six
+              // rows, not unticking one.
+              const allOn = rows.every((row) => owedTicked.has(row.studentId));
+              setOwedTicked((held) => {
+                const next = new Set(held);
+                for (const row of rows) {
+                  if (allOn) next.delete(row.studentId);
+                  else next.add(row.studentId);
+                }
+                return next;
+              });
+            }}
+            onCommit={(printingIds, skippingIds) => {
+              onOwedCommit(printingIds, skippingIds);
+              // Back to the screen whose primary opened this, where the
+              // receipt for the press is.
+              setOverlay(overlay.from);
+            }}
+            onBack={() => setOverlay(overlay.from)}
+          />
         ) : overlay.kind === 'reprint-confirm' ? (
           <ReprintConfirmScreen
             student={overlay.student}
@@ -2549,6 +2889,12 @@ export function KioskApp() {
                errand, however the transport is feeling. */
             gatheringPrints={prints}
             printedTonight={printedTonight}
+            /* The debts, and what the last press did about them — see the
+               printer screen's head. The offer is a confirm away, never a
+               print: this screen's primary opens it. */
+            owedIds={owedIds}
+            owedSent={owedSent}
+            onPrintOwed={() => openOwed(overlay)}
             onReprint={(label) => {
               /*
                * A row of the log opens the same confirm the by-name path opens.
@@ -2739,10 +3085,21 @@ export function KioskApp() {
         presentIds={presentIds}
         checkedOutIds={checkedOutIds}
         tracksCheckOut={binding.requiresCheckOut ?? false}
-        // Only "trouble" — a kiosk with no printer is not a kiosk with a broken
-        // one, and neither is one whose printer is simply unpaired.
-        printerNeedsAttention={printerState?.kind === 'trouble'}
+        /*
+         * "Trouble" — a kiosk with no printer is not a kiosk with a broken
+         * one, and neither is one whose printer is simply unpaired — or a
+         * printer that is working with name tags still waiting, which is the
+         * one addition: the mark means *the printer needs a person*, and a
+         * decision nobody has made is a person it needs. It goes out when the
+         * tags are printed, skipped, or age out of the offer.
+         */
+        printerNeedsAttention={printerState?.kind === 'trouble' || owedRows.length > 0}
         onPrinter={onPrinterDot}
+        /* The dot said in words, for ten minutes after a recovery and only on
+           glass nobody is touching — see `owedNotice` above. Its tap is the
+           dot's own door. */
+        owedNotice={owedNotice}
+        onOwedNotice={onPrinterDot}
         // Mounted, not merely configured: the header's token step exists for
         // the photograph actually behind the glass, and until the pixels have
         // resolved there is nothing behind it but the page.

@@ -44,6 +44,10 @@
  *                             "Room 201, upstairs" — so the meta line's wrap is photographed
  *   ?policy=1                 the printer arrived from the tablet's device-management policy,
  *                             so there was no set-up step to miss
+ *   ?screen=owed              the offer the kiosk makes when the printer comes back owing tags
+ *   ?owed=6                   how many name tags the printer owes: the staff menu's waiting line,
+ *                             the search screen's notice, and the printer screen's offer
+ *   ?sent=1                   …and that offer just pressed, so the batch is on its way
  *   ?detected=plain|guessed|unknown
  *                             what "Check the printer" comes back with on the printer screen —
  *                             a clean read-off, a roll the packet could not choose between, or a
@@ -61,6 +65,7 @@ import { RegistrationFlow } from '@/kiosk/registration/RegistrationFlow';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
 import { ChangeEventScreen } from '@/kiosk/screens/ChangeEventScreen';
 import { EventChooser } from '@/kiosk/screens/EventChooser';
+import { OwedScreen, type OwedGroup } from '@/kiosk/screens/OwedScreen';
 import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
@@ -361,6 +366,106 @@ const PRINTED_TONIGHT: PrintedLabel[] = [
   { id: 'p3', studentId: '6', name: 'Alice Alberts', atMs: NOW - 11 * 60_000, failed: false },
 ];
 
+/*
+ * The tags the printer owes, for the offer it makes when it comes back.
+ *
+ * `?owed=N` takes the first N of these, so one number drives all four surfaces
+ * at once — the staff menu's waiting line, the search screen's notice, the
+ * printer screen's offer, and the confirm itself. Six is the number the
+ * journeys kept landing on: a roll that ran out somewhere in the middle of a
+ * check-in queue and was noticed at the end of it.
+ *
+ * The arrival times are real minutes back from `NOW` and deliberately straddle
+ * the ten-minute tick: the first three are inside it and open ticked, the rest
+ * are behind it and open off, which is the frame the whole `owed.ts` policy
+ * exists to be judged by. Alma is the child registered at this kiosk tonight —
+ * `isNew`, so she is ticked however old her tag is, because the room has no
+ * other way to learn her name.
+ */
+const OWED_ALL = [
+  { studentId: '1', name: 'Ramona Alvarez', gradeLabel: '7th grade', minutes: 2, isNew: false },
+  { studentId: '2', name: 'Noah Alvarez', gradeLabel: '9th grade', minutes: 4, isNew: false },
+  { studentId: '4', name: 'Sam Alvarado', gradeLabel: '6th grade', minutes: 9, isNew: false },
+  { studentId: '8', name: 'Alma Alcott', gradeLabel: '10th grade', minutes: 14, isNew: true },
+  { studentId: '6', name: 'Alice Alberts', gradeLabel: '6th grade', minutes: 17, isNew: false },
+  { studentId: '9', name: 'Alden Aldridge', gradeLabel: '7th grade', minutes: 23, isNew: false },
+];
+
+const OWED_COUNT = Math.min(Number(params.get('owed') ?? 0) || 0, OWED_ALL.length);
+
+/* The rows as the screen takes them: arrival order, oldest first, in words. */
+const owedRows = OWED_ALL.slice(0, OWED_COUNT)
+  .map((row) => ({
+    studentId: row.studentId,
+    name: row.name,
+    gradeLabel: row.gradeLabel,
+    atLabel: new Date(NOW - row.minutes * 60_000).toLocaleTimeString('en', {
+      hour: 'numeric',
+      minute: '2-digit',
+    }),
+    isNew: row.isNew,
+    recent: row.minutes <= 10,
+    ticked: row.isNew || row.minutes <= 10,
+  }))
+  .reverse();
+
+const OWED_IDS = new Set(owedRows.map((row) => row.studentId));
+
+/*
+ * Grouped the way `KioskApp` groups them: one list when the register knows who
+ * is still in the room (`?pickup=1`), and recent-then-earlier when only a
+ * clock can stand in for it.
+ */
+const OWED_GROUPS: OwedGroup[] = (
+  binding.requiresCheckOut
+    ? [{ key: 'room' as const, rows: owedRows }]
+    : [
+        { key: 'recent' as const, rows: owedRows.filter((row) => row.recent) },
+        { key: 'earlier' as const, rows: owedRows.filter((row) => !row.recent) },
+      ]
+).filter((group) => group.rows.length > 0);
+
+/*
+ * The offer, with its ticks live, because the ticks are the design.
+ *
+ * Every other screen here is a pure render of its query string; this one holds
+ * the one piece of state a shooter has to be able to move, so a frame of "the
+ * leader unticked the four from before the walk" is a press away rather than a
+ * knob away.
+ */
+function OwedOffer() {
+  const [ticked, setTicked] = useState(
+    () => new Set(owedRows.filter((row) => row.ticked).map((row) => row.studentId)),
+  );
+  return (
+    <OwedScreen
+      groups={OWED_GROUPS}
+      ticked={ticked}
+      onToggleRow={(studentId) =>
+        setTicked((on) => {
+          const next = new Set(on);
+          if (!next.delete(studentId)) next.add(studentId);
+          return next;
+        })
+      }
+      onToggleGroup={(key) =>
+        setTicked((on) => {
+          const rows = OWED_GROUPS.find((group) => group.key === key)?.rows ?? [];
+          const next = new Set(on);
+          const all = rows.every((row) => next.has(row.studentId));
+          for (const row of rows) {
+            if (all) next.delete(row.studentId);
+            else next.add(row.studentId);
+          }
+          return next;
+        })
+      }
+      onCommit={() => {}}
+      onBack={() => {}}
+    />
+  );
+}
+
 /* Two of the fourteen methods, which are the two this screen calls. */
 const chooserServices = {
   listEvents: () => Promise.resolve(chooserEntries()),
@@ -478,6 +583,7 @@ export function Kiosk() {
         window={eventWindow('en', binding)}
         printer={printer}
         trouble={printer === 'trouble' ? { key: 'troubleUnplugged' } : null}
+        owed={OWED_COUNT}
         backdrop={params.get('backdrop') === '1'}
         onReprint={() => {}}
         onPrinter={() => {}}
@@ -488,6 +594,10 @@ export function Kiosk() {
         onStay={() => {}}
       />
     );
+  }
+
+  if (params.get('screen') === 'owed') {
+    return <OwedOffer />;
   }
 
   if (params.get('screen') === 'printer') {
@@ -509,6 +619,14 @@ export function Kiosk() {
         hasConfig={state.kind !== 'idle'}
         gatheringPrints={midEvening}
         printedTonight={midEvening ? PRINTED_TONIGHT : []}
+        /* One press settles every row it listed, so `?sent=1` is a screen with
+           nothing left owed: the batch verb gives the primary back to the
+           machine's own, and the log rows stop saying they are waiting. A
+           frame still offering *Print 6 name tags* under *Printing 6 name
+           tags* is a state the app never draws. */
+        owedIds={params.get('sent') === '1' ? new Set<string>() : OWED_IDS}
+        owedSent={params.get('sent') === '1' ? { count: OWED_COUNT } : null}
+        onPrintOwed={() => {}}
         onReprint={() => {}}
         onReprintByName={midEvening ? () => {} : undefined}
         onDone={() => {}}
@@ -615,8 +733,14 @@ export function Kiosk() {
       presentIds={new Set(params.get('present')?.split(',').filter(Boolean) ?? [])}
       checkedOutIds={new Set()}
       tracksCheckOut={binding.requiresCheckOut ?? false}
-      printerNeedsAttention={params.get('printer') === '1'}
+      /* The mark means *the printer needs a person*, and a decision nobody has
+         made is a person it needs — so `?owed=N` lights it too, exactly as the
+         app does. A frame of the notice with no mark above it would be
+         photographing a screen this kiosk never draws. */
+      printerNeedsAttention={params.get('printer') === '1' || OWED_COUNT > 0}
       onPrinter={() => {}}
+      owedNotice={OWED_COUNT}
+      onOwedNotice={() => {}}
       backdrop={photoUrl !== null}
       refresh="idle"
       widening={false}

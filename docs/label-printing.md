@@ -354,6 +354,58 @@ sticker for a child checked out twenty minutes ago is litter; one printed after 
 restart is a mystery in a stack of unclaimed badges. Anything more than two
 minutes stale is dropped.
 
+## The tags that missed an outage
+
+A roll runs out at 9:05 and somebody notices at 9:20. In between, a dozen
+children were checked in and walked into rooms with nothing on them. The kiosk
+is the only thing in the building that knows which dozen — it queued those
+labels and watched them fail — so when the printer comes back it offers to
+print them.
+
+It offers. It never prints by itself: a stack of stickers coming out of a
+printer somebody has just walked away from is the same litter problem as a
+label queued across a reboot.
+
+Three places say so, in rising order of how much of a person's attention they
+ask for:
+
+- **The amber mark** by the printer glyph on the check-in screen. It already
+  meant *the printer needs a person*, and a decision nobody has made is a
+  person it needs — so it is lit by a working printer too, and goes out when
+  the tags are printed, skipped, or age out.
+- **One line of words** on the check-in screen, for ten minutes after the
+  printer comes back and only while nobody has touched the glass for a few
+  seconds. The volunteer who reloaded the roll is a metre away looking at the
+  printer, not at the tablet. Tapping it opens the same staff screen the mark
+  does; nothing prints from the parent's glass.
+- **The staff menu and the printer screen**, which lead with *N waiting* and
+  offer **Print N name tags**.
+
+The press opens a list: every child, oldest arrival first, with the time they
+checked in and a tick. Inside ten minutes the tick is on; behind it the row is
+still offered but starts off, so the printer is not spending tape on children
+who have long since been walked to a room. A child registered at this kiosk
+tonight is always ticked — their sticker is how the room learns their name.
+Past half an hour a row drops off the offer entirely and lives only in **Name
+tags tonight**, where it can still be reprinted by name. On a gathering that
+hands children back, the register answers instead of the clock: a tag is owed
+until the child is checked out, and every row arrives ticked.
+
+One press settles the whole list. The ticked rows print; the rest are let go,
+which the screen says above the button before you press it. Nobody is asked
+about them again — unless a tag fails a second time, which puts it back.
+
+The batch prints the time each child *arrived*, not the time of the press: a
+nursery sticker reading 9:40 for a child who walked in at 9:12 is a sticker the
+room reads wrongly. A family standing at the kiosk while the batch runs is not
+made to wait behind it — their label goes next.
+
+The honest limit: this is a prompt, not a report. A coordinator who never looks
+at the tablet still finds those children at the next visit. What it removes is
+the case where somebody *was* standing right there, had just fixed the printer,
+and had no way to act on what the kiosk already knew. The design and what the
+critique loop threw out are in [kiosk-owed.md](kiosk-owed.md).
+
 ## Platform notes
 
 **macOS.** Nothing to configure. If the QL is *also* installed as a system

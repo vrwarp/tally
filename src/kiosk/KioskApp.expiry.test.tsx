@@ -74,6 +74,9 @@ const printing = {
     return () => {};
   }),
   printedTonight: vi.fn(() => []),
+  owedLabels: vi.fn(() => []),
+  printOwedLabels: vi.fn(),
+  settleOwed: vi.fn(),
   closePrinter: vi.fn(async () => {}),
   labelPreview: vi.fn(() => []),
 } as unknown as KioskPrinting;

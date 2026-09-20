@@ -117,6 +117,25 @@ describe('tokenValuesFor', () => {
       expect(time).toMatch(/\d/);
     });
 
+    it('says when the child arrived, for a tag the printer owed', () => {
+      /* A sticker printed twenty minutes late still belongs to the check-in it
+         was taken for: `{{time}}` on a nursery tag is what the room reads for
+         how long a child has been here, so a tag saying 9:40 for a child who
+         walked in at 9:12 is a tag read wrongly. See `../owed.ts`. */
+      const arrived = new Date();
+      arrived.setHours(9, 12, 0, 0);
+      const { time = '', date = '' } = tokenValuesFor(
+        grades,
+        'en',
+        student(),
+        BINDING,
+        arrived.getTime(),
+      );
+
+      expect(time).toBe(arrived.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' }));
+      expect(date).toBe(arrived.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+    });
+
     it('says today, and this hour', () => {
       const { date = '', time = '' } = tokenValuesFor(grades, 'en', student(), BINDING);
       const now = new Date();

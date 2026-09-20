@@ -68,6 +68,16 @@ const MAX_EVENTS_SHOWN = 40;
 /** How long "Copied" stays up. */
 const COPY_FEEDBACK_MS = 2500;
 
+/**
+ * How long a batch's receipt speaks in the present tense.
+ *
+ * Four labels take about ten seconds to reach the tape, and a line saying
+ * *Printing* after they have all come out is a line that was true once. It
+ * does not clear at the end of it — what the last press did is the head's
+ * until the screen is left or something else is pressed.
+ */
+const OWED_PRINTING_MS = 12_000;
+
 type CopyState = 'idle' | 'copied' | 'failed';
 
 /**
@@ -222,6 +232,9 @@ export function PrinterScreen({
   hasConfig,
   gatheringPrints = false,
   printedTonight,
+  owedIds,
+  owedSent = null,
+  onPrintOwed,
   onReprint,
   onReprintByName,
   returnsTo = 'staff',
@@ -247,6 +260,34 @@ export function PrinterScreen({
   gatheringPrints?: boolean;
   /** The evening's attempts, newest first. */
   printedTonight: readonly PrintedLabel[];
+  /**
+   * The children this printer still owes a name tag — see `owed.ts`.
+   *
+   * Two things on this screen read it. The head says how many, in the reserved
+   * line under the state, and the primary becomes the batch: two presses for
+   * four children where the log's rows are three apiece. And the rows for
+   * those children stop wearing the amber ring while the button above covers
+   * them — four ringed rows under one blue control made the slower door the
+   * louder one, and a volunteer taught that amber means *needs you* took it.
+   *
+   * Absent during setup, where the kiosk is on no gathering and owes nothing.
+   */
+  owedIds?: ReadonlySet<string>;
+  /**
+   * The batch this visit sent, if one has been: the receipt, and the only
+   * account a press with no undo gets.
+   *
+   * Handed in rather than raised here, because the press that spends the
+   * labels happens on the confirm this screen's primary opens — and a receipt
+   * the screen invented for itself would be a claim about a press it did not
+   * see. Cleared by the caller when the errand ends.
+   */
+  owedSent?: { count: number } | null;
+  /**
+   * Open the offer for those tags. Never prints: every path that spends a
+   * label on this kiosk goes through a confirm that shows whose it is.
+   */
+  onPrintOwed?: () => void;
   /**
    * Opens the reprint confirm for this label — it never prints on its own.
    *
@@ -532,6 +573,33 @@ export function PrinterScreen({
   const nameOf = (entry: Label) => printing.labelName(entry);
   const account = detection ? detectionAccount(t, detection, label, nameOf) : null;
   const line = stateLine(t, printerNote, state, detection);
+  /*
+   * What the printer owes, and what the last press did about it.
+   *
+   * The count is the caller's — it is a fact about the gathering, filtered by
+   * who has been collected and how long ago they arrived (`offeredOwed`) — and
+   * it is *not* re-read from the log: the log holds the evening's attempts,
+   * which is a different set from the debts nobody else can settle.
+   */
+  const owed = owedIds?.size ?? 0;
+  const owedOffered = owed > 0 && Boolean(onPrintOwed);
+  /*
+   * The receipt for a batch, kept until the screen is left or the next press.
+   *
+   * A press with no undo gets one account of itself, and for the first seconds
+   * it is true in the present tense — four labels take about ten — so it says
+   * `Printing` and then says what it did. Both live in the head rather than
+   * under a door they were not pressed from, which is where the first draft
+   * put them: bound by the family's own grammar to *Reprint a name tag*, a
+   * control the batch has nothing to do with.
+   */
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!owedSent) return;
+    setSettled(false);
+    const timer = setTimeout(() => setSettled(true), OWED_PRINTING_MS);
+    return () => clearTimeout(timer);
+  }, [owedSent]);
   // Newest first, and read on every render rather than held in state: the
   // record moves whenever the state does, which is what re-renders this.
   const events = printing.printerLog().slice(-MAX_EVENTS_SHOWN).reverse();
@@ -547,6 +615,23 @@ export function PrinterScreen({
    * it does.
    */
   const primary = ((): { label: string; press: () => void } | null => {
+    /*
+     * The batch outranks every other verb this screen has while the printer
+     * can actually print: it is the only control here that fixes the evening
+     * rather than the machine, and the children it is for are already in a
+     * room. Where the printer is *not* ready the state's own verb leads again
+     * — pressing Print with a jam uncleared spends four labels on nothing.
+     */
+    if (owedOffered && state.kind === 'ready') {
+      return {
+        label: tStaff('owedPrint', { count: owed }),
+        press: () => {
+          haptic();
+          forget();
+          onPrintOwed?.();
+        },
+      };
+    }
     if (!setup && !connectLeads) {
       return onReprintByName
         ? {
@@ -734,6 +819,34 @@ export function PrinterScreen({
             line.text
           )}
         </div>
+        {/*
+          * The news, and the slot it lives in whether there is any or not.
+          *
+          * Reserved rather than conditional, which is the whole point of
+          * drawing it here: the count clears on a press *and* on the age-out
+          * clock, so without a kept line a volunteer standing on this screen
+          * when the last tag ages out would watch the one saturated control
+          * jump and change its verb under a hand already moving. The head's
+          * own rule — one line, so the primary holds one y in every configured
+          * state — is answered by holding this one's height instead.
+          *
+          * It carries rank by weight and tone rather than by size: the fault
+          * on the line above is what a volunteer has to clear first, and a
+          * count set larger than it would answer the quieter of the two.
+          */}
+        {!setup && (
+          <div
+            className={`min-h-6 pt-0.5 text-sm font-semibold kiosk:min-h-7 kiosk:text-base ${
+              owedSent ? 'text-ink-100' : 'text-warn-400'
+            }`}
+          >
+            {owedSent
+              ? t(settled ? 'owedPrinted' : 'owedPrinting', { count: owedSent.count })
+              : owed > 0
+                ? t(state.kind === 'ready' ? 'owedNews' : 'owedWaiting', { count: owed })
+                : ''}
+          </div>
+        )}
       </div>
 
       {/*
@@ -942,7 +1055,9 @@ export function PrinterScreen({
                              which a browser draws outside the border box, arrived
                              with its left and right strokes shaved off. The same
                              defect the register's question list had. */
-                          entry.failed ? 'inset-ring-1 inset-ring-warn-500/40' : ''
+                          entry.failed && !owedIds?.has(entry.studentId)
+                            ? 'inset-ring-1 inset-ring-warn-500/40'
+                            : ''
                         }`}
                       >
                         <span className="min-w-0 truncate text-base font-semibold text-ink-100 kiosk:text-lg">
@@ -950,10 +1065,29 @@ export function PrinterScreen({
                         </span>
                         <span
                           className={`shrink-0 pl-3 text-sm whitespace-nowrap kiosk:text-base ${
-                            entry.failed ? 'font-semibold text-warn-400' : 'text-ink-500'
+                            entry.failed && !owedIds?.has(entry.studentId)
+                              ? 'font-semibold text-warn-400'
+                              : 'text-ink-500'
                           }`}
                         >
-                          {entry.failed ? t('didNotPrint') : clockTime(locale, entry.atMs)}
+                          {/*
+                            * A row the button above already covers says it is
+                            * waiting, not that it failed. Both are true; the
+                            * difference is that one of them is an errand and
+                            * the other is a fact, and while the batch is on
+                            * offer there should be one amber thing on the
+                            * screen saying what to do.
+                            */}
+                          {entry.failed
+                            ? owedIds?.has(entry.studentId)
+                              ? t('owedRowWaiting')
+                              : t('didNotPrint')
+                            : /* A row that came out says when, whatever else this
+                                 child is owed: the same name can carry an attempt
+                                 that printed at 9:02 and one that failed at 9:11,
+                                 and marking the first as waiting would put a
+                                 volunteer back in front of a sticker that exists. */
+                              clockTime(locale, entry.atMs)}
                         </span>
                       </button>
                     ))}

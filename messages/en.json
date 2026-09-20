@@ -2179,7 +2179,8 @@
     "delete": "Delete",
     "space": "Space",
     "apostrophe": "Apostrophe",
-    "hyphen": "Hyphen"
+    "hyphen": "Hyphen",
+    "staffPrint": "Staff · print name tags"
   },
   "Confirm": {
     "back": "← Back",
@@ -2240,7 +2241,16 @@
     "noTagTonight": "No name tag printed tonight.",
     "lastPrintedAt": "Last printed at {when}.",
     "printTagFor": "Print {name}'s name tag",
-    "printNameTag": "Print name tag"
+    "printNameTag": "Print name tag",
+    "owedTitle": "{count, plural, one {1 name tag did not print} other {# name tags did not print}}",
+    "owedInTheRoom": "In the room",
+    "owedRecent": "Last 10 minutes",
+    "owedEarlier": "Earlier",
+    "owedNewTonight": "New tonight",
+    "owedCost": "{count, plural, one {The unticked one is skipped.} other {The # unticked are skipped.}}",
+    "owedPrint": "{count, plural, one {Print 1 name tag} other {Print # name tags}}",
+    "owedSkip": "{count, plural, one {Skip 1 name tag} other {Skip # name tags}}",
+    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}"
   },
   "Search": {
     "searchEveryone": "Search everyone",
@@ -2262,7 +2272,8 @@
     "offerNotYours": "Not your family? Register your child",
     "offerFirstTime": "First time here? Register your child",
     "offerShort": "Not yours? Register",
-    "networkFailed": "No connection just now."
+    "networkFailed": "No connection just now.",
+    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}"
   },
   "Chooser": {
     "question": "Which gathering is this kiosk for?",
@@ -2421,7 +2432,12 @@
     "tabletPolicy": "Tablet printer setting",
     "tabletPolicyHint": "This tablet is managed, so Chrome can be handed the printer once and for good. Paste the line below into the Chrome settings list in the tablet's management app.",
     "tabletPolicyMore": "The rest of the tablet settings, and what each one is for, are at {url}.",
-    "policyCopied": "Printer setting copied to the clipboard"
+    "policyCopied": "Printer setting copied to the clipboard",
+    "owedNews": "{count, plural, one {1 name tag did not print.} other {# name tags did not print.}}",
+    "owedWaiting": "{count, plural, one {1 name tag is waiting.} other {# name tags are waiting.}}",
+    "owedPrinting": "{count, plural, one {Printing 1 name tag — take it to the room.} other {Printing # name tags — take them to the room.}}",
+    "owedPrinted": "{count, plural, one {1 name tag printed — take it to the room.} other {# name tags printed — take them to the room.}}",
+    "owedRowWaiting": "Waiting"
   },
   "Pairing": {
     "title": "Pair this kiosk",
