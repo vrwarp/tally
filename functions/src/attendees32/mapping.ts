@@ -260,6 +260,30 @@ export function contactsOf(attendee: A32Attendee): { phone: string | null; email
 }
 
 /**
+ * The slot to write a contact into: the first of its series that is empty.
+ *
+ * `contactsOf` reads these slots by *content* — a value with an `@` is an
+ * email wherever it happens to sit — precisely because a church's own data
+ * entry does not respect the slot names. The writer has to be careful in the
+ * other direction, and for the same reason: `phone1` is not free merely
+ * because nothing phone-shaped was found on the record. An address parked in
+ * `phone1` reads as the family's only email, and a number written on top of
+ * it destroys the one contact detail Attendees held — on the path whose whole
+ * promise is that Tally never overwrites one.
+ *
+ * Slots are numbered from 1 and the series is unbounded upstream, so the
+ * answer is simply the lowest index nothing is sitting on.
+ */
+export function freeContactSlot(
+  contacts: Readonly<Record<string, string>>,
+  prefix: 'phone' | 'email',
+): string {
+  let index = 1;
+  while (trimmed(contacts[`${prefix}${index}`] ?? null) !== null) index += 1;
+  return `${prefix}${index}`;
+}
+
+/**
  * Every phone-like value in `infos.contacts`, in slot order.
  *
  * All of them, unlike `contactsOf`'s first: the kiosk's last-4 index answers
