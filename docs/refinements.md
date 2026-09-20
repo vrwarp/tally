@@ -603,7 +603,7 @@ photo Sunday until they were forbidden to wrap, four empty boxes standing for
 a portrait tablet with three voices overran the region's top until it took a
 smaller step for its size and the sign's measure for its lines.
 
-## Changing a kiosk's languages after it is mounted — 1 design round, 1 frame round
+## Changing a kiosk's languages after it is mounted — 1 design round, 2 frame rounds
 
 The [four-language home screen](#kiosk-home-screen-in-four-languages--10-rounds)
 above shipped with its setting in one place: the pairing screen, chosen by
@@ -680,3 +680,43 @@ One thing changed that the round did not ask for. **Change gathering** moved to
 sit directly above **Keep checking in**: they are the same question answered
 two ways — stay on this gathering, or leave it — and were composed as unrelated
 while three rows apart.
+
+### The frames round
+
+Three critics on the rendered screens, and they converged on the same objects
+rather than dividing along their usual lines.
+
+- **The preview was a second control that disagreed with the first.** Two
+  groups of language-named plates sixty pixels apart, out of the same fill and
+  ring tokens, where a lit plate meant *pinned* above and *the current
+  language* below — so at three pins the chips were all bright and the preview
+  showed three of the four names grey. The lower group was the larger and the
+  nearer to the hand, and its cells are `disabled`: the tap it invited returned
+  nothing. Cut from the staff gate, where the real screen is one press of
+  **Done** away; kept on pairing, where it is an approval and several screens
+  away.
+- **The cap described a state this build cannot reach.** Three languages
+  besides English and a cap of three, so the "full" branch is only ever true
+  with every chip already lit — a sentence pointing at a dimmed fourth chip
+  that cannot exist. Sentence, styling and string all out; the numeric guard
+  stays, because the cap is a number and the catalogue is a list and nothing
+  makes them move together.
+- **A tap moved the next target.** Under a centred column the first pin
+  inserted the delete and lifted everything above it, so the second tap of the
+  ordinary two-language errand landed on inert prose. The delete holds its box
+  whether or not it is drawn.
+- **The delete was below the exit**, twelve pixels away, in a slab of the same
+  width and radius, and it closed the overlay too — so a tap twelve pixels low
+  produced exactly the confirmation **Done** would have, and the mistake was
+  invisible until the next family. Above the exit now, narrower, and it stays
+  on the screen.
+- **The row's boxes were sized by the wrong axis.** `kiosk:` matches width or
+  height, so a landscape shelf ran portrait-tablet row heights in 800px of
+  glass and put **Keep checking in** below an unsignposted fold. Labels keep
+  `kiosk:` — the reader is at seventy centimetres either way — and boxes move
+  to `tall:`.
+
+Not taken: cutting the language names from the staff row (two consultants
+asked for them by name), restyling rather than cutting the preview, and the
+pairing screen's own three-rows-of-chips composition, which predates this
+change and deserves its own round.
