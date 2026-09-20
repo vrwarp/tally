@@ -46,6 +46,25 @@ export interface LabelJob {
    * about the printer rather than about a child.
    */
   name?: string;
+  /**
+   * When this label's moment was: the check-in it belongs to, near enough.
+   *
+   * The queue never reads it — it is carried for the two readers downstream.
+   * `index.ts` writes it into the owed set so a tag that finally comes out
+   * twenty minutes late still prints the time the child arrived, and the owed
+   * confirm sorts its rows by it so a stack reads in arrival order.
+   */
+  atMs?: number;
+  /**
+   * Whether a failure here leaves a child owed a name tag.
+   *
+   * True for the labels a check-in or a registration produces, which is what
+   * "owed" means: this kiosk took an arrival and no sticker came out. False
+   * for a reprint, where somebody is standing at the screen that just told
+   * them it failed, and absent for a test label, which is about the printer
+   * rather than about a child.
+   */
+  owable?: boolean;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
@@ -114,6 +133,36 @@ interface QueuedLabel {
   job: LabelJob;
   result: Promise<RasterResult>;
   queuedAtMs: number;
+  /**
+   * Whether this one is a tag the printer owes from earlier — see `printOwed`.
+   *
+   * The flag rides on the queued label rather than on the job because it is a
+   * fact about *this* sending of it: the same job description, printed at
+   * check-in, is an ordinary label.
+   */
+  owed?: boolean;
+}
+
+/**
+ * The second lane: name tags that missed an outage, sent after the fact.
+ *
+ * Everything about the first lane is built for a label whose child is standing
+ * at the kiosk — it is speculative, it is bounded, and it throws away whatever
+ * has gone stale on the way to the head. A tag the printer owes from twenty
+ * minutes ago is the opposite of all three: somebody asked for it on purpose,
+ * it is late by construction, and the count they pressed is a promise about how
+ * many come out. So it travels in its own lane, under two rules.
+ *
+ * **A family at the glass never waits behind it.** `takeNext` prefers the live
+ * lane on every pass, so a batch of nine goes out in the gaps between the
+ * stickers of whoever is checking in now.
+ *
+ * **Nothing in it is dropped.** No staleness test — lateness is the point —
+ * and no overflow, because dropping one would quietly turn a printed count into
+ * a wrong one and re-owe the label behind the volunteer's back.
+ */
+interface OwedLabel extends QueuedLabel {
+  owed: true;
 }
 
 export interface QueueOptions {
@@ -130,11 +179,29 @@ export interface QueueOptions {
   onFailure?: (error: unknown, job: LabelJob) => void;
   /** Called when a label is dropped rather than attempted, and why. */
   onDropped?: (reason: 'stale' | 'overflow', job: LabelJob) => void;
+  /**
+   * Called when one actually reached the tape.
+   *
+   * The counterpart to `onFailure`, and it exists for one reader: the owed set
+   * in `index.ts`, which is a list of children whose sticker never came out and
+   * so has to be told when one does. Everything else about a label that worked
+   * is already said by the log.
+   */
+  onPrinted?: (job: LabelJob) => void;
 }
 
 export interface LabelQueue {
   warm(job: LabelJob): void;
   print(job: LabelJob): void;
+  /**
+   * Print name tags the printer owes from earlier, in the order given.
+   *
+   * A second lane, for the reasons on `OwedLabel`: a family standing at the
+   * glass never waits behind the batch, and nothing in the batch is dropped —
+   * not as stale, because being late is what these are, and not as overflow,
+   * because the count somebody pressed is a promise about how many come out.
+   */
+  printOwed(jobs: readonly LabelJob[]): void;
   forget(studentId: string): void;
   /**
    * The child this label was for turns out to have a different id than the one
@@ -176,6 +243,8 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
 
   const warm = new Map<string, Promise<RasterResult>>();
   const pending: QueuedLabel[] = [];
+  /** The second lane — see `OwedLabel`. Taken only when `pending` is empty. */
+  const owedPending: OwedLabel[] = [];
   let pumping: Promise<void> | null = null;
   const printed: PrintedLabel[] = [];
   let nextRecordId = 0;
@@ -225,13 +294,26 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
     return result;
   }
 
+  /**
+   * The next label to send: a live one if there is one, else an owed one.
+   *
+   * Asked again after every `await`, which is the whole of the promise that a
+   * family at the glass never waits behind a batch — a sticker queued while
+   * the third owed tag is on the wire goes out fourth, not tenth.
+   */
+  function takeNext(): QueuedLabel | undefined {
+    return pending.shift() ?? owedPending.shift();
+  }
+
   async function drain(): Promise<void> {
     // Draining *is* shifting until there is nothing left, so the emptiness test
     // and the shift are one thing. Written as two — `while (length > 0)` and
     // then `if (!next) break` — each covered for the other, and neither could
     // have been wrong.
-    for (let next = pending.shift(); next; next = pending.shift()) {
-      if (now() - next.queuedAtMs > MAX_LABEL_AGE_MS) {
+    for (let next = takeNext(); next; next = takeNext()) {
+      // An owed tag is late by construction — that is what it is — so the one
+      // lane that measures lateness does not measure this one.
+      if (!next.owed && now() - next.queuedAtMs > MAX_LABEL_AGE_MS) {
         // Logged as an attempt that failed, because that is what it is from the
         // far side of the glass: a child with no sticker, and somebody who can
         // now see so and print it again.
@@ -244,6 +326,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
         const result = await next.result;
         await send(result);
         record(next.job, false);
+        options.onPrinted?.(next.job);
       } catch (error) {
         // One label failing must not stall the ones behind it. A jam usually
         // means the next will fail too, and the state the controller keeps is
@@ -261,7 +344,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
       pumping = null;
       // A label enqueued during the last `await` of a drain would otherwise sit
       // here until the next tap.
-      if (pending.length > 0) pump();
+      if (pending.length > 0 || owedPending.length > 0) pump();
     });
   }
 
@@ -284,6 +367,22 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
         options.onDropped?.('overflow', dropped.job);
       }
       pending.push({ job, result, queuedAtMs: now() });
+      pump();
+    },
+
+    printOwed(jobs) {
+      for (const job of jobs) {
+        /*
+         * Rasterised afresh rather than through the warm cache, and never
+         * cached: these are drawn from the roster as it reads now, with the
+         * child's own arrival time in `{{time}}` (see `tokenValuesFor`), and a
+         * warm raster for the same child would be either the one that already
+         * failed or one built for a different moment.
+         */
+        const result = raster(job);
+        result.catch(() => {});
+        owedPending.push({ job, result, queuedAtMs: now(), owed: true });
+      }
       pump();
     },
 
@@ -320,6 +419,9 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
     forgetPrinted() {
       printed.length = 0;
       aliases.clear();
+      // A kiosk that has left the gathering must not go on printing its tags.
+      // Whatever is already on the wire finishes; nothing else starts.
+      owedPending.length = 0;
     },
 
     depth() {

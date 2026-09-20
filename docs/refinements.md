@@ -183,6 +183,42 @@ Shipped behaviour and the two refusals:
 
 ---
 
+## Name tags a printer owes — 3 loops
+
+A printer that is down while families check in leaves children in rooms with
+nothing on them, and the kiosk is the only thing in the building that knows
+which children — it queued those labels and watched them fail. Before this work
+that knowledge reached a person only as a row in **Name tags tonight**, four
+presses behind a two-second hold, which is not where anybody is looking in the
+one minute they would act on it: standing at the printer, having just fixed it.
+
+The journey loop found five ways it happens, and the differences between them
+are the policy. A roll that runs out mid-queue has somebody standing there. A
+tablet carried to a bus door and docked ten minutes later has tags that are
+already twenty minutes old — so the notice's clock runs from the recovery, not
+from the tags. A printer that powers *itself* back on after an hour has nobody
+near it at all, which is the case that settles the central question: **the
+kiosk offers, and never prints by itself.** A stack of stickers arriving on a
+tape nobody is watching is the litter problem the queue already refuses to be a
+spool for.
+
+The visual loop's hardest argument was the hand-off — whether a recovery may
+put the offer itself in front of whoever is standing there. The friendliest
+version was also the one that opens a print screen under a parent's thumb, so
+what shipped is the narrowest arrival that proves a volunteer is looking: the
+printer became ready *because of a press on the printer screen*, and the
+printer screen is what is on the glass. Three further decisions came out of the
+review: the amber mark stays lit until the list is settled but **skipping
+settles it**, rows are in **arrival order** because that is the order the stack
+comes off the printer, and on a gathering with no check-out the rows behind the
+ten-minute window are offered **unticked** rather than hidden.
+
+Shipped behaviour and the refusals:
+[docs/kiosk-owed.md](kiosk-owed.md). For an operator:
+[docs/label-printing.md](label-printing.md#the-tags-that-missed-an-outage).
+
+---
+
 ## The gathering's icon on the kiosk — 7 rounds
 
 An event in Tally can wear an icon a leader picked from a curated slice of

@@ -290,6 +290,8 @@ export function Demo() {
               tracksCheckOut={false}
               printerNeedsAttention={false}
               onPrinter={() => {}}
+              owedNotice={0}
+              onOwedNotice={() => {}}
               backdrop={photo && idle}
               refresh={refresh}
               widening={widening}

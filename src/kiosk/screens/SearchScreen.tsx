@@ -641,6 +641,8 @@ export function SearchScreen({
   tracksCheckOut,
   printerNeedsAttention,
   onPrinter,
+  owedNotice,
+  onOwedNotice,
   backdrop,
   refresh,
   widening,
@@ -661,6 +663,28 @@ export function SearchScreen({
   printerNeedsAttention: boolean;
   /** What the dot opens — the printer screen. See SearchHeader. */
   onPrinter: () => void;
+  /**
+   * How many name tags the printer owes, when the kiosk should say so here —
+   * zero on every ordinary evening, and zero on most of an evening something
+   * went wrong. The caller owns *when*: a recovery's ten minutes, the glass
+   * untouched for a few seconds, nothing typed (`owed.ts`).
+   *
+   * It is the corner dot said in words, for the one person the dot is bad at
+   * reaching: the volunteer who has just fixed the printer and is looking at
+   * the printer. A mark that was already lit before they fixed it tells them
+   * nothing; a bar appearing in a region that was empty three seconds ago is
+   * what a glance from a metre away catches.
+   *
+   * Nothing about it is the parent's. It says whose it is in its first word,
+   * it holds nothing to decide, and the first keystroke takes it away.
+   */
+  owedNotice: number;
+  /**
+   * The notice, tapped — the same door the dot opens, which is the whole of
+   * the guard on it. A stray press meets a staff screen, not a list of
+   * children with a commit under it.
+   */
+  onOwedNotice: () => void;
   /** The gathering's photograph is mounted behind this screen. See SearchHeader. */
   backdrop: boolean;
   /**
@@ -698,6 +722,9 @@ export function SearchScreen({
   tallyRender('SearchScreen');
   const t = useTranslations('Search');
   const tDoor = useTranslations('Door');
+  /* The staff notice's one press — the rest of this screen's taps are the
+     memoized header's and the rows' own guards. */
+  const tap = useTap();
   // The kiosk's language, which the hours and the opens-at line are formatted
   // against — `Intl` would otherwise answer with the tablet's. See binding.ts.
   const locale = useLocale();
@@ -1213,6 +1240,46 @@ export function SearchScreen({
         {truncated && (
           <div className="mx-auto w-full max-w-2xl pt-2 pb-16 text-center text-base text-ink-400 kiosk:text-lg tall:pb-20 lg:max-w-5xl">
             {t('moreNames')}
+          </div>
+        )}
+
+        {/*
+          * The staff notice, at the foot of the region and only on an idle
+          * screen — see the `owedNotice` prop for who it is for and when.
+          *
+          * A sibling of the column with `mt-auto`, so the void of an empty
+          * search falls between the instruction and this rather than under it:
+          * the region reads sign, then nothing, then note, and the rule below
+          * stays the console's own edge. The staff column's width rather than
+          * the console's box, because it is a staff object standing in the
+          * region and not a second tier of the console — the finding that
+          * moved it here.
+          *
+          * One control and nothing to decide. It does not print, it does not
+          * settle anything, and its tap goes exactly where the amber dot's
+          * goes; the confirm with children's names on it stays two screens
+          * away, behind a door a parent has no reason to open.
+          */}
+        {outcome.mode === 'idle' && owedNotice > 0 && (
+          <div className="mx-auto mt-auto w-full max-w-xl pt-6 pb-6">
+            <button
+              type="button"
+              tabIndex={-1}
+              {...tap(onOwedNotice)}
+              className="flex h-16 w-full items-center justify-between gap-4 rounded-xl bg-ink-900 px-5 text-left active:bg-ink-800"
+            >
+              <span className="min-w-0 truncate text-xl text-ink-200 kiosk:text-2xl">
+                {t.rich('owedNotice', {
+                  count: owedNotice,
+                  mark: (chunks: ReactNode) => (
+                    <span className="font-semibold text-ink-100">{chunks}</span>
+                  ),
+                })}
+              </span>
+              <span aria-hidden className="shrink-0 text-2xl text-ink-400">
+                ›
+              </span>
+            </button>
           </div>
         )}
       </div>

@@ -110,7 +110,8 @@
     "delete": "删除",
     "space": "空格",
     "apostrophe": "撇号",
-    "hyphen": "连字符"
+    "hyphen": "连字符",
+    "staffPrint": "同工 · 打印名牌"
   },
   "Grades": {
     "preK": "幼儿园中班",
@@ -212,7 +213,12 @@
     "tabletPolicy": "平板的打印机设置",
     "tabletPolicyHint": "这台平板受管理，因此可以一次性把打印机交给 Chrome。请把下面这行内容粘贴到平板管理应用中的 Chrome 设置列表里。",
     "tabletPolicyMore": "其余的平板设置，以及每一项的用途，请见 {url}。",
-    "policyCopied": "打印机设置已复制到剪贴板"
+    "policyCopied": "打印机设置已复制到剪贴板",
+    "owedNews": "{count, plural, other {有 # 张名牌没有打印出来。}}",
+    "owedWaiting": "{count, plural, other {有 # 张名牌在等着打印。}}",
+    "owedPrinting": "{count, plural, other {正在打印 # 张名牌 — 请送到教室。}}",
+    "owedPrinted": "{count, plural, other {已打印 # 张名牌 — 请送到教室。}}",
+    "owedRowWaiting": "等待中"
   },
   "Register": {
     "couldNotSave": "Tally 现在没能完成。请再试一次，或者找辅导。",
@@ -283,7 +289,8 @@
     "offerNotYours": "不是您家的孩子吗？为您的孩子登记",
     "offerFirstTime": "第一次来？为您的孩子登记",
     "offerShort": "不是您家的？登记",
-    "networkFailed": "现在连不上网络。"
+    "networkFailed": "现在连不上网络。",
+    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 张名牌在等着打印}}"
   },
   "Staff": {
     "changeEventTitle": "更换聚会？",
@@ -318,6 +325,15 @@
     "noTagTonight": "今天还没有打印过名牌。",
     "lastPrintedAt": "上次打印于 {when}。",
     "printTagFor": "打印 {name} 的名牌",
-    "printNameTag": "打印名牌"
+    "printNameTag": "打印名牌",
+    "owedTitle": "{count, plural, other {有 # 张名牌没有打印出来}}",
+    "owedInTheRoom": "还在教室里",
+    "owedRecent": "最近 10 分钟",
+    "owedEarlier": "更早",
+    "owedNewTonight": "今天新来",
+    "owedCost": "{count, plural, other {没有勾选的 # 张会跳过。}}",
+    "owedPrint": "{count, plural, other {打印 # 张名牌}}",
+    "owedSkip": "{count, plural, other {跳过 # 张名牌}}",
+    "statusWaiting": "{count, plural, other {# 张待打印}}"
   }
 }

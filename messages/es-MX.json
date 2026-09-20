@@ -2179,7 +2179,8 @@
     "delete": "Retroceso",
     "space": "Espacio",
     "apostrophe": "Apóstrofo",
-    "hyphen": "Guion"
+    "hyphen": "Guion",
+    "staffPrint": "Personal · imprimir etiquetas"
   },
   "Confirm": {
     "back": "← Atrás",
@@ -2240,7 +2241,16 @@
     "noTagTonight": "Hoy no se imprimió ninguna etiqueta.",
     "lastPrintedAt": "Última impresión: {when}.",
     "printTagFor": "Imprimir la etiqueta de {name}",
-    "printNameTag": "Imprimir etiqueta"
+    "printNameTag": "Imprimir etiqueta",
+    "owedTitle": "{count, plural, one {1 etiqueta no se imprimió} other {# etiquetas no se imprimieron}}",
+    "owedInTheRoom": "En el salón",
+    "owedRecent": "Últimos 10 minutos",
+    "owedEarlier": "Antes",
+    "owedNewTonight": "Nueva familia",
+    "owedCost": "{count, plural, one {La que está sin marcar se omite.} other {Las # sin marcar se omiten.}}",
+    "owedPrint": "{count, plural, one {Imprimir 1 etiqueta} other {Imprimir # etiquetas}}",
+    "owedSkip": "{count, plural, one {Omitir 1 etiqueta} other {Omitir # etiquetas}}",
+    "statusWaiting": "{count, plural, one {1 pendiente} other {# pendientes}}"
   },
   "Search": {
     "searchEveryone": "Buscar entre todos",
@@ -2262,7 +2272,8 @@
     "offerNotYours": "¿No es su familia? Inscriba a su hijo o hija",
     "offerFirstTime": "¿Primera vez aquí? Inscriba a su hijo o hija",
     "offerShort": "¿No es suya? Inscribir",
-    "networkFailed": "Sin conexión."
+    "networkFailed": "Sin conexión.",
+    "owedNotice": "<mark>Personal</mark> — {count, plural, one {1 etiqueta pendiente} other {# etiquetas pendientes}}"
   },
   "Chooser": {
     "question": "¿Para qué reunión es este kiosco?",
@@ -2421,7 +2432,12 @@
     "tabletPolicy": "Configuración de impresora de la tableta",
     "tabletPolicyHint": "Esta tableta está administrada, así que se le puede dar la impresora a Chrome de una vez por todas. Pega la línea de abajo en la lista de configuraciones de Chrome de la app de administración de la tableta.",
     "tabletPolicyMore": "El resto de la configuración de la tableta, y para qué sirve cada parte, está en {url}.",
-    "policyCopied": "Configuración de impresora copiada"
+    "policyCopied": "Configuración de impresora copiada",
+    "owedNews": "{count, plural, one {1 etiqueta no se imprimió.} other {# etiquetas no se imprimieron.}}",
+    "owedWaiting": "{count, plural, one {1 etiqueta está pendiente.} other {# etiquetas están pendientes.}}",
+    "owedPrinting": "{count, plural, one {Imprimiendo 1 etiqueta — llévala al salón.} other {Imprimiendo # etiquetas — llévalas al salón.}}",
+    "owedPrinted": "{count, plural, one {1 etiqueta impresa — llévala al salón.} other {# etiquetas impresas — llévalas al salón.}}",
+    "owedRowWaiting": "Pendiente"
   },
   "Pairing": {
     "title": "Vincula este kiosco",

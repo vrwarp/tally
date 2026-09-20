@@ -74,6 +74,7 @@ import {
   type PrinterConfig,
 } from './device';
 import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
+import type { OwedTag } from '../owed';
 import { createPrinterLog, isNoise, type PrinterLogEntry } from './log';
 import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
@@ -100,6 +101,7 @@ export {
   setAllergySource,
 } from './allergy';
 export type { PrintedLabel } from './queue';
+export type { OwedTag } from '../owed';
 export type { AllergySource } from './allergy';
 
 /*
@@ -179,7 +181,26 @@ export type PrinterState =
    * should say so in words.
    */
   | { kind: 'unpaired'; searching: boolean }
-  | { kind: 'ready'; config: PrinterConfig }
+  | {
+      kind: 'ready';
+      config: PrinterConfig;
+      /**
+       * Whether a person pressed something on a staff screen to get here.
+       *
+       * `press` for the browser's chooser and for **Look again**; absent for
+       * every silent path — the boot, the recovery ladder, a `connect` event,
+       * the next family's label. One reader, and it is the whole of why the
+       * field exists: the kiosk may open the owed confirm by itself *only*
+       * when somebody just asked the printer a question and is looking at the
+       * answer. A screen that swapped under a hand on a timer's say-so would
+       * land a descending thumb on a commit it never aimed at.
+       *
+       * Deliberately not part of {@link sameState}: this is a property of the
+       * arrival, not of what the screen says, so a second `ready` never
+       * re-renders for it.
+       */
+      cause?: 'press';
+    }
   | { kind: 'trouble'; message: PrinterNote; advice: PrinterNote | null };
 
 /**
@@ -218,6 +239,32 @@ export interface PrinterDetection {
 
 let state: PrinterState = { kind: 'idle' };
 const listeners = new Set<(state: PrinterState) => void>();
+
+/**
+ * The children whose name tag never came out, and when it should have.
+ *
+ * Not the same set as "labels that failed", and the difference is the whole of
+ * why it is a map here rather than a filter over the log. A label that failed
+ * while the printer was still `ready` — one rejected transfer the recovery
+ * ladder quietly fixes — leaves the parent's own ten-minute hold available, so
+ * it is theirs to print and no staff surface should count it; that failure
+ * never reaches `owe`. What does reach it is every failure the kiosk *painted*,
+ * which is exactly the set nobody else can fix. See `../owed.ts` for what is
+ * then done with it, and `reprintOffer.ts` for the hold this defers to.
+ *
+ * Bounded by age rather than by count, in the screens that read it: the log's
+ * eight is a bound on names held in memory for weeks, and dropping the oldest
+ * *here* would drop the children who have been in a room longest without a
+ * tag — the rows a runner most needs. Ids and moments only; the names come
+ * from the roster at render.
+ */
+const owed = new Map<string, number>();
+
+/** Write one down. Never for a test label, which is about the printer. */
+function owe(job: LabelJob): void {
+  if (!job.name || job.owable === false) return;
+  owed.set(job.studentId, job.atMs ?? Date.now());
+}
 
 /**
  * The record of what happened — see `log.ts`. Module-level like the state,
@@ -670,8 +717,31 @@ async function adopt(
     startRecovery(device);
   });
   await device.open();
-  setState({ kind: 'ready', config: active }, cause);
+  setState(readyState(active, cause), cause);
 }
+
+/**
+ * The `ready` state, carrying whether a press is what produced it.
+ *
+ * One place rather than two, because the two publishers of `ready` — this
+ * module's `adopt` and `reopen`'s already-open shortcut — are the two ends of
+ * the same question, and a hand-off that fired from one and not the other
+ * would be a hand-off nobody could predict. See the `cause` field.
+ */
+function readyState(active: PrinterConfig, cause: string): PrinterState {
+  return cause === 'pair' || cause === LOOK_AGAIN
+    ? { kind: 'ready', config: active, cause: 'press' }
+    : { kind: 'ready', config: active };
+}
+
+/**
+ * The cause `ready()` records when a volunteer pressed **Look again**.
+ *
+ * The same call serves the boot, where nobody pressed anything, so the caller
+ * says which it is. It is a log line as well as a flag: "why did the printer
+ * come back at 9:31" is answered by the word, in the record, for free.
+ */
+export const LOOK_AGAIN = 'look-again';
 
 /**
  * A printer this kiosk was never set up with, granted to the origin anyway.
@@ -731,10 +801,21 @@ async function adoptPolicyGrant(): Promise<PrinterConfig | null> {
  * No user gesture: `getDevices` returns what the origin has already been granted,
  * which is exactly the case a kiosk that rebooted at 4am is in.
  */
-export async function ready(): Promise<PrinterState> {
+export async function ready(
+  /**
+   * Why this is being called: the boot, or a volunteer pressing **Look again**.
+   *
+   * Only the printer screen passes {@link LOOK_AGAIN}, and only from a press.
+   * It reaches the state as `cause: 'press'` and it reaches the record as the
+   * word — both of which exist so the kiosk can tell "the printer came back
+   * because somebody asked it to, and they are looking at the screen" from the
+   * four ways it comes back with nobody watching.
+   */
+  cause: 'boot' | typeof LOOK_AGAIN = 'boot',
+): Promise<PrinterState> {
   const stored = readPrinterConfig() ?? (await adoptPolicyGrant());
   if (!stored) {
-    setState({ kind: 'idle' }, 'boot');
+    setState({ kind: 'idle' }, cause);
     return state;
   }
   config = stored;
@@ -747,7 +828,7 @@ export async function ready(): Promise<PrinterState> {
         // No advice: nobody in a lobby is going to change browser, and the
         // person who can is reading the setup docs rather than this screen.
       },
-      'boot',
+      cause,
     );
     return state;
   }
@@ -784,7 +865,7 @@ export async function ready(): Promise<PrinterState> {
   // Cancel-then-restart, because this runs again on every printer-screen exit.
   stopBootRetry();
   bootRetry = { timer: null, step: 0 };
-  await reopen('boot');
+  await reopen(cause);
   if (state.kind === 'unpaired') scheduleBootStep();
   else stopBootRetry();
   return state;
@@ -1203,18 +1284,26 @@ const queue = createLabelQueue({
     await printer.sendRaw(result.job, { pageCount: result.pageCount });
     if (state.kind === 'trouble' && config) setState({ kind: 'ready', config }, 'label-printed');
   },
-  onFailure: (error) => {
+  onPrinted: (job) => {
+    // Whoever asked for it — the check-in, a staff reprint, the parent's own
+    // hold, the batch — a sticker that came out is a debt that is paid.
+    owed.delete(job.studentId);
+  },
+  onFailure: (error, job) => {
     // The error and never the job: the job is a child's name and the words on
     // their sticker, and the record lives on a lobby tablet for weeks.
     log.record('kiosk', 'label-failed', errorInfo(error));
     // A label that died with the transport is the recovery's to explain: it is
     // deciding whether the printer left or merely dropped a transfer, and
-    // painting "unplugged" here would answer before it has looked.
+    // painting "unplugged" here would answer before it has looked. It is also
+    // why nothing is owed on this branch: the state stays `ready`, so the
+    // parent standing at the kiosk still has their own hold. See `owed`.
     if ((error as { code?: unknown } | null)?.code === 'disconnected' && recovery) return;
     const { message, advice } = describe(error);
     setState({ kind: 'trouble', message, advice }, 'label-failed');
+    owe(job);
   },
-  onDropped: (reason) => {
+  onDropped: (reason, job) => {
     if (reason === 'stale') {
       log.record('kiosk', 'label-stale');
       setState(
@@ -1226,6 +1315,9 @@ const queue = createLabelQueue({
         'label-stale',
       );
     }
+    // Either way it is a child with no sticker and nobody told: a spool that
+    // overran is not something the family at the glass can see happen.
+    owe(job);
   },
 });
 
@@ -1235,16 +1327,28 @@ function jobFor(
   student: KioskStudent,
   binding: KioskBinding,
   template: LabelTemplate,
+  /**
+   * When this label's moment was — absent for the ordinary one, which is now.
+   *
+   * Carried on the job rather than resolved at the wire, because a tag the
+   * printer owed is re-rastered twenty minutes late and `{{time}}` has to say
+   * when the child arrived. See `tokenValuesFor`.
+   */
+  atMs?: number,
+  /** Whether a failure here leaves a child owed a tag — see `owe`. */
+  owable = true,
 ): LabelJob {
   return {
     studentId: student.id,
+    atMs: atMs ?? Date.now(),
+    owable,
     // What the printer screen's log will call them. The roster's own display
     // name, not the sticker's — a template may print a first name and an
     // initial, and a volunteer looking for the label that did not come out is
     // looking for the child they can see.
     name: `${student.firstName} ${student.lastName}`.trim(),
     template,
-    values: tokenValuesFor(grades, locale, student, binding),
+    values: tokenValuesFor(grades, locale, student, binding, atMs),
   };
 }
 
@@ -1313,6 +1417,16 @@ export function pendingLabelId(registrationId: string, index: number): string {
 export function adoptStudentId(from: string, to: string): void {
   queue.rekey(from, to);
   adoptAllergyNote(from, to);
+  // And the debt, if that sticker is one: a registration whose labels failed
+  // is owed under the run's own key until the callable says who the children
+  // are, and a row keyed to a child the roster cannot answer for is dropped
+  // from the offer (see `offeredOwed`) — so without this the one family whose
+  // tags matter most, the one the room has never met, is the one left out.
+  const at = owed.get(from);
+  if (at !== undefined) {
+    owed.delete(from);
+    owed.set(to, at);
+  }
 }
 
 /** The confirm screen closed without confirming; its label is not wanted. */
@@ -1346,7 +1460,70 @@ export function reprintLabel(
   student: KioskStudent,
   binding: KioskBinding,
 ): void {
-  printLabel(grades, locale, student, binding);
+  const template = binding.labelTemplate;
+  if (!template) return;
+  startAllergyLookup(student, template);
+  /*
+   * `owable: false`, which is the one thing that differs from a check-in's
+   * label. A reprint that fails is failing in front of the person who asked
+   * for it, on a screen that says so; writing it into the owed set would put
+   * a child this kiosk may never have checked in — staff may reprint for
+   * anybody — into a list whose whole claim is "this kiosk took these
+   * arrivals and no sticker came out". See `owed`.
+   */
+  queue.print(jobFor(grades, locale, student, binding, template, undefined, false));
+}
+
+/**
+ * Print the name tags this printer owes, in the order given.
+ *
+ * The one place a batch happens, and everything careful about it is either in
+ * `queue.printOwed` (a family at the glass never waits behind it; nothing in it
+ * is dropped) or in `owed.ts` (who is on the list at all). What is here is the
+ * one fact neither of those can supply: each tag is rasterised with the moment
+ * its child arrived, so a sticker that comes out at 9:40 for a 9:12 check-in
+ * says 9:12 — which on a nursery tag is what the room reads for how long a
+ * child has been in it.
+ *
+ * Settling is the caller's, not this function's: the confirm spends the whole
+ * question in one press, printing the ticked rows and skipping the rest, so it
+ * calls {@link settleOwed} for all of them and these come back only if they
+ * fail again.
+ */
+export function printOwedLabels(
+  grades: GradeStrings,
+  locale: string,
+  binding: KioskBinding,
+  tags: readonly { student: KioskStudent; atMs: number }[],
+): void {
+  const template = binding.labelTemplate;
+  if (!template) return;
+  const jobs = tags.map(({ student, atMs }) => {
+    startAllergyLookup(student, template);
+    return jobFor(grades, locale, student, binding, template, atMs);
+  });
+  log.record('kiosk', 'owed-print', { count: jobs.length });
+  queue.printOwed(jobs);
+}
+
+/** The name tags this kiosk still owes — see `owed`. */
+export function owedLabels(): readonly OwedTag[] {
+  return [...owed].map(([studentId, atMs]) => ({ studentId, atMs }));
+}
+
+/**
+ * These have been answered for: printed, skipped, or no longer offered.
+ *
+ * One press on the confirm settles every row it listed — the ticked ones go to
+ * the printer and the rest are let go — so the count on the glass, the mark in
+ * the corner and the row on the staff menu all clear together rather than
+ * leaving a volunteer asked the same question by three surfaces. A tag that
+ * then fails again is written down again, which is the honest answer: it is
+ * still owed.
+ */
+export function settleOwed(studentIds: readonly string[]): void {
+  for (const studentId of studentIds) owed.delete(studentId);
+  log.record('kiosk', 'owed-settled', { count: studentIds.length });
 }
 
 /**
@@ -1382,6 +1559,10 @@ export function labelPreview(
 export function forgetGathering(): void {
   forgetAllergies();
   queue.forgetPrinted();
+  // The same argument as the allergy notes and the label log: a kiosk that has
+  // left a gathering holds nothing about the children who were at it, and an
+  // owed tag is a child's name waiting to be printed.
+  owed.clear();
 }
 
 /** The evening's attempts, newest first, for the printer screen. */

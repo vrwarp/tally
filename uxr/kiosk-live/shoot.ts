@@ -366,6 +366,23 @@ const SCENES: {
   },
   { id: 'setup-chooser-light-ready', query: 'screen=chooser&labels=some&printer=ready&ground=light', views: ['kiosktall'] },
   { id: 'setup-chooser-nothing-today', query: 'screen=chooser&events=none', views: ['kiosktall'] },
+  /*
+   * The name tags a printer came back owing — the portrait tablet only, which
+   * is the shape this was designed against and the only one a lobby uses.
+   *
+   * Six tags straddling the ten-minute tick, so a frame carries both groups,
+   * the three-state group mark, and the *New tonight* row whose sticker is how
+   * a room learns a child's name. The three surfaces before the offer are here
+   * too: the front door's one line of words, the staff menu's waiting count,
+   * and the printer screen leading with the batch rather than with the machine.
+   */
+  { id: 'owed-offer', query: 'screen=owed&owed=6', views: ['kiosktall'] },
+  { id: 'owed-offer-one', query: 'screen=owed&owed=1', views: ['kiosktall'] },
+  { id: 'owed-offer-pickup', query: 'screen=owed&owed=6&pickup=1', views: ['kiosktall'] },
+  { id: 'owed-notice', query: 'owed=6', views: ['kiosktall'] },
+  { id: 'owed-staff', query: 'screen=staff&owed=6', views: ['kiosktall'] },
+  { id: 'owed-printer', query: 'screen=printer&from=staff&printer=ready&owed=6', views: ['kiosktall'] },
+  { id: 'owed-printer-sent', query: 'screen=printer&from=staff&printer=ready&owed=6&sent=1', views: ['kiosktall'] },
   /* The printer screen as setup reaches it: no evening, no reprint door. */
   { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
   { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },

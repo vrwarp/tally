@@ -86,6 +86,7 @@ export function StaffScreen({
   iconPath,
   window: eventWindow,
   printer,
+  owed = 0,
   trouble,
   backdrop,
   onReprint,
@@ -108,6 +109,17 @@ export function StaffScreen({
    * says what it knows first.
    */
   printer: 'ready' | 'trouble' | 'none';
+  /**
+   * How many name tags the printer owes — see `owed.ts`. Zero on an ordinary
+   * evening, which is every evening nothing went wrong.
+   *
+   * It rides the row that already carries a status rather than arriving as a
+   * row of its own above *Reprint a name tag*. Order carries rank on this
+   * menu, and the reprint is the errand somebody walks over for mid-service;
+   * a row that appears above it on the evenings a volunteer is most likely to
+   * be hurrying would demote the trained first press exactly then.
+   */
+  owed?: number;
   /**
    * Whether this binding is wearing a photograph — the row below is drawn
    * only while there is one to take off. False again after the hold's own
@@ -155,7 +167,14 @@ export function StaffScreen({
    * fact the lightest object on the glass.
    */
   const printerLine =
-    printer === 'ready'
+    /*
+     * The waiting count outranks the printer's own state, and it is the only
+     * thing here that ever does. "Ready" is the answer to a question nobody
+     * walked over to ask; four name tags waiting is a reason to press this row.
+     */
+    owed > 0
+      ? { text: t('statusWaiting', { count: owed }), tone: 'text-warn-400' }
+      : printer === 'ready'
       ? /*
          * Settled, so it recedes. It was `present-400`, which made the one
          * chromatic object on the calm screen a word confirming that nothing had

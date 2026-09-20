@@ -2179,7 +2179,8 @@
     "delete": "刪除",
     "space": "空白鍵",
     "apostrophe": "撇號",
-    "hyphen": "連字號"
+    "hyphen": "連字號",
+    "staffPrint": "同工 · 列印名牌"
   },
   "Confirm": {
     "back": "← 返回",
@@ -2240,7 +2241,16 @@
     "noTagTonight": "今晚沒有印過名牌。",
     "lastPrintedAt": "上次列印於 {when}。",
     "printTagFor": "列印 {name} 的名牌",
-    "printNameTag": "列印名牌"
+    "printNameTag": "列印名牌",
+    "owedTitle": "{count, plural, other {有 # 張名牌沒有印出來}}",
+    "owedInTheRoom": "還在教室裡",
+    "owedRecent": "最近 10 分鐘",
+    "owedEarlier": "更早",
+    "owedNewTonight": "今天新來",
+    "owedCost": "{count, plural, other {沒有勾選的 # 張會跳過。}}",
+    "owedPrint": "{count, plural, other {列印 # 張名牌}}",
+    "owedSkip": "{count, plural, other {跳過 # 張名牌}}",
+    "statusWaiting": "{count, plural, other {# 張待列印}}"
   },
   "Search": {
     "searchEveryone": "搜尋所有人",
@@ -2262,7 +2272,8 @@
     "offerNotYours": "不是您家的孩子嗎？為您的孩子登記",
     "offerFirstTime": "第一次來？為您的孩子登記",
     "offerShort": "不是您家的孩子？登記",
-    "networkFailed": "現在連不上網路。"
+    "networkFailed": "現在連不上網路。",
+    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 張名牌在等著列印}}"
   },
   "Chooser": {
     "question": "這台簽到台是給哪場聚會用的？",
@@ -2421,7 +2432,12 @@
     "tabletPolicy": "平板的印表機設定",
     "tabletPolicyHint": "這臺平板受管理，因此可以一次性把印表機交給 Chrome。請把下面這行內容貼到平板管理應用程式中的 Chrome 設定清單裡。",
     "tabletPolicyMore": "其餘的平板設定，以及每一項的用途，請見 {url}。",
-    "policyCopied": "印表機設定已複製到剪貼簿"
+    "policyCopied": "印表機設定已複製到剪貼簿",
+    "owedNews": "{count, plural, other {有 # 張名牌沒有印出來。}}",
+    "owedWaiting": "{count, plural, other {有 # 張名牌在等著列印。}}",
+    "owedPrinting": "{count, plural, other {正在列印 # 張名牌 — 請送到教室。}}",
+    "owedPrinted": "{count, plural, other {已列印 # 張名牌 — 請送到教室。}}",
+    "owedRowWaiting": "等待中"
   },
   "Pairing": {
     "title": "配對這台簽到台",

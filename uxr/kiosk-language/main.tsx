@@ -163,6 +163,8 @@ export function Kiosk() {
     tracksCheckOut: binding.requiresCheckOut ?? false,
     printerNeedsAttention: false,
     onPrinter: () => {},
+    owedNotice: 0,
+    onOwedNotice: () => {},
     backdrop: photoUrl !== null,
     refresh: 'idle' as const,
     widening: false,

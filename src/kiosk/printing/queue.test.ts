@@ -433,6 +433,122 @@ describe('the label queue', () => {
     });
   });
 
+  describe('the batch a recovered printer owes', () => {
+    /*
+     * A second lane, and the whole of why it exists is that the first one has
+     * rules a batch must not be subject to. `printOwed` hands over a stack of
+     * tags for children who checked in while the printer was down: they are
+     * minutes old by construction, there may be a dozen of them, and a family
+     * standing at the glass while they come out must not wait behind them.
+     */
+    it('prints the family at the glass before the next of the batch', async () => {
+      const raster = fakeRaster();
+      const send = fakeSend();
+      const gate = deferred();
+      let first = true;
+      const queue = createLabelQueue({
+        raster: raster.fn,
+        send: async (result) => {
+          if (first) {
+            first = false;
+            await gate.promise;
+          }
+          await send.fn(result);
+        },
+      });
+
+      queue.printOwed([job('owed-a'), job('owed-b'), job('owed-c')]);
+      await Promise.resolve();
+      // A parent taps mid-stack: the batch is on the tape and this label is
+      // the one somebody is standing there waiting for.
+      queue.print(job('live'));
+      gate.release();
+      await queue.idle();
+
+      // The first of the batch was already in the air; everything after it
+      // yields, which is the claim — the live label is not last.
+      expect(raster.seen[0]).toBe('owed-a');
+      expect(queue.printedTonight().map((entry) => entry.studentId)).toEqual([
+        'owed-c',
+        'owed-b',
+        'live',
+        'owed-a',
+      ]);
+    });
+
+    it('never drops one of the batch as stale', async () => {
+      const raster = fakeRaster();
+      const send = fakeSend();
+      const clock = fakeClock();
+      const queue = createLabelQueue({
+        raster: raster.fn,
+        send: send.fn,
+        now: clock.now,
+      });
+
+      queue.printOwed([job('ada')]);
+      // Half an hour after the check-in it was owed for — which is the whole
+      // point of the offer, and would be twenty-eight minutes past the age at
+      // which an ordinary label is thrown away.
+      clock.advance(MAX_LABEL_AGE_MS * 15);
+      await queue.idle();
+
+      expect(send.sent).toHaveLength(1);
+      expect(queue.printedTonight()[0]).toMatchObject({ studentId: 'ada', failed: false });
+    });
+
+    it('never drops one of the batch for overflow', async () => {
+      const gate = deferred();
+      const send = fakeSend();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: async (result) => {
+          await gate.promise;
+          await send.fn(result);
+        },
+      });
+
+      // Twelve children in one outage is an ordinary outage; the live lane
+      // holds eight, and a volunteer who ticked twelve rows gets twelve tags.
+      const outage = Array.from({ length: MAX_QUEUED_LABELS + 4 }, (_unused, index) =>
+        job(`child-${index}`),
+      );
+      queue.printOwed(outage);
+      gate.release();
+      await queue.idle();
+
+      expect(send.sent).toHaveLength(outage.length);
+      expect(queue.printedTonight().every((entry) => !entry.failed)).toBe(true);
+    });
+
+    it('leaves nothing of the batch behind when the kiosk leaves the gathering', async () => {
+      const gate = deferred();
+      const send = fakeSend();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: async (result) => {
+          await gate.promise;
+          await send.fn(result);
+        },
+      });
+
+      queue.printOwed([job('ada'), job('gus'), job('mira')]);
+      await Promise.resolve();
+      /* Unbinding is the one act that says these tags are for a gathering this
+         kiosk is no longer on — a stack for last night's children coming out
+         over tonight's check-ins is the failure the queue refuses to be a
+         spool for. */
+      queue.forgetPrinted();
+      gate.release();
+      await queue.idle();
+
+      // The one already in the air finishes — it is on the tape either way —
+      // but nothing behind it is drawn, which is the claim.
+      expect(send.sent).toHaveLength(1);
+      expect(queue.printedTonight().map((entry) => entry.studentId)).toEqual(['ada']);
+    });
+  });
+
   describe('the warm cache', () => {
     it('holds a handful and drops the oldest past it', async () => {
       const raster = fakeRaster();

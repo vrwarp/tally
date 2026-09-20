@@ -16,12 +16,25 @@
  */
 import { useTranslations } from 'use-intl';
 
-export function StaffMark() {
+export function StaffMark({
+  /**
+   * Which errand this is — the reprint by default, since that is the flow the
+   * mark was drawn for and three of its four screens still say it.
+   *
+   * A second word rather than a second component: what the mark *is* — the
+   * quiet label that tells a parent this glass is not theirs — does not change
+   * between the two flows, and a screen that carried its own copy of the
+   * treatment is a screen that drifts from it.
+   */
+  label = 'staffReprint',
+}: {
+  label?: 'staffReprint' | 'staffPrint';
+} = {}) {
   const t = useTranslations('Door');
   return (
     <div className="flex items-center justify-center">
       <span className="inline-flex items-center rounded-lg bg-ink-800/70 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-300 kiosk:text-base">
-        {t('staffReprint')}
+        {t(label)}
       </span>
     </div>
   );

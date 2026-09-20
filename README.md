@@ -190,6 +190,7 @@ with the same ground photographed from the running app:
 | --- | --- |
 | [docs/review-corrections.md](docs/review-corrections.md) — correcting a self-registered family before approving them | [frame by frame](docs/walkthrough/corrections/README.md) |
 | [docs/kiosk-reprint.md](docs/kiosk-reprint.md) — reprinting a name tag, and the two wider designs that were refused | [frame by frame](docs/walkthrough/reprint/README.md) |
+| [docs/kiosk-owed.md](docs/kiosk-owed.md) — the name tags a printer owes when it comes back, and why the kiosk offers them rather than printing them | — |
 | [docs/team-access.md](docs/team-access.md) — who may sign in and who may work each gathering: every journey and edge case, and the changes that survived five rounds of critique and the owner's review | [frame by frame](docs/uxr/access-walkthrough/README.md) |
 | [docs/parent-contact.md](docs/parent-contact.md) — taking a parent's number at the door without slowing the queue | — |
 | [docs/label-printing.md](docs/label-printing.md) — setting up a Brother QL: models, media, per-platform quirks, what a label may say | — |

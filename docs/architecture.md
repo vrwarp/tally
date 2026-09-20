@@ -172,7 +172,10 @@ to somebody who cannot fix a printer anyway. A check-out prints nothing at all: 
 the door, and a parent re-tapping a child who is already checked in does not print either — except
 inside the ten minutes after this kiosk checked them in, once, which is the whole of the exception
 and is [reasoned out here](kiosk-reprint.md). Reprinting for a named child is a staff screen behind
-the same held **Clear**, and it no longer costs the kiosk its gathering.
+the same held **Clear**, and it no longer costs the kiosk its gathering. The dot carries one more
+meaning than "something is broken": a printer that came back owing name tags — children checked in
+while it was down — lights it too, because a decision nobody has made is a person the printer needs.
+The kiosk offers that batch rather than printing it, and [reasons that out here](kiosk-owed.md).
 
 Setting a printer up, and what a label may say, is [label printing](label-printing.md).
 

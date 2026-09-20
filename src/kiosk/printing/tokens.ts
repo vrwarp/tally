@@ -40,8 +40,20 @@ export function tokenValuesFor(
   locale: string,
   student: KioskStudent,
   binding: KioskBinding,
+  /**
+   * When the sticker's moment was, for a label coming out late.
+   *
+   * Absent means now, which is every ordinary label: a check-in prints in the
+   * same second it is taken. A name tag the printer *owed* is the exception —
+   * drawn twenty minutes after the child walked in — and `{{time}}` on a
+   * nursery sticker is what the room reads for how long they have been here.
+   * A tag saying 9:40 for a child who arrived at 9:12 is a tag read wrongly, so
+   * the moment travels with the tag rather than being taken from the clock when
+   * it finally reaches the tape. See `../owed.ts`.
+   */
+  atMs?: number,
 ): LabelTokenValues {
-  const now = new Date();
+  const now = atMs === undefined ? new Date() : new Date(atMs);
   // `student.firstName` is the composite the roster row displays — `Benson
   // “蔡秉洲”` — because that is what makes both spellings searchable. A sticker
   // wants the halves apart: see the `LABEL_TOKENS` comment for why the quotes

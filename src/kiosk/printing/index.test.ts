@@ -174,6 +174,8 @@ const queue = vi.hoisted(() => ({
   print: vi.fn(),
   forget: vi.fn(),
   printedTonight: vi.fn(() => [] as unknown[]),
+  printOwed: vi.fn(),
+  rekey: vi.fn(),
   forgetPrinted: vi.fn(),
   depth: vi.fn(() => 0),
   idle: vi.fn(async () => {}),
@@ -202,6 +204,7 @@ vi.mock('@/kiosk/printing/allergy', () => ({
   },
   startAllergyLookup: (student: { id: string }) => allergy.started.push(student.id),
   forgetAllergy: (studentId: string) => allergy.forgotten.push(studentId),
+  adoptAllergyNote: vi.fn(),
   forgetAllergies: () => {
     allergy.forgotAll += 1;
   },
@@ -1440,6 +1443,140 @@ describe('the queue’s two ways of not printing', () => {
   });
 });
 
+describe('the name tags this kiosk still owes', () => {
+  /*
+   * The ledger behind the offer. Which rows reach a volunteer is `../owed.ts`;
+   * what is asserted here is the narrower and more dangerous question of what
+   * gets written into it at all — because a debt written down for a label the
+   * parent can still print themselves turns one family's small inconvenience
+   * into a staff prompt, and a debt *not* written down is a child in a room
+   * with no name on them and nobody who knows.
+   */
+  function failedJob(studentId = 'pco_1', atMs?: number): LabelJob {
+    return { studentId, name: 'Ada', template: TEMPLATE, values: {}, atMs };
+  }
+
+  it('owes a tag for a failure painted as trouble', async () => {
+    const printing = await load();
+
+    queue.options.onFailure?.(
+      { code: 'printer-error', errors: [{ message: 'Out of labels.' }] },
+      failedJob('pco_1', 1_700_000_000_000),
+    );
+
+    expect(printing.owedLabels()).toEqual([{ studentId: 'pco_1', atMs: 1_700_000_000_000 }]);
+  });
+
+  it('owes a tag the queue threw away, however quietly', async () => {
+    // Overflow says nothing to anyone — the depth on the printer screen
+    // already reports a printer that is behind — but it is still a child with
+    // no sticker, which is the one fact the offer exists to carry.
+    const printing = await load();
+
+    queue.options.onDropped?.('overflow', failedJob('pco_9'));
+
+    expect(printing.owedLabels().map((tag) => tag.studentId)).toEqual(['pco_9']);
+  });
+
+  it('owes nothing for a staff reprint that failed', async () => {
+    /* A reprint is staff standing at the printer watching it not work: they
+       can press again. Writing it down would put "1 waiting" on the screen of
+       the person who is already looking at the failure. */
+    const printing = await load();
+    queue.print.mockClear();
+
+    printing.reprintLabel(grades, 'en', ADA, binding());
+    const job = queue.print.mock.calls[0]?.[0] as LabelJob;
+    queue.options.onDropped?.('overflow', job);
+
+    expect(job.owable).toBe(false);
+    expect(printing.owedLabels()).toEqual([]);
+  });
+
+  it('pays the debt when the sticker finally comes out', async () => {
+    const printing = await load();
+
+    queue.options.onDropped?.('overflow', failedJob());
+    queue.options.onPrinted?.(failedJob());
+
+    expect(printing.owedLabels()).toEqual([]);
+  });
+
+  it('follows a just-registered child to the id the server gave them', async () => {
+    /* The one family the room has never met is the one whose labels are keyed
+       to a temporary id until the callable answers. A debt left under the old
+       key is dropped from the offer as a child the roster cannot name. */
+    const printing = await load();
+
+    queue.options.onDropped?.('overflow', failedJob('reg_7:0', 1_700_000_000_000));
+    printing.adoptStudentId('reg_7:0', 'pco_42');
+
+    expect(printing.owedLabels()).toEqual([{ studentId: 'pco_42', atMs: 1_700_000_000_000 }]);
+  });
+
+  it('settles every row the confirm listed, ticked or not', async () => {
+    // One press answers the whole question, so the count on the front door,
+    // the mark in the corner and the staff menu's line all clear together.
+    const printing = await load();
+
+    queue.options.onDropped?.('overflow', failedJob('a'));
+    queue.options.onDropped?.('overflow', failedJob('b'));
+    printing.settleOwed(['a', 'b']);
+
+    expect(printing.owedLabels()).toEqual([]);
+  });
+
+  it('writes a tag down again if the batch fails again', async () => {
+    // The honest answer: it is still owed. A settle that stuck would lose the
+    // children whose tags a printer that was never really fixed ate twice.
+    const printing = await load();
+
+    printing.settleOwed(['pco_1']);
+    queue.options.onDropped?.('overflow', failedJob('pco_1'));
+
+    expect(printing.owedLabels().map((tag) => tag.studentId)).toEqual(['pco_1']);
+  });
+
+  it('hands the batch to the queue with each child’s own arrival time', async () => {
+    /* `{{time}}` on a nursery sticker is what the room reads for how long a
+       child has been here, so the moment travels with the tag rather than
+       being taken from the clock when it reaches the tape. */
+    const printing = await load();
+    queue.printOwed.mockClear();
+
+    printing.printOwedLabels(grades, 'en', binding(), [
+      { student: ADA, atMs: 1_700_000_000_000 },
+    ]);
+
+    const jobs = queue.printOwed.mock.calls[0]?.[0] as LabelJob[];
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].atMs).toBe(1_700_000_000_000);
+    expect(queue.print).not.toHaveBeenCalled();
+  });
+
+  it('prints no batch for a gathering that prints no labels', async () => {
+    const printing = await load();
+    queue.printOwed.mockClear();
+
+    printing.printOwedLabels(grades, 'en', binding(null as never), [
+      { student: ADA, atMs: 1_700_000_000_000 },
+    ]);
+
+    expect(queue.printOwed).not.toHaveBeenCalled();
+  });
+
+  it('forgets the debts when the kiosk leaves the gathering', async () => {
+    // An owed tag is a child's name waiting to be printed, and last night's
+    // children are not tonight's.
+    const printing = await load();
+
+    queue.options.onDropped?.('overflow', failedJob());
+    printing.forgetGathering();
+
+    expect(printing.owedLabels()).toEqual([]);
+  });
+});
+
 describe('labelPreview', () => {
   it('shows the words the sticker will carry', async () => {
     const printing = await load();
@@ -1650,6 +1787,22 @@ describe('recovering without a human', () => {
     device.emit('disconnect');
     return { device, printing, seen };
   }
+
+  it('owes no name tag for a label that died while it was looking', async () => {
+    /* The label that failed with the transport is the recovery's to explain,
+       and while it is looking the state stays `ready` — so the parent standing
+       at the glass still has their own ten-minute hold, and this sticker is
+       theirs to print rather than a debt for staff. See `../owed.ts`. */
+    const { printing } = await lost();
+
+    queue.options.onFailure?.(
+      { code: 'disconnected' },
+      { studentId: 'pco_1', name: 'Ada', template: TEMPLATE, values: {} },
+    );
+
+    expect(printing.currentState().kind).toBe('ready');
+    expect(printing.owedLabels()).toEqual([]);
+  });
 
   it('waits before asking whether the printer is still there', async () => {
     const { printing } = await lost();
