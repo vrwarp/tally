@@ -22,7 +22,7 @@ import {
   createSimulatorFetch,
 } from '../../../tools/pco-simulator/src/index.js';
 import type { PcoConfig, PcoWriteBackMode } from '../config.js';
-import { createPcoClient, type PcoClient } from './client.js';
+import { PcoApiError, createPcoClient, type PcoClient } from './client.js';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { fetchPersonDetails } from './roster.js';
 import { createTtlCache } from './cache.js';
@@ -441,6 +441,91 @@ describe('createFamily against the simulator', () => {
     expect(h.store.householdsForPerson(newChild.id).map((household) => household.id)).toEqual([
       anchorHousehold.id,
     ]);
+  });
+
+  /*
+   * The bug this exists to keep fixed.
+   *
+   * `household_role` is a closed enum upstream and `child` is not in it —
+   * `child_or_dependent` is. Tally wrote the obvious word, which is also the
+   * word Planning Center uses for the flag on a Person, and the simulator took
+   * whatever string it was handed. So every test and every e2e run passed, and
+   * the 422 arrived for the first time on a Sunday: a registration that failed
+   * on its last write, after the parent had already been created, leaving a
+   * family half-built on a record with no undo.
+   *
+   * Asserting the value rather than just the membership is the point. A
+   * household the child is *in* is what the other tests check, and that is
+   * exactly what stayed true while the role was wrong.
+   */
+  it('files a joined child under a role Planning Center accepts', async () => {
+    const anchorHousehold = h.store.householdsForPerson(FIXTURE_IDS.leilaPhoneOnlyParent)[0]!;
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed(`students/pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`, annotation());
+    h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
+
+    const result = await build({
+      studentIds: ['t-new'],
+      anchorStudentIds: [`pco_${FIXTURE_IDS.leilaPhoneOnlyParent}`],
+    });
+
+    expect(result.status).toBe('already-has-family');
+    const membership = h.store
+      .membershipsForHousehold(anchorHousehold.id)
+      .find((entry) => entry.person_id === newChild.id);
+    expect(membership?.household_role).toBe('child_or_dependent');
+  });
+
+  /*
+   * The same role, down the other path that writes one: a household that is
+   * already there but has no adult in it, so the parent and the sibling are
+   * both posted into it. Two `household_memberships` writes, two roles, and
+   * only one of them was ever right.
+   */
+  it('files the parent and the child into an adultless household under roles it accepts', async () => {
+    const anchorHousehold = h.store.householdsForPerson(MARCUS)[0]!;
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+    h.db.seed(`students/${MARCUS_STUDENT}`, annotation());
+    h.db.seed('students/t-new', annotation({ pcoPersonId: newChild.id }));
+
+    const result = await build({
+      studentIds: ['t-new'],
+      anchorStudentIds: [MARCUS_STUDENT],
+      phone: '(510) 555-0142',
+    });
+
+    expect(result.status).toBe('created');
+    const roles = new Map(
+      h.store
+        .membershipsForHousehold(anchorHousehold.id)
+        .map((entry) => [entry.person_id, entry.household_role] as const),
+    );
+    expect(roles.get(newChild.id)).toBe('child_or_dependent');
+    expect(roles.get(result.parentPersonId!)).toBe('parent_guardian');
+  });
+
+  /*
+   * And the guard that gives the two tests above their teeth: the simulator
+   * now answers a role outside the enum the way Planning Center does, so the
+   * word `child` cannot pass a test run again.
+   */
+  it('is rejected by Planning Center when the role is not one it knows', async () => {
+    const household = h.store.householdsForPerson(FIXTURE_IDS.leilaPhoneOnlyParent)[0]!;
+    const newChild = h.store.createPerson({ first_name: 'Ada', last_name: 'Fields', child: true });
+
+    const failure = await h.client
+      .post(`/households/${household.id}/household_memberships`, {
+        data: {
+          type: 'HouseholdMembership',
+          attributes: { person_id: newChild.id, pending: false, household_role: 'child' },
+          relationships: { person: { data: { type: 'Person', id: newChild.id } } },
+        },
+      })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(PcoApiError);
+    expect((failure as PcoApiError).status).toBe(422);
+    expect((failure as PcoApiError).message).toContain('child is not a valid household role');
   });
 
   it('uses the sibling’s household even when it has no adult in it yet', async () => {

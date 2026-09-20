@@ -93,6 +93,14 @@ gap is the whole reason `syncPeople` makes a second pass over
 `/households/{id}/household_memberships`, so the simulator reproduces it rather
 than helpfully filling it in.
 
+`household_role` is a closed enum — `parent_guardian`, `adult`, `other_adult`,
+`child_or_dependent` — and a `POST` carrying anything else is a 422, the same
+way the real API answers it. This one was learned the hard way: the simulator
+used to store whatever string it was handed, so `household_role: 'child'` —
+the word Planning Center itself uses for the flag on a Person — passed every
+test and every end-to-end run, and the 422 arrived for the first time in a
+church's lobby, on the last write of a registration.
+
 ## Control plane
 
 Only on the HTTP server, for end-to-end tests:

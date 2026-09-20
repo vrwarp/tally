@@ -564,7 +564,7 @@ export class SimulatorStore {
         id: `M${this.org.memberships.length + 1000}`,
         household_id: existing,
         person_id: student.id,
-        household_role: 'child',
+        household_role: 'child_or_dependent',
         person_name: `${student.first_name} ${student.last_name}`.trim(),
         pending: false,
       });

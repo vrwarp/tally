@@ -496,6 +496,68 @@ describe('setParentContact', () => {
     expect(contacts.email1).toBe('hana@example.org');
   });
 
+  /*
+   * The bug this exists to keep fixed.
+   *
+   * `contactsOf` reads these slots by content, not by name — an address with
+   * an `@` is the family's email wherever it happens to sit — because a
+   * church's own data entry does not respect the names. The writer used to
+   * assume they were honest and put every number in `phone1`, so an address
+   * parked there was read as the only email on file and then written straight
+   * over. The record's one contact detail, destroyed by the path whose whole
+   * promise is that Tally never overwrites one.
+   */
+  it('does not write a number over an address parked in the phone slot', async () => {
+    const wei = idOf('Wei');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+
+    // Somebody typed the family's email into the phone box. It is still the
+    // only way the church can reach them.
+    const hana = [...store.attendees.values()].find((a) => a.firstName === 'Hana')!;
+    hana.infos.contacts = { phone1: 'hana@example.org' };
+
+    const result = await setParentContact({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      phone: '555-9999',
+    });
+
+    expect(result.status).toBe('updated');
+    expect(result.wrote).toEqual(['phone']);
+
+    const contacts = hana.infos.contacts as Record<string, string>;
+    expect(contacts.phone1).toBe('hana@example.org');
+    expect(Object.values(contacts)).toContain('555-9999');
+  });
+
+  /* The mirror image: an address must not land on top of a parked number. */
+  it('does not write an address over a number parked in the email slot', async () => {
+    const wei = idOf('Wei');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+
+    const hana = [...store.attendees.values()].find((a) => a.firstName === 'Hana')!;
+    hana.infos.contacts = { email1: '555-0322' };
+
+    const result = await setParentContact({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      email: 'hana@example.org',
+    });
+
+    expect(result.status).toBe('updated');
+    expect(result.wrote).toEqual(['email']);
+
+    const contacts = hana.infos.contacts as Record<string, string>;
+    expect(contacts.email1).toBe('555-0322');
+    expect(Object.values(contacts)).toContain('hana@example.org');
+  });
+
   it('says when there is no adult to attach the contact to', async () => {
     const nkechi = idOf('Nkechi');
     db.seed(`students/a32_${nkechi}`, { status: 'active' });

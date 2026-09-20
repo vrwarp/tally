@@ -412,6 +412,18 @@ const HOUSEHOLD_MEMBERSHIPS_PATH = /^\/households\/([^/]+)\/household_membership
 const PERSON_PHONES_PATH = /^\/people\/([^/]+)\/phone_numbers$/;
 const PERSON_EMAILS_PATH = /^\/people\/([^/]+)\/emails$/;
 
+/**
+ * `household_role` is a closed enum upstream, and the simulator enforces it.
+ *
+ * Worth the four lines because the value that is *not* in it is the obvious
+ * one: `child`, the word Planning Center itself uses for the flag on a Person
+ * and the word anybody writing this call reaches for. A simulator that accepts
+ * whatever string it is handed lets that through every test and e2e run, and
+ * the 422 arrives for the first time in a church's lobby, on the last write of
+ * a registration — after the parent has already been created.
+ */
+const HOUSEHOLD_ROLES = new Set(['parent_guardian', 'adult', 'other_adult', 'child_or_dependent']);
+
 function checkAuth(request: SimRequest, store: SimulatorStore): SimResponse | null {
   const header = request.authorization ?? '';
   if (!header.toLowerCase().startsWith('basic ')) {
@@ -622,6 +634,12 @@ function route(request: SimRequest, store: SimulatorStore): SimResponse {
   if (method === 'POST' && membershipMatch) {
     const householdId = decodeURIComponent(membershipMatch[1]!);
     const attributes = extractAttributes(request.body) ?? {};
+    // Mirrors the store's own reading of the field: absent or blank means "let
+    // the simulator decide", anything else has to be a role the API knows.
+    const role = attributes.household_role == null ? '' : String(attributes.household_role).trim();
+    if (role.length > 0 && !HOUSEHOLD_ROLES.has(role)) {
+      return error(422, 'Unprocessable Entity', `${role} is not a valid household role`);
+    }
     // The relationship is authoritative; `person_id` is accepted alongside it
     // because the real API documents both.
     const personId = relationshipIds(request.body, 'person')[0] ?? attributes.person_id;

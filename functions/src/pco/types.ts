@@ -201,3 +201,15 @@ export const PCO_TYPES = {
 
 /** Household roles, most-parental first — this order *is* the preference rule. */
 export const HOUSEHOLD_ADULT_ROLES = ['parent_guardian', 'adult', 'other_adult'] as const;
+
+/**
+ * The role a child is given in a household.
+ *
+ * Planning Center's enum is closed and does not contain `child` — the word
+ * every other part of this codebase uses for the same idea, down to the `child`
+ * flag on a Person. Posting one is a 422 ("child is not a valid household
+ * role") that fails a registration at the last step, after the parent has
+ * already been written, so the value lives here rather than being spelled out
+ * at each write site.
+ */
+export const HOUSEHOLD_CHILD_ROLE = 'child_or_dependent';

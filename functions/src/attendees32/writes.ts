@@ -48,6 +48,7 @@ import {
   birthdayPatch,
   contactsOf,
   displayFirstNameOf,
+  freeContactSlot,
   findContactCandidates,
   mapAttendeeToRosterPerson,
   adultContactOf,
@@ -780,14 +781,14 @@ export async function setParentContact(
     // a number already on file.
     if (onFile.contactPhone) skipped.push('phone');
     else {
-      contacts.phone1 = phone;
+      contacts[freeContactSlot(contacts, 'phone')] = phone;
       wrote.push('phone');
     }
   }
   if (email) {
     if (onFile.contactEmail) skipped.push('email');
     else {
-      contacts.email1 = email;
+      contacts[freeContactSlot(contacts, 'email')] = email;
       wrote.push('email');
     }
   }
@@ -1010,14 +1011,14 @@ export async function addParent(
     if (phone) {
       if (onFile.contactPhone) skipped.push('phone');
       else {
-        contacts.phone1 = phone;
+        contacts[freeContactSlot(contacts, 'phone')] = phone;
         wrote.push('phone');
       }
     }
     if (email) {
       if (onFile.contactEmail) skipped.push('email');
       else {
-        contacts.email1 = email;
+        contacts[freeContactSlot(contacts, 'email')] = email;
         wrote.push('email');
       }
     }
@@ -1571,14 +1572,14 @@ export async function createFamily(
     if (phone) {
       if (onFile.contactPhone) skipped.push('phone');
       else {
-        contacts.phone1 = phone;
+        contacts[freeContactSlot(contacts, 'phone')] = phone;
         wrote.push('phone');
       }
     }
     if (email) {
       if (onFile.contactEmail) skipped.push('email');
       else {
-        contacts.email1 = email;
+        contacts[freeContactSlot(contacts, 'email')] = email;
         wrote.push('email');
       }
     }

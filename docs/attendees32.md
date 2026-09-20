@@ -119,6 +119,15 @@ costs no extra requests.
   same way, which is what `where[child]=false` does on the other side — without it, the only
   exclusion was the children of the registration being approved, so a father and son who share a
   name could see the son corroborated as the father the moment his own mobile was on file.
+- **Slots are read by content, so they are written that way too.** `contactsOf` decides what a
+  slot holds by looking at the value — anything with an `@` is an email, wherever it sits — because
+  a church's own data entry does not respect the names, and an address typed into the phone box is
+  still the family's address. The writer has to be careful in the same direction: `phone1` is not
+  free merely because nothing phone-shaped was found on the record. It used to put every number
+  there regardless, so an address parked in `phone1` read as the only email on file and was then
+  written straight over — the record's one contact detail destroyed by the path whose whole promise
+  is fill-only-when-empty. `freeContactSlot` now picks the lowest-numbered slot nothing is sitting
+  on.
 - **Corroboration reads every number.** `contactsOf` answers with the first phone-like slot, which
   is right for "how do we reach this family" and wrong for "is this the same human": a parent whose
   `phone1` is a work line and whose mobile sits in `phone2` is the same parent. The match uses

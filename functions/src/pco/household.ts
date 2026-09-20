@@ -55,6 +55,7 @@ import { loadPersonWithHousehold } from './roster.js';
 import { followPersonLink, isPersonGoneError } from './personLink.js';
 import { readThroughMerges, resolveStudentPerson } from './studentPerson.js';
 import {
+  HOUSEHOLD_CHILD_ROLE,
   PCO_TYPES,
   type PcoHousehold,
   type PcoHouseholdMembership,
@@ -882,7 +883,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
         {
           data: {
             type: PCO_TYPES.householdMembership,
-            attributes: { person_id: child.personId, pending: false, household_role: 'child' },
+            attributes: { person_id: child.personId, pending: false, household_role: HOUSEHOLD_CHILD_ROLE },
             relationships: { person: { data: { type: PCO_TYPES.person, id: child.personId } } },
           },
         },
@@ -1078,7 +1079,7 @@ export async function createFamily(options: CreateFamilyOptions): Promise<Create
       await client.post(`/households/${encodeURIComponent(householdId)}/household_memberships`, {
         data: {
           type: PCO_TYPES.householdMembership,
-          attributes: { person_id: child.personId, pending: false, household_role: 'child' },
+          attributes: { person_id: child.personId, pending: false, household_role: HOUSEHOLD_CHILD_ROLE },
           relationships: { person: { data: { type: PCO_TYPES.person, id: child.personId } } },
         },
       });
