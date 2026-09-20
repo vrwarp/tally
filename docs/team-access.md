@@ -823,7 +823,9 @@ member list the 672px its row layout needs *and* leave the invitation column roo
 want roughly 1,060px between them and have 992. Narrowing the rail makes the overflowing column
 worse; stacking puts eleven members between an admin and the invitations they came for. It wants a
 layout decision rather than a fraction, and taking one in the last hour of this campaign would be
-the wrong time to make it.
+the wrong time to make it. It is a core member's finding as well as an admin's now: the screen
+lays out two columns whenever there are two cards to put in them, which is what stopped the
+roster's own read deciding where the invitations sat (docs/layout-stability.md).
 
 ### Round two
 

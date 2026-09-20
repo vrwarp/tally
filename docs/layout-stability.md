@@ -53,11 +53,22 @@ on both sides.
 ```bash
 npx playwright test --project=chromium-desktop e2e/layout-shift.spec.ts
 LAYOUT_SHIFT_REPORT=1 npx playwright test e2e/layout-shift.spec.ts
+LAYOUT_SHIFT_SLOW_READS=250 npx playwright test e2e/layout-shift.spec.ts
 ```
 
 The second writes a readout per screen to `perf-results/layout-stability/`,
 which is what to read when tuning a placeholder against the row it stands for.
 A failure prints the same readout in its message.
+
+The third holds every Firestore request back by that many milliseconds, and it
+is the one condition the spec cannot otherwise arrange. Against the emulators
+the local reads beat the first paint, so the loading pass ordinarily scores a
+screen drawn from data it already had, and the placeholders it would have shown
+a person on a slower machine are never on screen to be measured at all. A
+loaded CI runner arranges it by accident — which is how the Team screen's 172px
+below was found, on the third attempt of a job whose first two had already
+failed. The window is narrow: 250ms reproduces that one and 400ms does not, so
+sweep a few values when hunting rather than trusting a single number.
 
 ## What it found, and what changed
 
@@ -188,6 +199,70 @@ the chart somebody was looking at back to a placeholder. This is the same rule
 `rosterSettled` states for the roster, and it earns its keep for the same
 reason.
 
+### Two cards in one column is the roster deciding where the other one sits
+
+The Team screen lays out two columns — who is already here, and who is on their
+way — and it decided on them by asking `isAdmin`. That was the rank invitations
+belonged to before they were widened to core. The card itself moved to
+`can('core')`; the layout around it did not, so a children's director on a
+laptop got both cards stacked in one 48rem column with the roster on top.
+
+Which made the invite card's position a function of a read. The roster draws
+three placeholder rows — 292px of card — and the seeded ministry it resolves to
+is one row, 123px. Paint the placeholder first and the card below it jumps
+172px *up* the screen: 0.0490, against a loading budget of 0.02. The first
+attempt of the same CI job jumped the other way, +106px, because the world it
+ran against held more profiles by then. This is the bullet above in its
+unforgivable form, and it is why no placeholder count would have fixed it —
+three rows is wrong for a ministry of one and wrong for a ministry of eleven,
+and which one a church has is the thing the read is for.
+
+Side by side, the length of the roster is not a fact the invitations can feel:
+two grid items, two columns, `lg:items-start`. The left one resolving from
+three grey bars to one row now moves nothing. Below `lg` nothing changed —
+there the invite card is already a disclosure at the top of the page and the
+roster is the last thing on it, which is the same property arrived at from the
+other side.
+
+### Three more of the same shape, found by holding the reads back
+
+The Team screen's 172px came from CI rather than from this spec, so the spec
+was taught the condition that found it (`LAYOUT_SHIFT_SLOW_READS`, above) and
+every screen was swept against it at 100ms through 700ms, at both viewports.
+Three more came out, and each is the same mistake in a different costume: a
+question answered by something other than the thing that decides the answer.
+
+**Insights' tab row agreed with a silence it had not heard yet.** The row falls
+back to the calendar's gatherings "until the registers say which ran", and it
+asked `awaitingHistory` — a read-in-flight flag — to tell it when that was.
+`useEventSnapshots` starts its read from an effect, so the render that first
+hands it a window reports no snapshots *and* no read in flight, which is the
+shape of "asked, and there were none". For one frame the row therefore drew
+nothing, and on a machine loaded enough to paint that frame the row arrived a
+paint later and pushed the tiles, the call lists and the chart down 60px —
+0.0319 at a 200ms hold. The row now reads the history's own answer
+(`gatherings.length > 0 ? gatherings : planned`), which is data rather than a
+state of the read and cannot have a frame like that.
+
+**A stat tile is as wide as its row lets it be, not as wide as the screen.**
+The hint under a tile's number reserved two lines on a phone and one from `sm`
+up, on the reasoning that a laptop has room for "Friday Fellowship · +10 vs 22
+before" on one line. It has not: the row is two tiles across on a phone and
+four or five across at `lg`, so a wider screen buys more tiles rather than
+wider ones — 147px of text inside a laptop's tile against a phone's 154. The
+sentence wrapped on both, so the row went on dropping its 16px onto the call
+lists on a laptop, exactly as it had on a phone before the phone was fixed. The
+second line is reserved at every width now. A viewport was never the question.
+
+**The thresholds preview is a panel, so its waiting state is one too.** On
+Settings, "Working out what these thresholds mean right now…" is one line and
+what replaces it is 110px of panel, with the Save button and three more cards
+under it on a phone. The waiting state now wears the panel's own frame —
+heading, the line at the foot, an em dash where the count will be, and the
+sentence said once to a screen reader. The rows per gathering still arrive,
+because that is a list of unknown length; the residue is 0.0015 where the whole
+panel was 0.0116.
+
 ## What still moves, and why it should
 
 **A list arriving pushes what is under it.** Insights' MIA list goes from four
@@ -195,7 +270,10 @@ placeholder rows to however many names there are — thirteen in the seeded
 ministry — and the trend chart below it moves down 1125px. No placeholder can
 know that number in advance, and one that guessed high would leave a hole under
 every shorter list. The report names it in full; the score ignores it, which is
-right, because it happens entirely below the fold.
+right, because it happens entirely below the fold. The rider is the whole of
+the Team screen's story below: *below the fold* is the reason this is
+forgivable, and it stops being true the moment a list of unknown length has
+something at the fold underneath it.
 
 **A line of variable-length text settles.** A phone shows a parent's name,
 number and address on one line for one family and two for the next. The

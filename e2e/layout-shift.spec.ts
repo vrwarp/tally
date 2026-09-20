@@ -133,6 +133,31 @@ async function measure(
   await new Promise((resolve) => setTimeout(resolve, 5_500));
 
   await installStabilityProbe(page);
+  /*
+   * The local reads, held behind the first paint on demand.
+   *
+   * Against the emulators Firestore answers before the app has drawn anything,
+   * so the loading pass ordinarily scores a screen composed from data it
+   * already had, and the placeholder a person on a slower machine would have
+   * seen is never on screen to be measured. A loaded CI runner arranges the
+   * other order by accident — which is how the Team screen's 172px was found,
+   * by a job that failed three times on main and had passed on the branch an
+   * hour earlier.
+   *
+   * So the order is arrangeable here too. `LAYOUT_SHIFT_SLOW_READS=250` is what
+   * reproduces that one; the window is narrow enough that 400 does not, so a
+   * hunt sweeps values rather than trusting a number. Opt-in, because holding
+   * every read back is a different question from the one this spec asks by
+   * default, and a screen that only jumps under it is still a screen that
+   * jumps. See docs/layout-stability.md.
+   */
+  const slowReads = Number(process.env.LAYOUT_SHIFT_SLOW_READS ?? 0);
+  if (slowReads > 0) {
+    await page.route('**/google.firestore.v1.Firestore/**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, slowReads));
+      await route.continue();
+    });
+  }
   await holdSimulator({});
 
   const openedAt = Date.now();
