@@ -77,6 +77,33 @@ import { useTimeFormats } from '@/hooks/useTimeFormats';
 type StatusFilter = 'active' | 'inactive' | 'all';
 type QuickFilter = 'none' | 'incomplete' | 'visitors' | 'inFlight' | 'needsYou';
 
+/**
+ * What the grade control is asking for: one grade, everybody without one, or
+ * `null` for no narrowing at all.
+ *
+ * Having no grade is a fact about a person rather than a gap in the filter —
+ * the adult volunteers a hand-picked roster deliberately carries, and the
+ * children the sync could not read a grade for. So it is a third answer here
+ * and not the absence of one, because "who has no grade on file" is exactly
+ * the question somebody asks in the hour before they go and fill them in.
+ */
+type GradeChoice = Grade | 'none' | null;
+
+/**
+ * The grade select's value, back to what it is asking for.
+ *
+ * A `<select>` speaks only strings, so the two non-grades need spellings: the
+ * empty option is the browser's own "nothing chosen" and stays `null`, and
+ * `none` is a word no `Grade` can be confused with. Which is why it is read
+ * here rather than cast where the grades are: `Number('none')` is `NaN`, and a
+ * `NaN` grade matches nobody — not even the people it was asked for — while
+ * Pre-K's `-1` is a real grade that looks exactly like a sentinel.
+ */
+function readGradeChoice(value: string): GradeChoice {
+  if (value === '') return null;
+  return value === 'none' ? 'none' : (Number(value) as Grade);
+}
+
 export function StudentsPage() {
   const tCommon = useTranslations('Common');
   const grades = useGrades();
@@ -116,7 +143,7 @@ export function StudentsPage() {
    * snapshot out, at every commit.
    */
   const deferredQuery = useDeferredValue(query);
-  const [grade, setGrade] = useState<Grade | null>(null);
+  const [grade, setGrade] = useState<GradeChoice>(null);
   // Inactive students are history, not roster: the default view hides them.
   const [status, setStatus] = useState<StatusFilter>('active');
   const [quick, setQuick] = useState<QuickFilter>('none');
@@ -187,8 +214,9 @@ export function StudentsPage() {
       if (status !== 'all' && student.status !== status) return false;
       // Somebody with no grade is in no grade. Asking for 6th graders and
       // getting the ministry's adult volunteers back is the same bug as
-      // printing "6th grade" under their name.
-      if (grade !== null && student.grade !== grade) return false;
+      // printing "6th grade" under their name — and `'none'` is how you ask
+      // for those volunteers on purpose.
+      if (grade !== null && student.grade !== (grade === 'none' ? null : grade)) return false;
       return matcher.matches(student.searchName);
     });
   }, [students, status, grade, deferredQuery]);
@@ -509,9 +537,7 @@ export function StudentsPage() {
           <SelectField
             label={tCommon('grade')}
             value={grade ?? ''}
-            onChange={(changed) =>
-              setGrade(changed.target.value ? (Number(changed.target.value) as Grade) : null)
-            }
+            onChange={(changed) => setGrade(readGradeChoice(changed.target.value))}
           >
             <option value="">{t('allGrades')}</option>
             {GRADES.map((value) => (
@@ -519,6 +545,19 @@ export function StudentsPage() {
                 {gradeName(grades, value)}
               </option>
             ))}
+            {/* Below 12th rather than beside "All grades": the list above it is
+                a sequence, and a row that is not a point on that sequence
+                belongs after the end of it rather than wedged into the top,
+                where it would also read as a second way of saying "do not
+                narrow by grade" — which is what "All grades" already is.
+
+                `grades('none')` rather than `Common.noGrade`, which is the
+                same two words: this option and the cell in every matching row
+                name one group of students on one screen, and reading the word
+                for it out of the same key is what keeps them from drifting
+                apart in a language where the row says one thing and the filter
+                that produced it another. */}
+            <option value="none">{grades('none')}</option>
           </SelectField>
 
           <SelectField
