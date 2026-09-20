@@ -19,7 +19,7 @@
  * and leaving is one of its doors, so the prompt below is two taps away rather
  * than one, and everything that was true of it is still true when it arrives.
  */
-import { act, fireEvent, render, screen } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
@@ -344,33 +344,130 @@ describe('the staff gate', () => {
 });
 
 /*
- * The language switch's off switch. Device-local like the photograph's, for
- * the Sunday a tablet has moved lobbies or the switch is confusing more
- * families than it helps.
+ * What this lobby speaks, from behind the gate.
+ *
+ * The row used to be **English only** and it only deleted: a volunteer could
+ * take the languages off and nothing at the tablet could put them back. It is
+ * a door onto a screen now, and the delete is the quiet control at the foot of
+ * it — so the errand that matters, swapping one language for another on a
+ * Sunday morning, is finally possible without an administrator.
  */
 describe('the lobby’s languages, from behind the gate', () => {
-  it('takes every language but English off the switch, and off the disk', async () => {
+  it('names what is offered on the row, and opens the screen that sets it', async () => {
     localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['zh-Hant', 'es-MX']));
     await mount();
     expect(screen.getByTestId('language-switch')).toBeTruthy();
 
     await holdClear();
     // Named, so nobody presses it blind.
-    const row = screen.getByText('English only').closest('button')!;
-    expect(row.textContent).toContain('繁體中文 · Español');
+    const row = screen.getByText('Languages').closest('button')!;
+    // The catalogue's order, not the order they were tapped in — the pins are
+    // a set, and this row says what the switch will say.
+    expect(row.textContent).toContain('Español · 繁體中文');
 
-    await tap('English only');
-    // Back on the door, with English alone on it —
-    expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
-    expect(screen.queryByTestId('language-switch')).toBeNull();
-    // — and off the disk, so the ~4am reload keeps it that way.
-    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual([]);
+    await tap('Languages');
+    expect(screen.getByTestId('language-pins')).toBeTruthy();
+    // Every candidate is drawn, pressed or not — an absence would read as a
+    // language this build cannot speak.
+    expect(screen.getByRole('button', { name: '简体中文' })).toBeTruthy();
   });
 
-  it('has no such row on a kiosk with nothing pinned', async () => {
+  it('adds a language the lobby did not offer, and puts it on the switch', async () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['es-MX']));
     await mount();
     await holdClear();
-    expect(screen.getByText('Change gathering')).toBeTruthy();
-    expect(screen.queryByText('English only')).toBeNull();
+    await tap('Languages');
+
+    await tap('简体中文');
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual(['es-MX', 'zh-Hans']);
+
+    await tap('Done — back to check-in');
+    expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
+    const names = screen.getByTestId('language-switch').textContent;
+    expect(names).toContain('简体中文');
+    expect(names).toContain('Español');
+  });
+
+  it('is the one door a kiosk with nothing pinned still has', async () => {
+    await mount();
+    await holdClear();
+    // Drawn even with nothing to take off: a tablet staged with a pairing link
+    // never draws the pairing screen, so this is the only way it can ever be
+    // given a language at all.
+    const row = screen.getByText('Languages').closest('button')!;
+    // And the words a volunteer was trained on stay on the menu, as the
+    // truthful answer to *what does this kiosk offer*.
+    expect(row.textContent).toContain('English only');
+
+    await tap('Languages');
+    await tap('Español');
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual(['es-MX']);
+  });
+
+  it('takes every language but English off, where the mistake would be visible', async () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['zh-Hant', 'es-MX']));
+    await mount();
+    await holdClear();
+    await tap('Languages');
+
+    await tap('English only');
+    // Off the disk, so the ~4am reload keeps it that way.
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual([]);
+    /*
+     * And still on the screen. While this closed the overlay, a thumb that
+     * landed on it instead of Done produced exactly the confirmation Done
+     * would have — the idle screen — so the deletion was invisible until the
+     * next family. Staying put makes the control remove itself in front of
+     * the person who pressed it, and the undo one tap per language.
+     */
+    expect(screen.getByTestId('language-pins')).toBeTruthy();
+    // Gone as a control — it holds its box so the column does not jump, and
+    // `visibility: hidden` keeps it out of the accessibility tree.
+    expect(screen.queryByRole('button', { name: 'English only' })).toBeNull();
+
+    await tap('Done — back to check-in');
+    expect(screen.getByText(PLACEHOLDER)).toBeTruthy();
+    expect(screen.queryByTestId('language-switch')).toBeNull();
+  });
+
+  it('offers no way to delete on a kiosk that has nothing to delete', async () => {
+    await mount();
+    await holdClear();
+    await tap('Languages');
+    // A control that takes nothing off answers a press with nothing, which is
+    // the frozen-tablet reading this codebase removes wherever it finds it.
+    expect(screen.queryByRole('button', { name: 'English only' })).toBeNull();
+  });
+
+  it('gives the same switch whichever way round the chips are tapped', async () => {
+    await mount();
+    await holdClear();
+    await tap('Languages');
+    await tap('繁體中文');
+    await tap('Español');
+    /*
+     * Tapped Chinese first, and the switch still reads English · Español ·
+     * 繁體中文. There is no sequence to get wrong, to show, or to explain to
+     * somebody standing at a kiosk with a queue.
+     */
+    expect(JSON.parse(localStorage.getItem(KIOSK_KEYS.pins)!)).toEqual(['es-MX', 'zh-Hant']);
+
+    await tap('Done — back to check-in');
+    const cells = within(screen.getByTestId('language-switch')).getAllByRole('button');
+    expect(cells.map((cell) => cell.textContent)).toEqual(['English', 'Español', '繁體中文']);
+  });
+
+  it('rests the screen in English on the way in, not only on the way out', async () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['es-MX']));
+    await mount();
+    // A family chose Spanish and walked off; the clock has not fired yet.
+    await tap('Español');
+    expect(screen.getByText(/nombre/i)).toBeTruthy();
+
+    await holdClear();
+    // The volunteer walked over *because* of the language. The menu, the row
+    // and the way out are all in English.
+    expect(screen.getByText('Languages')).toBeTruthy();
+    expect(screen.getByText('Keep checking in')).toBeTruthy();
   });
 });

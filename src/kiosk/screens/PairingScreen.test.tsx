@@ -19,6 +19,7 @@ import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PairingScreen, POLL_MS, TROUBLE_AFTER_FAILURES } from '@/kiosk/screens/PairingScreen';
 import type { KioskServices } from '@/kiosk/KioskApp';
+import type { Locale } from '@/lib/locales';
 
 function servicesWith(poll: KioskServices['pollPairing']): KioskServices {
   return {
@@ -270,6 +271,24 @@ describe('the lobby’s languages', () => {
     expect(within(pins).queryByRole('button', { name: 'English' })).toBeNull();
     // Nothing to preview until something is pinned.
     expect(screen.queryByTestId('language-switch')).toBeNull();
+  });
+
+  it('keeps every chosen language pressable at the cap, so a swap is possible', async () => {
+    const onPins = vi.fn();
+    const pins: Locale[] = ['zh-Hant', 'es-MX', 'zh-Hans'];
+    render(
+      <PairingScreen
+        services={servicesWith(pending())}
+        onPaired={vi.fn()}
+        pins={pins}
+        onPins={onPins}
+      />,
+    );
+    await tick();
+    const group = screen.getByTestId('language-pins');
+    // Taking one off is the way to make room, so it must still answer.
+    pressIn(group, '繁體中文');
+    expect(onPins).toHaveBeenCalledWith(['es-MX', 'zh-Hans']);
   });
 
   it('shows the volunteer the switch a family will see', async () => {

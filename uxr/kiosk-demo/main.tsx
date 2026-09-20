@@ -11,7 +11,10 @@
  *
  * Knobs, all optional, for the walkthrough's frames and deep links:
  *
- *   ?screen=checkin|pairing|staff   which screen to open on
+ *   ?screen=checkin|pairing|staff|languages
+ *                                   which screen to open on
+ *   ?printer=none|ready|trouble     what the staff menu says about the printer
+ *   ?owed=4                         name tags the printer owes, on that row
  *   ?pins=zh-Hans,es-MX,zh-Hant     the lobby's languages (default: all three)
  *   ?photo=1                        a photograph behind the idle screen
  *   ?buffer=Alva                    letters already typed
@@ -29,6 +32,7 @@ import type { KioskKey } from '@/kiosk/components/Keyboard';
 import type { KioskRefresh, KioskServices } from '@/kiosk/KioskApp';
 import { KioskIntlProvider } from '@/kiosk/KioskIntlProvider';
 import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
+import { LanguagesScreen } from '@/kiosk/screens/LanguagesScreen';
 import { PairingScreen } from '@/kiosk/screens/PairingScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
@@ -50,8 +54,8 @@ const lang = params.get('lang');
 if (isLocale(lang)) localStorage.setItem(KIOSK_LOCALE_STORAGE_KEY, lang);
 else localStorage.removeItem(KIOSK_LOCALE_STORAGE_KEY);
 
-type Screen = 'checkin' | 'pairing' | 'staff';
-const SCREENS: readonly Screen[] = ['checkin', 'pairing', 'staff'];
+type Screen = 'checkin' | 'pairing' | 'staff' | 'languages';
+const SCREENS: readonly Screen[] = ['checkin', 'pairing', 'staff', 'languages'];
 const isScreen = (value: string | null): value is Screen =>
   (SCREENS as readonly string[]).includes(value ?? '');
 
@@ -63,6 +67,12 @@ const INITIAL_PINS: Locale[] = params.has('pins')
   ? sanitizePins(params.get('pins')!.split(','))
   : ['zh-Hans', 'es-MX', 'zh-Hant'];
 const NOBODY = params.get('nomatch') === '1';
+/* The staff menu's own knobs. Its tallest state — a printer in trouble, which
+   draws a sentence under the reprint door, plus a photograph, which draws a
+   row — is the one worth measuring: the screen is a centred column. */
+const PRINTER =
+  (['none', 'ready', 'trouble'] as const).find((kind) => kind === params.get('printer')) ?? 'none';
+const OWED = Number(params.get('owed') ?? '0') || 0;
 const BARE = params.get('bare') === '1';
 const PHOTO_URL = new URL('./backdrop-demo.svg', import.meta.url).href;
 
@@ -226,7 +236,13 @@ export function Demo() {
             screen === candidate ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
           }`}
         >
-          {candidate === 'checkin' ? 'Check-in' : candidate === 'pairing' ? 'Pairing' : 'Staff'}
+          {candidate === 'checkin'
+            ? 'Check-in'
+            : candidate === 'pairing'
+              ? 'Pairing'
+              : candidate === 'staff'
+                ? 'Staff'
+                : 'Languages'}
         </button>
       ))}
       <span className="min-w-0 flex-1 truncate px-2 text-ink-400">
@@ -260,8 +276,9 @@ export function Demo() {
           <StaffScreen
             title={binding.title}
             window={eventWindow(locale, binding)}
-            printer="none"
-            trouble={null}
+            printer={PRINTER}
+            owed={OWED}
+            trouble={PRINTER === 'trouble' ? { key: 'troubleUnplugged' } : null}
             backdrop={photo}
             onHideBackdrop={() => {
               setPhoto(false);
@@ -271,11 +288,18 @@ export function Demo() {
             onPrinter={() => say('The printer screen is not part of this demo.')}
             onChangeEvent={() => say('Changing the gathering is not part of this demo.')}
             pins={pins}
+            onLanguages={() => setScreen('languages')}
+            onStay={home}
+          />
+        ) : screen === 'languages' ? (
+          <LanguagesScreen
+            pins={pins}
+            onPins={setPins}
             onEnglishOnly={() => {
               setPins([]);
               home();
             }}
-            onStay={home}
+            onDone={home}
           />
         ) : (
           <>

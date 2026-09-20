@@ -8,7 +8,7 @@
  * reboot.
  */
 import { isDeviceId } from '@/lib/kioskDevice';
-import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/locales';
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '@/lib/locales';
 import { asGrade } from '@/types';
 import type { KioskStudent } from './search';
 
@@ -329,23 +329,52 @@ export function writeCachedPulse(pulse: CachedPulse): void {
 export const MAX_PINS = 3;
 
 /**
- * A stored list of languages, made safe to offer.
+ * A stored set of languages, made safe to offer, in the one order the kiosk
+ * ever offers them.
  *
  * English is never a pin: it is the resting language and the first cell of the
  * switch whatever this list says. Anything else that is not a locale this
  * build speaks — a tag from a build that spoke more, a typo in a hand-edited
  * key — is dropped rather than offered, because the next thing done with a pin
  * is to import its catalogue and put its name on a button.
+ *
+ * ## Which is a set, not a sequence
+ *
+ * The pins were kept in the order a volunteer tapped them, and the switch
+ * stood in that order. It bought nothing and cost a question nobody should
+ * have to answer at a kiosk with a queue: *does it matter which I press
+ * first?* The chips are drawn in catalogue order, so the control and the
+ * switch then disagreed — a lobby that tapped Chinese then Spanish read
+ * `Español · 简体中文` across the chips and `简体中文 · Español` on the glass —
+ * and the only way to reorder was to unpin everything and start again, which
+ * nothing said.
+ *
+ * So the order is the catalogue's, decided here and nowhere else. Tapping is
+ * a set operation: the same three languages give the same switch however they
+ * were chosen, and there is no sequence to get wrong, to show, or to explain.
  */
 export function sanitizePins(value: unknown): Locale[] {
   if (!Array.isArray(value)) return [];
-  const pins: Locale[] = [];
-  for (const entry of value) {
-    if (!isLocale(entry) || entry === DEFAULT_LOCALE || pins.includes(entry)) continue;
-    pins.push(entry);
-    if (pins.length === MAX_PINS) break;
-  }
-  return pins;
+  /*
+   * Asked for, rather than accepted. The stored list is a question — *are
+   * these offered?* — and the catalogue answers it, which is what makes the
+   * set untyped: a tag from a build that spoke more languages, or a typo in a
+   * hand-edited key, is simply a question nothing says yes to. Sieving the
+   * input first and then sieving the catalogue would be the same filter
+   * written twice, and the second copy is the one that decides the order.
+   */
+  const asked = new Set<unknown>(value);
+  /*
+   * `slice` is the bound `MAX_PINS` exists for. It cannot fire while the
+   * catalogue holds exactly `MAX_PINS` languages besides English, so no test
+   * can reach it; it is here because the cap is a number and the catalogue is
+   * a list, and nothing makes them move together.
+   */
+  // Stryker disable next-line MethodExpression: the cap is unreachable — see above.
+  return LOCALES.filter((locale) => locale !== DEFAULT_LOCALE && asked.has(locale)).slice(
+    0,
+    MAX_PINS,
+  );
 }
 
 /** The languages this kiosk offers beside English, in the order it offers them. */

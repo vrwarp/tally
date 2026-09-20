@@ -14,7 +14,7 @@
  * choice is between an old roster and a lobby screen that cannot check anybody
  * in.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isDeviceId } from '@/lib/kioskDevice';
 import {
@@ -296,6 +296,52 @@ describe('ensureDeviceId', () => {
     expect(isDeviceId(minted)).toBe(true);
   });
 
+  /*
+   * The old-WebView arm. It is not decoration: a tablet whose browser has no
+   * WebCrypto still has to be a kiosk, and an id that came back empty or
+   * short would be written to the disk and then used as a document path.
+   * Uniqueness is all the id needs — the secret in the pairing handshake is a
+   * separate thing — so the fallback is `Math.random`, and this is the only
+   * test that ever runs it.
+   */
+  it('mints a usable id on a browser with no WebCrypto', () => {
+    localStorage.clear();
+    const real = globalThis.crypto;
+    // `getRandomValues` is what the code asks for, so that is what goes.
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {},
+    });
+    try {
+      const minted = ensureDeviceId();
+      expect(isDeviceId(minted)).toBe(true);
+      // Twelve bytes, two hex digits each, behind the prefix.
+      expect(minted).toMatch(/^kiosk-[0-9a-f]{24}$/);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: real });
+    }
+  });
+
+  it('fills every byte of the fallback id, rather than the first or none', () => {
+    const real = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: {} });
+    const random = vi.spyOn(Math, 'random');
+    try {
+      // 0.5 * 256 = 128 = 0x80, in all twelve bytes — which a loop that ran
+      // once, ran backwards, or did not run at all could not produce.
+      random.mockReturnValue(0.5);
+      localStorage.clear();
+      expect(ensureDeviceId()).toBe(`kiosk-${'80'.repeat(12)}`);
+      // And the arithmetic is a product, not a quotient: 0.99 * 256 is 253.
+      random.mockReturnValue(0.99);
+      localStorage.clear();
+      expect(ensureDeviceId()).toBe(`kiosk-${'fd'.repeat(12)}`);
+    } finally {
+      random.mockRestore();
+      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: real });
+    }
+  });
+
   it('mints a different id for a different storage container', () => {
     localStorage.clear();
     const first = ensureDeviceId();
@@ -310,13 +356,48 @@ describe('ensureDeviceId', () => {
  * button, so the reader is the one place a stale or hand-edited key is caught.
  */
 describe('readPins', () => {
-  it('reads back the languages a volunteer pinned, in the order they were pinned', () => {
+  it('reads back the languages a volunteer pinned', () => {
+    writePins(['es-MX', 'zh-Hant']);
+    expect(readPins()).toEqual(['es-MX', 'zh-Hant']);
+  });
+
+  /*
+   * A set, not a sequence. Tap order used to be the switch's order, which
+   * bought nothing and cost a question nobody should answer at a kiosk with a
+   * queue — and the chips, drawn in catalogue order, then disagreed with the
+   * switch they were setting.
+   */
+  it('offers the same switch however the chips were tapped', () => {
     writePins(['zh-Hant', 'es-MX']);
-    expect(readPins()).toEqual(['zh-Hant', 'es-MX']);
+    const oneWay = readPins();
+    writePins(['es-MX', 'zh-Hant']);
+    expect(readPins()).toEqual(oneWay);
+  });
+
+  it('puts them in the catalogue’s order, not the volunteer’s', () => {
+    writePins(['zh-Hant', 'zh-Hans', 'es-MX']);
+    expect(readPins()).toEqual(['es-MX', 'zh-Hans', 'zh-Hant']);
   });
 
   it('answers nothing for a kiosk nobody has pinned', () => {
     expect(readPins()).toEqual([]);
+  });
+
+  /*
+   * Not decoration: the sieve below is a `Set` built from whatever is on the
+   * disk, and `new Set(5)` throws. A hand-edited key holding a number would
+   * take the idle screen down on boot rather than come back empty.
+   */
+  it('answers nothing for a key holding something that cannot be iterated', () => {
+    localStorage.setItem(KIOSK_KEYS.pins, '5');
+    expect(readPins()).toEqual([]);
+    localStorage.setItem(KIOSK_KEYS.pins, '{"es-MX":true}');
+    expect(readPins()).toEqual([]);
+  });
+
+  it('drops a tag from a build that spoke more languages', () => {
+    localStorage.setItem(KIOSK_KEYS.pins, JSON.stringify(['fr-CA', 'es-MX', 17, null]));
+    expect(readPins()).toEqual(['es-MX']);
   });
 
   it('never offers English as a pin — it is the first cell whatever the disk says', () => {

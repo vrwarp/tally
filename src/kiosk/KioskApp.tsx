@@ -69,6 +69,7 @@ import {
   readCachedRoster,
   readJson,
   readPins,
+  sanitizePins,
   writePins,
   type CachedPulse,
 } from './storage';
@@ -77,13 +78,15 @@ import { ConfirmScreen } from './screens/ConfirmScreen';
 import { StaffScreen } from './screens/StaffScreen';
 import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
 import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
-import { StaffSession } from './components/StaffSession';
+import { STAFF_ASKING_MS, STAFF_RETURN_MS, StaffSession } from './components/StaffSession';
+import { loadCatalog } from './messages';
 import { reprintOffer, reprintStanding, type ReprintStanding } from './reprintOffer';
 import { OWED_NOTICE_MS, OWED_QUIET_MS, offeredOwed, type OwedRow } from './owed';
 import { OwedScreen, type OwedGroup } from './screens/OwedScreen';
 import { useQuietGlass } from './components/useQuietGlass';
 import { SiblingScreen } from './screens/SiblingScreen';
 import { EventChooser } from './screens/EventChooser';
+import { LanguagesScreen } from './screens/LanguagesScreen';
 import { PairingScreen } from './screens/PairingScreen';
 import { PrinterScreen } from './screens/PrinterScreen';
 import { SearchScreen } from './screens/SearchScreen';
@@ -223,6 +226,14 @@ type Overlay =
    */
   | { kind: 'staff' }
   | { kind: 'reprint' }
+  /**
+   * Which languages this lobby offers — see `LanguagesScreen`.
+   *
+   * One way in, so it carries no `from`: the staff gate's own row. Its
+   * **Done** goes to the door rather than back to the menu, because the
+   * errand is one decision and the chips have already recorded it.
+   */
+  | { kind: 'languages' }
   | { kind: 'reprint-confirm'; student: KioskStudent; from: ReprintFrom }
   | PrinterOverlay
   | OwedOverlay
@@ -467,9 +478,36 @@ export function KioskApp() {
    */
   const [pins, setPinsState] = useState<Locale[]>(() => readPins());
   const setPins = useCallback((next: Locale[]) => {
-    writePins(next);
-    setPinsState(next);
-  }, []);
+    /*
+     * Through `sanitizePins` before either the disk or the screen sees it,
+     * because that is where the order is decided: the pins are a set, and the
+     * switch stands in catalogue order however the chips were tapped. Writing
+     * the raw list and holding the raw list would have left the glass in tap
+     * order until the next reload put it right.
+     */
+    const ordered = sanitizePins(next);
+    writePins(ordered);
+    setPinsState(ordered);
+    /*
+     * Fetch the words for anything just added, now.
+     *
+     * A pin is a promise the tablet may not be able to keep. The catalogue is
+     * a lazy `import()` fired when the provider first sees the locale, the
+     * kiosk's worker precaches nothing and learns assets on first fetch, and
+     * `loadCatalog` answers a chunk that will not load with English and no
+     * error. So a language pinned on a tablet that has never rendered it — or
+     * on the morning after a deploy, when every chunk URL is new — could paint
+     * a cell reading 中文 that changes nothing when the family it was added
+     * for presses it, silently, in front of them.
+     *
+     * Here is the moment to spend the network: a member of staff is standing
+     * at the device, nobody is queueing behind the request, and the fetch puts
+     * the chunk in the worker's asset cache for every Sunday after. Fire and
+     * forget — the failure it guards against is the one `loadCatalog` already
+     * handles, and a rejected warm must never cost a volunteer their tap.
+     */
+    for (const pin of next) if (!pins.includes(pin)) void loadCatalog(pin);
+  }, [pins]);
   const [students, setStudents] = useState<KioskStudent[]>(
     () => readCachedRoster()?.students ?? [],
   );
@@ -789,16 +827,23 @@ export function KioskApp() {
   }, [binding]);
 
   /**
-   * The staff gate's answer to a language switch that is wrong *today* — the
-   * pairing screen's pins, taken off this device now, with no network and no
-   * re-pairing. Built like `hideBackdrop`: written through so the ~4am reload
-   * keeps them off, and the idle screen standing there in English is the
-   * confirmation.
+   * The languages screen's answer to a switch that is wrong *today* — the pins
+   * taken off this device now, with no network and no re-pairing. Built like
+   * `hideBackdrop`: written through so the ~4am reload keeps them off, and the
+   * idle screen standing there in English is the confirmation.
+   *
+   * It used to be a row on the staff menu, one press from a queue and undoable
+   * only by an administrator retiring the device. It is the quiet control on
+   * the screen that can also put them back — the same words in the same order
+   * for anyone told the old script over the phone.
+   *
+   * It no longer closes the overlay, and that is the safety rather than an
+   * oversight: while it did, a thumb that landed on it instead of **Done**
+   * produced exactly the confirmation **Done** would have — the idle screen —
+   * and the deletion was invisible until the next family. Staying put makes
+   * the mistake visible where it was made and the undo one tap per language.
    */
-  const englishOnly = useCallback(() => {
-    setPins([]);
-    setOverlay(null);
-  }, [setPins]);
+  const englishOnly = useCallback(() => setPins([]), [setPins]);
 
   /* ---- Boot: load Firebase after first paint, restore the session -------- */
 
@@ -2279,7 +2324,25 @@ export function KioskApp() {
    * on the one subtree whose whole design is that they never do (see
    * components/Keyboard.tsx, and the counts in docs/kiosk-performance.md).
    */
-  const onStaffGate = useCallback(() => setOverlay({ kind: 'staff' }), []);
+  const onStaffGate = useCallback(() => {
+    /*
+     * English on the way in, not only on the way out.
+     *
+     * Behind this gate is staff glass, and the one errand back there whose
+     * trigger *is* the language — the switch is offering something nobody in
+     * this room reads — was the one the kiosk answered in that language: the
+     * menu, the row, the hint and the way out all in it, for the full
+     * forty-five seconds of the session, because the reset fires on coming
+     * home (the `cameHome` effect above) and the sixty-second clock is
+     * disabled while an overlay is up.
+     *
+     * The dot in the corner is deliberately not this: a parent who taps it to
+     * find out what amber means is still a parent, and is handed back to the
+     * screen they were reading.
+     */
+    setLocale(RESTING_LOCALE);
+    setOverlay({ kind: 'staff' });
+  }, [setLocale]);
 
   /**
    * The amber dot, tapped.
@@ -2748,6 +2811,7 @@ export function KioskApp() {
       overlay?.kind === 'staff' ||
       overlay?.kind === 'reprint' ||
       overlay?.kind === 'reprint-confirm' ||
+      overlay?.kind === 'languages' ||
       overlay?.kind === 'printer' ||
       overlay?.kind === 'owed' ||
       overlay?.kind === 'unbind'
@@ -2810,7 +2874,7 @@ export function KioskApp() {
             backdrop={!!binding.kioskBackdropId}
             onHideBackdrop={hideBackdrop}
             pins={pins}
-            onEnglishOnly={englishOnly}
+            onLanguages={() => setOverlay({ kind: 'languages' })}
             onReprint={() => {
               setBuffer('');
               setSentId(null);
@@ -2819,6 +2883,13 @@ export function KioskApp() {
             onPrinter={() => setOverlay({ kind: 'printer', from: 'staff' })}
             onChangeEvent={() => setOverlay({ kind: 'unbind' })}
             onStay={leaveStaff}
+          />
+        ) : overlay.kind === 'languages' ? (
+          <LanguagesScreen
+            pins={pins}
+            onPins={setPins}
+            onEnglishOnly={englishOnly}
+            onDone={leaveStaff}
           />
         ) : overlay.kind === 'reprint' ? (
           <ReprintScreen
@@ -2946,7 +3017,12 @@ export function KioskApp() {
       return (
         <>
           {backdrop}
-          <StaffSession onReturn={leaveStaff}>
+          <StaffSession
+            onReturn={leaveStaff}
+            /* The one screen back here whose next step is a question put to a
+               person — see `STAFF_ASKING_MS`. */
+            returnMs={overlay.kind === 'languages' ? STAFF_ASKING_MS : STAFF_RETURN_MS}
+          >
             {overlay.kind === 'printer' && !printing ? (
               <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>
             ) : (
