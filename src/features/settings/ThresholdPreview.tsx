@@ -20,6 +20,16 @@ import { useTranslations } from 'use-intl';
 /** Enough history for the widest window a threshold can ask for. */
 const HISTORY_EVENTS = 14;
 
+/*
+ * The panel's own frame, named because the waiting state wears it too — the
+ * two have to be the same box or the reservation below is a guess at a height
+ * rather than the height itself.
+ */
+const PANEL = 'flex flex-col gap-2 rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800';
+const PANEL_HEADING = 'text-[11px] font-semibold uppercase tracking-wide text-ink-500';
+const PANEL_FOOT =
+  'flex items-baseline justify-between gap-3 border-t border-ink-800 pt-2 text-sm text-ink-300';
+
 export interface ThresholdPreviewProps {
   /** The *draft* settings, so the numbers move as the fields do. */
   draft: Pick<AppSettings, 'predictiveMinAttended' | 'predictiveOfLastN' | 'miaConsecutiveMisses'>;
@@ -151,9 +161,36 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
     );
   }
 
+  /*
+   * The panel, with the numbers not in yet.
+   *
+   * A sentence where the panel goes is 110px shorter than what replaces it,
+   * and on a phone what sits under this is the Save button and three more
+   * cards — so every one of them moved the moment Planning Center answered.
+   * Now it is the settled panel with the ink taken out, which is the idiom
+   * docs/layout-stability.md sets out for exactly this: same frame, same
+   * heading, same line at the foot, an em dash where the count will be.
+   *
+   * What it cannot reserve is a row per gathering — a list of unknown length,
+   * and the case the same document says to let arrive. Reserving the parts
+   * that are known is what was worth having: the residue is two rows rather
+   * than the whole panel.
+   */
   if (loading && snapshots.length === 0) {
     return (
-      <p className="text-xs text-ink-500">{t('previewWorking')}</p>
+      <div className={PANEL}>
+        <p className={PANEL_HEADING}>{t('previewHeading')}</p>
+        {/* Said once, where a reader who cannot see the dash will hear it. */}
+        <span role="status" className="sr-only">
+          {t('previewWorking')}
+        </span>
+        <p className={PANEL_FOOT}>
+          <span>{t('previewMiaLabel')}</span>
+          <span aria-hidden className="shrink-0 tabular-nums text-ink-500">
+            —
+          </span>
+        </p>
+      </div>
     );
   }
 
@@ -168,10 +205,8 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
   const changed = miaNow !== miaSaved;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl bg-ink-950 px-3 py-2.5 ring-1 ring-ink-800">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">
-        {t('previewHeading')}
-      </p>
+    <div className={PANEL}>
+      <p className={PANEL_HEADING}>{t('previewHeading')}</p>
 
       {predicted.length > 0 ? (
         <ul className="flex flex-col gap-1 text-sm text-ink-300">
@@ -187,7 +222,7 @@ export function ThresholdPreview({ draft, saved, valid }: ThresholdPreviewProps)
         </ul>
       ) : null}
 
-      <p className="flex items-baseline justify-between gap-3 border-t border-ink-800 pt-2 text-sm text-ink-300">
+      <p className={PANEL_FOOT}>
         <span>{t('previewMiaLabel')}</span>
         <span className="shrink-0 tabular-nums">
           <span className={cn('font-semibold', changed ? 'text-warn-400' : 'text-ink-100')}>

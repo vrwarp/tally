@@ -14,7 +14,7 @@ import { render, screen } from '@/test/rtl';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
-import { makeSettings } from '../../../tests/factories';
+import { makeEvent, makeSettings } from '../../../tests/factories';
 
 const useData = vi.hoisted(() => vi.fn());
 const useEventSnapshots = vi.hoisted(() => vi.fn());
@@ -134,5 +134,83 @@ describe('DashboardPage', () => {
     // zeros above it.
     expect(container.querySelectorAll('.animate-pulse')).toHaveLength(0);
     expect(screen.getByText(/No gatherings on record yet/i)).toBeInTheDocument();
+  });
+
+  /*
+   * The row of tabs, which sits above everything else on the screen and so is
+   * the one thing here that must not arrive late.
+   *
+   * It used to ask `awaitingHistory` — a read-in-flight flag — whether the
+   * registers had spoken. That flag is false for one render longer than it
+   * looks: `useEventSnapshots` starts its read from an effect, so the render
+   * that first hands it a window reports no snapshots *and* no read in flight,
+   * which is the shape of "asked, and there were none". The row agreed with
+   * that silence, drew nothing, and came back a paint later 60px further up
+   * the screen than everything under it. The first case below is that exact
+   * frame; the second is the handover it must not break.
+   */
+  function twoGatherings(overrides: Record<string, unknown> = {}) {
+    emptyMinistry({
+      events: [
+        makeEvent({ id: 'friday', seriesId: 'friday-fellowship', title: 'Friday Fellowship' }),
+        makeEvent({ id: 'sunday', seriesId: 'sunday-school', title: 'Sunday School' }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it('draws the tabs from the calendar before the registers have said anything', () => {
+    twoGatherings();
+    // No snapshots and no read in flight: the frame between the calendar
+    // landing and the history read being started.
+    useEventSnapshots.mockReturnValue({
+      snapshots: [],
+      denied: new Set(),
+      loading: false,
+      error: null,
+    });
+
+    mount();
+
+    expect(screen.getByRole('button', { name: 'Friday Fellowship' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sunday School' })).toBeInTheDocument();
+  });
+
+  it('keeps them while the history read is out', () => {
+    twoGatherings();
+    useEventSnapshots.mockReturnValue({
+      snapshots: [],
+      denied: new Set(),
+      loading: true,
+      error: null,
+    });
+
+    mount();
+
+    expect(screen.getByRole('button', { name: 'Friday Fellowship' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sunday School' })).toBeInTheDocument();
+  });
+
+  it('hands them to the history, which drops a gathering nobody checked into', () => {
+    twoGatherings();
+    // One chain was held; the other was scheduled and nobody came, which is
+    // the disagreement the handover exists for.
+    useEventSnapshots.mockReturnValue({
+      snapshots: [
+        {
+          event: makeEvent({ id: 'friday', seriesId: 'friday-fellowship', title: 'Friday Fellowship' }),
+          presentStudentIds: new Set(['student-1']),
+          checkedOutStudentIds: new Set<string>(),
+          held: true,
+        },
+      ],
+      denied: new Set(),
+      loading: false,
+      error: null,
+    });
+
+    mount();
+
+    expect(screen.queryByRole('button', { name: 'Sunday School' })).not.toBeInTheDocument();
   });
 });

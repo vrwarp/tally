@@ -34,12 +34,13 @@
  * knowing before editing this file, because each looks like an oddity and is
  * not:
  *
- * **The row is a container query, not a breakpoint.** An admin's roster shares
- * its width with the 24rem invite column, so at `lg` the row has 296px and at
- * 1440px it has 712px; a core member's is wide at both. `lg:` cannot be right
- * for all three. `@2xl` asks the row whether it has room, which is the actual
- * question, and turns three stacked facts into four aligned columns — eleven
- * profiles and four invitations on one laptop screen instead of six.
+ * **The row is a container query, not a breakpoint.** An inviter's roster
+ * shares its width with the 24rem invite column, so at `lg` the row has 296px
+ * and at 1440px it has 712px; a counselor's, which has no second card beside
+ * it, is wide at both. `lg:` cannot be right for all three. `@2xl` asks the
+ * row whether it has room, which is the actual question, and turns three
+ * stacked facts into four aligned columns — eleven profiles and four
+ * invitations on one laptop screen instead of six.
  *
  * **A badge here means an exception, never a role.** Counselor is plain text.
  * What wears a ring is the thing worth spotting: an elevated role, a suspended
@@ -318,6 +319,11 @@ export function TeamPage() {
   const consequence = useConsequence(byUid);
 
   const isAdmin = can('admin');
+  /*
+   * Core and up: the rank the invite card is offered to, and therefore the
+   * rank whose screen has a second column to put it in.
+   */
+  const canInvite = can('core');
 
   const [pinned, setPinned] = useState<PinnedAdmins>({ status: 'loading', emails: NO_PINNED });
   /** Bumped by Retry, so a failed answer can be asked for again. */
@@ -758,10 +764,24 @@ export function TeamPage() {
         </details>
       </header>
 
+      {/*
+        * Two columns exactly when there are two cards.
+        *
+        * This asked `isAdmin` back when the invitations were an admin's alone,
+        * and kept asking it after P4 widened them to core — so a core member's
+        * laptop stacked a 24rem card's worth of invitation under the roster in
+        * one 48rem column, and the roster's own read then decided where the
+        * invite card sat. A roster is a list of unknown length: its placeholder
+        * stands for three rows, the ministry it draws may be one or eleven, and
+        * whichever way that lands the card below it moves — 172px up on a
+        * runner slow enough to paint the placeholder first, which is what
+        * `e2e/layout-shift.spec.ts` caught. Side by side, the length of the
+        * roster is not a fact the invitations can feel.
+        */}
       <div
         className={cn(
           'grid gap-4',
-          isAdmin ? 'lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-6' : 'lg:max-w-3xl',
+          canInvite ? 'lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start lg:gap-6' : 'lg:max-w-3xl',
         )}
       >
         <Card className="@container">
@@ -929,7 +949,7 @@ export function TeamPage() {
           * own nursery team used to need an admin over everyone's access to a
           * roster of minors, because she had one nineteen-year-old to add.
           */}
-        {can('core') ? <InviteCard members={users} membersError={usersError} /> : null}
+        {canInvite ? <InviteCard members={users} membersError={usersError} /> : null}
       </div>
     </PageFrame>
   );

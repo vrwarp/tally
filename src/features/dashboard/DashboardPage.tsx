@@ -248,9 +248,27 @@ export function DashboardPage() {
    * checked into is not a gathering this screen can say anything about, and
    * `groupByGathering` is what decides that. So the calendar's answer holds the
    * row until the real one arrives, and the real one wins.
+   *
+   * The handover asks the history what it has, not whether a read is out.
+   * `awaitingHistory` was the question here, and it is false for one render
+   * longer than it looks: `useEventSnapshots` starts its read from an effect,
+   * so the render that first hands it a window reports no snapshots and no
+   * read in flight — the shape of "asked, and there were none". For one frame
+   * the row therefore agreed with the history's silence and drew nothing, and
+   * on a machine loaded enough to paint that frame the row arrived a paint
+   * later and shoved the whole screen down 60px: 0.0319 on the loading pass,
+   * against a budget of 0.02, found with `LAYOUT_SHIFT_SLOW_READS`. Reading
+   * `gatherings` directly cannot have a frame like that, because it is data
+   * rather than a state of the read — the row appears with the tiles, from the
+   * same answer, and changes only when a truer one lands.
+   *
+   * The cost is a calendar whose gatherings have no registers at all keeping
+   * its tabs instead of losing them when the read comes back empty. That is an
+   * install with nothing recorded yet, where the row names the gatherings it
+   * has and every one of them is as empty as the screen says.
    */
   const planned = useMemo(() => gatheringsOnCalendar(workable, series), [workable, series]);
-  const tabs = awaitingHistory ? planned : gatherings;
+  const tabs = gatherings.length > 0 ? gatherings : planned;
 
   // A tab can vanish when the window scrolls past a dormant gathering; fall back
   // rather than render lists for a chain that is no longer offered.

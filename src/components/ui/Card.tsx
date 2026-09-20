@@ -140,17 +140,27 @@ export function StatTile({
         {value}
       </p>
       {/*
-        Two lines' room for the hint on a phone, one where two words fit on one.
+        Two lines' room for the hint, at every width.
 
         A tile is drawn before its number is known and again after, and the hint
         is the part that changes length: "first one in this window" is one line
         at 188px, "Sunday School · +6 vs 18 before" is two. The tiles share a
         grid row, so the longest hint sets the row's height — and the row sits
         directly above the call lists, which meant every one of them dropped
-        16px the moment the registers answered. Reserving the second line costs
-        a phone a little air inside four tiles and costs a laptop nothing.
+        16px the moment the registers answered.
+
+        The reservation was `sm:min-h-4` on the argument that a laptop has room
+        for the long hint on one line. It has not: the row is two tiles across
+        on a phone and four or five across at `lg`, so a wider screen buys more
+        tiles rather than wider ones. Measured, a laptop's tile holds 147px of
+        text and a phone's 154 — the laptop's is the narrower of the two — and
+        "Friday Fellowship · +10 vs 22 before" wraps in both. So the screen
+        went on dropping its 16px on a laptop, where
+        `LAYOUT_SHIFT_SLOW_READS=200` found it. The viewport was never the
+        question; the tile's own width is, and that answers the same at every
+        viewport there is.
       */}
-      {hint ? <p className="mt-0.5 min-h-8 text-xs text-ink-500 sm:min-h-4">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 min-h-8 text-xs text-ink-500">{hint}</p> : null}
     </div>
   );
 }
