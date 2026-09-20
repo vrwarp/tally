@@ -661,7 +661,7 @@ export function Kiosk() {
     return (
       <ConfirmScreen
         student={tapped}
-        intent="check-in"
+        intent={params.get('pickup') === '1' ? 'check-out' : 'check-in'}
         family={family}
         skipped={ticked ? new Set() : new Set(family.map((member) => member.id))}
         onToggle={() => {}}
@@ -670,13 +670,14 @@ export function Kiosk() {
         onConfirm={() => {}}
         onFindSibling={() => {}}
         onBack={() => {}}
-        commitStyle={(params.get('commit') ?? 'verb') as 'verb' | 'named' | 'countOf'}
+        commitStyle={(params.get('commit') ?? 'verb') as 'verb' | 'countOf' | 'hybrid'}
         room={
           placement === 'none'
             ? null
             : { title: 'Kids Church', location: params.get('rooms') === 'long' ? 'Fellowship Hall, upstairs' : 'Room 104' }
         }
         roomPlacement={placement === 'masthead' ? 'masthead' : 'underName'}
+        head={params.get('head') === 'tight' ? 'tight' : 'full'}
       />
     );
   }

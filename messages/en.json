@@ -2208,7 +2208,7 @@
     "checkInAll": "Check in all {count}",
     "checkIn": "Check in",
     "checkInOf": "Check in {count} of {total}",
-    "roomLine": "{title} · {room}"
+    "checkOutOf": "Check out {count} of {total}"
   },
   "Staff": {
     "changeEventTitle": "Change gathering?",

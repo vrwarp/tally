@@ -2208,7 +2208,7 @@
     "checkInAll": "全部簽到（{count} 個）",
     "checkIn": "簽到",
     "checkInOf": "為 {total} 人中的 {count} 人簽到",
-    "roomLine": "{title} · {room}"
+    "checkOutOf": "為 {total} 人中的 {count} 人簽退"
   },
   "Staff": {
     "changeEventTitle": "更換聚會？",

@@ -67,6 +67,21 @@ import type { KioskStudent } from '../search';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useTranslations } from 'use-intl';
 
+/**
+ * The longest a named commit may be before it stops naming anybody.
+ *
+ * The button's inner width is 392px at 30px bold — about 21 Latin characters —
+ * and its contract is one line, fixed height, no wrap. Rather than truncate a
+ * child's name on the control that cannot be undone, the label falls back to
+ * counting. Measured in characters because the alternative is measuring text on
+ * every render of the one screen that must not stutter.
+ *
+ * The frames set this number twice. At 24 it passed "Check in Ramona and Noah"
+ * — exactly 24 characters — and the button rendered "Check in Ramona an…", the
+ * one failure this constant exists to prevent.
+ */
+const COMMIT_LABEL_MAX = 21;
+
 /** A sibling row and the gap under it — the pitch the list quantises to. */
 const ROW_HEIGHT = 64;
 const ROW_GAP = 8;
@@ -86,6 +101,7 @@ export function ConfirmScreen({
   commitStyle = 'verb',
   room = null,
   roomPlacement = 'underName',
+  head = 'full',
 }: {
   student: KioskStudent;
   intent: KioskIntent;
@@ -136,11 +152,20 @@ export function ConfirmScreen({
    * Default-off so nothing changes until a direction wins; the winner keeps its
    * branch and this prop goes.
    */
-  commitStyle?: 'verb' | 'named' | 'countOf';
+  commitStyle?: 'verb' | 'countOf' | 'hybrid';
   /** UXR candidate knob — the gathering and room this kiosk is checking into. */
   room?: { title: string; location: string | null } | null;
   /** UXR candidate knob — where that room is said. */
   roomPlacement?: 'underName' | 'masthead';
+  /**
+   * UXR candidate knob — whether the head keeps the grade once it says a room.
+   *
+   * `'tight'` drops it, on the argument that a parent told Room 104 does not
+   * need the classification the room was derived from, and that the room should
+   * be paid for out of the line it replaces rather than out of the child's own
+   * air at seven siblings.
+   */
+  head?: 'full' | 'tight';
 }) {
   const grades = useGrades();
   tallyRender('ConfirmScreen');
@@ -163,20 +188,54 @@ export function ConfirmScreen({
    * width-safe alternative: one shape at every family size and every language.
    */
   const commitLabel = (() => {
-    if (commitStyle === 'named') {
-      if (chosen.length === 1) return tr('checkInOne', { name: chosen[0]!.firstName });
-      if (chosen.length === 2)
-        return tr('checkInTwo', { first: chosen[0]!.firstName, second: chosen[1]!.firstName });
-      return tr('checkInMany', { count: chosen.length });
+    if (commitStyle === 'verb')
+      return intent === 'check-out'
+        ? others > 0
+          ? t('checkOutAll', { count: chosen.length })
+          : t('checkOut')
+        : others > 0
+          ? t('checkInAll', { count: chosen.length })
+          : t('checkIn');
+
+    /* Nothing was offered, so there is nobody to be left behind and nothing for
+       a count to be against. The plain verb, as today. */
+    if (family.length === 0) return intent === 'check-out' ? t('checkOut') : t('checkIn');
+
+    /*
+     * Everybody offered is included, so no count is owed — and this is the only
+     * place naming is safe. `hybrid` spends it here and nowhere else: the first
+     * round's named-always candidate read "Check in Ramona" identically at zero,
+     * two and seven siblings left behind, which made it a null treatment against
+     * the exact failure the round was convened for. A label may only be warm
+     * where it cannot be silent.
+     */
+    if (commitStyle === 'hybrid' && chosen.length === family.length + 1) {
+      const named =
+        chosen.length === 1
+          ? tr('checkInOne', { name: chosen[0]!.firstName })
+          : chosen.length === 2
+            ? tr('checkInTwo', { first: chosen[0]!.firstName, second: chosen[1]!.firstName })
+            : null;
+      /* Never an ellipsis on the control that cannot be undone, and never
+         "Check in 1 children": past the budget it falls through to the count. */
+      if (named && named.length <= COMMIT_LABEL_MAX && intent === 'check-in') return named;
     }
-    if (commitStyle === 'countOf' && family.length > 0)
-      return t('checkInOf', { count: chosen.length, total: family.length + 1 });
-    return others > 0 ? t('checkInAll', { count: chosen.length }) : t('checkIn');
+
+    /* Somebody is being left behind. The count says so in the one place a
+       parent steering their thumb is actually looking. */
+    const counted = { count: chosen.length, total: family.length + 1 };
+    return intent === 'check-out' ? t('checkOutOf', counted) : t('checkInOf', counted);
   })();
 
-  /** UXR candidate: the room, as one line, or nothing when none is known. */
-  const roomLine =
-    room && room.location ? t('roomLine', { title: room.title, room: room.location }) : room?.title;
+  /**
+   * UXR candidate: where this child is going.
+   *
+   * The room alone. The gathering's name is constant for the life of this
+   * kiosk's binding — a parent did not choose between gatherings on the way
+   * here, and naming it tells nobody where to walk — so the only half that
+   * varies, and the only half that is an instruction, is the room.
+   */
+  const roomLine = room?.location ?? null;
 
   /*
    * How many names the list can print, measured rather than counted.
@@ -237,9 +296,15 @@ export function ConfirmScreen({
             row below is legibly its answer. Dropping it left a bare noun phrase
             whose nearest noun was the child's name — "not this child, show me a
             different one", to exactly the parent this exists for. */}
-        <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
-          {intent === 'check-out' ? t('checkingOutAnyoneElse') : t('anyoneElse')}
-        </div>
+        {/* The caption heads the list. With nothing guessed it labels nothing
+            but the plate below it, which already says what it says — and it
+            costs the commonest journey on this screen a line to dismiss on the
+            way to green. */}
+        {family.length > 0 && (
+          <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
+            {intent === 'check-out' ? t('checkingOutAnyoneElse') : t('anyoneElse')}
+          </div>
+        )}
 
         {family.length > 0 && (
           /*
@@ -404,14 +469,18 @@ export function ConfirmScreen({
           <div className="text-5xl/[1.15] font-bold text-ink-50">
             {student.firstName} {student.lastName}
           </div>
-          {student.grade !== null && (
+          {student.grade !== null && !(head === 'tight' && roomLine) && (
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
           )}
           {/* UXR candidate: the room, said where the child is named. The same
               stated fact for every child on the screen, at no cost in rows —
               which is what a per-row line could not manage. */}
           {roomLine && roomPlacement === 'underName' && (
-            <div className="pt-3 text-2xl font-semibold text-brand-300">{roomLine}</div>
+            /* On the ink ramp, not an accent: this is context, and context in
+               this system is a distance from the reader. brand belongs to the
+               one control that leaves the screen, and an accent means nothing
+               once two things wear it for different reasons. */
+            <div className="pt-3 text-2xl font-semibold text-ink-200">{roomLine}</div>
           )}
         </div>
 
@@ -560,13 +629,7 @@ export function ConfirmScreen({
           }`}
           style={{ touchAction: 'manipulation' }}
         >
-          {intent === 'check-out' ? (
-            others > 0 ? (
-              t('checkOutAll', { count: chosen.length })
-            ) : (
-              t('checkOut')
-            )
-          ) : commitStyle === 'verb' ? (
+          {commitStyle === 'verb' ? (
             commitLabel
           ) : (
             <span className="min-w-0 truncate">{commitLabel}</span>

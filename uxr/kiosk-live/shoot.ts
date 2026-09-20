@@ -602,6 +602,10 @@ const SCENES: {
   { id: 'confirm-a-es', query: 'screen=confirm&kin=2&commit=named&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
   { id: 'confirm-a-long', query: 'screen=confirm&kin=2&commit=named&room=under&long=1', views: ['kiosktall'] },
 
+  /* The room string a church actually types, in the 448px column rather than
+     on B's full-bleed strip — the measure where it has to live under the name. */
+  { id: 'confirm-a-longroom', query: 'screen=confirm&kin=2&commit=named&room=under&rooms=long', views: ['kiosktall'] },
+
   { id: 'confirm-b-alone', query: 'screen=confirm&kin=0&commit=named&room=masthead', views: ['kiosktall'] },
   { id: 'confirm-b-two', query: 'screen=confirm&kin=2&commit=named&room=masthead', views: ['kiosktall'] },
   { id: 'confirm-b-seven', query: 'screen=confirm&kin=7&commit=named&room=masthead', views: ['kiosktall'] },
@@ -611,6 +615,49 @@ const SCENES: {
   { id: 'confirm-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
   { id: 'confirm-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
   { id: 'confirm-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+
+  /*
+   * Round 2. The masthead is gone — both critics rejected it as furniture sitting
+   * on top of the composition rather than in it. What is left is one question,
+   * the button, against a head that now says the room alone, on the ink ramp.
+   */
+  { id: 'r2-a-alone', query: 'screen=confirm&kin=0&commit=named&room=under', views: ['kiosktall'] },
+  { id: 'r2-a-two', query: 'screen=confirm&kin=2&commit=named&room=under', views: ['kiosktall'] },
+  { id: 'r2-a-seven', query: 'screen=confirm&kin=7&commit=named&room=under', views: ['kiosktall'] },
+  { id: 'r2-a-es', query: 'screen=confirm&kin=2&commit=named&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+  { id: 'r2-a-long', query: 'screen=confirm&kin=2&commit=named&room=under&long=1', views: ['kiosktall'] },
+  { id: 'r2-a-longroom', query: 'screen=confirm&kin=2&commit=named&room=under&rooms=long', views: ['kiosktall'] },
+  /* The same, with the grade line paid to the room. */
+  { id: 'r2-atight-two', query: 'screen=confirm&kin=2&commit=named&room=under&head=tight', views: ['kiosktall'] },
+  { id: 'r2-atight-seven', query: 'screen=confirm&kin=7&commit=named&room=under&head=tight', views: ['kiosktall'] },
+
+  { id: 'r2-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r2-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r2-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r2-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+
+  /*
+   * Round 3. The named-always candidate is retired: its label read identically
+   * at zero, two and seven children left behind, which is a null treatment
+   * against the failure the round exists for. What is left is the count, and a
+   * hybrid that is allowed to be warm only where it cannot be silent — when
+   * everybody offered is included, and so no count is owed.
+   */
+  { id: 'r3-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r3-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r3-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'r3-c-all', query: 'screen=confirm&kin=2&commit=countOf&room=under&ticked=all', views: ['kiosktall'] },
+  { id: 'r3-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+  { id: 'r3-c-pickup', query: 'screen=confirm&kin=2&commit=countOf&room=under&pickup=1', views: ['kiosktall'] },
+
+  { id: 'r3-h-alone', query: 'screen=confirm&kin=0&commit=hybrid&room=under', views: ['kiosktall'] },
+  { id: 'r3-h-two', query: 'screen=confirm&kin=2&commit=hybrid&room=under', views: ['kiosktall'] },
+  { id: 'r3-h-seven', query: 'screen=confirm&kin=7&commit=hybrid&room=under', views: ['kiosktall'] },
+  /* The case the hybrid exists for: everybody offered is ticked, so no count is
+     owed and the label may name them. */
+  { id: 'r3-h-all', query: 'screen=confirm&kin=1&commit=hybrid&room=under&ticked=all', views: ['kiosktall'] },
+  { id: 'r3-h-long', query: 'screen=confirm&kin=2&commit=hybrid&room=under&long=1&ticked=all', views: ['kiosktall'] },
+  { id: 'r3-h-pickup', query: 'screen=confirm&kin=2&commit=hybrid&room=under&pickup=1', views: ['kiosktall'] },
 
 ];
 
