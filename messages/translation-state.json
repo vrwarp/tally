@@ -14054,6 +14054,48 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.policyCheck": {
+    "source": "Forget this printer and ask the tablet",
+    "context": "Button on the lobby kiosk’s printer screen, inside a folded, staff-only block about the tablet’s device-management settings. Pressing it deletes the printer this kiosk has saved and then asks the tablet whether its own management policy hands one over — a way of testing whether that policy is working. “The tablet” is the Android device the kiosk runs on.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCheckHint": {
+    "source": "Checks whether the setting above is actually in force. Revoke this site's USB permission in Chrome first — Settings, then Site settings, then USB devices — or the printer comes back on that old permission and this proves nothing.",
+    "context": "Warning above the button, on the lobby kiosk’s printer screen, in a folded staff-only block. It says the check only means something if Chrome’s own saved USB permission for this site is removed first, because otherwise the printer returns on that old permission and the result looks like a pass. “Settings, then Site settings, then USB devices” is a path through Chrome’s own menus and should use whatever those menus are called in this language.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCheckBusy": {
+    "source": "Asking…",
+    "context": "The same button’s label while the check is running, a second or two at most. Replaces the button’s usual words in place.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCheckFound": {
+    "source": "The tablet handed the printer over. The setting above is in force.",
+    "context": "Result line under that button: the tablet’s management policy did hand a printer over, so the setting shown just above in the same block is working. Good news, stated plainly.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCheckNone": {
+    "source": "Nothing came from the tablet's settings. Either they are not in force or the printer is not plugged in — chrome://policy on this tablet says which.",
+    "context": "Result line under that button: no printer arrived from the tablet’s settings. Deliberately does not conclude which of the two causes it was. “chrome://policy” is a literal address typed into the tablet’s browser and is never translated.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.policyCheckFailed": {
+    "source": "The check could not be run, so nothing here was established either way. chrome://policy on this tablet is the answer.",
+    "context": "Result line under that button when the check itself could not run, which is different from the check coming back empty: nothing was learned in either direction. “chrome://policy” is a literal address typed into the tablet’s browser and is never translated.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Printer.policyCopied": {
     "source": "Printer setting copied to the clipboard",
     "context": "Announced to screen readers when the Chrome printer setting has been copied to the clipboard. Not shown on screen.",

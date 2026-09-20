@@ -108,11 +108,18 @@ function isConfig(value: unknown): value is PrinterConfig {
 export function readPrinterConfig(): PrinterConfig | null {
   const stored = readJson<PrinterConfig>(KIOSK_KEYS.printer);
   if (!isConfig(stored)) return null;
-  // Only ever written as `true`, so anything else — absent, or some older
-  // shape's leftovers — reads as "nothing known against this config".
-  return stored.guessed === true
-    ? { model: stored.model, label: stored.label, guessed: true }
-    : { model: stored.model, label: stored.label };
+  // Both flags are only ever written as `true`, so anything else — absent, or
+  // some older shape's leftovers — reads as "nothing known against this
+  // config". Rebuilt field by field rather than spread wholesale: this is the
+  // boundary that decides what the rest of the module may believe about a
+  // config, and a spread would let any key a future shape adds through it
+  // unexamined.
+  return {
+    model: stored.model,
+    label: stored.label,
+    ...(stored.guessed === true ? { guessed: true } : {}),
+    ...(stored.viaPolicy === true ? { viaPolicy: true } : {}),
+  };
 }
 
 export function writePrinterConfig(config: PrinterConfig): void {
@@ -122,6 +129,18 @@ export function writePrinterConfig(config: PrinterConfig): void {
     // Omitted rather than written `false`, so the stored shape stays the two
     // fields it has always been on the ordinary kiosk.
     ...(config.guessed === true ? { guessed: true } : {}),
+    /*
+     * And provenance with them, which it was not until this line existed.
+     *
+     * `configure()` and `checkPrinter`'s settle both go to deliberate trouble
+     * to carry `viaPolicy` onto the config they rewrite — and both handed it
+     * to a writer that dropped it on the floor, so the flag lived exactly as
+     * long as the tab did. The visible cost was that `setByPolicy` appeared on
+     * the boot that adopted the printer and never again: the one sentence
+     * telling a volunteer that the missing set-up step is the design, gone by
+     * the next morning's reload, on every managed tablet in the building.
+     */
+    ...(config.viaPolicy === true ? { viaPolicy: true } : {}),
   });
 }
 

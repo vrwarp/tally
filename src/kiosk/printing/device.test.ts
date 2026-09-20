@@ -124,6 +124,60 @@ describe('readPrinterConfig', () => {
   });
 });
 
+/**
+ * The two optional flags, which are provenance rather than settings.
+ *
+ * `guessed` says the model or the roll was inferred rather than answered, and
+ * `viaPolicy` says the printer arrived from the tablet's own management policy
+ * rather than from somebody pressing *Connect*. Both are read by screens that
+ * decide what to tell a volunteer — an amber printer on the chooser, and the
+ * sentence explaining that the absent set-up step is the design — so a flag
+ * that does not survive the write it was set on is a screen that quietly tells
+ * a different story the next morning.
+ *
+ * `viaPolicy` did not survive one, which is what these tests are here to stop
+ * happening again: the writer listed `guessed` and nothing else, and every
+ * careful hand-off of the flag inside `printing/index.ts` ended at it.
+ */
+describe('the provenance flags', () => {
+  it('carries both back out of storage', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', guessed: true, viaPolicy: true });
+
+    expect(readPrinterConfig()).toEqual({
+      model: 'QL-810W',
+      label: '62x29',
+      guessed: true,
+      viaPolicy: true,
+    });
+  });
+
+  it('carries each without the other', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', guessed: true });
+    expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29', guessed: true });
+
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', viaPolicy: true });
+    expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29', viaPolicy: true });
+  });
+
+  it('writes neither as `false`, so an ordinary kiosk stores the two fields', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', guessed: false, viaPolicy: false });
+
+    expect(JSON.parse(stored() ?? 'null')).toEqual({ model: 'QL-810W', label: '62x29' });
+  });
+
+  it('reads anything but `true` as nothing known', () => {
+    // A config written by an older build, or one some other shape left behind.
+    for (const junk of [false, 'yes', 1, null]) {
+      window.localStorage.setItem(
+        KIOSK_KEYS.printer,
+        JSON.stringify({ model: 'QL-810W', label: '62x29', guessed: junk, viaPolicy: junk }),
+      );
+
+      expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29' });
+    }
+  });
+});
+
 describe('clearPrinterConfig', () => {
   it('forgets the printer', () => {
     writePrinterConfig({ model: 'QL-810W', label: '62x29' });

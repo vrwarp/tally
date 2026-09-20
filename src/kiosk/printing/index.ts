@@ -69,6 +69,7 @@ import { tokenValuesFor } from './tokens';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
+  clearPrinterConfig,
   readPrinterConfig,
   writePrinterConfig,
   type PrinterConfig,
@@ -729,7 +730,7 @@ async function adopt(
  * would be a hand-off nobody could predict. See the `cause` field.
  */
 function readyState(active: PrinterConfig, cause: string): PrinterState {
-  return cause === 'pair' || cause === LOOK_AGAIN
+  return cause === 'pair' || cause === LOOK_AGAIN || cause === RE_ADOPT
     ? { kind: 'ready', config: active, cause: 'press' }
     : { kind: 'ready', config: active };
 }
@@ -742,6 +743,18 @@ function readyState(active: PrinterConfig, cause: string): PrinterState {
  * come back at 9:31" is answered by the word, in the record, for free.
  */
 export const LOOK_AGAIN = 'look-again';
+
+/**
+ * The cause `ready()` records when staff asked the tablet to hand the printer over.
+ *
+ * Distinct from {@link LOOK_AGAIN} in the record because the two answer
+ * different questions. *Look again* asks whether the printer is back; this asks
+ * whether the *tablet's policy* is working at all, and the difference matters to
+ * whoever reads the log afterwards — a `forget` followed by a `policy-grant` is
+ * the proof that `WebUsbAllowDevicesForUrls` took, and a `forget` followed by
+ * nothing is the proof that it did not.
+ */
+export const RE_ADOPT = 're-adopt';
 
 /**
  * A printer this kiosk was never set up with, granted to the origin anyway.
@@ -805,13 +818,13 @@ export async function ready(
   /**
    * Why this is being called: the boot, or a volunteer pressing **Look again**.
    *
-   * Only the printer screen passes {@link LOOK_AGAIN}, and only from a press.
-   * It reaches the state as `cause: 'press'` and it reaches the record as the
-   * word — both of which exist so the kiosk can tell "the printer came back
-   * because somebody asked it to, and they are looking at the screen" from the
-   * four ways it comes back with nobody watching.
+   * Only the printer screen passes {@link LOOK_AGAIN} or {@link RE_ADOPT}, and
+   * only from a press. It reaches the state as `cause: 'press'` and it reaches
+   * the record as the word — both of which exist so the kiosk can tell "the
+   * printer came back because somebody asked it to, and they are looking at the
+   * screen" from the four ways it comes back with nobody watching.
    */
-  cause: 'boot' | typeof LOOK_AGAIN = 'boot',
+  cause: 'boot' | typeof LOOK_AGAIN | typeof RE_ADOPT = 'boot',
 ): Promise<PrinterState> {
   const stored = readPrinterConfig() ?? (await adoptPolicyGrant());
   if (!stored) {
@@ -943,6 +956,48 @@ export async function closePrinter(cause: string): Promise<void> {
       setTimeout(resolve, CLOSE_CAP_MS);
     }),
   ]);
+}
+
+/**
+ * Put the saved printer down and ask the tablet for one from scratch.
+ *
+ * Staff-only, from the folded policy block on the printer screen, and it exists
+ * to answer one question that cannot otherwise be answered from inside the app:
+ * **did `WebUsbAllowDevicesForUrls` actually take?**
+ *
+ * {@link adoptPolicyGrant} only ever runs on a kiosk with no stored config,
+ * because "a printer is granted to this origin and nobody here set one up" is
+ * the only evidence a *page* can have that the grant came from the tablet
+ * rather than from a chooser — `getDevices()` returns the same `USBDevice`
+ * either way and Android Chrome exposes no provenance for a USB permission. So
+ * a tablet that was ever paired by hand has spent that evidence, and the policy
+ * it is now carrying is invisible to the kiosk forever after. This hands the
+ * evidence back: drop the config, and the next `ready()` is indistinguishable
+ * from a tablet staged fresh.
+ *
+ * **What it proves is only as good as what was revoked first.** An old chooser
+ * grant in Chrome's site settings makes the printer come back exactly as a
+ * policy grant would, and the kiosk will believe it and say so. The screen's
+ * copy carries that condition, because this module cannot check it and must not
+ * pretend to — see `docs/tablet-management.md` §4.5, which says the same thing
+ * about running the check by hand.
+ *
+ * Safe to press with nothing attached and safe to press twice. The worst case
+ * is a kiosk back where it started, one press of *Connect* from a printer.
+ *
+ * Returns the config the kiosk came back with, or `null` when it came back with
+ * nothing — which is the answer the screen reports.
+ */
+export async function forgetPrinter(): Promise<PrinterConfig | null> {
+  await closePrinter(RE_ADOPT);
+  clearPrinterConfig();
+  config = null;
+  log.record('kiosk', 'forget');
+  // No interim `idle` published: `ready()` publishes whatever it lands on, and
+  // a state that exists only between two lines of this function is a frame the
+  // screens would have to render and nobody wants to see.
+  await ready(RE_ADOPT);
+  return config;
 }
 
 /**

@@ -2272,6 +2272,11 @@ describe('what the record says, exactly', () => {
         // The roll was never read. The chooser's strip reads this and colours
         // the printer amber rather than claiming a media size it invented.
         guessed: true,
+        // And the provenance, which is what the printer screen's `setByPolicy`
+        // is drawn from. It used to be set on the config in memory and dropped
+        // by the writer, so the sentence appeared on the boot that adopted the
+        // printer and on no boot after it.
+        viaPolicy: true,
       });
       // The record names the grant, so a volunteer reading the printer screen's
       // log can tell a printer the policy handed over from one somebody paired.
@@ -2322,6 +2327,79 @@ describe('what the record says, exactly', () => {
 
       expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
       expect(said(printing).join('\n')).toContain('policy-grant-failed');
+    });
+  });
+
+  describe('forgetPrinter: handing the evidence back', () => {
+    /*
+     * `adoptPolicyGrant` can only ever fire on a kiosk with no stored config,
+     * because "a printer is granted here and nobody set one up" is the only
+     * evidence a page can have that the grant came from the tablet: the browser
+     * returns the same device whether it was policy or a chooser, and exposes
+     * no provenance for a USB permission. A tablet paired by hand has spent
+     * that evidence for good, and the policy it is now carrying is invisible to
+     * the kiosk — which is the state a real one is in by the time anybody gets
+     * round to staging it. This is the way back.
+     */
+
+    it('lets a hand-paired kiosk adopt by policy after all', async () => {
+      const { printing } = await booted();
+      expect(printing.readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29' });
+
+      const next = await printing.forgetPrinter();
+
+      expect(next).toEqual({
+        model: DEFAULT_PRINTER_MODEL,
+        label: DEFAULT_PRINTER_LABEL,
+        guessed: true,
+        viaPolicy: true,
+      });
+      // And on the store, not merely in hand: the sentence this exists to put
+      // on the screen is read from a config that has to survive the reload.
+      expect(printing.readPrinterConfig()).toMatchObject({ viaPolicy: true });
+    });
+
+    it('comes back with nothing when the tablet hands nothing over', async () => {
+      const { printing } = await booted();
+      usb.paired = [];
+
+      await expect(printing.forgetPrinter()).resolves.toBeNull();
+
+      expect(window.localStorage.getItem(KIOSK_KEYS.printer)).toBeNull();
+      expect(printing.currentState().kind).toBe('idle');
+    });
+
+    it('writes both halves down, so the log tells a pass from a fail', async () => {
+      const { printing } = await booted();
+      await printing.forgetPrinter();
+
+      const record = said(printing).join('\n');
+      expect(record).toContain('kiosk forget');
+      expect(record).toContain('kiosk policy-grant');
+      // The cause is the word, so the record says which press this was — a
+      // volunteer asking whether the printer is back, or staff asking whether
+      // the tablet policy took.
+      expect(record).toContain('cause="re-adopt"');
+    });
+
+    it('is safe on a kiosk that never had a printer at all', async () => {
+      const printing = await load();
+      await printing.ready();
+      usb.paired = [makeDevice()];
+
+      await expect(printing.forgetPrinter()).resolves.toMatchObject({ viaPolicy: true });
+    });
+
+    it('lets go of the printer it was holding before asking again', async () => {
+      const { device, printing } = await booted();
+      expect(device.opened).toBe(true);
+
+      await printing.forgetPrinter();
+
+      // Closed and reopened rather than carried across: the config it was
+      // opened for is gone by then, and a transport outliving its config is
+      // how a kiosk ends up printing at the model it used to have.
+      expect(device.close).toHaveBeenCalled();
     });
   });
 
