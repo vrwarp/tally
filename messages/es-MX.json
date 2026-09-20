@@ -2206,7 +2206,9 @@
     "checkOutAll": "Registrar salida de los {count}",
     "checkOut": "Registrar salida",
     "checkInAll": "Registrar a los {count}",
-    "checkIn": "Registrar entrada"
+    "checkIn": "Registrar entrada",
+    "checkInOf": "Registrar a {count} de {total}",
+    "roomLine": "{title} · {room}"
   },
   "Staff": {
     "changeEventTitle": "¿Cambiar de reunión?",

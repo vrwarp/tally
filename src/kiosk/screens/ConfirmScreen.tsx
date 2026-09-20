@@ -83,6 +83,9 @@ export function ConfirmScreen({
   onConfirm,
   onFindSibling,
   onBack,
+  commitStyle = 'verb',
+  room = null,
+  roomPlacement = 'underName',
 }: {
   student: KioskStudent;
   intent: KioskIntent;
@@ -121,6 +124,23 @@ export function ConfirmScreen({
    */
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
+  /**
+   * UXR candidate knob — how the commit button names what it is about to do.
+   *
+   * `'verb'` is what ships today: a plain verb alone, a count once more than
+   * the tapped child is included. The other two are the campaign's candidates
+   * for the same problem — under a fail-closed tick the plain verb reads
+   * identically for a family of one and a family of four, on the one control a
+   * parent is actually looking at.
+   *
+   * Default-off so nothing changes until a direction wins; the winner keeps its
+   * branch and this prop goes.
+   */
+  commitStyle?: 'verb' | 'named' | 'countOf';
+  /** UXR candidate knob — the gathering and room this kiosk is checking into. */
+  room?: { title: string; location: string | null } | null;
+  /** UXR candidate knob — where that room is said. */
+  roomPlacement?: 'underName' | 'masthead';
 }) {
   const grades = useGrades();
   tallyRender('ConfirmScreen');
@@ -128,10 +148,35 @@ export function ConfirmScreen({
   // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);
   const t = useTranslations('Confirm');
+  const tr = useTranslations('Register');
   const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
   const others = chosen.length - 1;
+
+  /*
+   * UXR candidate: what the commit says.
+   *
+   * `named` borrows the registration wizard's own contract, word for word —
+   * `Register.checkInOne/Two/Many` already exist and are drafted in all four
+   * catalogues, which is why no new grammar is invented here. `countOf` is the
+   * width-safe alternative: one shape at every family size and every language.
+   */
+  const commitLabel = (() => {
+    if (commitStyle === 'named') {
+      if (chosen.length === 1) return tr('checkInOne', { name: chosen[0]!.firstName });
+      if (chosen.length === 2)
+        return tr('checkInTwo', { first: chosen[0]!.firstName, second: chosen[1]!.firstName });
+      return tr('checkInMany', { count: chosen.length });
+    }
+    if (commitStyle === 'countOf' && family.length > 0)
+      return t('checkInOf', { count: chosen.length, total: family.length + 1 });
+    return others > 0 ? t('checkInAll', { count: chosen.length }) : t('checkIn');
+  })();
+
+  /** UXR candidate: the room, as one line, or nothing when none is known. */
+  const roomLine =
+    room && room.location ? t('roomLine', { title: room.title, room: room.location }) : room?.title;
 
   /*
    * How many names the list can print, measured rather than counted.
@@ -336,9 +381,17 @@ export function ConfirmScreen({
      * rather than tapped.
      */
     <div
-      className="grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
+      className="relative grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
       style={{ gridTemplateColumns: 'minmax(0, var(--confirm-measure, 28rem))' }}
     >
+      {/* UXR candidate: the room as a standing header — where you are, in the
+          same place on every scene, present before the parent reads anything
+          else. Out of flow on purpose, so it cannot take a row off the offer. */}
+      {roomLine && roomPlacement === 'masthead' && (
+        <div className="absolute inset-x-0 top-0 flex h-16 items-center justify-center border-b border-ink-800 px-8 text-xl font-semibold text-brand-300">
+          {roomLine}
+        </div>
+      )}
       {/* The clear band above the commit, and the invariant the whole screen is
           measured against: the same 48px in every scene, and no scene may spend
           it. The expensive mis-tap is always *toward* the green — it commits a
@@ -353,6 +406,12 @@ export function ConfirmScreen({
           </div>
           {student.grade !== null && (
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
+          )}
+          {/* UXR candidate: the room, said where the child is named. The same
+              stated fact for every child on the screen, at no cost in rows —
+              which is what a per-row line could not manage. */}
+          {roomLine && roomPlacement === 'underName' && (
+            <div className="pt-3 text-2xl font-semibold text-brand-300">{roomLine}</div>
           )}
         </div>
 
@@ -486,20 +545,32 @@ export function ConfirmScreen({
             haptic();
             onConfirm(chosen);
           })}
-          className={`w-full shrink-0 rounded-2xl p-7 text-3xl font-bold text-white ${
+          className={`w-full shrink-0 rounded-2xl text-3xl font-bold text-white ${
+            /* UXR candidate: the wizard's physical contract. A label that wraps
+               takes a second line out of the 1fr track the offer list measures
+               itself into — so a longer name silently costs a visible row on the
+               list that must not hide anybody. Fixed height, one line, clipped. */
+            commitStyle === 'verb'
+              ? 'p-7'
+              : 'flex h-23 items-center justify-center px-7'
+          } ${
             intent === 'check-out'
               ? 'bg-brand-600 active:bg-brand-500'
               : 'bg-present-600 active:bg-present-500'
           }`}
           style={{ touchAction: 'manipulation' }}
         >
-          {intent === 'check-out'
-            ? others > 0
-              ? t('checkOutAll', { count: chosen.length })
-              : t('checkOut')
-            : others > 0
-              ? t('checkInAll', { count: chosen.length })
-              : t('checkIn')}
+          {intent === 'check-out' ? (
+            others > 0 ? (
+              t('checkOutAll', { count: chosen.length })
+            ) : (
+              t('checkOut')
+            )
+          ) : commitStyle === 'verb' ? (
+            commitLabel
+          ) : (
+            <span className="min-w-0 truncate">{commitLabel}</span>
+          )}
         </button>
       )}
 

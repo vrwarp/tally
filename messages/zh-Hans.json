@@ -2206,7 +2206,9 @@
     "checkOutAll": "为这 {count} 个孩子全部签出",
     "checkOut": "签出",
     "checkInAll": "为这 {count} 个孩子全部签到",
-    "checkIn": "签到"
+    "checkIn": "签到",
+    "checkInOf": "为 {total} 人中的 {count} 人签到",
+    "roomLine": "{title} · {room}"
   },
   "Staff": {
     "changeEventTitle": "更换聚会？",

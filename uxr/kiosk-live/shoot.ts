@@ -575,6 +575,43 @@ const SCENES: {
     ],
     hold: 1_000,
   },
+  /*
+   * The family offer, once the tick fails closed — the campaign in
+   * docs/uxr/family-offer-and-programmes.md.
+   *
+   * Portrait only, which is the decision that came back from the findings: the
+   * landscape fold is real and gets its own adjustment later, so photographing
+   * it here would only re-argue a question already answered.
+   *
+   * The before-frame is first and is the only one with anything ticked. Then the
+   * bare fail-closed screen, then three candidates for how the commit names what
+   * it is about to do and where the room is said. Each is shot alone (the
+   * commonest family), at two, and at seven — the cap, where the fold decides
+   * whether a child in the building keeps a record.
+   */
+  { id: 'confirm-today-two', query: 'screen=confirm&kin=2&ticked=all', views: ['kiosktall'] },
+  { id: 'confirm-base-alone', query: 'screen=confirm&kin=0', views: ['kiosktall'] },
+  { id: 'confirm-base-two', query: 'screen=confirm&kin=2', views: ['kiosktall'] },
+  { id: 'confirm-base-seven', query: 'screen=confirm&kin=7', views: ['kiosktall'] },
+
+  { id: 'confirm-a-alone', query: 'screen=confirm&kin=0&commit=named&room=under', views: ['kiosktall'] },
+  { id: 'confirm-a-two', query: 'screen=confirm&kin=2&commit=named&room=under', views: ['kiosktall'] },
+  { id: 'confirm-a-seven', query: 'screen=confirm&kin=7&commit=named&room=under', views: ['kiosktall'] },
+  /* The two the button cannot be measured without: a Spanish pair, and a name
+     typed to the register's own limits. */
+  { id: 'confirm-a-es', query: 'screen=confirm&kin=2&commit=named&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+  { id: 'confirm-a-long', query: 'screen=confirm&kin=2&commit=named&room=under&long=1', views: ['kiosktall'] },
+
+  { id: 'confirm-b-alone', query: 'screen=confirm&kin=0&commit=named&room=masthead', views: ['kiosktall'] },
+  { id: 'confirm-b-two', query: 'screen=confirm&kin=2&commit=named&room=masthead', views: ['kiosktall'] },
+  { id: 'confirm-b-seven', query: 'screen=confirm&kin=7&commit=named&room=masthead', views: ['kiosktall'] },
+  { id: 'confirm-b-longroom', query: 'screen=confirm&kin=2&commit=named&room=masthead&rooms=long', views: ['kiosktall'] },
+
+  { id: 'confirm-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'confirm-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'confirm-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
+  { id: 'confirm-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
+
 ];
 
 const args = process.argv.slice(2);
