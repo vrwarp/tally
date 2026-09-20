@@ -27,7 +27,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/context/ToastProvider';
 import { StudentsPage } from '@/features/students/StudentsPage';
 import { makeSettings, makeStudent } from '../../../tests/factories';
-import type { Student, UpstreamEdit } from '@/types';
+import { PRE_K, type Student, type UpstreamEdit } from '@/types';
 
 const useData = vi.hoisted(() => vi.fn());
 const useAuth = vi.hoisted(() => vi.fn());
@@ -397,6 +397,75 @@ describe('StudentsPage grade', () => {
 
     expect(screen.getByRole('link', { name: /Alena/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Alan Wan/ })).not.toBeInTheDocument();
+  });
+
+  /*
+   * The other half of that. Keeping the volunteers out of 6th grade is only
+   * honest if there is still a way to ask for them: they are who somebody is
+   * looking for when a grade needs filling in, and before this they were
+   * reachable through nothing but a name they might not know how to spell.
+   */
+  it('hands back exactly the students nobody holds a grade for', async () => {
+    const user = userEvent.setup();
+    renderRoster([
+      volunteer(),
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6 }),
+    ]);
+
+    const filter = screen.getByRole('option', { name: 'All grades' }).closest('select')!;
+    await user.selectOptions(filter, 'none');
+
+    expect(screen.getByRole('link', { name: /Alan Wan/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Alena/ })).not.toBeInTheDocument();
+  });
+
+  /*
+   * Pre-K is grade -1, so "no grade" and "the lowest grade there is" are the
+   * two answers a `<select>` is most likely to conflate — the obvious way to
+   * write this option runs its value through the same `Number` cast as the
+   * grades and gets `NaN`, which matches nobody at all rather than the
+   * volunteers, while Pre-K's own negative number looks like a sentinel.
+   */
+  it('does not confuse having no grade with being in Pre-K', async () => {
+    const user = userEvent.setup();
+    renderRoster([
+      volunteer(),
+      makeStudent({ id: 'pco_7', firstName: 'Amani', lastName: 'Diallo', grade: PRE_K }),
+    ]);
+
+    const filter = screen.getByRole('option', { name: 'All grades' }).closest('select')!;
+    await user.selectOptions(filter, 'none');
+
+    expect(screen.getByRole('link', { name: /Alan Wan/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Amani/ })).not.toBeInTheDocument();
+
+    await user.selectOptions(filter, String(PRE_K));
+
+    expect(screen.getByRole('link', { name: /Amani/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Alan Wan/ })).not.toBeInTheDocument();
+  });
+
+  /*
+   * A count that promises what pressing a chip produces, per `StudentsPage` —
+   * and a filter the Clear link can see, so somebody who narrows to the
+   * volunteers is not left with a roster of one and no visible way back.
+   */
+  it('counts and clears like every other filter on the screen', async () => {
+    const user = userEvent.setup();
+    renderRoster([
+      volunteer(),
+      makeStudent({ id: 'pco_9', firstName: 'Alena', lastName: 'Ruiz', grade: 6 }),
+    ]);
+
+    const filter = screen.getByRole('option', { name: 'All grades' }).closest('select')!;
+    await user.selectOptions(filter, 'none');
+
+    expect(screen.getByText('1 of 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    expect(screen.getByRole('link', { name: /Alena/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Alan Wan/ })).toBeInTheDocument();
   });
 });
 

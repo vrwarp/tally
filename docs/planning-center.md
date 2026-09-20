@@ -203,6 +203,11 @@ and every child too young to have one — arrives with `grade: null`, and screen
 the clause, or leave them out of a grade filter accordingly. Nothing writes an invented grade down
 either: not the check-in batch, not an annotation document, not a push.
 
+The roster screen's grade filter carries **No grade** as an option of its own, below 12th, so that
+absence is something a leader can ask for and not only something people fall out of: it is the list
+you want in the hour before you go and fill the grades in, and the volunteers on it are otherwise
+reachable by name alone.
+
 This replaced a `gradeOnFile` boolean carried alongside the number. The flag tracked whether the
 upstream value was *blank*, not whether it had been clamped, so a real 3rd grader was reported as
 `{ grade: 6, gradeOnFile: true }` — Tally asserting as a fact that a child in 3rd grade was in 6th.
