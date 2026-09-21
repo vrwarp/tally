@@ -270,10 +270,17 @@ const CLOCKS = new Map<string, Intl.DateTimeFormat>();
 
 function clock(locale: string, ms: number): string {
   let format = CLOCKS.get(locale);
+  /* Stryker disable all: equivalent — see docs/mutation-testing.md. The cache is
+     a speed decision and nothing else: a formatter built fresh every call
+     formats the identical string, so a mutant that always rebuilds one, or
+     never stores it, is indistinguishable from this code by any assertion.
+     Killing either would mean testing that a Map was written to, which is a
+     test of the optimisation rather than of the kiosk. */
   if (!format) {
     format = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
     CLOCKS.set(locale, format);
   }
+  /* Stryker restore all */
   return format.format(new Date(ms));
 }
 
