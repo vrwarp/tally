@@ -72,6 +72,9 @@ export function tokenValuesFor(
     lastInitial: student.lastName ? student.lastName.slice(0, 1).toUpperCase() : '',
     grade: student.grade === null ? '' : gradeDescription(grades, student.grade),
     eventTitle: binding.title,
+    // Empty rather than absent, like `nickname`: a kiosk that looked and found
+    // no room sends nothing, and a line that is only this token drops.
+    location: binding.location ?? '',
     date: now.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
     time: now.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
   };

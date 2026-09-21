@@ -646,8 +646,7 @@ export function Kiosk() {
    *
    *   ?screen=confirm
    *   ?kin=N                 how many brothers and sisters the guess offered (0-7)
-   *   ?commit=verb|count     what the green button says
-   *   ?room=none|under|masthead    where the gathering and its room are said
+   *   ?room=none             the gathering names no room, so the grade stays
    *   ?ticked=all            the pre-tick as it behaves today, for the before-frame
    *   ?long=1                the tapped child named to the register's limits
    *   ?lang=es-MX|zh-Hant    the kiosk's language (see the mount below)
@@ -657,7 +656,6 @@ export function Kiosk() {
     const tapped = params.get('long') === '1' ? LONG_NAME : STUDENTS[0]!;
     const family = STUDENTS.filter((student) => student.id !== tapped.id).slice(0, kin);
     const ticked = params.get('ticked') === 'all';
-    const placement = params.get('room') ?? 'none';
     return (
       <ConfirmScreen
         student={tapped}
@@ -670,13 +668,15 @@ export function Kiosk() {
         onConfirm={() => {}}
         onFindSibling={() => {}}
         onBack={() => {}}
-        commitStyle={(params.get('commit') ?? 'verb') as 'verb' | 'count'}
+        /* The room, as the binding now carries it. `?rooms=long` is the string
+           a church actually types, in the 448px column it has to live in. */
         room={
-          placement === 'none'
+          params.get('room') === 'none'
             ? null
-            : { title: 'Kids Church', location: params.get('rooms') === 'long' ? 'Fellowship Hall, upstairs' : 'Room 104' }
+            : params.get('rooms') === 'long'
+              ? 'Fellowship Hall, upstairs'
+              : 'Room 104'
         }
-        roomPlacement={placement === 'masthead' ? 'masthead' : 'underName'}
       />
     );
   }

@@ -83,9 +83,7 @@ export function ConfirmScreen({
   onConfirm,
   onFindSibling,
   onBack,
-  commitStyle = 'verb',
   room = null,
-  roomPlacement = 'underName',
 }: {
   student: KioskStudent;
   intent: KioskIntent;
@@ -125,20 +123,17 @@ export function ConfirmScreen({
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
   /**
-   * UXR candidate knob — how the commit button names what it is about to do.
+   * The room this kiosk checks into, or null when the gathering names none.
    *
-   * `'verb'` is what ships today: a plain verb alone, a count once more than
-   * the tapped child is included. The other two are the campaign's candidates
-   * for the same problem — under a fail-closed tick the plain verb reads
-   * identically for a family of one and a family of four, on the one control a
-   * parent is actually looking at.
-   *
-   * Default-off so nothing changes until a direction wins; the winner keeps its
-   * branch and this prop goes.
+   * Said once, at screen level, under the child's name — and it replaces the
+   * grade line rather than standing beside it. A per-row "usually in the
+   * Nursery" was tried and rejected: a second line on a 64px row takes the
+   * offer from seven visible names to five, and until the kiosk can route a
+   * child anywhere the only honest wording is a standing claim about them,
+   * made in front of a stranger's parent, that is irrelevant to the decision
+   * on the screen.
    */
-  commitStyle?: 'verb' | 'count';
-  /** UXR candidate knob — the gathering and room this kiosk is checking into. */
-  room?: { title: string; location: string | null } | null;
+  room?: string | null;
   /** UXR candidate knob — where that room is said. */
   roomPlacement?: 'underName' | 'masthead';
 }) {
@@ -151,53 +146,31 @@ export function ConfirmScreen({
   const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
-  const others = chosen.length - 1;
 
   /*
-   * UXR candidate: what the commit says.
+   * What the green button says it is about to do.
    *
-   * `named` borrows the registration wizard's own contract, word for word —
-   * `Register.checkInOne/Two/Many` already exist and are drafted in all four
-   * catalogues, which is why no new grammar is invented here. `countOf` is the
-   * width-safe alternative: one shape at every family size and every language.
+   * The plain verb when the guess turned nobody up, and a count the moment it
+   * did — so the *presence* of a number is itself the signal that there were
+   * other names on this screen and they are not going. Under a fail-closed
+   * tick that is the whole of the guard, because a parent's hands do
+   * tap-child, press-green, walk, and the button is the one control they are
+   * looking at: their thumb is steering to it.
+   *
+   * Two shapes were built before this one and both were photographed failing.
+   * A button that named who was going ("Check in Ramona") read byte-identically
+   * with nobody left behind and with seven, and truncated a long name to an
+   * ellipsis on the one control with no undo. A count against the total
+   * ("Check in 1 of 8") read as a set to be completed — the strongest element
+   * on the glass inviting a parent up to eight, over a list that includes the
+   * children of another programme.
    */
   const commitLabel = (() => {
-    if (commitStyle === 'verb')
-      return intent === 'check-out'
-        ? others > 0
-          ? t('checkOutAll', { count: chosen.length })
-          : t('checkOut')
-        : others > 0
-          ? t('checkInAll', { count: chosen.length })
-          : t('checkIn');
-
-    /*
-     * The plain verb when the guess turned nobody up, and a count the moment it
-     * did — so the *presence* of a number is itself the signal that there were
-     * other names on this screen and they are not going.
-     *
-     * The count deliberately has no denominator. "Check in 1 of 8" was built
-     * first, and it reads as a set to be completed: the strongest thing on the
-     * glass invites a parent to work the number up to eight, and the eight
-     * includes every child the phone guess turned up — a nursery toddler among
-     * them, on a kiosk bound to the children's programme. A guard against
-     * leaving somebody out must not become an argument for taking somebody who
-     * belongs in another room.
-     */
     if (family.length === 0) return intent === 'check-out' ? t('checkOut') : t('checkIn');
     const counted = { count: chosen.length };
     return intent === 'check-out' ? t('checkOutCount', counted) : t('checkInCount', counted);
   })();
 
-  /**
-   * UXR candidate: where this child is going.
-   *
-   * The room alone. The gathering's name is constant for the life of this
-   * kiosk's binding — a parent did not choose between gatherings on the way
-   * here, and naming it tells nobody where to walk — so the only half that
-   * varies, and the only half that is an instruction, is the room.
-   */
-  const roomLine = room?.location ?? null;
 
   /*
    * How many names the list can print, measured rather than counted.
@@ -408,17 +381,9 @@ export function ConfirmScreen({
      * rather than tapped.
      */
     <div
-      className="relative grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
+      className="grid h-full w-full grid-rows-[minmax(0,1fr)_auto_auto] justify-center justify-items-center p-8 pb-[max(2rem,18vh)] text-center"
       style={{ gridTemplateColumns: 'minmax(0, var(--confirm-measure, 28rem))' }}
     >
-      {/* UXR candidate: the room as a standing header — where you are, in the
-          same place on every scene, present before the parent reads anything
-          else. Out of flow on purpose, so it cannot take a row off the offer. */}
-      {roomLine && roomPlacement === 'masthead' && (
-        <div className="absolute inset-x-0 top-0 flex h-16 items-center justify-center border-b border-ink-800 px-8 text-xl font-semibold text-brand-300">
-          {roomLine}
-        </div>
-      )}
       {/* The clear band above the commit, and the invariant the whole screen is
           measured against: the same 48px in every scene, and no scene may spend
           it. The expensive mis-tap is always *toward* the green — it commits a
@@ -437,18 +402,18 @@ export function ConfirmScreen({
               seven siblings the alternative was taking it out of the child's own
               air. Where no room is known the grade stays, which is also what a
               gathering with no location typed falls back to. */}
-          {student.grade !== null && !roomLine && (
+          {student.grade !== null && !room && (
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
           )}
           {/* UXR candidate: the room, said where the child is named. The same
               stated fact for every child on the screen, at no cost in rows —
               which is what a per-row line could not manage. */}
-          {roomLine && roomPlacement === 'underName' && (
+          {room && (
             /* On the ink ramp, not an accent: this is context, and context in
                this system is a distance from the reader. brand belongs to the
                one control that leaves the screen, and an accent means nothing
                once two things wear it for different reasons. */
-            <div className="pt-3 text-2xl font-semibold text-ink-200">{roomLine}</div>
+            <div className="pt-3 text-2xl font-semibold text-ink-200">{room}</div>
           )}
         </div>
 
@@ -582,26 +547,18 @@ export function ConfirmScreen({
             haptic();
             onConfirm(chosen);
           })}
-          className={`w-full shrink-0 rounded-2xl text-3xl font-bold text-white ${
-            /* UXR candidate: the wizard's physical contract. A label that wraps
-               takes a second line out of the 1fr track the offer list measures
-               itself into — so a longer name silently costs a visible row on the
-               list that must not hide anybody. Fixed height, one line, clipped. */
-            commitStyle === 'verb'
-              ? 'p-7'
-              : 'flex h-23 items-center justify-center px-7'
-          } ${
+          /* Fixed height, one line, clipped. A label that wrapped would take a
+             second line out of the 1fr track the offer list measures itself
+             into — so a longer string would silently cost a visible row on the
+             list that must not hide anybody. */
+          className={`flex h-23 w-full shrink-0 items-center justify-center rounded-2xl px-7 text-3xl font-bold text-white ${
             intent === 'check-out'
               ? 'bg-brand-600 active:bg-brand-500'
               : 'bg-present-600 active:bg-present-500'
           }`}
           style={{ touchAction: 'manipulation' }}
         >
-          {commitStyle === 'verb' ? (
-            commitLabel
-          ) : (
-            <span className="min-w-0 truncate">{commitLabel}</span>
-          )}
+          <span className="min-w-0 truncate">{commitLabel}</span>
         </button>
       )}
 

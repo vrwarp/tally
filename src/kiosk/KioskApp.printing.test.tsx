@@ -327,7 +327,7 @@ describe('a family checked in together', () => {
   }
 
   /** A ticked sibling, unticked — a row in a list that scrolls, so on lift. */
-  async function untick(name: string): Promise<void> {
+  async function toggle(name: string): Promise<void> {
     const row = screen.getByText(name).closest('button')!;
     await act(async () => {
       fireEvent.pointerDown(row);
@@ -341,25 +341,37 @@ describe('a family checked in together', () => {
     await mount();
     await pickAda();
 
-    // The sibling arrives ticked, so their label is worth the same head start.
+    /*
+     * Only Ada, because only Ada is ticked. Warming follows the tick rather
+     * than the offer: rasterising for every name the phone guess turned up
+     * would spend a few hundred thousand pixels per child a parent was never
+     * going to take, in the same worker the one they did take is queued behind.
+     */
+    expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[2].id)).toEqual([ADA.id]);
+
+    // The tick is what buys the sibling a head start, and it still lands ahead
+    // of the thumb: a tick is followed by a look at the list, and the commit is
+    // a separate press.
+    await toggle('Byron Lovelace');
     expect(vi.mocked(printing.warmLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
 
-    await tap(/check in all 2/i);
+    await tap(/check in 2/i);
 
     expect(vi.mocked(printing.printLabel).mock.calls.map((call) => call[2].id).sort()).toEqual(
       [ADA.id, BYRON.id].sort(),
     );
   });
 
-  it('forgets the label of a sibling who is unticked', async () => {
+  it('forgets the label of a sibling the parent ticks and then thinks better of', async () => {
     asSiblings();
     await mount();
     await pickAda();
 
-    await untick('Byron Lovelace');
-    await tap('Check in');
+    await toggle('Byron Lovelace');
+    await toggle('Byron Lovelace');
+    await tap(/check in 1/i);
 
     expect(printing.forgetLabel).toHaveBeenCalledWith(BYRON.id);
     expect(printing.printLabel).toHaveBeenCalledTimes(1);
@@ -376,7 +388,10 @@ describe('a family checked in together', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
 
-    await tap(/check out all 2/i);
+    // Both still arrive ticked here, and deliberately: a pickup's ticks come
+    // off the register — who actually walked in together — rather than off a
+    // guess, so the change to the check-in tick leaves this alone.
+    await tap(/check out 2/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
     expect(services.performCheckOut).toHaveBeenCalledTimes(2);

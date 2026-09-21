@@ -34,11 +34,21 @@ function joinNames(locale: string, names: readonly string[]): string {
 export function SuccessScreen({
   students,
   intent,
+  room = null,
   onDone,
 }: {
   /** Everyone the one confirm covered — never empty. */
   students: readonly KioskStudent[];
   intent: KioskIntent;
+  /**
+   * Where the children just checked in are going, or null when the gathering
+   * names no room.
+   *
+   * Only on an arrival. A pickup is a family leaving the building, and naming
+   * the room they have just collected from would be directions to where they
+   * have been.
+   */
+  room?: string | null;
   onDone: () => void;
 }) {
   const t = useTranslations('Confirm');
@@ -83,6 +93,13 @@ export function SuccessScreen({
               : t('checkedInTick', { count: students.length })}
         </div>
       </div>
+      {/* The last thing the glass says before it clears, and on a morning with
+          two programmes running the only thing on it a parent can act on. The
+          sticker in their hand says the same, which is the half that survives
+          the four seconds this screen lasts. */}
+      {room && !checkedOut && (
+        <div className="text-3xl font-semibold text-ink-100">{room}</div>
+      )}
       <div className="text-lg text-ink-500">{tDoor('tapToCarryOn')}</div>
     </div>
   );

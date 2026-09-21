@@ -88,6 +88,23 @@ export interface KioskBinding {
    */
   requiresCheckOut?: boolean;
   /**
+   * The room this gathering meets in, as a leader typed it, or null.
+   *
+   * Carried rather than read: the kiosk never opens an event document, so
+   * everything per-event it knows arrives on the chooser row and is persisted
+   * here. It is what the confirm and success screens name, and what the
+   * `{{location}}` label token prints — the one fact on those screens that
+   * tells a parent where to walk.
+   *
+   * Optional for the same reason `requiresCheckOut` is: a binding written
+   * before this existed has no such key, and a paired lobby screen must not be
+   * logged out by a deploy. Absent reads as "no room named", which is exactly
+   * what a gathering with no location typed produces anyway, so the screens
+   * fall back to the grade line either way and the next rebind picks the real
+   * answer up.
+   */
+  location?: string | null;
+  /**
    * What to print at check-in, or null/absent for nothing.
    *
    * Optional for the same reason `requiresCheckOut` is: a binding written before

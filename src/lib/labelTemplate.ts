@@ -261,6 +261,22 @@ export const LABEL_TOKENS = [
   'grade',
   'allergy',
   'eventTitle',
+  /*
+   * The room the gathering meets in, as a leader typed it.
+   *
+   * The one token on a sticker that tells a parent where to walk, and the only
+   * instrument the volunteer at the door has: the lobby kiosk's answer to two
+   * programmes running at the same hour is to say the room everywhere rather
+   * than to refuse anybody, and the sticker is the half of that which leaves
+   * with the family. `eventTitle` is not a substitute — two gatherings in one
+   * building at one hour are frequently both called "Sunday Morning".
+   *
+   * Empty on a gathering with no location typed, which is the ordinary case, so
+   * a line carrying it wants `requiresValue: true` or it prints its caption
+   * alone. `LabelTemplateField` switches that on as the token is inserted,
+   * which is what saves a leader from discovering it on a Sunday.
+   */
+  'location',
   'date',
   'time',
 ] as const;

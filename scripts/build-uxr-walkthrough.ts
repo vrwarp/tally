@@ -41,6 +41,17 @@ interface Round {
   settled?: boolean;
 }
 
+/** A live copy of the thing the page is about, embedded rather than described. */
+interface Demo {
+  /** Path the iframe loads, relative to the page. */
+  src: string;
+  title: string;
+  /** A sentence or two above the frame: what to try, and what to watch. */
+  lead: string;
+  /** Pixel height of the frame — a portrait tablet is tall. */
+  height?: number;
+}
+
 interface Changes {
   /** Page title and tab title. Defaults to the first refinement's. */
   title?: string;
@@ -48,6 +59,8 @@ interface Changes {
   headline?: string;
   description?: string;
   intro: string[];
+  /** Optional: a working copy of the screen, above the comparisons. */
+  demo?: Demo;
   method: string[];
   /** The tiles above the method. Defaults to the first refinement's four. */
   rounds?: Round[];
@@ -355,6 +368,19 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
     color: var(--muted);
     font-size: 0.95rem;
   }
+  /* The live copy. A portrait tablet is 800×1280, so the frame is scaled to
+     fit the column rather than scrolled inside it: a demo somebody has to
+     scroll to press is a demo nobody presses. */
+  .demo { margin: 3.5rem 0 1rem; }
+  .demo h2 { font-size: 1.35rem; margin: 0 0 .4rem; }
+  .demo-lead { max-width: 34rem; margin: 0 0 1.25rem; color: var(--muted); }
+  .demo-frame {
+    width: 100%; max-width: 25rem; margin-inline: auto; height: var(--demo-h);
+    border-radius: 16px; overflow: hidden; background: #020617;
+    box-shadow: 0 10px 34px rgb(2 6 23 / 0.32);
+  }
+  .demo-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+
   .method li::before {
     content: counter(step, decimal-leading-zero);
     position: absolute; left: 0; top: 0.1rem;
@@ -584,6 +610,18 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
   <div class="method">
     <h2>How it was arrived at</h2>
     <ol>${changes.method.map((line) => `<li>${markNumbers(line)}</li>`).join('')}</ol>
+    ${
+      changes.demo
+        ? `<section class="demo">
+      <h2>${escapeHtml(changes.demo.title)}</h2>
+      <p class="demo-lead">${markNumbers(changes.demo.lead)}</p>
+      <div class="demo-frame" style="--demo-h:${changes.demo.height ?? 900}px">
+        <iframe src="${escapeHtml(changes.demo.src)}" title="${escapeHtml(changes.demo.title)}"
+                loading="lazy" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </section>`
+        : ''
+    }
   </div>
 
   ${sections.join('\n')}

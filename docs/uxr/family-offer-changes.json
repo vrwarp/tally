@@ -129,5 +129,11 @@
         }
       ]
     }
-  ]
+  ],
+  "demo": {
+    "src": "./demo/kiosk.html?bare=1&buffer=0134",
+    "title": "Try it",
+    "lead": "The real screens, over a fixture roster and no network. Tap Ramona: her brother and sister are offered and neither is ticked, and the button says how many are going. Tick one and watch the number move. Nothing here is a recording — it is the same components the frames below were shot from.",
+    "height": 980
+  }
 }

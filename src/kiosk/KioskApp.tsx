@@ -1783,19 +1783,35 @@ export function KioskApp() {
    */
   const skippedFor = useCallback(
     (student: KioskStudent, intent: KioskIntent, family: readonly KioskStudent[]): Set<string> => {
-      if (intent === 'check-in') {
-        if (scope.recent.size === 0) return new Set();
-        return new Set(
-          family.filter((member) => !scope.recent.has(member.id)).map((member) => member.id),
-        );
-      }
+      /*
+       * A check-in ticks nobody but the child who was tapped.
+       *
+       * This used to tick whoever passed the gathering's own "Recent"
+       * prediction, and the ministry that runs on it asked for the prediction
+       * out: the roster carries parents mis-filed as children by the church's
+       * previous check-in kiosk, imported with years of attendance, so a
+       * 41-year-old clears "two of the last three" better than a child who
+       * joined in September — and arrived pre-ticked under a thumb that was
+       * already moving toward the green.
+       *
+       * It also failed *open*. An empty `scope.recent` — a chain with no
+       * history yet, a failed read, a cold tablet, a gathering somebody
+       * restricted — skipped nobody, which is to say it ticked the entire
+       * household on exactly the mornings with the least evidence behind them.
+       *
+       * The offer stays as wide as it ever was; only the tick is gone. What
+       * replaces it as a guard is the commit button, which counts who is going
+       * (see ConfirmScreen): with nobody else offered it is a plain verb, so a
+       * number on it means other names are on this screen and are not going.
+       */
+      if (intent === 'check-in') return new Set(family.map((member) => member.id));
       const mine = intent === 'check-out' ? arrivals.get(student.id) : undefined;
       if (!mine) return new Set();
       return new Set(
         family.filter((member) => arrivals.get(member.id) !== mine).map((member) => member.id),
       );
     },
-    [arrivals, scope],
+    [arrivals],
   );
 
   const onConfirm = useCallback(
@@ -2953,6 +2969,7 @@ export function KioskApp() {
           <SuccessScreen
             students={overlay.students}
             intent={overlay.intent}
+            room={binding.location ?? null}
             onDone={() => {
               // Home, cleared. A parent with three kids retypes their four digits
               // rather than the whole queue behind them reading the last one's
@@ -3036,6 +3053,11 @@ export function KioskApp() {
           onReprint={() => reprintFor(overlay.student)}
           family={overlay.family}
           skipped={overlay.skipped}
+          /* Where this child is going, from the binding rather than an event
+             read — the kiosk never opens an event document. Null on a
+             gathering with no room typed, and the screen falls back to the
+             grade line it would otherwise have replaced. */
+          room={binding.location ?? null}
           onToggle={(studentId) => {
             const next = new Set(overlay.skipped);
             const ticking = next.delete(studentId);
@@ -3127,12 +3149,17 @@ export function KioskApp() {
            * that tracks check-out, most taps once the room has filled are
            * check-outs, and rasterising for those is work thrown away.
            *
-           * Only the siblings arriving *ticked*, for the same reason: a child
-           * the prediction does not expect is more likely than not to be
-           * unticked and left, and rasterising for them is a few hundred
-           * thousand pixels of work thrown away — in the worker the ticked
-           * children are queued behind. A sibling the parent does tick is warmed
-           * on the tap, which is still ahead of the thumb reaching the button.
+           * Only the siblings arriving *ticked*, which since the tick began
+           * failing closed is none of them: the loop below is a no-op on the
+           * way in, and every sibling is warmed by the tap that includes them
+           * (see `onToggle`), which is still ahead of the thumb reaching the
+           * button. That is the right way round rather than a loss. Warming the
+           * whole offer would rasterise a few hundred thousand pixels for each
+           * child a parent was never going to take, in the same worker the one
+           * they did take is queued behind.
+           *
+           * The loop stays because `skipped` is the caller's to decide and this
+           * screen should not assume it is always everybody.
            */
           for (const member of taking) services?.warmStudentDates(member.id);
           if (prints && intent === 'check-in') {

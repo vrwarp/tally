@@ -273,7 +273,22 @@ export function LabelTemplateField({
     const line = value.lines[index];
     if (!line) return;
     const spacer = line.text === '' || line.text.endsWith(' ') ? '' : ' ';
-    patchLine(index, { text: `${line.text}${spacer}{{${token}}}`.slice(0, MAX_LABEL_LINE_LENGTH) });
+    /*
+     * Tokens that are usually empty switch the line's own "only if it has a
+     * value" on as they are inserted, because the failure is invisible from
+     * this screen and lands in a parent's hand.
+     *
+     * Most gatherings have no room typed and no allergy on file, so a line
+     * reading `Room: {{location}}` prints "Room:" and nothing after it — which
+     * a leader arranging a label in the office on a Tuesday has no way to
+     * foresee. It is only a default: the checkbox below is still theirs, and a
+     * line that already requires a value is left alone.
+     */
+    const usuallyEmpty = token === 'location' || token === 'allergy';
+    patchLine(index, {
+      text: `${line.text}${spacer}{{${token}}}`.slice(0, MAX_LABEL_LINE_LENGTH),
+      ...(usuallyEmpty && !line.requiresValue ? { requiresValue: true } : {}),
+    });
   };
 
   return (
