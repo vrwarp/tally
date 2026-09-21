@@ -320,17 +320,35 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'Three children, one number',
         title: 'Anyone else? Asked once, answered in a list',
         caption:
-          'Every child on the number is offered; the ones this gathering actually expects arrive ticked. That distinction is the whole of the screen. A household is a guess made from four phone digits, and it is frequently right about the family and wrong about tonight — the third child here has not been in months, and ticking her would have written a child who is not in the building onto a register nobody can reconcile. So the prediction decides the tick and the guess decides the list: she is still there, at full weight, one tap from being included. The button counts what it will actually do, which is the only place on the screen that says how many.',
+          'Every child on the number is offered, and none of them is ticked. A household is a guess made from four phone digits, frequently right about the family and wrong about this morning — and the roster it is read against carries parents mis-filed as children by the church\'s previous check-in kiosk, so the adult scores best on any \'comes every week\' test you build. Ticking anybody on the strength of that writes a person who is not in the building onto a register nobody can reconcile. So the guess decides the list and the parent decides the tick: every name is there, at full weight, one tap from being included. The button counts who is going, which is the only place on the screen that says how many.',
       });
 
-      await kiosk.getByRole('button', { name: /Check in all/i }).click();
+      /*
+       * The parent says who else came, which is the change: two taps, and the
+       * count on the button moves with them. Addressed by state rather than by
+       * name so the walkthrough reads the same for either seeded cast.
+       */
+      const offered = kiosk.locator('button[aria-pressed="false"]');
+      for (let remaining = await offered.count(); remaining > 0; remaining -= 1) {
+        await offered.first().click();
+      }
+      await expect(kiosk.getByRole('button', { name: /Check in 3/i })).toBeVisible();
+      await shoot(kiosk, 'kiosk', {
+        act: 'At the door',
+        who: 'Three children, one number',
+        title: 'Three ticks the parent made, and a button that counts them',
+        caption:
+          'The same list with the family\'s own answer on it. Nothing here was decided for them, and the button has moved from \'Check in 1\' to \'Check in 3\' as each name landed — which is the whole of the guard that replaced the pre-tick. A parent whose hands do tap-child, press-green, walk is not reading this list; they are reading the thing their thumb is steering to, so that is where the count went. With nobody else offered the button is a plain verb, so a number on it means there are other names on this screen and they are not going.',
+      });
+
+      await kiosk.getByRole('button', { name: /Check in 3/i }).click();
       await expect(kiosk.getByText(/are checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
       await shoot(kiosk, 'kiosk', {
         act: 'At the door',
         who: 'Three children, one number',
-        title: 'One tap, two children, two stickers',
+        title: 'One press, three children, three stickers',
         caption:
-          'One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when the confirm screen came up. They share an arrival id, which is what lets the pickup screen later offer exactly this group back — see Act 5. The sibling nobody ticked is not on the register and has no sticker coming, and no volunteer has to go looking for a child who was never dropped off.',
+          'One press of one button, one arrival written on the register, and a label rasterising for each of them in a worker that started when their name was ticked. They share an arrival id, which is what lets the pickup screen later offer exactly this group back — see Act 5. Anybody left unticked is not on the register and has no sticker coming, and no volunteer has to go looking for a child who was never dropped off.',
       });
       await backToSearch(kiosk);
 
@@ -773,11 +791,11 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
         who: 'The same family, three hours later',
         title: 'The ones who came in together',
         caption:
-          'Three children, one number, and the screen has already decided that two of them are going home and one is a question. Ada is ticked because she and Chidi walked in on the same form — one press of one button, recorded on the register as one arrival — and Zuri is not, because she came separately. Until this existed the only answer available here was the check-in\'s guess at a family from four phone digits, which would have ticked all three on the strength of a shared number. The guess is what you have at the front door. By the time somebody comes back for them there is a fact.',
+          'Three children, one number, and the screen has already decided that two of them are going home and one is a question. Ada is ticked because she and Chidi walked in on the same form — one press of one button, recorded on the register as one arrival — and Zuri is not, because she came separately. This is the one screen on the kiosk where anything arrives ticked, and it is why: the front door has a guess at a family from four phone digits, and by the time somebody comes back for them there is a fact, stated by a thumb an hour ago and written on the register.',
       });
 
       await kiosk.getByRole('button', { name: /Zuri/i }).first().click();
-      await expect(kiosk.getByRole('button', { name: /Check out all 3/i })).toBeVisible();
+      await expect(kiosk.getByRole('button', { name: /Check out 3/i })).toBeVisible();
       await shoot(kiosk, 'kiosk', {
         act: 'Going home',
         who: 'The same family, three hours later',
@@ -786,7 +804,7 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
           'Arriving apart and leaving together is the ordinary case, not the exception — so the sibling the register cannot vouch for is still on the screen, in the list, one tap from ticked. Dropping her name would have been worse than leaving it unticked: a parent taking their family home should never have to go round the flow twice. The arrival decides what is *ticked*; the phone guess decides what is *shown*, and the two are different jobs.',
       });
 
-      await kiosk.getByRole('button', { name: /Check out all 3/i }).click();
+      await kiosk.getByRole('button', { name: /Check out 3/i }).click();
       // The success screen and the button now say the same thing: the kiosk's
       // pickup vocabulary is "check out" from the row through to the farewell.
       await expect(kiosk.getByText(/checked out\. See you next time/i)).toBeVisible({
