@@ -5173,6 +5173,13 @@
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
+  "KioskPair.setupPage": {
+    "source": "Everything a managed tablet needs — the printer rule for its Chrome, the QR that provisions it, and what each one is for — is at <link>/setup</link>.",
+    "context": "Small print at the foot of the kiosk pairing screen, pointing at the separate staging page a managed tablet is set up from. A \"managed tablet\" is one the church enrolled and configures centrally, not a tablet somebody brought. The <link> chunk is a URL path and stays exactly as it is.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "KioskPair.retire": {
     "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "es-MX": "machine",

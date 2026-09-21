@@ -133,6 +133,25 @@ export function KioskPage() {
             mono: (chunks) => <span className="font-mono text-ink-300">{chunks}</span>,
           })}
         </p>
+        {/* The other half of staging a tablet, and the half this page has never
+            mentioned: everything in the *tablet's* settings lives at `/setup`.
+            A plain anchor rather than a `Link`, because that page is its own
+            entry (`setup.html`) and not a route this router knows — and a new
+            tab, because somebody reading this is usually mid-pairing. */}
+        <p className="max-w-prose text-xs leading-relaxed text-ink-500">
+          {t.rich('setupPage', {
+            link: (chunks) => (
+              <a
+                href="/setup"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-brand-300 hover:text-brand-200"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
+        </p>
         <p className="max-w-prose text-xs leading-relaxed text-ink-500">
           {core ? t('retireCore') : t('retire')}
         </p>
