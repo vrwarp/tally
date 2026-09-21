@@ -32,6 +32,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { haptic } from '@/lib/utils';
 import { WEB_USB_POLICY_KEY, webUsbPolicyJson } from '@/lib/printerVendor';
+import { hasGrantedPrinter } from '../policyGrant';
 import { useTap, useTapGuard } from '../components/tapGuard';
 import { useOverflowFade } from '../components/useOverflowFade';
 import type { KioskPrinting } from '../KioskApp';
@@ -363,6 +364,24 @@ export function PrinterScreen({
   const [copied, setCopied] = useState<CopyState>('idle');
   /** What the policy fold's check has to report, if it has been pressed. */
   const [grantCheck, setGrantCheck] = useState<GrantCheck>('idle');
+  /**
+   * Whether the browser already holds this printer for this origin.
+   *
+   * What decides which of the two sentences under *Connect* is true, and the
+   * reason there are two. On a tablet where the origin has no grant, pressing
+   * connect opens Chrome's own device list and somebody picks the QL. Where it
+   * has one — from the tablet's policy, or from a chooser somebody answered
+   * before — Chrome skips its list entirely and the only dialog is Android's
+   * *Allow … to access*, which is the OS granting **Chrome** the device and is
+   * not something a page or a Chrome policy can waive (`docs/label-printing.md`,
+   * "Skipping the chooser entirely").
+   *
+   * Deliberately not a claim about *how* the grant arose. `getDevices()` cannot
+   * tell policy from chooser — see `checkGrant` — and this sentence does not
+   * need it to: what it promises is the absence of a list, which is true of
+   * either.
+   */
+  const [grantedHere, setGrantedHere] = useState(false);
   /** Which block the flag above is about. Meaningless while it is `idle`. */
   const [copySlot, setCopySlot] = useState<CopySlot>('events');
   /**
@@ -410,6 +429,23 @@ export function PrinterScreen({
       if (copyTimer.current) clearTimeout(copyTimer.current);
     };
   }, []);
+
+  /*
+   * Re-asked on every state change rather than once at mount, because the
+   * answer changes underneath this screen: the first *Allow* is what turns a
+   * policy grant into a device Chrome will hand over, and the frame after it is
+   * exactly the one where the sentence below would otherwise still be promising
+   * a list that will not appear.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void hasGrantedPrinter().then((granted) => {
+      if (!cancelled) setGrantedHere(granted);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.kind]);
 
   const flash = (slot: CopySlot, next: CopyState) => {
     setCopySlot(slot);
@@ -807,7 +843,11 @@ export function PrinterScreen({
         primarySays.push(<Say key="cable">{t('checkPowerAndCable')}</Say>);
       else if (!hasConfig) primarySays.push(<Say key="plug">{t('plugInFirst')}</Say>);
       if (primaryOpensChooser)
-        primarySays.push(<Say key="window">{t('connectOpensWindow')}</Say>);
+        primarySays.push(
+          <Say key="window">
+            {grantedHere ? t('connectAsksAndroid') : t('connectOpensWindow')}
+          </Say>,
+        );
     }
   }
 
@@ -1000,7 +1040,7 @@ export function PrinterScreen({
           {setup && state.kind === 'trouble' && (
             <Unit>
               {secondary('connect-again', t('connectThisAgain'), () => void connect(), busy)}
-              <Say>{t('connectOpensWindow')}</Say>
+              <Say>{grantedHere ? t('connectAsksAndroid') : t('connectOpensWindow')}</Say>
             </Unit>
           )}
           {setup && state.kind === 'unpaired' && (

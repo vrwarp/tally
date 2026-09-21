@@ -13965,6 +13965,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.connectAsksAndroid": {
+    "source": "The browser already has this printer, so there is no list to pick from — tap Allow when Android asks.",
+    "context": "Sentence under the Connect button on the lobby kiosk’s printer screen, shown instead of the one above it when the browser already has permission for the printer. It tells the reader not to expect the browser’s device-chooser list, and that the dialog they will see is Android’s own — the operating system asking whether Chrome may use the printer. “Allow” is the button on that Android dialog and should match whatever Android calls it in this language.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Printer.mayConnectItself": {
     "source": "It may connect on its own in a few seconds — or press Connect this printer again to hurry it.",
     "es-MX": "machine",

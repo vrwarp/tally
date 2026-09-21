@@ -2417,6 +2417,7 @@
     "connectedGuessedModel": "Conectada — hubo que adivinar el modelo.",
     "plugInFirst": "Primero conecta la impresora a esta tableta y enciéndela.",
     "connectOpensWindow": "Al conectar, el navegador abre una ventana con los dispositivos USB que alcanza a ver — elige la QL.",
+    "connectAsksAndroid": "El navegador ya tiene esta impresora, así que no hay ninguna lista de dónde elegir — presiona Permitir cuando Android lo pregunte.",
     "mayConnectItself": "Puede conectarse sola en unos segundos — o presiona Conectar esta impresora otra vez.",
     "troubleThenLookAgain": "Si está conectada y encendida y nada cambia, presiona Buscar otra vez.",
     "selectionCancelled": "No se seleccionó ninguna impresora. Elige la QL, o asegúrate de que esté conectada y encendida.",

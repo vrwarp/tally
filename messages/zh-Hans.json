@@ -2417,6 +2417,7 @@
     "connectedGuessedModel": "已连接——型号只能靠猜。",
     "plugInFirst": "请先把打印机接到这台平板上并打开电源。",
     "connectOpensWindow": "连接时浏览器会弹出一个窗口，列出它能看到的 USB 设备——请选择那台 QL。",
+    "connectAsksAndroid": "浏览器已经拿到这台打印机，因此不会再列出设备供你选择——Android 询问时请点“允许”。",
     "mayConnectItself": "它可能过几秒钟自己就连上了——也可以按“重新连接这台打印机”快一点。",
     "troubleThenLookAgain": "如果电源线已接好、电源也开着，却还是没有变化，请按“再找一次”。",
     "selectionCancelled": "未选择打印机。请选择 QL，或确保已接通电源并开机。",

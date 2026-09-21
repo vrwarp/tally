@@ -2417,6 +2417,7 @@
     "connectedGuessedModel": "已連接——型號只能靠猜。",
     "plugInFirst": "請先把印表機接到這台平板上並打開電源。",
     "connectOpensWindow": "連接時瀏覽器會彈出一個視窗，列出它能看到的 USB 裝置——請選擇那台 QL。",
+    "connectAsksAndroid": "瀏覽器已經拿到這臺印表機，因此不會再列出裝置供你選擇——Android 詢問時請點「允許」。",
     "mayConnectItself": "它可能過幾秒鐘自己就連上了——也可以按「重新連接這台印表機」快一點。",
     "troubleThenLookAgain": "如果電源線已接好、電源也開著，卻還是沒有變化，請按「再找一次」。",
     "selectionCancelled": "未選擇印表機。請選擇 QL，或確保已接通電源並開機。",
