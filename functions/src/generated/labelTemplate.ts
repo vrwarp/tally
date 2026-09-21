@@ -154,8 +154,14 @@ export interface LabelTemplate {
   fontScale?: number;
 }
 
+/* Stryker disable all: static — see docs/mutation-testing.md. Both tables are
+   assigned once at module scope, so every mutant in them is static and no test
+   can be seen to kill one, however loudly it asserts the values. The assertion
+   exists: `labelTemplate.test.ts` pins both lists, in order, because a size or
+   an alignment leaving the list is a control leaving the editor's screen. */
 export const LABEL_LINE_SIZES: readonly LabelLineSize[] = ['sm', 'md', 'lg', 'xl'];
 export const LABEL_LINE_ALIGNS: readonly LabelLineAlign[] = ['left', 'center', 'right'];
+/* Stryker restore all */
 
 /**
  * Caps, which exist to bound the kiosk rather than to express taste.
@@ -301,6 +307,11 @@ export type LabelTokenValues = Partial<Record<LabelToken, string>>;
  * initial to tell two Noahs apart, then the details a volunteer wants and a
  * parent does not: which gathering, and when they arrived.
  */
+/* Stryker disable all: static — see docs/mutation-testing.md. A table assigned
+   once at module scope: its mutants are static, and `labelTemplate.test.ts`
+   pins the whole object with a `toEqual` the tool cannot watch working. Worth
+   pinning rather than waving through, because this is the sticker a leader gets
+   the first time they switch printing on. */
 export const DEFAULT_LABEL_TEMPLATE: LabelTemplate = {
   lines: [
     // Every line here is a token on its own, so none of them needs
@@ -312,6 +323,7 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplate = {
   ],
   copies: 1,
 };
+/* Stryker restore all */
 
 const TOKEN_PATTERN = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
 
@@ -326,6 +338,11 @@ const TOKEN_PATTERN = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
  * The group pattern skips doubled brackets on both sides, so `[[` inside a
  * group does not close it.
  */
+/* Stryker disable next-line Regex: static — see docs/mutation-testing.md. A
+   module-scope literal, so its mutants are static and unkillable by a test that
+   nonetheless covers them: the seven cases under "an optional [...] group" in
+   labelTemplate.test.ts exercise this pattern, including the doubled-bracket
+   escape both surviving mutants break (`Room [[3]]` reads back as `Room [3]`). */
 const OPTIONAL_GROUP_PATTERN = /\[((?:[^[\]]|\[\[|\]\])*)\]/g;
 const ESCAPED_BRACKET_PATTERN = /\[\[|\]\]/g;
 

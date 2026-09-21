@@ -16,6 +16,8 @@ import {
   MIN_LABEL_FONT_SCALE,
   MIN_LABEL_FIXED_LENGTH_MM,
   LABEL_TOKENS,
+  LABEL_LINE_ALIGNS,
+  LABEL_LINE_SIZES,
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
   fillLabelTokens,
@@ -123,6 +125,50 @@ describe('tokensIn', () => {
 describe('the default template', () => {
   it('survives its own sanitizer unchanged', () => {
     expect(sanitizeLabelTemplate(DEFAULT_LABEL_TEMPLATE)).toEqual(DEFAULT_LABEL_TEMPLATE);
+  });
+
+  /*
+   * Said out loud, line by line, rather than compared against itself.
+   *
+   * The assertion above cannot fail on a changed default: it reads the constant
+   * on both sides, so editing a size or a token mutates the expectation with the
+   * value. Everything else in this file asks *properties* of the template — that
+   * its tokens are known, that it mentions nothing a lobby screen may not know.
+   * Nothing claimed what it actually is.
+   *
+   * It is worth claiming. This is the sticker a leader gets the first time they
+   * switch printing on and the only one most gatherings ever use, so its
+   * contents are a product decision rather than an implementation detail: a
+   * first name big enough to read across a room, an initial to tell two Noahs
+   * apart, then the gathering and the arrival time a volunteer wants and a
+   * parent does not.
+   */
+  it('is this, exactly', () => {
+    expect(DEFAULT_LABEL_TEMPLATE).toEqual({
+      lines: [
+        {
+          text: '{{firstName}} {{lastInitial}}',
+          size: 'xl',
+          bold: true,
+          align: 'center',
+          requiresValue: false,
+        },
+        { text: '{{grade}}', size: 'md', bold: false, align: 'center', requiresValue: false },
+        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+        { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+      ],
+      copies: 1,
+    });
+  });
+
+  /*
+   * The two tables the editor draws its controls from. A size or an alignment
+   * quietly leaving the list is a control quietly leaving the screen, and until
+   * now nothing in the suite read either of them at all.
+   */
+  it('offers four sizes and three alignments, in the order the editor shows them', () => {
+    expect(LABEL_LINE_SIZES).toEqual(['sm', 'md', 'lg', 'xl']);
+    expect(LABEL_LINE_ALIGNS).toEqual(['left', 'center', 'right']);
   });
 
   it('uses only tokens the kiosk can answer', () => {
