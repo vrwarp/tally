@@ -67,21 +67,6 @@ import type { KioskStudent } from '../search';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useTranslations } from 'use-intl';
 
-/**
- * The longest a named commit may be before it stops naming anybody.
- *
- * The button's inner width is 392px at 30px bold — about 21 Latin characters —
- * and its contract is one line, fixed height, no wrap. Rather than truncate a
- * child's name on the control that cannot be undone, the label falls back to
- * counting. Measured in characters because the alternative is measuring text on
- * every render of the one screen that must not stutter.
- *
- * The frames set this number twice. At 24 it passed "Check in Ramona and Noah"
- * — exactly 24 characters — and the button rendered "Check in Ramona an…", the
- * one failure this constant exists to prevent.
- */
-const COMMIT_LABEL_MAX = 21;
-
 /** A sibling row and the gap under it — the pitch the list quantises to. */
 const ROW_HEIGHT = 64;
 const ROW_GAP = 8;
@@ -151,7 +136,7 @@ export function ConfirmScreen({
    * Default-off so nothing changes until a direction wins; the winner keeps its
    * branch and this prop goes.
    */
-  commitStyle?: 'verb' | 'countOf' | 'hybrid';
+  commitStyle?: 'verb' | 'count';
   /** UXR candidate knob — the gathering and room this kiosk is checking into. */
   room?: { title: string; location: string | null } | null;
   /** UXR candidate knob — where that room is said. */
@@ -163,7 +148,6 @@ export function ConfirmScreen({
   // it depends on things this screen has no business knowing about.
   const memberTap = useTapGuard(onToggle);
   const t = useTranslations('Confirm');
-  const tr = useTranslations('Register');
   const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
@@ -187,34 +171,22 @@ export function ConfirmScreen({
           ? t('checkInAll', { count: chosen.length })
           : t('checkIn');
 
-    /* Nothing was offered, so there is nobody to be left behind and nothing for
-       a count to be against. The plain verb, as today. */
-    if (family.length === 0) return intent === 'check-out' ? t('checkOut') : t('checkIn');
-
     /*
-     * Everybody offered is included, so no count is owed — and this is the only
-     * place naming is safe. `hybrid` spends it here and nowhere else: the first
-     * round's named-always candidate read "Check in Ramona" identically at zero,
-     * two and seven siblings left behind, which made it a null treatment against
-     * the exact failure the round was convened for. A label may only be warm
-     * where it cannot be silent.
+     * The plain verb when the guess turned nobody up, and a count the moment it
+     * did — so the *presence* of a number is itself the signal that there were
+     * other names on this screen and they are not going.
+     *
+     * The count deliberately has no denominator. "Check in 1 of 8" was built
+     * first, and it reads as a set to be completed: the strongest thing on the
+     * glass invites a parent to work the number up to eight, and the eight
+     * includes every child the phone guess turned up — a nursery toddler among
+     * them, on a kiosk bound to the children's programme. A guard against
+     * leaving somebody out must not become an argument for taking somebody who
+     * belongs in another room.
      */
-    if (commitStyle === 'hybrid' && chosen.length === family.length + 1) {
-      const named =
-        chosen.length === 1
-          ? tr('checkInOne', { name: chosen[0]!.firstName })
-          : chosen.length === 2
-            ? tr('checkInTwo', { first: chosen[0]!.firstName, second: chosen[1]!.firstName })
-            : null;
-      /* Never an ellipsis on the control that cannot be undone, and never
-         "Check in 1 children": past the budget it falls through to the count. */
-      if (named && named.length <= COMMIT_LABEL_MAX && intent === 'check-in') return named;
-    }
-
-    /* Somebody is being left behind. The count says so in the one place a
-       parent steering their thumb is actually looking. */
-    const counted = { count: chosen.length, total: family.length + 1 };
-    return intent === 'check-out' ? t('checkOutOf', counted) : t('checkInOf', counted);
+    if (family.length === 0) return intent === 'check-out' ? t('checkOut') : t('checkIn');
+    const counted = { count: chosen.length };
+    return intent === 'check-out' ? t('checkOutCount', counted) : t('checkInCount', counted);
   })();
 
   /**

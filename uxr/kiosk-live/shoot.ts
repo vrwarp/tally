@@ -599,11 +599,11 @@ const SCENES: {
    * Portrait only, by decision. The landscape fold is real and gets its own
    * adjustment later.
    */
-  { id: 'offer-alone', query: side('screen=confirm&kin=0&room=under&commit=countOf', 'screen=confirm&kin=0'), views: ['kiosktall'] },
-  { id: 'offer-two', query: side('screen=confirm&kin=2&room=under&commit=countOf', 'screen=confirm&kin=2&ticked=all'), views: ['kiosktall'] },
-  { id: 'offer-seven', query: side('screen=confirm&kin=7&room=under&commit=countOf', 'screen=confirm&kin=7&ticked=all'), views: ['kiosktall'] },
-  { id: 'offer-pickup', query: side('screen=confirm&kin=2&room=under&commit=countOf&pickup=1', 'screen=confirm&kin=2&ticked=all&pickup=1'), views: ['kiosktall'] },
-  { id: 'offer-es', query: side('screen=confirm&kin=2&room=under&commit=countOf&lang=es-MX', 'screen=confirm&kin=2&ticked=all&lang=es-MX'), views: ['kiosktall'], settle: 600 },
+  { id: 'offer-alone', query: side('screen=confirm&kin=0&room=under&commit=count', 'screen=confirm&kin=0'), views: ['kiosktall'] },
+  { id: 'offer-two', query: side('screen=confirm&kin=2&room=under&commit=count', 'screen=confirm&kin=2&ticked=all'), views: ['kiosktall'] },
+  { id: 'offer-seven', query: side('screen=confirm&kin=7&room=under&commit=count', 'screen=confirm&kin=7&ticked=all'), views: ['kiosktall'] },
+  { id: 'offer-pickup', query: side('screen=confirm&kin=2&room=under&commit=count&pickup=1', 'screen=confirm&kin=2&ticked=all&pickup=1'), views: ['kiosktall'] },
+  { id: 'offer-es', query: side('screen=confirm&kin=2&room=under&commit=count&lang=es-MX', 'screen=confirm&kin=2&ticked=all&lang=es-MX'), views: ['kiosktall'], settle: 600 },
 
 ];
 

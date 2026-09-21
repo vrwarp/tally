@@ -93,8 +93,8 @@
     "checkOut": "簽出",
     "checkInAll": "全部簽到（{count} 個）",
     "checkIn": "簽到",
-    "checkInOf": "為 {total} 人中的 {count} 人簽到",
-    "checkOutOf": "為 {total} 人中的 {count} 人簽退"
+    "checkInCount": "為 {count} 人簽到",
+    "checkOutCount": "為 {count} 人簽退"
   },
   "Door": {
     "loading": "載入中…",

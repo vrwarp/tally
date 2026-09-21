@@ -93,8 +93,8 @@
     "checkOut": "签出",
     "checkInAll": "为这 {count} 个孩子全部签到",
     "checkIn": "签到",
-    "checkInOf": "为 {total} 人中的 {count} 人签到",
-    "checkOutOf": "为 {total} 人中的 {count} 人签退"
+    "checkInCount": "为 {count} 人签到",
+    "checkOutCount": "为 {count} 人签退"
   },
   "Door": {
     "loading": "加载中…",

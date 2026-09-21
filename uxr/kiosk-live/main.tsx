@@ -646,7 +646,7 @@ export function Kiosk() {
    *
    *   ?screen=confirm
    *   ?kin=N                 how many brothers and sisters the guess offered (0-7)
-   *   ?commit=verb|named|countOf   what the green button says
+   *   ?commit=verb|count     what the green button says
    *   ?room=none|under|masthead    where the gathering and its room are said
    *   ?ticked=all            the pre-tick as it behaves today, for the before-frame
    *   ?long=1                the tapped child named to the register's limits
@@ -670,7 +670,7 @@ export function Kiosk() {
         onConfirm={() => {}}
         onFindSibling={() => {}}
         onBack={() => {}}
-        commitStyle={(params.get('commit') ?? 'verb') as 'verb' | 'countOf' | 'hybrid'}
+        commitStyle={(params.get('commit') ?? 'verb') as 'verb' | 'count'}
         room={
           placement === 'none'
             ? null

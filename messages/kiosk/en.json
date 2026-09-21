@@ -93,8 +93,8 @@
     "checkOut": "Check out",
     "checkInAll": "Check in all {count}",
     "checkIn": "Check in",
-    "checkInOf": "Check in {count} of {total}",
-    "checkOutOf": "Check out {count} of {total}"
+    "checkInCount": "Check in {count}",
+    "checkOutCount": "Check out {count}"
   },
   "Door": {
     "loading": "Loading…",
