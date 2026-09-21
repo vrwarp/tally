@@ -12716,9 +12716,10 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Confirm.checkOutAll": {
-    "source": "Check out all {count}",
-    "es-MX": "reviewed",
+  "Confirm.checkOutCount": {
+    "source": "Check out {count}",
+    "context": "The same commit button at pickup, where a parent is collecting children rather than dropping them off. {count} is how many are ticked and about to be checked out. With nobody else offered the button reads the plain verb instead (Confirm.checkOut).",
+    "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -12728,9 +12729,10 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Confirm.checkInAll": {
-    "source": "Check in all {count}",
-    "es-MX": "reviewed",
+  "Confirm.checkInCount": {
+    "source": "Check in {count}",
+    "context": "The kiosk confirm screen's commit button, when the phone guess offered other children beside the one a parent tapped. {count} is how many are ticked and about to be checked in, not how many were offered — nothing arrives ticked, so the number is the screen saying there are other names on it that are not going. With nobody else offered the button reads the plain verb instead (Confirm.checkIn).",
+    "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },

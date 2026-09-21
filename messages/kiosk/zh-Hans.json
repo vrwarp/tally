@@ -89,9 +89,7 @@
     "tagSentFor": "{name} 的名牌已发送到打印机。",
     "forAnotherAsk": "还要一张的话，请到接待台找同工。",
     "alreadyCheckedIn": "✓ 已经签到过了",
-    "checkOutAll": "为这 {count} 个孩子全部签出",
     "checkOut": "签出",
-    "checkInAll": "为这 {count} 个孩子全部签到",
     "checkIn": "签到",
     "checkInCount": "为 {count} 人签到",
     "checkOutCount": "为 {count} 人签退"
