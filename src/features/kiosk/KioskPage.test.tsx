@@ -112,6 +112,21 @@ describe('who the kiosk screen is for', () => {
   });
 });
 
+describe('the way out to the staging page', () => {
+  it('points at /setup, for anybody who can see this screen', () => {
+    // The kiosk's own printer screen already sends people to `/setup`; this
+    // page is where somebody plans the trip, and it used to be the one place
+    // that never mentioned it. Counselor rank on purpose: the person holding
+    // the tablet on a Friday evening is usually not core team.
+    renderAs('counselor', OK);
+    const link = screen.getByRole('link', { name: '/setup' });
+    expect(link).toHaveAttribute('href', '/setup');
+    // A new tab, because the reader is mid-pairing — and `/setup` is its own
+    // entry, so following it in place would drop the app.
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+});
+
 describe('a staging link, for a tablet nobody will be standing at', () => {
   const LINK = { status: 'created', code: 'K7MQ2X', secret: 'a'.repeat(32), expiresInSeconds: 3600 };
 

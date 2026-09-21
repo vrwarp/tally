@@ -928,6 +928,7 @@
     "intro": "On the kiosk device, open <mono>/kiosk</mono>. It shows a six-character code — type it here to let that kiosk in.",
     "backToCheckIn": "Check in",
     "whatIsKiosk": "<mono>/kiosk</mono> is a self-serve check-in screen for lobby tablets, allowing families to check in by name or phone number.",
+    "setupPage": "Everything a managed tablet needs — the printer rule for its Chrome, the QR that provisions it, and what each one is for — is at <link>/setup</link>.",
     "retire": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "retireCore": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "blocked": "Tally cannot sign a kiosk in yet. Approving a code is still recorded, but the lobby screen keeps waiting until somebody runs the setup command below.",

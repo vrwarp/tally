@@ -928,6 +928,7 @@
     "intro": "En el dispositivo del kiosco, abre <mono>/kiosk</mono>. Va a mostrar un código de seis caracteres — escríbelo aquí para dejar entrar a ese kiosco.",
     "backToCheckIn": "Pasar lista",
     "whatIsKiosk": "<mono>/kiosk</mono> es una pantalla de autorregistro para tabletas de vestíbulo, donde las familias registran su entrada por nombre o por número de teléfono.",
+    "setupPage": "Todo lo que necesita una tableta administrada — la regla de la impresora para su Chrome, el código QR que la aprovisiona y para qué sirve cada cosa — está en <link>/setup</link>.",
     "retire": "Para dar de baja un kiosco, borra los datos del sitio en el navegador de ese dispositivo. Un kiosco sigue funcionando sin importar quién lo vinculó: apagarle el acceso a una persona no lo detiene.",
     "retireCore": "Para dar de baja un kiosco, borra los datos del sitio en el navegador de ese dispositivo. Un kiosco sigue funcionando sin importar quién lo vinculó: apagarle el acceso a una persona no lo detiene.",
     "blocked": "Tally aún no puede darle sesión a un kiosco. Aprobar un código sí se anota, pero la pantalla del vestíbulo se va a quedar esperando hasta que alguien corra el comando de configuración de abajo.",
