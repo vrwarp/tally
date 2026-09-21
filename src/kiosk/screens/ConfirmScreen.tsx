@@ -101,7 +101,6 @@ export function ConfirmScreen({
   commitStyle = 'verb',
   room = null,
   roomPlacement = 'underName',
-  head = 'full',
 }: {
   student: KioskStudent;
   intent: KioskIntent;
@@ -157,15 +156,6 @@ export function ConfirmScreen({
   room?: { title: string; location: string | null } | null;
   /** UXR candidate knob — where that room is said. */
   roomPlacement?: 'underName' | 'masthead';
-  /**
-   * UXR candidate knob — whether the head keeps the grade once it says a room.
-   *
-   * `'tight'` drops it, on the argument that a parent told Room 104 does not
-   * need the classification the room was derived from, and that the room should
-   * be paid for out of the line it replaces rather than out of the child's own
-   * air at seven siblings.
-   */
-  head?: 'full' | 'tight';
 }) {
   const grades = useGrades();
   tallyRender('ConfirmScreen');
@@ -469,7 +459,13 @@ export function ConfirmScreen({
           <div className="text-5xl/[1.15] font-bold text-ink-50">
             {student.firstName} {student.lastName}
           </div>
-          {student.grade !== null && !(head === 'tight' && roomLine) && (
+          {/* The room replaces the grade rather than standing beside it. A parent
+              told Room 104 does not need the classification the room was derived
+              from, and the head is where the room's 44px has to come from — at
+              seven siblings the alternative was taking it out of the child's own
+              air. Where no room is known the grade stays, which is also what a
+              gathering with no location typed falls back to. */}
+          {student.grade !== null && !roomLine && (
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
           )}
           {/* UXR candidate: the room, said where the child is named. The same

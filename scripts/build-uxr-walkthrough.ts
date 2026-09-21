@@ -19,7 +19,7 @@ import { join } from 'node:path';
 const ROOT = 'docs/uxr';
 
 interface Note {
-  viewport: 'phone' | 'desktop';
+  viewport: 'phone' | 'desktop' | 'kiosktall';
   headline: string;
   why: string;
   changes: string[];
@@ -138,13 +138,19 @@ for (const [index, scene] of changes.scenes.entries()) {
         <article class="panel panel--${note.viewport}">
           <header class="panel-head">
             <p class="chip chip--${note.viewport}">
-              <span class="chip-dot"></span>${phone ? 'Phone · 390 × 844 · thumb' : 'Laptop · 1440 × 900 · pointer'}
+              <span class="chip-dot"></span>${
+                note.viewport === 'kiosktall'
+                  ? 'Lobby tablet · 800 × 1280 · portrait'
+                  : phone
+                    ? 'Phone · 390 × 844 · thumb'
+                    : 'Laptop · 1440 × 900 · pointer'
+              }
             </p>
             <h4>${escapeHtml(note.headline)}</h4>
           </header>
 
           <div class="media">
-            <figure class="compare" style="--ratio:${phone ? '460 / 995' : '1240 / 775'}">
+            <figure class="compare" style="--ratio:${note.viewport === 'kiosktall' ? '560 / 896' : phone ? '460 / 995' : '1240 / 775'}">
               <img class="base" src="${after}" alt="${escapeHtml(scene.title)}, after, on ${note.viewport}" loading="lazy" decoding="async">
               <div class="reveal">
                 <img src="${before}" alt="${escapeHtml(scene.title)}, before, on ${note.viewport}" loading="lazy" decoding="async">
@@ -416,6 +422,7 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
   .chip-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
   .chip--phone { background: var(--phone-soft); color: var(--phone); }
   .chip--desktop { background: var(--desk-soft); color: var(--desk); }
+  .chip--kiosktall { background: var(--phone-soft); color: var(--phone); }
 
   /* ---- the comparison itself ---- */
 
@@ -429,8 +436,9 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
    * a hand; the laptop takes the full card, the way it fills a screen.
    */
   .media { background: var(--sunken); border-block: 1px solid var(--rule); }
-  .panel--phone .media { padding: 1.4rem 1.25rem 0; }
+  .panel--phone .media, .panel--kiosktall .media { padding: 1.4rem 1.25rem 0; }
   .panel--phone .compare { max-width: 23rem; margin-inline: auto; border-radius: 12px; }
+  .panel--kiosktall .compare { max-width: 28rem; margin-inline: auto; border-radius: 14px; }
 
   .compare {
     position: relative;
@@ -441,7 +449,7 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
     touch-action: pan-y;
     isolation: isolate;
   }
-  .panel--phone .compare { box-shadow: 0 8px 26px rgb(2 6 23 / 0.28); }
+  .panel--phone .compare, .panel--kiosktall .compare { box-shadow: 0 8px 26px rgb(2 6 23 / 0.28); }
   .compare img {
     position: absolute; inset: 0;
     width: 100%; height: 100%;

@@ -677,7 +677,6 @@ export function Kiosk() {
             : { title: 'Kids Church', location: params.get('rooms') === 'long' ? 'Fellowship Hall, upstairs' : 'Room 104' }
         }
         roomPlacement={placement === 'masthead' ? 'masthead' : 'underName'}
-        head={params.get('head') === 'tight' ? 'tight' : 'full'}
       />
     );
   }

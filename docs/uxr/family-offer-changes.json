@@ -1,0 +1,132 @@
+{
+  "title": "Tally — the family offer, before and after",
+  "headline": "The kiosk stopped <em>guessing who came with you</em>",
+  "description": "A before-and-after record of the lobby kiosk's confirm screen: why the pre-ticked family offer was retired, and what three rounds of critique settled about the button that replaced it.",
+  "intro": [
+    "A parent types four digits, taps one child, and the kiosk offers the rest of the family — guessed from the phone number the church has on file. Until now those names arrived ticked, and one press of a green button took all of them.",
+    "The guess is frequently right about the household and wrong about this morning. It is also built on a roster that carries parents mis-filed as children, imported with two years of attendance from the church's previous check-in kiosk — which means a 41-year-old passes the “came to two of the last three” test better than a child who joined in September, arrives pre-ticked, and gets a sticker and a place in a room count nobody can reconcile.",
+    "Worse, the tick fails open: where a gathering has no history yet, or the read fails, or the tablet is cold, every name the guess turned up arrives ticked. On a gathering whose access has been restricted — a nursery, typically — that is every Sunday.",
+    "So the offer stays exactly as wide, and nothing arrives ticked but the child who was tapped. The question this refinement had to answer is what that costs, and what stops it being silent."
+  ],
+  "method": [
+    "The risk the change creates is precise: a parent's hands do tap-child, press-green, walk. Today the commit button reads the same plain verb whether one child is going or one of four, and it is the only control they are looking at — because their thumb is steering to it.",
+    "Three candidates were built into the real component behind default-off props and mounted in the kiosk harness, so every frame is the app rather than a drawing of it: a button that names who is going, a room stated in a masthead above the glass, and a button that counts the chosen against the offered.",
+    "Three critics read each round at 800 × 1280 — one asking whether the parent can finish the job on the tablet they are holding, one whether the screen is composed, one what should come off it.",
+    "The frames overturned the starting favourite twice. The naming candidate read byte-identically with zero, two and seven children left unticked, which makes it a null treatment against the one failure the round was convened for; and it truncated a 40-character name to an ellipsis on the one control with no undo. A hybrid that named the family only where everybody offered was included survived a round longer and then collapsed, because the case where naming is safe is also the case with two names in it, and two names do not fit.",
+    "What ships is the count against the total, on the pickup as well as the arrival — the direction this screen's own header calls the dangerous one, and the one no candidate had been wired to."
+  ],
+  "rounds": [
+    {
+      "label": "Round one",
+      "value": "3",
+      "note": "candidates, 22 findings"
+    },
+    {
+      "label": "Round two",
+      "value": "2",
+      "note": "candidates; the masthead retired"
+    },
+    {
+      "label": "Round three",
+      "value": "1",
+      "note": "the hybrid collapsed into the count"
+    },
+    {
+      "label": "Settled",
+      "value": "0",
+      "note": "no finding above minor",
+      "settled": true
+    }
+  ],
+  "scenes": [
+    {
+      "scene": "offer-two",
+      "title": "A family of three",
+      "audience": "Parent · Sunday, 9:22am",
+      "job": "Check in the children who actually came, in under twenty seconds, with a queue behind you.",
+      "notes": [
+        {
+          "viewport": "kiosktall",
+          "headline": "Two ticks the parent never made become two ticks they did",
+          "why": "Before, Noah and Priya arrive ticked because they answer to the same four digits and cleared this gathering's prediction. The button says “Check in all 3”, and a parent who taps their own child and presses green has checked in two more without reading a name. After, nothing is ticked but Ramona — and the button says so, in the one place a thumb is already aimed.",
+          "changes": [
+            "Nothing arrives ticked but the child who was tapped, and the tick now fails closed: no participation data means tick that child and nobody else, where it used to mean tick everybody.",
+            "The commit counts the chosen against the offered — “Check in 1 of 3” — so the label moves the moment somebody is being left behind. It is the only one of the three candidates that does; the naming candidate read identically at zero and at seven.",
+            "The offer itself is untouched. Every name the guess turned up is still listed at full weight, one tap from being included.",
+            "The room this check-in is for is named on the screen for the first time, and the grade line pays for it."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "offer-seven",
+      "title": "Seven guessed, at the cap",
+      "audience": "Parent · the worst case the guess produces",
+      "job": "Find your own two children among everybody who answers to your phone number.",
+      "notes": [
+        {
+          "viewport": "kiosktall",
+          "headline": "Eight people, one press, and no scroll",
+          "why": "This is the frame that decides whether a fail-closed tick is safe to ship. Before, a press took all eight. After, a hidden row would be a child standing in the building with no record — so the question is whether the list can print the cap without a fold. On this glass it can: seven rows, no “more below”, and the commit does not move.",
+          "changes": [
+            "All seven offered names print without scrolling at 800 × 1280, measured rather than asserted — and the room line costs no visible row.",
+            "The button reads “Check in 1 of 8”, which is the only element on the screen that states the scope of what is about to happen.",
+            "The commit keeps a fixed height and clips rather than wraps. A label that wrapped would take a second line out of the very track the offer list measures itself into, and the list is the one thing here allowed to shrink."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "offer-alone",
+      "title": "One child, nothing guessed",
+      "audience": "Parent · the commonest journey on this screen",
+      "job": "Tap your child and go.",
+      "notes": [
+        {
+          "viewport": "kiosktall",
+          "headline": "The screen gets quieter, not busier",
+          "why": "The refinement adds a room and a longer button, so the case it must not tax is the one most parents are in. With nothing guessed there is nobody to be left behind, so there is nothing for a count to be against — and a caption reading “Anyone else?” was labelling an empty list, one line to dismiss on the way to green.",
+          "changes": [
+            "The button stays the plain verb when no family was offered. The count is spent only where somebody could be left behind.",
+            "The “Anyone else?” caption goes when there is no list under it. The plate below carries its own plus and its own noun.",
+            "The room replaces the grade rather than standing beside it — a parent told Room 104 does not need the classification the room was derived from."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "offer-pickup",
+      "title": "The pickup",
+      "audience": "Parent · Sunday, 11:30am, two tired children",
+      "job": "Take your family home, and leave the register saying so.",
+      "notes": [
+        {
+          "viewport": "kiosktall",
+          "headline": "The direction this screen calls the dangerous one",
+          "why": "A stray check-in is self-correcting when the child walks in anyway; a stray check-out is a claim that somebody took a child out of the building. None of the three candidates had been wired to it — the round would have closed on arrival frames alone and shipped the pickup unchanged. The frames caught that, and the same guard now carries across.",
+          "changes": [
+            "“Check out 1 of 3” — the count applies to the pickup as well as the arrival, in the brand ramp this screen already spends on handing children back.",
+            "One new string rather than three: the count shape ports to the check-out with a single key in each of the four catalogues, where a naming shape would have needed nine."
+          ]
+        }
+      ]
+    },
+    {
+      "scene": "offer-es",
+      "title": "The same screen in Spanish",
+      "audience": "Parent · a congregation with two languages",
+      "job": "Read a button in your own language and know what it is about to do.",
+      "notes": [
+        {
+          "viewport": "kiosktall",
+          "headline": "One shape at every family size, in every language",
+          "why": "The naming candidate could not survive here: “Registrar a Guadalupe y Maximiliano” is half again the width the button has. The count is a fixed short shape in all four catalogues — and the room line, which first said the gathering's name as well, was the one string arriving in English on a Spanish screen.",
+          "changes": [
+            "The room is the room alone. The gathering's name is constant for the life of a kiosk's binding, tells nobody where to walk, and was the half that could not be translated.",
+            "The Spanish count lost a personal “a” inherited from the naming string, where it was correct before a name and a preposition looking for a person before a numeral."
+          ]
+        }
+      ]
+    }
+  ]
+}

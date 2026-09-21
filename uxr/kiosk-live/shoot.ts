@@ -62,6 +62,18 @@ type ViewportName = keyof typeof VIEWPORTS;
  * because both change the header's height, and the header is the one part of
  * this layout that is allowed to.
  */
+/**
+ * Which side of the walkthrough this run is shooting.
+ *
+ * `UXR_SIDE=before` gives the scene the props the screen ships with today;
+ * anything else gives it the ones the campaign settled. Both halves have to be
+ * shot by the same harness in the same browser or the slider shows the
+ * harness changing rather than the screen — see uxr/README.md, which has the
+ * scar from the first before/after pair that was not.
+ */
+const side = (after: string, before: string) =>
+  process.env.UXR_SIDE === 'before' ? before : after;
+
 const SCENES: {
   id: string;
   query: string;
@@ -576,88 +588,22 @@ const SCENES: {
     hold: 1_000,
   },
   /*
-   * The family offer, once the tick fails closed — the campaign in
-   * docs/uxr/family-offer-and-programmes.md.
+   * The family offer, before and after — the pair the walkthrough is built from.
    *
-   * Portrait only, which is the decision that came back from the findings: the
-   * landscape fold is real and gets its own adjustment later, so photographing
-   * it here would only re-argue a question already answered.
+   * Both sides come out of this one table so a scene id cannot mean two
+   * different framings: `UXR_SIDE=before` shoots the screen as it behaves today
+   * and anything else shoots what the three critique rounds settled. Same
+   * component, same fixture, same glass; only the props differ, which is the
+   * whole claim the slider makes.
    *
-   * The before-frame is first and is the only one with anything ticked. Then the
-   * bare fail-closed screen, then three candidates for how the commit names what
-   * it is about to do and where the room is said. Each is shot alone (the
-   * commonest family), at two, and at seven — the cap, where the fold decides
-   * whether a child in the building keeps a record.
+   * Portrait only, by decision. The landscape fold is real and gets its own
+   * adjustment later.
    */
-  { id: 'confirm-today-two', query: 'screen=confirm&kin=2&ticked=all', views: ['kiosktall'] },
-  { id: 'confirm-base-alone', query: 'screen=confirm&kin=0', views: ['kiosktall'] },
-  { id: 'confirm-base-two', query: 'screen=confirm&kin=2', views: ['kiosktall'] },
-  { id: 'confirm-base-seven', query: 'screen=confirm&kin=7', views: ['kiosktall'] },
-
-  { id: 'confirm-a-alone', query: 'screen=confirm&kin=0&commit=named&room=under', views: ['kiosktall'] },
-  { id: 'confirm-a-two', query: 'screen=confirm&kin=2&commit=named&room=under', views: ['kiosktall'] },
-  { id: 'confirm-a-seven', query: 'screen=confirm&kin=7&commit=named&room=under', views: ['kiosktall'] },
-  /* The two the button cannot be measured without: a Spanish pair, and a name
-     typed to the register's own limits. */
-  { id: 'confirm-a-es', query: 'screen=confirm&kin=2&commit=named&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
-  { id: 'confirm-a-long', query: 'screen=confirm&kin=2&commit=named&room=under&long=1', views: ['kiosktall'] },
-
-  /* The room string a church actually types, in the 448px column rather than
-     on B's full-bleed strip — the measure where it has to live under the name. */
-  { id: 'confirm-a-longroom', query: 'screen=confirm&kin=2&commit=named&room=under&rooms=long', views: ['kiosktall'] },
-
-  { id: 'confirm-b-alone', query: 'screen=confirm&kin=0&commit=named&room=masthead', views: ['kiosktall'] },
-  { id: 'confirm-b-two', query: 'screen=confirm&kin=2&commit=named&room=masthead', views: ['kiosktall'] },
-  { id: 'confirm-b-seven', query: 'screen=confirm&kin=7&commit=named&room=masthead', views: ['kiosktall'] },
-  { id: 'confirm-b-longroom', query: 'screen=confirm&kin=2&commit=named&room=masthead&rooms=long', views: ['kiosktall'] },
-
-  { id: 'confirm-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'confirm-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'confirm-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'confirm-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
-
-  /*
-   * Round 2. The masthead is gone — both critics rejected it as furniture sitting
-   * on top of the composition rather than in it. What is left is one question,
-   * the button, against a head that now says the room alone, on the ink ramp.
-   */
-  { id: 'r2-a-alone', query: 'screen=confirm&kin=0&commit=named&room=under', views: ['kiosktall'] },
-  { id: 'r2-a-two', query: 'screen=confirm&kin=2&commit=named&room=under', views: ['kiosktall'] },
-  { id: 'r2-a-seven', query: 'screen=confirm&kin=7&commit=named&room=under', views: ['kiosktall'] },
-  { id: 'r2-a-es', query: 'screen=confirm&kin=2&commit=named&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
-  { id: 'r2-a-long', query: 'screen=confirm&kin=2&commit=named&room=under&long=1', views: ['kiosktall'] },
-  { id: 'r2-a-longroom', query: 'screen=confirm&kin=2&commit=named&room=under&rooms=long', views: ['kiosktall'] },
-  /* The same, with the grade line paid to the room. */
-  { id: 'r2-atight-two', query: 'screen=confirm&kin=2&commit=named&room=under&head=tight', views: ['kiosktall'] },
-  { id: 'r2-atight-seven', query: 'screen=confirm&kin=7&commit=named&room=under&head=tight', views: ['kiosktall'] },
-
-  { id: 'r2-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r2-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r2-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r2-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
-
-  /*
-   * Round 3. The named-always candidate is retired: its label read identically
-   * at zero, two and seven children left behind, which is a null treatment
-   * against the failure the round exists for. What is left is the count, and a
-   * hybrid that is allowed to be warm only where it cannot be silent — when
-   * everybody offered is included, and so no count is owed.
-   */
-  { id: 'r3-c-alone', query: 'screen=confirm&kin=0&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r3-c-two', query: 'screen=confirm&kin=2&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r3-c-seven', query: 'screen=confirm&kin=7&commit=countOf&room=under', views: ['kiosktall'] },
-  { id: 'r3-c-all', query: 'screen=confirm&kin=2&commit=countOf&room=under&ticked=all', views: ['kiosktall'] },
-  { id: 'r3-c-es', query: 'screen=confirm&kin=2&commit=countOf&room=under&lang=es-MX', views: ['kiosktall'], settle: 600 },
-  { id: 'r3-c-pickup', query: 'screen=confirm&kin=2&commit=countOf&room=under&pickup=1', views: ['kiosktall'] },
-
-  { id: 'r3-h-alone', query: 'screen=confirm&kin=0&commit=hybrid&room=under', views: ['kiosktall'] },
-  { id: 'r3-h-two', query: 'screen=confirm&kin=2&commit=hybrid&room=under', views: ['kiosktall'] },
-  { id: 'r3-h-seven', query: 'screen=confirm&kin=7&commit=hybrid&room=under', views: ['kiosktall'] },
-  /* The case the hybrid exists for: everybody offered is ticked, so no count is
-     owed and the label may name them. */
-  { id: 'r3-h-all', query: 'screen=confirm&kin=1&commit=hybrid&room=under&ticked=all', views: ['kiosktall'] },
-  { id: 'r3-h-long', query: 'screen=confirm&kin=2&commit=hybrid&room=under&long=1&ticked=all', views: ['kiosktall'] },
-  { id: 'r3-h-pickup', query: 'screen=confirm&kin=2&commit=hybrid&room=under&pickup=1', views: ['kiosktall'] },
+  { id: 'offer-alone', query: side('screen=confirm&kin=0&room=under&commit=countOf', 'screen=confirm&kin=0'), views: ['kiosktall'] },
+  { id: 'offer-two', query: side('screen=confirm&kin=2&room=under&commit=countOf', 'screen=confirm&kin=2&ticked=all'), views: ['kiosktall'] },
+  { id: 'offer-seven', query: side('screen=confirm&kin=7&room=under&commit=countOf', 'screen=confirm&kin=7&ticked=all'), views: ['kiosktall'] },
+  { id: 'offer-pickup', query: side('screen=confirm&kin=2&room=under&commit=countOf&pickup=1', 'screen=confirm&kin=2&ticked=all&pickup=1'), views: ['kiosktall'] },
+  { id: 'offer-es', query: side('screen=confirm&kin=2&room=under&commit=countOf&lang=es-MX', 'screen=confirm&kin=2&ticked=all&lang=es-MX'), views: ['kiosktall'], settle: 600 },
 
 ];
 
