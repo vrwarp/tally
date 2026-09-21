@@ -340,7 +340,7 @@ describe('behind the door', () => {
     expect(screen.getByText('Mara Okonjo')).toBeTruthy();
 
     await pick('Mara Okonjo');
-    await tap(/Check in all 2/i);
+    await tap(/Check in 2/i);
     expect(
       vi
         .mocked(services.performCheckIn)
@@ -355,8 +355,9 @@ describe('behind the door', () => {
     await pick('Noah Adeyemi');
 
     // The phone guess is not scoped either — the offer stays as wide as the
-    // household, and only the tick follows the prediction.
+    // household. Nothing about it is ticked, and the count on the button is
+    // what says so.
     expect(screen.getByText('Sofia Adeyemi')).toBeTruthy();
-    expect(screen.getByText(/^Check in$/)).toBeTruthy();
+    expect(screen.getByText(/Check in 1/i)).toBeTruthy();
   });
 });

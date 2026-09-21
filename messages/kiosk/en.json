@@ -89,10 +89,10 @@
     "tagSentFor": "Name tag sent for {name}.",
     "forAnotherAsk": "For another, ask at the check-in desk.",
     "alreadyCheckedIn": "✓ Already checked in",
-    "checkOutAll": "Check out all {count}",
     "checkOut": "Check out",
-    "checkInAll": "Check in all {count}",
-    "checkIn": "Check in"
+    "checkIn": "Check in",
+    "checkInCount": "Check in {count}",
+    "checkOutCount": "Check out {count}"
   },
   "Door": {
     "loading": "Loading…",

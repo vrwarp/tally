@@ -70,6 +70,8 @@ import { PrinterScreen } from '@/kiosk/screens/PrinterScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
 import { SuccessScreen } from '@/kiosk/screens/SuccessScreen';
+import { ConfirmScreen } from '@/kiosk/screens/ConfirmScreen';
+import { KIOSK_LOCALE_STORAGE_KEY } from '@/lib/locales';
 import type { KioskEventEntry, KioskPrinting, KioskServices } from '@/kiosk/KioskApp';
 /*
  * The printer, without a printer.
@@ -634,6 +636,51 @@ export function Kiosk() {
     );
   }
 
+  /*
+   * The confirm screen, as the family-offer campaign needs to photograph it.
+   *
+   * Every knob here is a candidate rather than a state, because the question
+   * this round asks is *how* a recommendation should be built, not whether the
+   * screen works. The tick is fail-closed in every frame but `ticked=all`,
+   * which is the before-frame: that is the decision the campaign already took.
+   *
+   *   ?screen=confirm
+   *   ?kin=N                 how many brothers and sisters the guess offered (0-7)
+   *   ?room=none             the gathering names no room, so the grade stays
+   *   ?ticked=all            the pre-tick as it behaves today, for the before-frame
+   *   ?long=1                the tapped child named to the register's limits
+   *   ?lang=es-MX|zh-Hant    the kiosk's language (see the mount below)
+   */
+  if (params.get('screen') === 'confirm') {
+    const kin = Math.max(0, Math.min(7, Number(params.get('kin') ?? '1')));
+    const tapped = params.get('long') === '1' ? LONG_NAME : STUDENTS[0]!;
+    const family = STUDENTS.filter((student) => student.id !== tapped.id).slice(0, kin);
+    const ticked = params.get('ticked') === 'all';
+    return (
+      <ConfirmScreen
+        student={tapped}
+        intent={params.get('pickup') === '1' ? 'check-out' : 'check-in'}
+        family={family}
+        skipped={ticked ? new Set() : new Set(family.map((member) => member.id))}
+        onToggle={() => {}}
+        reprintOffer="none"
+        onReprint={() => {}}
+        onConfirm={() => {}}
+        onFindSibling={() => {}}
+        onBack={() => {}}
+        /* The room, as the binding now carries it. `?rooms=long` is the string
+           a church actually types, in the 448px column it has to live in. */
+        room={
+          params.get('room') === 'none'
+            ? null
+            : params.get('rooms') === 'long'
+              ? 'Fellowship Hall, upstairs'
+              : 'Room 104'
+        }
+      />
+    );
+  }
+
   if (params.get('screen') === 'success') {
     return (
       <SuccessScreen
@@ -762,6 +809,14 @@ export function Kiosk() {
  * per scene whatever the page contains cannot notice; the frames are only
  * useless.
  */
+/*
+ * The kiosk's language is a property of the tablet, so it lives in storage
+ * rather than in a prop — `?lang=` writes it before the provider reads it,
+ * which is the only way a frame in another language can be shot at all.
+ */
+const wanted = new URLSearchParams(window.location.search).get('lang');
+if (wanted) localStorage.setItem(KIOSK_LOCALE_STORAGE_KEY, wanted);
+
 createRoot(document.getElementById('root')!).render(
   <KioskIntlProvider>
     <Kiosk />

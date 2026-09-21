@@ -83,6 +83,7 @@ export function ConfirmScreen({
   onConfirm,
   onFindSibling,
   onBack,
+  room = null,
 }: {
   student: KioskStudent;
   intent: KioskIntent;
@@ -121,6 +122,20 @@ export function ConfirmScreen({
    */
   onFindSibling?: (anchors: KioskStudent[]) => void;
   onBack: () => void;
+  /**
+   * The room this kiosk checks into, or null when the gathering names none.
+   *
+   * Said once, at screen level, under the child's name — and it replaces the
+   * grade line rather than standing beside it. A per-row "usually in the
+   * Nursery" was tried and rejected: a second line on a 64px row takes the
+   * offer from seven visible names to five, and until the kiosk can route a
+   * child anywhere the only honest wording is a standing claim about them,
+   * made in front of a stranger's parent, that is irrelevant to the decision
+   * on the screen.
+   */
+  room?: string | null;
+  /** UXR candidate knob — where that room is said. */
+  roomPlacement?: 'underName' | 'masthead';
 }) {
   const grades = useGrades();
   tallyRender('ConfirmScreen');
@@ -131,7 +146,31 @@ export function ConfirmScreen({
   const tap = useTap();
 
   const chosen = [student, ...family.filter((member) => !skipped.has(member.id))];
-  const others = chosen.length - 1;
+
+  /*
+   * What the green button says it is about to do.
+   *
+   * The plain verb when the guess turned nobody up, and a count the moment it
+   * did — so the *presence* of a number is itself the signal that there were
+   * other names on this screen and they are not going. Under a fail-closed
+   * tick that is the whole of the guard, because a parent's hands do
+   * tap-child, press-green, walk, and the button is the one control they are
+   * looking at: their thumb is steering to it.
+   *
+   * Two shapes were built before this one and both were photographed failing.
+   * A button that named who was going ("Check in Ramona") read byte-identically
+   * with nobody left behind and with seven, and truncated a long name to an
+   * ellipsis on the one control with no undo. A count against the total
+   * ("Check in 1 of 8") read as a set to be completed — the strongest element
+   * on the glass inviting a parent up to eight, over a list that includes the
+   * children of another programme.
+   */
+  const commitLabel = (() => {
+    if (family.length === 0) return intent === 'check-out' ? t('checkOut') : t('checkIn');
+    const counted = { count: chosen.length };
+    return intent === 'check-out' ? t('checkOutCount', counted) : t('checkInCount', counted);
+  })();
+
 
   /*
    * How many names the list can print, measured rather than counted.
@@ -192,9 +231,15 @@ export function ConfirmScreen({
             row below is legibly its answer. Dropping it left a bare noun phrase
             whose nearest noun was the child's name — "not this child, show me a
             different one", to exactly the parent this exists for. */}
-        <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
-          {intent === 'check-out' ? t('checkingOutAnyoneElse') : t('anyoneElse')}
-        </div>
+        {/* The caption heads the list. With nothing guessed it labels nothing
+            but the plate below it, which already says what it says — and it
+            costs the commonest journey on this screen a line to dismiss on the
+            way to green. */}
+        {family.length > 0 && (
+          <div className="shrink-0 pb-1 text-left text-xl text-ink-400">
+            {intent === 'check-out' ? t('checkingOutAnyoneElse') : t('anyoneElse')}
+          </div>
+        )}
 
         {family.length > 0 && (
           /*
@@ -351,8 +396,24 @@ export function ConfirmScreen({
           <div className="text-5xl/[1.15] font-bold text-ink-50">
             {student.firstName} {student.lastName}
           </div>
-          {student.grade !== null && (
+          {/* The room replaces the grade rather than standing beside it. A parent
+              told Room 104 does not need the classification the room was derived
+              from, and the head is where the room's 44px has to come from — at
+              seven siblings the alternative was taking it out of the child's own
+              air. Where no room is known the grade stays, which is also what a
+              gathering with no location typed falls back to. */}
+          {student.grade !== null && !room && (
             <div className="pt-3 text-2xl text-ink-400">{gradeDescription(grades, student.grade)}</div>
+          )}
+          {/* UXR candidate: the room, said where the child is named. The same
+              stated fact for every child on the screen, at no cost in rows —
+              which is what a per-row line could not manage. */}
+          {room && (
+            /* On the ink ramp, not an accent: this is context, and context in
+               this system is a distance from the reader. brand belongs to the
+               one control that leaves the screen, and an accent means nothing
+               once two things wear it for different reasons. */
+            <div className="pt-3 text-2xl font-semibold text-ink-200">{room}</div>
           )}
         </div>
 
@@ -486,20 +547,18 @@ export function ConfirmScreen({
             haptic();
             onConfirm(chosen);
           })}
-          className={`w-full shrink-0 rounded-2xl p-7 text-3xl font-bold text-white ${
+          /* Fixed height, one line, clipped. A label that wrapped would take a
+             second line out of the 1fr track the offer list measures itself
+             into — so a longer string would silently cost a visible row on the
+             list that must not hide anybody. */
+          className={`flex h-23 w-full shrink-0 items-center justify-center rounded-2xl px-7 text-3xl font-bold text-white ${
             intent === 'check-out'
               ? 'bg-brand-600 active:bg-brand-500'
               : 'bg-present-600 active:bg-present-500'
           }`}
           style={{ touchAction: 'manipulation' }}
         >
-          {intent === 'check-out'
-            ? others > 0
-              ? t('checkOutAll', { count: chosen.length })
-              : t('checkOut')
-            : others > 0
-              ? t('checkInAll', { count: chosen.length })
-              : t('checkIn')}
+          <span className="min-w-0 truncate">{commitLabel}</span>
         </button>
       )}
 

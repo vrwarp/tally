@@ -1,11 +1,14 @@
 /**
- * The kiosk's home screen, live, for the walkthrough of the lobby-languages
- * change (PR #231).
+ * The kiosk, live, for the walkthroughs — the lobby-languages change first,
+ * and now the family offer.
  *
- * Real components — `SearchScreen`, `PairingScreen`, `StaffScreen` — over a
- * fixture roster and no network, with the few things `KioskApp` owns rebuilt
- * here in miniature: the typed buffer, the lobby's pins, and the clock that
- * gives the screen back. The strip along the top is the demo's, not the
+ * Real components — `SearchScreen`, `ConfirmScreen`, `SuccessScreen`,
+ * `PairingScreen`, `StaffScreen` — over a fixture roster and no network, with
+ * the few things `KioskApp` owns rebuilt here in miniature: the typed buffer,
+ * the lobby's pins, the clock that gives the screen back, and the family the
+ * kiosk guesses from four digits (real `familyOf` over a real inverted index,
+ * because a hard-coded sibling list would be demonstrating a different
+ * screen). The strip along the top is the demo's, not the
  * kiosk's: it moves between the three screens and says what the language
  * clock is doing, which on a real tablet is invisible by design.
  *
@@ -35,6 +38,9 @@ import type { KioskSearchOutcome, KioskStudent } from '@/kiosk/search';
 import { LanguagesScreen } from '@/kiosk/screens/LanguagesScreen';
 import { PairingScreen } from '@/kiosk/screens/PairingScreen';
 import { SearchScreen } from '@/kiosk/screens/SearchScreen';
+import { ConfirmScreen } from '@/kiosk/screens/ConfirmScreen';
+import { SuccessScreen } from '@/kiosk/screens/SuccessScreen';
+import { buildFamilyDigits, familyOf } from '@/kiosk/family';
 import { StaffScreen } from '@/kiosk/screens/StaffScreen';
 import { sanitizePins } from '@/kiosk/storage';
 import {
@@ -90,7 +96,26 @@ const binding: KioskBinding = {
   boundAtMs: NOW - 45 * 60_000,
   requiresCheckOut: false,
   allergiesSupported: true,
+  // What the confirm and success screens name, and what a sticker would print.
+  location: 'Room 104',
 };
+
+/**
+ * The households the kiosk would guess from four digits.
+ *
+ * Real `familyOf` over a real inverted index, rather than a hand-drawn list of
+ * siblings: the whole point of the offer is that it is a guess from a phone
+ * number, and a demo that hard-coded the answer would be demonstrating a
+ * different screen. Ramona's household is the one a visitor lands in by typing
+ * anything four digits long.
+ */
+const LAST4: Record<string, string[]> = {
+  '0134': ['1', '2', '3'],
+  '7788': ['7', '8'],
+  '2200': ['9', '10'],
+};
+
+const FAMILY_DIGITS = buildFamilyDigits(LAST4);
 
 const STUDENTS: KioskStudent[] = [
   { id: '1', firstName: 'Ramona', lastName: 'Alvarez', grade: 7 },
@@ -115,7 +140,14 @@ function outcomeFor(buffer: string): KioskSearchOutcome {
     NOBODY || needles.length === 0
       ? []
       : mode === 'phone'
-        ? STUDENTS.filter((student) => student.id === '7' || student.id === '8')
+        ? /* The household those four digits answer to, out of the same index
+             `familyOf` reads, so the names a visitor finds and the names the
+             confirm then offers cannot disagree. Any other four digits find the
+             Tsai and Chen households, which is what the languages walkthrough
+             photographs. */
+          STUDENTS.filter((student) =>
+            (LAST4[buffer] ?? ['7', '8']).includes(student.id),
+          )
         : mode === 'phone-partial'
           ? []
           : STUDENTS.filter((student) => {
@@ -146,6 +178,12 @@ export function Demo() {
   const [refresh, setRefresh] = useState<KioskRefresh>('idle');
   const [note, setNote] = useState<string | null>(null);
   const [left, setLeft] = useState<number | null>(null);
+  const [confirm, setConfirm] = useState<{
+    student: KioskStudent;
+    family: readonly KioskStudent[];
+    skipped: ReadonlySet<string>;
+  } | null>(null);
+  const [done, setDone] = useState<readonly KioskStudent[] | null>(null);
 
   /* What `KioskApp` does with the same facts: a language is a family's, and
      goes home when they do — on the way back to the door from any other
@@ -167,6 +205,8 @@ export function Demo() {
     setScreen('checkin');
     setBuffer('');
     setRefresh('idle');
+    setConfirm(null);
+    setDone(null);
     setLocale(DEFAULT_LOCALE);
   }, [setLocale]);
 
@@ -213,14 +253,17 @@ export function Demo() {
     }, 900);
   }, []);
 
-  const onPick = useCallback(
-    (student: KioskStudent) => {
-      setPresent((held) => new Set([...held, student.id]));
-      say(`${student.firstName.replace(/\s*“.*”/, '')} checked in — the kiosk goes home, in English.`);
-      home();
-    },
-    [home, say],
-  );
+  /*
+   * Tapping a name opens the confirm, exactly as `KioskApp` does — and the
+   * offer arrives with nothing ticked but the child who was tapped, which is
+   * the change this demo exists to let somebody feel rather than read about.
+   */
+  const onPick = useCallback((student: KioskStudent) => {
+    const family = familyOf(student, STUDENTS, FAMILY_DIGITS).filter(
+      (member) => !present.has(member.id),
+    );
+    setConfirm({ student, family, skipped: new Set(family.map((member) => member.id)) });
+  }, [present]);
 
   const outcome = outcomeFor(buffer);
   const idle = outcome.mode === 'idle';
@@ -270,7 +313,46 @@ export function Demo() {
     <div className="flex h-full flex-col">
       {strip}
       <div className="relative min-h-0 flex-1">
-        {screen === 'pairing' ? (
+        {done ? (
+          <SuccessScreen
+            students={done}
+            intent="check-in"
+            room={binding.location ?? null}
+            onDone={() => {
+              setDone(null);
+              home();
+            }}
+          />
+        ) : confirm ? (
+          <ConfirmScreen
+            student={confirm.student}
+            intent="check-in"
+            family={confirm.family}
+            skipped={confirm.skipped}
+            reprintOffer="none"
+            onReprint={() => {}}
+            room={binding.location ?? null}
+            onToggle={(studentId) =>
+              setConfirm((held) => {
+                if (!held) return held;
+                const next = new Set(held.skipped);
+                if (!next.delete(studentId)) next.add(studentId);
+                return { ...held, skipped: next };
+              })
+            }
+            onConfirm={(chosen) => {
+              setPresent((held) => new Set([...held, ...chosen.map((one) => one.id)]));
+              setConfirm(null);
+              setDone(chosen);
+              say(
+                chosen.length === 1
+                  ? 'One child checked in — the button said so before the press.'
+                  : `${chosen.length} children checked in, each one ticked by hand.`,
+              );
+            }}
+            onBack={() => setConfirm(null)}
+          />
+        ) : screen === 'pairing' ? (
           <PairingScreen services={services} onPaired={() => {}} pins={pins} onPins={setPins} />
         ) : screen === 'staff' ? (
           <StaffScreen

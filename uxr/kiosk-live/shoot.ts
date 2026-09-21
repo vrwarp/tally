@@ -62,6 +62,18 @@ type ViewportName = keyof typeof VIEWPORTS;
  * because both change the header's height, and the header is the one part of
  * this layout that is allowed to.
  */
+/**
+ * Which side of the walkthrough this run is shooting.
+ *
+ * `UXR_SIDE=before` gives the scene the props the screen ships with today;
+ * anything else gives it the ones the campaign settled. Both halves have to be
+ * shot by the same harness in the same browser or the slider shows the
+ * harness changing rather than the screen — see uxr/README.md, which has the
+ * scar from the first before/after pair that was not.
+ */
+const side = (after: string, before: string) =>
+  process.env.UXR_SIDE === 'before' ? before : after;
+
 const SCENES: {
   id: string;
   query: string;
@@ -575,6 +587,24 @@ const SCENES: {
     ],
     hold: 1_000,
   },
+  /*
+   * The family offer, before and after — the pair the walkthrough is built from.
+   *
+   * Both sides come out of this one table so a scene id cannot mean two
+   * different framings: `UXR_SIDE=before` shoots the screen as it behaves today
+   * and anything else shoots what the three critique rounds settled. Same
+   * component, same fixture, same glass; only the props differ, which is the
+   * whole claim the slider makes.
+   *
+   * Portrait only, by decision. The landscape fold is real and gets its own
+   * adjustment later.
+   */
+  { id: 'offer-alone', query: side('screen=confirm&kin=0', 'screen=confirm&kin=0&room=none'), views: ['kiosktall'] },
+  { id: 'offer-two', query: side('screen=confirm&kin=2', 'screen=confirm&kin=2&ticked=all&room=none'), views: ['kiosktall'] },
+  { id: 'offer-seven', query: side('screen=confirm&kin=7', 'screen=confirm&kin=7&ticked=all&room=none'), views: ['kiosktall'] },
+  { id: 'offer-pickup', query: side('screen=confirm&kin=2&pickup=1', 'screen=confirm&kin=2&ticked=all&pickup=1&room=none'), views: ['kiosktall'] },
+  { id: 'offer-es', query: side('screen=confirm&kin=2&lang=es-MX', 'screen=confirm&kin=2&ticked=all&lang=es-MX&room=none'), views: ['kiosktall'], settle: 600 },
+
 ];
 
 const args = process.argv.slice(2);

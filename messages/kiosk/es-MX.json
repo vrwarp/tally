@@ -89,10 +89,10 @@
     "tagSentFor": "Se envió la etiqueta de {name}.",
     "forAnotherAsk": "Para otra, pida en la mesa de registro.",
     "alreadyCheckedIn": "✓ Ya había llegado",
-    "checkOutAll": "Registrar salida de los {count}",
     "checkOut": "Registrar salida",
-    "checkInAll": "Registrar a los {count}",
-    "checkIn": "Registrar entrada"
+    "checkIn": "Registrar entrada",
+    "checkInCount": "Registrar {count}",
+    "checkOutCount": "Registrar salida de {count}"
   },
   "Door": {
     "loading": "Cargando…",

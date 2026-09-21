@@ -621,8 +621,19 @@ export function RegistrationFlow({
               <p className="text-2xl font-semibold text-ink-100">
                 {welcomeLine(t, locale, state.children)}
               </p>
-              {/* The whole handoff, in one sentence: this is how they find
-                  themselves next week without anybody's help. */}
+              {/* Where to take them, before how to find themselves next week.
+                  This is the only screen a brand-new family ever reaches — the
+                  registration checks the children in itself, so they never meet
+                  the confirm or the ordinary success screen — and until now it
+                  ended by naming a phone number to a family standing in a lobby
+                  holding two stickers and no idea which door is theirs. On a
+                  morning with a children's programme and a nursery running at
+                  the same hour, that is the whole of their problem. */}
+              {binding.location && (
+                <p className="text-3xl font-semibold text-ink-100">{binding.location}</p>
+              )}
+              {/* The other half of the handoff, in one sentence: this is how
+                  they find themselves next week without anybody's help. */}
               <p className="text-xl text-ink-400">
                 {t.rich('nextTime', {
                   last4: state.last4,

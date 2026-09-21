@@ -2203,10 +2203,10 @@
     "tagSentFor": "已送出 {name} 的名牌。",
     "forAnotherAsk": "還要一張的話，請向服務台的同工詢問。",
     "alreadyCheckedIn": "✓ 已經簽到過了",
-    "checkOutAll": "全部簽出（{count} 個）",
     "checkOut": "簽出",
-    "checkInAll": "全部簽到（{count} 個）",
-    "checkIn": "簽到"
+    "checkIn": "簽到",
+    "checkInCount": "為 {count} 人簽到",
+    "checkOutCount": "為 {count} 人簽退"
   },
   "Staff": {
     "changeEventTitle": "更換聚會？",

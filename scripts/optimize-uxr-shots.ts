@@ -20,7 +20,7 @@ from PIL import Image
 
 # The two halves have to come out the same pixel size or the slider reveals a
 # shifted image rather than a changed one.
-TARGET = {"desktop": 1240, "phone": 460}
+TARGET = {"desktop": 1240, "phone": 460, "kiosktall": 560}
 
 for side in ("before", "after"):
     src = f"uxr/renders/{side}"
@@ -29,7 +29,11 @@ for side in ("before", "after"):
     for path in sorted(glob.glob(f"{src}/*-fold.png")):
         name = os.path.basename(path)
         stem = name[: -len("-fold.png")]
-        viewport = "desktop" if stem.endswith("--desktop") else "phone"
+        viewport = (
+            "desktop" if stem.endswith("--desktop")
+            else "kiosktall" if stem.endswith("--kiosktall")
+            else "phone"
+        )
         image = Image.open(path).convert("RGB")
         width = TARGET[viewport]
         height = round(image.size[1] * width / image.size[0])

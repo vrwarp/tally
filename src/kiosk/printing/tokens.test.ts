@@ -43,6 +43,24 @@ const BINDING: KioskBinding = {
 };
 
 describe('tokenValuesFor', () => {
+  it('carries the room, which is the only thing on a sticker that says where to walk', () => {
+    const values = tokenValuesFor(grades, 'en', student(), { ...BINDING, location: 'Room 104' });
+    expect(values.location).toBe('Room 104');
+  });
+
+  it('sends an empty room rather than none, so a line that is only the room drops', () => {
+    /*
+     * Most gatherings have no location typed. Empty is what `fillLabelTemplate`
+     * reads as nothing — the same distinction `nickname` draws — so a template
+     * line carrying only this token prints nothing instead of a blank sticker,
+     * and one carrying a caption beside it is what `requiresValue` is for.
+     */
+    expect(tokenValuesFor(grades, 'en', student(), BINDING).location).toBe('');
+    expect(
+      tokenValuesFor(grades, 'en', student(), { ...BINDING, location: null }).location,
+    ).toBe('');
+  });
+
   it('splits the stored composite into a first name and a nickname', () => {
     const values = tokenValuesFor(grades, 'en', student({ firstName: 'Benson “蔡秉洲”' }), BINDING);
 

@@ -402,6 +402,10 @@ export async function bindEntry(entry: KioskEventEntry): Promise<KioskBinding> {
     checkInOpensAtMs: entry.checkInOpensAt,
     checkInClosesAtMs: entry.checkInClosesAt,
     requiresCheckOut: entry.requiresCheckOut,
+    // The room, straight off the chooser row. Trimmed to null so a gathering
+    // whose location is an empty string reads the same as one with none — the
+    // screens branch on it, and " " is not a room.
+    location: entry.location?.trim() ? entry.location.trim() : null,
     // Sanitised even though the server sent it: this is the value the kiosk
     // will read back out of localStorage for the rest of the evening, and the
     // renderer should never be handed a shape it has to defend against.

@@ -19,7 +19,7 @@ import { join } from 'node:path';
 const ROOT = 'docs/uxr';
 
 interface Note {
-  viewport: 'phone' | 'desktop';
+  viewport: 'phone' | 'desktop' | 'kiosktall';
   headline: string;
   why: string;
   changes: string[];
@@ -41,6 +41,17 @@ interface Round {
   settled?: boolean;
 }
 
+/** A live copy of the thing the page is about, embedded rather than described. */
+interface Demo {
+  /** Path the iframe loads, relative to the page. */
+  src: string;
+  title: string;
+  /** A sentence or two above the frame: what to try, and what to watch. */
+  lead: string;
+  /** Pixel height of the frame — a portrait tablet is tall. */
+  height?: number;
+}
+
 interface Changes {
   /** Page title and tab title. Defaults to the first refinement's. */
   title?: string;
@@ -48,6 +59,8 @@ interface Changes {
   headline?: string;
   description?: string;
   intro: string[];
+  /** Optional: a working copy of the screen, above the comparisons. */
+  demo?: Demo;
   method: string[];
   /** The tiles above the method. Defaults to the first refinement's four. */
   rounds?: Round[];
@@ -138,13 +151,19 @@ for (const [index, scene] of changes.scenes.entries()) {
         <article class="panel panel--${note.viewport}">
           <header class="panel-head">
             <p class="chip chip--${note.viewport}">
-              <span class="chip-dot"></span>${phone ? 'Phone · 390 × 844 · thumb' : 'Laptop · 1440 × 900 · pointer'}
+              <span class="chip-dot"></span>${
+                note.viewport === 'kiosktall'
+                  ? 'Lobby tablet · 800 × 1280 · portrait'
+                  : phone
+                    ? 'Phone · 390 × 844 · thumb'
+                    : 'Laptop · 1440 × 900 · pointer'
+              }
             </p>
             <h4>${escapeHtml(note.headline)}</h4>
           </header>
 
           <div class="media">
-            <figure class="compare" style="--ratio:${phone ? '460 / 995' : '1240 / 775'}">
+            <figure class="compare" style="--ratio:${note.viewport === 'kiosktall' ? '560 / 896' : phone ? '460 / 995' : '1240 / 775'}">
               <img class="base" src="${after}" alt="${escapeHtml(scene.title)}, after, on ${note.viewport}" loading="lazy" decoding="async">
               <div class="reveal">
                 <img src="${before}" alt="${escapeHtml(scene.title)}, before, on ${note.viewport}" loading="lazy" decoding="async">
@@ -349,6 +368,19 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
     color: var(--muted);
     font-size: 0.95rem;
   }
+  /* The live copy. A portrait tablet is 800×1280, so the frame is scaled to
+     fit the column rather than scrolled inside it: a demo somebody has to
+     scroll to press is a demo nobody presses. */
+  .demo { margin: 3.5rem 0 1rem; }
+  .demo h2 { font-size: 1.35rem; margin: 0 0 .4rem; }
+  .demo-lead { max-width: 34rem; margin: 0 0 1.25rem; color: var(--muted); }
+  .demo-frame {
+    width: 100%; max-width: 25rem; margin-inline: auto; height: var(--demo-h);
+    border-radius: 16px; overflow: hidden; background: #020617;
+    box-shadow: 0 10px 34px rgb(2 6 23 / 0.32);
+  }
+  .demo-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+
   .method li::before {
     content: counter(step, decimal-leading-zero);
     position: absolute; left: 0; top: 0.1rem;
@@ -416,6 +448,7 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
   .chip-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
   .chip--phone { background: var(--phone-soft); color: var(--phone); }
   .chip--desktop { background: var(--desk-soft); color: var(--desk); }
+  .chip--kiosktall { background: var(--phone-soft); color: var(--phone); }
 
   /* ---- the comparison itself ---- */
 
@@ -429,8 +462,9 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
    * a hand; the laptop takes the full card, the way it fills a screen.
    */
   .media { background: var(--sunken); border-block: 1px solid var(--rule); }
-  .panel--phone .media { padding: 1.4rem 1.25rem 0; }
+  .panel--phone .media, .panel--kiosktall .media { padding: 1.4rem 1.25rem 0; }
   .panel--phone .compare { max-width: 23rem; margin-inline: auto; border-radius: 12px; }
+  .panel--kiosktall .compare { max-width: 28rem; margin-inline: auto; border-radius: 14px; }
 
   .compare {
     position: relative;
@@ -441,7 +475,7 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
     touch-action: pan-y;
     isolation: isolate;
   }
-  .panel--phone .compare { box-shadow: 0 8px 26px rgb(2 6 23 / 0.28); }
+  .panel--phone .compare, .panel--kiosktall .compare { box-shadow: 0 8px 26px rgb(2 6 23 / 0.28); }
   .compare img {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
@@ -576,6 +610,18 @@ const html = `<title>${escapeHtml(changes.title ?? 'Tally — what the refinemen
   <div class="method">
     <h2>How it was arrived at</h2>
     <ol>${changes.method.map((line) => `<li>${markNumbers(line)}</li>`).join('')}</ol>
+    ${
+      changes.demo
+        ? `<section class="demo">
+      <h2>${escapeHtml(changes.demo.title)}</h2>
+      <p class="demo-lead">${markNumbers(changes.demo.lead)}</p>
+      <div class="demo-frame" style="--demo-h:${changes.demo.height ?? 900}px">
+        <iframe src="${escapeHtml(changes.demo.src)}" title="${escapeHtml(changes.demo.title)}"
+                loading="lazy" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </section>`
+        : ''
+    }
   </div>
 
   ${sections.join('\n')}

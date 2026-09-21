@@ -16,6 +16,8 @@ import {
   MIN_LABEL_FONT_SCALE,
   MIN_LABEL_FIXED_LENGTH_MM,
   LABEL_TOKENS,
+  LABEL_LINE_ALIGNS,
+  LABEL_LINE_SIZES,
   MAX_LABEL_COPIES,
   MAX_LABEL_LINES,
   fillLabelTokens,
@@ -109,6 +111,26 @@ describe('an optional [...] group', () => {
   });
 });
 
+describe('a token with room around it', () => {
+  /*
+   * `{{ firstName }}` is what a leader types as often as the tight form, and
+   * the pattern allows it on both sides deliberately. Nothing asked for it,
+   * which left the whitespace in the pattern free to be anything at all.
+   */
+  it('is filled whatever space sits inside the braces', () => {
+    const values = { firstName: 'Ada' };
+    expect(fillLabelTokens('{{ firstName }}', values)).toBe('Ada');
+    expect(fillLabelTokens('{{firstName }}', values)).toBe('Ada');
+    expect(fillLabelTokens('{{  firstName}}', values)).toBe('Ada');
+  });
+
+  it('is not filled when the space is inside the name', () => {
+    // The tolerance is around the token, not through it: `{{first Name}}` is a
+    // leader's typo and prints as itself rather than quietly becoming a name.
+    expect(fillLabelTokens('{{first Name}}', { firstName: 'Ada' })).toBe('{{first Name}}');
+  });
+});
+
 describe('tokensIn', () => {
   it('lists tokens in first-seen order without repeats', () => {
     expect(tokensIn('{{firstName}} {{grade}} {{firstName}}')).toEqual(['firstName', 'grade']);
@@ -123,6 +145,50 @@ describe('tokensIn', () => {
 describe('the default template', () => {
   it('survives its own sanitizer unchanged', () => {
     expect(sanitizeLabelTemplate(DEFAULT_LABEL_TEMPLATE)).toEqual(DEFAULT_LABEL_TEMPLATE);
+  });
+
+  /*
+   * Said out loud, line by line, rather than compared against itself.
+   *
+   * The assertion above cannot fail on a changed default: it reads the constant
+   * on both sides, so editing a size or a token mutates the expectation with the
+   * value. Everything else in this file asks *properties* of the template — that
+   * its tokens are known, that it mentions nothing a lobby screen may not know.
+   * Nothing claimed what it actually is.
+   *
+   * It is worth claiming. This is the sticker a leader gets the first time they
+   * switch printing on and the only one most gatherings ever use, so its
+   * contents are a product decision rather than an implementation detail: a
+   * first name big enough to read across a room, an initial to tell two Noahs
+   * apart, then the gathering and the arrival time a volunteer wants and a
+   * parent does not.
+   */
+  it('is this, exactly', () => {
+    expect(DEFAULT_LABEL_TEMPLATE).toEqual({
+      lines: [
+        {
+          text: '{{firstName}} {{lastInitial}}',
+          size: 'xl',
+          bold: true,
+          align: 'center',
+          requiresValue: false,
+        },
+        { text: '{{grade}}', size: 'md', bold: false, align: 'center', requiresValue: false },
+        { text: '{{eventTitle}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+        { text: '{{time}}', size: 'sm', bold: false, align: 'center', requiresValue: false },
+      ],
+      copies: 1,
+    });
+  });
+
+  /*
+   * The two tables the editor draws its controls from. A size or an alignment
+   * quietly leaving the list is a control quietly leaving the screen, and until
+   * now nothing in the suite read either of them at all.
+   */
+  it('offers four sizes and three alignments, in the order the editor shows them', () => {
+    expect(LABEL_LINE_SIZES).toEqual(['sm', 'md', 'lg', 'xl']);
+    expect(LABEL_LINE_ALIGNS).toEqual(['left', 'center', 'right']);
   });
 
   it('uses only tokens the kiosk can answer', () => {
@@ -261,6 +327,52 @@ describe('sanitizeLabelTemplate', () => {
     expect(sanitizeLabelTemplate({ lines })?.copies).toBe(1);
   });
 
+  /*
+   * The three shapes a template can arrive in that are not a template at all.
+   *
+   * This function is the gate on a value a browser wrote: `firestore.rules`
+   * cannot check the inside of a label template, so everything that keeps a
+   * malformed one from reaching a printer is here. Null, a string and a number
+   * are what a stale client, a half-written document or a hand-edited console
+   * session actually produce.
+   */
+  it('refuses anything that is not an object', () => {
+    expect(sanitizeLabelTemplate(null)).toBeNull();
+    expect(sanitizeLabelTemplate(undefined)).toBeNull();
+    expect(sanitizeLabelTemplate('{{firstName}}')).toBeNull();
+    expect(sanitizeLabelTemplate(7)).toBeNull();
+  });
+
+  it('steps over a line that is not an object rather than failing the template', () => {
+    // A template degrades to the part this deploy understands; one bad entry in
+    // the array must not cost a family the rest of their sticker.
+    const template = sanitizeLabelTemplate({
+      lines: [null, '{{firstName}}', 42, { text: '{{firstName}}' }],
+      copies: 1,
+    });
+    expect(template?.lines).toEqual([
+      { text: '{{firstName}}', size: 'md', bold: false, align: 'center', requiresValue: false },
+    ]);
+  });
+
+  it('keeps an only-if-filled line marked as one', () => {
+    // The flag `{{location}}` and `{{allergy}}` are inserted with: a line that
+    // lost it on the way through here prints its caption over an empty value.
+    const template = sanitizeLabelTemplate({
+      lines: [{ text: 'Room {{location}}', requiresValue: true }],
+      copies: 1,
+    });
+    expect(template?.lines[0]?.requiresValue).toBe(true);
+  });
+
+  it('falls back to one copy when the count is not a finite number', () => {
+    expect(sanitizeLabelTemplate({ ...DEFAULT_LABEL_TEMPLATE, copies: Number.NaN })?.copies).toBe(1);
+    expect(sanitizeLabelTemplate({ ...DEFAULT_LABEL_TEMPLATE, copies: '2' })?.copies).toBe(1);
+    expect(
+      sanitizeLabelTemplate({ ...DEFAULT_LABEL_TEMPLATE, copies: Number.POSITIVE_INFINITY })?.copies,
+    ).toBe(1);
+  });
+
   it('truncates a line long enough to be a mistake', () => {
     const result = sanitizeLabelTemplate({
       lines: [{ text: 'x'.repeat(500), size: 'md', bold: false, align: 'center', requiresValue: false }],
@@ -370,5 +482,46 @@ describe('sameLabelTemplate', () => {
     const shorter = structuredClone(DEFAULT_LABEL_TEMPLATE);
     shorter.lines.pop();
     expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, shorter)).toBe(false);
+  });
+
+  /*
+   * The three per-line fields the comparison reads and nothing asked about.
+   *
+   * This function decides whether an edit is unsaved and whether a kiosk's
+   * cached template is stale, so a field it silently ignores is a change that
+   * never reaches the shelf: a leader unbolds a line, saves, and the lobby goes
+   * on printing the old sticker until something else happens to differ.
+   */
+  it('notices a line that changed weight, alignment or its only-if-filled flag', () => {
+    const unbolded = structuredClone(DEFAULT_LABEL_TEMPLATE);
+    unbolded.lines[0]!.bold = false;
+    expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, unbolded)).toBe(false);
+
+    const realigned = structuredClone(DEFAULT_LABEL_TEMPLATE);
+    realigned.lines[0]!.align = 'left';
+    expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, realigned)).toBe(false);
+
+    const conditional = structuredClone(DEFAULT_LABEL_TEMPLATE);
+    conditional.lines[0]!.requiresValue = true;
+    expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, conditional)).toBe(false);
+  });
+
+  /*
+   * The bottom margin, which the shape tests compare only at the top. Tape is
+   * cut from the content, so the two ends are separate decisions and a template
+   * that differs only at the bottom is a different sticker.
+   */
+  it('notices a changed bottom margin', () => {
+    const lower = structuredClone(DEFAULT_LABEL_TEMPLATE);
+    lower.marginBottomMm = 4;
+    expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, lower)).toBe(false);
+    expect(sameLabelTemplate(lower, structuredClone(lower))).toBe(true);
+  });
+
+  it('notices a turned label against an unturned one, in either order', () => {
+    const turned = structuredClone(DEFAULT_LABEL_TEMPLATE);
+    turned.rotated = true;
+    expect(sameLabelTemplate(DEFAULT_LABEL_TEMPLATE, turned)).toBe(false);
+    expect(sameLabelTemplate(turned, DEFAULT_LABEL_TEMPLATE)).toBe(false);
   });
 });
