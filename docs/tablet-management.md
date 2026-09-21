@@ -738,6 +738,32 @@ It buys the six wants in §1 and nothing more. Three things it specifically does
   its `connect` event, but Chrome still raises Android's "Allow access" dialog on the first `open()`
   after a re-attach. The visit becomes a tap on *Allow* rather than a trip through the staff
   screens. It does not become nothing.
+
+  **And no device-owner setting removes it.** Worth writing down, because it is the first thing
+  anybody asks on seeing the dialog survive a correctly applied policy. The two are different
+  layers: `WebUsbAllowDevicesForUrls` grants *this origin* access within Chrome, while the dialog is
+  Android granting *Chrome, the app* access to the physical device — held by `UsbService`, keyed to
+  the package, and dropped on detach. Nothing a DPC can reach:
+
+  - AMAPI's `permissionGrants` sets **manifest runtime permissions** (camera, location, and the
+    rest). A USB device grant is not one of them, so there is no policy field to set — in AMAPI, in
+    Test DPC, or anywhere else a device owner can write.
+  - The switch that does exist is `config_disableUsbPermissionDialogs`, an AOSP **build-time**
+    resource in `frameworks/base/core/res/res/values/config.xml`. It is a custom-ROM affair, and
+    setting it on a device carrying Google services fails CTS — so not on a tablet bought from a
+    shop.
+  - The persistent per-device grant some apps get — the *use by default for this USB device*
+    checkbox — comes from the app declaring a `USB_DEVICE_ATTACHED` intent filter with a
+    `device_filter.xml`. That is **Chrome's manifest**, not ours, and Chrome does not declare one
+    for arbitrary WebUSB devices.
+  - MDMs that do offer it (Esper's `UsbPermissionManager`, for one) ship a **privileged system
+    agent** signed into the platform. That is a different kind of product from a device-owner DPC,
+    and adopting one to remove one tap is not a trade this deployment should make.
+
+  So the lever that is actually ours is to make re-attaches rarer rather than cheaper: Auto Power
+  Off *None*, mains power, a hub the tablet does not switch off (§4.8's list, and
+  [`label-printing.md`](label-printing.md)). ChromeOS is the only route that removes the dialog
+  outright, which is one more entry on §7's side of the ledger.
 - **Managed configuration reaching the web page.** `ManagedConfigurationPerOrigin` and
   `navigator.managed.getManagedConfiguration()` — which would let the console hand the kiosk its
   gathering and its pairing token directly — are ChromeOS and desktop only, and require

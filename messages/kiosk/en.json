@@ -195,6 +195,7 @@
     "connectedGuessedModel": "Connected — the model had to be guessed.",
     "plugInFirst": "Plug the printer into this tablet and switch it on first.",
     "connectOpensWindow": "Connecting opens a window from the browser listing the USB devices it can see — pick the QL.",
+    "connectAsksAndroid": "The browser already has this printer, so there is no list to pick from — tap Allow when Android asks.",
     "mayConnectItself": "It may connect on its own in a few seconds — or press Connect this printer again to hurry it.",
     "troubleThenLookAgain": "If it is plugged in and switched on and nothing changes, press Look again.",
     "selectionCancelled": "No printer selected. Choose the QL, or make sure it is plugged in and switched on.",

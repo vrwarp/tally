@@ -185,6 +185,60 @@ describe('a printer the tablet policy granted', () => {
   });
 });
 
+describe('which dialog Connect is about to open', () => {
+  /*
+   * The sentence under *Connect* used to promise, unconditionally, a browser
+   * window listing USB devices to pick the QL from. On a tablet whose origin
+   * already holds the printer — which is every managed one, and any that has
+   * been paired before — Chrome opens no list at all, and the only dialog is
+   * Android's own *Allow Chrome to access QL-810W?*. So the screen was telling
+   * somebody to pick from a list that was never going to appear, at the one
+   * moment they are standing there wondering what they are looking at.
+   *
+   * The test drives the real `hasGrantedPrinter` through a stubbed bus rather
+   * than mocking the module, because what is being pinned is the *condition* —
+   * a Brother device already granted to this origin — and a mock would pin only
+   * that the branch exists.
+   */
+
+  function granting(devices: { vendorId: number }[]) {
+    Object.defineProperty(navigator, 'usb', {
+      configurable: true,
+      value: { getDevices: async () => devices },
+    });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'usb');
+  });
+
+  it('names Android when the browser already holds the printer', async () => {
+    granting([{ vendorId: 0x04f9 }]);
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29' }, { hasConfig: false });
+
+    expect(await screen.findByText(/tap Allow when Android asks/i)).toBeInTheDocument();
+    expect(screen.queryByText(/listing the USB devices/i)).not.toBeInTheDocument();
+  });
+
+  it('still promises the chooser where there is no grant to skip it', async () => {
+    granting([]);
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29' }, { hasConfig: false });
+
+    expect(await screen.findByText(/listing the USB devices/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tap Allow when Android asks/i)).not.toBeInTheDocument();
+  });
+
+  it('is not fooled by some other vendor on the bus', async () => {
+    // The tablet policy pre-grants Zebra and Dymo too, and a grant for a
+    // printer this kiosk cannot drive is not a reason to promise no chooser:
+    // connecting one still opens the list.
+    granting([{ vendorId: 0x0a5f }]);
+    mount(handleUnpaired(), { model: 'QL-810W', label: '62x29' }, { hasConfig: false });
+
+    expect(await screen.findByText(/listing the USB devices/i)).toBeInTheDocument();
+  });
+});
+
 describe('checking whether the tablet policy took', () => {
   /*
    * The one control on this screen aimed at a question rather than at a
