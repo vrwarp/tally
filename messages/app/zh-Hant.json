@@ -547,6 +547,19 @@
     "refusedBanner": "此聚會未開放你簽到——查看同工名單",
     "refusedSee": "查看"
   },
+  "PastChange": {
+    "titleCheckIn": "要為 {name} 補簽到過去的聚會嗎？",
+    "titleUndo": "要從過去的聚會中移除 {name} 嗎？",
+    "titleCheckOut": "要為 {name} 補簽出過去的聚會嗎？",
+    "titleUndoCheckOut": "要在過去的聚會中把 {name} 放回房間嗎？",
+    "titleSwap": "要把過去的簽到從 {wrong} 移到 {right} 嗎？",
+    "body": "這會更改 {date} {title} 的點名紀錄，而不是今天的。",
+    "confirmCheckIn": "簽到",
+    "confirmUndo": "移除",
+    "confirmCheckOut": "簽出",
+    "confirmUndoCheckOut": "放回",
+    "confirmSwap": "移動"
+  },
   "StudentRow": {
     "whoWithGrade": "{name}，{grade}",
     "ariaSwapSource": "{who}——正在移動的這筆簽到",

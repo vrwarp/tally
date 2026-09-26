@@ -456,8 +456,9 @@ export const StudentRow = memo(function StudentRow({
               lands most easily. An 8px overshoot from the row body landed
               inside the delete, for the whole height of the row.
 
-              A confirmation is not the fix: undo is one tap and never a dialog,
-              which is the whole reason a mis-tap is cheap here. So the divider
+              A confirmation is not the fix: on the night undo is one tap and
+              never a dialog, which is the whole reason a mis-tap is cheap here
+              (a past gathering asks — see `PastChangeDialog`). So the divider
               stays exactly where it was, drawn by this slot, and the button
               inside it starts 8px further right. An overshoot now lands on the
               slot, which is not a button and does nothing. The target keeps its

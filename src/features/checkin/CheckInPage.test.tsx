@@ -75,11 +75,14 @@ const live = vi.hoisted(() => {
     /** Shared empties, so nothing below allocates one per render. */
     nothing: [] as never[],
     noNotes: new Map<string, string>(),
+    /** The page's clock. Moved forward to make a gathering past. */
+    now: null as Date | null,
   };
 });
 
 const services = vi.hoisted(() => ({
   checkIn: vi.fn(async () => {}),
+  undoCheckIn: vi.fn(async () => {}),
   ensureMaterialized: vi.fn(async () => {}),
 }));
 
@@ -102,7 +105,7 @@ vi.mock('@/hooks/useActiveEvent', async () => {
       event: useSyncExternalStore(live.event.subscribe, live.event.read),
       eventLoading: false,
       fromArchive: false,
-      now: NOW,
+      now: live.now ?? NOW,
       selectableEvents: live.nothing,
     }),
     useSeriesHistoryEvents: () => live.nothing,
@@ -153,7 +156,7 @@ vi.mock('@/services/attendance', () => ({
   checkIn: services.checkIn,
   checkOut: vi.fn(async () => {}),
   swapCheckIn: vi.fn(async () => {}),
-  undoCheckIn: vi.fn(async () => {}),
+  undoCheckIn: services.undoCheckIn,
   undoCheckOut: vi.fn(async () => {}),
   quickAddAndCheckIn: vi.fn(async () => 'student-new'),
 }));
@@ -242,6 +245,9 @@ beforeEach(() => {
   live.attendance.publish([]);
   live.handed.length = 0;
   live.builds.length = 0;
+  live.now = null;
+  services.checkIn.mockClear();
+  services.undoCheckIn.mockClear();
   services.checkIn.mockImplementation(async () => {});
   services.ensureMaterialized.mockImplementation(async () => {});
 });
@@ -371,5 +377,83 @@ describe('quick add', () => {
 
     expect(document.querySelector('dialog')).not.toBeNull();
     expect(screen.getByLabelText(/^first name/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Every write on a gathering from an earlier day asks first.
+ *
+ * Friday the 13th, looked at from the Friday after — the night a counselor
+ * lands on by picking the wrong row, and forty taps into the wrong register is
+ * the worst thing this screen can do.
+ */
+describe('a past gathering', () => {
+  const NEXT_FRIDAY = new Date('2026-02-20T19:30:00');
+
+  function adaRow(): Parameters<RosterListProps['onPress']>[0] {
+    const entry = handed().entries.find((row) => row.student.id === 'ada');
+    if (!entry) throw new Error('Ada is not on the roster');
+    return entry;
+  }
+
+  it('asks before a check-in, and writes it once confirmed', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+
+    expect(services.checkIn).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', { name: 'Check Ada Byron in to a past gathering?' }),
+    ).toBeInTheDocument();
+    // The confirm is where the caret is, so Enter answers it on a laptop.
+    expect(screen.getByRole('button', { name: 'Check in' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Check in' }));
+
+    expect(services.checkIn).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('dialog')).toBeNull();
+  });
+
+  it('writes nothing when the question is cancelled', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(services.checkIn).not.toHaveBeenCalled();
+    expect(document.querySelector('dialog')).toBeNull();
+  });
+
+  it('asks before an undo, too', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open(FRIDAY, [makeAttendance({ studentId: 'ada', eventId: FRIDAY.id })]);
+
+    await act(async () => {
+      handed().onUndo?.(adaRow());
+    });
+
+    expect(services.undoCheckIn).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(services.undoCheckIn).toHaveBeenCalledWith(FRIDAY.id, 'ada');
+  });
+
+  it('does not ask on the night itself', async () => {
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(services.checkIn).toHaveBeenCalledTimes(1);
   });
 });

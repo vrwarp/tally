@@ -2982,6 +2982,83 @@
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
+  "PastChange.titleCheckIn": {
+    "source": "Check {name} in to a past gathering?",
+    "context": "Title of the confirmation that appears before a check-in is recorded on a gathering from an earlier day. {name} is a student. Asked every time, so it must read as a question about this one student.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.titleUndo": {
+    "source": "Remove {name} from a past gathering?",
+    "context": "Title of the confirmation before a student's check-in is deleted from a gathering on an earlier day. {name} is a student.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.titleCheckOut": {
+    "source": "Check {name} out of a past gathering?",
+    "context": "Title of the confirmation before a check-out is recorded on a gathering from an earlier day. {name} is a student.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.titleUndoCheckOut": {
+    "source": "Put {name} back in the room at a past gathering?",
+    "context": "Title of the confirmation before a check-out is undone on a gathering from an earlier day, marking the student as still in the room. {name} is a student.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.titleSwap": {
+    "source": "Move a past check-in from {wrong} to {right}?",
+    "context": "Title of the confirmation before a check-in on a gathering from an earlier day is handed from the student it was wrongly recorded for ({wrong}) to the right one ({right}).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.body": {
+    "source": "This changes the register for {title} on {date}, not today’s.",
+    "context": "The one sentence inside the past-gathering confirmation. {title} is the gathering's name as a leader typed it; {date} is its weekday and date, already formatted. The point is that the reader may be on the wrong night.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.confirmCheckIn": {
+    "source": "Check in",
+    "context": "Confirm button on the past-gathering check-in confirmation.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.confirmUndo": {
+    "source": "Remove",
+    "context": "Confirm button that deletes a check-in from a past gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.confirmCheckOut": {
+    "source": "Check out",
+    "context": "Confirm button on the past-gathering check-out confirmation.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.confirmUndoCheckOut": {
+    "source": "Put back",
+    "context": "Confirm button that undoes a check-out on a past gathering, putting the student back in the room.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastChange.confirmSwap": {
+    "source": "Move",
+    "context": "Confirm button that moves a check-in from one student to another on a past gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "StudentRow.whoWithGrade": {
     "source": "{name}, {grade}",
     "es-MX": "machine",

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
 import { cn } from '@/lib/utils';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
@@ -72,6 +72,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   loading?: boolean;
   leading?: ReactNode;
+  /** Passed straight through to the `<button>` — React 19 takes it as a prop. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({
