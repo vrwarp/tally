@@ -17,6 +17,7 @@ import {
   formatSeenShort,
   fromDateTimeLocalValue,
   isCheckInOpen,
+  isPastGathering,
   nextSeriesOccurrence,
   parseTimeOfDay,
   pickActiveEvent,
@@ -148,6 +149,38 @@ describe('isCheckInOpen', () => {
 
   it('is open in the middle', () => {
     expect(isCheckInOpen(event, FRIDAY_EVENING)).toBe(true);
+  });
+});
+
+describe('isPastGathering', () => {
+  // Friday 13 February, 19:00–21:00, window 18:00–22:00.
+  const friday = makeEvent({});
+
+  it('is past once the window has closed on an earlier day', () => {
+    expect(isPastGathering(friday, new Date(2026, 1, 14, 9, 0))).toBe(true);
+    expect(isPastGathering(friday, new Date(2026, 1, 20, 19, 0))).toBe(true);
+  });
+
+  it('is not past later the same evening, after the window closed', () => {
+    expect(isPastGathering(friday, new Date(2026, 1, 13, 23, 30))).toBe(false);
+  });
+
+  it('is not past while the window is still open', () => {
+    expect(isPastGathering(friday, FRIDAY_EVENING)).toBe(false);
+  });
+
+  it('is not past for a night still running after midnight', () => {
+    const lockIn = makeEvent({
+      startAt: new Date(2026, 1, 13, 23, 30),
+      endAt: new Date(2026, 1, 14, 7, 0),
+      checkInClosesAt: new Date(2026, 1, 14, 7, 0),
+    });
+    expect(isPastGathering(lockIn, new Date(2026, 1, 14, 0, 20))).toBe(false);
+    expect(isPastGathering(lockIn, new Date(2026, 1, 14, 7, 0, 0, 1))).toBe(true);
+  });
+
+  it('is not past for a gathering that has not happened yet', () => {
+    expect(isPastGathering(friday, new Date(2026, 1, 12, 12, 0))).toBe(false);
   });
 });
 

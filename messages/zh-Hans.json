@@ -547,6 +547,19 @@
     "refusedBanner": "此聚会暂未开放你的签到权限——请查看参与同工",
     "refusedSee": "查看"
   },
+  "PastChange": {
+    "titleCheckIn": "要为 {name} 补签到过去的聚会吗？",
+    "titleUndo": "要从过去的聚会中移除 {name} 吗？",
+    "titleCheckOut": "要为 {name} 补签出过去的聚会吗？",
+    "titleUndoCheckOut": "要在过去的聚会中把 {name} 放回场内吗？",
+    "titleSwap": "要把过去的签到从 {wrong} 移到 {right} 吗？",
+    "body": "这会更改 {date} {title} 的点名记录，而不是今天的。",
+    "confirmCheckIn": "签到",
+    "confirmUndo": "移除",
+    "confirmCheckOut": "签出",
+    "confirmUndoCheckOut": "放回",
+    "confirmSwap": "移动"
+  },
   "StudentRow": {
     "whoWithGrade": "{name}，{grade}",
     "ariaSwapSource": "{who}——正在移动的这条签到",

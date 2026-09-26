@@ -547,6 +547,19 @@
     "refusedBanner": "This gathering isn't letting you check in — see Who's on",
     "refusedSee": "See"
   },
+  "PastChange": {
+    "titleCheckIn": "Check {name} in to a past gathering?",
+    "titleUndo": "Remove {name} from a past gathering?",
+    "titleCheckOut": "Check {name} out of a past gathering?",
+    "titleUndoCheckOut": "Put {name} back in the room at a past gathering?",
+    "titleSwap": "Move a past check-in from {wrong} to {right}?",
+    "body": "This changes the register for {title} on {date}, not today’s.",
+    "confirmCheckIn": "Check in",
+    "confirmUndo": "Remove",
+    "confirmCheckOut": "Check out",
+    "confirmUndoCheckOut": "Put back",
+    "confirmSwap": "Move"
+  },
   "StudentRow": {
     "whoWithGrade": "{name}, {grade}",
     "ariaSwapSource": "{who} — the check-in being moved",

@@ -56,6 +56,23 @@ export function isCheckInOpen(event: TallyEvent, now: Date): boolean {
 }
 
 /**
+ * True for a gathering that is over and was on an earlier day — the register
+ * a counselor can only reach by going back for it, and the one a mis-chosen
+ * night gets forty students tapped into.
+ *
+ * Both halves, because either alone asks at the wrong time. The calendar day
+ * alone would ask on every tap at the lock-in still running at twenty past
+ * midnight; the window alone would ask on every correction made in the car
+ * park the moment this morning's service let out.
+ */
+export function isPastGathering(event: TallyEvent, now: Date): boolean {
+  return (
+    event.checkInClosesAt < now &&
+    startOfDay(event.startAt).getTime() < startOfDay(now).getTime()
+  );
+}
+
+/**
  * The gathering whose check-in window covers this instant.
  *
  * Priority:

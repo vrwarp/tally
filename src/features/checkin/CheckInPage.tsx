@@ -48,6 +48,7 @@ import { ArchivedNight } from '@/features/checkin/ArchivedNight';
 import { LockedGathering } from '@/features/events/LockedGathering';
 import { ChooseEvent } from '@/features/checkin/ChooseEvent';
 import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
+import { PastChangeDialog, type PastChange } from '@/features/checkin/PastChangeDialog';
 import { RosterList } from '@/features/checkin/RosterList';
 import { SearchBar } from '@/features/checkin/SearchBar';
 import { buildRoster, formerStudent, type RosterFocus } from '@/features/roster/predictiveRoster';
@@ -67,9 +68,7 @@ import {
   undoCheckIn,
   undoCheckOut,
 } from '@/services/attendance';
-import {
-  isCheckInOpen,
-} from '@/lib/time';
+import { isCheckInOpen, isPastGathering } from '@/lib/time';
 import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
@@ -251,7 +250,7 @@ export function CheckInPage() {
   const rosterList = useRef<HTMLUListElement | null>(null);
 
   /**
-   * The two values a tap needs to know but no tap handler may be rebuilt for.
+   * The values a tap needs to know but no tap handler may be rebuilt for.
    *
    * Refreshed every render and read at tap time, so the tap handlers do not
    * have to be reborn on every keystroke and every attendance echo. The row
@@ -265,9 +264,29 @@ export function CheckInPage() {
    * a render that returned early below (archive, locked, no roster) without
    * updating it would leave that window showing the render before it.
    */
-  const latest = useRef({ query: '', attendanceCount: 0 });
+  const latest = useRef({ query: '', attendanceCount: 0, now });
   latest.current.query = query;
   latest.current.attendanceCount = attendance.length;
+  latest.current.now = now;
+
+  /**
+   * An attendance write on a past gathering, held until somebody confirms it.
+   *
+   * Every write on a past gathering asks first, without exception — see
+   * `PastChangeDialog`. The clock is read through `latest` at tap time, so its
+   * tick does not rebuild every row's handlers.
+   */
+  const [pastChange, setPastChange] = useState<
+    (PastChange & { run: () => void }) | null
+  >(null);
+  const unlessPast = useCallback(
+    (change: PastChange, run: () => Promise<void>): Promise<void> => {
+      if (!event || !isPastGathering(event, latest.current.now)) return run();
+      setPastChange({ ...change, run: () => void run() });
+      return Promise.resolve();
+    },
+    [event],
+  );
 
   /**
    * The "Who's on" sheet, and which gathering it is open for.
@@ -688,48 +707,50 @@ export function CheckInPage() {
       // Through the ref, not the closure: this handler is a prop on every row,
       // and closing over `query` would rebuild it — and repaint the roster —
       // on each of the three letters that led to this tap. See `latest`.
-      const searched = latest.current.query.trim() !== "";
+      await unlessPast({ kind: "checkIn", name }, () => {
+        const searched = latest.current.query.trim() !== "";
 
-      await write(
-        [entry.student.id],
-        (cause) => (noteRefusal(cause) ? null : t("errorCheckIn", { name })),
-        async () => {
-          // Paint and buzz first — the confirmation must land on the tap, not on
-          // the round trip.
-          haptic();
-          flash(entry.student.id);
-          setAnnouncement(t("announceCheckedIn", { name }));
-          // Attendance hangs off the event document, so the gathering has to be
-          // one. Almost always already done by the effect above; this is what
-          // makes it true for a counselor getting a head start on a gathering
-          // whose check-in has not opened yet.
-          await ensureMaterialized(event);
-          await checkIn({
-            event,
-            student: entry.student,
-            uid: user.uid,
-            method: searched ? "search" : "tap",
-          });
+        return write(
+          [entry.student.id],
+          (cause) => (noteRefusal(cause) ? null : t("errorCheckIn", { name })),
+          async () => {
+            // Paint and buzz first — the confirmation must land on the tap, not on
+            // the round trip.
+            haptic();
+            flash(entry.student.id);
+            setAnnouncement(t("announceCheckedIn", { name }));
+            // Attendance hangs off the event document, so the gathering has to be
+            // one. Almost always already done by the effect above; this is what
+            // makes it true for a counselor getting a head start on a gathering
+            // whose check-in has not opened yet.
+            await ensureMaterialized(event);
+            await checkIn({
+              event,
+              student: entry.student,
+              uid: user.uid,
+              method: searched ? "search" : "tap",
+            });
 
-          /*
-           * An empty box and a caret, ready for the next name.
-           *
-           * Only after the write actually lands — `write` swallows the failure,
-           * so anything past the await is a check-in that happened — and only
-           * for a check-in that came out of a search, on a laptop. That is the
-           * back-fill loop: a core member with a paper register types three
-           * letters, arrows down, presses Enter, and types the next three. The
-           * alternative was select-all-and-retype thirty times, or two device
-           * switches per student.
-           */
-          if (searched && onLaptop()) {
-            setQuery("");
-            searchInput.current?.focus();
-          }
-        },
-      );
+            /*
+             * An empty box and a caret, ready for the next name.
+             *
+             * Only after the write actually lands — `write` swallows the failure,
+             * so anything past the await is a check-in that happened — and only
+             * for a check-in that came out of a search, on a laptop. That is the
+             * back-fill loop: a core member with a paper register types three
+             * letters, arrows down, presses Enter, and types the next three. The
+             * alternative was select-all-and-retype thirty times, or two device
+             * switches per student.
+             */
+            if (searched && onLaptop()) {
+              setQuery("");
+              searchInput.current?.focus();
+            }
+          },
+        );
+      });
     },
-    [event, user, flash, write, refuseFrozen, noteRefusal, t],
+    [event, user, flash, write, refuseFrozen, noteRefusal, unlessPast, t],
   );
 
   /**
@@ -749,16 +770,19 @@ export function CheckInPage() {
       if (!event) return;
       const name = nameOf(entry);
 
-      // No confirm dialog: a mistaken undo costs one more tap, whereas a modal
-      // costs every counselor a beat on every correction.
-      setExpandedId(null);
-      await write([entry.student.id], t("errorUndo", { name }), async () => {
-        await undoCheckIn(event.id, entry.student.id);
-        setAnnouncement(t("announceRemoved", { name }));
-        show(t("toastUndid", { name }), { tone: "info" });
+      // No confirm dialog on the night: a mistaken undo costs one more tap,
+      // whereas a modal costs every counselor a beat on every correction. A
+      // past gathering is the exception — see `unlessPast`.
+      await unlessPast({ kind: "undo", name }, () => {
+        setExpandedId(null);
+        return write([entry.student.id], t("errorUndo", { name }), async () => {
+          await undoCheckIn(event.id, entry.student.id);
+          setAnnouncement(t("announceRemoved", { name }));
+          show(t("toastUndid", { name }), { tone: "info" });
+        });
       });
     },
-    [event, show, write, nameOf, t],
+    [event, show, write, nameOf, unlessPast, t],
   );
 
   const handleCheckOut = useCallback(
@@ -769,16 +793,18 @@ export function CheckInPage() {
       if (refuseFrozen(entry)) return;
       const name = nameOf(entry);
 
-      setExpandedId(null);
-      await write([entry.student.id], t("errorCheckOut", { name }), async () => {
-        // No `flash`: the green animation means "checked in", and saying that
-        // as somebody leaves would be the wrong confirmation entirely.
-        haptic();
-        setAnnouncement(t("announceCheckedOut", { name }));
-        await checkOut(event.id, entry.student.id, user.uid);
+      await unlessPast({ kind: "checkOut", name }, () => {
+        setExpandedId(null);
+        return write([entry.student.id], t("errorCheckOut", { name }), async () => {
+          // No `flash`: the green animation means "checked in", and saying that
+          // as somebody leaves would be the wrong confirmation entirely.
+          haptic();
+          setAnnouncement(t("announceCheckedOut", { name }));
+          await checkOut(event.id, entry.student.id, user.uid);
+        });
       });
     },
-    [event, user, write, refuseFrozen, nameOf, t],
+    [event, user, write, refuseFrozen, nameOf, unlessPast, t],
   );
 
   const handleUndoCheckOut = useCallback(
@@ -787,14 +813,16 @@ export function CheckInPage() {
       if (refuseFrozen(entry)) return;
       const name = nameOf(entry);
 
-      setExpandedId(null);
-      await write([entry.student.id], t("errorUndoCheckOut", { name }), async () => {
-        haptic();
-        setAnnouncement(t("announceBackInRoom", { name }));
-        await undoCheckOut(event.id, entry.student.id);
+      await unlessPast({ kind: "undoCheckOut", name }, () => {
+        setExpandedId(null);
+        return write([entry.student.id], t("errorUndoCheckOut", { name }), async () => {
+          haptic();
+          setAnnouncement(t("announceBackInRoom", { name }));
+          await undoCheckOut(event.id, entry.student.id);
+        });
       });
     },
-    [event, write, refuseFrozen, nameOf, t],
+    [event, write, refuseFrozen, nameOf, unlessPast, t],
   );
 
   /**
@@ -814,27 +842,31 @@ export function CheckInPage() {
       const right = studentFullName(entry.student);
       const when = time.clock(from.record.checkedInAt);
 
-      setSwapForId(null);
-      setQuery("");
+      // Cancelling leaves the picker up, so the right name is still one tap
+      // away if the wrong one was picked.
+      await unlessPast({ kind: "swap", wrong, right }, () => {
+        setSwapForId(null);
+        setQuery("");
 
-      await write(
-        [from.student.id, entry.student.id],
-        t("errorSwap", { name: right }),
-        async () => {
-          haptic();
-          flash(entry.student.id);
-          setAnnouncement(t("announceSwapped", { when, wrong, right }));
-          await swapCheckIn({
-            event,
-            from: from.record,
-            to: entry.student,
-            uid: user.uid,
-          });
-          show(t("toastSwapped", { wrong, right, when }), { tone: "success" });
-        },
-      );
+        return write(
+          [from.student.id, entry.student.id],
+          t("errorSwap", { name: right }),
+          async () => {
+            haptic();
+            flash(entry.student.id);
+            setAnnouncement(t("announceSwapped", { when, wrong, right }));
+            await swapCheckIn({
+              event,
+              from: from.record,
+              to: entry.student,
+              uid: user.uid,
+            });
+            show(t("toastSwapped", { wrong, right, when }), { tone: "success" });
+          },
+        );
+      });
     },
-    [event, user, swapSource, flash, show, write, refuseFrozen, nameOf, t, time],
+    [event, user, swapSource, flash, show, write, refuseFrozen, nameOf, unlessPast, t, time],
   );
 
   /**
@@ -1367,6 +1399,18 @@ export function CheckInPage() {
             // The register as it stands before this visitor's own record
             // arrives, which is the count `forgetCachedHistory` asks about.
             forgetCachedHistory(attendance.length);
+          }}
+        />
+      ) : null}
+
+      {pastChange ? (
+        <PastChangeDialog
+          event={event}
+          change={pastChange}
+          onCancel={() => setPastChange(null)}
+          onConfirm={() => {
+            setPastChange(null);
+            pastChange.run();
           }}
         />
       ) : null}

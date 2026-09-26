@@ -547,6 +547,19 @@
     "refusedBanner": "Esta reunión no te deja pasar lista — mira Quiénes están",
     "refusedSee": "Ver"
   },
+  "PastChange": {
+    "titleCheckIn": "¿Registrar la llegada de {name} a una reunión pasada?",
+    "titleUndo": "¿Quitar a {name} de una reunión pasada?",
+    "titleCheckOut": "¿Registrar la salida de {name} de una reunión pasada?",
+    "titleUndoCheckOut": "¿Regresar a {name} al salón en una reunión pasada?",
+    "titleSwap": "¿Mover una entrada pasada de {wrong} a {right}?",
+    "body": "Esto cambia la lista de {title} del {date}, no la de hoy.",
+    "confirmCheckIn": "Registrar llegada",
+    "confirmUndo": "Quitar",
+    "confirmCheckOut": "Registrar salida",
+    "confirmUndoCheckOut": "Regresar",
+    "confirmSwap": "Mover"
+  },
   "StudentRow": {
     "whoWithGrade": "{name}, {grade}",
     "ariaSwapSource": "{who} — la entrada que se está moviendo",
