@@ -15,6 +15,7 @@ import {
   formatEventWindow,
   formatRelative,
   formatSeenShort,
+  formatWeekdayDay,
   fromDateTimeLocalValue,
   isCheckInOpen,
   isPastGathering,
@@ -155,6 +156,17 @@ describe('isCheckInOpen', () => {
 describe('isPastGathering', () => {
   // Friday 13 February, 19:00–21:00, window 18:00–22:00.
   const friday = makeEvent({});
+
+  it('is not past until the window has actually closed', () => {
+    // A window that runs into the next morning: at its closing instant the
+    // day is already a later one, and only the window keeps it open.
+    const lockIn = makeEvent({
+      startAt: new Date(2026, 1, 13, 23, 30),
+      endAt: new Date(2026, 1, 14, 7, 0),
+      checkInClosesAt: new Date(2026, 1, 14, 7, 0),
+    });
+    expect(isPastGathering(lockIn, new Date(2026, 1, 14, 7, 0, 0, 0))).toBe(false);
+  });
 
   it('is past once the window has closed on an earlier day', () => {
     expect(isPastGathering(friday, new Date(2026, 1, 14, 9, 0))).toBe(true);
@@ -681,6 +693,58 @@ describe('the three ways a date is written on screen', () => {
     expect(formatRelative(kiwi, twoHoursAgo)).toBe('2 hours ago');
     expect(formatRelative(kiwi, twoHoursAgo)).toBe('2 hours ago');
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('formatWeekdayDay', () => {
+  /** Sun 15 Feb 2026. */
+  const sunday = new Date(2026, 1, 15, 9, 0);
+  const at = (locale: string) => formatWeekdayDay({ locale, t: times.t }, sunday);
+
+  it('keeps the weekday and the day, and drops the month', () => {
+    expect(at('en')).toBe('Sun 15');
+  });
+
+  it('keeps only the separators that sit between two kept parts', () => {
+    // "dom 15 de feb": the " de " leads to the month, so it goes with it.
+    expect(at('es-MX')).toBe('dom 15');
+    // 2月15日周日: the 月 follows the month and nothing kept precedes it; the
+    // 日 sits between the day and the weekday and stays.
+    expect(at('zh-Hans')).toBe('15日周日');
+    expect(at('zh-Hant')).toBe('15日週日');
+  });
+});
+
+describe('formatRelative, unit by unit', () => {
+  const now = FRIDAY_EVENING;
+  const ago = (ms: number) => formatRelative(times, new Date(now.getTime() - ms), now);
+  const SECOND = 1000;
+  const MINUTE = 60 * SECOND;
+  const HOUR = 60 * MINUTE;
+  const DAY = 24 * HOUR;
+
+  it('climbs to the next unit exactly at each boundary', () => {
+    expect(ago(59 * SECOND)).toBe('59 seconds ago');
+    expect(ago(60 * SECOND)).toBe('1 minute ago');
+    expect(ago(59 * MINUTE)).toBe('59 minutes ago');
+    expect(ago(60 * MINUTE)).toBe('1 hour ago');
+    expect(ago(23 * HOUR)).toBe('23 hours ago');
+    expect(ago(24 * HOUR)).toBe('1 day ago');
+    expect(ago(29 * DAY)).toBe('29 days ago');
+    expect(ago(30 * DAY)).toBe('1 month ago');
+    expect(ago(330 * DAY)).toBe('11 months ago');
+    expect(ago(360 * DAY)).toBe('1 year ago');
+  });
+
+  it('divides its way up the ladder rather than multiplying', () => {
+    expect(ago(3 * DAY)).toBe('3 days ago');
+    expect(ago(90 * DAY)).toBe('3 months ago');
+    expect(ago(730 * DAY)).toBe('2 years ago');
+  });
+
+  it('says a future instant in the future tense', () => {
+    expect(formatRelative(times, new Date(now.getTime() + 2 * HOUR), now)).toBe('in 2 hours');
+    expect(formatRelative(times, new Date(now.getTime() + 45 * DAY), now)).toBe('in 2 months');
   });
 });
 
