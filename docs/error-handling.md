@@ -116,6 +116,11 @@ Three places look like they are missing error handling and are not:
   write half above is still open and still wants watching rather than guessing.
 - **An unacknowledged write is not distinguishable from a committed one.**
   Related to the above and with the same reasoning.
+- **The kiosk's retry queue loses records beyond a short blip.** It replays only
+  while the kiosk is bound, deletes whatever the rules refuse, keeps the newest
+  50 writes, can erase records queued while a replay runs, and stamps late
+  records with the upload moment. Each is reproduced, and the design that closes
+  them is proposed, in [kiosk-offline-recovery.md](kiosk-offline-recovery.md).
 - **`updateStudent` has no optimistic-concurrency check.** Two core-team members
   editing the same profile in the same minute will have one silently overwrite
   the other. Rare enough, and the fix (a version field and a merge UI) is
