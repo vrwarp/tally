@@ -12800,15 +12800,14 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Confirm.checkOutCount": {
-    "source": "Check out {count}",
-    "context": "The same commit button at pickup, where a parent is collecting children rather than dropping them off. {count} is how many are ticked and about to be checked out. With nobody else offered the button reads the plain verb instead (Confirm.checkOut).",
+  "Confirm.checkOut": {
+    "source": "Check out",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Confirm.checkOut": {
-    "source": "Check out",
+  "Confirm.checkIn": {
+    "source": "Check in",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -12820,8 +12819,9 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Confirm.checkIn": {
-    "source": "Check in",
+  "Confirm.checkOutCount": {
+    "source": "Check out {count}",
+    "context": "The same commit button at pickup, where a parent is collecting children rather than dropping them off. {count} is how many are ticked and about to be checked out. With nobody else offered the button reads the plain verb instead (Confirm.checkOut).",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -13247,6 +13247,12 @@
   },
   "Chooser.loadFailed": {
     "source": "Couldn’t load the calendar. Check the network, then reopen the kiosk.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.bindFailed": {
+    "source": "Couldn’t set the kiosk to {title}. Hold it again to retry.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

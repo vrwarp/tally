@@ -4,6 +4,7 @@
     "holdOne": "Mantén una para fijar el kiosco en ella.",
     "loading": "Cargando…",
     "loadFailed": "No se pudo cargar el calendario. Revisa la red y vuelve a abrir el kiosco.",
+    "bindFailed": "No se pudo fijar el kiosco en {title}. Mantenlo presionado otra vez para reintentar.",
     "checkInOpen": "Registro abierto",
     "opensAt": "El registro abre {when}",
     "endedPickupOnly": "Terminó — solo para recoger",

@@ -119,9 +119,9 @@ service cloud.firestore {
      * id (`{chain}-{date}`) has no `eventAccess` document of its own, so an
      * attendance write aimed at that path before materialisation is not caught
      * here. What catches it is the callable: `materializeOccurrence` is gated on
-     * the chain, so the occurrence never becomes real for somebody outside it,
-     * and `getKioskEvents` refuses to bind a kiosk to a gathering its approver
-     * cannot work. Rules cannot parse the chain back out of the derived id —
+     * the chain, so the occurrence never becomes real for a person outside it;
+     * a kiosk may be set to any gathering, and writes attendance only under
+     * the chain `kioskBoundTo` names. Rules cannot parse the chain back out of the derived id —
      * chain keys may themselves contain the separator — so this is the seam.
      */
     function eventChain(eventId) {

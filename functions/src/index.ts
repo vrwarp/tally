@@ -2813,7 +2813,7 @@ export const materializeOccurrence = onCall<
   { chain: string; startAt: number },
   Promise<{ id: string; created: boolean }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  await requireMemberOrKiosk(request.auth);
+  const identity = await requireMemberOrKiosk(request.auth);
 
   // Safe to set globally because a v2 function is its own service — nothing
   // else shares this container.
@@ -2837,8 +2837,16 @@ export const materializeOccurrence = onCall<
    * refuse. Refusing here is what stops an occurrence of a restricted chain
    * ever becoming real for somebody outside it, and therefore what stops
    * attendance being filed under it.
+   *
+   * A person's gate, and only a person's. A kiosk is a room, not a volunteer
+   * (see `getKioskEvents`): it may be set to any gathering, restricted ones
+   * included, and `kiosk_<deviceId>` is on no chain's member list. Asking
+   * `requireOnChain` about it refused every restricted gathering nobody had
+   * opened in the app yet — the nursery at 9:30 on a Sunday — with the list
+   * drawn and the hold doing nothing. What holds a kiosk's attendance writes to
+   * one gathering is `kioskBoundTo` in the rules, not this.
    */
-  await requireOnChain(request.auth!.uid, chain);
+  if (identity.kind === 'member') await requireOnChain(identity.uid, chain);
 
   const result = await materializeOne(
     db(),
