@@ -121,6 +121,11 @@ Three places look like they are missing error handling and are not:
   50 writes, can erase records queued while a replay runs, and stamps late
   records with the upload moment. Each is reproduced, and the design that closes
   them is proposed, in [kiosk-offline-recovery.md](kiosk-offline-recovery.md).
+- **The Team page calls a healthy kiosk "not recording" two minutes in five.**
+  `KIOSK_LIVE_WITHIN_MS` is three minutes, on the assumption that a bound kiosk
+  reports every thirty seconds; it reports every five (`PRESENT_REFRESH_MS`). In
+  those two minutes **Retire** also skips its confirmation. The same proposal
+  covers it.
 - **`updateStudent` has no optimistic-concurrency check.** Two core-team members
   editing the same profile in the same minute will have one silently overwrite
   the other. Rare enough, and the fix (a version field and a merge UI) is
