@@ -2296,6 +2296,7 @@
     "holdOne": "按住任一場聚會，就會把簽到台設定為那一場。",
     "loading": "載入中…",
     "loadFailed": "無法載入行事曆。請檢查網路，然後重新開啟簽到台。",
+    "bindFailed": "無法把簽到台設定為「{title}」。請再按住一次重試。",
     "checkInOpen": "簽到進行中",
     "opensAt": "{when} 開始簽到",
     "endedPickupOnly": "已結束——只能接人",

@@ -188,6 +188,16 @@ export function EventChooser({
   const tap = useTap();
   const [received, setReceived] = useState<KioskEventEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
+  /*
+   * The gathering a hold just failed to set the kiosk to, by title.
+   *
+   * Not `failed`: the list is on the screen, so "couldn't load the calendar"
+   * above it was untrue, and "reopen the kiosk" sent a volunteer to fix a
+   * network that was fine. Setting the kiosk is a second call — it creates
+   * the occurrence when nobody has opened it in the app yet — and that call
+   * can be refused while the list stands.
+   */
+  const [bindFailed, setBindFailed] = useState<string | null>(null);
   const [binding, setBinding] = useState(false);
   const nowMs = useMemo(() => Date.now(), []);
 
@@ -299,12 +309,13 @@ export function EventChooser({
     if (!entry || binding) return;
     onSelect(entryKey(entry));
     setBinding(true);
+    setBindFailed(null);
     try {
       const bound = await services.bindEntry(entry);
       onBound(bound);
     } catch {
       setBinding(false);
-      setFailed(true);
+      setBindFailed(entry.title);
     }
   };
 
@@ -507,6 +518,11 @@ export function EventChooser({
         {failed && (
           <div className="pt-12 text-center text-ink-300">
             {t("loadFailed")}
+          </div>
+        )}
+        {bindFailed !== null && (
+          <div role="alert" className="pb-3 text-center text-warn-400">
+            {t("bindFailed", { title: bindFailed })}
           </div>
         )}
         <div className="mx-auto flex max-w-2xl flex-col gap-3">

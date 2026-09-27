@@ -4,6 +4,7 @@
     "holdOne": "Hold one to set the kiosk to it.",
     "loading": "Loading…",
     "loadFailed": "Couldn’t load the calendar. Check the network, then reopen the kiosk.",
+    "bindFailed": "Couldn’t set the kiosk to {title}. Hold it again to retry.",
     "checkInOpen": "Check-in open",
     "opensAt": "Check-in opens {when}",
     "endedPickupOnly": "Ended — pickup only",

@@ -4,6 +4,7 @@
     "holdOne": "按住其中一项，就把签到台设成这场聚会。",
     "loading": "加载中…",
     "loadFailed": "无法加载日历。请检查网络，然后重新打开签到台。",
+    "bindFailed": "无法把签到台设成“{title}”。请再按住一次重试。",
     "checkInOpen": "签到进行中",
     "opensAt": "{when} 开始签到",
     "endedPickupOnly": "已结束——只能接孩子",

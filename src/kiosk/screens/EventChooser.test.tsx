@@ -196,6 +196,33 @@ describe('holding a gathering', () => {
     expect(onBound).toHaveBeenCalledWith(bindingFor(YOUTH));
   });
 
+  it('says the setting failed, not the calendar, when the bind is refused', async () => {
+    const bindEntry = vi
+      .fn<KioskServices['bindEntry']>()
+      .mockRejectedValueOnce(new Error('permission-denied'))
+      .mockResolvedValueOnce(bindingFor(YOUTH));
+    const onBound = await renderChooser(servicesWith(bindEntry));
+    const youth = row('Youth group');
+
+    down(youth);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
+
+    expect(onBound).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Couldn’t set the kiosk to Youth group. Hold it again to retry.',
+    );
+    // The list arrived; saying otherwise sent a volunteer to fix the network.
+    expect(screen.queryByText(/Couldn’t load the calendar/)).toBeNull();
+    expect(row('Nursery')).toBeInTheDocument();
+
+    up(youth);
+    down(youth);
+    await tick(HOLD_DELAY_MS + HOLD_MS);
+
+    expect(onBound).toHaveBeenCalledWith(bindingFor(YOUTH));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('binds the row under the thumb, not the one already picked', async () => {
     const bindEntry = vi.fn(async () => bindingFor(YOUTH));
     await renderChooser(servicesWith(bindEntry));
