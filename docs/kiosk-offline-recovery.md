@@ -3,9 +3,11 @@
 **Status: proposal — nothing here is built.** Written against `main` at `9aae8cc`. Every failure
 below was reproduced rather than inferred: against the real `firestore.rules` in the emulator, and
 by running the real `KioskApp` and `src/kiosk/services.ts` over a simulated network (see
-[How this was checked](#how-this-was-checked)). The draft was then walked by three consultants —
-the church staff who answer for the shelf, a parent at the door, and a journey critic — and this
-version is what survived them ([What the critique changed](#what-the-critique-changed)).
+[How this was checked](#how-this-was-checked)). The draft was walked by three consultants — the
+church staff who answer for the shelf, a parent at the door, and a journey critic — and then by the
+owner, whose decisions are recorded in [What the reviews changed](#what-the-reviews-changed). The
+owner's standing instruction shaped this version most: **syncing carries a lot of complexity and
+risk; keep it to the minimum that loses nothing.**
 
 A tap at the lobby kiosk is a fact about the morning: this child came, and later, this child went
 home with somebody. `src/kiosk/printing/queue.ts` already states the kiosk's intent for it — *"a
@@ -45,8 +47,8 @@ and resets that child's `firstAttendedAt` to today (`studentDates` in `services.
 `studentDatePatch` in `attendancePayloads.ts`).
 
 Two things already go right and must survive any change. A write whose reply was lost is refused
-on replay as a duplicate, so the original record stands with its true time. And a check-in a
-counselor recorded on their phone is never double-counted: the kiosk's later write is refused.
+on replay as a duplicate, so the original record stands. And a check-in a counselor recorded on
+their phone is never double-counted.
 
 ### And what Tally already tells people to do
 
@@ -71,7 +73,7 @@ Tally and its docs currently teach treats that tablet as disposable:
   the chooser's list comes from a callable with no cached copy, so after **Leave** the glass reads
   *"Couldn't load the calendar"* and nothing can be bound until the internet returns.
 
-Once this ships, the likeliest way to lose a morning is not a bug. It is a well-meant reset.
+Once the queue is fixed, the likeliest way to lose a morning is not a bug. It is a well-meant reset.
 
 ### The journeys
 
@@ -89,8 +91,7 @@ Once this ships, the likeliest way to lose a morning is not a bug. It is a well-
    one call to the server; the queue cannot hold it, and the wizard prints their tags five seconds into
    a save that will not finish (`PROCESSING_MS`, `RegistrationFlow.tsx`).
 7. **The room.** A counselor's register — on a phone, on cellular — is short by every child the kiosk
-   took since 9:41, and on a gathering that hands children back its *in room* count is wrong both
-   ways. The nursery door says *"she's not checked in"* to a parent holding the sticker.
+   took since 9:41. The nursery door says *"she's not checked in"* to a parent holding the sticker.
 8. **The other tablet.** A lobby with two kiosks, or a phone at a side door: a family checked in at one
    picks up at the other, which cannot know they came.
 9. **Monday.** A leader opens Sunday's register and it is twelve children short. Nothing anywhere says
@@ -104,20 +105,36 @@ Seven promises, each testable, each answered by a part of the design:
 
 1. **Written down first.** Every tap is on the tablet's own storage before the tick paints — before
    any request — so a reload, a crash or a request that never returns cannot take it.
-2. **Two ways off the tablet, and only two.** A record leaves when the register confirms it holds
-   it, or when a person decides. Never by count, by age, or by a refusal nobody read.
+2. **Two ways off the tablet, and only two.** A record leaves when Tally confirms it has it, or when a
+   person decides. Never by count, by age, or by a refusal nobody read.
 3. **The moment of the tap.** The register says when the child arrived and when they left, not when
-   the tablet next found the internet; when a record arrived late, it says that too; and when a time
-   is not known, it says *not known* rather than a wrong one.
+   the tablet next found the internet — and when two devices saw the same arrival, the earlier one.
 4. **Nothing to remember.** Uploading does not depend on which gathering the kiosk is set to, which
    screen it is on, or anybody doing anything.
-5. **Somebody can see it, in every state.** On the kiosk, in every phase that can hold records —
-   bound, on the chooser, on the pairing screen. In Tally, from what Tally can *infer*, because the
-   states that hold records are, almost always, the ones in which the tablet cannot report.
+5. **Somebody can see it, in every state.** On the kiosk, in every phase that can hold records. In
+   Tally, from what Tally can *infer*, because the states that hold records are, almost always, the
+   ones in which the tablet cannot report.
 6. **Nothing tells anybody to throw the tablet away.** No string, doc or control recommends a wipe,
    reset or reinstall without one pre-check: the kiosk saying *All check-ins are in Tally*.
 7. **The door never waits.** A parent sees what they see today: an immediate tick, a tag, and
    nothing about the internet.
+
+## Keeping the sync small
+
+Every mechanism that moves a record between the tablet and Tally is a place for it to be lost,
+duplicated or misdated, and every rarely-run fallback is where bugs wait. So the design holds to
+five rules, and anything that failed them was cut ([What the reviews changed](#what-the-reviews-changed)):
+
+- **One store.** The journal in `localStorage`. No second store to fall back to.
+- **One way out.** A single uploader, one pass at a time.
+- **One road.** Every record reaches the register through one callable. The kiosk stops writing
+  attendance itself.
+- **One idea of identity.** Everything is idempotent on the record's id and on the attendance
+  document's id — the child — so sending anything twice is harmless.
+- **The tablet never decides a record is finished.** Only Tally's answer, or a person, does.
+
+No server-side matching between devices, no clock synchronisation, no offline binding, and no
+heartbeat that exists only to carry a number.
 
 ---
 
@@ -137,13 +154,12 @@ interface KioskRecord {
   studentId: string;
   tappedAtMs: number;     // the kiosk's clock at the tap
   arrivalId?: string;     // check-in: who came through the door together
-  student?: {             // check-in: what the date patch writes
+  student?: {             // check-in: what the server's date patch writes
     firstName: string; lastName: string; grade: number | null; searchName: string;
   };
   gathering: string;      // the title, so a person reading the list knows which morning
   attempts: number;
-  lastTriedAtMs?: number;
-  lastProblem?: 'network' | 'server' | 'refused';  // what the last attempt hit
+  lastProblem?: 'network' | 'server';  // what the last attempt hit, for the staff row's words
 }
 ```
 
@@ -152,36 +168,30 @@ structurally: nothing ever rewrites the whole queue, so nothing can write back a
 record arrives by writing its own key and leaves by removing its own key, and a tap's write stays the
 same size however long the outage has run.
 
-**`localStorage`, not IndexedDB.** The write has to be synchronous to happen before the tick, and
-IndexedDB's is not. `localStorage` survives a reload and a crashed tab — the browser process holds
-it, not the page — and it is already the store the kiosk's warm boot trusts. IndexedDB would buy
-room the journal does not need ([The cap](#the-cap)) at the price of an asynchronous gap — and the
-last time this codebase leaned on it, through Firestore's persistent cache, the client wedged
-(`src/lib/firebase.ts`).
+**`localStorage`, synchronously.** The write has to happen before the tick, so it has to be
+synchronous. `localStorage` survives a reload and a crashed tab — the browser process holds it, not
+the page — and it is already the store the kiosk's warm boot trusts.
 
 **No count limit.** See [The cap](#the-cap).
 
-**When storage is full, facts outrank caches, and every fallback is a disk.** The journal write
-catches the quota error and frees the kiosk's own caches, least-missed first — the pulse, the
-participation scope (which already fails open), the printer log, a second language's messages, the
-phone index, the roster last — then tries again. If the record still will not fit, it goes to
-IndexedDB immediately after the tick: on this path the argument for writing before the tick has
-already been given up, and an asynchronous disk beats memory. Only if that fails too is it held in
-memory. Two guards go with the last two steps:
+**When storage is full, facts outrank caches.** The journal write catches the quota error and frees
+the kiosk's own caches, least-missed first — the pulse, the participation scope (which already fails
+open), the printer log, a second language's messages, the phone index, the roster last — then tries
+again. If the record still will not fit, it is held in memory and still uploaded, and two things
+happen: the kiosk's own 4am reload (`KioskApp.tsx:1371`) is suppressed while anything is held, and
+the corner mark lights and opens the Check-ins screen rather than the printer screen it opens today
+(`SearchScreen.tsx:664`; when the printer needs somebody too, the staff menu, where both rows say so).
+The mark also lights when the roster or phone index was given up, because a reload would then leave
+the door unable to find anybody.
 
-- **The 4am reload waits.** The kiosk reloads itself at the quiet hour whenever it is unattended and
-  unbound (`KioskApp.tsx:1371`) — every night after a gathering. While anything is held in memory,
-  that reload is suppressed. The tablets' system-update window opens at the same hour and can restart
-  the tablet regardless, which is why IndexedDB comes before memory.
-- **The corner mark lights** — for a record held in memory, and for a roster or phone index given up
-  to make room (a reload would then leave the door unable to find anybody) — and it opens the
-  Check-ins screen, not the printer screen it opens today (`SearchScreen.tsx:664`). When the printer
-  needs somebody as well, it opens the staff menu, where both rows say so.
+That is a state in which a reload *can* lose a record, and it stays: with room for thousands of
+records ([The cap](#the-cap)) it takes an outage of weeks to reach, and a second store that runs once a
+decade is a bigger risk than the case it covers.
 
 **Migration.** The first boot of the new bundle turns any `tally:kiosk:pending` entries into records
 — their `queuedAtMs` standing in for the tap time, marked approximate — and removes the old key.
 
-### 2. One uploader, always running
+### 2. One uploader
 
 A single uploader owns the journal's way out.
 
@@ -190,128 +200,120 @@ A single uploader owns the journal's way out.
 - **In every phase with a session** — bound, on the chooser, on the printer screen, behind the staff
   gate. Not on the pairing screen, where there is no session to write with: records wait, and the
   first pass after pairing picks them up. Which gathering the kiosk is set to stops mattering.
-- **Woken by** a new record (at once, so the live path is exactly as fast as today), boot, the
-  browser's `online` event, the page becoming visible again, and a timer — every 30 seconds while
-  anything waits, backing off to five minutes while passes keep failing, back to 30 seconds the
-  moment one succeeds.
-- **Every request has a deadline** of 20 seconds, because Lite's `fetch` has none. A request that
-  timed out may still have landed; the next attempt finds it already on the register, which counts
-  as success.
-- **Tap order, pickups behind their arrivals.** A check-out is never sent before this tablet's
-  check-in for the same child and gathering is confirmed. If that check-in needs a person, so does
-  its pickup.
+- **Woken by** a new record (at once), boot, the browser's `online` event, the page becoming visible
+  again, and a plain 30-second timer while anything waits. No backoff: a handful of kiosks retrying
+  every 30 seconds is nothing, and one fewer thing to reason about.
+- **Every request has a deadline** of 20 seconds, because nothing underneath has one. A request that
+  timed out may still have landed; the next attempt is told it is already recorded, which counts as
+  success.
+- **Tap order.** A pass sends records oldest first, so a pickup always travels behind this tablet's
+  own arrival for the same child.
 
-The uploader also defines one state several behaviours below depend on. **The kiosk is *out of
-touch*** when its last attempt to reach Tally — an upload, a register read, a standing report —
-failed and nothing has succeeded since. It is back in touch the moment anything succeeds.
+The uploader also keeps one fact several behaviours below depend on. **The kiosk is *out of touch***
+when its last attempt to reach Tally — an upload, a register read, a standing report — failed and
+nothing has succeeded since. It is back in touch the moment anything succeeds.
 
-### 3. Two roads to the register
+### 3. One road to the register
 
-**The direct road** is today's write: the Lite `writeBatch` for a check-in, `updateDoc` for a
-pickup, the time taken from the server. It carries a record on its first attempt when the record is
-fresh — tapped within the last minute — and belongs to the gathering the kiosk is set to. That is
-the ordinary case, where the direct road is fastest and cheapest, and it keeps working when Cloud
-Functions do not.
-
-**The late road** is a new callable, `landKioskRecords`, for everything else: a record that has
-failed once, anything older than a minute, anything for a gathering the kiosk is no longer set to.
-It takes up to a hundred records a call and answers for each:
+Every record reaches the register through one new callable, `landKioskRecords`. A pass sends every
+waiting record, up to a hundred a call, and the callable answers for each:
 
 | Outcome | Meaning | On the tablet |
 |---|---|---|
-| `landed` | Written now, with the tap's own time. | Removed. |
-| `already-recorded` | The register already has it — an earlier attempt whose reply was lost, a counselor on their phone, another kiosk. The record that is there stands; the kiosk's own tap time is kept beside it (§4). | Removed. |
-| `held` | A pickup whose arrival is not on the register, and not in this tablet's journal either — it may be on another tablet or a phone that has not reached Tally yet. The server keeps it, and applies it when that arrival lands, from whichever device; if none has by the end of the next day, it is parked. | Removed: it is in Tally now. |
+| `landed` | Written, with the tap's own time. | Removed. |
+| `already-recorded` | The register already had it — an earlier attempt whose reply was lost, a counselor on their phone, another kiosk. The earlier of the two moments now stands (§4). | Removed. |
+| `waiting` | A pickup whose arrival is not on the register yet — because the arrival is itself still waiting on this tablet, or is on another device that has not reached Tally. | Kept, and sent again next pass. |
 | `parked` | Needs a person, and no retry will change that (§5). The server keeps it, with the reason. | Removed: it is in Tally now. |
 
 A refusal of the *whole* call — a retired kiosk — changes nothing on the tablet. Every record
 waits, and pairing the tablet again resumes them: re-pairing keeps the device id, so the uid, and
 clears the retirement (`recordPairedDevice` in `functions/src/kiosk/devices.ts`).
 
-The late road exists because the direct one cannot do three things:
+**Why one road, and why this one.** Today the kiosk writes attendance straight to Firestore, and the
+first draft kept that for fresh records and added the callable for late ones. Two roads meant rules
+for choosing between them, two ways a write could be refused, two vocabularies of outcome, a race
+when both carried the same record, and a count of what was waiting that needed its own reports. A
+direct write also cannot do the three things the late record needs:
 
 - **Write for a gathering the kiosk has left.** The rules take a kiosk's reach from the gathering on
-  its device row *now* (`kioskBoundTo`). That is the right fence for a live screen and the wrong one
-  for a record made yesterday. The callable checks each record against its own gathering instead.
+  its device row *now* (`kioskBoundTo`) — the right fence for a live screen, the wrong one for a
+  record made yesterday. The callable checks each record against its own gathering.
 - **Say why.** The rules can only say no. A kiosk that cannot tell *already recorded* from *frozen*
   from *retired* has two choices, delete or retry forever, and today it deletes.
-- **Keep the moment, checked.** It writes `checkedInAt` and `checkedOutAt` from the tap (§4), in a
-  transaction that also reads the child's history — so `isFirstEver` and the date patch are
-  computed against the server's current state, which closes the first-ever hazard above.
+- **Keep the moment.** It writes the tap's time (§4) in a transaction that also reads the child's
+  history, so `isFirstEver` and the date patch are computed against the server's own state — which
+  closes the first-ever hazard.
 
-It also empties a long outage quickly: 500 records are five calls, where the direct road would be a
-thousand round trips in sequence.
-
-Its authority is the kiosk's own and no wider. It may add a check-in that is not there and record a
-first pickup — no undo, no moving a counselor's record — and it makes the same frozen-student check
-`attendanceFrozen()` makes in the rules. Its fence is `requireLiveKiosk`
-(`functions/src/index.ts:458`), the same test `isLiveKiosk()` makes.
+The price is stated plainly. **The tick never waits on the callable** — it is painted from the
+journal — so a cold start delays only how soon a check-in appears on counselors' phones, by a second
+or two. And **if Cloud Functions are down, records wait on the tablet** instead of landing directly;
+nothing is lost, and the staff row says so. Both are cheaper than the second road.
 
 **It is also how Tally learns what is waiting.** Every call carries *N still on this tablet, the
 oldest tapped at T*, and the function writes `waitingCount`, `waitingSinceAt` and `allInAt` onto the
-device row itself. After any pass that changes the count, the uploader makes that call even when it
-has no records to send, so a stale count always clears. The kiosk's standing report — the write
-that also tells a kiosk whether it has been retired — gains no fields at all. A report refused over a
-new field reads, to the kiosk, exactly like a retirement, and that is not a risk worth a number.
+device row. Because every record goes through the callable, the call that lands the last one reports
+zero: the count cannot go stale, and nothing extra is sent to keep it true. The kiosk's standing
+report — the write that also tells a kiosk whether it has been retired — gains no fields.
 
-**Each road is the other's contingency.** If Cloud Functions are down, or a new kiosk bundle meets
-functions too old to have the callable, the direct road carries this gathering's records — older
-ones with the tap's time, which the rules already accept on a create and on a first pickup — and
-the rest wait. If the rules refuse the direct road, the late road takes the record and says why.
+**Its authority is the kiosk's own, plus the owner's one decision.** It may add a check-in that is not
+there and record a pickup — no undo, and the same frozen-student check `attendanceFrozen()` makes in
+the rules — and it may move an existing arrival or pickup *earlier*, to a tap it witnessed, never
+later (§4). Its fence is `requireLiveKiosk` (`functions/src/index.ts:458`), the same test
+`isLiveKiosk()` makes. Once no kiosk runs the old bundle, the rules that let a kiosk session write
+attendance directly are removed: the lobby's session then cannot write the register at all except
+through the one function that checks every record.
 
 ### 4. The moment of the tap
 
-A late record's `checkedInAt` and `checkedOutAt` are the tap's time. The moment it actually reached
-Tally rides beside it — `recordedAt` on a check-in, `checkedOutRecordedAt` on a pickup, both
-written by the server. Nothing that reads the register has to change to become correct: the
-check-in screen, the event page, the CSV export and the student history all read `checkedInAt`,
-which is now true.
+A record's `checkedInAt` and `checkedOutAt` are the tap's time, and `recordedAt` /
+`checkedOutRecordedAt` say when it reached Tally. Nothing that reads the register has to change to
+become correct: the check-in screen, the event page, the CSV export and the student history all read
+`checkedInAt`, which is now true.
 
-When the register already had the child, the record that is there stands — a late kiosk never moves
-anybody's record — but the kiosk's own tap is kept beside it (`kioskTappedAt`,
-`kioskCheckedOutTappedAt`), so an earlier truth survives for the CSV and for anybody who asks
-*when did she really arrive?* Whether the register should *show* the earlier of the two is
-[open question 1](#open-questions).
+**When two devices saw the same arrival, the earlier moment wins** — the owner's decision. If the
+register already holds a check-in for the child and the kiosk's tap is earlier, the callable moves the
+arrival back to the tap (time, who witnessed it, and its arrival id) and keeps the later entry beside
+it as `laterCheckIn` — who and when — so nothing a counselor did disappears. The same holds for a
+pickup: the parent's 10:45 at the kiosk beats a counselor's tidy-up *Out* at 11:15, and the 11:15 is
+kept as `laterCheckOut`. A kiosk tap *later* than what the register holds changes nothing. Because the
+server does this once, every reader shows the earlier time with no change of its own.
 
 The time comes from the kiosk's clock, which the door already trusts: `windowHasOpened` refuses
-check-ins by it, so a kiosk whose clock is badly wrong cannot take a check-in in the first place.
-The callable still bounds it — not after the server's own now, and not before the gathering's
-check-in window opened, less an hour of slack. A time outside those bounds lands at the nearest edge
-of the gathering's window marked `timeUncertain`, and every screen that would print its clock time
-says *time not known* instead. A wrong pickup time is worse than none. The callable's response, and
-the chooser's list of gatherings, also carry `serverNowMs`, so the kiosk has a fresh measure of its
-own clock's error at every binding and corrects tap times by it.
+check-ins by it, so a kiosk whose clock is badly wrong cannot take a check-in in the first place. The
+callable still bounds it — not after its own now, and not before the gathering's check-in window
+opened, less an hour. A time outside those bounds lands at the nearest edge, flagged
+`timeUncertain`, and the register row and the CSV say *time not known* rather than print a time that
+cannot have happened.
 
 ### 5. Nothing is thrown away
 
 Every path that deletes a record today becomes one of three:
 
-- **On the register**, or held by the server for its arrival — gone from the tablet, because Tally
-  has it.
-- **Waiting** — kept, and tried again.
+- **On the register** — gone from the tablet, because Tally has it.
+- **Waiting** — kept, and sent again.
 - **Parked** — the outcomes no retry can fix. The callable writes these to a new
   `kioskParkedRecords` collection and they leave the tablet: once a record has reached Tally, whether
   it belongs on the register is a decision for the core team with Tally open, not for a lobby screen
   — and the tablet is the one place that can be wiped.
 
+The server decides between waiting and parked from its own facts, so the tablet never has to: a pickup
+whose arrival is missing *waits* until the day after the gathering ends — time for another device's
+arrival to arrive — and is parked after that.
+
 Parked records are settled on the Review page — *the other end of the lobby kiosk*, already core-only
 and already where the door's unfinished business goes — and linked from the gathering's own event
-page, where a shortfall is actually noticed. One pair of buttons does not fit every reason, so each
-card says, above its buttons and in Review's grammar, what the press will do:
+page, where a shortfall is actually noticed. Each card says, above its buttons and in Review's
+grammar, what the press will do:
 
 | Reason | The card says | Its answers |
 |---|---|---|
 | The child's upstream record is gone (frozen) | *Noah's record in the church's database is missing, so Tally can't record his 9:43 arrival yet* — with a link to the repair on his page | **Record Noah's 9:43 arrival**, enabled once the freeze lifts; **Let it go** |
 | The gathering was deleted after the tap | The names and tap times, so they can be re-recorded on the right night by hand | **Let it go** only — there is nothing to record onto, and guessing a night is how forty check-ins land on the wrong gathering |
-| A held pickup whose arrival never landed | *The register has no arrival for Ava on Sept 27, so her 10:52 pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.* | **Let it go** |
-| A pickup whose arrival was parked | Settled with its arrival, on the same card | — |
+| A pickup whose arrival never appeared | *The register has no arrival for Ava on Sept 27, so her 10:52 pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.* | **Let it go** |
+| A pickup whose arrival was parked | Nothing of its own: it is parked with its arrival, on the same card, and settled with it | — |
 
 **Let it go** is kept as a decision with a name on it, not as an absence. The Review item in the
 navigation shows how many are waiting.
-
-The commonest way to produce the third reason on an ordinary Sunday is stopped at the source (§6):
-a kiosk that keeps offering a pickup for an arrival a counselor removed. Today the rules refuse that
-pickup and it vanishes silently; with a late road it would become a Review card every week.
 
 ### 6. The room: what this tablet knows, and what it cannot
 
@@ -325,13 +327,15 @@ never lets go: the register poll adds what the server says to whatever the kiosk
 It is stored for the bound gathering (`tally:kiosk:room`: student ids, arrival ids and times, no
 names), written when it changes, restored on boot while the binding is live, and cleared with the
 rest of the evening in `leaveGathering`. So a reboot mid-outage still offers a pickup as a pickup.
-And because the two sets are kept apart, a child the register showed and then stopped showing —
-with nothing of this tablet's own waiting for them — is a removal somebody made on purpose, and the
-kiosk stops offering their pickup.
+And because the two sets are kept apart, a child the register showed and then stopped showing — with
+nothing of this tablet's own waiting for them — is a removal somebody made on purpose, and the kiosk
+stops offering their pickup. That also keeps the commonest *pickup with no arrival* from reaching
+Review every Sunday.
 
-**Its limit is honest:** a tablet only knows what it saw. During an outage, a child checked in on a
-phone or at a second kiosk is not in this tablet's room, and without more it reads *Check in* at
-pickup — journey 8. §8 is what the door does about that.
+This is all local: the room is never sent anywhere. **Its limit is honest** — a tablet only knows what
+it saw. During an outage, a child checked in on a phone or at a second kiosk is not in this tablet's
+room and reads *Check in* at pickup (journey 8). The volunteer card covers it; §8 has an optional
+answer at the door.
 
 ### 7. Who sees what
 
@@ -340,10 +344,10 @@ pickup — journey 8. §8 is what the door does about that.
 - **Bound, behind the staff gate.** When nothing waits, the staff menu says *All check-ins are in
   Tally* as a line of text in the screen's statement style — not another row on a menu that already
   overflows a landscape shelf. When something waits, it becomes a row, worded from what the last
-  attempt actually hit:
+  attempt hit:
   - *12 waiting for the internet since 9:41* — the network.
-  - *12 waiting — Tally isn't taking them right now. Tell the office.* — a server error, say after a
-    bad deploy, which should reach a person rather than wait politely.
+  - *12 waiting — Tally isn't taking them right now. Tell the office.* — a server error, which should
+    reach a person rather than wait politely.
   - *2 check-ins aren't saved yet — don't reload or restart; get it online.* — held in memory.
 - **The Check-ins screen** behind that row lists what is waiting, oldest first — child, gathering,
   tap time, what the last attempt said — under the heading *These go to Tally by themselves. Don't
@@ -355,79 +359,66 @@ pickup — journey 8. §8 is what the door does about that.
   from Sunday Kids haven't reached Tally yet — keep this tablet plugged in and on the Wi-Fi.* With
   progress while it sends.
 - **On the pairing screen**, retired or unpaired: *12 check-ins are waiting on this tablet. Pair it
-  and they'll go to Tally.* The retired line's *"has not recorded anything since"* stays true and
-  gains that sentence beside it, and the install prompt is hidden while records wait.
-
-Nothing on the parent's side of the glass changes, with the exceptions §8 argues for.
+  and they'll go to Tally.* The install prompt is hidden while records wait.
+- **On untouched glass, for staff** — §8.
 
 **In Tally — from what it can infer.** A tablet holding records is almost always one that cannot
-report. But Tally already knows the gathering a kiosk was set to (`boundTo`, `boundChain` stay on the
-row when it unbinds offline), the gathering's window, and when it was last heard from. That is enough
-to say the true thing without any report:
+report. But Tally already knows the gathering a kiosk was set to (`boundTo` and `boundChain` stay on
+the row when it unbinds offline), the gathering's window, and when it was last heard from. That is
+enough to say the true thing without any new report:
 
 - **The Team page's kiosk row** replaces *"Paired … · not recording"*, for a kiosk last heard from while
   set to a gathering, with *Out of touch since 9:41 while at Sunday Kids — probably the church's
-  internet. It keeps recording on the tablet.* Once the server has a count, it adds *12 waiting on
+  internet. It keeps recording on the tablet.* When the callable has reported, it adds *12 waiting on
   this tablet*, and later *All in Tally since Mon 9:02*.
-- **Retire** asks first, for every kiosk that may hold records — anything last heard from while set
-  to a gathering, not just a kiosk heard from in the last three minutes — and says what it costs:
-  *Retiring stops it at its next connection and shows a pairing code, possibly mid-pickup. Anything
-  still on the tablet waits until it's paired again.* The toast's *"stops recording at its next tap"*
-  is reworded to match.
-- **The standing report runs every minute while bound** instead of every five, so *Recording Sunday
-  Kids right now* is true at every minute of a healthy morning and the three-minute window means what
-  its comment says.
+- **Retire asks first** for every kiosk that may hold records — anything last heard from while set to
+  a gathering — and says what it costs: *Retiring stops it at its next connection and shows a pairing
+  code, possibly mid-pickup. Anything still on the tablet waits until it's paired again.* The toast is
+  reworded to match.
+- **The liveness window is made true** by widening it, not by reporting more often:
+  `KIOSK_LIVE_WITHIN_MS` becomes twelve minutes, two missed five-minute reports and some slack. No new
+  writes.
 - **The Kiosk page lists every kiosk** and its state in its core section — today it lists none, and a
   kiosk is findable only inside the panel of whoever paired it, as a hex id — and a kiosk can be given
   a name: *Lobby*, *Nursery door*.
 - **The gathering's event page**, for the core team: *The lobby kiosk was last heard from at 9:41 while
   set to this gathering. Check-ins and pickups made there after that are still on the tablet.* Later:
   *12 check-ins from the lobby kiosk arrived late — all in Tally since Mon 9:02.* One quiet summary
-  line, not a badge on every row that reads as an error; the CSV gains `recorded_at` and the kiosk's
-  tap-time columns.
-- **The counselor's register** — the people holding the children — says it too, for both halves:
-  *Check-ins and pickups made at the lobby kiosk since 9:41 aren't on this list yet. A child wearing
-  this morning's name tag was checked in.* Device rows are core-only, so this reads a narrow
-  per-gathering copy (`kioskPresence/{chain}`: last heard, waiting, all-in), written by a trigger from
-  the device row and readable by anybody on the gathering. Its threshold is three missed reports, so a
-  healthy kiosk never trips it.
+  line, not a badge on every row; the CSV gains `recorded_at` and the later entries.
+- **The counselor's register** says only that the kiosk is out of touch — no counts, the owner's
+  choice of the smaller option: *The lobby kiosk hasn't been heard from since 9:41. Check-ins and
+  pickups made there aren't on this list yet — a child wearing this morning's name tag was checked
+  in.* Device rows are core-only by design, so a trigger copies one field — when each kiosk bound to a
+  gathering was last heard from — into `kioskPresence/{chain}`, readable by anybody on that gathering.
+  It is derived and one-way: if the trigger lags or fails, counselors simply see no line.
 
 ### 8. The door, while the kiosk is out of touch
 
-Four places where the right behaviour at the glass depends on knowing the kiosk cannot reach Tally.
-The first two keep the internet off the parent's screen entirely; the third is the one exception
-argued for.
-
-- **A family nobody has met** (Phase 1). While out of touch, *First time here?* goes straight to *A
-  leader will get you started* — before six screens of questions, not after them — and no name tag is
-  ever printed ahead of a save the kiosk expects to fail. Today the family types everything and then
-  either fails, or, on a hanging connection, walks off with tags for a registration that never
-  finished (*"Your name tags have printed, but this is not finished"*). A registration cannot be
-  journaled: the parent's number may live only inside the one call ([product.md](product.md),
-  Journey 4c), and a kiosk session may not write student documents. A leader quick-adds the family on
-  a phone instead.
-- **A pickup for a child this tablet did not see** (Phase 3). On a gathering that hands children back,
+- **A family nobody has met.** While out of touch, *First time here?* goes straight to *A leader will
+  get you started* — before six screens of questions, not after them — and no name tag is printed
+  ahead of a save the kiosk expects to fail. Today the family types everything and then either fails,
+  or, on a hanging connection, walks off with tags for a registration that never finished (*"Your name
+  tags have printed, but this is not finished"*). A registration cannot be journaled — the parent's
+  number may live only inside the one call ([product.md](product.md), Journey 4c), and a kiosk session
+  may not write student documents — so a leader quick-adds the family on a phone instead.
+- **A line for staff on untouched glass** — the owner's decision. After ten minutes out of touch, in
+  the grammar of the owed-tags notice ([kiosk-owed.md](kiosk-owed.md) §3: its first word says who it
+  is for, it asks nothing, the first keystroke removes it, never on a confirm or a tick): *For staff:
+  this kiosk can't reach Tally. Check-ins are kept here and send themselves — please don't reset it.*
+  It reaches the person deciding the kiosk is broken before they reach the power button.
+- **Moving the kiosk.** While out of touch, **Leave** says what it costs: the kiosk cannot be set to a
+  gathering again until it can reach Tally.
+- **Optional — a pickup for a child this tablet did not see.** Only for a church that runs two kiosks
+  for one gathering, or records on phones during outages. On a gathering that hands children back,
   while out of touch, a child this tablet does not know to be in the room gets a confirm screen that
-  asks plainly rather than assumes: the verb the hour makes likely in the thumb's usual place — *Check
-  in* before the gathering's midpoint, *Check out* after it — and the other beside it. Siblings are
-  offered but not pre-ticked, since this tablet does not know who came in together. A pickup recorded
-  this way is `held` by the server until the other device's arrival lands. Never a *Welcome* for a
-  child being carried out of the building.
-- **A line for staff on untouched glass** (Phase 3). After ten minutes out of touch, in the grammar of
-  the owed-tags notice ([kiosk-owed.md](kiosk-owed.md) §3 — its first word says who it is for, it asks
-  nothing, the first keystroke removes it, never on a confirm or a tick): *For staff: this kiosk can't
-  reach Tally. Check-ins are kept here and send themselves — please don't reset it.* It reaches the
-  person deciding the kiosk is broken before they reach the power button. It is also the one proposal
-  here that puts words about the network where a parent can see them, and the parent consultant
-  asked for none — [open question 2](#open-questions).
-- **Moving the kiosk** (Phase 1, then Phase 3). While out of touch, **Leave** says what it costs: the
-  kiosk cannot be set to a gathering again until it can reach Tally. Later, the chooser keeps today's
-  rows, so an offline move to a gathering that already exists works, its records journaled for the
-  late road like any others.
+  asks rather than assumes: the verb the hour makes likely in the thumb's usual place — *Check in*
+  before the gathering's midpoint, *Check out* after it — and the other beside it, siblings offered
+  but not pre-ticked. The pickup it records needs nothing new: it is `waiting` until the other device's
+  arrival reaches Tally.
 
 ### 9. The words Tally already says
 
-Promise 6 is mostly text, and it ships with Phase 1, not after it:
+Promise 6 is mostly text, and it ships with the first phase:
 
 - **The Kiosk page's footnote** stops telling anybody to clear site data: retiring is done in Tally,
   and a tablet is wiped only after it says *All check-ins are in Tally*.
@@ -459,17 +450,14 @@ seconds". It could stand for two real limits:
 - **Replay time.** At two round trips per record — around half a second on a lobby connection — 50
   records take about 25 seconds, just inside the 30-second timer. Above that, replays overlap and
   failure 5 starts erasing records. Whether or not anybody meant it, that is the one sense in which
-  50 has been load-bearing, and it is why raising the number on its own would make things worse.
+  50 has been load-bearing, and it is why raising the number on its own would make things worse. With
+  one pass at a time and a hundred records a call, 500 records drain in five calls.
 
 **So the proposal removes the cap rather than raising it to 200 or 500.** Any number at which the
 oldest record is dropped is a rule for deleting children's attendance, and the outage that reaches
 it is exactly the one where it matters most. Storage is the real limit, and §1 says what happens
 there. What the number was standing in for is better as attention: the count is on the kiosk in every
 phase, and in Tally from anywhere.
-
-If a backstop is still wanted — against a bug that journals in a loop, say — it should be large
-(5,000), and reaching it should light the mark and send further records down §1's fallbacks. Never
-drop the oldest.
 
 ---
 
@@ -480,11 +468,11 @@ drop the oldest.
 | Internet down for minutes, hours or days | Journals, ticks and prints as normal; uploads by itself when any connection returns, on any screen | Nothing. |
 | Wi-Fi up, internet down — requests hang | A deadline on every request, one pass at a time; nothing lost | Nothing. |
 | Tablet reloads, reboots or crashes | Journal and room survive; its own check-ins are still offered as pickups | Nothing. |
-| Kiosk set to another gathering, or carried to one | The late road does not care; **Leave** warns that it cannot rebind until online | Nothing. Until Phase 3 caches the chooser, a move made offline waits for the internet; record that gathering on phones meanwhile. |
+| Kiosk set to another gathering, or carried to one | The records don't care; **Leave** warns that it cannot rebind until online | Nothing. A move made offline waits for the internet; record that gathering on phones meanwhile. |
 | A new family arrives | Sends them to a leader before the questions; prints nothing | A leader quick-adds them on a phone, on mobile data. |
-| A child checked in on a phone or another kiosk, picked up here | Asks *dropping off or picking up?* (Phase 3); a pickup is held by the server until the arrival lands | Before Phase 3: a child checked in on a phone is checked out on the phone, and one checked in at the other kiosk is checked out there. |
-| Storage full | Frees caches; then IndexedDB; then memory, with the 4am reload suppressed and the mark lit | Do not reload it; get it online. |
-| Cloud Functions down, or older than the kiosk | Direct road for this gathering's records; the rest wait | Nothing — the staff row says *Tell the office* if it goes on. |
+| A child checked in on a phone or another kiosk, picked up here | Offers *Check in*, unless the optional question in §8 is on | A child checked in on a phone is checked out on the phone; one checked in at the other kiosk is checked out there. |
+| Storage full | Frees caches; then holds in memory, with the 4am reload suppressed and the mark lit | Do not reload it; get it online. |
+| Cloud Functions down | Everything waits on the tablet; nothing lost | Nothing — the staff row says *Tell the office* if it goes on. |
 | Kiosk retired while records wait | Everything waits; Retire warned first | Pair it again — same tablet, same records. |
 | Child's record frozen, gathering deleted, an arrival that never came | Parked on Review, per reason | The core team decides there. |
 | Tablet clock wrong | Bounded by the gathering's window; *time not known* if outside it | Nothing. |
@@ -522,80 +510,81 @@ records.
 ## The refusals
 
 - **Raising the cap to 200 or 500.** Any number is a deletion rule — [The cap](#the-cap).
-- **One road, through the callable.** Simpler, and it would put a cold start and a dependency on
-  Cloud Functions behind the door's most common action, and throw away the contingency of two
-  independent roads.
+- **Two roads** — direct writes for fresh records, the callable for late ones. The first draft's
+  design, cut for the reasons in §3.
 - **Re-pointing the device row to drain.** Today's rules would let the kiosk set its row to
   yesterday's gathering, replay, and set it back — no server change at all. But while it points at
-  yesterday, today's register refuses the live door, and a refused live check-in is not retried
-  today. Two passes and a poll racing over one field is a mechanism that works in testing and not on
-  a Sunday.
+  yesterday, today's register refuses the live door. Two passes and a poll racing over one field is a
+  mechanism that works in testing and not on a Sunday.
 - **Widening the rules instead of a callable** — a list of recent gatherings on the device row, a
-  client time bounded by `request.time`. Smaller, and no Function; but the rules still could not say
-  *why* they refused, so the kiosk would still be choosing between deleting and retrying forever, and
-  a long outage would still drain at two round trips a record.
-- **Carrying the waiting count on the standing report.** It was the first draft's idea. The report is
-  sent only while bound and only while online — the two states in which the count is least needed —
-  and it is the retirement oracle, where a refusal over a new field reads as a retired kiosk.
-- **Moving a counselor's record to the kiosk's earlier time.** The house rule is that a lobby tap
-  never moves a person's record; the earlier tap is kept beside it instead (§4).
-- **IndexedDB as the journal.** The write must be synchronous to precede the tick (§1). It is the
-  overflow, not the store.
-- **Firestore's offline persistence, or the full SDK.** The kiosk uses Lite precisely to stay off
-  the realtime SDK's weight (`scripts/check-kiosk-budget.mjs`), and the persistent cache is what
-  wedged the main app (`src/lib/firebase.ts`).
+  client time bounded by `request.time`. The rules still could not say *why* they refused, so the
+  kiosk would still choose between deleting and retrying forever.
+- **A second store** (IndexedDB) for when `localStorage` is full, **server-side matching** of pickups to
+  other devices' arrivals, **correcting for the kiosk's clock**, **binding offline** from a cached copy
+  of the chooser, **reporting standing every minute**, and **accepting a retired tablet's earlier
+  records**. Each was in a draft; each is sync machinery for a case the plainer design already
+  survives. See [What the reviews changed](#what-the-reviews-changed).
+- **Carrying the waiting count on the standing report.** The report is sent only while bound and
+  online — when the count is least needed — and it is the retirement oracle, where a refusal over a
+  new field reads as a retired kiosk.
+- **Firestore's offline persistence, or the full SDK.** The kiosk uses Lite precisely to stay off the
+  realtime SDK's weight (`scripts/check-kiosk-budget.mjs`), and the persistent cache is what wedged
+  the main app (`src/lib/firebase.ts`).
 - **Background Sync in the service worker.** Not on Safari; it would need the Firebase session inside
   a worker; and the kiosk page is always open anyway.
-- **Telling the parent.** A tick beside *saved offline* reads as *your check-in failed*. The record
-  is safe and the parent has nothing to do.
+- **Telling the parent.** A tick beside *saved offline* reads as *your check-in failed*. The one line
+  about the network (§8) is addressed to staff, on untouched glass.
 - **Refusing check-ins while offline.** The one thing worse than a late record is a child with none.
-- **A badge on every late row of the register.** It reads as an error on exactly the rows that are now
-  right. One summary line on the event page does the job.
+- **A badge on every late row of the register.** It reads as an error on exactly the rows that are
+  now right. One summary line on the event page does the job.
 - **Journaling registrations.** Blocked by the constraints in §8; the most a later version could do
   is a names-only arrival parked for Review — never the phone number.
-- **Printing a paper copy of what is waiting.** A stack of slips nobody asked for; the list behind
-  the gate is the paper, when paper is needed.
-- **A QR hand-off to a phone** — the kiosk shows its waiting records as a code, a leader's phone on
-  cellular uploads them. Genuinely useful for a tablet that cannot get online at all, and deferred:
-  it needs a camera scanner in the main app, and the hotspot covers that case until an outage shows
-  otherwise.
+- **A binding log** — a record of which gatherings each kiosk stood in, so the callable could refuse
+  records for any other. It would make the kiosk's reach narrower than today's, where a kiosk can
+  point itself at any gathering; it is more sync, and the reach it narrows is not new. The thing to
+  add if a stolen kiosk ever becomes a real worry.
+- **Printing a paper copy of what is waiting**, and **a QR hand-off to a phone.** A stack of slips
+  nobody asked for; a camera scanner in the main app for a case the hotspot already covers.
 
 ---
 
-## What the critique changed
+## What the reviews changed
 
-The first draft (`af33ecd0`) went to three consultants. The mechanism survived all three — the
-journal, the one uploader, the late road, the tap times, no cap. What changed is almost everything
-around it, because all three found the same thing from different sides: **the records now wait
-precisely when the kiosk is unbound, offline, unpaired or in a cupboard, and the draft's visibility
-lived only in the states where nothing was waiting.**
+**The consultants.** The mechanism survived all three — the journal, the one uploader, the tap
+times, no cap. What changed was everything around it, because all three found the same thing from
+different sides: *the records now wait precisely when the kiosk is unbound, offline, unpaired or in a
+cupboard, and the first draft's visibility lived only in the states where nothing was waiting.*
 
-- **The church staff** would adopt Phase 1 with no cap, and would not hand out the runbook as written.
-  They found the Team page calling an offline kiosk *not recording* and retiring it on one unconfirmed
-  tap; the waiting count riding a report that is never sent while records wait; Monday's answer buried
-  under the pairer's name as a hex id; the laminated reset card already at the desk; the runbook sending
-  volunteers onto phones on the same dead Wi-Fi; the newcomer as the thing that actually brings a
-  volunteer to the tablet; the week-in-a-cupboard; and per-kind parked cards. Each is in §5, §7, §8 and
-  the card.
-- **The parent** wants the door unchanged and got it — with one requested exception: at another tablet,
-  during an outage, never a *Welcome* for a child being carried out (§8, `held` pickups). The nursery
-  volunteers' phones must say the kiosk is offline and to go by the sticker — the counselor line moved
-  from optional to Phase 2. A wrong pickup time is worse than none (§4).
-- **The journey critic** found the blocker the draft missed — Tally's own instructions treat the tablet
-  as disposable (§9, now Phase 1) — and a second: memory-held records lost to the kiosk's own 4am
-  reload (§1). It also found the three-versus-five-minute liveness bug, the offline **Leave**, the
+- **The church staff** would adopt the first phase with no cap. They found the Team page calling an
+  offline kiosk *not recording* and retiring it on one unconfirmed tap, the waiting count riding a
+  report never sent while records wait, Monday's answer buried under a hex id, the laminated reset
+  card already at the desk, a runbook sending volunteers onto phones on the same dead Wi-Fi, the
+  newcomer as the thing that actually brings a volunteer to the tablet, and the week in a cupboard.
+- **The parent** wants the door unchanged — with one exception at another tablet (§8, optional) — and
+  asked that the nursery volunteers' phones say the kiosk is offline and to go by the sticker, and
+  that the earlier drop-off time win.
+- **The journey critic** found the blocker the first draft missed — Tally's own instructions treat the
+  tablet as disposable (§9) — and the three-versus-five-minute liveness bug, the offline **Leave**, the
   undo that would have filled Review every Sunday (§6), and the limit of what one tablet can know.
 
-**Where they disagreed**, and what this version does:
+**The owner.**
 
-1. *The parent*: two times for one drop-off — keep the earlier on the record. *The journey critic*:
-   never move a person's record; keep the kiosk's tap beside it. → Kept beside (§4); which one the
-   register shows is open question 1.
-2. *The parent*: nothing about the internet on the parent's side of the glass. *The journey critic*: a
-   staff-addressed line on untouched glass is what stops the reset. → Proposed for Phase 3 in the
-   owed notice's proven grammar; open question 2.
-3. *The church staff*: the counselor line can wait for Phase 3. *The parent and the journey critic*: it
-   is the moment the tick stops meaning anything. → Phase 2.
+1. *Two times for one drop-off:* **the earlier wins** — on the record itself, for arrivals and, by the
+   same argument, pickups (§4). The callable moves the time; the later entry is kept beside it.
+2. *A line for staff on untouched glass:* **yes** (§8), in the first phase.
+3. *What counselors see:* **the smaller option** — out of touch, no counts, from a one-field copy
+   (§7).
+4. *Syncing in general:* **minimise it.** This version cuts, from the one before it:
+   - the second road — every record now goes through the callable, and the kiosk stops writing
+     attendance itself;
+   - server-side *held* pickups matched to another device's arrival — a pickup now simply waits on the
+     tablet, and the server parks it after a day;
+   - the IndexedDB fallback — one store;
+   - clock-offset correction from `serverNowMs` — bounds and a flag instead;
+   - exponential backoff — a plain 30-second timer;
+   - reporting standing every minute — the liveness window is widened instead;
+   - binding offline from a cached chooser — **Leave** warns instead;
+   - accepting a retired tablet's earlier records, and the binding log that would have made it safe.
 
 ---
 
@@ -603,29 +592,28 @@ lived only in the states where nothing was waiting.**
 
 ### Phase 1 — nothing is lost, and nothing tells anyone to lose it
 
-- **New `src/kiosk/journal.ts`** — records one key each, the migration, the storage fallbacks. Pure
-  apart from `localStorage` and IndexedDB, as `printing/log.ts` is apart from `localStorage`.
-- **New `src/kiosk/uploader.ts`** — the pass: single-flight, deadlines, backoff, ordering, the choice
-  of road, outcomes, *out of touch*. Transports injected, so it is testable without Firebase, as
+- **New `src/kiosk/journal.ts`** — records one key each, the migration, the quota handling. Pure
+  apart from `localStorage`, as `printing/log.ts` is.
+- **New `src/kiosk/uploader.ts`** — the pass: single-flight, the deadline, the timer, tap order,
+  outcomes, *out of touch*. Transport injected, so it is testable without Firebase, as
   `printing/queue.ts` is without a printer.
-- **`src/kiosk/services.ts`** — the `landKioskRecords` wrapper; the direct road's two writes stay;
-  `enqueueCheckIn`, `enqueueCheckOut`, `replayQueue` and `MAX_QUEUED` go.
+- **`src/kiosk/services.ts`** — the `landKioskRecords` wrapper. `performCheckIn`, `performCheckOut`,
+  `studentDates`, `enqueueCheckIn`, `enqueueCheckOut`, `replayQueue` and `MAX_QUEUED` go: the kiosk no
+  longer writes attendance.
 - **`src/kiosk/KioskApp.tsx`** — `onConfirm` journals before the tick; the uploader's lifecycle
-  leaves the bound-only effect; the room's two sets; the 4am guard; the mark's new destination.
-- **The kiosk's words in every phase** — the staff statement and row, the Check-ins screen, the
-  chooser's line, the pairing screen's line, the hidden install prompt, **Leave**'s warning, and
-  *First time here?* while out of touch.
+  leaves the bound-only effect; the room's two sets; the 4am guard; the mark's destination.
+- **The kiosk's words** — the staff statement and row, the Check-ins screen, the chooser's line, the
+  pairing screen's line, the hidden install prompt, **Leave**'s warning, *First time here?* while out
+  of touch, and the staff line on untouched glass.
 - **New `functions/src/kiosk/landing.ts`** — the callable: one transaction per record, the outcomes,
-  held pickups and parking, the time bounds, the counts on the device row, `serverNowMs`.
-- **`firestore.rules`** — `kioskParkedRecords` and held pickups, server-written and core-readable;
-  `checkOutKeys()` gains `checkedOutRecordedAt` and `kioskCheckedOutTappedAt` so the main app's undo
-  clears them; the server-only attendance fields refused from client writes.
+  earlier-wins, parking, the time bounds, the counts on the device row.
+- **`firestore.rules`** — `kioskParkedRecords`, server-written and core-readable; the new attendance
+  fields server-only; `checkOutKeys()` gains `checkedOutRecordedAt` and `laterCheckOut` so the main
+  app's undo clears them.
 - **Types and converters** — the new optional attendance fields, and *time not known*.
+- **The Team page** — *out of touch since …* in place of *not recording*; **Retire** asking first;
+  `KIOSK_LIVE_WITHIN_MS` widened.
 - **The words Tally already says** — §9, the volunteer card and the drill, with the sweep as a test.
-- **The Team page stops inviting the wrong move** — the kiosk row's *out of touch since …* in place
-  of *not recording*, and **Retire** asking first for any kiosk last heard from while set to a
-  gathering. The church staff's first ask, and small.
-- **`KIOSK_LIVE_WITHIN_MS`** made true — the standing report every minute while bound.
 
 ### Phase 2 — Tally says what it knows
 
@@ -633,24 +621,11 @@ lived only in the states where nothing was waiting.**
 - The event page's line for the core team, and the CSV's columns.
 - Parked cards on Review, per reason, linked from the event page, counted in the navigation.
 - The counselor's register line, with `kioskPresence/{chain}` and its trigger.
+- The kiosk session's direct attendance-write rules removed, once no kiosk runs the old bundle.
 
-### Phase 3 — the door, while out of touch
+### Optional
 
-- *Dropping off or picking up?* for a child this tablet did not see, on a gathering that hands
-  children back.
-- The staff line on untouched glass.
-- Today's chooser rows cached, for an offline move.
-
-### Phase 4 — hardening, optional
-
-- **A binding log.** A trigger records which gathering a device was set to and when (and, once offline
-  moves exist, the journal reports them), and the callable then accepts records only for gatherings the
-  kiosk actually stood in, at the times it stood there — narrower than today, when the rules let a
-  kiosk point itself at any gathering.
-- **Records from a retired tablet, tapped before it was retired**, sent in one last pass before it signs
-  itself out and accepted for gatherings the log says it was set to — so retiring never strands a
-  morning. Safe only with the log.
-- **The QR hand-off**, if outages prove long.
+- *Check in or check out?* for a child this tablet did not see (§8), for a church with two kiosks.
 
 ---
 
@@ -683,11 +658,12 @@ For the build:
 - Unit tests for `journal.ts` and `uploader.ts`, with every failure in [the table](#what-happens-now)
   as a named test.
 - The simulations above become `KioskApp.offline.test.tsx`: the Sunday outage, the hanging connection,
-  the move, the reboot, 500 records, and storage full at 4am.
-- Rules tests for the new collections and the server-only attendance fields.
-- Functions tests for every outcome, the same record twice, a pickup ahead of its arrival in one batch,
-  a pickup held for another device's arrival, the time bounds, a retired kiosk, a frozen child, and the
-  transactional date patch.
+  the move, the reboot, 500 records, storage full at 4am.
+- Rules tests for the parked collection and the server-only attendance fields.
+- Functions tests for every outcome; the same record twice; a pickup behind its arrival in one batch;
+  a pickup whose arrival is on another device, before and after the day it may wait; earlier-wins for
+  an arrival and for a pickup, and a later tap changing nothing; the time bounds; a retired kiosk; a
+  frozen child; the transactional date patch.
 - End to end: Playwright's `context.setOffline(true)` around a real kiosk session against the
   emulators — the drill, automated, including *cut the network at 9:41; on Monday both the event page
   and the Team row say so*.
@@ -700,23 +676,18 @@ For the build:
 ## Rollout
 
 - **Backend first.** Rules and functions deploy on merge; kiosks pick up a new bundle at their 4am
-  reload, so for a while new kiosks meet old functions and old kiosks meet new ones. A new kiosk
-  finding no callable keeps its records and uses the direct road for the gathering it is on — nothing
-  lost. An old kiosk behaves as today until its reload.
-- **The standing report gains no fields**, only frequency, so a rules mismatch cannot make a kiosk
-  believe it was retired.
+  reload. A new kiosk that meets old functions finds no callable, keeps its records and says so on the
+  staff row — nothing lost, only late until the functions deploy. An old kiosk keeps writing directly,
+  which is why the direct-write rules stay until Phase 2.
+- **The standing report does not change**, so a rules mismatch cannot make a kiosk believe it was
+  retired.
 - **The migration** runs once, on the first boot of the new bundle.
 - **The card and the drill** go out with Phase 1, not after it.
 
 ## Open questions
 
-1. Should the register *show* the earlier of the two times for a drop-off recorded twice — the parent's
-   ask — or the time of the record that stands, with the kiosk's tap in the CSV?
-2. The staff line on untouched glass: worth its words on the parent's side of the kiosk, in the owed
-   notice's grammar, or does the chooser line, the staff row and the card do enough?
-3. Is `kioskPresence/{chain}`, readable by anybody on the gathering, the right shape for the counselor
-   line — or should counselors see only *the kiosk is out of touch*, with no counts?
-4. How much slack around a gathering's window should a tap time be allowed?
-5. Is the binding log, and with it accepting a retired tablet's earlier records, worth a trigger on
-   every change of binding?
-6. Who names kiosks — the person who pairs one, or only the core team?
+1. How much slack around a gathering's window should a tap time be allowed? An hour before the window
+   opens is the draft's guess.
+2. Who names kiosks — the person who pairs one, or only the core team?
+3. Is a second or two before a check-in appears on counselors' phones, on a cold start, acceptable —
+   or should the callable keep one instance warm during gatherings?
