@@ -18,6 +18,7 @@ import type {
   DocumentSnapshotLike,
   FirestoreLike,
   QuerySnapshotLike,
+  TransactionLike,
   WriteBatchLike,
 } from '../firestore.js';
 
@@ -134,6 +135,37 @@ export class FakeFirestore implements FirestoreLike {
           .map((key) => this.snapshot(key)),
       }),
     };
+  }
+
+  /**
+   * Reads see the committed state; writes are held and applied together when
+   * the callback resolves, and dropped if it throws — the two properties a
+   * caller relies on. There is no contention here to retry, so the callback
+   * runs once.
+   */
+  async runTransaction<T>(update: (transaction: TransactionLike) => Promise<T>): Promise<T> {
+    const queued: Array<() => void> = [];
+    let wrote = false;
+    const transaction: TransactionLike = {
+      get: async (ref) => {
+        if (wrote) throw new Error('Firestore transactions require all reads before all writes.');
+        return this.snapshot(ref.path);
+      },
+      set: (ref, value, options) => {
+        wrote = true;
+        queued.push(() => this.write(ref.path, value, options?.merge === true));
+        return transaction;
+      },
+      update: (ref, value) => {
+        wrote = true;
+        if (!this.data.has(ref.path)) throw new Error(`NOT_FOUND: ${ref.path}`);
+        queued.push(() => this.write(ref.path, value, true));
+        return transaction;
+      },
+    };
+    const result = await update(transaction);
+    for (const apply of queued) apply();
+    return result;
   }
 
   batch(): WriteBatchLike {

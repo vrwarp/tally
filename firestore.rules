@@ -788,7 +788,48 @@ service cloud.firestore {
                  .data.get('upstreamRecordMissing', false) == true;
         }
 
-        function checkOutKeys() { return ['checkedOutAt', 'checkedOutBy']; }
+        /**
+         * The pickup's fields. The last three are the server's (see
+         * `serverAttendanceKeys`) and are listed so that an undo — which clears
+         * every one of them — still touches only a pickup.
+         */
+        function checkOutKeys() {
+          return ['checkedOutAt', 'checkedOutBy',
+                  'checkedOutRecordedAt', 'laterCheckOut', 'checkedOutTimeUncertain'];
+        }
+
+        /**
+         * What only `landKioskRecords` writes: when a record reached Tally, the
+         * record it came from, the later entry an earlier tap replaced, and a
+         * time the server could not vouch for. See
+         * functions/src/kiosk/landing.ts.
+         *
+         * A client may carry them forward or remove them — a counselor's undo
+         * removes a pickup's — and nothing else. A forged `recordedAt` would be
+         * a register claiming a record arrived late, or on time, on nobody's
+         * word but a browser's.
+         */
+        function serverAttendanceKeys() {
+          return ['recordedAt', 'kioskRecordId', 'laterCheckIn', 'timeUncertain',
+                  'checkedOutRecordedAt', 'laterCheckOut', 'checkedOutTimeUncertain'];
+        }
+
+        function keptOrRemoved(key) {
+          return !(key in request.resource.data)
+            || (resource != null
+                && key in resource.data
+                && request.resource.data[key] == resource.data[key]);
+        }
+
+        function serverFieldsUntouched() {
+          return keptOrRemoved('recordedAt')
+            && keptOrRemoved('kioskRecordId')
+            && keptOrRemoved('laterCheckIn')
+            && keptOrRemoved('timeUncertain')
+            && keptOrRemoved('checkedOutRecordedAt')
+            && keptOrRemoved('laterCheckOut')
+            && keptOrRemoved('checkedOutTimeUncertain');
+        }
 
         /**
          * A pickup, recorded by whoever was at the door for it.
@@ -845,7 +886,7 @@ service cloud.firestore {
          */
         allow get, list: if kioskBoundTo(eventChain(eventId))
                          || (isActive() && onChain(eventChain(eventId)));
-        allow create: if validAttendance() && !attendanceFrozen()
+        allow create: if validAttendance() && !attendanceFrozen() && serverFieldsUntouched()
                       && (kioskBoundTo(eventChain(eventId))
                           || (isCounselor() && onChain(eventChain(eventId))));
         /**
@@ -855,7 +896,7 @@ service cloud.firestore {
          * this and renders an already-collected student as done rather than
          * re-writing them.
          */
-        allow update: if !attendanceFrozen()
+        allow update: if !attendanceFrozen() && serverFieldsUntouched()
                       && (isKioskSession()
                             ? (kioskBoundTo(eventChain(eventId)) && kioskCheckOutAllowed())
                             : (isCounselor() && onChain(eventChain(eventId))
@@ -1469,6 +1510,19 @@ service cloud.firestore {
                         && touchesOnly(['retiredAt', 'retiredBy'])
                         && validRetirement());
       allow delete: if false;
+    }
+
+    /**
+     * Records the lobby kiosk kept that no retry can land — a child whose
+     * record upstream has gone, a gathering deleted after the tap, a pickup
+     * whose arrival never came. Written only by `landKioskRecords`, through the
+     * Admin SDK, and settled by the core team; see
+     * docs/kiosk-offline-recovery.md. Holds names and times, which is why a
+     * counselor and the lobby's own session may not read it.
+     */
+    match /kioskParkedRecords/{recordId} {
+      allow get, list: if isCore() && !isKioskSession();
+      allow write: if false;
     }
 
     /**

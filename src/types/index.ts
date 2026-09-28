@@ -988,6 +988,15 @@ export interface KioskDeviceDoc {
   charging?: boolean;
   retiredAt: Timestamp | null;
   retiredBy: string | null;
+  /**
+   * What the tablet still holds that has not reached the register, and the
+   * oldest of it — written by `landKioskRecords` on every call, never by the
+   * kiosk's own report. `allInAt` is the moment a tablet that had been holding
+   * records emptied. All absent until the kiosk first sends a record this way.
+   */
+  waitingCount?: number;
+  waitingSinceAt?: Timestamp | null;
+  allInAt?: Timestamp | null;
 }
 
 /**
@@ -1033,16 +1042,62 @@ export interface AttendanceRecordDoc {
    * volunteer who takes a child in is rarely the one who hands them back.
    */
   checkedOutBy?: string;
+
+  /*
+   * The rest is written only by `landKioskRecords`, the road every record from
+   * the lobby kiosk now takes (functions/src/kiosk/landing.ts), and the rules
+   * let no client set any of it — see docs/kiosk-offline-recovery.md. All
+   * optional: absent on everything the main app writes and on every record
+   * from before the road existed.
+   */
+
+  /** When the arrival reached Tally. `checkedInAt` is when it happened. */
+  recordedAt?: Timestamp;
+  /** The kiosk record it came from — the key its landing is idempotent on. */
+  kioskRecordId?: string;
+  /**
+   * The entry an earlier kiosk tap replaced. Two devices saw the same arrival,
+   * and the earlier moment is when the child was handed over, so it stands;
+   * the later one is kept here rather than lost.
+   */
+  laterCheckIn?: { at: Timestamp | null; by: string | null; method: string | null };
+  /** The kiosk's clock was too far out to vouch for `checkedInAt`. */
+  timeUncertain?: boolean;
+  /** When the pickup reached Tally. */
+  checkedOutRecordedAt?: Timestamp;
+  /** The pickup an earlier kiosk tap replaced, as `laterCheckIn`. */
+  laterCheckOut?: { at: Timestamp | null; by: string | null };
+  /** As `timeUncertain`, for the pickup. */
+  checkedOutTimeUncertain?: boolean;
 }
 
 export interface AttendanceRecord
-  extends Omit<AttendanceRecordDoc, 'checkedInAt' | 'checkedOutAt' | 'checkedOutBy'> {
+  extends Omit<
+    AttendanceRecordDoc,
+    | 'checkedInAt'
+    | 'checkedOutAt'
+    | 'checkedOutBy'
+    | 'recordedAt'
+    | 'kioskRecordId'
+    | 'laterCheckIn'
+    | 'timeUncertain'
+    | 'checkedOutRecordedAt'
+    | 'laterCheckOut'
+    | 'checkedOutTimeUncertain'
+  > {
   /** Equal to `studentId`. */
   id: string;
   checkedInAt: Date;
   /** Null while they are still in the room. */
   checkedOutAt: Date | null;
   checkedOutBy: string | null;
+  /**
+   * The kiosk's clock could not vouch for the arrival's time, or the pickup's.
+   * Every screen that prints the clock time says "time not known" instead.
+   * Absent (false) for nearly every record.
+   */
+  timeUncertain?: boolean;
+  checkedOutTimeUncertain?: boolean;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -1147,6 +1147,131 @@ describe('check-out', () => {
   });
 });
 
+/**
+ * What only `landKioskRecords` writes onto a record — when it reached Tally, the
+ * record it came from, the later entry an earlier tap replaced, a time the
+ * server could not vouch for. A client may carry them forward or remove them;
+ * it may never set them. See functions/src/kiosk/landing.ts.
+ */
+describe('the server’s own attendance fields', () => {
+  const LANDED = Timestamp.fromDate(new Date('2026-02-14T17:00:00Z'));
+
+  /** A record as the late road leaves it: a pickup, with everything beside it. */
+  async function seedLandedPickup(): Promise<void> {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), paths.attendance(ID.event, ID.student)), {
+        ...attendanceDoc(),
+        recordedAt: LANDED,
+        kioskRecordId: 'record-00000001',
+        laterCheckIn: { at: LANDED, by: UID.counselor, method: 'tap' },
+        checkedOutAt: LANDED,
+        checkedOutBy: kioskUid(DEVICE.live),
+        checkedOutRecordedAt: LANDED,
+        laterCheckOut: { at: LANDED, by: UID.core },
+      });
+    });
+  }
+
+  it('refuses a check-in that claims when it reached Tally, from a counselor or a kiosk', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.counselor), paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.counselor, recordedAt: LANDED } as never),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({
+          studentId: ID.otherStudent,
+          checkedInBy: kioskUid(DEVICE.live),
+          kioskRecordId: 'record-00000002',
+        } as never),
+      ),
+    );
+  });
+
+  it('refuses an update that invents an earlier entry or doubts a time', async () => {
+    for (const forged of [
+      { laterCheckIn: { at: LANDED, by: UID.core, method: 'tap' } },
+      { timeUncertain: true },
+      { checkedOutRecordedAt: LANDED },
+    ]) {
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.counselor), paths.attendance(ID.event, ID.student)), forged),
+      );
+    }
+  });
+
+  it('lets a counselor put a child back in the room, taking the server’s pickup fields with it', async () => {
+    await seedLandedPickup();
+    await assertSucceeds(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: deleteField(),
+        checkedOutBy: deleteField(),
+        checkedOutRecordedAt: deleteField(),
+        laterCheckOut: deleteField(),
+        checkedOutTimeUncertain: deleteField(),
+      }),
+    );
+  });
+
+  it('refuses an undo that rewrites the server’s fields instead of removing them', async () => {
+    await seedLandedPickup();
+    await assertFails(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: deleteField(),
+        checkedOutBy: deleteField(),
+        checkedOutRecordedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('lets an ordinary pickup land on a record that carries them, untouched', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), paths.attendance(ID.event, ID.student)), {
+        ...attendanceDoc(),
+        recordedAt: LANDED,
+        kioskRecordId: 'record-00000001',
+      });
+    });
+    await assertSucceeds(
+      updateDoc(doc(asUser(env, UID.core), paths.attendance(ID.event, ID.student)), {
+        checkedOutAt: serverTimestamp(),
+        checkedOutBy: UID.core,
+      }),
+    );
+  });
+});
+
+describe('kioskParkedRecords', () => {
+  const at = (db: Firestore) => doc(db, 'kioskParkedRecords', `check-in:${ID.event}:${ID.student}`);
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      await setDoc(at(context.firestore() as unknown as Firestore), {
+        kind: 'check-in',
+        eventId: ID.event,
+        studentId: ID.student,
+        reason: 'frozen',
+      });
+    });
+  });
+
+  it('is read by the core team, and by nobody below it or at the door', async () => {
+    await assertSucceeds(getDoc(at(asUser(env, UID.core))));
+    await assertSucceeds(getDocs(collection(asUser(env, UID.admin), 'kioskParkedRecords')));
+    await assertFails(getDoc(at(asUser(env, UID.counselor))));
+    await assertFails(getDoc(at(asKioskDevice(env, DEVICE.live))));
+  });
+
+  it('is written by the server alone', async () => {
+    await assertFails(setDoc(at(asUser(env, UID.admin)), { reason: 'frozen' }));
+    await assertFails(deleteDoc(at(asUser(env, UID.admin))));
+    await assertFails(setDoc(at(asKioskDevice(env, DEVICE.live)), { reason: 'frozen' }));
+  });
+});
+
 describe('the attendance freeze (upstreamRecordMissing)', () => {
   /** Server-writes a student whose Planning Center record is known gone. */
   async function seedFrozenStudent(studentId: string): Promise<void> {

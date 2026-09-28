@@ -128,6 +128,12 @@ import {
   type RegisterFamilyResult,
 } from './kiosk/registration.js';
 import {
+  LandingInputError,
+  parseLandRequest,
+  runLandKioskRecords,
+} from './kiosk/landing.js';
+import type { LandKioskRecordsResponse } from './generated/kioskLanding.js';
+import {
   amendRegistration as runAmendRegistration,
   type AmendChild,
   type AmendGuardian,
@@ -3645,6 +3651,50 @@ export const registerFamily = onCall<Record<string, unknown>, Promise<RegisterFa
       }
       throw error;
     }
+  },
+);
+
+/**
+ * The lobby kiosk's records, reaching the register — every check-in and every
+ * pickup it takes, live or after an outage, through this one road.
+ *
+ * The kiosk writes each tap to the tablet before its tick paints and sends it
+ * here in tap order, up to `MAX_RECORDS_PER_CALL` at a time; each record comes
+ * back `landed`, `already-recorded`, `waiting` or `parked`, and only `waiting`
+ * stays on the tablet. See functions/src/kiosk/landing.ts and
+ * docs/kiosk-offline-recovery.md.
+ *
+ * The gate is the one `registerFamily` uses: the kiosk claim plus a live device
+ * row, so retiring a kiosk stops its records at the moment it stops everything
+ * else — and they wait on the tablet, not in a bin, until it is paired again.
+ *
+ * No instance is kept warm (the owner's decision): nothing at the door waits
+ * on this call, so a cold start costs counselors' phones a second or three on
+ * the first family after a lull, and nothing else.
+ */
+export const landKioskRecords = onCall<Record<string, unknown>, Promise<LandKioskRecordsResponse>>(
+  { timeoutSeconds: 60, memory: '256MiB' },
+  async (request) => {
+    if (request.auth?.token?.kiosk !== true) {
+      throw refuse('permission-denied', 'auth.kioskOnly', 'Only a lobby kiosk sends these.');
+    }
+    const caller = await requireLiveKiosk(request.auth);
+
+    let parsed;
+    try {
+      parsed = parseLandRequest(request.data);
+    } catch (error) {
+      if (error instanceof LandingInputError) throw new HttpsError('invalid-argument', error.message);
+      throw error;
+    }
+
+    return runLandKioskRecords({
+      db: db(),
+      request: parsed,
+      caller: { uid: caller.uid, deviceId: caller.deviceId },
+      now: new Date(),
+      logger,
+    });
   },
 );
 

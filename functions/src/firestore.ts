@@ -58,10 +58,26 @@ export interface WriteBatchLike {
   commit(): Promise<unknown>;
 }
 
+/**
+ * A read-then-write that nothing else can interleave with.
+ *
+ * Only what a record landing from the kiosk needs: read the arrival, the child
+ * and the gathering, decide, and write — so that two devices landing the same
+ * child at once, or a counselor tapping them in the same second, cannot both
+ * believe they were first. Reads must all come before writes, as the admin SDK
+ * requires.
+ */
+export interface TransactionLike {
+  get(ref: DocumentRefLike): Promise<DocumentSnapshotLike>;
+  set(ref: DocumentRefLike, data: Record<string, unknown>, options?: { merge?: boolean }): unknown;
+  update(ref: DocumentRefLike, data: Record<string, unknown>): unknown;
+}
+
 export interface FirestoreLike {
   collection(path: string): CollectionRefLike;
   doc(path: string): DocumentRefLike;
   batch(): WriteBatchLike;
+  runTransaction<T>(update: (transaction: TransactionLike) => Promise<T>): Promise<T>;
 }
 
 /**

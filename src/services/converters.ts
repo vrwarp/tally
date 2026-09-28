@@ -360,6 +360,10 @@ export function toAttendance(
           (snapshot.metadata.hasPendingWrites ? new Date() : null))
         : null,
     checkedOutBy: strOrNull(data.checkedOutBy),
+    // Present only when true — the server's doubt about a kiosk clock, which
+    // every screen that prints the time answers with "time not known".
+    ...(data.timeUncertain === true ? { timeUncertain: true } : {}),
+    ...(data.checkedOutTimeUncertain === true ? { checkedOutTimeUncertain: true } : {}),
   };
 }
 
