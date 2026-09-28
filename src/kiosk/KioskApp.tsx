@@ -1477,16 +1477,23 @@ export function KioskApp() {
    * screen that must open with the internet already gone.
    */
   const [checkInsModule, setCheckInsModule] = useState<typeof CheckInsModule | null>(null);
+  const wantsCheckIns = overlay?.kind === 'check-ins';
   useEffect(() => {
-    if (!services) return;
+    if (!services || checkInsModule) return;
     let cancelled = false;
-    void import('./screens/CheckInsScreen').then((loaded) => {
-      if (!cancelled) setCheckInsModule(loaded);
-    });
+    import('./screens/CheckInsScreen')
+      .then((loaded) => {
+        if (!cancelled) setCheckInsModule(loaded);
+      })
+      .catch(() => {
+        // A tablet that booted offline onto a bundle it never fetched this
+        // chunk for. The screen says *Loading…*, and opening it again — or the
+        // next boot — tries again.
+      });
     return () => {
       cancelled = true;
     };
-  }, [services]);
+  }, [services, checkInsModule, wantsCheckIns]);
 
   /** A name for a record that carries none — a pickup — off the roster. */
   const studentsById = useMemo(
