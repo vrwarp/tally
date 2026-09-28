@@ -516,7 +516,9 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                     <p role="alert" className="basis-full text-xs text-ink-400">
                       {live
                         ? t('retireLiveWarning', { gathering: device.boundTo ?? '' })
-                        : t('retireOutOfTouchWarning', { gathering: device.boundTo ?? '' })}
+                        : quietSince
+                          ? t('retireOutOfTouchWarning', { gathering: device.boundTo ?? '' })
+                          : t('retireWaitingWarning', { count: device.waitingCount ?? 0 })}
                     </p>
                   ) : null}
                 </li>

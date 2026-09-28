@@ -331,6 +331,20 @@ describe('PersonPanel — the kiosks they paired', () => {
     await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('lobby-tablet', MIRIAM.id));
   });
 
+  it('asks before retiring an idle kiosk that still holds check-ins, and says how many', async () => {
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ boundTo: null, boundChain: null, waitingCount: 2 })]);
+      return () => {};
+    });
+    const user = show(SAM);
+
+    await user.click(screen.getByRole('button', { name: 'Retire' }));
+    expect(retireKioskDevice).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/still has 2 check-ins on it that haven’t reached Tally/),
+    ).toBeInTheDocument();
+  });
+
   it('counts a kiosk as recording between its five-minute reports', () => {
     // Nine minutes since the last report is one missed poll, not a dead tablet.
     subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {

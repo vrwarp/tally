@@ -185,6 +185,47 @@ describe('an arrival', () => {
     expect(held.laterCheckIn).toEqual({ at: counselorAt, by: 'uid-counselor', method: 'tap' });
   });
 
+  it('replaces the displaced entry whole — no stale "time not known", no stale arrival', async () => {
+    // A tablet with a clock three hours fast landed Ada first — pulled back to
+    // the server's now and flagged — under its own arrival. Another kiosk's
+    // trustworthy tap, earlier and with no arrival of its own, then arrives.
+    const db = dbWithSunday();
+    const firstNow = START + 20 * MINUTE;
+    await land(db, [checkIn(firstNow + 3 * 60 * MINUTE, { arrivalId: 'arrival-fast' })], firstNow);
+    expect(ms(attendance(db)!.checkedInAt)).toBe(firstNow);
+    expect(attendance(db)!.timeUncertain).toBe(true);
+
+    const trustworthy = checkIn(START + 5 * MINUTE, { id: 'in-trust-aaaa', arrivalId: undefined });
+    await land(db, [trustworthy], START + 25 * MINUTE);
+
+    const held = attendance(db)!;
+    expect(ms(held.checkedInAt)).toBe(START + 5 * MINUTE);
+    expect(held.timeUncertain).toBeUndefined();
+    expect(held.arrivalId).toBeUndefined();
+    expect(held.kioskRecordId).toBe('in-trust-aaaa');
+    // What else the document held stays as it was.
+    expect(held).toMatchObject({ studentId: ADA, eventId: EVENT, isFirstEver: true });
+  });
+
+  it('keeps the counselor’s entry beside it however many earlier taps arrive after', async () => {
+    const db = dbWithSunday();
+    const counselorAt = Timestamp.fromMillis(START + 60 * MINUTE);
+    db.seed(`events/${EVENT}/attendance/${ADA}`, {
+      studentId: ADA,
+      eventId: EVENT,
+      checkedInAt: counselorAt,
+      checkedInBy: 'uid-counselor',
+      method: 'tap',
+      isFirstEver: false,
+    });
+    await land(db, [checkIn(START + 20 * MINUTE)], START + 2 * 60 * MINUTE);
+    await land(db, [checkIn(START + 10 * MINUTE, { id: 'in-second-aaaa' })], START + 2 * 60 * MINUTE);
+
+    const held = attendance(db)!;
+    expect(ms(held.checkedInAt)).toBe(START + 10 * MINUTE);
+    expect(held.laterCheckIn).toEqual({ at: counselorAt, by: 'uid-counselor', method: 'tap' });
+  });
+
   it('changes nothing when the register already has the child earlier', async () => {
     const db = dbWithSunday();
     db.seed(`events/${EVENT}/attendance/${ADA}`, {
@@ -334,6 +375,30 @@ describe('one call', () => {
       { id: `in-${START}-aaaa`, outcome: 'waiting', waitingFor: 'retry' },
       { id: 'in-other-aaaa', outcome: 'landed' },
     ]);
+  });
+});
+
+describe('a pickup behind an arrival that did not land', () => {
+  it('waits with it, rather than being parked as a pickup whose arrival never came', async () => {
+    class Flaky extends FakeFirestore {
+      private calls = 0;
+      override async runTransaction<T>(update: (tx: TransactionLike) => Promise<T>): Promise<T> {
+        this.calls += 1;
+        if (this.calls === 1) throw new Error('contention');
+        return super.runTransaction(update);
+      }
+    }
+    const db = new Flaky();
+    for (const [path, value] of dbWithSunday().data) db.seed(path, value);
+
+    // Two days after the gathering — past the day a pickup waits for its arrival.
+    const result = await land(db, [checkIn(START), checkOut(END - 5 * MINUTE)], END + 2 * 24 * 60 * MINUTE);
+
+    expect(result.outcomes).toEqual([
+      { id: `in-${START}-aaaa`, outcome: 'waiting', waitingFor: 'retry' },
+      { id: `out-${END - 5 * MINUTE}-aaaa`, outcome: 'waiting', waitingFor: 'arrival' },
+    ]);
+    expect(db.writtenPaths('kioskParkedRecords/')).toEqual([]);
   });
 });
 

@@ -5242,6 +5242,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Team.retireWaitingWarning": {
+    "source": "This kiosk still has {count, plural, one {1 check-in} other {# check-ins}} on it that haven’t reached Tally. Retiring shows a pairing code the next time it reaches Tally; they wait there until it’s paired again.",
+    "context": "Confirmation under a lobby kiosk's Retire button on the Team page, for a kiosk that told Tally it still holds check-ins it could not send (for example a pickup waiting for another device's check-in). {count} is how many. Same consequences as Team.retireLiveWarning.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "KioskPair.title": {
     "source": "Pair a kiosk",
     "es-MX": "machine",

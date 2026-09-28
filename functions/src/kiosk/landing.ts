@@ -213,6 +213,35 @@ function millis(value: unknown): number | null {
   return toDateOrNull(value)?.getTime() ?? null;
 }
 
+/** The fields that are one arrival's own — replaced whole when an earlier one displaces it. */
+const ARRIVAL_FIELDS = [
+  'checkedInAt',
+  'checkedInBy',
+  'method',
+  'arrivalId',
+  'recordedAt',
+  'kioskRecordId',
+  'timeUncertain',
+] as const;
+
+/** The same for a pickup. */
+const PICKUP_FIELDS = [
+  'checkedOutAt',
+  'checkedOutBy',
+  'checkedOutRecordedAt',
+  'checkedOutTimeUncertain',
+] as const;
+
+/** The document as held, without one entry's own fields. */
+function without(
+  held: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  const rest = { ...held };
+  for (const field of fields) delete rest[field];
+  return rest;
+}
+
 function attendanceRef(db: FirestoreLike, eventId: string, studentId: string): DocumentRefLike {
   return db.doc(`${PATHS.events}/${eventId}/attendance/${studentId}`);
 }
@@ -301,9 +330,22 @@ async function landOne(
       };
 
       if (action === 'move-earlier') {
-        tx.update(hereRef, {
+        /*
+         * The whole document, not an update: an earlier tap replaces the entry
+         * it displaces *whole*. Merged over it, the displaced entry's own
+         * `arrivalId` or `timeUncertain` would outlive it — a trustworthy 9:41
+         * still reading *time not known*, or claiming a group it was not in.
+         *
+         * The displaced entry is kept as `laterCheckIn`, unless one is already
+         * kept: the first entry ever displaced is the only one a person can
+         * have made — once a record stands, the app offers nobody a second
+         * check-in — so a third witness replaces the kiosk's own middle tap,
+         * never the counselor's.
+         */
+        tx.set(hereRef, {
+          ...without(held!, ARRIVAL_FIELDS),
           ...arrival,
-          laterCheckIn: {
+          laterCheckIn: held!.laterCheckIn ?? {
             at: held!.checkedInAt ?? null,
             by: typeof held!.checkedInBy === 'string' ? held!.checkedInBy : null,
             method: typeof held!.method === 'string' ? held!.method : null,
@@ -390,9 +432,11 @@ async function landOne(
       ...(uncertain ? { checkedOutTimeUncertain: true } : {}),
     };
     if (action === 'move-earlier') {
-      tx.update(hereRef, {
+      // Whole, for the reasons the arrival's is: see above.
+      tx.set(hereRef, {
+        ...without(held, PICKUP_FIELDS),
         ...pickup,
-        laterCheckOut: {
+        laterCheckOut: held.laterCheckOut ?? {
           at: held.checkedOutAt ?? null,
           by: typeof held.checkedOutBy === 'string' ? held.checkedOutBy : null,
         },
@@ -424,7 +468,25 @@ export async function runLandKioskRecords(args: {
 
   // In order, one at a time: a pickup in the same call as its arrival must see
   // the arrival already written.
+  /*
+   * Arrivals in this call that did not land — a transaction that threw, say.
+   * Their pickups later in the same call wait with them: sent on alone, a
+   * pickup would find no arrival and, a day after the gathering, be parked as
+   * one that never came while its arrival lands on the next pass. (Across
+   * calls, the kiosk's uploader holds a pickup behind its own arrival.)
+   */
+  const arrivalsNotIn = new Set<string>();
+
   for (const parsed of request.records) {
+    if (
+      parsed.ok &&
+      parsed.record.kind === 'check-out' &&
+      arrivalsNotIn.has(`${parsed.record.eventId}/${parsed.record.studentId}`)
+    ) {
+      outcomes.push({ id: parsed.record.id, outcome: 'waiting', waitingFor: 'arrival' });
+      waitingTaps.push(parsed.record.tappedAtMs);
+      continue;
+    }
     if (!parsed.ok) {
       await db.doc(`${PARKED_COLLECTION}/unreadable:${parsed.id}`).set({
         ...parsed.partial,
@@ -439,7 +501,12 @@ export async function runLandKioskRecords(args: {
     try {
       const result = await landOne(db, parsed.record, caller, now);
       outcomes.push(result);
-      if (result.outcome === 'waiting') waitingTaps.push(parsed.record.tappedAtMs);
+      if (result.outcome === 'waiting') {
+        waitingTaps.push(parsed.record.tappedAtMs);
+        if (parsed.record.kind === 'check-in') {
+          arrivalsNotIn.add(`${parsed.record.eventId}/${parsed.record.studentId}`);
+        }
+      }
     } catch (error) {
       // One record's trouble is not the call's: it stays on the tablet and is
       // sent again, and the records beside it still land.
@@ -450,6 +517,9 @@ export async function runLandKioskRecords(args: {
       });
       outcomes.push({ id: parsed.record.id, outcome: 'waiting', waitingFor: 'retry' });
       waitingTaps.push(parsed.record.tappedAtMs);
+      if (parsed.record.kind === 'check-in') {
+        arrivalsNotIn.add(`${parsed.record.eventId}/${parsed.record.studentId}`);
+      }
     }
   }
 

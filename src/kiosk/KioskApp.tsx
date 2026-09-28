@@ -1604,14 +1604,18 @@ export function KioskApp() {
       // no-cache kiosk.html makes it double as the update channel.
       /*
        * Not while a record is held only in this page — the one state in which
-       * a reload can still lose one (see `journal.ts`). The uploader lands it
-       * the moment Tally answers, and the next night's hour is soon enough.
+       * a reload can still lose one (see `journal.ts`) — and not while the
+       * roster or phone index was given up to make room for one and the kiosk
+       * cannot fetch it back: a reload then would leave the door finding
+       * nobody. The uploader and the next read put both right the moment Tally
+       * answers, and the next night's hour is soon enough.
        */
       if (
         unattended() &&
         isQuietHour() &&
         (!binding || !bindingIsLive(binding, Date.now())) &&
-        heldInMemoryCount() === 0
+        heldInMemoryCount() === 0 &&
+        !(outOfTouchSince() !== null && doorCachesWereGivenUp())
       ) {
         if (reloadingRef.current) return;
         reloadingRef.current = true;

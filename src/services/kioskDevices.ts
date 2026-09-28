@@ -119,11 +119,18 @@ export function kioskOutOfTouchSince(device: KioskDevice, nowMs: number): Date |
 
 /**
  * Whether retiring this kiosk could take something away: a kiosk recording
- * now, or one last heard from while set to a gathering, which may be holding
- * that gathering's check-ins until it can reach Tally. Both get asked first.
+ * now; one last heard from while set to a gathering, which may be holding that
+ * gathering's check-ins until it can reach Tally; or one that told Tally it
+ * still holds some — `landKioskRecords` writes the count on every call, so a
+ * tablet set to nothing with a pickup waiting a day for another device's
+ * arrival says so. All three get asked first.
  */
 export function kioskMayHoldRecords(device: KioskDevice, nowMs: number): boolean {
-  return isKioskLive(device, nowMs) || kioskOutOfTouchSince(device, nowMs) !== null;
+  return (
+    isKioskLive(device, nowMs) ||
+    kioskOutOfTouchSince(device, nowMs) !== null ||
+    (!device.retiredAt && (device.waitingCount ?? 0) > 0)
+  );
 }
 
 /**

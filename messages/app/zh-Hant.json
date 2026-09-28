@@ -936,7 +936,8 @@
     "mailboxNote": "{address} 看似共用信箱。在 Tally 中一個帳號代表一位同工：若多人共用此帳號登入，任何人進行的簽到點名紀錄皆會歸在此姓名名下。",
     "noHistoryNote": "Tally 僅記錄權限的起始與終止時間。不會記錄過往曾參與過哪些聚會的名單。",
     "kioskOutOfTouch": "自 {when} 起失去聯繫，當時在 {gathering}——多半是教會的網路問題。它會繼續在平板上記錄。",
-    "retireOutOfTouchWarning": "此簽到台最後一次聯繫時在 {gathering}，平板上可能還有簽到紀錄。停用後，它下次連上 Tally 時會顯示配對碼，可能正好在接孩子的時候；平板上的紀錄會留在平板上，等重新配對後再上傳。"
+    "retireOutOfTouchWarning": "此簽到台最後一次聯繫時在 {gathering}，平板上可能還有簽到紀錄。停用後，它下次連上 Tally 時會顯示配對碼，可能正好在接孩子的時候；平板上的紀錄會留在平板上，等重新配對後再上傳。",
+    "retireWaitingWarning": "此簽到台上還有 {count, plural, other {# 筆簽到紀錄}}沒有傳到 Tally。停用後，它下次連上 Tally 時會顯示配對碼；這些紀錄會留在平板上，等重新配對後再上傳。"
   },
   "KioskPair": {
     "title": "配對簽到台",

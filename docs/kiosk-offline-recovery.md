@@ -653,9 +653,29 @@ cupboard, and the first draft's visibility lived only in the states where nothin
   and the staging runbook gained its step 0.
 - **The sweep** is `tests/resetAdvice.test.ts`: every shipped string that mentions a reset, a wipe or
   a reinstall forbids it or quotes the all-clear, and the old advice cannot return to the docs.
+- **A pickup waits for its own arrival** — held back by the uploader while this tablet's arrival for
+  the same child is still waiting, and answered `waiting` by the callable when its arrival earlier in
+  the same call did not land — so an arrival that fails once cannot turn its pickup into a parked
+  *no-arrival*.
+- **Earlier wins replaces the displaced entry whole** (its own arrival id and *time not known* go
+  with it) and keeps the *first* entry displaced as `laterCheckIn` / `laterCheckOut` — the only one a
+  person can have made, since the app offers nobody a second check-in once a record stands.
+- **The tablet lets go only on a known answer** — `landed`, `already-recorded` or `parked`; anything
+  else, including an answer a later server adds, is sent again. A record held in memory moves to the
+  disk the moment a landing frees room, and the four o'clock reload also waits while the door's caches
+  are missing and the kiosk cannot fetch them back.
+- **Retire also asks first** for a kiosk set to nothing that told Tally it still holds records (the
+  device row's `waitingCount`).
 - **Not yet:** a parked check-in tapped a second time — possible only if the room was cleared by
-  leaving and rebinding — replaces the first parked copy, so its card would show the later time.
-  Worth fixing with the Review cards in Phase 2, which are where parked records are read.
+  leaving and rebinding — replaces the first parked copy, so its card would show the later time; and
+  the device row's counts are written outside a transaction, so a call that times out and finishes
+  after its retry can leave an older count. Both are read only by Phase 2's screens and are worth
+  fixing with them. A record migrated from the old queue goes up with the time its old write failed,
+  which is minutes after the tap at most and never before it; it is marked *about* on the tablet but
+  not on the register. And the callable takes a live kiosk's word for which gathering a record
+  belongs to — the reach [§3](#3-one-road-to-the-register) chose over a binding log — so a stolen
+  kiosk session could write attendance, or parked records, for any gathering until the kiosk is
+  retired.
 
 **Checked** as built: unit tests for the journal, the uploader, the room and *out of touch*;
 `KioskApp.offline.test.tsx` running the outages above against the real kiosk (an outage past the end

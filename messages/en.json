@@ -936,7 +936,8 @@
     "mailboxNote": "{address} looks like a shared mailbox. One account is one person in Tally: if several people sign in to this one, every register any of them takes is filed under this name.",
     "noHistoryNote": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past.",
     "kioskOutOfTouch": "Out of touch since {when} while at {gathering} — probably the church’s internet. It keeps recording on the tablet.",
-    "retireOutOfTouchWarning": "This kiosk was last heard from while at {gathering}, so it may still have check-ins on it. Retiring shows a pairing code the next time it reaches Tally, possibly mid-pickup; anything on the tablet waits there until it’s paired again."
+    "retireOutOfTouchWarning": "This kiosk was last heard from while at {gathering}, so it may still have check-ins on it. Retiring shows a pairing code the next time it reaches Tally, possibly mid-pickup; anything on the tablet waits there until it’s paired again.",
+    "retireWaitingWarning": "This kiosk still has {count, plural, one {1 check-in} other {# check-ins}} on it that haven’t reached Tally. Retiring shows a pairing code the next time it reaches Tally; they wait there until it’s paired again."
   },
   "KioskPair": {
     "title": "Pair a kiosk",

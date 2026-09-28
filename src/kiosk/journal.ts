@@ -135,6 +135,7 @@ export function write(record: KioskRecord): 'stored' | 'held' {
 
   if (stored) {
     heldInMemory.delete(record.id);
+    storeHeld();
   } else {
     heldInMemory.set(record.id, record);
   }
@@ -142,10 +143,24 @@ export function write(record: KioskRecord): 'stored' | 'held' {
   return stored ? 'stored' : 'held';
 }
 
+/**
+ * Moves what is held in memory onto the disk, as far as there is room — tried
+ * whenever room may have appeared. A record held in memory is the one a reload
+ * can lose, and one that keeps coming back `waiting` could otherwise stay that
+ * way for a day.
+ */
+function storeHeld(): void {
+  for (const [id, record] of heldInMemory) {
+    if (!tryStore(RECORD_PREFIX + id, JSON.stringify(record))) return;
+    heldInMemory.delete(id);
+  }
+}
+
 /** Takes a record off the tablet — only ever because Tally now has it. */
 export function remove(id: string): void {
   heldInMemory.delete(id);
   removeKey(RECORD_PREFIX + id);
+  storeHeld();
   emit();
 }
 
@@ -236,8 +251,20 @@ export function isHeldInMemory(id: string): boolean {
   return heldInMemory.has(id);
 }
 
-/** Whether the roster or phone index was given up to make room for a record. */
+/**
+ * Whether the roster or phone index was given up to make room for a record,
+ * and is still missing — the moment the kiosk fetches it back, this is false
+ * again.
+ */
 export function doorCachesWereGivenUp(): boolean {
+  if (!doorCachesGivenUp) return false;
+  try {
+    doorCachesGivenUp = EVICTABLE.some(
+      (cache) => cache.door && localStorage.getItem(cache.key) === null,
+    );
+  } catch {
+    // Storage is not answering; say what was last known.
+  }
   return doorCachesGivenUp;
 }
 

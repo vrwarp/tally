@@ -936,7 +936,8 @@
     "mailboxNote": "{address} parece un buzón compartido. Una cuenta es una persona en Tally: si varias personas inician sesión con esta, todas las listas que cualquiera de ellas pase quedan bajo este nombre.",
     "noHistoryNote": "Tally anota cuándo empezó el acceso y cuándo terminó, y nada más. No guarda ningún registro de en qué reuniones estuvo alguien en el pasado.",
     "kioskOutOfTouch": "Sin conexión desde {when} mientras estaba en {gathering} — probablemente el internet de la iglesia. Sigue anotando en la tableta.",
-    "retireOutOfTouchWarning": "De este kiosco no se sabe nada desde que estaba en {gathering}, así que quizá todavía tenga registros. Darlo de baja hace que muestre un código de vinculación la próxima vez que se conecte con Tally, quizá a mitad de una salida; lo que haya en la tableta espera ahí hasta que se vuelva a vincular."
+    "retireOutOfTouchWarning": "De este kiosco no se sabe nada desde que estaba en {gathering}, así que quizá todavía tenga registros. Darlo de baja hace que muestre un código de vinculación la próxima vez que se conecte con Tally, quizá a mitad de una salida; lo que haya en la tableta espera ahí hasta que se vuelva a vincular.",
+    "retireWaitingWarning": "Este kiosco todavía tiene {count, plural, one {1 registro} other {# registros}} que no han llegado a Tally. Darlo de baja hace que muestre un código de vinculación la próxima vez que se conecte con Tally; esperan ahí hasta que se vuelva a vincular."
   },
   "KioskPair": {
     "title": "Vincular un kiosco",

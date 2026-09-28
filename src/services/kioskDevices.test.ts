@@ -374,6 +374,18 @@ describe('kioskOutOfTouchSince and kioskMayHoldRecords', () => {
     expect(kioskMayHoldRecords(device({ lastSeenAt: new Date(nowMs - 60_000) }), nowMs)).toBe(true);
   });
 
+  it('asks before retiring a kiosk set to nothing that told Tally it still holds records', () => {
+    // Online, idle — and a pickup waiting a day for another device's arrival.
+    const holding = device({
+      boundTo: null,
+      boundChain: null,
+      lastSeenAt: new Date(nowMs - 60_000),
+      waitingCount: 1,
+    });
+    expect(kioskOutOfTouchSince(holding, nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(holding, nowMs)).toBe(true);
+  });
+
   it('asks nothing of a kiosk last set to nothing, or already retired', () => {
     const idle = device({ boundTo: null, boundChain: null, lastSeenAt: nineFortyOne });
     expect(kioskOutOfTouchSince(idle, nowMs)).toBeNull();

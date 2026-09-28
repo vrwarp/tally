@@ -150,6 +150,65 @@ describe('a pass', () => {
   });
 });
 
+describe('what it lets go of', () => {
+  it('keeps a record whose answer it does not know, or that was not answered for', async () => {
+    const h = harness([rec(1), rec(2)]);
+    h.answerWith(async () => ({
+      // A later server's new answer, and a record the reply left out.
+      outcomes: [{ id: 'record-0001', outcome: 'try-later' as never }],
+    }));
+    await createUploader(h.deps).kick();
+
+    expect(h.journal.map((r) => r.id)).toEqual(['record-0001', 'record-0002']);
+    expect(h.deps.remove).not.toHaveBeenCalled();
+  });
+
+  it('holds a pickup back while its own arrival is still waiting on the tablet', async () => {
+    // Twenty-six arrivals, then a pickup for the first child: the arrival goes
+    // in the first call and comes back waiting, the pickup would go in the
+    // second — and without its arrival Tally would park it as never having come.
+    const arrivals = Array.from({ length: 26 }, (_, i) => rec(i + 1));
+    const pickup = rec(100, {
+      id: 'record-pickup',
+      kind: 'check-out',
+      studentId: 'student-1',
+      student: undefined,
+    });
+    const h = harness([...arrivals, pickup]);
+    h.answerWith(async (request) => ({
+      outcomes: request.records.map((r) =>
+        r.id === 'record-0001'
+          ? { id: r.id, outcome: 'waiting' as const, waitingFor: 'retry' as const }
+          : { id: r.id, outcome: 'landed' as const },
+      ),
+    }));
+    await createUploader(h.deps).kick();
+
+    const sent = h.calls.flatMap((call) => call.records.map((r) => r.id));
+    expect(sent).not.toContain('record-pickup');
+    expect(h.journal.map((r) => r.id)).toEqual(['record-0001', 'record-pickup']);
+    expect(h.deps.noteAttempt).toHaveBeenCalledWith('record-pickup', 'arrival');
+  });
+
+  it('counts a tap made while a call is out among what is still on the tablet', async () => {
+    const h = harness(Array.from({ length: 26 }, (_, i) => rec(i + 1)));
+    let first = true;
+    h.answerWith(async (request) => {
+      if (first) {
+        first = false;
+        // A family taps in while the first call is in the air.
+        h.journal.push(rec(500));
+      }
+      return { outcomes: request.records.map((r) => ({ id: r.id, outcome: 'landed' as const })) };
+    });
+    await createUploader(h.deps).kick();
+
+    // The second call carries the one left from the first pass's snapshot and
+    // reports the new tap as still on the tablet.
+    expect(h.calls[1]!.stillOnTablet).toEqual({ count: 1, oldestTappedAtMs: NINE + 500 });
+  });
+});
+
 describe('one pass at a time — the old queue’s overlapping replays', () => {
   it('runs exactly one more pass for any number of kicks during a pass', async () => {
     const h = harness([rec(1)]);

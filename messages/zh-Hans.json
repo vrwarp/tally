@@ -936,7 +936,8 @@
     "mailboxNote": "{address} 似乎是共用邮箱。在 Tally 中一个账号对应一位同工：如果多人共用此账号登录，任何人点名登记的名单都会记在此姓名下。",
     "noHistoryNote": "Tally 仅记录权限的开启和终止时间。系统不会留存某人过往负责哪些聚会的历史记录。",
     "kioskOutOfTouch": "自 {when} 起失去联系，当时在 {gathering}——多半是教会的网络问题。它会继续在平板上记录。",
-    "retireOutOfTouchWarning": "此签到台最后一次联系时在 {gathering}，平板上可能还有签到记录。停用后，它下次连上 Tally 时会显示配对码，可能正好在接孩子的时候；平板上的记录会留在平板上，等重新配对后再上传。"
+    "retireOutOfTouchWarning": "此签到台最后一次联系时在 {gathering}，平板上可能还有签到记录。停用后，它下次连上 Tally 时会显示配对码，可能正好在接孩子的时候；平板上的记录会留在平板上，等重新配对后再上传。",
+    "retireWaitingWarning": "此签到台上还有 {count, plural, other {# 条签到记录}}没有传到 Tally。停用后，它下次连上 Tally 时会显示配对码；这些记录会留在平板上，等重新配对后再上传。"
   },
   "KioskPair": {
     "title": "配对签到台",

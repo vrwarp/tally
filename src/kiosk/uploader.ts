@@ -101,10 +101,12 @@ export function toWire(record: KioskRecord): KioskRecordWire {
   };
 }
 
-function earliest(a: number | null, b: number | null): number | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  return Math.min(a, b);
+/** The answers that mean Tally has a record — on the register, or parked for a person. */
+const SETTLED: ReadonlySet<string> = new Set<LandingOutcome>(['landed', 'already-recorded', 'parked']);
+
+/** One child at one gathering — what an arrival and its pickup share. */
+function childAt(record: Pick<KioskRecord, 'eventId' | 'studentId'>): string {
+  return `${record.eventId}/${record.studentId}`;
 }
 
 export interface Uploader {
@@ -149,19 +151,40 @@ export function createUploader(deps: UploaderDeps): Uploader {
       set({ sending: null, lastProblem: null });
       return;
     }
-
-    // Records an earlier batch of this pass sent back as waiting: still on the
-    // tablet, so still part of what the next call reports as left.
-    let carried = 0;
-    let carriedOldest: number | null = null;
     set({ sending: { total: all.length, left: all.length } });
 
-    for (let start = 0; start < all.length; start += MAX_RECORDS_PER_CALL) {
-      const batch = all.slice(start, start + MAX_RECORDS_PER_CALL);
-      const rest = all.slice(start + MAX_RECORDS_PER_CALL);
+    /*
+     * A pickup travels behind this tablet's own arrival for the same child, or
+     * not at all. Tap order puts the arrival first, and within one call the
+     * server answers them in order; across calls this is the half the server
+     * cannot see — an arrival that came back waiting in an earlier batch is
+     * still on the tablet, and a pickup sent on without it would find no
+     * arrival and, a day after the gathering, be parked as one that never
+     * came. So it waits for its arrival here instead.
+     */
+    const heldArrivals = new Set<string>();
+    const queue = [...all];
+
+    while (queue.length > 0) {
+      const batch: KioskRecord[] = [];
+      while (batch.length < MAX_RECORDS_PER_CALL && queue.length > 0) {
+        const next = queue.shift()!;
+        if (next.kind === 'check-out' && heldArrivals.has(childAt(next))) {
+          deps.noteAttempt(next.id, 'arrival');
+          continue;
+        }
+        batch.push(next);
+      }
+      if (batch.length === 0) break;
+
+      // Counted off the journal as it is now, not as it was when the pass
+      // began: a family tapping in while this call is out is still on the
+      // tablet, and Tally's count of what is waiting must include them.
+      const sending = new Set(batch.map((record) => record.id));
+      const rest = deps.records().filter((record) => !sending.has(record.id));
       const stillOnTablet = {
-        count: carried + rest.length,
-        oldestTappedAtMs: earliest(carriedOldest, rest[0]?.tappedAtMs ?? null),
+        count: rest.length,
+        oldestTappedAtMs: rest[0]?.tappedAtMs ?? null,
       };
 
       let response: LandKioskRecordsResponse;
@@ -179,17 +202,20 @@ export function createUploader(deps: UploaderDeps): Uploader {
       const outcomes = new Map(response.outcomes.map((outcome) => [outcome.id, outcome]));
       for (const record of batch) {
         const outcome = outcomes.get(record.id);
-        if (outcome && outcome.outcome !== 'waiting') {
-          deps.settled?.(record, outcome.outcome);
+        /*
+         * Let go only on an answer that says Tally has it. Waiting, an answer
+         * this build does not know, or no answer for this record at all — none
+         * of them is that, and each is sent again.
+         */
+        if (outcome && SETTLED.has(outcome.outcome)) {
+          deps.settled?.(record, outcome.outcome as Exclude<LandingOutcome, 'waiting'>);
           deps.remove(record.id);
           continue;
         }
-        // Waiting, or — never by design — not answered for at all: kept.
         deps.noteAttempt(record.id, outcome?.waitingFor === 'arrival' ? 'arrival' : 'server');
-        carried += 1;
-        carriedOldest = earliest(carriedOldest, record.tappedAtMs);
+        if (record.kind === 'check-in') heldArrivals.add(childAt(record));
       }
-      set({ sending: { total: all.length, left: rest.length } });
+      set({ sending: { total: all.length, left: queue.length } });
     }
     set({ sending: null, lastProblem: null });
   }

@@ -146,6 +146,35 @@ describe('when storage is full', () => {
     expect(doorCachesWereGivenUp()).toBe(true);
   });
 
+  it('says the door caches are back once the kiosk has fetched them again', () => {
+    seedCaches();
+    fullUntil(KIOSK_KEYS.roster);
+    write(record());
+    expect(doorCachesWereGivenUp()).toBe(true);
+
+    localStorage.setItem(KIOSK_KEYS.phoneIndex, '{}');
+    localStorage.setItem(KIOSK_KEYS.roster, '{}');
+    expect(doorCachesWereGivenUp()).toBe(false);
+  });
+
+  it('moves a record held in memory onto the disk as soon as there is room', () => {
+    seedCaches();
+    let full = true;
+    const setItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (full && key.startsWith(RECORD_PREFIX)) throw new DOMException('full', 'QuotaExceededError');
+      return setItem.call(this, key, value);
+    });
+    const held = record({ studentId: 'student-held' });
+    expect(write(held)).toBe('held');
+
+    // A record lands and its key goes, and with it the room the held one needed.
+    full = false;
+    remove('some-landed-record');
+    expect(heldInMemoryCount()).toBe(0);
+    expect(localStorage.getItem(RECORD_PREFIX + held.id)).not.toBeNull();
+  });
+
   it('holds a record in memory when nothing makes room — never drops it', () => {
     seedCaches();
     fullUntil(null);
