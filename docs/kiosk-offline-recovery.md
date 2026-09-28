@@ -657,6 +657,17 @@ cupboard, and the first draft's visibility lived only in the states where nothin
   leaving and rebinding — replaces the first parked copy, so its card would show the later time.
   Worth fixing with the Review cards in Phase 2, which are where parked records are read.
 
+**Checked** as built: unit tests for the journal, the uploader, the room and *out of touch*;
+`KioskApp.offline.test.tsx` running the outages above against the real kiosk (an outage past the end
+of the gathering, a hanging connection, 500 records, a reload mid-outage and mid-request, storage full
+at four o'clock, a retired kiosk, the old queue, and every new sentence); functions tests for every
+outcome; rules tests for the parked collection and the server-only fields; the whole unit, functions
+and rules suites; the kiosk byte budget; and the kiosk's end-to-end spec against the emulators, where
+every check-in and pickup now goes through the callable. **Not yet run:** mutation testing of
+`journal.ts` and `uploader.ts`; the tick timed at the Pi-3 throttle and on the church's own tablet;
+an end-to-end run with `context.setOffline(true)`; and the weekday drill on a real tablet, which is
+the check that matters most before the first Sunday it is relied on.
+
 ### Phase 2 — Tally says what it knows
 
 - The Team row's counts and *All in Tally since …*; the Kiosk page's list; kiosk names.
