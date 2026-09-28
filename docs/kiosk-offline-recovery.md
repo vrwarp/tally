@@ -245,9 +245,12 @@ direct write also cannot do the three things the late record needs:
   closes the first-ever hazard.
 
 The price is stated plainly. **The tick never waits on the callable** — it is painted from the
-journal — so a cold start delays only how soon a check-in appears on counselors' phones, by a second
-or two. And **if Cloud Functions are down, records wait on the tablet** instead of landing directly;
-nothing is lost, and the staff row says so. Both are cheaper than the second road.
+journal — so a cold start delays only how soon a check-in appears on counselors' phones: the first
+family after the function has sat idle shows up one to three seconds late, and every one after it in
+a few hundred milliseconds, about as today. No instance is kept warm — the owner's decision, because
+nobody at the door waits on it. And **if Cloud Functions are down, records wait on the tablet**
+instead of landing directly; nothing is lost, and the staff row says so. Both are cheaper than the
+second road.
 
 **It is also how Tally learns what is waiting.** Every call carries *N still on this tablet, the
 oldest tapped at T*, and the function writes `waitingCount`, `waitingSinceAt` and `allInAt` onto the
@@ -280,10 +283,13 @@ server does this once, every reader shows the earlier time with no change of its
 
 The time comes from the kiosk's clock, which the door already trusts: `windowHasOpened` refuses
 check-ins by it, so a kiosk whose clock is badly wrong cannot take a check-in in the first place. The
-callable still bounds it — not after its own now, and not before the gathering's check-in window
-opened, less an hour. A time outside those bounds lands at the nearest edge, flagged
-`timeUncertain`, and the register row and the CSV say *time not known* rather than print a time that
-cannot have happened.
+callable still bounds it — a check-in not before the gathering's check-in window opened, a pickup not
+before its arrival, and neither after the server's own now. A time outside a bound is pulled to it.
+Within fifteen minutes of the bound that is ordinary clock drift between a tablet and the server, and
+nothing more is said; further out, the record is flagged `timeUncertain`, and the register row and the
+CSV say *time not known* rather than print a time that cannot have happened. Fifteen minutes is the
+owner's decision: the bound exists only to catch a badly wrong clock, so its exact size barely
+matters.
 
 ### 5. Nothing is thrown away
 
@@ -585,6 +591,9 @@ cupboard, and the first draft's visibility lived only in the states where nothin
    - reporting standing every minute — the liveness window is widened instead;
    - binding offline from a cached chooser — **Leave** warns instead;
    - accepting a retired tablet's earlier records, and the binding log that would have made it safe.
+5. *How far a tap time may stray:* **fifteen minutes**, either side of its bound (§4).
+6. *A warm instance for the callable:* **none.** A cold start costs counselors' phones a second or
+   three on the first family after a lull, and nobody at the door waits on it (§3).
 
 ---
 
@@ -686,8 +695,5 @@ For the build:
 
 ## Open questions
 
-1. How much slack around a gathering's window should a tap time be allowed? An hour before the window
-   opens is the draft's guess.
-2. Who names kiosks — the person who pairs one, or only the core team?
-3. Is a second or two before a check-in appears on counselors' phones, on a cold start, acceptable —
-   or should the callable keep one instance warm during gatherings?
+1. Who names kiosks — the person who pairs one, or only the core team? Phase 2; it blocks nothing in
+   Phase 1.
