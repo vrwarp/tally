@@ -47,7 +47,9 @@ export function outOfTouchSince(): number | null {
 
 export function subscribeTouch(listener: Listener): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /**

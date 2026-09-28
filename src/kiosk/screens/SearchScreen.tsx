@@ -137,24 +137,43 @@ function WidenButton({
  * a minute crossing the opens-at boundary still repaints on the next render,
  * exactly as it did when this was inline.
  */
+/**
+ * What the corner mark is about.
+ *
+ * It was the printer's alone. It is also the tablet's own records now, in the
+ * one state that needs a person: a check-in that could not be written to the
+ * disk, or a cache the door depends on given up to make room for one (see
+ * `journal.ts`) — either way a reload would cost something. Parents are told
+ * about neither, for the same reason: they cannot fix it, and amber words
+ * beside a green tick read as a failed check-in.
+ */
+export type KioskMark = 'printer' | 'check-ins' | 'both';
+
+const MARK_LABELS = {
+  printer: 'printerNeedsAttention',
+  'check-ins': 'checkInsNeedAttention',
+  both: 'markBoth',
+} as const satisfies Record<KioskMark, string>;
+
 const SearchHeader = memo(function SearchHeader({
   iconPath,
   title,
   line,
-  printerNeedsAttention,
-  onPrinter,
+  mark,
+  onMark,
 }: {
   iconPath: string | null | undefined;
   title: string;
   /** The line under the title, already decided: the hours, opens-at, or closed. */
   line: string;
-  printerNeedsAttention: boolean;
+  /** What needs a member of staff, if anything — see `KioskMark`. */
+  mark: KioskMark | null;
   /**
-   * Open the printer screen. Reached only through the dot, so it is only ever
-   * called on a kiosk whose printer is in trouble — and it has to be stable,
-   * because this memo is what keeps the header out of every keystroke.
+   * Open whatever the mark is about. Reached only through the dot, so it is
+   * only ever called while something needs somebody — and it has to be
+   * stable, because this memo is what keeps the header out of every keystroke.
    */
-  onPrinter: () => void;
+  onMark: () => void;
 }) {
   /*
    * The hours line's photograph step (ink-500 → ink-300 while the picture is
@@ -195,16 +214,16 @@ const SearchHeader = memo(function SearchHeader({
         * unchanged either way — it is absolute, and the button is drawn
         * concentric with the dot it replaced.
         */}
-      {printerNeedsAttention && (
+      {mark && (
         <button
           type="button"
           tabIndex={-1}
-          aria-label={t('printerNeedsAttention')}
+          aria-label={t(MARK_LABELS[mark])}
           {...tap(() => {
             // The quiet buzz the standing chips wear, not the door's: this is a
             // mark in a corner, and it answers like one.
             haptic(8);
-            onPrinter();
+            onMark();
           })}
           className="absolute top-[calc(max(1rem,var(--spacing-safe-top))-1rem)] right-0 flex h-11 w-11 items-center justify-center rounded-full active:bg-ink-800"
           style={{ touchAction: 'manipulation' }}
@@ -632,10 +651,12 @@ export function SearchScreen({
   presentIds,
   checkedOutIds,
   tracksCheckOut,
-  printerNeedsAttention,
-  onPrinter,
+  mark,
+  onMark,
   owedNotice,
   onOwedNotice,
+  offlineNotice,
+  onOfflineNotice,
   backdrop,
   refresh,
   widening,
@@ -653,9 +674,10 @@ export function SearchScreen({
   presentIds: ReadonlySet<string>;
   checkedOutIds: ReadonlySet<string>;
   tracksCheckOut: boolean;
-  printerNeedsAttention: boolean;
-  /** What the dot opens — the printer screen. See SearchHeader. */
-  onPrinter: () => void;
+  /** What the corner mark is about, or null for no mark. See SearchHeader. */
+  mark: KioskMark | null;
+  /** What the mark opens — the screen that answers it. */
+  onMark: () => void;
   /**
    * How many name tags the printer owes, when the kiosk should say so here —
    * zero on every ordinary evening, and zero on most of an evening something
@@ -678,6 +700,15 @@ export function SearchScreen({
    * children with a commit under it.
    */
   onOwedNotice: () => void;
+  /**
+   * Whether to say, for staff, that this kiosk cannot reach Tally — after ten
+   * minutes of it, on idle glass nobody is touching, in the owed notice's
+   * grammar and slot. It exists for the person about to decide the kiosk is
+   * broken, and reaches them before they reach the power button.
+   */
+  offlineNotice: boolean;
+  /** The notice, tapped — the Check-ins screen, which says what is waiting. */
+  onOfflineNotice: () => void;
   /** The gathering's photograph is mounted behind this screen. See SearchHeader. */
   backdrop: boolean;
   /**
@@ -967,8 +998,8 @@ export function SearchScreen({
         iconPath={binding.iconPath}
         title={binding.title}
         line={headerLine}
-        printerNeedsAttention={printerNeedsAttention}
-        onPrinter={onPrinter}
+        mark={mark}
+        onMark={onMark}
       />
 
       {/*
@@ -1180,8 +1211,10 @@ export function SearchScreen({
         )}
 
         {/*
-          * The staff notice, at the foot of the region and only on an idle
-          * screen — see the `owedNotice` prop for who it is for and when.
+          * The staff notices, at the foot of the region and only on an idle
+          * screen — see the `owedNotice` and `offlineNotice` props for who they
+          * are for and when. The kiosk that cannot reach Tally goes first when
+          * both stand: it is the one somebody might reset.
           *
           * A sibling of the column with `mt-auto`, so the void of an empty
           * search falls between the instruction and this rather than under it:
@@ -1191,31 +1224,57 @@ export function SearchScreen({
           * region and not a second tier of the console — the finding that
           * moved it here.
           *
-          * One control and nothing to decide. It does not print, it does not
-          * settle anything, and its tap goes exactly where the amber dot's
-          * goes; the confirm with children's names on it stays two screens
-          * away, behind a door a parent has no reason to open.
+          * One control each and nothing to decide. Neither prints, sends or
+          * settles anything, and each tap goes to a staff screen that explains
+          * it; the confirm with children's names on it stays two screens away,
+          * behind a door a parent has no reason to open.
           */}
-        {outcome.mode === 'idle' && owedNotice > 0 && (
-          <div className="mx-auto mt-auto w-full max-w-xl pt-6 pb-6">
-            <button
-              type="button"
-              tabIndex={-1}
-              {...tap(onOwedNotice)}
-              className="flex h-16 w-full items-center justify-between gap-4 rounded-xl bg-ink-900 px-5 text-left active:bg-ink-800"
-            >
-              <span className="min-w-0 truncate text-xl text-ink-200 tall:text-2xl">
-                {t.rich('owedNotice', {
-                  count: owedNotice,
-                  mark: (chunks: ReactNode) => (
-                    <span className="font-semibold text-ink-100">{chunks}</span>
-                  ),
-                })}
-              </span>
-              <span aria-hidden className="shrink-0 text-2xl text-ink-400">
-                ›
-              </span>
-            </button>
+        {outcome.mode === 'idle' && (owedNotice > 0 || offlineNotice) && (
+          <div className="mx-auto mt-auto flex w-full max-w-xl flex-col gap-3 pt-6 pb-6">
+            {offlineNotice && (
+              /*
+               * Two sentences, so it wraps where the owed notice truncates:
+               * the second half — *please don't reset it* — is the half that
+               * does the work.
+               */
+              <button
+                type="button"
+                tabIndex={-1}
+                {...tap(onOfflineNotice)}
+                className="flex min-h-16 w-full items-center justify-between gap-4 rounded-xl bg-ink-900 px-5 py-3 text-left active:bg-ink-800"
+              >
+                <span className="min-w-0 text-xl text-ink-200 tall:text-2xl">
+                  {t.rich('offlineNotice', {
+                    mark: (chunks: ReactNode) => (
+                      <span className="font-semibold text-ink-100">{chunks}</span>
+                    ),
+                  })}
+                </span>
+                <span aria-hidden className="shrink-0 text-2xl text-ink-400">
+                  ›
+                </span>
+              </button>
+            )}
+            {owedNotice > 0 && (
+              <button
+                type="button"
+                tabIndex={-1}
+                {...tap(onOwedNotice)}
+                className="flex h-16 w-full items-center justify-between gap-4 rounded-xl bg-ink-900 px-5 text-left active:bg-ink-800"
+              >
+                <span className="min-w-0 truncate text-xl text-ink-200 tall:text-2xl">
+                  {t.rich('owedNotice', {
+                    count: owedNotice,
+                    mark: (chunks: ReactNode) => (
+                      <span className="font-semibold text-ink-100">{chunks}</span>
+                    ),
+                  })}
+                </span>
+                <span aria-hidden className="shrink-0 text-2xl text-ink-400">
+                  ›
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>

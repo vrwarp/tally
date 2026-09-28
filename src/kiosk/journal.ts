@@ -61,7 +61,9 @@ function emit(): void {
 
 export function subscribeJournal(listener: Listener): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** An id for a new record: opaque, bounded, one path segment. */
@@ -227,6 +229,11 @@ export function records(): KioskRecord[] {
 /** How many records exist only in this page. */
 export function heldInMemoryCount(): number {
   return heldInMemory.size;
+}
+
+/** Whether this record exists only in this page — the Check-ins screen says so. */
+export function isHeldInMemory(id: string): boolean {
+  return heldInMemory.has(id);
 }
 
 /** Whether the roster or phone index was given up to make room for a record. */

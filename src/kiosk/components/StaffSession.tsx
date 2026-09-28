@@ -44,6 +44,14 @@ export const STAFF_RETURN_MS = 45_000;
 /** What a screen gets when a volunteer has to ask somebody a question. */
 export const STAFF_ASKING_MS = 90_000;
 
+/**
+ * What the Check-ins screen gets: long enough to read a list out over the
+ * phone to the office, or to photograph it and send it — neither of which
+ * touches the glass — and still bounded, because it names children on a
+ * tablet in a lobby.
+ */
+export const STAFF_READING_MS = 5 * 60_000;
+
 export function StaffSession({
   onReturn,
   returnMs = STAFF_RETURN_MS,

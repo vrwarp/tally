@@ -3,6 +3,7 @@ import {
   RECORD_PREFIX,
   doorCachesWereGivenUp,
   heldInMemoryCount,
+  isHeldInMemory,
   migrateLegacyQueue,
   mintRecordId,
   noteAttempt,
@@ -152,9 +153,11 @@ describe('when storage is full', () => {
     expect(write(r)).toBe('held');
 
     expect(heldInMemoryCount()).toBe(1);
+    expect(isHeldInMemory(r.id)).toBe(true);
     expect(records().map((x) => x.id)).toEqual([r.id]);
     remove(r.id);
     expect(heldInMemoryCount()).toBe(0);
+    expect(isHeldInMemory(r.id)).toBe(false);
     expect(records()).toEqual([]);
   });
 });

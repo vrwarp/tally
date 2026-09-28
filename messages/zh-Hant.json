@@ -2193,6 +2193,9 @@
     "apostrophe": "撇號",
     "hyphen": "連字號",
     "staffPrint": "同工 · 列印名牌",
+    "staffCheckIns": "同工 · 簽到紀錄",
+    "leaderTitle": "請找輔導幫您登記",
+    "leaderWhy": "這台簽到台現在連不上 Tally，所以無法新增家庭。輔導可以用手機為您新增。",
     "turnUprightTitle": "請將螢幕轉為直向",
     "turnUprightBody": "簽到只能在直向螢幕下使用。如果無法轉動，請找輔導。"
   },
@@ -2266,7 +2269,27 @@
     "owedCost": "{count, plural, other {沒有勾選的 # 張會跳過。}}",
     "owedPrint": "{count, plural, other {列印 # 張名牌}}",
     "owedSkip": "{count, plural, other {跳過 # 張名牌}}",
-    "statusWaiting": "{count, plural, other {# 張待列印}}"
+    "statusWaiting": "{count, plural, other {# 張待列印}}",
+    "checkInsAllIn": "所有簽到紀錄都已傳到 Tally",
+    "checkIns": "簽到紀錄",
+    "checkInsWaiting": "{count, plural, other {# 筆待上傳}}",
+    "checkInsNetwork": "從 {time} 起在等網路恢復。",
+    "checkInsServer": "Tally 現在不接收這些紀錄——請告訴辦公室。",
+    "checkInsHeld": "{count, plural, other {有 # 筆還沒存進這台平板}}——請不要重新整理或重新啟動，先讓它連上網路。",
+    "checkInsAbout": "這些紀錄會自動傳到 Tally。在這個畫面顯示「所有簽到紀錄都已傳到 Tally」之前，請不要重設或重新安裝這台平板。",
+    "checkInsNothingWaiting": "這台平板上沒有待上傳的紀錄。",
+    "checkInsSending": "正在上傳 {total} 筆……還剩 {left} 筆",
+    "checkInsTryNow": "立即重試",
+    "recordIn": "簽到",
+    "recordOut": "簽出",
+    "recordAbout": "約 {time}",
+    "recordHeld": "未存進這台平板",
+    "recordNotSent": "尚未上傳",
+    "recordNoInternet": "沒有網路",
+    "recordServer": "Tally 沒有接收",
+    "recordArrival": "在等對應的簽到",
+    "someone": "一個孩子",
+    "changeEventOffline": "這台簽到台現在連不上 Tally。一旦離開，要等它連上之後才能再設定聚會。"
   },
   "Search": {
     "searchEveryone": "搜尋所有人",
@@ -2289,7 +2312,10 @@
     "offerFirstTime": "第一次來？為您的孩子登記",
     "offerShort": "不是您家的孩子？登記",
     "networkFailed": "現在連不上網路。",
-    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 張名牌在等著列印}}"
+    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 張名牌在等著列印}}",
+    "offlineNotice": "<mark>同工</mark> — 這台簽到台連不上 Tally。簽到紀錄保存在這裡，會自動上傳；請不要重設它。",
+    "checkInsNeedAttention": "這台平板上的簽到紀錄需要處理",
+    "markBoth": "印表機和簽到紀錄都需要處理"
   },
   "Chooser": {
     "question": "這台簽到台是給哪場聚會用的？",
@@ -2318,7 +2344,9 @@
     "connectThePrinterAgain": "重新連接印表機",
     "oneMoment": "請稍候…",
     "printerSettings": "印表機設定",
-    "nameTagsWontPrint": "名牌不會列印"
+    "nameTagsWontPrint": "名牌不會列印",
+    "waitingFrom": "{count, plural, other {{gathering} 的 # 筆簽到紀錄}}還沒傳到 Tally——請讓這台平板保持充電並連著 Wi-Fi。",
+    "waiting": "{count, plural, other {有 # 筆簽到紀錄}}還沒傳到 Tally——請讓這台平板保持充電並連著 Wi-Fi。"
   },
   "Register": {
     "couldNotSave": "Tally 目前無法完成這個步驟。請再試一次，或找輔導幫忙。",
@@ -2473,7 +2501,8 @@
     "retired": "此簽到台已於 {time} 在 Tally 中停用，此後未再記錄任何資料。在重新配對前，請由輔導使用手機為孩子簽到。",
     "pinLanguages": "這裡的家庭使用的語言",
     "pinHint": "英文一定會有。",
-    "pinPreview": "家庭會看到的畫面"
+    "pinPreview": "家庭會看到的畫面",
+    "waiting": "{count, plural, other {這台平板上有 # 筆簽到紀錄在等待上傳}}。完成配對後就會傳到 Tally。"
   },
   "Time": {
     "today": "今天",

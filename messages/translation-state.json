@@ -12668,6 +12668,27 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Door.staffCheckIns": {
+    "source": "Staff · check-ins",
+    "context": "Small label at the top of the kiosk's Check-ins screen, saying the glass is for staff — the same pattern as 'Staff · reprint a name tag'.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Door.leaderTitle": {
+    "source": "A leader will get you started",
+    "context": "Title of the screen a first-time family sees after pressing 'First time here?' while the kiosk cannot reach Tally: registering needs the internet, so a leader adds them on a phone instead. Addressed to a parent (formal).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Door.leaderWhy": {
+    "source": "This kiosk can’t reach Tally right now, so it can’t add a new family. A leader can add you on their phone.",
+    "context": "Line under 'A leader will get you started', for a first-time family at a kiosk that cannot reach Tally. Addressed to a parent (formal).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Door.turnUprightTitle": {
     "source": "Turn the screen upright",
     "context": "Heading of the screen that covers the lobby kiosk while the tablet is turned sideways. The kiosk only works in portrait; read by a parent or a volunteer standing at the tablet.",
@@ -13097,6 +13118,146 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Staff.checkInsAllIn": {
+    "source": "All check-ins are in Tally",
+    "context": "The kiosk's all-clear, on the staff menu and as the Check-ins screen's heading when the list is empty: every check-in and pickup made on this tablet has reached Tally. It is also the exact phrase the volunteer card and the Check-ins screen tell people to wait for before resetting a tablet, so it must stay short and quotable. \"Check-ins\" covers pickups too.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkIns": {
+    "source": "Check-ins",
+    "context": "Label of the staff-menu row that opens the list of check-ins and pickups still on this tablet. Only drawn while something is waiting. Covers pickups too.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsWaiting": {
+    "source": "{count, plural, one {1 waiting} other {# waiting}}",
+    "context": "Status at the right end of the staff-menu row for check-ins still on this tablet: how many have not reached Tally yet. Not the printer's 'waiting' (name tags to print) — these are attendance records waiting to be sent.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsNetwork": {
+    "source": "Waiting for the internet since {time}.",
+    "context": "Line under the staff-menu row for waiting check-ins, when the last attempt could not reach Tally at all. {time} is a clock time (9:41) — when the oldest waiting one was made. Reassuring, not alarming: they send themselves once the internet is back.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsServer": {
+    "source": "Tally isn’t taking them right now — tell the office.",
+    "context": "Line under the staff-menu row for waiting check-ins, when Tally was reached but refused or failed to take them — a server problem a volunteer cannot fix, so it asks them to tell the church office. Addressed to a volunteer (informal).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsHeld": {
+    "source": "{count, plural, one {1 isn’t} other {# aren’t}} saved on this tablet yet — don’t reload or restart it; get it online.",
+    "context": "Line under the staff-menu row, and on the Check-ins screen, in the rare case the tablet's storage was full: these check-ins exist only in the open page, so reloading or restarting the tablet would lose them. The one urgent instruction on the kiosk. Addressed to a volunteer.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsAbout": {
+    "source": "These go to Tally by themselves. Don’t reset or reinstall this tablet until this screen says “All check-ins are in Tally”.",
+    "context": "Heading of the kiosk's Check-ins screen (staff-facing), above the list of check-ins and pickups still on the tablet. The quoted phrase must be exactly the translation of Staff.checkInsAllIn, which is what the screen says once the list is empty. A factory reset or reinstall deletes whatever is still on the tablet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsNothingWaiting": {
+    "source": "Nothing is waiting on this tablet.",
+    "context": "Line under the all-clear on the kiosk's Check-ins screen once the list is empty.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsSending": {
+    "source": "Sending {total} … {left} left",
+    "context": "Progress while the kiosk sends waiting check-ins to Tally: {total} is how many it set out to send, {left} how many are still to go. On the Check-ins screen and the gathering chooser.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.checkInsTryNow": {
+    "source": "Try now",
+    "context": "Button on the kiosk's Check-ins screen: send the waiting check-ins now instead of waiting for the next automatic try (every 30 seconds). Harmless to press repeatedly.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordIn": {
+    "source": "Check-in",
+    "context": "Kind of a waiting record on the kiosk's Check-ins screen, before its time: 'Check-in · 9:41'. A noun.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordOut": {
+    "source": "Check-out",
+    "context": "Kind of a waiting record on the kiosk's Check-ins screen, before its time: 'Check-out · 10:52' — a child picked up. A noun.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordAbout": {
+    "source": "about {time}",
+    "context": "A waiting record's time when it is only approximate (carried over from an older version of the kiosk, which kept the moment of a failed send rather than of the tap). {time} is a clock time, sometimes with a weekday: 'about Sun 9:41'.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordHeld": {
+    "source": "Not saved on this tablet",
+    "context": "A waiting record's status on the Check-ins screen when storage was full and it exists only in the open page — a reload would lose it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordNotSent": {
+    "source": "Not sent yet",
+    "context": "A waiting record's status on the Check-ins screen before the kiosk has tried to send it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordNoInternet": {
+    "source": "No internet",
+    "context": "A waiting record's status on the Check-ins screen: the last try could not reach Tally.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordServer": {
+    "source": "Tally didn’t take it",
+    "context": "A waiting record's status on the Check-ins screen: Tally was reached but did not accept it this time (a server problem). It will be tried again.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.recordArrival": {
+    "source": "Waiting for their check-in",
+    "context": "A waiting pickup's status on the Check-ins screen: Tally has no check-in for this child yet (perhaps it is still on another device), so the pickup waits for it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.someone": {
+    "source": "A child",
+    "context": "Stands in for a name on the Check-ins screen when a waiting pickup is for a child the tablet no longer has on its list.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Staff.changeEventOffline": {
+    "source": "This kiosk can’t reach Tally right now. Once it leaves, it can’t be set to a gathering again until it can.",
+    "context": "Extra warning on the kiosk's 'Change gathering?' screen, only while the kiosk cannot reach Tally: the list of gatherings comes from Tally, so after leaving, the kiosk cannot be set to any gathering until the internet is back. Addressed to a volunteer.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Search.searchEveryone": {
     "source": "Search everyone",
     "es-MX": "machine",
@@ -13225,6 +13386,27 @@
   },
   "Search.owedNotice": {
     "source": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Search.offlineNotice": {
+    "source": "<mark>Staff</mark> — this kiosk can’t reach Tally. Check-ins are kept here and send themselves; please don’t reset it.",
+    "context": "A line on the idle kiosk screen, for staff only, after the kiosk has been unable to reach Tally for ten minutes. Its first word says who it is for (same grammar as the name-tags notice). It asks nothing of a parent; it exists to stop a volunteer from resetting a tablet that is still holding the morning's check-ins.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Search.checkInsNeedAttention": {
+    "source": "Check-ins on this tablet need attention",
+    "context": "Accessible name of the small amber mark in the corner of the kiosk screen when check-ins could not be saved to the tablet's storage. Tapping it opens the staff Check-ins screen.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Search.markBoth": {
+    "source": "The printer and the check-ins need attention",
+    "context": "Accessible name of the amber corner mark when both the label printer and the tablet's check-ins need a member of staff. Tapping it opens the staff menu.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -13387,6 +13569,20 @@
   },
   "Chooser.nameTagsWontPrint": {
     "source": "name tags won’t print",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.waitingFrom": {
+    "source": "{count, plural, one {1 check-in from {gathering} hasn’t} other {# check-ins from {gathering} haven’t}} reached Tally yet — keep this tablet plugged in and on the Wi-Fi.",
+    "context": "Quiet line on the kiosk's gathering chooser, where a kiosk sits between gatherings, while check-ins are still on the tablet. {gathering} is the gathering's name (Sunday Kids). Tells a volunteer to leave the tablet powered and connected so they can send themselves.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.waiting": {
+    "source": "{count, plural, one {1 check-in hasn’t} other {# check-ins haven’t}} reached Tally yet — keep this tablet plugged in and on the Wi-Fi.",
+    "context": "The same line as Chooser.waitingFrom, when the waiting check-ins come from more than one gathering (or one whose name is not known).",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -14307,6 +14503,13 @@
   "Pairing.pinPreview": {
     "source": "What families will see",
     "context": "Label over a live miniature of the check-in screen's language switch, showing the volunteer what the chosen languages will look like to a family.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Pairing.waiting": {
+    "source": "{count, plural, one {1 check-in is} other {# check-ins are}} waiting on this tablet. Pair it and {count, plural, one {it’ll} other {they’ll}} go to Tally.",
+    "context": "Line on the kiosk's pairing screen (retired or never paired) while check-ins made on this tablet have not reached Tally: they wait, and are sent once the kiosk is paired again. Also a quiet reason not to wipe or reinstall it.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

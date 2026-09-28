@@ -238,7 +238,9 @@ export function createUploader(deps: UploaderDeps): Uploader {
     state: () => current,
     subscribe(listener) {
       listeners.add(listener);
-      return () => listeners.delete(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
   };
 }

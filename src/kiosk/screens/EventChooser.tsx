@@ -108,6 +108,7 @@ export function EventChooser({
   selectedKey = null,
   onSelect,
   onBound,
+  unsent = null,
 }: {
   services: KioskServices;
   /** Null when this kiosk has no printer and nothing has asked for one yet. */
@@ -168,6 +169,20 @@ export function EventChooser({
   selectedKey?: string | null;
   onSelect: (key: string | null) => void;
   onBound: (binding: KioskBinding) => void;
+  /**
+   * Check-ins still on this tablet, while there are any — see `journal.ts`.
+   *
+   * This is the screen a kiosk spends the week on between gatherings, so it is
+   * where a volunteer walking past learns that Sunday is not all in Tally yet
+   * and the tablet must stay plugged in and online. `gathering` is the one
+   * gathering they came from, when there is only one; `sending` is a pass
+   * under way.
+   */
+  unsent?: {
+    count: number;
+    gathering: string | null;
+    sending: { total: number; left: number } | null;
+  } | null;
 }) {
   /*
    * See the note on the printer screen's unbind. A screen entered from a
@@ -177,6 +192,7 @@ export function EventChooser({
    * event`.
    */
   const t = useTranslations("Chooser");
+  const tStaff = useTranslations("Staff");
   // The printer's own words, borrowed rather than restated: *Look again* and
   // *Looking for the printer…* mean the same thing on both screens, and two
   // catalogue entries for one sentence is how they stop meaning it.
@@ -509,6 +525,24 @@ export function EventChooser({
             below the question, because the person reading it is a volunteer
             setting a tablet up once, not somebody using this screen daily. */}
         <div className="pt-1 text-sm text-ink-500">{t("holdOne")}</div>
+        {/*
+          * One quiet line, and above the list rather than under it: it has to
+          * be read beside *Couldn't load the calendar* too, which on its own
+          * reads as a broken tablet somebody should reset — the one thing that
+          * would lose what this line is counting.
+          */}
+        {unsent && unsent.count > 0 && (
+          <div className="mx-auto max-w-2xl pt-3 text-base text-ink-300">
+            {unsent.sending
+              ? tStaff("checkInsSending", {
+                  total: unsent.sending.total,
+                  left: unsent.sending.left,
+                })
+              : unsent.gathering
+                ? t("waitingFrom", { count: unsent.count, gathering: unsent.gathering })
+                : t("waiting", { count: unsent.count })}
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

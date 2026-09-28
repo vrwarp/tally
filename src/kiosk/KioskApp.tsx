@@ -77,7 +77,9 @@ import {
 } from './storage';
 import { keepScreenAwake } from './wakeLock';
 import {
+  doorCachesWereGivenUp,
   heldInMemoryCount,
+  isHeldInMemory,
   migrateLegacyQueue,
   mintRecordId,
   noteAttempt,
@@ -98,12 +100,22 @@ import {
   writeRoom,
   type KioskRoom,
 } from './room';
-import { reached, unreached } from './touch';
+import { outOfTouchSince, reached, subscribeTouch, unreached } from './touch';
+import type { UploaderState } from './uploader';
 import { ConfirmScreen } from './screens/ConfirmScreen';
 import { StaffScreen } from './screens/StaffScreen';
+import { useCheckInsLine, type CheckInsSummary } from './checkInsLine';
+// Type-only, like the services and printing chunks above — see the effect that
+// loads it, just behind the services chunk.
+import type * as CheckInsModule from './screens/CheckInsScreen';
 import { ReprintScreen, MAX_REPRINT_RESULTS } from './screens/ReprintScreen';
 import { ReprintConfirmScreen } from './screens/ReprintConfirmScreen';
-import { STAFF_ASKING_MS, STAFF_RETURN_MS, StaffSession } from './components/StaffSession';
+import {
+  STAFF_ASKING_MS,
+  STAFF_READING_MS,
+  STAFF_RETURN_MS,
+  StaffSession,
+} from './components/StaffSession';
 import { loadCatalog } from './messages';
 import { reprintOffer, reprintStanding, type ReprintStanding } from './reprintOffer';
 import { OWED_NOTICE_MS, OWED_QUIET_MS, offeredOwed, type OwedRow } from './owed';
@@ -114,10 +126,10 @@ import { EventChooser } from './screens/EventChooser';
 import { LanguagesScreen } from './screens/LanguagesScreen';
 import { PairingScreen } from './screens/PairingScreen';
 import { PrinterScreen } from './screens/PrinterScreen';
-import { SearchScreen } from './screens/SearchScreen';
+import { SearchScreen, type KioskMark } from './screens/SearchScreen';
 import { ChangeEventScreen } from './screens/ChangeEventScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
-import { NotOpenScreen } from './screens/NotOpenScreen';
+import { NotOpenScreen, SeeALeaderScreen } from './screens/NotOpenScreen';
 import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
 import type { Locale } from '@/lib/locales';
@@ -280,10 +292,20 @@ type Overlay =
    * nightly reload cannot fire while somebody stands there deciding.
    */
   | { kind: 'unbind' }
+  /**
+   * What is still on this tablet — see CheckInsScreen. From the staff menu's
+   * row, or from the front door's corner mark and staff notice, and **Done**
+   * goes back to whichever it was.
+   */
+  | { kind: 'check-ins'; from: 'staff' | 'home' }
+  /** *First time here?* on a kiosk that cannot reach Tally — see SeeALeaderScreen. */
+  | { kind: 'see-a-leader' }
   | null;
 
 const MAX_BUFFER = 24;
 const PRESENT_REFRESH_MS = 5 * 60_000;
+/** How long out of touch before the front door says so, for staff. */
+const OFFLINE_NOTICE_AFTER_MS = 10 * 60_000;
 /**
  * How often the kiosk asks "did anything I cache change?"
  *
@@ -1407,6 +1429,78 @@ export function KioskApp() {
     return uploader.start();
   }, [uploader, uid]);
 
+  /* ---- What the kiosk says about its records ----------------------------- */
+
+  /** The pass under way and what stopped the last one, for the words below. */
+  const [upload, setUpload] = useState<UploaderState>({ sending: null, lastProblem: null });
+  useEffect(() => (uploader ? uploader.subscribe(setUpload) : undefined), [uploader]);
+
+  /**
+   * Since when this kiosk has been out of touch with Tally, or null — see
+   * `touch.ts`. What **Leave**, *First time here?* and the staff notice on
+   * the front door hang off; none of them is sync.
+   */
+  const [outOfTouchAt, setOutOfTouchAt] = useState<number | null>(outOfTouchSince);
+  useEffect(() => subscribeTouch(setOutOfTouchAt), []);
+
+  /*
+   * Out of touch for ten minutes: past a blip, and — on a Sunday — before
+   * anybody has been standing at a "broken" kiosk long enough to reach for the
+   * power button. The notice it arms is below, beside the owed one.
+   */
+  const [longOutOfTouch, setLongOutOfTouch] = useState(false);
+  useEffect(() => {
+    setLongOutOfTouch(false);
+    if (outOfTouchAt === null) return;
+    const timer = setTimeout(
+      () => setLongOutOfTouch(true),
+      Math.max(0, outOfTouchAt + OFFLINE_NOTICE_AFTER_MS - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [outOfTouchAt]);
+
+  const checkIns: CheckInsSummary = {
+    count: journal.length,
+    held: journal.length > 0 ? heldInMemoryCount() : 0,
+    problem: upload.lastProblem,
+    oldestAtMs: journal[0]?.tappedAtMs ?? null,
+  };
+  const checkInsLine = useCheckInsLine(checkIns);
+
+  /*
+   * The Check-ins screen, behind an import rather than in the first paint:
+   * it is staff glass, opened on the rare evening something is waiting, and
+   * the first paint's budget is for what a family needs before the network
+   * answers (scripts/check-kiosk-budget.mjs). Fetched as soon as the services
+   * chunk is in rather than when somebody opens it, and that is the point: the
+   * kiosk's worker caches only what it has seen fetched, and this is the one
+   * screen that must open with the internet already gone.
+   */
+  const [checkInsModule, setCheckInsModule] = useState<typeof CheckInsModule | null>(null);
+  useEffect(() => {
+    if (!services) return;
+    let cancelled = false;
+    void import('./screens/CheckInsScreen').then((loaded) => {
+      if (!cancelled) setCheckInsModule(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [services]);
+
+  /** A name for a record that carries none — a pickup — off the roster. */
+  const studentsById = useMemo(
+    () => new Map(students.map((student) => [student.id, student])),
+    [students],
+  );
+  const nameOf = useCallback(
+    (studentId: string) => {
+      const student = studentsById.get(studentId);
+      return student ? `${student.firstName} ${student.lastName}` : null;
+    },
+    [studentsById],
+  );
+
   /* ---- The bound kiosk: register, pulse, standing ------------------------- */
 
   useEffect(() => {
@@ -2449,8 +2543,33 @@ export function KioskApp() {
     owedRows.length > 0 &&
     recovered !== null &&
     Date.now() - recovered.atMs < OWED_NOTICE_MS;
-  const quiet = useQuietGlass(Boolean(noticeWindow) && calm, OWED_QUIET_MS);
+  /*
+   * One stillness for both notices on the front door — the owed tags and the
+   * kiosk that cannot reach Tally — because they obey the same guards: calm,
+   * idle, untouched for a few seconds, never under a parent's hand.
+   */
+  const quiet = useQuietGlass((Boolean(noticeWindow) || longOutOfTouch) && calm, OWED_QUIET_MS);
   const owedNotice = noticeWindow && quiet ? owedRows.length : 0;
+  const offlineNotice = longOutOfTouch && quiet;
+
+  /*
+   * The corner mark: the printer, the tablet's records, or both — and the
+   * screen that answers each. The records light it only in the states a
+   * reload would cost something: a record held in this page alone, or a cache
+   * the door needs given up to make room for one while the kiosk cannot
+   * fetch it back.
+   */
+  const printerNeedsStaff = printerState?.kind === 'trouble' || owedRows.length > 0;
+  const recordsNeedStaff =
+    checkIns.held > 0 || (outOfTouchAt !== null && doorCachesWereGivenUp());
+  const mark: KioskMark | null =
+    printerNeedsStaff && recordsNeedStaff
+      ? 'both'
+      : printerNeedsStaff
+        ? 'printer'
+        : recordsNeedStaff
+          ? 'check-ins'
+          : null;
 
   /** Leaving the staff flow, by hand or by the gate's own clock. */
   const leaveStaff = useCallback(() => {
@@ -2513,6 +2632,20 @@ export function KioskApp() {
    */
   const onPrinterDot = useCallback(() => setOverlay({ kind: 'printer', from: 'home' }), []);
 
+  /**
+   * The corner mark, tapped: the printer screen for the printer, the Check-ins
+   * screen for the records, and the staff menu — where both rows say so — when
+   * it is both. Stable per mark, for the memoized header.
+   */
+  const onMark = useCallback(() => {
+    if (mark === 'both') setOverlay({ kind: 'staff' });
+    else if (mark === 'check-ins') setOverlay({ kind: 'check-ins', from: 'home' });
+    else setOverlay({ kind: 'printer', from: 'home' });
+  }, [mark]);
+
+  /** The staff notice about a kiosk out of touch, tapped: what is waiting. */
+  const onOfflineNotice = useCallback(() => setOverlay({ kind: 'check-ins', from: 'home' }), []);
+
   /* ---- Registration ------------------------------------------------------- */
 
   /*
@@ -2543,14 +2676,28 @@ export function KioskApp() {
     setBuffer('');
   }, [binding, dayAtTime, locale]);
 
+  /**
+   * A registration is one call to the server and cannot wait on the tablet the
+   * way a check-in can, so on a kiosk that cannot reach Tally the wizard would
+   * be six screens of questions ending in a failure. Said before the first one
+   * instead — see SeeALeaderScreen.
+   */
+  const refuseAsOutOfTouch = useCallback((): boolean => {
+    if (outOfTouchSince() === null) return false;
+    setBuffer('');
+    setOverlay({ kind: 'see-a-leader' });
+    return true;
+  }, []);
+
   const startWizard = useCallback(() => {
     if (!arrivalsOpen()) {
       refuseAsNotOpen();
       return;
     }
+    if (refuseAsOutOfTouch()) return;
     setBuffer('');
     setRegistering({ registrationId: newRegistrationId(), anchors: [] });
-  }, [arrivalsOpen, refuseAsNotOpen]);
+  }, [arrivalsOpen, refuseAsNotOpen, refuseAsOutOfTouch]);
 
   /**
    * The registration half of "who else is with them".
@@ -2567,11 +2714,12 @@ export function KioskApp() {
         refuseAsNotOpen();
         return;
       }
+      if (refuseAsOutOfTouch()) return;
       setOverlay(null);
       setBuffer('');
       setRegistering({ registrationId: newRegistrationId(), anchors });
     },
-    [arrivalsOpen, refuseAsNotOpen],
+    [arrivalsOpen, refuseAsNotOpen, refuseAsOutOfTouch],
   );
 
   /**
@@ -2608,6 +2756,10 @@ export function KioskApp() {
       children: readonly { firstName: string; lastName: string; grade: Grade | null; allergies: string }[],
     ) => {
       if (!prints || !binding || !printing) return;
+      // Not ahead of a save the kiosk already expects to fail: the family would
+      // walk off wearing tags for a registration that never happened. The
+      // response, if it comes, prints them in `onRegistered`.
+      if (outOfTouchSince() !== null) return;
       printedRunRef.current = registrationId;
       for (const [index, child] of children.entries()) {
         try {
@@ -2790,6 +2942,7 @@ export function KioskApp() {
         reason={pairingReason}
         pins={pins}
         onPins={setPins}
+        waiting={journal.length}
         onPaired={(paired) => {
           setUid(paired);
           setPairingReason(null);
@@ -2861,6 +3014,20 @@ export function KioskApp() {
           setRoom(emptyRoom(bound.eventId));
           setPhase('ready');
         }}
+        unsent={
+          journal.length > 0
+            ? {
+                count: journal.length,
+                // Named only when every one of them is from the same gathering.
+                gathering: journal.every(
+                  (record) => record.gathering && record.gathering === journal[0]!.gathering,
+                )
+                  ? journal[0]!.gathering
+                  : null,
+                sending: upload.sending,
+              }
+            : null
+        }
       />
     );
   }
@@ -2968,7 +3135,8 @@ export function KioskApp() {
       overlay?.kind === 'languages' ||
       overlay?.kind === 'printer' ||
       overlay?.kind === 'owed' ||
-      overlay?.kind === 'unbind'
+      overlay?.kind === 'unbind' ||
+      overlay?.kind === 'check-ins'
     ) {
       const staffScreen =
         overlay.kind === 'unbind' ? (
@@ -2987,6 +3155,7 @@ export function KioskApp() {
              * gate, so there is no cheaper way back in.
              */
             onStay={() => setOverlay({ kind: 'staff' })}
+            outOfTouch={outOfTouchAt !== null}
             // A kiosk that has left a gathering has no business still holding
             // notes about the children who were at it — nor the evening's list
             // of who had a name tag printed, which is the same argument about
@@ -3036,8 +3205,27 @@ export function KioskApp() {
             }}
             onPrinter={() => setOverlay({ kind: 'printer', from: 'staff' })}
             onChangeEvent={() => setOverlay({ kind: 'unbind' })}
+            checkIns={checkIns}
+            onCheckIns={() => setOverlay({ kind: 'check-ins', from: 'staff' })}
             onStay={leaveStaff}
           />
+        ) : overlay.kind === 'check-ins' ? (
+          checkInsModule === null ? (
+            <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>
+          ) : (
+            <checkInsModule.CheckInsScreen
+              records={journal}
+              nameOf={nameOf}
+              isHeld={isHeldInMemory}
+              sending={upload.sending}
+              line={checkInsLine}
+              onTryNow={() => void uploader?.kick()}
+              returnsTo={overlay.from === 'home' ? 'check-in' : 'staff'}
+              // Opened from the front door, **Done** goes back there — the dot's
+              // rule (see `PrinterOverlay`); from the menu, back to the menu.
+              onDone={overlay.from === 'home' ? leaveStaff : () => setOverlay({ kind: 'staff' })}
+            />
+          )
         ) : overlay.kind === 'languages' ? (
           <LanguagesScreen
             pins={pins}
@@ -3175,7 +3363,13 @@ export function KioskApp() {
             onReturn={leaveStaff}
             /* The one screen back here whose next step is a question put to a
                person — see `STAFF_ASKING_MS`. */
-            returnMs={overlay.kind === 'languages' ? STAFF_ASKING_MS : STAFF_RETURN_MS}
+            returnMs={
+              overlay.kind === 'languages'
+                ? STAFF_ASKING_MS
+                : overlay.kind === 'check-ins'
+                  ? STAFF_READING_MS
+                  : STAFF_RETURN_MS
+            }
           >
             {overlay.kind === 'printer' && !printing ? (
               <div className="flex h-full items-center justify-center text-ink-500">{tDoor('loading')}</div>
@@ -3207,6 +3401,20 @@ export function KioskApp() {
         </>
       );
     }
+    if (overlay?.kind === 'see-a-leader') {
+      return (
+        <>
+          {backdrop}
+          <SeeALeaderScreen
+            onDone={() => {
+              setOverlay(null);
+              setBuffer('');
+            }}
+          />
+        </>
+      );
+    }
+
     if (overlay?.kind === 'not-open') {
       return (
         <>
@@ -3336,13 +3544,15 @@ export function KioskApp() {
          * decision nobody has made is a person it needs. It goes out when the
          * tags are printed, skipped, or age out of the offer.
          */
-        printerNeedsAttention={printerState?.kind === 'trouble' || owedRows.length > 0}
-        onPrinter={onPrinterDot}
+        mark={mark}
+        onMark={onMark}
         /* The dot said in words, for ten minutes after a recovery and only on
            glass nobody is touching — see `owedNotice` above. Its tap is the
            dot's own door. */
         owedNotice={owedNotice}
         onOwedNotice={onPrinterDot}
+        offlineNotice={offlineNotice}
+        onOfflineNotice={onOfflineNotice}
         // Mounted, not merely configured: the header's token step exists for
         // the photograph actually behind the glass, and until the pixels have
         // resolved there is nothing behind it but the page.

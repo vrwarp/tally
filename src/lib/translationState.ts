@@ -164,6 +164,7 @@ export const SAME_VALUE_GROUPS: readonly (readonly string[])[] = [
  * `OneOff.metaWithGrade`, `DangerZone.consequenceCheckIns` /
  * `Import.checkInCount`, `Staff.nameCount` / `Search.matchCount`,
  * `LabelTemplate.sampleEvent` / `KioskTheme.previewTitle` (both sample data),
+ * `Staff.statusWaiting` / `Staff.checkInsWaiting` (name tags against records),
  * and the bare format strings `Events.when` / `EventHero.whenDayWindow` /
  * `PastGatherings.when`.
  */
@@ -175,6 +176,12 @@ export const DELIBERATELY_UNPINNED = [
   ['DangerZone.consequenceCheckIns', 'Import.checkInCount'],
   ['Staff.nameCount', 'Search.matchCount'],
   ['LabelTemplate.sampleEvent', 'KioskTheme.previewTitle'],
+  /*
+   * Both "N waiting" on the kiosk's staff menu, and not the same thing: the
+   * printer's is name tags waiting to print (张待打印), the check-ins row's is
+   * records waiting to reach Tally (条待上传).
+   */
+  ['Staff.statusWaiting', 'Staff.checkInsWaiting'],
 ] as const;
 
 /**
@@ -204,6 +211,14 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
    * drafted on its own — which the sanity check in the script enforces.
    */
   { message: 'Backends.pcoQueued', quotes: 'RowBadge.queuedBadge' },
+  /*
+   * The kiosk's Check-ins screen tells a volunteer not to reset the tablet
+   * until it says one phrase — the all-clear the same screen shows once the
+   * list is empty, and the phrase the volunteer card teaches. A translation that
+   * quoted anything else would be an instruction to wait for words that never
+   * appear.
+   */
+  { message: 'Staff.checkInsAbout', quotes: 'Staff.checkInsAllIn' },
 ];
 
 /**

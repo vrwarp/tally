@@ -28,7 +28,7 @@ export function StaffMark({
    */
   label = 'staffReprint',
 }: {
-  label?: 'staffReprint' | 'staffPrint';
+  label?: 'staffReprint' | 'staffPrint' | 'staffCheckIns';
 } = {}) {
   const t = useTranslations('Door');
   return (

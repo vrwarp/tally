@@ -26,7 +26,9 @@
     "connectThePrinterAgain": "Connect the printer again",
     "oneMoment": "One moment…",
     "printerSettings": "Printer settings",
-    "nameTagsWontPrint": "name tags won’t print"
+    "nameTagsWontPrint": "name tags won’t print",
+    "waitingFrom": "{count, plural, one {1 check-in from {gathering} hasn’t} other {# check-ins from {gathering} haven’t}} reached Tally yet — keep this tablet plugged in and on the Wi-Fi.",
+    "waiting": "{count, plural, one {1 check-in hasn’t} other {# check-ins haven’t}} reached Tally yet — keep this tablet plugged in and on the Wi-Fi."
   },
   "Common": {
     "language": "Language",
@@ -113,6 +115,9 @@
     "apostrophe": "Apostrophe",
     "hyphen": "Hyphen",
     "staffPrint": "Staff · print name tags",
+    "staffCheckIns": "Staff · check-ins",
+    "leaderTitle": "A leader will get you started",
+    "leaderWhy": "This kiosk can’t reach Tally right now, so it can’t add a new family. A leader can add you on their phone.",
     "turnUprightTitle": "Turn the screen upright",
     "turnUprightBody": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader."
   },
@@ -134,7 +139,8 @@
     "retired": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again.",
     "pinLanguages": "Languages families here speak",
     "pinHint": "English is always offered.",
-    "pinPreview": "What families will see"
+    "pinPreview": "What families will see",
+    "waiting": "{count, plural, one {1 check-in is} other {# check-ins are}} waiting on this tablet. Pair it and {count, plural, one {it’ll} other {they’ll}} go to Tally."
   },
   "Printer": {
     "troubleReported": "The printer reported a problem.",
@@ -300,7 +306,10 @@
     "offerFirstTime": "First time here? Register your child",
     "offerShort": "Not yours? Register",
     "networkFailed": "No connection just now.",
-    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}"
+    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}",
+    "offlineNotice": "<mark>Staff</mark> — this kiosk can’t reach Tally. Check-ins are kept here and send themselves; please don’t reset it.",
+    "checkInsNeedAttention": "Check-ins on this tablet need attention",
+    "markBoth": "The printer and the check-ins need attention"
   },
   "Staff": {
     "changeEventTitle": "Change gathering?",
@@ -346,6 +355,26 @@
     "owedCost": "{count, plural, one {The unticked one is skipped.} other {The # unticked are skipped.}}",
     "owedPrint": "{count, plural, one {Print 1 name tag} other {Print # name tags}}",
     "owedSkip": "{count, plural, one {Skip 1 name tag} other {Skip # name tags}}",
-    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}"
+    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsAllIn": "All check-ins are in Tally",
+    "checkIns": "Check-ins",
+    "checkInsWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsNetwork": "Waiting for the internet since {time}.",
+    "checkInsServer": "Tally isn’t taking them right now — tell the office.",
+    "checkInsHeld": "{count, plural, one {1 isn’t} other {# aren’t}} saved on this tablet yet — don’t reload or restart it; get it online.",
+    "checkInsAbout": "These go to Tally by themselves. Don’t reset or reinstall this tablet until this screen says “All check-ins are in Tally”.",
+    "checkInsNothingWaiting": "Nothing is waiting on this tablet.",
+    "checkInsSending": "Sending {total} … {left} left",
+    "checkInsTryNow": "Try now",
+    "recordIn": "Check-in",
+    "recordOut": "Check-out",
+    "recordAbout": "about {time}",
+    "recordHeld": "Not saved on this tablet",
+    "recordNotSent": "Not sent yet",
+    "recordNoInternet": "No internet",
+    "recordServer": "Tally didn’t take it",
+    "recordArrival": "Waiting for their check-in",
+    "someone": "A child",
+    "changeEventOffline": "This kiosk can’t reach Tally right now. Once it leaves, it can’t be set to a gathering again until it can."
   }
 }

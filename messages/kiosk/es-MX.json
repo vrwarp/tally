@@ -26,7 +26,9 @@
     "connectThePrinterAgain": "Conectar impresora otra vez",
     "oneMoment": "Un momento…",
     "printerSettings": "Configuración de la impresora",
-    "nameTagsWontPrint": "las etiquetas no se imprimirán"
+    "nameTagsWontPrint": "las etiquetas no se imprimirán",
+    "waitingFrom": "{count, plural, one {1 registro de {gathering} aún no llega} other {# registros de {gathering} aún no llegan}} a Tally — mantén esta tableta conectada a la corriente y al Wi-Fi.",
+    "waiting": "{count, plural, one {1 registro aún no llega} other {# registros aún no llegan}} a Tally — mantén esta tableta conectada a la corriente y al Wi-Fi."
   },
   "Common": {
     "language": "Idioma",
@@ -113,6 +115,9 @@
     "apostrophe": "Apóstrofo",
     "hyphen": "Guion",
     "staffPrint": "Personal · imprimir etiquetas",
+    "staffCheckIns": "Personal · registros",
+    "leaderTitle": "Un líder le ayudará a registrarse",
+    "leaderWhy": "Este kiosco no puede conectarse con Tally ahora, así que no puede agregar una familia nueva. Un líder puede agregarlos desde su teléfono.",
     "turnUprightTitle": "Gire la pantalla a vertical",
     "turnUprightBody": "Para registrar la entrada, la pantalla tiene que estar en vertical. Si no puede girarla, busque a un líder."
   },
@@ -134,7 +139,8 @@
     "retired": "Este kiosco se dio de baja en Tally a las {time} y desde entonces no ha registrado nada. Registra a los niños desde el teléfono de un líder hasta que se vuelva a vincular.",
     "pinLanguages": "Idiomas de las familias",
     "pinHint": "El inglés siempre está.",
-    "pinPreview": "Lo que verán las familias"
+    "pinPreview": "Lo que verán las familias",
+    "waiting": "{count, plural, one {Hay 1 registro pendiente} other {Hay # registros pendientes}} en esta tableta. Vincúlala y {count, plural, one {se enviará} other {se enviarán}} a Tally."
   },
   "Printer": {
     "troubleReported": "La impresora reportó un problema.",
@@ -300,7 +306,10 @@
     "offerFirstTime": "¿Primera vez aquí? Inscriba a su hijo o hija",
     "offerShort": "¿No es suya? Inscribir",
     "networkFailed": "Sin conexión.",
-    "owedNotice": "<mark>Personal</mark> — {count, plural, one {1 etiqueta pendiente} other {# etiquetas pendientes}}"
+    "owedNotice": "<mark>Personal</mark> — {count, plural, one {1 etiqueta pendiente} other {# etiquetas pendientes}}",
+    "offlineNotice": "<mark>Personal</mark> — este kiosco no puede conectarse con Tally. Los registros se guardan aquí y se envían solos; por favor no lo restablezcas.",
+    "checkInsNeedAttention": "Los registros de esta tableta necesitan atención",
+    "markBoth": "La impresora y los registros necesitan atención"
   },
   "Staff": {
     "changeEventTitle": "¿Cambiar de reunión?",
@@ -346,6 +355,26 @@
     "owedCost": "{count, plural, one {La que está sin marcar se omite.} other {Las # sin marcar se omiten.}}",
     "owedPrint": "{count, plural, one {Imprimir 1 etiqueta} other {Imprimir # etiquetas}}",
     "owedSkip": "{count, plural, one {Omitir 1 etiqueta} other {Omitir # etiquetas}}",
-    "statusWaiting": "{count, plural, one {1 pendiente} other {# pendientes}}"
+    "statusWaiting": "{count, plural, one {1 pendiente} other {# pendientes}}",
+    "checkInsAllIn": "Todos los registros están en Tally",
+    "checkIns": "Registros",
+    "checkInsWaiting": "{count, plural, one {1 pendiente} other {# pendientes}}",
+    "checkInsNetwork": "Esperando internet desde las {time}.",
+    "checkInsServer": "Tally no los está aceptando ahora — avisa a la oficina.",
+    "checkInsHeld": "{count, plural, one {1 aún no está guardado} other {# aún no están guardados}} en esta tableta — no la recargues ni la reinicies; conéctala a internet.",
+    "checkInsAbout": "Se envían solos a Tally. No restablezcas ni reinstales esta tableta hasta que esta pantalla diga «Todos los registros están en Tally».",
+    "checkInsNothingWaiting": "No hay nada pendiente en esta tableta.",
+    "checkInsSending": "Enviando {total} … faltan {left}",
+    "checkInsTryNow": "Intentar ahora",
+    "recordIn": "Entrada",
+    "recordOut": "Salida",
+    "recordAbout": "hacia las {time}",
+    "recordHeld": "No guardado en esta tableta",
+    "recordNotSent": "Aún sin enviar",
+    "recordNoInternet": "Sin internet",
+    "recordServer": "Tally no lo aceptó",
+    "recordArrival": "Esperando su entrada",
+    "someone": "Un niño",
+    "changeEventOffline": "Este kiosco no puede conectarse con Tally ahora. Si sale, no se podrá elegir otra reunión hasta que vuelva a conectarse."
   }
 }

@@ -24,7 +24,8 @@ import {
 } from '@/kiosk/journal';
 import type { KioskStudent } from '@/kiosk/search';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
-import { outOfTouchSince, resetTouchForTests } from '@/kiosk/touch';
+import { outOfTouchSince, resetTouchForTests, unreached } from '@/kiosk/touch';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { RETRY_EVERY_MS, UPLOAD_DEADLINE_MS, createUploader } from '@/kiosk/uploader';
 import type { LandKioskRecordsRequest } from '@/lib/kioskLanding';
 import { fakeRegister, sentRecords } from '@/test/kioskLanding';
@@ -196,6 +197,22 @@ async function tapThrough(student: KioskStudent, verb: RegExp): Promise<void> {
   await wait(5_000);
 }
 
+/** The staff gate: **Clear**, held. */
+async function holdClear(): Promise<void> {
+  const clear = document.querySelector<HTMLButtonElement>('[data-key="clear"]')!;
+  await act(async () => {
+    fireEvent.pointerDown(clear);
+  });
+  await wait(HOLD_DELAY_MS + HOLD_MS);
+}
+
+/** The kiosk finding it cannot reach Tally — what every failed request says. */
+async function loseTouch(): Promise<void> {
+  await act(async () => {
+    unreached();
+  });
+}
+
 function waitingIds(): string[] {
   return journalRecords().map((record) => `${record.kind}:${record.studentId}`);
 }
@@ -265,6 +282,11 @@ describe('a tap, with the internet gone', () => {
     await wait(35 * 60_000);
     expect(screen.getByText(CHOOSER)).toBeTruthy();
     expect(waitingIds()).toEqual([`check-in:${ADA.id}`]);
+    // Said where the kiosk will sit all week, beside the calendar that failed.
+    expect(screen.getByText(/Couldn’t load the calendar/)).toBeTruthy();
+    expect(
+      screen.getByText(/^1 check-in from Sunday Kids hasn’t reached Tally yet — keep this tablet plugged in/),
+    ).toBeTruthy();
 
     // Monday: the internet is back, and nobody has set the kiosk to anything.
     vi.setSystemTime(Date.now() + 20 * 3_600_000);
@@ -277,6 +299,7 @@ describe('a tap, with the internet gone', () => {
     // whatever the kiosk is on now.
     expect(sent).toMatchObject({ eventId: 'sunday-kids-2026-09-27', studentId: ADA.id });
     expect(screen.getByText(CHOOSER)).toBeTruthy();
+    expect(screen.queryByText(/reached Tally yet/)).toBeNull();
   });
 
   it('sends a pickup behind its own arrival, in the order they happened', async () => {
@@ -460,6 +483,12 @@ describe('when storage is full — failure 7', () => {
       await tapThrough(ADA, /^check in$/i);
       expect(heldInMemoryCount()).toBe(1);
 
+      // The corner mark, and what it opens: the one record a reload would lose.
+      await press(screen.getByLabelText('Check-ins on this tablet need attention'));
+      expect(screen.getByText('Not saved on this tablet')).toBeTruthy();
+      expect(screen.getByText(/1 isn’t saved on this tablet yet — don’t reload or restart it/)).toBeTruthy();
+      await press(screen.getByText(/Done — back to check-in/).closest('button')!);
+
       // Past four, unbound and untouched: the moment the kiosk reloads itself.
       await wait(40 * 60_000);
       expect(screen.getByText(CHOOSER)).toBeTruthy();
@@ -495,6 +524,10 @@ describe('a kiosk retired with records on it', () => {
     await wait(5 * RETRY_EVERY_MS);
     expect(vi.mocked(services.landRecords).mock.calls.length).toBe(sentSoFar);
     expect(waitingIds()).toEqual([`check-in:${ADA.id}`]);
+    // And it says what pairing it again is for.
+    expect(
+      screen.getByText('1 check-in is waiting on this tablet. Pair it and it’ll go to Tally.'),
+    ).toBeTruthy();
   });
 });
 
@@ -527,5 +560,90 @@ describe('the old retry queue', () => {
       }),
     ]);
     expect([...tally.present]).toEqual([BYRON.id]);
+  });
+});
+
+describe('what the kiosk says, while it cannot reach Tally', () => {
+  it('says on the staff menu that everything is in Tally, and when it is not, why', async () => {
+    await mount();
+    await holdClear();
+    expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
+    await press(screen.getByText(/Keep checking in/).closest('button')!);
+
+    net = 'down';
+    await tapThrough(ADA, /^check in$/i);
+    await holdClear();
+    expect(screen.getByText('1 waiting')).toBeTruthy();
+    expect(screen.getByText(/^Waiting for the internet since /)).toBeTruthy();
+
+    // The list behind the row: who, and what the last attempt ran into.
+    await press(screen.getByText('Check-ins').closest('button')!);
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
+    expect(screen.getByText('No internet')).toBeTruthy();
+
+    // Try now, with the internet back: the list empties while it is open.
+    net = 'up';
+    await press(screen.getByText(/Try now/).closest('button')!);
+    await wait(1_000);
+    expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
+    expect([...tally.present]).toEqual([ADA.id]);
+  });
+
+  it('tells staff on untouched glass after ten minutes, and the first touch takes it away', async () => {
+    await mount();
+    await loseTouch();
+    await wait(9 * 60_000);
+    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+
+    // The ten minutes, and then the few seconds of stillness the front door's
+    // staff notices wait for.
+    await wait(60_000);
+    await wait(5_000);
+    const notice = screen.getByText(/this kiosk can’t reach Tally/);
+    expect(notice.textContent).toMatch(/Check-ins are kept here and send themselves; please don’t reset it/);
+
+    await type('a');
+    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+  });
+
+  it('opens the list from the notice, and comes back to the door', async () => {
+    await mount();
+    await loseTouch();
+    await wait(10 * 60_000);
+    await wait(5_000);
+
+    await press(screen.getByText(/this kiosk can’t reach Tally/).closest('button')!);
+    expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
+    await press(screen.getByText(/Done — back to check-in/).closest('button')!);
+    // Back at the door, and — once the glass is still again — so is the notice.
+    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+    await wait(5_000);
+    expect(screen.getByText(/this kiosk can’t reach Tally/)).toBeTruthy();
+  });
+
+  it('sends a new family to a leader before the first question, not after the last', async () => {
+    await mount();
+    await loseTouch();
+
+    await press(screen.getByText(/Register your child/).closest('button')!);
+    expect(screen.getByText('A leader will get you started')).toBeTruthy();
+    expect(screen.getByText(/so it can’t add a new family/)).toBeTruthy();
+
+    // And the wizard as usual once Tally answers again.
+    await wait(10_000);
+    await act(async () => {
+      const { reached } = await import('@/kiosk/touch');
+      reached();
+    });
+    await press(screen.getByText(/Register your child/).closest('button')!);
+    expect(screen.queryByText('A leader will get you started')).toBeNull();
+  });
+
+  it('says what Leave costs', async () => {
+    await mount();
+    await loseTouch();
+    await holdClear();
+    await press(screen.getByText('Change gathering').closest('button')!);
+    expect(screen.getByText(/can’t be set to a gathering again until it can/)).toBeTruthy();
   });
 });

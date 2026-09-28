@@ -65,7 +65,7 @@ import { isRefusal, type RestoredSession, type StandingOutcome } from './session
 import { sanitizeKioskPalette } from './theme';
 import type { KioskStudent } from './search';
 import { isAnswer, noteFailure, reached } from './touch';
-import { UPLOAD_DEADLINE_MS } from './uploader';
+import { UPLOAD_DEADLINE_MS, withDeadline } from './uploader';
 
 /*
  * The uploader rides in this chunk rather than the kiosk's first paint: it
@@ -360,12 +360,15 @@ export async function reportStanding(
    */
   const battery = await readBattery();
   try {
-    await updateDoc(doc(db, paths.kioskDevice(deviceId)), {
-      lastSeenAt: serverTimestamp(),
-      boundTo: bound?.title ?? null,
-      boundChain: bound?.chain ?? null,
-      ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
-    });
+    await withDeadline(
+      updateDoc(doc(db, paths.kioskDevice(deviceId)), {
+        lastSeenAt: serverTimestamp(),
+        boundTo: bound?.title ?? null,
+        boundChain: bound?.chain ?? null,
+        ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
+      }),
+      UPLOAD_DEADLINE_MS,
+    );
     reached();
     return 'live';
   } catch (error) {
@@ -712,9 +715,13 @@ function pulseChannel(data: Record<string, unknown> | null, name: string): numbe
  */
 export async function fetchPulse(): Promise<KioskPulse | null> {
   try {
-    const snapshot = await getDoc(doc(db, 'kioskIndex/pulse'));
-    // Every thirty seconds while bound, so the likeliest thing to notice that
-    // the kiosk is back in touch — or that it is not. See `touch.ts`.
+    /*
+     * Every thirty seconds while bound, so the likeliest thing to notice that
+     * the kiosk is back in touch — or that it is not (see `touch.ts`). With a
+     * deadline for that reason: Lite's `fetch` has none, and a read into a
+     * connection that hangs would otherwise never say anything at all.
+     */
+    const snapshot = await withDeadline(getDoc(doc(db, 'kioskIndex/pulse')), UPLOAD_DEADLINE_MS);
     reached();
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
@@ -891,8 +898,14 @@ export async function refreshDirectory(
 export async function registerFamily(
   request: RegisterFamilyRequest,
 ): Promise<RegisterFamilyResult> {
-  const { data } = await registerFamilyCallable(request);
-  return data;
+  try {
+    const { data } = await registerFamilyCallable(request);
+    reached();
+    return data;
+  } catch (error) {
+    noteFailure(error);
+    throw error;
+  }
 }
 
 /**
@@ -983,7 +996,10 @@ export interface KioskAttendance {
 export async function fetchAttendance(eventId: string): Promise<KioskAttendance> {
   let snapshot;
   try {
-    snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+    snapshot = await withDeadline(
+      getDocs(collection(db, paths.attendanceCollection(eventId))),
+      UPLOAD_DEADLINE_MS,
+    );
     reached();
   } catch (error) {
     noteFailure(error);
@@ -1044,7 +1060,7 @@ export async function landRecords(
  */
 export async function reachTally(): Promise<boolean> {
   try {
-    await getDoc(doc(db, 'kioskIndex/pulse'));
+    await withDeadline(getDoc(doc(db, 'kioskIndex/pulse')), UPLOAD_DEADLINE_MS);
     return true;
   } catch (error) {
     return isAnswer(error);
