@@ -15,6 +15,8 @@ import { Timestamp } from 'firebase/firestore';
 import {
   KIOSK_LIVE_WITHIN_MS,
   isKioskLive,
+  kioskMayHoldRecords,
+  kioskOutOfTouchSince,
   retireKioskDevice,
   subscribeKioskDevices,
 } from '@/services/kioskDevices';
@@ -331,7 +333,7 @@ describe('isKioskLive', () => {
 
   it('is false exactly at the window, and true a millisecond inside it', () => {
     // The boundary is the whole of what the constant means, and `<=` here would
-    // arm Retire on a tablet whose last word was three minutes ago.
+    // call a kiosk live on the very report that says it is not.
     expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS) }), nowMs))
       .toBe(false);
     expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS + 1) }), nowMs))
@@ -346,5 +348,38 @@ describe('isKioskLive', () => {
 
   it('is false for a row that has never reported', () => {
     expect(isKioskLive(device({ lastSeenAt: null }), nowMs)).toBe(false);
+  });
+
+  it('holds a healthy kiosk live between its five-minute reports, and past one missed', () => {
+    // The window used to be three minutes against a five-minute report, so a
+    // kiosk in perfect health read "not recording" two minutes in every five.
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - 4 * 60_000) }), nowMs)).toBe(true);
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - 9 * 60_000) }), nowMs)).toBe(true);
+  });
+});
+
+describe('kioskOutOfTouchSince and kioskMayHoldRecords', () => {
+  const nowMs = new Date('2026-09-06T11:00:00Z').getTime();
+  const nineFortyOne = new Date('2026-09-06T09:41:00Z');
+
+  it('says when a kiosk went quiet while set to a gathering', () => {
+    const quiet = device({ lastSeenAt: nineFortyOne });
+    expect(kioskOutOfTouchSince(quiet, nowMs)).toEqual(nineFortyOne);
+    // It may be holding that gathering's check-ins, so Retire asks first.
+    expect(kioskMayHoldRecords(quiet, nowMs)).toBe(true);
+  });
+
+  it('says nothing of a live kiosk, though retiring it would still take something away', () => {
+    expect(kioskOutOfTouchSince(device({ lastSeenAt: new Date(nowMs - 60_000) }), nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(device({ lastSeenAt: new Date(nowMs - 60_000) }), nowMs)).toBe(true);
+  });
+
+  it('asks nothing of a kiosk last set to nothing, or already retired', () => {
+    const idle = device({ boundTo: null, boundChain: null, lastSeenAt: nineFortyOne });
+    expect(kioskOutOfTouchSince(idle, nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(idle, nowMs)).toBe(false);
+
+    const retired = device({ lastSeenAt: nineFortyOne, retiredAt: new Date(nowMs - 1_000) });
+    expect(kioskMayHoldRecords(retired, nowMs)).toBe(false);
   });
 });

@@ -116,16 +116,20 @@ Three places look like they are missing error handling and are not:
   write half above is still open and still wants watching rather than guessing.
 - **An unacknowledged write is not distinguishable from a committed one.**
   Related to the above and with the same reasoning.
-- **The kiosk's retry queue loses records beyond a short blip.** It replays only
-  while the kiosk is bound, deletes whatever the rules refuse, keeps the newest
-  50 writes, can erase records queued while a replay runs, and stamps late
-  records with the upload moment. Each is reproduced, and the design that closes
-  them is proposed, in [kiosk-offline-recovery.md](kiosk-offline-recovery.md).
-- **The Team page calls a healthy kiosk "not recording" two minutes in five.**
-  `KIOSK_LIVE_WITHIN_MS` is three minutes, on the assumption that a bound kiosk
-  reports every thirty seconds; it reports every five (`PRESENT_REFRESH_MS`). In
-  those two minutes **Retire** also skips its confirmation. The same proposal
-  covers it.
+- **A kiosk destroyed before it reconnects takes its records with it.** The
+  lobby kiosk no longer loses anything to an outage — every tap is journaled on
+  the tablet before its tick and sent, one road and one pass at a time, until
+  Tally answers for it ([kiosk-offline-recovery.md](kiosk-offline-recovery.md);
+  the old retry queue's losses are reproduced there). But until a connection
+  exists the tablet is the only copy, and a record held only in memory because
+  storage was full survives no reload. What Tally can do is say so: the kiosk
+  says what it holds on every screen, and the Team page says *out of touch since
+  9:41 while at Sunday Kids* rather than *not recording*.
+- **Parked kiosk records have nowhere to be settled yet.** A record Tally took
+  but could not put on the register — a frozen child, a deleted gathering, a
+  pickup whose arrival never came — waits in `kioskParkedRecords`. The Review
+  cards that settle them are the proposal's Phase 2; until then they are kept,
+  and only the Firestore console shows them.
 - **`updateStudent` has no optimistic-concurrency check.** Two core-team members
   editing the same profile in the same minute will have one silently overwrite
   the other. Rare enough, and the fix (a version field and a merge UI) is

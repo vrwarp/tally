@@ -926,15 +926,17 @@
     "kioskOffCharger": "Con batería · {percent}%",
     "kioskRetiredOn": "Se dio de baja {when}",
     "retireKiosk": "Dar de baja",
-    "retireLiveWarning": "Este kiosco está anotando {gathering} ahora mismo. Darlo de baja detiene eso en el siguiente toque, y un líder va a tener que registrar a los niños desde un teléfono hasta que se vuelva a vincular.",
+    "retireLiveWarning": "Este kiosco está anotando {gathering} ahora mismo. Darlo de baja hace que muestre un código de vinculación la próxima vez que se conecte con Tally, quizá a mitad de una salida; lo que siga en la tableta espera ahí hasta que se vuelva a vincular.",
     "keepItRunning": "Dejarlo",
     "yesRetire": "Sí, darlo de baja",
-    "kioskRetiredToast": "{device} se dio de baja. Deja de anotar en su siguiente toque; la fila se queda como el registro de lo que alcanzó a tomar.",
+    "kioskRetiredToast": "{device} se dio de baja. Mostrará un código de vinculación la próxima vez que se conecte con Tally, y lo que siga en él espera hasta que se vuelva a vincular. La fila se queda como el registro de lo que alcanzó a tomar.",
     "retireKioskFailed": "No se pudo dar de baja ese kiosco. Prueba en un momento.",
     "asksHeading": "Pidieron que los agregaran esta semana",
     "askRow": "{name} · {gathering} · {when}",
     "mailboxNote": "{address} parece un buzón compartido. Una cuenta es una persona en Tally: si varias personas inician sesión con esta, todas las listas que cualquiera de ellas pase quedan bajo este nombre.",
-    "noHistoryNote": "Tally anota cuándo empezó el acceso y cuándo terminó, y nada más. No guarda ningún registro de en qué reuniones estuvo alguien en el pasado."
+    "noHistoryNote": "Tally anota cuándo empezó el acceso y cuándo terminó, y nada más. No guarda ningún registro de en qué reuniones estuvo alguien en el pasado.",
+    "kioskOutOfTouch": "Sin conexión desde {when} mientras estaba en {gathering} — probablemente el internet de la iglesia. Sigue anotando en la tableta.",
+    "retireOutOfTouchWarning": "De este kiosco no se sabe nada desde que estaba en {gathering}, así que quizá todavía tenga registros. Darlo de baja hace que muestre un código de vinculación la próxima vez que se conecte con Tally, quizá a mitad de una salida; lo que haya en la tableta espera ahí hasta que se vuelva a vincular."
   },
   "KioskPair": {
     "title": "Vincular un kiosco",
@@ -942,8 +944,8 @@
     "backToCheckIn": "Pasar lista",
     "whatIsKiosk": "<mono>/kiosk</mono> es una pantalla de autorregistro para tabletas de vestíbulo, donde las familias registran su entrada por nombre o por número de teléfono.",
     "setupPage": "Todo lo que necesita una tableta administrada — la regla de la impresora para su Chrome, el código QR que la aprovisiona y para qué sirve cada cosa — está en <link>/setup</link>.",
-    "retire": "Para dar de baja un kiosco, borra los datos del sitio en el navegador de ese dispositivo. Un kiosco sigue funcionando sin importar quién lo vinculó: apagarle el acceso a una persona no lo detiene.",
-    "retireCore": "Para dar de baja un kiosco, borra los datos del sitio en el navegador de ese dispositivo. Un kiosco sigue funcionando sin importar quién lo vinculó: apagarle el acceso a una persona no lo detiene.",
+    "retire": "El equipo central da de baja los kioscos en la página Equipo. No borres los datos del sitio de un kiosco ni restablezcas la tableta hasta que diga «Todos los registros están en Tally». Un kiosco sigue funcionando sin importar quién lo vinculó: quitarle el acceso a una persona no lo detiene.",
+    "retireCore": "Para dar de baja un kiosco, abre en la página Equipo a la persona que lo vinculó y pulsa Dar de baja. No borres los datos del sitio de un kiosco ni restablezcas la tableta hasta que diga «Todos los registros están en Tally». Un kiosco sigue funcionando sin importar quién lo vinculó: quitarle el acceso a una persona no lo detiene.",
     "blocked": "Tally aún no puede darle sesión a un kiosco. Aprobar un código sí se anota, pero la pantalla del vestíbulo se va a quedar esperando hasta que alguien corra el comando de configuración de abajo.",
     "codeLabel": "Código de vinculación",
     "approving": "Aprobando…",
@@ -2512,7 +2514,8 @@
     "monthsAgo": "{count, plural, one {hace 1 mes} other {hace # meses}}",
     "yearsAgo": "{count, plural, one {hace 1 año} other {hace # años}}",
     "window": "{start} – {end}",
-    "dateTime": "{date} · {time}"
+    "dateTime": "{date} · {time}",
+    "notKnown": "hora desconocida"
   },
   "Birthday": {
     "finishTheYear": "Termina el año, o quítalo — un cumpleaños puede guardarse sin año.",

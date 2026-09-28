@@ -118,7 +118,18 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
     { header: 'event_date', value: () => isoDate(event.startAt) },
     { header: 'event_start', value: () => isoDateTime(event.startAt) },
     { header: 'checked_in', value: (row) => row.attendance !== null },
-    { header: 'checked_in_at', value: (row) => isoDateTime(row.attendance?.checkedInAt) },
+    /*
+     * Blank when the device that recorded it had a clock too far wrong to
+     * believe: the stored moment is the bound it was pulled to, plausible and
+     * not what happened, and a spreadsheet cannot say *time not known* beside a
+     * timestamp any more than the register can (see `formatAttendanceClock`).
+     * `checked_in` still says they came.
+     */
+    {
+      header: 'checked_in_at',
+      value: (row) =>
+        row.attendance?.timeUncertain ? '' : isoDateTime(row.attendance?.checkedInAt),
+    },
     {
       header: 'checked_in_by',
       value: (row) => {
@@ -144,7 +155,11 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
 
   if (event.requiresCheckOut) {
     base.push(
-      { header: 'checked_out_at', value: (row) => isoDateTime(row.attendance?.checkedOutAt) },
+      {
+        header: 'checked_out_at',
+        value: (row) =>
+          row.attendance?.checkedOutTimeUncertain ? '' : isoDateTime(row.attendance?.checkedOutAt),
+      },
       {
         header: 'checked_out_by',
         value: (row) => {

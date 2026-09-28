@@ -124,6 +124,11 @@ export function makeAttendance(overrides: Partial<AttendanceRecord> = {}): Atten
     isFirstEver: pick(overrides, 'isFirstEver', false),
     checkedOutAt: pick(overrides, 'checkedOutAt', null),
     checkedOutBy: pick(overrides, 'checkedOutBy', null),
+    // Absent unless a test says otherwise, as on almost every stored record.
+    ...(overrides.timeUncertain ? { timeUncertain: overrides.timeUncertain } : {}),
+    ...(overrides.checkedOutTimeUncertain
+      ? { checkedOutTimeUncertain: overrides.checkedOutTimeUncertain }
+      : {}),
   };
 }
 

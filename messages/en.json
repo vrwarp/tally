@@ -926,15 +926,17 @@
     "kioskOffCharger": "On battery · {percent}%",
     "kioskRetiredOn": "Retired {when}",
     "retireKiosk": "Retire",
-    "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
+    "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring shows a pairing code on it the next time it reaches Tally, possibly mid-pickup; anything still on the tablet waits there until it’s paired again.",
     "keepItRunning": "Keep it",
     "yesRetire": "Yes, retire",
-    "kioskRetiredToast": "{device} retired. It stops recording at its next tap; the row stays as the record of what it took.",
+    "kioskRetiredToast": "{device} retired. It shows a pairing code the next time it reaches Tally, and anything still on it waits until it’s paired again. The row stays as the record of what it took.",
     "retireKioskFailed": "Could not retire that kiosk. Try again in a moment.",
     "asksHeading": "Asked to be added this week",
     "askRow": "{name} · {gathering} · {when}",
     "mailboxNote": "{address} looks like a shared mailbox. One account is one person in Tally: if several people sign in to this one, every register any of them takes is filed under this name.",
-    "noHistoryNote": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past."
+    "noHistoryNote": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past.",
+    "kioskOutOfTouch": "Out of touch since {when} while at {gathering} — probably the church’s internet. It keeps recording on the tablet.",
+    "retireOutOfTouchWarning": "This kiosk was last heard from while at {gathering}, so it may still have check-ins on it. Retiring shows a pairing code the next time it reaches Tally, possibly mid-pickup; anything on the tablet waits there until it’s paired again."
   },
   "KioskPair": {
     "title": "Pair a kiosk",
@@ -942,8 +944,8 @@
     "backToCheckIn": "Check in",
     "whatIsKiosk": "<mono>/kiosk</mono> is a self-serve check-in screen for lobby tablets, allowing families to check in by name or phone number.",
     "setupPage": "Everything a managed tablet needs — the printer rule for its Chrome, the QR that provisions it, and what each one is for — is at <link>/setup</link>.",
-    "retire": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
-    "retireCore": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "retire": "Kiosks are retired on the Team page, by the core team. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "retireCore": "To retire a kiosk, open the person who paired it on the Team page and press Retire. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
     "blocked": "Tally cannot sign a kiosk in yet. Approving a code is still recorded, but the lobby screen keeps waiting until somebody runs the setup command below.",
     "codeLabel": "Pairing code",
     "approving": "Approving…",
@@ -2512,7 +2514,8 @@
     "monthsAgo": "{count, plural, one {1 mth ago} other {# mths ago}}",
     "yearsAgo": "{count, plural, one {1 yr ago} other {# yrs ago}}",
     "window": "{start} – {end}",
-    "dateTime": "{date} · {time}"
+    "dateTime": "{date} · {time}",
+    "notKnown": "time not known"
   },
   "Birthday": {
     "finishTheYear": "Finish the year, or take it out — a birthday can go in without one.",

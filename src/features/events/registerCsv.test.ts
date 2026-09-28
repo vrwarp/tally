@@ -165,6 +165,24 @@ describe('buildRegisterCsv — a lobby kiosk', () => {
     expect(row.checked_out_by).toBe('Lobby kiosk');
     expect(row.method).toBe('kiosk');
   });
+
+  it('leaves a time blank that came from a tablet whose clock could not be believed', () => {
+    // The stored moment is the bound it was pulled to — plausible, and not what
+    // happened. The row still says they came.
+    const row = rowFor(
+      makeAttendance({
+        studentId: 'pco_1',
+        checkedInAt: new Date('2026-09-27T09:00:00Z'),
+        checkedOutAt: new Date('2026-09-27T10:30:00Z'),
+        timeUncertain: true,
+        checkedOutTimeUncertain: true,
+        method: 'kiosk',
+      }),
+    );
+    expect(row.checked_in).toBe('yes');
+    expect(row.checked_in_at).toBe('');
+    expect(row.checked_out_at).toBe('');
+  });
 });
 
 describe('buildRegisterCsv — a student the roster no longer names', () => {

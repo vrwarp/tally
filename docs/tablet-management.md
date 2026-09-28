@@ -432,9 +432,33 @@ for the first tablet and five for each after.
 One exception, and it is the useful one for tablets already in service: device owner *can* be
 granted after setup over adb, while no accounts exist on the device. §4.6 step 1 has the command.
 
-Worth doing while the tablets are still on a desk: print the enrolment QR and leave a laminated copy
-at the check-in desk. A tablet that dies on a Sunday is then a factory reset, a scan and three
-minutes, done by whoever is standing there, rather than a phone call.
+Worth doing while the tablets are still on a desk: print the enrolment QR and keep it with whoever
+sets tablets up — for a new tablet, or one that is truly broken. **Not** at the check-in desk as the
+answer to a kiosk that "isn't working": a kiosk keeps every check-in and pickup on its own storage
+until it can reach Tally, and a factory reset is the one thing that deletes them
+([kiosk-offline-recovery.md](kiosk-offline-recovery.md)). What goes on the desk is the card below.
+
+#### The card at the desk
+
+One side, laminated:
+
+- **The internet is down? Keep using the kiosk.** Every check-in and pickup is kept on the tablet and
+  goes to Tally by itself.
+- **Reloading, or turning the tablet off and on, is safe** — unless the kiosk says check-ins *aren't
+  saved yet*. If it is frozen and the menu will not open, restart it. Never reset it.
+- **Factory reset, clearing Chrome's data, uninstalling or re-enrolling** — only after the kiosk says
+  *All check-ins are in Tally* (hold **Clear** for two seconds; it is on the staff menu).
+- **You don't need to re-record kiosk check-ins** — they are saved on the tablet. Anything you do
+  record on a phone during an outage: turn its Wi-Fi off and use mobile data first. A child checked in
+  on a phone is checked out on the phone.
+- **New families during an outage** are quick-added by a leader on a phone, on mobile data.
+- **At pack-up**, if the kiosk does not say *All check-ins are in Tally*: leave it plugged in and on the
+  Wi-Fi, or put it on a phone hotspot for two minutes and watch it go — or tell the director.
+
+And a ten-minute weekday drill before the first Sunday it matters: a test gathering; the tablet's
+Wi-Fi off; five in; reload; three out; Wi-Fi on; watch the kiosk and the register come right. Delete
+the test gathering only after the kiosk says *All check-ins are in Tally*, or the drill parks its own
+records.
 
 ### 4.5 Reading the answer off the device
 
@@ -570,6 +594,13 @@ and the kiosk falls back to asking for a printer exactly as it does now.
 
 #### The runbook
 
+**0. Before a tablet already in service is reset: it holds nothing.** Every way into device owner
+below starts with a factory reset, and a kiosk that could not reach Tally is still holding the
+check-ins it took. Hold **Clear** for two seconds; the staff menu must say *All check-ins are in
+Tally*. If it lists some waiting, get it online — a phone hotspot for two minutes will do — and wait
+for the line. A tablet that is not paired says how many are waiting on its pairing screen: pair it
+first, and let them go.
+
 **1. Get to device owner.** Three ways in; none needs a console, an account or a network service.
 
 - **`afw#testdpc`** — factory reset, and at the setup wizard's Google account field type
@@ -586,8 +617,8 @@ and the kiosk falls back to asking for a printer exactly as it does now.
   ```
 
   It lands in the same place as `afw#testdpc`, with nothing typed on the tablet — which is the
-  argument for it. §4.4 already suggests laminating a console's enrolment QR and leaving it at the
-  check-in desk so a dead tablet is a reset and a scan; this is that, without a console.
+  argument for it. §4.4 suggests keeping a console's enrolment QR with whoever sets tablets up; this
+  is that, without a console — and step 0 still comes first.
   [Test DPC's README](https://github.com/googlesamples/android-testdpc#qr-code-provisioning-device-owner-n-only)
   carries the payload above and a pre-made code — and **`/setup` draws the same code itself**
   (§6.3), so a laptop with that page open is a scannable one and nothing has to be generated
@@ -708,8 +739,8 @@ in the half that is not being taken.
   and product identifiers in §4.3 are fixed properties of hardware, and Tally's origin changes about
   never. Realistically this is a ten-minute visit every year or two — and the tablet is in the lobby.
 - **Device owner is only grantable at provisioning** (or over adb on an account-less device). Moving
-  to an EMM later means factory-resetting each tablet. Cheap — a kiosk tablet holds nothing and
-  Tally's pairing is a code — but not free.
+  to an EMM later means factory-resetting each tablet. Cheap — a kiosk tablet holds nothing once it
+  says *All check-ins are in Tally* (runbook step 0), and Tally's pairing is a code — but not free.
 - **No fleet visibility.** Test DPC reports to nobody. This is the one that would genuinely hurt, and
   it is why §6.1 is first in §6: the kiosk can report its own battery and charging state into the row
   it already writes, which is better than what an EMM would tell you anyway, because it is reported
@@ -831,7 +862,7 @@ encodes the invite QR, so this cost a ceiling: it stopped at version 10 and the 
 version 14 symbol. The code is for the *next* tablet, never the one showing it, and the page says
 so: whatever is displaying `/setup` is past its own setup wizard. Which makes this the one part of
 the page that wants a laptop or a printout rather than the tablet in your hands — and the reason
-§4.4's laminated-QR-at-the-desk trick now needs no console at all.
+§4.4's printed enrolment QR now needs no console at all.
 
 **It should not be staff-gated, and the reason is worth being precise about.** An earlier draft of
 this section said it should be. That was wrong twice over. First, there is nothing secret in it: a

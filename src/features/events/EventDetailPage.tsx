@@ -475,13 +475,13 @@ export function EventDetailPage() {
                           </span>
                         ) : null}
                         <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                          {time.clock(record.checkedInAt)}
+                          {time.attendanceClock(record.checkedInAt, record.timeUncertain)}
                         </span>
                         {/* Only where there is one. A student with no pickup recorded
                             gets nothing here — no badge, no dash, no colour. */}
                         {event.requiresCheckOut && record.checkedOutAt ? (
                           <span className="shrink-0 text-xs tabular-nums text-ink-400">
-                            → {time.clock(record.checkedOutAt)}
+                            → {time.attendanceClock(record.checkedOutAt, record.checkedOutTimeUncertain)}
                           </span>
                         ) : null}
                       </li>

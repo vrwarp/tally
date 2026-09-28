@@ -5173,10 +5173,11 @@
     "zh-Hant": "reviewed"
   },
   "Team.retireLiveWarning": {
-    "source": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
+    "source": "This kiosk is recording {gathering} right now. Retiring shows a pairing code on it the next time it reaches Tally, possibly mid-pickup; anything still on the tablet waits there until it’s paired again.",
+    "context": "Confirmation under a lobby kiosk's Retire button on the Team page, for a kiosk recording right now. Retiring takes effect the next time the tablet reaches Tally, which may be while a parent is picking a child up; check-ins still on the tablet are kept there and sent once it is paired again.",
     "es-MX": "machine",
-    "zh-Hans": "reviewed",
-    "zh-Hant": "reviewed"
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Team.keepItRunning": {
     "source": "Keep it",
@@ -5191,10 +5192,11 @@
     "zh-Hant": "reviewed"
   },
   "Team.kioskRetiredToast": {
-    "source": "{device} retired. It stops recording at its next tap; the row stays as the record of what it took.",
+    "source": "{device} retired. It shows a pairing code the next time it reaches Tally, and anything still on it waits until it’s paired again. The row stays as the record of what it took.",
+    "context": "Toast after retiring a lobby kiosk on the Team page. {device} is the kiosk's id. There is no undo: the device row stays as the record of which check-ins that kiosk took.",
     "es-MX": "machine",
-    "zh-Hans": "reviewed",
-    "zh-Hant": "reviewed"
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Team.retireKioskFailed": {
     "source": "Could not retire that kiosk. Try again in a moment.",
@@ -5225,6 +5227,20 @@
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
+  },
+  "Team.kioskOutOfTouch": {
+    "source": "Out of touch since {when} while at {gathering} — probably the church’s internet. It keeps recording on the tablet.",
+    "context": "Status under a lobby kiosk on the Team page, when Tally last heard from it while it was set to a gathering and has heard nothing since. {when} is a time today (9:41 AM) or a date. The kiosk keeps taking check-ins on its own storage and sends them when it can reach Tally again, so this is reassuring rather than an alarm.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.retireOutOfTouchWarning": {
+    "source": "This kiosk was last heard from while at {gathering}, so it may still have check-ins on it. Retiring shows a pairing code the next time it reaches Tally, possibly mid-pickup; anything on the tablet waits there until it’s paired again.",
+    "context": "Confirmation under a lobby kiosk's Retire button on the Team page, for a kiosk Tally has not heard from since it was set to a gathering — it may be holding check-ins it could not send yet. Same consequences as Team.retireLiveWarning.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "KioskPair.title": {
     "source": "Pair a kiosk",
@@ -5258,16 +5274,18 @@
     "zh-Hant": "machine"
   },
   "KioskPair.retire": {
-    "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "source": "Kiosks are retired on the Team page, by the core team. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "context": "Footnote on the Kiosk page for a member who is not on the core team. Retiring a kiosk is done in Tally, never by wiping the tablet: the tablet may still hold check-ins it has not sent. The quoted phrase must be exactly the kiosk's all-clear (Staff.checkInsAllIn).",
     "es-MX": "machine",
-    "zh-Hans": "reviewed",
+    "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "KioskPair.retireCore": {
-    "source": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "source": "To retire a kiosk, open the person who paired it on the Team page and press Retire. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "context": "Footnote on the Kiosk page for the core team, who can retire a kiosk from the Team page (on the panel of whoever paired it). Never by wiping the tablet: it may still hold check-ins it has not sent. The quoted phrase must be exactly the kiosk's all-clear (Staff.checkInsAllIn).",
     "es-MX": "machine",
-    "zh-Hans": "reviewed",
-    "zh-Hant": "reviewed"
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "KioskPair.blocked": {
     "source": "Tally cannot sign a kiosk in yet. Approving a code is still recorded, but the lobby screen keeps waiting until somebody runs the setup command below.",
@@ -14558,6 +14576,13 @@
   },
   "Time.dateTime": {
     "source": "{date} · {time}",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Time.notKnown": {
+    "source": "time not known",
+    "context": "Shown in place of a check-in or pickup time on the register and the event page when the device that recorded it had a clock so far off that the real moment cannot be known. Lower case: it sits where a time like 9:41 AM would.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

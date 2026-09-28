@@ -1,6 +1,9 @@
 # Kiosk records that outlast an outage
 
-**Status: proposal — nothing here is built.** Written against `main` at `9aae8cc`. Every failure
+**Status: Phase 1 is built; Phase 2 is proposed.** What was built, and where it differs from what
+is written below, is under [Phase 1](#phase-1--nothing-is-lost-and-nothing-tells-anyone-to-lose-it).
+The proposal was written against `main` at `9aae8cc`, and the rest of this document still describes
+the kiosk as it was then where it says *today*. Every failure
 below was reproduced rather than inferred: against the real `firestore.rules` in the emulator, and
 by running the real `KioskApp` and `src/kiosk/services.ts` over a simulated network (see
 [How this was checked](#how-this-was-checked)). The draft was walked by three consultants — the
@@ -159,7 +162,8 @@ interface KioskRecord {
   };
   gathering: string;      // the title, so a person reading the list knows which morning
   attempts: number;
-  lastProblem?: 'network' | 'server';  // what the last attempt hit, for the staff row's words
+  lastProblem?: 'network' | 'server' | 'arrival';  // what the last attempt hit, for the staff row's words
+  approximate?: true;     // carried over from the old queue, which kept the failure's time, not the tap's
 }
 ```
 
@@ -216,7 +220,7 @@ nothing has succeeded since. It is back in touch the moment anything succeeds.
 ### 3. One road to the register
 
 Every record reaches the register through one new callable, `landKioskRecords`. A pass sends every
-waiting record, up to a hundred a call, and the callable answers for each:
+waiting record, twenty-five a call, and the callable answers for each:
 
 | Outcome | Meaning | On the tablet |
 |---|---|---|
@@ -303,7 +307,8 @@ Every path that deletes a record today becomes one of three:
   — and the tablet is the one place that can be wiped.
 
 The server decides between waiting and parked from its own facts, so the tablet never has to: a pickup
-whose arrival is missing *waits* until the day after the gathering ends — time for another device's
+whose arrival is missing *waits* for a day after the gathering ends (the later of its end and its
+check-in window's close) — time for another device's
 arrival to arrive — and is parked after that.
 
 Parked records are settled on the Review page — *the other end of the lobby kiosk*, already core-only
@@ -457,7 +462,8 @@ seconds". It could stand for two real limits:
   records take about 25 seconds, just inside the 30-second timer. Above that, replays overlap and
   failure 5 starts erasing records. Whether or not anybody meant it, that is the one sense in which
   50 has been load-bearing, and it is why raising the number on its own would make things worse. With
-  one pass at a time and a hundred records a call, 500 records drain in five calls.
+  one pass at a time and twenty-five records a call — a batch that fits inside one request's
+  deadline even on a cold start — 500 records drain in twenty calls, about a minute.
 
 **So the proposal removes the cap rather than raising it to 200 or 500.** Any number at which the
 oldest record is dropped is a rule for deleting children's attendance, and the outage that reaches
@@ -491,7 +497,9 @@ makes sure that if it happens, somebody knows.
 
 ### The volunteer card
 
-One side, laminated, replacing the reset-and-scan card at the desk:
+One side, laminated, replacing the reset-and-scan card at the desk — now in
+[tablet-management.md §4.4](tablet-management.md#44-enrolling), where the people who set tablets up
+will read it:
 
 - **The internet is down? Keep using the kiosk.** Every check-in and pickup is kept on the tablet and
   goes to Tally by itself.
@@ -623,6 +631,31 @@ cupboard, and the first draft's visibility lived only in the states where nothin
 - **The Team page** — *out of touch since …* in place of *not recording*; **Retire** asking first;
   `KIOSK_LIVE_WITHIN_MS` widened.
 - **The words Tally already says** — §9, the volunteer card and the drill, with the sweep as a test.
+
+**Built**, with these differences from the design above:
+
+- **Twenty-five records a call**, not a hundred: a batch has to fit inside one request's twenty-second
+  deadline on a cold start. Five hundred records are twenty calls, about a minute.
+- **A pickup waits a day** after the later of the gathering's end and its check-in window's close
+  before it is parked `no-arrival`.
+- **The room** (`src/kiosk/room.ts`) holds the register's last read, and the taps Tally has taken
+  since; the journal's own records are read straight from the journal. A tap Tally *parked* stays in
+  the room until the evening ends — the child is in the room as far as the tablet saw — so the pickup
+  parks beside it instead of being offered as a second check-in.
+- **The Check-ins screen** loads just behind the services chunk rather than with the first paint,
+  whose budget it would have filled; loading it straight away is what puts it in the kiosk worker's
+  cache before any outage. The uploader rides in the services chunk for the same reason.
+- **The kiosk's polls have deadlines too** — the pulse, the register and the standing report — so a
+  hanging connection is noticed as *out of touch* even with nothing waiting.
+- **The CSV** leaves `checked_in_at` / `checked_out_at` blank for a time Tally cannot vouch for;
+  `checked_in` still says they came. Its new columns are Phase 2.
+- **The volunteer card and the drill** live in [tablet-management.md §4.4](tablet-management.md#44-enrolling),
+  and the staging runbook gained its step 0.
+- **The sweep** is `tests/resetAdvice.test.ts`: every shipped string that mentions a reset, a wipe or
+  a reinstall forbids it or quotes the all-clear, and the old advice cannot return to the docs.
+- **Not yet:** a parked check-in tapped a second time — possible only if the room was cleared by
+  leaving and rebinding — replaces the first parked copy, so its card would show the later time.
+  Worth fixing with the Review cards in Phase 2, which are where parked records are read.
 
 ### Phase 2 — Tally says what it knows
 

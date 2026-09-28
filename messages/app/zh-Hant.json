@@ -926,15 +926,17 @@
     "kioskOffCharger": "使用電池 · {percent}%",
     "kioskRetiredOn": "已於 {when} 停用",
     "retireKiosk": "停用",
-    "retireLiveWarning": "此簽到台目前正在記錄 {gathering}。停用後會在下一次觸碰時停止運作，在重新配對前，必須由輔導使用手機為孩子簽到。",
+    "retireLiveWarning": "此簽到台目前正在記錄 {gathering}。停用後，它下次連上 Tally 時會顯示配對碼，可能正好在接孩子的時候；平板上還沒上傳的紀錄會留在平板上，等重新配對後再上傳。",
     "keepItRunning": "維持運作",
     "yesRetire": "是，停用簽到台",
-    "kioskRetiredToast": "已停用 {device}。它將在下一次點擊時停止記錄；此列會保留作為過往簽到紀錄。",
+    "kioskRetiredToast": "已停用 {device}。它下次連上 Tally 時會顯示配對碼，還沒上傳的紀錄會等重新配對後再上傳。此列會保留作為過往簽到紀錄。",
     "retireKioskFailed": "無法停用該簽到台。請稍後再試。",
     "asksHeading": "本週請求加入名單",
     "askRow": "{name} · {gathering} · {when}",
     "mailboxNote": "{address} 看似共用信箱。在 Tally 中一個帳號代表一位同工：若多人共用此帳號登入，任何人進行的簽到點名紀錄皆會歸在此姓名名下。",
-    "noHistoryNote": "Tally 僅記錄權限的起始與終止時間。不會記錄過往曾參與過哪些聚會的名單。"
+    "noHistoryNote": "Tally 僅記錄權限的起始與終止時間。不會記錄過往曾參與過哪些聚會的名單。",
+    "kioskOutOfTouch": "自 {when} 起失去聯繫，當時在 {gathering}——多半是教會的網路問題。它會繼續在平板上記錄。",
+    "retireOutOfTouchWarning": "此簽到台最後一次聯繫時在 {gathering}，平板上可能還有簽到紀錄。停用後，它下次連上 Tally 時會顯示配對碼，可能正好在接孩子的時候；平板上的紀錄會留在平板上，等重新配對後再上傳。"
   },
   "KioskPair": {
     "title": "配對簽到台",
@@ -942,8 +944,8 @@
     "backToCheckIn": "簽到",
     "whatIsKiosk": "<mono>/kiosk</mono> 是供大廳平板使用的自助簽到畫面，方便家庭按姓名或電話號碼辦理簽到。",
     "setupPage": "受管平板所需的一切——Chrome 的印表機規則、用於佈建裝置的 QR code，以及每一項的用途——都在 <link>/setup</link>。",
-    "retire": "要停用一台簽到台，請在那台裝置上清除瀏覽器的網站資料。",
-    "retireCore": "若要停用簽到台，請清除該裝置上的瀏覽器網站資料。簽到台無論由誰配對皆可持續運作：關閉個人存取權限並不會使簽到台停止。",
+    "retire": "簽到台由核心同工在「團隊」頁面停用。在簽到台顯示「所有簽到紀錄都已傳到 Tally」之前，請不要清除它的網站資料，也不要重設平板。無論由誰配對，簽到台都會繼續運作：關閉某個人的權限並不會讓它停下。",
+    "retireCore": "要停用簽到台，請在「團隊」頁面打開配對它的那位同工，然後點「停用」。在簽到台顯示「所有簽到紀錄都已傳到 Tally」之前，請不要清除它的網站資料，也不要重設平板。無論由誰配對，簽到台都會繼續運作：關閉某個人的權限並不會讓它停下。",
     "blocked": "Tally 還不能讓簽到台登入。批准配對碼仍然會記錄下來，但大廳的畫面會一直等著，直到有人執行下面的設定指令。",
     "codeLabel": "配對代碼",
     "approving": "正在批准…",
@@ -2183,7 +2185,8 @@
     "monthsAgo": "{count, plural, other {# 個月前}}",
     "yearsAgo": "{count, plural, other {# 年前}}",
     "window": "{start} – {end}",
-    "dateTime": "{date} · {time}"
+    "dateTime": "{date} · {time}",
+    "notKnown": "時間不詳"
   },
   "Birthday": {
     "finishTheYear": "把年份寫完，或者去掉——生日不填年份也可以。",

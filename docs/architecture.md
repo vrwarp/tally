@@ -189,6 +189,22 @@ The kiosk offers that batch rather than printing it, and [reasons that out here]
 
 Setting a printer up, and what a label may say, is [label printing](label-printing.md).
 
+**A tap needs no network.** Every check-in and pickup is written to the tablet's own storage in the
+handler that paints its tick (`src/kiosk/journal.ts`, one `localStorage` key per record, no count
+limit), and leaves only when Tally answers for it. A single uploader (`src/kiosk/uploader.ts`) sends
+the journal oldest first to one callable, `landKioskRecords`, in every phase that has a session —
+bound, on the chooser, behind the staff gate — one pass at a time, with a deadline on every request,
+because Firestore Lite's `fetch` has none and a lobby connection that hangs is the outage that used
+to lose the most. The callable writes each record with the moment of the tap, earlier wins when two
+devices saw the same arrival, and answers landed, already recorded, waiting or parked; the kiosk no
+longer writes attendance itself. Who the tablet believes is in the room is kept on the disk too
+(`src/kiosk/room.ts`), so a reboot mid-outage still offers a pickup as a pickup. And the kiosk says
+what it holds in every phase — the staff menu's *All check-ins are in Tally*, the Check-ins list,
+the chooser's and the pairing screen's lines, a notice for staff after ten minutes out of touch —
+because once records survive an outage, the likeliest way to lose a morning is a well-meant reset.
+The whole design, and the failures of the retry queue it replaced, are in
+[kiosk-offline-recovery.md](kiosk-offline-recovery.md).
+
 ---
 
 ## The storage decisions worth knowing

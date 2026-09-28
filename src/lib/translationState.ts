@@ -219,6 +219,9 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
    * appear.
    */
   { message: 'Staff.checkInsAbout', quotes: 'Staff.checkInsAllIn' },
+  // And the Kiosk page's footnote, which tells people the same thing from Tally.
+  { message: 'KioskPair.retire', quotes: 'Staff.checkInsAllIn' },
+  { message: 'KioskPair.retireCore', quotes: 'Staff.checkInsAllIn' },
 ];
 
 /**

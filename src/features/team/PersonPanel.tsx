@@ -24,8 +24,10 @@
  *   are already written; neither enforces anything.
  * - **The kiosks this person paired**, because a device row records who
  *   approved it and their name at the time, and "whose tablet is that" has no
- *   other answer. Retire arms while the kiosk is live: retiring a working
- *   lobby screen mid-morning takes something away, and an installed tablet
+ *   other answer. Retire arms for any kiosk that may be holding records — one
+ *   recording now, or one last heard from while set to a gathering, which is
+ *   almost always a lobby whose internet went rather than a tablet that
+ *   stopped: retiring either takes something away, and an installed tablet
  *   that has been re-paired leaves duplicate rows, which is exactly the shape
  *   of list a mis-tap happens in.
  * - **The week's unanswered asks** on the gatherings this person could act on
@@ -56,6 +58,8 @@ import { isOutstanding, subscribeChainRequests } from '@/services/accessRequests
 import { addChainMembers, removeChainMember } from '@/services/eventAccess';
 import {
   isKioskLive,
+  kioskMayHoldRecords,
+  kioskOutOfTouchSince,
   retireKioskDevice,
   subscribeKioskDevices,
 } from '@/services/kioskDevices';
@@ -429,18 +433,35 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
           <ul className="flex flex-col gap-2">
             {theirKiosks.map((device) => {
               const live = isKioskLive(device, nowMs);
+              const quietSince = kioskOutOfTouchSince(device, nowMs);
               return (
                 <li key={device.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-ink-100">{device.id}</span>
-                    <span className="block text-xs text-ink-400">
+                    {/*
+                      A bound kiosk that stopped reporting used to read "not
+                      recording", which was the one thing it almost certainly
+                      was still doing: a tablet whose lobby lost the internet
+                      keeps taking check-ins on its own storage, and the report
+                      that would say so is the thing that cannot land. Said as
+                      it is, with the time Tally last heard from it.
+                    */}
+                    <span className={`block text-xs ${quietSince ? 'text-warn-400' : 'text-ink-400'}`}>
                       {device.retiredAt
                         ? t('kioskRetiredOn', { when: time.weekdayDate(device.retiredAt) })
                         : live
                           ? t('kioskLive', { gathering: device.boundTo ?? '' })
-                          : t('kioskIdle', {
-                              when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
-                            })}
+                          : quietSince
+                            ? t('kioskOutOfTouch', {
+                                when:
+                                  quietSince.toDateString() === now.toDateString()
+                                    ? time.clock(quietSince)
+                                    : time.weekdayDate(quietSince),
+                                gathering: device.boundTo ?? '',
+                              })
+                            : t('kioskIdle', {
+                                when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
+                              })}
                     </span>
                     {/*
                       Said only when it is worth saying. A shelf tablet lives on
@@ -477,7 +498,11 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                     <Button
                       variant="secondary"
                       disabled={busy === device.id}
-                      onClick={() => (live ? setArmedRetire(device.id) : void retire(device))}
+                      onClick={() =>
+                        kioskMayHoldRecords(device, nowMs)
+                          ? setArmedRetire(device.id)
+                          : void retire(device)
+                      }
                     >
                       {t('retireKiosk')}
                     </Button>
@@ -489,7 +514,9 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
                       its width. */}
                   {armedRetire === device.id ? (
                     <p role="alert" className="basis-full text-xs text-ink-400">
-                      {t('retireLiveWarning', { gathering: device.boundTo ?? '' })}
+                      {live
+                        ? t('retireLiveWarning', { gathering: device.boundTo ?? '' })
+                        : t('retireOutOfTouchWarning', { gathering: device.boundTo ?? '' })}
                     </p>
                   ) : null}
                 </li>

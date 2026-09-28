@@ -47,13 +47,16 @@ import type { KioskDevice } from '@/types';
 /**
  * How recently a bound kiosk must have reported to count as live.
  *
- * The kiosk writes `lastSeenAt` on every register poll — every thirty seconds
- * while it is bound and its window is open — so three minutes is six missed
- * reports. Short enough that a tablet somebody unplugged after the service
- * stops claiming to be working; long enough that a lobby wifi blip does not
- * make a screen with a parent in front of it read as dead.
+ * The kiosk writes `lastSeenAt` on every register poll, which is every five
+ * minutes while it is bound (`PRESENT_REFRESH_MS` in `KioskApp`) — so twelve
+ * minutes is two missed reports and some slack. It was three, on a comment
+ * that said the poll ran every thirty seconds: a healthy kiosk read *not
+ * recording* two minutes in every five, and was retired on one unconfirmed
+ * tap while it did (docs/kiosk-offline-recovery.md). Widened rather than
+ * reported more often, because a report is a write per kiosk per poll and the
+ * window only has to be true.
  */
-export const KIOSK_LIVE_WITHIN_MS = 3 * 60_000;
+export const KIOSK_LIVE_WITHIN_MS = 12 * 60_000;
 
 function toKioskDevice(snapshot: {
   id: string;
@@ -72,6 +75,11 @@ function toKioskDevice(snapshot: {
     // "does not say" and "flat" stay different things on the way to the screen.
     ...(typeof data.batteryLevel === 'number' ? { batteryLevel: data.batteryLevel } : {}),
     ...(typeof data.charging === 'boolean' ? { charging: data.charging } : {}),
+    // What `landKioskRecords` last heard was still on the tablet — see
+    // functions/src/kiosk/landing.ts. Absent on a kiosk that has never sent.
+    ...(typeof data.waitingCount === 'number' ? { waitingCount: data.waitingCount } : {}),
+    ...('waitingSinceAt' in data ? { waitingSinceAt: toDateOrNull(data.waitingSinceAt) } : {}),
+    ...('allInAt' in data ? { allInAt: toDateOrNull(data.allInAt) } : {}),
     retiredAt: toDateOrNull(data.retiredAt),
     retiredBy: typeof data.retiredBy === 'string' ? data.retiredBy : null,
   };
@@ -91,6 +99,31 @@ export function isKioskLive(device: KioskDevice, nowMs: number): boolean {
   if (!device.boundChain) return false;
   const seen = device.lastSeenAt?.getTime();
   return seen !== undefined && nowMs - seen < KIOSK_LIVE_WITHIN_MS;
+}
+
+/**
+ * When a kiosk that went quiet while set to a gathering was last heard from —
+ * or null for one that is live, retired, or was last set to nothing.
+ *
+ * Tally cannot see the tablet, but it knows enough to say the true thing: a
+ * kiosk records on its own storage whether or not it can reach Tally, and it
+ * leaves its gathering on this row when it loses the internet, because the
+ * report that would clear it never lands. So a bound row that stopped
+ * reporting is, almost always, a kiosk still recording in a lobby whose
+ * internet went — not one that stopped. See docs/kiosk-offline-recovery.md §7.
+ */
+export function kioskOutOfTouchSince(device: KioskDevice, nowMs: number): Date | null {
+  if (device.retiredAt || !device.boundChain || !device.lastSeenAt) return null;
+  return isKioskLive(device, nowMs) ? null : device.lastSeenAt;
+}
+
+/**
+ * Whether retiring this kiosk could take something away: a kiosk recording
+ * now, or one last heard from while set to a gathering, which may be holding
+ * that gathering's check-ins until it can reach Tally. Both get asked first.
+ */
+export function kioskMayHoldRecords(device: KioskDevice, nowMs: number): boolean {
+  return isKioskLive(device, nowMs) || kioskOutOfTouchSince(device, nowMs) !== null;
 }
 
 /**
@@ -125,9 +158,11 @@ export function subscribeKioskDevices(
  * whole-document write reads as touching every key — including `approvedBy`
  * and the name it was approved under, which are the custody record.
  *
- * The kiosk finds out on its next refused write rather than being told: it
- * re-reads the register, and a refusal there is the one refusal that cannot be
- * about a student. That is why nothing here notifies anything.
+ * The kiosk finds out the next time it reaches Tally rather than being told:
+ * its standing report is refused, or its upload is, and either refusal is the
+ * one that cannot be about a student. It then shows a pairing code, and keeps
+ * whatever records it holds until it is paired again. That is why nothing
+ * here notifies anything.
  */
 export async function retireKioskDevice(deviceId: string, byUid: string): Promise<void> {
   await updateDoc(doc(db, paths.kioskDevice(deviceId)), {

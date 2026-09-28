@@ -913,12 +913,17 @@ export interface TallyEvent
  * acknowledges it, and the Team screen has to draw the row either way.
  */
 export interface KioskDevice
-  extends Omit<KioskDeviceDoc, 'pairedAt' | 'lastSeenAt' | 'retiredAt'> {
+  extends Omit<
+    KioskDeviceDoc,
+    'pairedAt' | 'lastSeenAt' | 'retiredAt' | 'waitingSinceAt' | 'allInAt'
+  > {
   /** The device id the kiosk minted for itself; the document id. */
   id: string;
   pairedAt: Date | null;
   lastSeenAt: Date | null;
   retiredAt: Date | null;
+  waitingSinceAt?: Date | null;
+  allInAt?: Date | null;
 }
 
 /**

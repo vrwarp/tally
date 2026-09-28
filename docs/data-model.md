@@ -43,6 +43,8 @@ events/{eventId}                         a single dated gathering
 events/{eventId}/attendance/{studentId}  who showed up
 events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
 accessRequests/{chainKey}__{uid}         somebody asking to be put on a gathering
+kioskDevices/{deviceId}                  a paired lobby kiosk's standing
+kioskParkedRecords/{recordId}            a kiosk tap that reached Tally but not the register
 transitions/{chainKey}__{studentId}      this gathering no longer expects this student
 config/settings                          tunable thresholds
 config/planningCenter                    the non-secret Planning Center settings
@@ -317,13 +319,18 @@ chain's own instances — so removing the last one empties the calendar ahead. I
 | `studentId` | string | Equal to the document id. Enforced by rules. |
 | `eventId` | string | Equal to the parent document id. Enforced by rules. |
 | `seriesId` | string \| null | Copied from the event so a collection-group query can count a series without joining. |
-| `checkedInAt` | Timestamp | `serverTimestamp()`. Reads back as null in the optimistic local snapshot, which the converters handle. For imported history it is the instant the kiosk recorded, which can trail the gathering by days when attendance was taken late. |
+| `checkedInAt` | Timestamp | `serverTimestamp()` for a check-in made in the app. Reads back as null in the optimistic local snapshot, which the converters handle. For imported history it is the instant the kiosk recorded, which can trail the gathering by days when attendance was taken late. For a lobby-kiosk record it is **the moment of the tap**, by the kiosk's clock, however late the record reached Tally — bounded by what could have happened (not before the gathering's check-in opened, not after the server's now; see `timeUncertain`). |
 | `checkedInBy` | string | Must equal the caller's uid — enforced by rules for client writes. Rows imported from Planning Center Check-Ins carry the sentinel `'planning-center'` instead (written by the Admin SDK, which rules do not govern). |
 | `method` | `'tap' \| 'search' \| 'quick-add' \| 'manual' \| 'import' \| 'kiosk'` | Purely diagnostic: it tells the core team whether the predictive roster is earning its keep. `import` marks a row that came from Check-Ins history rather than from anybody's thumb; `kiosk` marks a self-serve tap in the lobby. |
 | `isFirstEver` | boolean | True when this was the student's first ever check-in. |
 | `checkedOutAt` | Timestamp, or **absent** | When somebody checked them out, on an event with `requiresCheckOut`. The key being absent is the whole "still in the room" state, so it is never written as null — see below. |
 | `checkedOutBy` | string, or absent | Who recorded the pickup. Deliberately not required to equal `checkedInBy`: the volunteer who takes a child in is rarely the one who hands them back. |
 | `arrivalId` | string, or **absent** | Who came through the door together — the same opaque value on every child one press of the kiosk's confirm button put on the register. Written only by the kiosk; the main app checks students in one at a time and makes no claim. Rules pin it to a non-empty string of at most 64 characters. |
+| `recordedAt` | Timestamp, or absent | When a kiosk record reached Tally — `landKioskRecords`' own now. Beside `checkedInAt` it says how late a record came in; absent on everything written in the app. |
+| `kioskRecordId` | string, or absent | The id the kiosk minted for the tap. What makes a retried record idempotent. |
+| `laterCheckIn` | `{ at, by, method }`, or absent | **Earlier wins.** When a kiosk's tap is earlier than the check-in the register already held — a counselor who recorded the same child on a phone at 9:52, say, while the kiosk was offline from 9:41 — the arrival moves back to the tap and the later entry is kept here, so nothing a counselor did disappears. A kiosk tap *later* than the register's changes nothing. |
+| `timeUncertain` | `true`, or absent | The tap's time was outside what could have happened by more than fifteen minutes of ordinary clock drift, so the stored `checkedInAt` is the bound it was pulled to. Screens and the CSV say *time not known* instead of printing it. |
+| `checkedOutRecordedAt`, `laterCheckOut`, `checkedOutTimeUncertain` | as above, or absent | The same three for a pickup: when it reached Tally, a later pickup the kiosk's earlier one displaced (`{ at, by }`), and a time Tally cannot vouch for. The main app's undo of a pickup deletes all of them with it. |
 
 **Arrivals, and why absent is not empty.** A pickup asks "who else is going home with them", and
 until this field existed the only answer available was the kiosk's guess at a family from four phone
@@ -341,8 +348,18 @@ second into the third, so the key is omitted rather than emptied.
 
 **Who writes:** any counselor may create, update and delete. Undoing a mistaken tap is a delete, and
 has to be as fast as the tap was. A *check-out* is a second, narrower shape of update — two fields
-and no others, permitted to any counselor rather than only the one who did the check-in — and it is
-the one update a kiosk session may perform.
+and no others, permitted to any counselor rather than only the one who did the check-in.
+
+**The lobby kiosk writes through one callable.** A kiosk journals every tap on its own storage and
+sends it to `landKioskRecords` (`functions/src/kiosk/landing.ts`), which writes the record with the
+Admin SDK in a transaction — the arrival, and the student's attendance dates against the server's
+own copy of them — and answers for each record: landed, already recorded, waiting (a pickup whose
+arrival has not reached Tally yet), or parked. The fields above that only the callable writes
+(`recordedAt`, `kioskRecordId`, `laterCheckIn`, `timeUncertain` and their pickup twins) are refused
+from every client by `serverFieldsUntouched()`, which is also what keeps a counselor's edit from
+forging them. The rules that let a kiosk session create a check-in and a first pickup directly are
+still there for kiosks running an older bundle, and go once none do — see
+[kiosk-offline-recovery.md](./kiosk-offline-recovery.md).
 
 ### `events/{eventId}/rsvps/{studentId}`
 
@@ -681,7 +698,8 @@ person who approved the pairing touches nothing.
 | `approvedBy`, `approvedByName` | — | Who vouched for the code, and their name as of that moment — denormalised the way `transitions.releasedByName` is, because the row outlives the profile. |
 | `pairedAt` | timestamp | |
 | `lastSeenAt` | timestamp or null | Written by the kiosk on every register poll while bound. Null until it first reports in. |
-| `boundTo`, `boundChain` | string or null | The title and chain of the gathering the kiosk is bound to, written by the kiosk at bind time and null between gatherings. `boundChain` is **the whole of the kiosk's reach**: the attendance rules let a kiosk session read and write the register of that chain and no other — a fence on the chain included, since `eventAccess` is about people and a kiosk stands in whichever room a leader pointed it at. |
+| `boundTo`, `boundChain` | string or null | The title and chain of the gathering the kiosk is bound to, written by the kiosk at bind time and null between gatherings. `boundChain` is **the whole of the kiosk's reach** in the rules: a kiosk session may read the register of that chain and no other — a fence on the chain included, since `eventAccess` is about people and a kiosk stands in whichever room a leader pointed it at. (What it records goes through `landKioskRecords`, which judges each record against its own gathering.) A kiosk that loses the internet keeps its gathering here, because the report that would clear it never lands — which is how the Team page can say *out of touch since 9:41 while at Sunday Kids* rather than *not recording*. |
+| `waitingCount`, `waitingSinceAt`, `allInAt` | number / timestamp, or absent | What the kiosk said, on its last call to `landKioskRecords`, was still on the tablet: how many, and since when the oldest. `allInAt` is the moment a tablet that had been holding records reported none. Written only by the callable; absent on a kiosk that has never sent one. |
 | `retiredAt`, `retiredBy` | — | Set by core and up, in their own name. Never cleared from a client: pairing again is how a retired tablet comes back, and the claim replaces the row wholesale. |
 
 **Who writes: the server, at claim time, wholesale.** The kiosk may update only `lastSeenAt`,
@@ -691,18 +709,40 @@ there is no sweep: the row is the provenance of every morning that kiosk recorde
 costs nothing to keep. Core and up read them; a kiosk cannot read even its own.
 
 **The report is the oracle.** The kiosk writes its row the moment a gathering is bound and again
-on every register poll — so a report the lobby wifi dropped at bind time lands on the next one —
-and after any refused write. The rules let a kiosk touch its own row only while it stands, so a
-refusal *there* is the one refusal that cannot be about a frozen student, a pickup already
-recorded or a gathering's fence. A refused check-in asks the row before it concludes anything:
-row live, it was the child, and the row on the glass stays green as today; row refused, this
-device is nobody, the binding is put down, the session signed out, and the pairing screen says
-from when the register may be short. No callable, no debounce, one round trip.
+on every register poll (every five minutes while bound) — so a report the lobby wifi dropped at bind
+time lands on the next one — and whenever `landKioskRecords` refuses a whole call. The rules let a
+kiosk touch its own row only while it stands, so a refusal *there* is the one refusal that cannot be
+about the records: row live, the call's trouble was something else and the records wait; row
+refused, this device is nobody, the binding is put down, the session signed out, and the pairing
+screen says from when the register may be short — and how many records wait on the tablet for the
+pairing that sends them. The Team page counts a bound kiosk live for twelve minutes after its last
+report (`KIOSK_LIVE_WITHIN_MS`): two missed polls and some slack.
 
 **Migration.** A token minted before kiosks had identities is the approver's uid with no device
 claim. The kiosk compares its restored session's uid against `kiosk_<its own id>` at boot, signs a
 mismatch out once, and pairs again with its own sentence ("Tally was updated…") — see
 [deployment-setup.md](./deployment-setup.md#after-the-kiosk-identity-update-every-kiosk-pairs-once).
+
+### `kioskParkedRecords/{recordId}`
+
+A kiosk record that reached Tally but cannot go on the register without a person deciding — written
+by `landKioskRecords` instead of the attendance document, so the tablet can let go of it (the tablet
+is the one place that can be wiped). Keyed `{kind}:{eventId}:{studentId}`, or `unreadable:{id}` for a
+record that did not parse.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `kind`, `eventId`, `studentId` | — | What the tap was, and for whom. |
+| `reason` | `'frozen' \| 'gathering-deleted' \| 'no-arrival' \| 'arrival-parked' \| 'unreadable'` | Why it is here: the child's upstream record is missing; the gathering was deleted after the tap; a pickup whose arrival never reached the register by a day after the gathering ended; a pickup whose arrival is itself parked; or a record the server could not read. |
+| `tappedAt`, `recordId`, `arrivalId?` | — | The tap as the kiosk kept it. |
+| `student?` | `{ firstName, lastName, grade, searchName }` | A check-in's names, as the kiosk had them — so a card can name a child whose record is gone. |
+| `gathering` | string or null | The gathering's title, from the event if it still exists. |
+| `deviceId`, `parkedAt` | — | Which kiosk, and when it arrived. |
+
+**Who reads and writes:** core and up read (the Review page is where they are settled — Phase 2 of
+the proposal); nobody writes from a client, a kiosk session included. Names of minors, so it is
+held to the same retention as the register it stands in for — see
+[minors-data.md](./minors-data.md).
 
 ### `kioskIndex/phones`
 
