@@ -35,6 +35,7 @@ function harness(initial: KioskRecord[] = []) {
 
   const deps: UploaderDeps = {
     records: () => [...journal].sort((a, b) => a.tappedAtMs - b.tappedAtMs),
+    settled: vi.fn(),
     remove: vi.fn((id: string) => {
       const at = journal.findIndex((r) => r.id === id);
       if (at >= 0) journal.splice(at, 1);
@@ -106,6 +107,27 @@ describe('a pass', () => {
     }));
     await createUploader(h.deps).kick();
     expect(h.journal).toEqual([]);
+  });
+
+  it('says what Tally took before the journal lets go of it, and nothing about what waits', async () => {
+    const h = harness([rec(1), rec(2), rec(3)]);
+    const order: string[] = [];
+    vi.mocked(h.deps.settled!).mockImplementation((record, outcome) => {
+      // Still on the tablet at this moment: the room takes over from the journal.
+      expect(h.journal.some((r) => r.id === record.id)).toBe(true);
+      order.push(`${record.id}:${outcome}`);
+    });
+    h.answerWith(async () => ({
+      outcomes: [
+        { id: 'record-0001', outcome: 'landed' },
+        { id: 'record-0002', outcome: 'parked', reason: 'frozen' },
+        { id: 'record-0003', outcome: 'waiting', waitingFor: 'arrival' },
+      ],
+    }));
+    await createUploader(h.deps).kick();
+
+    expect(order).toEqual(['record-0001:landed', 'record-0002:parked']);
+    expect(h.journal.map((r) => r.id)).toEqual(['record-0003']);
   });
 
   it('sends a long outage in tap order, twenty-five a call, and tells each call what is left', async () => {

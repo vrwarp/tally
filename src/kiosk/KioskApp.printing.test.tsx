@@ -24,6 +24,8 @@ import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything, sentRecords } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 const ADA: KioskStudent = {
   id: 'student-ada',
@@ -85,7 +87,6 @@ const printing = {
 /** Who the register says is already here. Reassigned per test. */
 let present = new Set<string>();
 let checkedOut = new Set<string>();
-let checkInFails: Error | null = null;
 /** The family digits, so only the tests about families see one. */
 let last4: Record<string, string[]> = {};
 
@@ -105,16 +106,10 @@ const services = {
   refetchRoster: vi.fn(async () => {}),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {
-    if (checkInFails) throw checkInFails;
-  }),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
   fetchAllergyNote: vi.fn(async () => null),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -191,7 +186,6 @@ beforeEach(() => {
   localStorage.clear();
   present = new Set();
   checkedOut = new Set();
-  checkInFails = null;
   last4 = {};
   configurePrinter();
 });
@@ -233,7 +227,7 @@ describe('printing from the kiosk flow', () => {
     await tap(/check out/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
-    expect(services.performCheckOut).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-out')).toHaveLength(1);
   });
 
   it('does not print for a child who is already checked in', async () => {
@@ -280,7 +274,7 @@ describe('printing from the kiosk flow', () => {
     await tap('Check in');
 
     expect(screen.getByText(/checked in/i)).toBeTruthy();
-    expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-in')).toHaveLength(1);
   });
 
   it('says nothing to a parent about the printer', async () => {
@@ -310,7 +304,7 @@ describe('a gathering with no label template', () => {
 
     expect(printing.warmLabel).not.toHaveBeenCalled();
     expect(printing.printLabel).not.toHaveBeenCalled();
-    expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-in')).toHaveLength(1);
   });
 });
 
@@ -394,7 +388,7 @@ describe('a family checked in together', () => {
     await tap(/check out 2/i);
 
     expect(printing.printLabel).not.toHaveBeenCalled();
-    expect(services.performCheckOut).toHaveBeenCalledTimes(2);
+    expect(sentRecords(services.landRecords, 'check-out')).toHaveLength(2);
   });
 });
 

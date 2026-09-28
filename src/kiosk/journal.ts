@@ -156,6 +156,7 @@ export function noteAttempt(id: string, problem: NonNullable<KioskRecord['lastPr
   else if (!tryStore(RECORD_PREFIX + id, JSON.stringify(next))) {
     // The count is a courtesy; the record is already on the disk as it was.
   }
+  emit();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -251,14 +252,19 @@ interface LegacyEntry {
  *
  * Its `queuedAtMs` is the moment the write failed, not the tap — within a
  * minute or two of it — so the record is marked approximate rather than
- * passed off as exact.
+ * passed off as exact. The old entries never carried the gathering's title;
+ * `known` is the binding the tablet booted with, which names the one gathering
+ * a queue is almost always for, and anything else goes up untitled — the
+ * server reads the title off the gathering itself.
  *
  * The old key goes only once every entry is on the disk. If any had to be held
  * in memory, the old queue stays, and the next boot migrates it again: the
  * duplicates that makes are harmless — the server answers the second copy
  * `already-recorded` — and a loss would not be.
  */
-export function migrateLegacyQueue(gathering = ''): number {
+export function migrateLegacyQueue(
+  known: { eventId: string; title: string } | null = null,
+): number {
   const stored = readJson<unknown>(KIOSK_KEYS.pending);
   if (!Array.isArray(stored)) return 0;
 
@@ -281,7 +287,7 @@ export function migrateLegacyQueue(gathering = ''): number {
         ? { arrivalId: raw.arrivalId }
         : {}),
       ...(kind === 'check-in' ? { student: raw.student as KioskRecordStudent } : {}),
-      gathering,
+      gathering: known && known.eventId === raw.eventId ? known.title : '',
       attempts: 0,
       approximate: true,
     };

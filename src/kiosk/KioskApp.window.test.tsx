@@ -24,6 +24,9 @@ import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything, sentRecords } from '@/test/kioskLanding';
+import { records as journalRecords } from '@/kiosk/journal';
+import { createUploader } from '@/kiosk/uploader';
 
 const NOAH: KioskStudent = {
   id: 's-noah',
@@ -121,14 +124,10 @@ const services = {
     checkedOut: new Set<string>(),
     arrivals: new Map<string, string>(),
   })),
-  replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn(async () => {}),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -196,10 +195,10 @@ describe('a gathering that has not opened', () => {
     await mount(BEFORE_DOORS());
     await checkInNoah();
 
-    expect(services.performCheckIn).not.toHaveBeenCalled();
-    // And not queued either: an arrival that is wrong now is wrong in thirty
-    // seconds, so the retry queue must not be the way round the front door.
-    expect(services.enqueueCheckIn).not.toHaveBeenCalled();
+    // Not written down either: an arrival that is wrong now is wrong in thirty
+    // seconds, so the journal must not be the way round the front door.
+    expect(journalRecords()).toEqual([]);
+    expect(services.landRecords).not.toHaveBeenCalled();
     expect(screen.getByText(/not open yet/i)).toBeTruthy();
   });
 
@@ -252,7 +251,7 @@ describe('a gathering that is open', () => {
     await mount(OPEN_NOW());
     await checkInNoah();
 
-    expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-in')).toHaveLength(1);
     expect(screen.queryByText(/not open yet/i)).toBeNull();
   });
 
@@ -266,7 +265,7 @@ describe('a gathering that is open', () => {
 
     // The asymmetry, stated. Late is a fact about a family who really did
     // arrive; early is a claim about an evening that has not happened.
-    expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-in')).toHaveLength(1);
   });
 
   it('does not lock out a binding written before the field existed', async () => {
@@ -275,6 +274,6 @@ describe('a gathering that is open', () => {
 
     // A deploy must not turn a paired lobby screen into a tablet that refuses
     // everyone on the strength of a key it never stored.
-    expect(services.performCheckIn).toHaveBeenCalledTimes(1);
+    expect(sentRecords(services.landRecords, 'check-in')).toHaveLength(1);
   });
 });

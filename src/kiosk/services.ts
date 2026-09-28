@@ -31,17 +31,16 @@ import {
   getDocs,
   getFirestore,
   query,
-  deleteField,
   serverTimestamp,
   where,
   updateDoc,
-  writeBatch,
   type Firestore,
 } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
 import { kioskUid } from '@/lib/kioskDevice';
+import type { LandKioskRecordsRequest, LandKioskRecordsResponse } from '@/lib/kioskLanding';
 import {
   KIOSK_BACKDROPS_COLLECTION,
   KIOSK_BACKDROP_MAX_BYTES,
@@ -54,13 +53,6 @@ import { paths } from '@/lib/paths';
 import { readBattery } from './battery';
 import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
 import {
-  attendancePayload,
-  checkOutPayload,
-  isFirstEver,
-  studentDatePatch,
-  type CheckInStudent,
-} from '@/services/attendancePayloads';
-import {
   asGrade,
   type PcoRosterPerson,
   type RegisterFamilyRequest,
@@ -72,6 +64,17 @@ import { joinKioskRoster } from './roster';
 import { isRefusal, type RestoredSession, type StandingOutcome } from './session';
 import { sanitizeKioskPalette } from './theme';
 import type { KioskStudent } from './search';
+import { isAnswer, noteFailure, reached } from './touch';
+import { UPLOAD_DEADLINE_MS } from './uploader';
+
+/*
+ * The uploader rides in this chunk rather than the kiosk's first paint: it
+ * cannot send anything before this module has loaded, and the first paint's
+ * byte budget (scripts/check-kiosk-budget.mjs) is for what the glass needs
+ * before the network answers. Re-exported so `KioskApp` never imports it as a
+ * value.
+ */
+export { createUploader } from './uploader';
 import {
   KIOSK_KEYS,
   ensureDeviceId,
@@ -311,7 +314,7 @@ export async function pollPairing(
 /**
  * Puts the session down. The next screen is the pairing code, and the device
  * id stays: a retired kiosk paired again is the same kiosk, under the same uid,
- * with the same queue of dropped writes waiting to land.
+ * with whatever its journal still holds waiting to land.
  */
 export async function unpair(): Promise<void> {
   await signOut(auth);
@@ -325,17 +328,18 @@ export async function unpair(): Promise<void> {
  * Reports to this kiosk's own device row: still here, and bound to this.
  *
  * Two jobs in one write. The row's `boundChain` is the whole of a kiosk's
- * reach in the rules — a kiosk session may write attendance for that chain
+ * reach in the rules — a kiosk session may read the register for that chain
  * and no other — so a binding that has not been reported is a binding that
- * cannot record, which is why the report goes up the moment a gathering is
- * bound and again on every register poll: a report the lobby wifi dropped at
- * bind time lands on the next one. And the write is the oracle for whether
- * this device still stands. The rules let a kiosk touch its own row only while
- * the row exists and nobody has retired it, so a refusal here is the one
- * refusal that cannot be about a student, a frozen record or a gathering's
- * fence — see `StandingOutcome`. A refused check-in asks this before it
- * concludes anything: the answer collapses "was it the child, or was it us?"
- * in one round trip, with no callable.
+ * cannot see who is here, which is why the report goes up the moment a
+ * gathering is bound and again on every register poll: a report the lobby
+ * wifi dropped at bind time lands on the next one. (Recording no longer
+ * depends on it: `landKioskRecords` checks each record against its own
+ * gathering.) And the write is the oracle for whether this device still
+ * stands. The rules let a kiosk touch its own row only while the row exists
+ * and nobody has retired it, so a refusal here is the one refusal that cannot
+ * be about a student, a frozen record or a gathering's fence — see
+ * `StandingOutcome`. The uploader asks this when Tally refuses a whole call:
+ * the answer collapses "is it the records, or is it us?" in one round trip.
  *
  * `null` between gatherings, so the row says the kiosk is standing idle
  * rather than still on last Sunday.
@@ -362,8 +366,10 @@ export async function reportStanding(
       boundChain: bound?.chain ?? null,
       ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
     });
+    reached();
     return 'live';
   } catch (error) {
+    noteFailure(error);
     if (!isRefusal(error)) return 'unknown';
     return auth.currentUser?.uid === kioskUid(deviceId) ? 'retired' : 'updated';
   }
@@ -374,8 +380,14 @@ export async function reportStanding(
 /* -------------------------------------------------------------------------- */
 
 export async function listEvents(): Promise<KioskEventEntry[]> {
-  const { data } = await getKioskEvents();
-  return data.events;
+  try {
+    const { data } = await getKioskEvents();
+    reached();
+    return data.events;
+  } catch (error) {
+    noteFailure(error);
+    throw error;
+  }
 }
 
 /**
@@ -701,6 +713,9 @@ function pulseChannel(data: Record<string, unknown> | null, name: string): numbe
 export async function fetchPulse(): Promise<KioskPulse | null> {
   try {
     const snapshot = await getDoc(doc(db, 'kioskIndex/pulse'));
+    // Every thirty seconds while bound, so the likeliest thing to notice that
+    // the kiosk is back in touch — or that it is not. See `touch.ts`.
+    reached();
     if (!snapshot.exists()) return null;
     const data = snapshot.data();
     return {
@@ -708,7 +723,8 @@ export async function fetchPulse(): Promise<KioskPulse | null> {
       phones: pulseChannel(data, 'phones'),
       participation: pulseChannel(data, 'participation'),
     };
-  } catch {
+  } catch (error) {
+    noteFailure(error);
     return null;
   }
 }
@@ -965,7 +981,14 @@ export interface KioskAttendance {
 }
 
 export async function fetchAttendance(eventId: string): Promise<KioskAttendance> {
-  const snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+  let snapshot;
+  try {
+    snapshot = await getDocs(collection(db, paths.attendanceCollection(eventId)));
+    reached();
+  } catch (error) {
+    noteFailure(error);
+    throw error;
+  }
   const arrivals = new Map<string, string>();
   for (const docSnapshot of snapshot.docs) {
     const arrivalId: unknown = docSnapshot.get('arrivalId');
@@ -983,260 +1006,47 @@ export async function fetchAttendance(eventId: string): Promise<KioskAttendance>
 }
 
 /* -------------------------------------------------------------------------- */
-/* Check-in                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const CLOCK = { serverTimestamp, deleteField };
-const MAX_QUEUED = 50;
-
-interface PendingCheckIn {
-  kind?: 'check-in';
-  eventId: string;
-  seriesId: string | null;
-  startAtMs: number;
-  studentId: string;
-  student: { firstName: string; lastName: string; grade: number | null; searchName: string };
-  uid: string;
-  /**
-   * Optional for the same reason `kind` is: a queue written before arrivals
-   * existed still replays, as a check-in that makes no claim about who else
-   * came through the door with them.
-   */
-  arrivalId?: string;
-  queuedAtMs: number;
-}
-
-/**
- * A pickup the network dropped. Far smaller than a check-in because it patches
- * a document that already exists — there is no student to describe.
- *
- * `kind` is optional on the check-in above so a queue written before pickup
- * existed still reads: an entry with no discriminator is a check-in, which is
- * all it could have been.
- */
-interface PendingCheckOut {
-  kind: 'check-out';
-  eventId: string;
-  studentId: string;
-  uid: string;
-  queuedAtMs: number;
-}
-
-type PendingWrite = PendingCheckIn | PendingCheckOut;
-
-function toDateOrNull(value: unknown): Date | null {
-  if (value && typeof (value as { toDate?: unknown }).toDate === 'function') {
-    return (value as { toDate(): Date }).toDate();
-  }
-  return null;
-}
-
-/**
- * The same two writes `src/services/attendance.ts#checkIn` makes, through the
- * lite SDK, sharing the payload builders so the documents cannot drift.
- *
- * Reads the student document first for the two dates `isFirstEver` and the
- * patch depend on — the roster payload does not carry them. The confirm screen
- * calls `warmStudentDates` when it opens, so by the time a thumb reaches the
- * button this read has usually already resolved.
- */
-export async function performCheckIn(args: {
-  binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
-  student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
-  uid: string;
-  /** The arrival this child was part of — see `attendancePayload`. */
-  arrivalId?: string;
-}): Promise<void> {
-  const { binding, student, uid, arrivalId } = args;
-
-  const dates = await studentDates(student.id);
-
-  const checkInStudent: CheckInStudent = {
-    id: student.id,
-    firstName: student.firstName,
-    lastName: student.lastName,
-    // `KioskStudent.grade` has always been nullable; it was the domain model
-    // underneath that could not hold the answer. Checked rather than asserted,
-    // because this argument is also the replay path — a queued write is JSON
-    // off the disk, and it can be older than the build reading it.
-    grade: asGrade(student.grade),
-    searchName: student.searchName,
-    firstAttendedAt: dates.firstAttendedAt,
-    lastAttendedAt: dates.lastAttendedAt,
-  };
-
-  const event = { id: binding.eventId, seriesId: binding.seriesId, startAt: new Date(binding.startAtMs) };
-
-  const batch = writeBatch(db);
-  batch.set(
-    doc(db, paths.attendance(event.id, student.id)),
-    attendancePayload(CLOCK, {
-      event,
-      studentId: student.id,
-      uid,
-      method: 'kiosk',
-      isFirstEver: isFirstEver(checkInStudent),
-      arrivalId,
-    }),
-  );
-  const patch = studentDatePatch(CLOCK, checkInStudent, event, uid);
-  if (patch) batch.set(doc(db, paths.student(student.id)), patch, { merge: true });
-
-  await batch.commit();
-}
-
-/**
- * Records a pickup from the lobby.
- *
- * `updateDoc`, emphatically not the `writeBatch.set` that `performCheckIn`
- * uses: a whole-document set reads as "touches every key" to the rules'
- * `touchesOnly`, so the check-out rule would refuse it. It also means a pickup
- * for a child nobody checked in fails rather than inventing a record.
- *
- * No undo counterpart, deliberately. The kiosk has never offered one for
- * check-in either — a bystander clearing a check-out somebody witnessed is
- * not a self-serve action — and the rules enforce that rather than trusting
- * this file to keep the promise.
- */
-export async function performCheckOut(args: {
-  eventId: string;
-  studentId: string;
-  uid: string;
-}): Promise<void> {
-  await updateDoc(
-    doc(db, paths.attendance(args.eventId, args.studentId)),
-    checkOutPayload(CLOCK, args.uid),
-  );
-}
-
-const dateCache = new Map<string, Promise<{ firstAttendedAt: Date | null; lastAttendedAt: Date | null }>>();
-
-function studentDates(studentId: string): Promise<{ firstAttendedAt: Date | null; lastAttendedAt: Date | null }> {
-  let promise = dateCache.get(studentId);
-  if (!promise) {
-    promise = getDoc(doc(db, paths.student(studentId)))
-      .then((snapshot) => {
-        const data = snapshot.exists() ? snapshot.data() : null;
-        return {
-          firstAttendedAt: toDateOrNull(data?.firstAttendedAt),
-          lastAttendedAt: toDateOrNull(data?.lastAttendedAt),
-        };
-      })
-      .catch(() => {
-        dateCache.delete(studentId);
-        return { firstAttendedAt: null, lastAttendedAt: null };
-      });
-    dateCache.set(studentId, promise);
-  }
-  return promise;
-}
-
-/** Called when the confirm screen opens, so the write is not gated on a read. */
-export function warmStudentDates(studentId: string): void {
-  void studentDates(studentId);
-}
-
-/** After a write lands, the cached dates are stale — the write moved them. */
-export function forgetStudentDates(studentId: string): void {
-  dateCache.delete(studentId);
-}
-
-/* -------------------------------------------------------------------------- */
-/* The retry queue                                                             */
+/* The one road                                                                */
 /* -------------------------------------------------------------------------- */
 
 /*
- * A check-in the network dropped is retried until it lands. Safe because the
- * attendance document id *is* the student id: replaying a write that actually
- * landed converges on the same document. The replay stamps its own moment
- * rather than the original one — the queue exists for blips measured in
- * seconds, and a serverTimestamp sentinel cannot be serialized anyway.
+ * The kiosk does not write attendance any more. Every check-in and pickup is a
+ * record in the journal first (`journal.ts`), and reaches the register through
+ * this one callable, which answers for each record — see
+ * docs/kiosk-offline-recovery.md §3 and `functions/src/kiosk/landing.ts`.
+ *
+ * The SDK is given the uploader's own deadline as well as the uploader
+ * enforcing it: the SDK's clock starts only after the auth token is in hand,
+ * and a token refresh into a dead connection has no clock of its own.
  */
+const landKioskRecordsCallable = httpsCallable<LandKioskRecordsRequest, LandKioskRecordsResponse>(
+  functions,
+  'landKioskRecords',
+  { timeout: UPLOAD_DEADLINE_MS },
+);
 
-function readQueue(): PendingWrite[] {
-  const stored = readJson<PendingWrite[]>(KIOSK_KEYS.pending);
-  return Array.isArray(stored) ? stored : [];
+/** Sends one batch of records; Tally answers for each. */
+export async function landRecords(
+  request: LandKioskRecordsRequest,
+): Promise<LandKioskRecordsResponse> {
+  const { data } = await landKioskRecordsCallable(request);
+  return data;
 }
 
-/** A pickup the network dropped. Same convergence argument as a check-in. */
-export function enqueueCheckOut(args: {
-  binding: Pick<KioskBinding, 'eventId'>;
-  student: { id: string };
-  uid: string;
-}): void {
-  const queue = readQueue().filter(
-    (entry) =>
-      !(
-        entry.kind === 'check-out' &&
-        entry.eventId === args.binding.eventId &&
-        entry.studentId === args.student.id
-      ),
-  );
-  queue.push({
-    kind: 'check-out',
-    eventId: args.binding.eventId,
-    studentId: args.student.id,
-    uid: args.uid,
-    queuedAtMs: Date.now(),
-  });
-  writeJson(KIOSK_KEYS.pending, queue.slice(-MAX_QUEUED));
-}
-
-export function enqueueCheckIn(args: {
-  binding: Pick<KioskBinding, 'eventId' | 'seriesId' | 'startAtMs'>;
-  student: { id: string; firstName: string; lastName: string; grade: number | null; searchName: string };
-  uid: string;
-  arrivalId?: string;
-}): void {
-  const queue = readQueue().filter(
-    (entry) => !(entry.eventId === args.binding.eventId && entry.studentId === args.student.id),
-  );
-  queue.push({
-    eventId: args.binding.eventId,
-    seriesId: args.binding.seriesId,
-    startAtMs: args.binding.startAtMs,
-    studentId: args.student.id,
-    student: {
-      firstName: args.student.firstName,
-      lastName: args.student.lastName,
-      grade: args.student.grade,
-      searchName: args.student.searchName,
-    },
-    uid: args.uid,
-    arrivalId: args.arrivalId,
-    queuedAtMs: Date.now(),
-  });
-  writeJson(KIOSK_KEYS.pending, queue.slice(-MAX_QUEUED));
-}
-
-/** Attempts everything queued; returns how many are still stuck. */
-export async function replayQueue(): Promise<number> {
-  const queue = readQueue();
-  if (queue.length === 0) return 0;
-
-  const stuck: PendingWrite[] = [];
-  for (const entry of queue) {
-    try {
-      if (entry.kind === 'check-out') {
-        await performCheckOut({ eventId: entry.eventId, studentId: entry.studentId, uid: entry.uid });
-      } else {
-        await performCheckIn({
-          binding: { eventId: entry.eventId, seriesId: entry.seriesId, startAtMs: entry.startAtMs },
-          student: { id: entry.studentId, ...entry.student },
-          uid: entry.uid,
-          arrivalId: entry.arrivalId,
-        });
-      }
-    } catch (error) {
-      // permission-denied is not "try later", it is "this write will never be
-      // accepted" — the student is frozen, the kiosk may only create a
-      // check-in, or a pickup is already recorded and only staff may move one.
-      // Either way retrying forever helps nobody. (A retired kiosk is refused
-      // here too; the next report to its device row is what notices that.)
-      if (isRefusal(error)) continue;
-      stuck.push(entry);
-    }
+/**
+ * Whether Tally answers at all — one small read, asked only after a call
+ * failed.
+ *
+ * The Functions SDK reports a dropped connection and a server error as the same
+ * `internal`, and the staff row says different things about them: *waiting for
+ * the internet* is a matter of time, *Tally isn't taking them* should reach the
+ * office. A refusal counts as an answer — something was there to refuse.
+ */
+export async function reachTally(): Promise<boolean> {
+  try {
+    await getDoc(doc(db, 'kioskIndex/pulse'));
+    return true;
+  } catch (error) {
+    return isAnswer(error);
   }
-  writeJson(KIOSK_KEYS.pending, stuck);
-  return stuck.length;
 }

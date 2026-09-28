@@ -30,6 +30,7 @@ import {
   type KioskRecordWire,
   type LandKioskRecordsRequest,
   type LandKioskRecordsResponse,
+  type LandingOutcome,
 } from '@/lib/kioskLanding';
 import type { KioskRecord } from './journal';
 
@@ -43,6 +44,12 @@ export interface UploaderDeps {
   /** The journal, oldest tap first. */
   records(): KioskRecord[];
   remove(id: string): void;
+  /**
+   * Tally has answered for a record, just before the journal lets go of it —
+   * so the room can go on counting the child as here until a register read
+   * speaks for them (see `room.ts`).
+   */
+  settled?(record: KioskRecord, outcome: Exclude<LandingOutcome, 'waiting'>): void;
   noteAttempt(id: string, problem: 'network' | 'server' | 'arrival'): void;
   /** The one road: `landKioskRecords`. */
   land(request: LandKioskRecordsRequest): Promise<LandKioskRecordsResponse>;
@@ -173,6 +180,7 @@ export function createUploader(deps: UploaderDeps): Uploader {
       for (const record of batch) {
         const outcome = outcomes.get(record.id);
         if (outcome && outcome.outcome !== 'waiting') {
+          deps.settled?.(record, outcome.outcome);
           deps.remove(record.id);
           continue;
         }

@@ -21,6 +21,8 @@ import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything, sentStudentIds } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 function student(id: string, firstName: string, lastName: string): KioskStudent {
   return {
@@ -88,7 +90,6 @@ const services = {
     checkedOut: new Set<string>(),
     arrivals: new Map<string, string>(),
   })),
-  replayQueue: vi.fn(async () => 0),
   /*
    * Deliberately answers with the roster the kiosk already has: the silent
    * sweep may fire behind a no-match, and a no-op here keeps every widening
@@ -96,12 +97,9 @@ const services = {
    * local.
    */
   refreshDirectory: vi.fn(async () => {}),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -341,12 +339,7 @@ describe('behind the door', () => {
 
     await pick('Mara Okonjo');
     await tap(/Check in 2/i);
-    expect(
-      vi
-        .mocked(services.performCheckIn)
-        .mock.calls.map((call) => call[0].student.id)
-        .sort(),
-    ).toEqual(['s-mara', 's-noah']);
+    expect(sentStudentIds(services.landRecords, 'check-in')).toEqual(['s-mara', 's-noah']);
   });
 
   it('still offers her on the confirm screen, unticked', async () => {

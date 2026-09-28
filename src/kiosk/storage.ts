@@ -30,7 +30,17 @@ export const KIOSK_KEYS = {
    * first poll instead of waiting out a cache TTL.
    */
   pulse: 'tally:kiosk:pulse',
+  /**
+   * The old retry queue, read once by `migrateLegacyQueue` and then gone. The
+   * kiosk's taps are the journal's now — one key each, under
+   * `tally:kiosk:record:` (see `journal.ts`).
+   */
   pending: 'tally:kiosk:pending',
+  /**
+   * Who this tablet believes is in the room for the bound gathering — see
+   * `room.ts`. Ids only, and cleared with the rest of the evening.
+   */
+  room: 'tally:kiosk:room',
   pairing: 'tally:kiosk:pairing',
   /**
    * Who this device is, to the server: the id its session is minted for.

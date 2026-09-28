@@ -15,6 +15,7 @@ import { act, render } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
+import { createUploader } from '@/kiosk/uploader';
 
 type Sentinel = {
   release: ReturnType<typeof vi.fn>;
@@ -89,7 +90,7 @@ vi.mock('@/kiosk/services', () => ({
   restoredSession: vi.fn(async () => ({ uid: null, reason: 'unpaired' })),
   beginPairing: vi.fn(async () => ({ code: 'HJ4K2P', secret: 's3cret', expiresInSeconds: 600 })),
   pollPairing: vi.fn(async () => null),
-  replayQueue: vi.fn(async () => 0),
+  createUploader,
 }) as unknown as KioskServices);
 
 describe('the kiosk', () => {

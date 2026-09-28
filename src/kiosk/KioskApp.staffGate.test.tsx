@@ -33,6 +33,8 @@ import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 const ADA: KioskStudent = {
   id: 'student-ada',
@@ -84,13 +86,9 @@ const services = {
   refetchRoster: vi.fn(async () => {}),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);

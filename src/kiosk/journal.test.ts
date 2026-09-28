@@ -179,7 +179,7 @@ describe('the old retry queue', () => {
       ]),
     );
 
-    expect(migrateLegacyQueue('Sunday Kids')).toBe(2);
+    expect(migrateLegacyQueue({ eventId: 'sunday-kids-2026-09-27', title: 'Sunday Kids' })).toBe(2);
     expect(localStorage.getItem(KIOSK_KEYS.pending)).toBeNull();
     const moved = records();
     expect(moved).toHaveLength(2);

@@ -33,6 +33,8 @@ import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 import type { RegisterFamilyRequest, RegisterFamilyResult } from '@/types';
+import { landEverything } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 const ADA: KioskStudent = {
   id: 'student-ada',
@@ -160,13 +162,6 @@ const services = {
   refetchRoster: vi.fn(async () => {}),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
   // Passed through to the printing chunk on mount; never called here, because
   // nothing a family registers a second ago has an allergy note on file.
   fetchAllergyNote: vi.fn(async () => null),
@@ -200,6 +195,9 @@ const services = {
       searchName: child.searchName,
     })),
   ),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);

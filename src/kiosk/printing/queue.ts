@@ -8,12 +8,11 @@
  *
  * **It is speculative.** `warm` starts rasterising when the confirm screen
  * opens, not when the button is pressed, so by the time a thumb lands the bytes
- * already exist and the only work left is the USB write. This is the same trick
- * `services.warmStudentDates` plays with the Firestore read it needs, for the
- * same reason, and it is the whole of why a label comes out quickly.
+ * already exist and the only work left is the USB write. That is the whole of
+ * why a label comes out quickly.
  *
- * **It is not durable.** Deliberately, and unlike the check-in retry queue in
- * `services.ts`, which persists to localStorage and replays for as long as it
+ * **It is not durable.** Deliberately, and unlike the kiosk's journal of taps
+ * (`journal.ts`), which persists to localStorage and is sent for as long as it
  * takes. A check-in is a fact about the evening and is worth landing late. A
  * label is worth nothing late: a sticker for a child who was checked out twenty
  * minutes ago is litter on the floor, and one queued before a reboot is a
