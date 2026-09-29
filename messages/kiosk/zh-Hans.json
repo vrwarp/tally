@@ -112,7 +112,9 @@
     "space": "空格",
     "apostrophe": "撇号",
     "hyphen": "连字符",
-    "staffPrint": "同工 · 打印名牌"
+    "staffPrint": "同工 · 打印名牌",
+    "turnUprightTitle": "请把屏幕竖过来",
+    "turnUprightBody": "签到只能在竖屏下使用。如果无法转动，请找辅导。"
   },
   "Grades": {
     "preK": "幼儿园中班",

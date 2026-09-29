@@ -28,8 +28,8 @@ and questions. React as this staff pair:
 
 - **Tuesday:** Walk the setup as the director. Where does this live in the
   editor, what do you have to know to get it right, and what does the screen
-  tell you before Sunday about how it will actually look on the shelf — both
-  orientations, both grounds? What guidance do you need at the moment of
+  tell you before Sunday about how it will actually look on the shelf — the
+  tablet stood on end, on both grounds? What guidance do you need at the moment of
   upload (size, subject, faces, rights) so the tool teaches the policy?
 - **Sunday:** Walk the failure modes as the coordinator. The image looks
   terrible on the day, or offensive, or it is simply wrong — what is the

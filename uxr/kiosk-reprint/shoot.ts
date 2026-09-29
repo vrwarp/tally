@@ -25,17 +25,12 @@ const executablePath =
 const VIEWPORTS = {
   phone: { width: 390, height: 844, scale: 2 },
   kiosktall: { width: 800, height: 1280, scale: 1 },
-  kioskwide: { width: 1280, height: 800, scale: 1 },
 } as const;
 
 type ViewportName = keyof typeof VIEWPORTS;
 
 /**
  * The states this proposal has to be right in.
- *
- * The landscape kiosk is on every scene that has a list in it: 1280×800 is the
- * shape that leaves the least track, and it is where a block added to the
- * printer screen or a row grown a chip will run out of room first.
  */
 const SCENES: {
   id: string;
@@ -44,7 +39,7 @@ const SCENES: {
   drive?: readonly string[];
   scrollToEnd?: boolean;
 }[] = [
-  { id: 'staff', query: 'screen=staff', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'staff', query: 'screen=staff', views: ['phone', 'kiosktall'] },
   /*
    * The three states of the one row that carries state, at the sizes where the
    * group is read as a group. The staff screen is four controls that mean four
@@ -52,11 +47,11 @@ const SCENES: {
    * set does not hold together across `Ready` / `Trouble` / `Not set up`, it
    * does not hold together at all.
    */
-  { id: 'staff-trouble', query: 'screen=staff&printer=trouble', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'staff-trouble', query: 'screen=staff&printer=trouble', views: ['phone', 'kiosktall'] },
   { id: 'staff-none', query: 'screen=staff&printer=none', views: ['phone', 'kiosktall'] },
-  { id: 'reprint-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'reprint-typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'reprint-capped', query: 'buffer=Al&present=2', views: ['phone', 'kioskwide'] },
+  { id: 'reprint-idle', query: '', views: ['phone', 'kiosktall'] },
+  { id: 'reprint-typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall'] },
+  { id: 'reprint-capped', query: 'buffer=Al&present=2', views: ['phone', 'kiosktall'] },
   {
     id: 'reprint-sent',
     query: 'buffer=Alva&present=1,2&sentId=1',
@@ -72,9 +67,9 @@ const SCENES: {
   {
     id: 'reprint-trouble',
     query: 'buffer=Alva&present=2&printer=trouble',
-    views: ['phone', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
-  { id: 'reprint-confirm', query: 'screen=confirm', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'reprint-confirm', query: 'screen=confirm', views: ['phone', 'kiosktall'] },
   { id: 'reprint-confirm-trouble', query: 'screen=confirm&printer=trouble', views: ['phone'] },
   /*
    * The parent-facing offer, which is the half of this proposal with a rule
@@ -91,7 +86,7 @@ const SCENES: {
   {
     id: 'done-offer',
     query: 'screen=done&checkedInAgo=3',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
   {
     id: 'done-spent',
@@ -101,7 +96,7 @@ const SCENES: {
   /* Eleven minutes later: the common case, and the one that has to be today's
      screen and one line. */
   { id: 'done-ask', query: 'screen=done&checkedInAgo=25', views: ['phone', 'kiosktall'] },
-  { id: 'printer-recent', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'printer-recent', query: 'screen=printer', views: ['phone', 'kiosktall'] },
 ];
 
 const args = process.argv.slice(2);

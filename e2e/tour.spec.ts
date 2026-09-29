@@ -28,10 +28,11 @@
  *      on, so what is photographed is the screen reacting rather than a mock
  *      of it.
  *
- * Everything runs twice, on a wide device and a tall one, because none of these
- * screens gets to choose its shape: a kiosk is however the shelf it sits on
- * wants, a parent's phone is a phone, and a counselor's Tally is whatever is in
- * their pocket. Portrait is where every layout here is tightest.
+ * Everything runs twice, on a wide device and a tall one, because a parent's
+ * phone is a phone and a counselor's Tally is whatever is in their pocket.
+ * Portrait is where every layout here is tightest. The kiosk is the exception:
+ * it only stands upright, so both passes drive it at the same portrait size
+ * and only the tall pass photographs it.
  *
  * Run it with the emulators up:
  *   WALKTHROUGH=1 npx playwright test --project=chromium-desktop e2e/tour.spec.ts
@@ -52,18 +53,20 @@ const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'tour');
 type Shape = 'wide' | 'tall';
 
 /**
- * Three surfaces, two shapes each — and the pairs are different devices, not
- * one device rotated, because that is what they are in the room.
+ * Three surfaces, two shapes for the two that have them — and the pairs are
+ * different devices, not one device rotated, because that is what they are in
+ * the room.
  *
- * The kiosk is a tablet in a stand, either way up. The phone is a phone, held
- * the way people hold phones and (for the wide pass) the way somebody holds one
- * when they are filling a form with two thumbs. The app is a laptop in an
+ * The kiosk is a tablet stood on end in a stand, and nothing else: it has no
+ * landscape layout, so the wide pass runs it upright too. The phone is a
+ * phone, held the way people hold phones and (for the wide pass) the way
+ * somebody holds one when they are filling a form with two thumbs. The app is a laptop in an
  * office and a phone at a door: the same screens, and the tall one is the one
  * that has to work.
  */
 const VIEWPORTS: Record<Shape, Record<'kiosk' | 'phone' | 'app', { width: number; height: number }>> = {
   wide: {
-    kiosk: { width: 1280, height: 800 },
+    kiosk: { width: 800, height: 1280 },
     phone: { width: 844, height: 420 },
     app: { width: 1280, height: 900 },
   },
@@ -268,11 +271,13 @@ test('capture the tour', async ({ browser, page, signedInAs }) => {
       device: Shot['device'],
       shot: { act: string; who: string; title: string; caption: string },
     ): Promise<void> => {
+      // Let the flash, the haptic and any height change finish before the shutter.
+      await target.waitForTimeout(450);
+      // The kiosk is one shape, so the tall pass's frame is the only one.
+      if (device === 'kiosk' && shape === 'wide') return;
       n += 1;
       const file = `${shape}-${String(n).padStart(2, '0')}-${slugOf(shot.title)}.png`;
       await mkdir(join(OUT_DIR, 'shots'), { recursive: true });
-      // Let the flash, the haptic and any height change finish before the shutter.
-      await target.waitForTimeout(450);
       await target.screenshot({ path: join(OUT_DIR, 'shots', file), fullPage: false });
       shots.push({ ...shot, file, shape, device });
     };

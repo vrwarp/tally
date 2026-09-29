@@ -48,12 +48,12 @@ export type LanguagePinsSize = 'setup' | 'kiosk';
 
 const CHIP: Record<LanguagePinsSize, string> = {
   setup: 'h-14 min-w-24 px-5 text-lg',
-  kiosk: 'h-14 min-w-24 px-5 text-lg kiosk:h-20 kiosk:min-w-32 kiosk:px-6 kiosk:text-2xl',
+  kiosk: 'h-14 min-w-24 px-5 text-lg tall:h-20 tall:min-w-32 tall:px-6 tall:text-2xl',
 };
 
 const NOTE: Record<LanguagePinsSize, string> = {
   setup: 'text-sm',
-  kiosk: 'text-sm kiosk:text-lg',
+  kiosk: 'text-sm tall:text-lg',
 };
 
 export function LanguagePins({
@@ -95,7 +95,7 @@ export function LanguagePins({
         role="group"
         aria-label={t('pinLanguages')}
         data-testid="language-pins"
-        className="flex flex-wrap items-center justify-center gap-2 kiosk:gap-3"
+        className="flex flex-wrap items-center justify-center gap-2 tall:gap-3"
       >
         {LOCALES.filter((candidate) => candidate !== DEFAULT_LOCALE).map((candidate) => {
           const pinned = pins.includes(candidate);

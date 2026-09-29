@@ -7,11 +7,8 @@
  * what a parent meets in the ten minutes after their own check-in. Same mount,
  * same shipped components, different question.
  *
- * Two shapes rather than the critique loop's three. A walkthrough is read
- * top-to-bottom against a page, and the pair that says the most is the lobby
- * tablet this actually runs on and the phone it is also run on; the landscape
- * kiosk is the same screens at a third set of measurements, and a reader who
- * has seen two does not learn a third thing from it.
+ * Two shapes, the same two the critique loop shoots: the lobby tablet this
+ * actually runs on, stood on end, and the phone it is also run on.
  *
  *   npx tsx uxr/kiosk-reprint/walkthrough.ts
  *   npx tsx scripts/build-reprint-walkthrough.ts

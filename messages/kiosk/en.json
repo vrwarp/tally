@@ -112,7 +112,9 @@
     "space": "Space",
     "apostrophe": "Apostrophe",
     "hyphen": "Hyphen",
-    "staffPrint": "Staff · print name tags"
+    "staffPrint": "Staff · print name tags",
+    "turnUprightTitle": "Turn the screen upright",
+    "turnUprightBody": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader."
   },
   "Grades": {
     "preK": "Pre-K",

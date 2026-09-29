@@ -20,7 +20,7 @@
  * `SearchScreen.variants.tsx`, and `@` after it names the languages the
  * lobby pins beside English at rest (`+`-joined), which becomes `?pins=`.
  * Round 7 narrowed the study to the portrait tablet, so `--view` defaults
- * to it; `--view phone,kiosktall,kioskwide` widens it again. `--lang` is a
+ * to it; `--view phone,kiosktall` widens it again. `--lang` is a
  * filter over what each scene asks for: the resting scenes are shot in the
  * kiosk's own language, the chosen ones in each language a family can
  * choose. Spanish is a language the kiosk does not speak yet, so a frame
@@ -51,7 +51,6 @@ const executablePath =
 const VIEWPORTS = {
   phone: { width: 390, height: 844, scale: 2 },
   kiosktall: { width: 800, height: 1280, scale: 1 },
-  kioskwide: { width: 1280, height: 800, scale: 1 },
 } as const;
 
 type ViewportName = keyof typeof VIEWPORTS;
@@ -78,10 +77,10 @@ const SCENES: {
   /** Presses to run before the shot — `data-key` values or button labels. */
   drive?: readonly string[];
 }[] = [
-  { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
-  { id: 'chosen', query: 'chosen=1', views: ['kiosktall', 'kioskwide'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
+  { id: 'idle', query: 'phase=0', views: ['phone', 'kiosktall'], langs: ['en'] },
+  { id: 'chosen', query: 'chosen=1', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
   { id: 'chosen-nomatch', query: 'chosen=1&buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
-  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall', 'kioskwide'], langs: ['en'] },
+  { id: 'typed', query: 'buffer=Alva&present=2', views: ['phone', 'kiosktall'], langs: ['en'] },
   /* Two letters of an English name the family knows only as a sound: the
      rows carry the Chinese name the roster holds, which is what a reader who
      cannot spell recognises. */
@@ -90,7 +89,7 @@ const SCENES: {
   { id: 'typed-many', query: 'buffer=A', views: ['kiosktall'], langs: ['en'] },
   { id: 'chosen-typed', query: 'chosen=1&buffer=Be', views: ['kiosktall'], langs: ['zh-Hant', 'zh-Hans', 'es-MX'] },
   { id: 'nomatch', query: 'buffer=Zzz&nomatch=1', views: ['kiosktall'], langs: ['en'] },
-  { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall', 'kioskwide'], langs: ['en'], settle: 1900 },
+  { id: 'photo-idle', query: 'photo=1&icon=church&phase=0', views: ['kiosktall'], langs: ['en'], settle: 1900 },
   { id: 'photo-light', query: 'photo=1&icon=church&ground=light&phase=0', views: ['kiosktall'], langs: ['en'], settle: 1900 },
 ];
 

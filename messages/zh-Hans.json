@@ -1515,12 +1515,10 @@
     "noPhoto": "没有照片——只用配色",
     "guidanceNoWords": "请使用没有文字的照片，确保签到台的使用说明清晰易读。",
     "guidanceConsent": "使用儿童照片前须取得家长同意。场地或装饰的照片效果最佳。",
-    "guidanceCrop": "照片顶部会被签到台文字遮挡。请查看下方横竖两种方向的预览效果。",
+    "guidanceCrop": "照片顶部会被签到台文字遮挡；签到台是竖屏，横拍的照片只会显示中间部分。请查看下方的预览效果。",
     "fieldHint": "在签到台显示这场聚会的待机界面时作为背景，家长一开始输入就会消失。改动会在架上的签到台下次重新绑定时生效。",
     "newPhoto": "新照片 · {detail}",
     "storedPhoto": "照片 · {when} 上传",
-    "onAShelf": "横放（横屏）",
-    "stoodOnEnd": "竖放（竖屏）",
     "readFailed": "读不了那张照片——换一张试试。",
     "previewTypeChildsName": "输入您孩子的英文名字",
     "previewOrPhone": "或者您电话号码的后 4 位",
@@ -2194,7 +2192,9 @@
     "space": "空格",
     "apostrophe": "撇号",
     "hyphen": "连字符",
-    "staffPrint": "同工 · 打印名牌"
+    "staffPrint": "同工 · 打印名牌",
+    "turnUprightTitle": "请把屏幕竖过来",
+    "turnUprightBody": "签到只能在竖屏下使用。如果无法转动，请找辅导。"
   },
   "Confirm": {
     "back": "← 返回",

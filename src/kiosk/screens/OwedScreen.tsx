@@ -208,7 +208,7 @@ export function OwedScreen({
         {/* The fact, and nothing under it. An earlier draft asked "Print them
             now?" here, which is the question the button at the foot both asks
             and answers. */}
-        <div className="w-full shrink-0 text-3xl font-bold text-ink-50 kiosk:text-4xl">
+        <div className="w-full shrink-0 text-3xl font-bold text-ink-50 tall:text-4xl">
           {t('owedTitle', { count: all.length })}
         </div>
 
@@ -298,7 +298,7 @@ export function OwedScreen({
                                ink rather than by the accent the ticks spend,
                                so a fact about the child is not read as a
                                second state chip. */
-                            <span className="shrink-0 rounded-lg bg-ink-700 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-100 kiosk:text-base">
+                            <span className="shrink-0 rounded-lg bg-ink-700 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-100 tall:text-base">
                               {t('owedNewTonight')}
                             </span>
                           )}
@@ -342,7 +342,7 @@ export function OwedScreen({
           commit: what happens to the rows that are *not* ticked, which is the
           half of a one-press settlement nobody would otherwise expect. */}
       <div className="w-full shrink-0">
-        <div className="pb-3 text-lg text-ink-400 kiosk:text-xl">
+        <div className="pb-3 text-lg text-ink-400 tall:text-xl">
           {skipping.length > 0 && printing.length > 0
             ? t('owedCost', { count: skipping.length })
             : t('reprintNoRegisterChange')}
@@ -354,7 +354,7 @@ export function OwedScreen({
             haptic();
             onCommit(printing, skipping);
           })}
-          className="w-full rounded-2xl bg-brand-600 p-7 text-2xl font-bold text-white active:bg-brand-500 kiosk:text-3xl"
+          className="w-full rounded-2xl bg-brand-600 p-7 text-2xl font-bold text-white active:bg-brand-500 tall:text-3xl"
           style={{ touchAction: 'manipulation' }}
         >
           {printing.length > 0

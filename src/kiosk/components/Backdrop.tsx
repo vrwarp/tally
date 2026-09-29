@@ -116,8 +116,8 @@ export const Backdrop = memo(function Backdrop({
       {/*
         * `alt=""` and aria-hidden on the frame: this is scenery, and a screen
         * reader walking the kiosk should never meet it. Cover-cropped, centred
-        * — the one image serves both orientations, which is why the editor
-        * previews both crops before Sunday.
+        * — a photograph taken sideways keeps only its middle on a tablet stood
+        * on end, which is why the editor previews that crop before Sunday.
         */}
       <img
         ref={imgRef}

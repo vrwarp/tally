@@ -151,7 +151,7 @@ const KEY_CLASS =
      is the feedback. Every screen without that class, the wizard's and the
      reprint search's keyboards included, keeps this keyboard byte-identical
      to the one that shipped. */
-  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-[3.625rem] kiosk:text-2xl';
+  'bg-ink-800 text-xl font-semibold text-ink-100 active:bg-ink-600 tall:h-[3.625rem] tall:text-2xl';
 
 /*
  * One row of the track. Twenty cells rather than ten so the home row's
@@ -169,7 +169,7 @@ const ROW_CLASS = 'grid grid-cols-[repeat(20,minmax(0,1fr))] gap-2.5';
  * else may go inside these two buttons: `onPointerDown` reads the button's
  * text, and a second child would silently fall it back to `data-key`.
  */
-const MARK_CLASS = 'block text-3xl leading-none kiosk:text-4xl';
+const MARK_CLASS = 'block text-3xl leading-none tall:text-4xl';
 
 export const Keyboard = memo(function Keyboard({
   onKey,
@@ -294,13 +294,7 @@ export const Keyboard = memo(function Keyboard({
 
   return (
     <div
-      /* One measure for the screen. Given a landscape kiosk the board used to
-         spend the extra width on the keys rather than on itself: 32px wide on a
-         phone, 121 here, so a key stopped being a key shape and the space bar
-         became the largest empty rectangle in the frame. Capped to the measure
-         the results and the readout sit on, the keys stay a family across the
-         three shapes and the screen has one left edge instead of two. */
-      className="mx-auto flex w-full flex-col gap-2.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0"
+      className="mx-auto flex w-full flex-col gap-2.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]"
       style={{ touchAction: 'manipulation' }}
       onPointerDown={onPointerDown}
     >

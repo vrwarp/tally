@@ -86,9 +86,8 @@ eight pixels apart at the same timestamp.
 ### 4. The printer screen lists the evening
 
 **Name tags tonight** — name, time, and whether it came out — replaces *Reprint
-the last label*. On the landscape kiosk the screen is two columns, with the
-setup selects folded into a summary line, so the reprint door is above the fold
-on the shape with the least vertical track.
+the last label*, with the setup selects folded into a summary line so the
+reprint door stays above the fold.
 
 ### 5. The parent's ten minutes
 
@@ -199,7 +198,8 @@ only what the frame is worth.
 - **`src/index.css`** — `@custom-variant kiosk (@media A, B)` compiled to `A`
   alone, so `kiosk:` was byte-for-byte `tall:` and every `kiosk:` utility under
   `src/kiosk/` was inert on a 1280×800 lobby tablet: the exact device the
-  variant exists for. Written as two `@slot` blocks now.
+  variant existed for. It was written as two `@slot` blocks at the time; the
+  kiosk has since become portrait-only, and `kiosk:` folded into `tall:`.
 - **`src/index.css`** — `.kiosk-list-fade`'s ramp is `min(what is hidden, one
   row)` where a caller publishes `--kiosk-hidden`. A region overrun by nine
   pixels was answering with an eighty-eight pixel dissolve over rows that fit.
@@ -270,9 +270,9 @@ harness, because every one of them is a claim about pixels.
 
 One of the four filed as *noted, not obviously worth acting on* was done too,
 because it was an accessibility floor rather than a preference: the standing
-promise measured 4.24:1 on the landscape kiosk, under the 4.5 the rest of the
-screen clears, on the sentence that makes a volunteer comfortable pressing a row
-while a parent watches. One ink step at `kiosk:` takes it to 7.87:1. The other
+promise measured 4.24:1 on the tablet, under the 4.5 the rest of the screen
+clears, on the sentence that makes a volunteer comfortable pressing a row while
+a parent watches. One ink step at `tall:` takes it to 7.87:1. The other
 three stand, for the reasons round 4 gives.
 
 ## What was thrown out
@@ -284,9 +284,6 @@ three stand, for the reasons round 4 gives.
   settles completes. Legible cancellation instead.
 - **Widening `TAP_SLOP_PX` for holds.** `tapGuard.ts` answers *did this finger
   stay put* once for the whole kiosk; a second constant is a second answer.
-- **80px rows on the landscape kiosk**, to match the portrait one. Three of them
-  plus the truncation line is 296px against a 255px track — it would have
-  re-fired the ramp it was raised to avoid. 72px is what fits.
 - **A measured `MAX_RESULTS`.** It would make the number of names on the glass a
   function of orientation, on the one screen whose difficulty is that the
   volunteer cannot see all the Alvarezes.

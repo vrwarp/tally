@@ -23,11 +23,10 @@
  * repeats (child 2's four questions, the sibling's four) are photographed
  * precisely because whether they *should* repeat is the open question.
  *
- * The whole tour runs twice, on the two shapes a kiosk is actually built in —
- * a tablet lying in a stand and one standing up in it. Neither is a phone, and
- * neither is a laptop, which is why the viewports are named here rather than
- * borrowed from the suite's device projects. Portrait is where the flow is
- * tightest: the keyboard takes the same room and there is less of it.
+ * The tour runs on the one shape a kiosk is built in — a tablet standing up
+ * in its stand. That is neither a phone nor a laptop, which is why the
+ * viewport is named here rather than borrowed from the suite's device
+ * projects.
  *
  * Run it with:
  *   WALKTHROUGH=1 npx playwright test --project=chromium-desktop \
@@ -45,13 +44,8 @@ import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'registration');
 
-type Orientation = 'landscape' | 'portrait';
-
-/** The two shapes a lobby tablet is mounted in. Not a phone, not a laptop. */
-const VIEWPORTS: Record<Orientation, { width: number; height: number }> = {
-  landscape: { width: 1280, height: 800 },
-  portrait: { width: 800, height: 1280 },
-};
+/** A lobby tablet stood on end in its stand. Not a phone, not a laptop. */
+const VIEWPORT = { width: 800, height: 1280 };
 
 interface Shot {
   file: string;
@@ -60,7 +54,6 @@ interface Shot {
   /** What the family has achieved by this frame — the chip above each shot. */
   state: string;
   caption: string;
-  orientation: Orientation;
   /** The wizard step this frame is showing, for anyone reading steps.ts beside it. */
   step: string;
   /** How many taps of any kind it took to get here from the resting screen. */
@@ -85,10 +78,7 @@ interface ShotSpec {
 }
 
 /**
- * One frame, in whichever orientation the tour is currently running.
- *
- * The caption is only recorded on the first pass: it describes the moment, not
- * the device, and two copies of it would be two things to keep in step.
+ * One frame.
  *
  * `settle` is the wait before the shutter. The default lets a flash, a haptic
  * and any height change finish; the spinner frame passes a short one, because
@@ -97,22 +87,21 @@ interface ShotSpec {
  */
 async function capture(
   page: Page,
-  orientation: Orientation,
   index: number,
   taps: number,
   shot: ShotSpec,
   settle = 450,
 ): Promise<void> {
-  const file = `${orientation}-${String(index).padStart(2, '0')}-${slugOf(shot.title)}.png`;
+  const file = `portrait-${String(index).padStart(2, '0')}-${slugOf(shot.title)}.png`;
   await mkdir(join(OUT_DIR, 'shots'), { recursive: true });
   await page.waitForTimeout(settle);
   await page.screenshot({ path: join(OUT_DIR, 'shots', file), fullPage: false });
-  shots.push({ ...shot, file, orientation, taps });
+  shots.push({ ...shot, file, taps });
 }
 
 /**
- * A family per run *and* per orientation, because the second pass would
- * otherwise walk up to the family the first one just registered and be told,
+ * A family per run, because a second run against the same emulator would
+ * otherwise walk up to the family the first one registered and be told,
  * correctly, that they are already on the list. Letters only — the name fields
  * refuse digits.
  */
@@ -121,10 +110,7 @@ const RUN = 'abcdefghijklmnopqrstuvwxyz'
   .sort(() => Math.random() - 0.5)
   .slice(0, 3)
   .join('');
-const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
-  landscape: { surname: `Okonkwo${RUN}`, phone: '5550172244' },
-  portrait: { surname: `Adeyemi${RUN}`, phone: '5550178866' },
-};
+const FAMILY = { surname: `Adeyemi${RUN}`, phone: '5550178866' };
 
 /**
  * The household the sibling frames join — seeded, and deliberately *not* the
@@ -139,8 +125,6 @@ const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
  *
  * A household the church has had for years is the truer subject anyway: the
  * parent whose next child is finally old enough has been coming for a decade.
- * One per orientation, because the two passes share an emulator and the second
- * would otherwise walk up to a child the first checked in.
  *
  * A *household*, not a child. Which of its children is standing at the kiosk
  * unticked is the seed's decision and it moves with the date — this file named
@@ -148,10 +132,7 @@ const FAMILY: Record<Orientation, { surname: string; phone: string }> = {
  * stopped carrying her. The pass below tries the rows the digits return and
  * takes the first that lands on a check-in.
  */
-const SIBLING: Record<Orientation, { digits: string; surname: string }> = {
-  landscape: { digits: '0347', surname: 'Osei' },
-  portrait: { digits: '0592', surname: 'Delgado' },
-};
+const SIBLING = { digits: '0592', surname: 'Delgado' };
 
 /**
  * The six-child run at the end, which is never submitted.
@@ -159,8 +140,8 @@ const SIBLING: Record<Orientation, { digits: string; surname: string }> = {
  * `MAX_CHILDREN` is six, and the confirm screen it caps — six rows, a dead
  * **Add another child**, and the line explaining why — has never been
  * photographed. Cancelled rather than checked in: the point is the geometry,
- * and a second invented household per orientation would be six children of
- * noise in the review queue.
+ * and a second invented household would be six children of noise in the
+ * review queue.
  */
 const CROWD = ['Ama', 'Bem', 'Chika', 'Dayo', 'Ejike', 'Femi'];
 
@@ -175,546 +156,542 @@ test('capture the registration walkthrough', async ({ browser, page, signedInAs 
   test.setTimeout(1_800_000);
   await signedInAs('core');
 
-  for (const orientation of ['landscape', 'portrait'] as Orientation[]) {
-    const { context, page: kiosk } = await openKiosk(browser, {
-      viewport: VIEWPORTS[orientation],
+  const { context, page: kiosk } = await openKiosk(browser, { viewport: VIEWPORT });
+  const { surname: SURNAME, phone: PHONE } = FAMILY;
+  const SIB = SIBLING;
+  let n = 0;
+  /*
+   * Taps are counted, not estimated. "How long is this flow?" is the first
+   * question anyone reworking it asks, and a number carried on each frame
+   * answers it per screen rather than in aggregate — a keystroke is a tap,
+   * a grade chip is a tap, **Next** is a tap.
+   */
+  let taps = 0;
+  const tap = async (action: Promise<void>, count = 1) => {
+    await action;
+    taps += count;
+  };
+  const shoot = (shot: ShotSpec, settle?: number) =>
+    capture(kiosk, (n += 1), taps, shot, settle);
+  const type = async (text: string) => {
+    await typeOnKiosk(kiosk, text);
+    taps += text.length;
+  };
+  const press = async (name: RegExp | string, exact = false) => {
+    await kiosk
+      .getByRole('button', typeof name === 'string' && exact ? { name, exact } : { name })
+      .first()
+      .click();
+    taps += 1;
+  };
+  const next = () => press(/^Next$/);
+  const clear = async () => {
+    await kiosk.locator('[data-key="clear"]').click();
+    taps += 1;
+  };
+
+  try {
+    await pairKiosk(kiosk, page);
+    // The Nursery prints labels, which is what makes the sticker real.
+    await bindTo(kiosk, /nursery/i);
+    // Pairing and binding are a volunteer's job once a term, not a family's.
+    taps = 0;
+
+    /* ---- Finding the door ---------------------------------------------- */
+
+    await shoot({
+      flow: 'Finding the door',
+      state: 'Nobody has typed anything',
+      step: 'search',
+      title: 'The kiosk at rest',
+      caption:
+        'Where every journey in this document starts, and the only screen a family sees before they touch anything. The door out of it is already on the glass, in the row above the keyboard — it has to be: a parent told "just put your name in" types their child\'s name, gets somebody else\'s Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke never moves the keyboard.',
     });
-    const { surname: SURNAME, phone: PHONE } = FAMILY[orientation];
-    const SIB = SIBLING[orientation];
-    let n = 0;
+
+    await type('Okon');
+    await shoot({
+      flow: 'Finding the door',
+      state: 'Not on the roster',
+      step: 'search (no match)',
+      title: 'No match',
+      caption:
+        'What a family nobody has met used to meet here was "No match — please see a leader", and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has ever met needs a form.',
+    });
+
+    /* ---- Your child ----------------------------------------------------- */
+
+    await press(/Register your child/i);
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 1 of 4',
+      step: 'child-first',
+      title: 'The whole run, before any of it is answered',
+      caption:
+        'One tap from the offer, and what a parent meets is not one question on an empty screen but the run: their child\'s questions, then their own, named and in order. This region used to be a 664px hole — half an upright tablet — between the question and the keys that answer it. The question is said again against the keys, and the two are doing different jobs: the row is the index, saying where you are and what you will be able to go back and fix; the line above the rule is the question, in the same glance as the thumb.',
+    });
+
+    await type('Chidii');
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 1 of 4',
+      step: 'child-first (typed)',
+      title: 'Capitals, and a key to argue with them',
+      caption:
+        'The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O\'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce. The doubled letter here is deliberate: it is the typo the repair five frames from now goes back for.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 2 of 4',
+      step: 'child-last',
+      title: "Child's last name, with nothing to carry",
+      caption:
+        'The first child of a new family is the one time this box opens empty — there is no previous child to borrow a surname from, and the kiosk does not know the family yet. Every later surname in this run arrives prefilled. An identical-looking screen that behaves differently is worth seeing twice.',
+    });
+
+    await type(SURNAME);
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 2 of 4',
+      step: 'child-last (typed)',
+      title: 'A surname nobody can spell for them',
+      caption:
+        'Twelve keystrokes on glass, and the only check on them is a parent reading the readout above the keys. This is the screen where a typo becomes a roster row, a sticker and a record in the church\'s database — and the readout is deliberately the same object the search screen taught them to read two taps ago.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 3 of 4',
+      step: 'child-grade',
+      title: 'Fifteen chips, four across',
+      caption:
+        'Four across rather than three is what puts fifteen chips in four rows instead of five — and four rows land in the keyboard\'s footprint to the pixel, so this question has the same console as every other and the rule above it does not move when the question changes. That is what the grade step gains: a **Next** and a readout it never had. A chip now selects rather than advancing, which costs a tap per child and buys a parent the sight of the year they picked before it reaches a sticker. Next stays dead until one is pressed, because the draft always holds a grade and "No grade" is an answer here rather than a default nobody chose.',
+    });
+
+    await press('4th grade', true);
+    await next();
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 4 of 4',
+      step: 'child-allergies',
+      title: 'Allergies, and the answer most families give',
+      caption:
+        'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is its own button rather than something typed into the box: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes. **No allergies** is lit and **Next** is dead, because there is nothing yet to press Next with — which is also the answer to what a parent is meant to do with two buttons.',
+    });
+
+    await type('Peanuts EpiPen in bag');
+    await shoot({
+      flow: 'Your child',
+      state: 'Registering — question 4 of 4',
+      step: 'child-allergies (typed)',
+      title: 'A real note, and the buttons trade places',
+      caption:
+        'The minority answer. The field takes digits as well as letters — "Type 1 diabetes", "EpiPen 0.3" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard\'s geometry on every screen including search. Note what auto-capitalisation does to a medical note: the rule that makes Anne-Marie right title-cases every word here, and flattens the capitals inside EpiPen while it is at it. And note the band above: one letter was enough for **Next** to take the colour and for **No allergies** to go quiet. Colour says which answer is being offered; neither button moves.',
+    });
+
+    /* ---- And you --------------------------------------------------------- */
+
+    await next();
+    await shoot({
+      flow: 'And you',
+      state: 'One child banked — adult, question 1 of 3',
+      step: 'guardian-first',
+      title: 'The child is answered, and it shows',
+      caption:
+        'The child\'s last question banks them and the wizard turns to the adult — and nothing about that arrives as a surprise, because the adult\'s three questions have been on the glass since the first keystroke. There used to be a screen in this gap ("Anybody else?", with **That\'s everyone** under it) and then a line standing in for it; a run named in full needs neither. What the list is doing now is the second job: the name typed forty seconds ago is right there to check, without pressing Back to reach it.',
+    });
+
+    await type('Ngozi');
+    await shoot({
+      flow: 'And you',
+      state: 'Adult — question 1 of 3',
+      step: 'guardian-first (typed)',
+      title: 'The list holds still while a name is typed',
+      caption:
+        'Nothing above the rule changes on a keystroke — the list is drawn from what has been committed, and a keystroke touches the buffer and the shift state and nothing else. It is memoised on exactly that, so the subtree does not re-render while somebody types. The same discipline the keyboard already keeps, and for the same reason.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'And you',
+      state: 'Adult — question 2 of 3',
+      step: 'guardian-last (carried)',
+      title: 'Your last name, borrowed from the child',
+      caption:
+        'Prefilled with the first child\'s surname, which is right far more often than it is wrong and is one Clear away when it is not — a step-parent, a different name, a family that does not share one. The prefill is silent: nothing on the screen says where those letters came from, so a parent who does share the name presses Next, and a parent who does not has to notice.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'And you',
+      state: 'Adult — question 3 of 3',
+      step: 'guardian-phone',
+      title: 'A dialer, for the one question that is a number',
+      caption:
+        'The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family\'s key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church\'s own database and to be reduced to four digits for the kiosk index.',
+    });
+
+    await type(PHONE.slice(0, 6));
+    await shoot({
+      flow: 'And you',
+      state: 'Adult — question 3 of 3',
+      step: 'guardian-phone (partial)',
+      title: 'Grouped as they are typed',
+      caption:
+        'Six digits in, and the readout is already punctuating them the way a phone number is read aloud. Next stays dead until there are ten: an incomplete number is refused on the glass rather than after a round trip.',
+    });
+
+    await type(PHONE.slice(6));
+    await shoot({
+      flow: 'And you',
+      state: 'Adult — question 3 of 3',
+      step: 'guardian-phone (complete)',
+      title: 'Ten digits',
+      caption:
+        'A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.',
+    });
+
+    /* ---- Fixing something ------------------------------------------- */
+
     /*
-     * Taps are counted, not estimated. "How long is this flow?" is the first
-     * question anyone reworking it asks, and a number carried on each frame
-     * answers it per screen rather than in aggregate — a keystroke is a tap,
-     * a grade chip is a tap, **Next** is a tap.
+     * The repair Back could not give them. The row a parent wants is a banked
+     * child's, three screens behind, and Back un-banks its way there — so
+     * fixing one letter used to mean answering the whole run again forwards.
      */
-    let taps = 0;
-    const tap = async (action: Promise<void>, count = 1) => {
-      await action;
-      taps += count;
-    };
-    const shoot = (shot: ShotSpec, settle?: number) =>
-      capture(kiosk, orientation, (n += 1), taps, shot, settle);
-    const type = async (text: string) => {
-      await typeOnKiosk(kiosk, text);
-      taps += text.length;
-    };
-    const press = async (name: RegExp | string, exact = false) => {
-      await kiosk
-        .getByRole('button', typeof name === 'string' && exact ? { name, exact } : { name })
-        .first()
-        .click();
+    await tap(kiosk.locator('[data-testid="question-child-0-child-first"]').click());
+    await shoot({
+      flow: 'Fixing something',
+      state: 'A question reopened, mid-answer',
+      step: 'child-first (reopened)',
+      title: 'One tap, five screens back',
+      caption:
+        'A parent standing on the phone question sees the doubled letter in their child\'s name. The row is a button: tapping it opens that question with its own answer already in the box and the keyboard lower-case, because the next press is a correction to a word that is there rather than the start of a new one. The child it belongs to is banked and five screens behind, and none of that is a parent\'s problem any more. Only answered questions are buttons — jumping forward to one nobody has reached would leave a hole in the run and a blank on the confirm. The phone row is marked "back to this" rather than lit: still unanswered, and where **Next** returns. The ten digits already typed travel with it, because a parent taps a row *while* answering something — that is when they notice — and coming back to an empty box would lose work they can see. Back here is "never mind", so a row tapped by accident costs nothing.',
+    });
+    await clear();
+    await type('Chidi');
+    await next();
+    await shoot({
+      flow: 'Fixing something',
+      state: 'Back where they were, with the digits intact',
+      step: 'guardian-phone (resumed)',
+      title: 'Put back, not walked back',
+      caption:
+        'Next commits the fix to the child it belongs to and returns straight to the question they were on, with their ten digits where they left them. The alternative — walking forward through everything between the typo and where they were — is five screens of re-confirming answers nobody changed, in front of a queue, to fix one letter.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'And you',
+      state: 'One child, ready to check in',
+      step: 'confirm',
+      title: 'Nothing above the rule has moved',
+      caption:
+        'The confirm keeps the run. Press **Next** on the phone question and the body does not change at all — same eleven rows, same order, same place — while the console below it changes completely. The confirm used to replace all of this with a receipt of the same facts in a different shape, at the one moment a parent is asked to check them, and its rows stopped being buttons exactly when repair was being asked for. Here every row is still a button. And there are two questions on this screen rather than one: the header asks whether the typing is right, over the rows that answer that by touch; **Anyone else to add?** sits on top of the two buttons that answer *it*. The commit names who it is about to check in, which the adult\'s row is deliberately not part of — a guardian never gets an attendance row, and "Check in everyone" said otherwise in front of the family it named.',
+    });
+
+    /* ---- Child 2, from the confirm --------------------------------------- */
+
+    await press(/Add another child/i);
+    await shoot({
+      flow: 'Child 2',
+      state: 'Second child — question 1 of 4',
+      step: 'child-first (child 2)',
+      title: 'Round two, from the top',
+      caption:
+        'The loop returns to exactly the screen the run opened on, with the header counting: "Child 2" rather than "Your child". The adult\'s three questions are not asked again — they have been answered, and this child\'s last question goes straight back to the confirm. Back from here abandons the half-typed child and returns to the confirm too, rather than closing a registration a parent has already answered seven questions for.',
+    });
+
+    await type('Ada');
+    await shoot({
+      flow: 'Child 2',
+      state: 'Second child — question 1 of 4',
+      step: 'child-first (child 2, typed)',
+      title: 'Three letters, same keyboard',
+      caption:
+        'Identical mechanics to the first child, photographed anyway: the repeats are the part of this flow most likely to be worth cutting, and a document that showed them once could not be used to argue about them.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'Child 2',
+      state: 'Second child — question 2 of 4',
+      step: 'child-last (carried)',
+      title: 'The surname, carried',
+      caption:
+        'The second child\'s last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot. It is still a full screen and a full tap for an answer the kiosk already has.',
+    });
+
+    await next();
+    await shoot({
+      flow: 'Child 2',
+      state: 'Second child — question 3 of 4',
+      step: 'child-grade (child 2)',
+      title: 'Grade again, with no memory',
+      caption:
+        'Fourteen chips a second time, opening on the same default as the first child rather than near the sibling just entered. Families arrive in bands — a four-year-old and a six-year-old, not a four-year-old and a fifteen-year-old — so whether this grid should lean on the answer above it is a real question this frame exists to ask.',
+    });
+
+    await press('2nd grade', true);
+    await next();
+    await shoot({
+      flow: 'Child 2',
+      state: 'Second child — question 4 of 4',
+      step: 'child-allergies (child 2)',
+      title: 'Allergies, asked again from scratch',
+      caption:
+        'Each child answers for themselves: the box opens empty on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine. The next frame is one press away — **No allergies** answers and moves on rather than ticking something Next then has to collect.',
+    });
+
+    await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
+    await shoot({
+      flow: 'Child 2',
+      state: 'Two children, ready to check in',
+      step: 'confirm (two children)',
+      title: 'Both of them, and the button names them',
+      caption:
+        'Back at the confirm, one child heavier — and this is the second look at the first child\'s name, ten seconds after it was typed and again at the end. Every fact under its own label: "Adeyeminkx" beside **Last name** is easier to check than the same word run into a sentence, and the allergy note sits on the row that asked for it. The commit reads **Check in Chidi and Ada** rather than "Check in everyone", which named a set the kiosk does not act on: the adult below them is on this screen, is not checked in, and is now visibly not in the button either.',
+    });
+
+    /* ---- The write, and what it teaches -------------------------------- */
+
+    /*
+     * The spinner needs a slow call to exist at all.
+     *
+     * Against a warm emulator on a loopback the write comes back faster than
+     * the shutter can be raised, and the first attempt at this frame
+     * photographed the success screen wearing the spinner's caption. So the
+     * request is held for a second and a half in the page's own network
+     * layer: the call is real, the screen is real, and only the latency is
+     * arranged — which is the latency a cold function on a church's Wi-Fi
+     * has anyway. Left in place for the sibling submit below, for the same
+     * reason.
+     */
+    await kiosk.route('**/registerFamily', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await route.continue();
+    });
+
+    await press(/^Check in Chidi and Ada$/);
+    await shoot(
+      {
+        flow: 'And you',
+        state: 'The call is in flight',
+        step: 'submitting',
+        title: 'One moment',
+        caption:
+          'Cancel goes invisible while the call is out, because a half-written family is worse than a slow one — but look at the other corner: **Back** is still there, and on this step `goBack` has no case, so it falls through to closing the whole flow. The write still lands; the family loses the screen that teaches them their four digits. Everything else here is absence: "Saving…" and a header, and no sense of how long, for a callable that writes children, a household and a check-in. This is the one frame in the document whose timing is arranged — the request is held for a second and a half so the screen exists long enough to photograph.',
+      },
+      500,
+    );
+    await expect(kiosk.getByText(/checked in\. Welcome!/)).toBeVisible({ timeout: 30_000 });
+    await shoot({
+      flow: 'And you',
+      state: 'On the roster, checked in',
+      step: 'success',
+      title: 'Next time, just type those four digits',
+      caption:
+        'Both children exist, both are checked in against tonight\'s gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app. It clears itself after eight seconds.',
+    });
+
+    await press(/^Done$/);
+    await type(PHONE.slice(-4));
+    await shoot({
+      flow: 'And you',
+      state: 'Findable',
+      step: 'search (by last 4)',
+      title: 'And it works immediately',
+      caption:
+        'Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church\'s backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.',
+    });
+
+    /* ---- The second child ---------------------------------------------- */
+
+    /*
+     * The journey the first design treated as impossible. The parent is
+     * standing at the confirm screen for the child the kiosk already has, and
+     * the kiosk already knows which family this is — so the sibling costs the
+     * child's own questions and nothing else, and joins the household
+     * upstream rather than founding a second one for the same family.
+     *
+     * A seeded family rather than the one above, and `SIBLING` says why.
+     */
+    await clear();
+    await type(SIB.digits);
+    const rows = kiosk.getByRole('button', { name: new RegExp(SIB.surname, 'i') });
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+    /*
+     * The first of this household's children who is not already on the
+     * register. A child the seed has ticked opens a pickup screen, which
+     * asks a different question and carries no sibling offer, so the row is
+     * backed out of and the next one tried.
+     */
+    let standing = '';
+    const rowCount = await rows.count();
+    for (let index = 0; index < rowCount; index += 1) {
+      const row = rows.nth(index);
+      const label = ((await row.textContent()) ?? '').trim();
+      await row.click();
       taps += 1;
-    };
-    const next = () => press(/^Next$/);
-    const clear = async () => {
-      await kiosk.locator('[data-key="clear"]').click();
-      taps += 1;
-    };
-
-    try {
-      await pairKiosk(kiosk, page);
-      // The Nursery prints labels, which is what makes the sticker real.
-      await bindTo(kiosk, /nursery/i);
-      // Pairing and binding are a volunteer's job once a term, not a family's.
-      taps = 0;
-
-      /* ---- Finding the door ---------------------------------------------- */
-
-      await shoot({
-        flow: 'Finding the door',
-        state: 'Nobody has typed anything',
-        step: 'search',
-        title: 'The kiosk at rest',
-        caption:
-          'Where every journey in this document starts, and the only screen a family sees before they touch anything. The door out of it is already on the glass, in the row above the keyboard — it has to be: a parent told "just put your name in" types their child\'s name, gets somebody else\'s Noah back, and never fails a search to be offered anything. Low-key and fixed-height, so a keystroke never moves the keyboard.',
-      });
-
-      await type('Okon');
-      await shoot({
-        flow: 'Finding the door',
-        state: 'Not on the roster',
-        step: 'search (no match)',
-        title: 'No match',
-        caption:
-          'What a family nobody has met used to meet here was "No match — please see a leader", and nothing else. Seeing a leader is still the right last word when something is wrong with the search; it was never the right first one for being new. Two offers sit under the empty result and they answer different questions: a family somebody added while they queued needs the kiosk to look again, and a family nobody has ever met needs a form.',
-      });
-
-      /* ---- Your child ----------------------------------------------------- */
-
-      await press(/Register your child/i);
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 1 of 4',
-        step: 'child-first',
-        title: 'The whole run, before any of it is answered',
-        caption:
-          'One tap from the offer, and what a parent meets is not one question on an empty screen but the run: their child\'s questions, then their own, named and in order. This region used to be a 664px hole — half an upright tablet — between the question and the keys that answer it. The question is said again against the keys, and the two are doing different jobs: the row is the index, saying where you are and what you will be able to go back and fix; the line above the rule is the question, in the same glance as the thumb.',
-      });
-
-      await type('Chidii');
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 1 of 4',
-        step: 'child-first (typed)',
-        title: 'Capitals, and a key to argue with them',
-        caption:
-          'The first letter is a capital without anybody asking, and so is the letter after every space, hyphen and apostrophe — the boundaries a name actually has, which is what makes Anne-Marie and O\'Brien come out right on their own. But no rule short of a dictionary gets McDonald and van der Berg too, so the shift key is there beside them: it cycles off, on and locked the way every phone does, and the letters wear the state so a key shows exactly what it will produce. The doubled letter here is deliberate: it is the typo the repair five frames from now goes back for.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 2 of 4',
-        step: 'child-last',
-        title: "Child's last name, with nothing to carry",
-        caption:
-          'The first child of a new family is the one time this box opens empty — there is no previous child to borrow a surname from, and the kiosk does not know the family yet. Every later surname in this run arrives prefilled. An identical-looking screen that behaves differently is worth seeing twice.',
-      });
-
-      await type(SURNAME);
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 2 of 4',
-        step: 'child-last (typed)',
-        title: 'A surname nobody can spell for them',
-        caption:
-          'Twelve keystrokes on glass, and the only check on them is a parent reading the readout above the keys. This is the screen where a typo becomes a roster row, a sticker and a record in the church\'s database — and the readout is deliberately the same object the search screen taught them to read two taps ago.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 3 of 4',
-        step: 'child-grade',
-        title: 'Fifteen chips, four across',
-        caption:
-          'Four across rather than three is what puts fifteen chips in four rows instead of five — and four rows land in the keyboard\'s footprint to the pixel, so this question has the same console as every other and the rule above it does not move when the question changes. That is what the grade step gains: a **Next** and a readout it never had. A chip now selects rather than advancing, which costs a tap per child and buys a parent the sight of the year they picked before it reaches a sticker. Next stays dead until one is pressed, because the draft always holds a grade and "No grade" is an answer here rather than a default nobody chose.',
-      });
-
-      await press('4th grade', true);
-      await next();
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 4 of 4',
-        step: 'child-allergies',
-        title: 'Allergies, and the answer most families give',
-        caption:
-          'The fourth question, and it only exists when the church\'s own database takes full write-back — the same gate the retired phone form kept, because collecting a medical note into a screen that silently drops it is worse than never asking. The common answer is its own button rather than something typed into the box: a medical field with a keyboard under it and no visible way to say "nothing" collects "None" and "N/A" as though they were notes. **No allergies** is lit and **Next** is dead, because there is nothing yet to press Next with — which is also the answer to what a parent is meant to do with two buttons.',
-      });
-
-      await type('Peanuts EpiPen in bag');
-      await shoot({
-        flow: 'Your child',
-        state: 'Registering — question 4 of 4',
-        step: 'child-allergies (typed)',
-        title: 'A real note, and the buttons trade places',
-        caption:
-          'The minority answer. The field takes digits as well as letters — "Type 1 diabetes", "EpiPen 0.3" is legitimate medical text — and it takes no comma or full stop, because two more keys would change the keyboard\'s geometry on every screen including search. Note what auto-capitalisation does to a medical note: the rule that makes Anne-Marie right title-cases every word here, and flattens the capitals inside EpiPen while it is at it. And note the band above: one letter was enough for **Next** to take the colour and for **No allergies** to go quiet. Colour says which answer is being offered; neither button moves.',
-      });
-
-      /* ---- And you --------------------------------------------------------- */
-
-      await next();
-      await shoot({
-        flow: 'And you',
-        state: 'One child banked — adult, question 1 of 3',
-        step: 'guardian-first',
-        title: 'The child is answered, and it shows',
-        caption:
-          'The child\'s last question banks them and the wizard turns to the adult — and nothing about that arrives as a surprise, because the adult\'s three questions have been on the glass since the first keystroke. There used to be a screen in this gap ("Anybody else?", with **That\'s everyone** under it) and then a line standing in for it; a run named in full needs neither. What the list is doing now is the second job: the name typed forty seconds ago is right there to check, without pressing Back to reach it.',
-      });
-
-      await type('Ngozi');
-      await shoot({
-        flow: 'And you',
-        state: 'Adult — question 1 of 3',
-        step: 'guardian-first (typed)',
-        title: 'The list holds still while a name is typed',
-        caption:
-          'Nothing above the rule changes on a keystroke — the list is drawn from what has been committed, and a keystroke touches the buffer and the shift state and nothing else. It is memoised on exactly that, so the subtree does not re-render while somebody types. The same discipline the keyboard already keeps, and for the same reason.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'And you',
-        state: 'Adult — question 2 of 3',
-        step: 'guardian-last (carried)',
-        title: 'Your last name, borrowed from the child',
-        caption:
-          'Prefilled with the first child\'s surname, which is right far more often than it is wrong and is one Clear away when it is not — a step-parent, a different name, a family that does not share one. The prefill is silent: nothing on the screen says where those letters came from, so a parent who does share the name presses Next, and a parent who does not has to notice.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'And you',
-        state: 'Adult — question 3 of 3',
-        step: 'guardian-phone',
-        title: 'A dialer, for the one question that is a number',
-        caption:
-          'The QWERTY row can type digits, but picking ten targets out of forty-three on a tablet while a queue watches is asking for a mistake in the one field where a mistake is expensive: four of these digits become the family\'s key for every visit after this one. The line above says why it is being asked for while a parent decides whether to give it — and it is the only thing on this screen Tally will not keep. The number lives inside one call, long enough to build the family in the church\'s own database and to be reduced to four digits for the kiosk index.',
-      });
-
-      await type(PHONE.slice(0, 6));
-      await shoot({
-        flow: 'And you',
-        state: 'Adult — question 3 of 3',
-        step: 'guardian-phone (partial)',
-        title: 'Grouped as they are typed',
-        caption:
-          'Six digits in, and the readout is already punctuating them the way a phone number is read aloud. Next stays dead until there are ten: an incomplete number is refused on the glass rather than after a round trip.',
-      });
-
-      await type(PHONE.slice(6));
-      await shoot({
-        flow: 'And you',
-        state: 'Adult — question 3 of 3',
-        step: 'guardian-phone (complete)',
-        title: 'Ten digits',
-        caption:
-          'A number nobody could ring is refused here rather than after the round trip, and a repdigit — the thing somebody types to get past a field they do not want to answer — is refused too.',
-      });
-
-      /* ---- Fixing something ------------------------------------------- */
-
-      /*
-       * The repair Back could not give them. The row a parent wants is a banked
-       * child's, three screens behind, and Back un-banks its way there — so
-       * fixing one letter used to mean answering the whole run again forwards.
-       */
-      await tap(kiosk.locator('[data-testid="question-child-0-child-first"]').click());
-      await shoot({
-        flow: 'Fixing something',
-        state: 'A question reopened, mid-answer',
-        step: 'child-first (reopened)',
-        title: 'One tap, five screens back',
-        caption:
-          'A parent standing on the phone question sees the doubled letter in their child\'s name. The row is a button: tapping it opens that question with its own answer already in the box and the keyboard lower-case, because the next press is a correction to a word that is there rather than the start of a new one. The child it belongs to is banked and five screens behind, and none of that is a parent\'s problem any more. Only answered questions are buttons — jumping forward to one nobody has reached would leave a hole in the run and a blank on the confirm. The phone row is marked "back to this" rather than lit: still unanswered, and where **Next** returns. The ten digits already typed travel with it, because a parent taps a row *while* answering something — that is when they notice — and coming back to an empty box would lose work they can see. Back here is "never mind", so a row tapped by accident costs nothing.',
-      });
-      await clear();
-      await type('Chidi');
-      await next();
-      await shoot({
-        flow: 'Fixing something',
-        state: 'Back where they were, with the digits intact',
-        step: 'guardian-phone (resumed)',
-        title: 'Put back, not walked back',
-        caption:
-          'Next commits the fix to the child it belongs to and returns straight to the question they were on, with their ten digits where they left them. The alternative — walking forward through everything between the typo and where they were — is five screens of re-confirming answers nobody changed, in front of a queue, to fix one letter.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'And you',
-        state: 'One child, ready to check in',
-        step: 'confirm',
-        title: 'Nothing above the rule has moved',
-        caption:
-          'The confirm keeps the run. Press **Next** on the phone question and the body does not change at all — same eleven rows, same order, same place — while the console below it changes completely. The confirm used to replace all of this with a receipt of the same facts in a different shape, at the one moment a parent is asked to check them, and its rows stopped being buttons exactly when repair was being asked for. Here every row is still a button. And there are two questions on this screen rather than one: the header asks whether the typing is right, over the rows that answer that by touch; **Anyone else to add?** sits on top of the two buttons that answer *it*. The commit names who it is about to check in, which the adult\'s row is deliberately not part of — a guardian never gets an attendance row, and "Check in everyone" said otherwise in front of the family it named.',
-      });
-
-      /* ---- Child 2, from the confirm --------------------------------------- */
-
-      await press(/Add another child/i);
-      await shoot({
-        flow: 'Child 2',
-        state: 'Second child — question 1 of 4',
-        step: 'child-first (child 2)',
-        title: 'Round two, from the top',
-        caption:
-          'The loop returns to exactly the screen the run opened on, with the header counting: "Child 2" rather than "Your child". The adult\'s three questions are not asked again — they have been answered, and this child\'s last question goes straight back to the confirm. Back from here abandons the half-typed child and returns to the confirm too, rather than closing a registration a parent has already answered seven questions for.',
-      });
-
-      await type('Ada');
-      await shoot({
-        flow: 'Child 2',
-        state: 'Second child — question 1 of 4',
-        step: 'child-first (child 2, typed)',
-        title: 'Three letters, same keyboard',
-        caption:
-          'Identical mechanics to the first child, photographed anyway: the repeats are the part of this flow most likely to be worth cutting, and a document that showed them once could not be used to argue about them.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'Child 2',
-        state: 'Second child — question 2 of 4',
-        step: 'child-last (carried)',
-        title: 'The surname, carried',
-        caption:
-          'The second child\'s last name arrives already typed, and the shift key is down rather than up — the next keystroke belongs mid-word, not at the start of one. This is the whole argument for a wizard over a form: the questions know what the family has already said, and a form cannot. It is still a full screen and a full tap for an answer the kiosk already has.',
-      });
-
-      await next();
-      await shoot({
-        flow: 'Child 2',
-        state: 'Second child — question 3 of 4',
-        step: 'child-grade (child 2)',
-        title: 'Grade again, with no memory',
-        caption:
-          'Fourteen chips a second time, opening on the same default as the first child rather than near the sibling just entered. Families arrive in bands — a four-year-old and a six-year-old, not a four-year-old and a fifteen-year-old — so whether this grid should lean on the answer above it is a real question this frame exists to ask.',
-      });
-
-      await press('2nd grade', true);
-      await next();
-      await shoot({
-        flow: 'Child 2',
-        state: 'Second child — question 4 of 4',
-        step: 'child-allergies (child 2)',
-        title: 'Allergies, asked again from scratch',
-        caption:
-          'Each child answers for themselves: the box opens empty on every entry to this step, so the second child is never silently answered by the first. Correct, and it is also the fourth screen in ninety seconds asking a parent about medicine. The next frame is one press away — **No allergies** answers and moves on rather than ticking something Next then has to collect.',
-      });
-
-      await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
-      await shoot({
-        flow: 'Child 2',
-        state: 'Two children, ready to check in',
-        step: 'confirm (two children)',
-        title: 'Both of them, and the button names them',
-        caption:
-          'Back at the confirm, one child heavier — and this is the second look at the first child\'s name, ten seconds after it was typed and again at the end. Every fact under its own label: "Adeyeminkx" beside **Last name** is easier to check than the same word run into a sentence, and the allergy note sits on the row that asked for it. The commit reads **Check in Chidi and Ada** rather than "Check in everyone", which named a set the kiosk does not act on: the adult below them is on this screen, is not checked in, and is now visibly not in the button either.',
-      });
-
-      /* ---- The write, and what it teaches -------------------------------- */
-
-      /*
-       * The spinner needs a slow call to exist at all.
-       *
-       * Against a warm emulator on a loopback the write comes back faster than
-       * the shutter can be raised, and the first attempt at this frame
-       * photographed the success screen wearing the spinner's caption. So the
-       * request is held for a second and a half in the page's own network
-       * layer: the call is real, the screen is real, and only the latency is
-       * arranged — which is the latency a cold function on a church's Wi-Fi
-       * has anyway. Left in place for the sibling submit below, for the same
-       * reason.
-       */
-      await kiosk.route('**/registerFamily', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
-        await route.continue();
-      });
-
-      await press(/^Check in Chidi and Ada$/);
-      await shoot(
-        {
-          flow: 'And you',
-          state: 'The call is in flight',
-          step: 'submitting',
-          title: 'One moment',
-          caption:
-            'Cancel goes invisible while the call is out, because a half-written family is worse than a slow one — but look at the other corner: **Back** is still there, and on this step `goBack` has no case, so it falls through to closing the whole flow. The write still lands; the family loses the screen that teaches them their four digits. Everything else here is absence: "Saving…" and a header, and no sense of how long, for a callable that writes children, a household and a check-in. This is the one frame in the document whose timing is arranged — the request is held for a second and a half so the screen exists long enough to photograph.',
-        },
-        500,
-      );
-      await expect(kiosk.getByText(/checked in\. Welcome!/)).toBeVisible({ timeout: 30_000 });
-      await shoot({
-        flow: 'And you',
-        state: 'On the roster, checked in',
-        step: 'success',
-        title: 'Next time, just type those four digits',
-        caption:
-          'Both children exist, both are checked in against tonight\'s gathering, and a sticker is coming out of the printer for each of them. The sentence under the tick is the part that matters next week: the last four digits of the number they just gave are the search this kiosk already had, and this is where the family learns it. That is the entire handoff — no account, no password, no app. It clears itself after eight seconds.',
-      });
-
-      await press(/^Done$/);
-      await type(PHONE.slice(-4));
-      await shoot({
-        flow: 'And you',
-        state: 'Findable',
-        step: 'search (by last 4)',
-        title: 'And it works immediately',
-        caption:
-          'Typed on the same screen, seconds later. Nothing was refetched: the answer came back with the registration and went straight into what this kiosk holds. It survives the nightly rebuild too — that job reads the church\'s backends, which may not know this number for hours or, on a deployment that cannot write households, ever, so a registration keeps its digits in an overlay the rebuild folds in rather than overwrites.',
-      });
-
-      /* ---- The second child ---------------------------------------------- */
-
-      /*
-       * The journey the first design treated as impossible. The parent is
-       * standing at the confirm screen for the child the kiosk already has, and
-       * the kiosk already knows which family this is — so the sibling costs the
-       * child's own questions and nothing else, and joins the household
-       * upstream rather than founding a second one for the same family.
-       *
-       * A seeded family rather than the one above, and `SIBLING` says why.
-       */
-      await clear();
-      await type(SIB.digits);
-      const rows = kiosk.getByRole('button', { name: new RegExp(SIB.surname, 'i') });
-      await expect(rows.first()).toBeVisible({ timeout: 15_000 });
-      /*
-       * The first of this household's children who is not already on the
-       * register. A child the seed has ticked opens a pickup screen, which
-       * asks a different question and carries no sibling offer, so the row is
-       * backed out of and the next one tried.
-       */
-      let standing = '';
-      const rowCount = await rows.count();
-      for (let index = 0; index < rowCount; index += 1) {
-        const row = rows.nth(index);
-        const label = ((await row.textContent()) ?? '').trim();
-        await row.click();
-        taps += 1;
-        const landed = await kiosk
-          .getByRole('button', { name: /Another child/i })
-          .waitFor({ state: 'visible', timeout: 5_000 })
-          .then(() => true)
-          .catch(() => false);
-        if (landed) {
-          standing = label;
-          break;
-        }
-        await press(/Back/);
+      const landed = await kiosk
+        .getByRole('button', { name: /Another child/i })
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (landed) {
+        standing = label;
+        break;
       }
-      if (standing === '') {
-        throw new Error(
-          `No child of the ${SIB.surname} household is on tonight's roster and unticked, ` +
-            'so there is no check-in for the sibling offer to sit under.',
-        );
-      }
-      await shoot({
-        flow: 'The second child',
-        state: 'On the confirm screen',
-        step: 'confirm (check-in)',
-        title: 'The other door, in the same slot',
-        caption:
-          'A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.',
-      });
-
-      /*
-       * The link asks the ambiguous question first, on purpose. "A brother or
-       * sister" is far more often one the roster already has and four digits
-       * simply failed to associate than one nobody has met — so the search
-       * comes first, and registering is the answer standing underneath it.
-       */
-      await press(/Another child/i);
-      await shoot({
-        flow: 'The second child',
-        state: 'Searching the roster first',
-        step: 'sibling search',
-        title: 'The cheaper answer, offered first',
-        caption:
-          'Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family\'s own rows greyed and inert so nobody taps a child twice, and keeps "add a new child" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.',
-      });
-
-      await press(/Not on the list\? Add a new child/i);
-      await shoot({
-        flow: 'The second child',
-        state: 'Sibling — question 1 of 4',
-        step: 'child-first (sibling mode)',
-        title: '"Another child", not "their brother"',
-        caption:
-          'The same first question, under a header that refuses to claim a relationship: the kiosk inferred kinship from four phone digits, and this wizard is reached from the screen that exists for everyone that inference is wrong about — a cousin, a neighbour\'s boy, a child on a different number. "Another child" is the only relationship it can actually vouch for: they arrived together. And no count under the field, because there is no adult section coming — the last of this child\'s questions goes straight to the confirm.',
-      });
-
-      await type('Emeka');
-      await next();
-      await shoot({
-        flow: 'The second child',
-        state: 'Sibling — question 2 of 4',
-        step: 'child-last (sibling mode, empty)',
-        title: 'The surname it does not carry',
-        caption:
-          'Empty — and this is the frame that shows why every step deserves a photograph. The prefill offers the surname of the previous child *in this run*, and a sibling run has none: the family being joined is on the confirm screen behind the wizard, not in the draft. The kiosk knows which household this is well enough to file the child into it, and still asks a parent to type a surname it is holding.',
-      });
-
-      await type(SIB.surname);
-      await next();
-      await shoot({
-        flow: 'The second child',
-        state: 'Sibling — question 3 of 4',
-        step: 'child-grade (sibling mode)',
-        title: 'Grade, unchanged by any of it',
-        caption:
-          'The same fourteen chips, opening on the same default, for a child whose siblings the kiosk has on screen. Nothing about the family it is joining narrows the grid.',
-      });
-
-      await press('Kindergarten', true);
-      await next();
-      await shoot({
-        flow: 'The second child',
-        state: 'Sibling — question 4 of 4',
-        step: 'child-allergies (sibling mode)',
-        title: 'Allergies, for the joining child',
-        caption:
-          'Asked here too, and on the same terms: the note goes to the reviewer and then upstream, and the kiosk keeps a marker rather than the text.',
-      });
-
-      await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
-      await shoot({
-        flow: 'The second child',
-        state: 'One child, no adult',
-        step: 'confirm (sibling mode)',
-        title: 'Joining the family that exists',
-        caption:
-          'No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. Four questions, then this. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.',
-      });
-
-      await press(/^Check in Emeka$/);
-      await shoot(
-        {
-          flow: 'The second child',
-          state: 'The call is in flight',
-          step: 'submitting (sibling mode)',
-          title: 'One moment, again',
-          caption:
-            'The same spinner, at the end of a run a third as long, and held the same way. What a family waits on here is identical to what the longer run waits on, which is a point in the sibling path\'s favour and an argument about the other one.',
-        },
-        500,
-      );
-      await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
-      await shoot({
-        flow: 'The second child',
-        state: 'Checked in, held for review',
-        step: 'success (sibling mode)',
-        title: 'Recorded, not decided',
-        caption:
-          'Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides. Note what this screen does *not* say: there is no four-digit line here, because a sibling run never asked for a number.',
-      });
-
-      /* ---- The edges ------------------------------------------------------ */
-
-      /*
-       * Six children on one confirm, never submitted — `CROWD` says why. The
-       * cap and the crowded list used to be two screens; with the fork gone
-       * they are the same screen, which is one of the plainer arguments for
-       * the move.
-       */
-      await press(/^Done$/);
-      await clear();
-      await press(/Register your child/i);
-      for (const [index, name] of CROWD.entries()) {
-        if (index > 0) await press(/Add another child/i);
-        await type(name);
-        await next();
-        if (index === 0) await type(`Nwosu${RUN}`);
-        await next();
-        await press('No grade', true);
-        await next();
-        await press(/^No allergies$/);
-        if (index === 0) {
-          // The adult, once, before the loop can return to the confirm.
-          await type('Chinelo');
-          await next();
-          await next();
-          await type('5550179911');
-          await next();
-        }
-      }
-      await shoot({
-        flow: 'The edges',
-        state: 'Six children — the cap',
-        step: 'confirm (at MAX_CHILDREN)',
-        title: 'Six rows, and the offer goes dead',
-        caption:
-          'Six is the wizard\'s cap and the server\'s. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. Past two the commit counts rather than lists, because six names would not fit a button. This is also the confirm holding as much as it ever has to: twenty-seven rows in a region that shows about fifteen, so it scrolls — which the receipt it replaced could not do at all. Whether the parent of six can check six children here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.',
-      });
-      await press(/^Cancel$/);
-
-    } finally {
-      await context.close();
+      await press(/Back/);
     }
+    if (standing === '') {
+      throw new Error(
+        `No child of the ${SIB.surname} household is on tonight's roster and unticked, ` +
+          'so there is no check-in for the sibling offer to sit under.',
+      );
+    }
+    await shoot({
+      flow: 'The second child',
+      state: 'On the confirm screen',
+      step: 'confirm (check-in)',
+      title: 'The other door, in the same slot',
+      caption:
+        'A parent whose next child is finally old enough starts here, not at the front door: they have already found their family by phone and tapped a name. The offer sits below the main action in the smaller weight, because it is the rarer of the two things somebody came to this screen to do — and it is on this screen at all because this is where the kiosk knows which family is standing in front of it.',
+    });
+
+    /*
+     * The link asks the ambiguous question first, on purpose. "A brother or
+     * sister" is far more often one the roster already has and four digits
+     * simply failed to associate than one nobody has met — so the search
+     * comes first, and registering is the answer standing underneath it.
+     */
+    await press(/Another child/i);
+    await shoot({
+      flow: 'The second child',
+      state: 'Searching the roster first',
+      step: 'sibling search',
+      title: 'The cheaper answer, offered first',
+      caption:
+        'Both readings of that link are real journeys. The common one is a sibling already on the roster whom the phone search did not surface — the church has them, the family folk simply do not line up — and finding them costs nothing and creates nothing. So this screen searches by name, shows the family\'s own rows greyed and inert so nobody taps a child twice, and keeps "add a new child" as a standing offer rather than the destination. A registration is the expensive answer and it is one tap further away.',
+    });
+
+    await press(/Not on the list\? Add a new child/i);
+    await shoot({
+      flow: 'The second child',
+      state: 'Sibling — question 1 of 4',
+      step: 'child-first (sibling mode)',
+      title: '"Another child", not "their brother"',
+      caption:
+        'The same first question, under a header that refuses to claim a relationship: the kiosk inferred kinship from four phone digits, and this wizard is reached from the screen that exists for everyone that inference is wrong about — a cousin, a neighbour\'s boy, a child on a different number. "Another child" is the only relationship it can actually vouch for: they arrived together. And no count under the field, because there is no adult section coming — the last of this child\'s questions goes straight to the confirm.',
+    });
+
+    await type('Emeka');
+    await next();
+    await shoot({
+      flow: 'The second child',
+      state: 'Sibling — question 2 of 4',
+      step: 'child-last (sibling mode, empty)',
+      title: 'The surname it does not carry',
+      caption:
+        'Empty — and this is the frame that shows why every step deserves a photograph. The prefill offers the surname of the previous child *in this run*, and a sibling run has none: the family being joined is on the confirm screen behind the wizard, not in the draft. The kiosk knows which household this is well enough to file the child into it, and still asks a parent to type a surname it is holding.',
+    });
+
+    await type(SIB.surname);
+    await next();
+    await shoot({
+      flow: 'The second child',
+      state: 'Sibling — question 3 of 4',
+      step: 'child-grade (sibling mode)',
+      title: 'Grade, unchanged by any of it',
+      caption:
+        'The same fourteen chips, opening on the same default, for a child whose siblings the kiosk has on screen. Nothing about the family it is joining narrows the grid.',
+    });
+
+    await press('Kindergarten', true);
+    await next();
+    await shoot({
+      flow: 'The second child',
+      state: 'Sibling — question 4 of 4',
+      step: 'child-allergies (sibling mode)',
+      title: 'Allergies, for the joining child',
+      caption:
+        'Asked here too, and on the same terms: the note goes to the reviewer and then upstream, and the kiosk keeps a marker rather than the text.',
+    });
+
+    await tap(kiosk.getByRole('button', { name: /^No allergies$/ }).click());
+    await shoot({
+      flow: 'The second child',
+      state: 'One child, no adult',
+      step: 'confirm (sibling mode)',
+      title: 'Joining the family that exists',
+      caption:
+        'No name, no phone number, no second household invented — the confirm names the siblings this child is being added to and that is the whole of it. Four questions, then this. The kiosk resolved the family from the four digits it searched with; the server re-verifies every one of those ids before it believes any of them, and at approval the household comes from an existing sibling rather than from the children in the run. That last part is the fix for a real bug: a family gaining a second child used to gain a second household, with the first child left behind in the original and invisible from the new one.',
+    });
+
+    await press(/^Check in Emeka$/);
+    await shoot(
+      {
+        flow: 'The second child',
+        state: 'The call is in flight',
+        step: 'submitting (sibling mode)',
+        title: 'One moment, again',
+        caption:
+          'The same spinner, at the end of a run a third as long, and held the same way. What a family waits on here is identical to what the longer run waits on, which is a point in the sibling path\'s favour and an argument about the other one.',
+      },
+      500,
+    );
+    await expect(kiosk.getByText(/is checked in\. Welcome!/i)).toBeVisible({ timeout: 30_000 });
+    await shoot({
+      flow: 'The second child',
+      state: 'Checked in, held for review',
+      step: 'success (sibling mode)',
+      title: 'Recorded, not decided',
+      caption:
+        'Nothing reached Planning Center. Every child a family registers is written held, and the hold is the only thing that gates the push — both backends, both sweeps, the on-create trigger and the re-create repair all consult it. What happens next happens on a weekday, on a core-team screen, with the form as the family typed it beside any roster row that shares a name: approve, merge, or discard. The door records; a person decides. Note what this screen does *not* say: there is no four-digit line here, because a sibling run never asked for a number.',
+    });
+
+    /* ---- The edges ------------------------------------------------------ */
+
+    /*
+     * Six children on one confirm, never submitted — `CROWD` says why. The
+     * cap and the crowded list used to be two screens; with the fork gone
+     * they are the same screen, which is one of the plainer arguments for
+     * the move.
+     */
+    await press(/^Done$/);
+    await clear();
+    await press(/Register your child/i);
+    for (const [index, name] of CROWD.entries()) {
+      if (index > 0) await press(/Add another child/i);
+      await type(name);
+      await next();
+      if (index === 0) await type(`Nwosu${RUN}`);
+      await next();
+      await press('No grade', true);
+      await next();
+      await press(/^No allergies$/);
+      if (index === 0) {
+        // The adult, once, before the loop can return to the confirm.
+        await type('Chinelo');
+        await next();
+        await next();
+        await type('5550179911');
+        await next();
+      }
+    }
+    await shoot({
+      flow: 'The edges',
+      state: 'Six children — the cap',
+      step: 'confirm (at MAX_CHILDREN)',
+      title: 'Six rows, and the offer goes dead',
+      caption:
+        'Six is the wizard\'s cap and the server\'s. **Add another child** goes dead and a line under the buttons explains it — the first time in the flow a parent is told no. A family of seven is rare and real, and what happens to them is a sentence pointing at a leader. Past two the commit counts rather than lists, because six names would not fit a button. This is also the confirm holding as much as it ever has to: twenty-seven rows in a region that shows about fifteen, so it scrolls — which the receipt it replaced could not do at all. Whether the parent of six can check six children here, on the one screen where checking is the entire job, is the question. This run was cancelled rather than submitted; nothing on it reached the roster.',
+    });
+    await press(/^Cancel$/);
+
+  } finally {
+    await context.close();
   }
 
   await writeFile(

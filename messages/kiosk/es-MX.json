@@ -112,7 +112,9 @@
     "space": "Espacio",
     "apostrophe": "Apóstrofo",
     "hyphen": "Guion",
-    "staffPrint": "Personal · imprimir etiquetas"
+    "staffPrint": "Personal · imprimir etiquetas",
+    "turnUprightTitle": "Gire la pantalla a vertical",
+    "turnUprightBody": "Para registrar la entrada, la pantalla tiene que estar en vertical. Si no puede girarla, busque a un líder."
   },
   "Grades": {
     "preK": "Prekínder",

@@ -96,7 +96,7 @@ export function LanguagesScreen({
        wrapper. Everything here fits every glass this runs on, but a
        translation is free to be longer than the English. */
     <div className="h-full overflow-y-auto overscroll-contain scroll-touch">
-      <div className="flex min-h-full flex-col items-center justify-center gap-6 p-8 text-center kiosk:gap-8">
+      <div className="flex min-h-full flex-col items-center justify-center gap-6 p-8 text-center tall:gap-8">
         <div className="flex flex-col gap-2">
           <div className="text-4xl font-semibold text-ink-100">{t('languages')}</div>
           {/*
@@ -113,16 +113,16 @@ export function LanguagesScreen({
             * under the hint that governs the control, because this is the
             * line you read once and that one is the instruction.
             */}
-          <p className="mx-auto max-w-xl text-lg text-ink-500 kiosk:text-2xl">
+          <p className="mx-auto max-w-xl text-lg text-ink-500 tall:text-2xl">
             {t('languagesAbout')}
           </p>
         </div>
 
-        <div className="flex w-full max-w-md flex-col items-center gap-3 kiosk:max-w-xl">
+        <div className="flex w-full max-w-md flex-col items-center gap-3 tall:max-w-xl">
           <LanguagePins pins={pins} onPins={onPins} size="kiosk" />
         </div>
 
-        <div className="flex w-full max-w-md flex-col kiosk:max-w-xl">
+        <div className="flex w-full max-w-md flex-col tall:max-w-xl">
           {/*
             * The delete, quiet and first — see the note at the top of the
             * file. Absent while there is nothing to take off: a control that
@@ -155,7 +155,7 @@ export function LanguagesScreen({
                   onEnglishOnly();
                 })
               : {})}
-            className={`mb-8 flex h-14 w-full max-w-xs items-center justify-center self-center rounded-xl bg-ink-800 px-5 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:text-2xl tall:h-20 ${
+            className={`mb-8 flex h-14 w-full max-w-xs items-center justify-center self-center rounded-xl bg-ink-800 px-5 text-lg font-semibold text-ink-200 active:bg-ink-700 tall:text-2xl tall:h-20 ${
               pins.length > 0 ? '' : 'invisible'
             }`}
           >
@@ -176,7 +176,7 @@ export function LanguagesScreen({
               haptic();
               onDone();
             })}
-            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:text-2xl tall:h-20"
+            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 tall:text-2xl tall:h-20"
           >
             {t('doneBackToCheckIn')}
           </button>

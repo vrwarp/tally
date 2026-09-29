@@ -36,11 +36,21 @@ const HOLD_DELAY_MS = 200;
 const HOLD_SLACK_MS = 700;
 
 /**
+ * A lobby tablet stood on end — the only way the kiosk stands.
+ *
+ * Wider than tall, the kiosk shows nothing but a request to turn the screen
+ * upright (src/kiosk/components/PortraitOnly.tsx), so a spec that opened it
+ * at a desktop project's landscape default would be testing that screen.
+ */
+export const KIOSK_VIEWPORT = { width: 800, height: 1280 } as const;
+
+/**
  * Opens the kiosk on its own device. Caller closes the context.
  *
- * `viewport` is for the walkthrough, which photographs the same tour on a
- * tablet lying in a stand and standing in one. A kiosk is whatever shape the
- * shelf it sits on wants, and the flow has to survive both.
+ * On the phone projects the device keeps the phone's own portrait viewport, so
+ * the kiosk's tightest shape stays covered. Where a project's default is wider
+ * than tall — the desktop ones — the device becomes `KIOSK_VIEWPORT` instead.
+ * `viewport` overrides both, for the walkthroughs, which name their shape.
  */
 export async function openKiosk(
   browser: Browser,
@@ -50,6 +60,10 @@ export async function openKiosk(
     options.viewport ? { viewport: options.viewport } : {},
   );
   const page = await context.newPage();
+  const size = page.viewportSize();
+  if (!options.viewport && size && size.width > size.height) {
+    await page.setViewportSize(KIOSK_VIEWPORT);
+  }
   await page.goto(KIOSK_PATH);
   return { context, page };
 }

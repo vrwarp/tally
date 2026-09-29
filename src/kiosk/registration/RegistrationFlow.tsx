@@ -601,7 +601,7 @@ export function RegistrationFlow({
               */}
             {state.step !== 'confirm' && (
               <div className="px-6 pt-3 pb-1">
-                <div className="mx-auto w-full max-w-2xl text-center text-2xl font-semibold text-ink-100 kiosk:text-3xl">
+                <div className="mx-auto w-full max-w-2xl text-center text-2xl font-semibold text-ink-100 tall:text-3xl">
                   {questionFor(t, state)}
                 </div>
               </div>
@@ -688,8 +688,7 @@ export function RegistrationFlow({
             * The band is drawn on the body's own measure — `max-w-2xl` inside
             * `px-6`, the pair the question list is laid out on — rather than
             * on the width of the glass. A button wider than the boxes it
-            * commits reads as belonging to something else, and on a 1280-wide
-            * kiosk it ran three hundred pixels past them on either side.
+            * commits reads as belonging to something else.
             *
             * The keyboard below it is the exception and stays full-bleed: it
             * is not part of the run, it is the thing under the thumbs.
@@ -769,7 +768,7 @@ export function RegistrationFlow({
               {readoutFor(questionStrings, state) && (
                 <span
                   data-testid="readout"
-                  className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl"
+                  className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl"
                 >
                   {readoutFor(questionStrings, state)}
                 </span>
@@ -868,7 +867,7 @@ function Meter({
           }}
         />
       </div>
-      <p className="text-center text-lg text-ink-400 kiosk:text-xl">{label}</p>
+      <p className="text-center text-lg text-ink-400 tall:text-xl">{label}</p>
     </div>
   );
 }
@@ -914,13 +913,13 @@ function SavingScreen({
           <div
             key={index}
             data-testid="saving-child"
-            className="flex h-14 items-center justify-between gap-3 rounded-xl bg-ink-900 px-5 kiosk:h-16"
+            className="flex h-14 items-center justify-between gap-3 rounded-xl bg-ink-900 px-5 tall:h-16"
           >
-            <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+            <span className="truncate text-lg font-semibold text-ink-100 tall:text-xl">
               {`${child.firstName} ${child.lastName}`.trim()}
             </span>
             {child.grade !== null && (
-              <span className="shrink-0 text-base text-ink-500 kiosk:text-lg">
+              <span className="shrink-0 text-base text-ink-500 tall:text-lg">
                 {gradeDescription(grades, child.grade)}
               </span>
             )}
@@ -1068,8 +1067,8 @@ function Header({
         {t('back')}
       </button>
       <div className="min-w-0 pt-1 text-center">
-        <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">{title}</div>
-        <div className="truncate text-base text-ink-500 kiosk:text-lg">{subtitle}</div>
+        <div className="text-2xl font-semibold text-balance text-ink-100 tall:text-3xl">{title}</div>
+        <div className="truncate text-base text-ink-500 tall:text-lg">{subtitle}</div>
       </div>
       {/* The same ink as Back. They are peers — two ways out of the same flow —
           and a step apart made Cancel read as the less available of the two,
@@ -1130,7 +1129,7 @@ const QuestionStack = memo(function QuestionStack({
     <>
       {sections.map((section) => (
         <div key={section.title} className="flex flex-col gap-1.5">
-          <div className="px-1 pt-1 text-sm tracking-[0.14em] text-ink-500 uppercase kiosk:text-base">
+          <div className="px-1 pt-1 text-sm tracking-[0.14em] text-ink-500 uppercase tall:text-base">
             {section.title}
           </div>
           {section.rows.map((row) => (
@@ -1165,7 +1164,7 @@ function QuestionRowView({
    * into view arrives with "YOUR CHILD" or "AND YOU" above it rather than flush
    * against a cut edge, which is the same row with no answer to "whose?".
    */
-  const shell = `flex h-14 w-full scroll-mt-10 items-center justify-between gap-3 rounded-xl px-5 text-left kiosk:h-16 ${
+  const shell = `flex h-14 w-full scroll-mt-10 items-center justify-between gap-3 rounded-xl px-5 text-left tall:h-16 ${
     row.state === 'now'
       ? 'bg-brand-600/15 ring-2 ring-brand-500/50'
       : row.state === 'done'
@@ -1177,7 +1176,7 @@ function QuestionRowView({
   const body = (
     <>
       <span
-        className={`truncate text-base kiosk:text-lg ${
+        className={`truncate text-base tall:text-lg ${
           row.state === 'now'
             ? 'font-semibold text-brand-300'
             : row.state === 'done'
@@ -1188,14 +1187,14 @@ function QuestionRowView({
         {row.label}
       </span>
       {row.answer !== '' && (
-        <span className="truncate text-lg font-semibold text-ink-100 kiosk:text-xl">
+        <span className="truncate text-lg font-semibold text-ink-100 tall:text-xl">
           {row.answer}
         </span>
       )}
       {/* Where Next puts them back, said on the row itself rather than in a
           sentence somewhere else on the screen. */}
       {row.resumeHere && (
-        <span className="shrink-0 text-sm tracking-[0.08em] text-ink-500 uppercase kiosk:text-base">
+        <span className="shrink-0 text-sm tracking-[0.08em] text-ink-500 uppercase tall:text-base">
           {t('backToThis')}
         </span>
       )}
@@ -1249,7 +1248,7 @@ function GradeChips({
 }) {
   const grades = useGrades();
   return (
-    <div className="mx-auto grid w-full grid-cols-4 gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:px-0">
+    <div className="mx-auto grid w-full grid-cols-4 gap-1.5 p-2 pb-[max(0.5rem,var(--spacing-safe-bottom))]">
       {GRADES.map((year) => (
         <GradeChip
           key={year}

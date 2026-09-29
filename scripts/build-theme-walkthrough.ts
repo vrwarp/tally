@@ -299,8 +299,10 @@ h2 {
 .frames { display: flex; flex-direction: column; gap: clamp(2.5rem, 5vw, 3.5rem); margin-top: 2rem; }
 
 figure { margin: 0; display: flex; flex-direction: column; gap: 0.9rem; }
+/* Capped by height as well as width: the kiosk frames stand on end, and at
+   the page's full width one of them would be taller than any screen. */
 figure img {
-  display: block; width: 100%; height: auto;
+  display: block; width: auto; max-width: 100%; height: auto; max-height: 85vh;
   border: 1px solid var(--edge); border-radius: 10px;
   background: var(--card); box-shadow: var(--shadow);
 }

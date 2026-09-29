@@ -102,9 +102,9 @@ const LOCALE_NAMES: Record<LocaleId, string> = {
  *
  * The two surfaces get different widths because they are different objects: a
  * phone frame is 412 CSS px of a screen somebody holds, and three of them sit
- * across a page comfortably at 380; a kiosk frame is a 1280px tablet, and three
- * of *those* across would be unreadable, so they get 620 and the row wraps to
- * two rows on a narrow page.
+ * across a page comfortably at 380; a kiosk frame is an 800px tablet stood on
+ * end, which reads at 460 and still sets three across a wide page, wrapping to
+ * two rows on a narrow one.
  */
 const PROGRAM = `
 import glob, os
@@ -116,8 +116,8 @@ for path in sorted(glob.glob("${SHOTS}/*.png")):
     name = os.path.basename(path)
     image = Image.open(path).convert("RGB")
     width, height = image.size
-    # A kiosk frame is 1280 wide; anything narrower came off a phone.
-    target = 620 if width >= 1000 else 380
+    # A kiosk frame is 800 wide; anything narrower came off a phone.
+    target = 460 if width >= 700 else 380
     if width > target:
         image = image.resize((target, round(height * target / width)), Image.LANCZOS)
     image.save(os.path.join("${WEB}", name[:-4] + ".jpg"), "JPEG",
@@ -237,7 +237,7 @@ for (const group of groups) {
   }
   markdown.push(`### ${group.title}\n`);
   if (group.caption) markdown.push(`${group.caption}\n`);
-  const width = group.surface === 'kiosk' ? 620 : 228;
+  const width = group.surface === 'kiosk' ? 240 : 228;
   for (const shot of group.shots) {
     const label = `${shot.title} — ${LOCALE_NAMES[shot.locale]}`;
     markdown.push(
@@ -323,7 +323,7 @@ figure img {
   border: 1px solid var(--rule); background: var(--card);
 }
 .row.app figure { width: 264px; }
-.row.kiosk figure { width: 540px; }
+.row.kiosk figure { width: 300px; }
 figcaption {
   margin-top: 9px; font-size: 0.83rem; color: var(--muted);
   display: flex; align-items: baseline; gap: 8px;

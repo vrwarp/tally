@@ -462,7 +462,7 @@ export function ConfirmScreen({
                  * implement, so silence is all they got.
                  */
                 strayHint={t('liftThenHold')}
-                className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 kiosk:px-8 kiosk:py-5 kiosk:text-xl"
+                className="rounded-xl bg-ink-800 px-6 py-4 text-lg font-semibold text-ink-200 active:bg-ink-700 tall:px-8 tall:py-5 tall:text-xl"
               >
                 {t('holdToPrint')}
               </HoldButton>
@@ -473,7 +473,7 @@ export function ConfirmScreen({
                * badge was on the floor of the hall had no way of knowing a
                * second copy was possible at all.
                */
-              <div className="text-base text-balance text-ink-400 kiosk:text-lg">
+              <div className="text-base text-balance text-ink-400 tall:text-lg">
                 {t('tagsFromDesk')}
               </div>
             ) : (
@@ -492,10 +492,10 @@ export function ConfirmScreen({
                * "sent", because the kiosk only knows it queued the job.
                */
               <div className="w-full">
-                <div className="text-lg font-semibold text-brand-300 kiosk:text-xl">
+                <div className="text-lg font-semibold text-brand-300 tall:text-xl">
                   {t('tagSentFor', { name: student.firstName })}
                 </div>
-                <div className="pt-2 text-base text-ink-400 kiosk:text-lg">
+                <div className="pt-2 text-base text-ink-400 tall:text-lg">
                   {t('forAnotherAsk')}
                 </div>
               </div>

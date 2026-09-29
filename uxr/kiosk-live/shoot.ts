@@ -47,7 +47,6 @@ const executablePath =
 const VIEWPORTS = {
   phone: { width: 390, height: 844, scale: 2 },
   kiosktall: { width: 800, height: 1280, scale: 1 },
-  kioskwide: { width: 1280, height: 800, scale: 1 },
 } as const;
 
 type ViewportName = keyof typeof VIEWPORTS;
@@ -115,13 +114,13 @@ const SCENES: {
    */
   drive?: readonly string[];
 }[] = [
-  { id: 'search-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'search-idle', query: '', views: ['phone', 'kiosktall'] },
   /*
    * The same screen wearing the gathering's icon — and the plain one above it
    * stays, because an icon is something a leader opts into and the header
    * without one is still the ordinary evening.
    */
-  { id: 'search-idle-icon', query: 'icon=groups', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'search-idle-icon', query: 'icon=groups', views: ['phone', 'kiosktall'] },
   { id: 'search-idle-pickup', query: 'pickup=1', views: ['phone', 'kiosktall'] },
   {
     id: 'search-idle-longtitle',
@@ -141,19 +140,12 @@ const SCENES: {
   {
     id: 'search-typed-icon',
     query: 'buffer=Alva&present=2&icon=groups',
-    views: ['phone', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
   {
     id: 'search-typed',
     query: 'buffer=Alva&present=2',
-    /*
-     * `kioskwide` is here because it was not, and a change to how the list
-     * wraps shipped unlooked-at: the landscape kiosk was only ever shot idle,
-     * so the round that gave it two columns had no frame with rows in it and
-     * both critics had to render one themselves. A state list that omits the
-     * state a change is about is worse than a short one.
-     */
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
   {
     /*
@@ -164,12 +156,12 @@ const SCENES: {
      */
     id: 'search-capped',
     query: 'buffer=Al',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
   {
     id: 'search-typed-scrolled',
     query: 'buffer=Alva&present=2',
-    views: ['phone', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     scrollToEnd: true,
   },
   {
@@ -184,10 +176,10 @@ const SCENES: {
      */
     id: 'search-longname',
     query: 'buffer=Alva&present=2&longname=1',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
-  { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'register-first', query: 'screen=register', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'search-nomatch', query: 'buffer=Zzz&nomatch=1', views: ['phone', 'kiosktall'] },
+  { id: 'register-first', query: 'screen=register', views: ['phone', 'kiosktall'] },
   {
     id: 'register-typing',
     query: 'screen=register',
@@ -197,7 +189,7 @@ const SCENES: {
   {
     id: 'register-grade',
     query: 'screen=register',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['R', 'O', 'Next', 'F', 'O', 'X', 'Next'],
   },
   /*
@@ -206,7 +198,7 @@ const SCENES: {
    * through choosing), and none — which has to come out as the list that
    * shipped, with no empty column down its left edge.
    */
-  { id: 'chooser-icons', query: 'screen=chooser', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'chooser-icons', query: 'screen=chooser', views: ['phone', 'kiosktall'] },
   { id: 'chooser-some', query: 'screen=chooser&icons=some', views: ['phone', 'kiosktall'] },
   { id: 'chooser-none', query: 'screen=chooser&icons=none', views: ['phone'] },
   /*
@@ -245,18 +237,18 @@ const SCENES: {
   {
     id: 'photo-idle',
     query: 'photo=1&icon=groups',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     settle: 1900,
   },
   {
     id: 'photo-typed',
     query: 'photo=1&buffer=Alva&present=2&icon=groups',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
   },
   {
     id: 'photo-light',
     query: 'photo=1&ground=light&icon=groups',
-    views: ['kiosktall', 'kioskwide'],
+    views: ['kiosktall'],
     settle: 1900,
   },
   { id: 'photo-staff', query: 'screen=staff&backdrop=1&icon=groups', views: ['phone', 'kiosktall'] },
@@ -278,13 +270,13 @@ const SCENES: {
    * to be answered on. `labels=some` is the church the question is about: one
    * gathering on the list prints and its neighbour does not.
    */
-  { id: 'setup-chooser', query: 'screen=chooser&labels=some', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-chooser', query: 'screen=chooser&labels=some', views: ['phone', 'kiosktall'] },
   {
     /* The row picked and the blue button live — the frame a volunteer is
        looking at when they decide whether the printer row above it is for them. */
     id: 'setup-chooser-selected',
     query: 'screen=chooser&labels=some',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['Wednesday Night'],
   },
   { id: 'setup-chooser-ready', query: 'screen=chooser&labels=some&printer=ready', views: ['phone', 'kiosktall'] },
@@ -313,13 +305,13 @@ const SCENES: {
   {
     id: 'setup-chooser-picked-prints',
     query: 'screen=chooser&labels=some',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['Kids Club'],
   },
   {
     id: 'setup-chooser-picked-prints-ready',
     query: 'screen=chooser&labels=some&printer=ready',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['Kids Club'],
   },
   {
@@ -396,8 +388,8 @@ const SCENES: {
   { id: 'owed-printer', query: 'screen=printer&from=staff&printer=ready&owed=6', views: ['kiosktall'] },
   { id: 'owed-printer-sent', query: 'screen=printer&from=staff&printer=ready&owed=6&sent=1', views: ['kiosktall'] },
   /* The printer screen as setup reaches it: no evening, no reprint door. */
-  { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall', 'kioskwide'] },
-  { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'setup-printer', query: 'screen=printer', views: ['phone', 'kiosktall'] },
+  { id: 'setup-printer-ready', query: 'screen=printer&printer=ready', views: ['phone', 'kiosktall'] },
   { id: 'setup-printer-trouble', query: 'screen=printer&printer=trouble', views: ['kiosktall'] },
   /*
    * The Android Sunday on the printer screen: set up with a printer the
@@ -443,7 +435,7 @@ const SCENES: {
   {
     id: 'setup-printer-detected',
     query: 'screen=printer&printer=ready&detected=plain',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['Connect a different printer'],
   },
   {
@@ -453,7 +445,7 @@ const SCENES: {
     drive: ['Connect a different printer'],
   },
   /* The same screen mid-evening, for the difference. */
-  { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall', 'kioskwide'] },
+  { id: 'staff-printer-screen', query: 'screen=printer&from=staff&printer=ready', views: ['kiosktall'] },
   /*
    * Mid-evening on a kiosk that was never given a printer, on a gathering
    * that prints: the recovery screen for the volunteer who skipped set-up
@@ -493,7 +485,7 @@ const SCENES: {
   {
     id: 'saving-processing',
     query: 'screen=register',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: [
       'R', 'O', 'B', 'I', 'N', 'Next',
       'F', 'I', 'E', 'L', 'D', 'S', 'Next',
@@ -517,7 +509,7 @@ const SCENES: {
   {
     id: 'saving-printed',
     query: 'screen=register',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: [
       'R', 'O', 'B', 'I', 'N', 'Next',
       'F', 'I', 'E', 'L', 'D', 'S', 'Next',
@@ -542,7 +534,7 @@ const SCENES: {
   {
     id: 'saving-timeout',
     query: 'screen=register&submit=deadline&after=6200',
-    views: ['phone', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: [
       'R', 'O', 'B', 'I', 'N', 'Next',
       'F', 'I', 'E', 'L', 'D', 'S', 'Next',
@@ -566,7 +558,7 @@ const SCENES: {
   {
     id: 'saving-refused',
     query: 'screen=register&submit=refuse&after=400',
-    views: ['kioskwide'],
+    views: ['kiosktall'],
     drive: [
       'R', 'O', 'B', 'I', 'N', 'Next',
       'F', 'I', 'E', 'L', 'D', 'S', 'Next',
@@ -595,9 +587,6 @@ const SCENES: {
    * and anything else shoots what the three critique rounds settled. Same
    * component, same fixture, same glass; only the props differ, which is the
    * whole claim the slider makes.
-   *
-   * Portrait only, by decision. The landscape fold is real and gets its own
-   * adjustment later.
    */
   { id: 'offer-alone', query: side('screen=confirm&kin=0', 'screen=confirm&kin=0&room=none'), views: ['kiosktall'] },
   { id: 'offer-two', query: side('screen=confirm&kin=2', 'screen=confirm&kin=2&ticked=all&room=none'), views: ['kiosktall'] },

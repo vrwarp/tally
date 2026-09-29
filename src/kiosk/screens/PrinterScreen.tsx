@@ -221,7 +221,7 @@ function clockTime(locale: string, atMs: number): string {
  * `ink-400` a reference note.
  */
 function Say({ tone = 'text-ink-300', children }: { tone?: string; children: ReactNode }) {
-  return <div className={`max-w-xl shrink-0 text-sm kiosk:text-base ${tone}`}>{children}</div>;
+  return <div className={`max-w-xl shrink-0 text-sm tall:text-base ${tone}`}>{children}</div>;
 }
 
 /**
@@ -874,7 +874,7 @@ export function PrinterScreen({
       {...tap(() => {
         if (!dim) press();
       })}
-      className={`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 kiosk:text-lg ${
+      className={`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 tall:text-lg ${
         dim ? 'opacity-50' : ''
       }`}
     >
@@ -903,10 +903,10 @@ export function PrinterScreen({
         * under a thumb when the boot ladder settles.
         */}
       <div
-        className={`mx-auto w-full max-w-2xl pb-4 text-center ${setup ? '' : 'lg:max-w-5xl'}`}
+        className="mx-auto w-full max-w-2xl pb-4 text-center"
       >
-        <div className="text-lg font-medium text-ink-400 kiosk:text-xl">{t('title')}</div>
-        <div className={`pt-1 text-sm kiosk:text-base ${line.tone}`}>
+        <div className="text-lg font-medium text-ink-400 tall:text-xl">{t('title')}</div>
+        <div className={`pt-1 text-sm tall:text-base ${line.tone}`}>
           {stillLooking ? (
             /* The app's own busy mark, so both screens say "working" the same
                way. Ten seconds of an ellipsis that never moves is a tablet a
@@ -939,7 +939,7 @@ export function PrinterScreen({
           */}
         {!setup && (
           <div
-            className={`min-h-6 pt-0.5 text-sm font-semibold kiosk:min-h-7 kiosk:text-base ${
+            className={`min-h-6 pt-0.5 text-sm font-semibold tall:min-h-7 tall:text-base ${
               owedSent ? 'text-ink-100' : 'text-warn-400'
             }`}
           >
@@ -953,40 +953,24 @@ export function PrinterScreen({
       </div>
 
       {/*
-        * Two columns where there is width for them, one where there is not.
-        *
-        * On 1280x800 this screen used to spend a quarter of its track on two
-        * selects that are chosen once at unboxing — each offering one real
-        * option — cut the label list mid-row, and put all four buttons below the
-        * fold, including the reprint door. What a volunteer could see was a list
-        * of `Print again` chips, so that is what they pressed, and the
-        * guess-the-last-label habit survived the redesign. Meanwhile 47% of the
-        * width was empty page.
-        *
-        * The act group leads in both shapes, and the reference group is
-        * anchored to the foot rather than trailing the act: the void then falls
-        * between two masses instead of hanging off one, and nothing a thumb
-        * aims at moves to buy it.
+        * The act group leads, and the reference group is anchored to the foot
+        * rather than trailing the act: the void then falls between two masses
+        * instead of hanging off one, and nothing a thumb aims at moves to buy
+        * it.
         */}
       <div
         className={`mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-8 ${
-          setup
-            ? 'overflow-y-auto'
-            : 'lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6'
+          setup ? 'overflow-y-auto' : ''
         }`}
       >
-        <div
-          className={`flex shrink-0 flex-col gap-6 ${
-            setup ? '' : 'lg:order-2 lg:min-h-0 lg:overflow-y-auto'
-          }`}
-        >
+        <div className="flex shrink-0 flex-col gap-6">
           {primary !== null && (
             <Unit>
               <button
                 type="button"
                 tabIndex={-1}
                 {...tap(primary.press)}
-                className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl"
+                className="flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 tall:h-20 tall:text-xl"
               >
                 {primary.label}
               </button>
@@ -1005,7 +989,7 @@ export function PrinterScreen({
             */}
           {rollAmbiguous && (
             <Unit>
-              <div className="max-w-xl shrink-0 text-sm text-ink-300 kiosk:text-base">
+              <div className="max-w-xl shrink-0 text-sm text-ink-300 tall:text-base">
                 {t('whichOnSpindle')}
               </div>
               <div className="grid shrink-0 grid-cols-1 gap-3">
@@ -1022,7 +1006,7 @@ export function PrinterScreen({
                        as its colour 650px under a primary that had just taught
                        "blue is the thing to press" — and this blue is an answer
                        already given. */
-                    className={`flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg ${
+                    className={`flex w-full items-center rounded-xl p-4 text-base tall:text-lg ${
                       entry.identifier === label
                         ? 'bg-brand-600/25 text-brand-200 ring-2 ring-brand-500'
                         : 'bg-ink-800 text-ink-100 active:bg-ink-700'
@@ -1109,23 +1093,19 @@ export function PrinterScreen({
           )}
         </div>
 
-        <div
-          className={`mt-auto flex min-h-0 shrink flex-col gap-3 ${
-            setup ? '' : 'lg:order-1 lg:mt-0'
-          }`}
-        >
+        <div className="mt-auto flex min-h-0 shrink flex-col gap-3">
           {!setup && (
             /* The card is the height of the evening, not the height of the track. */
-            <div className="flex max-h-full min-h-0 flex-col rounded-xl bg-ink-900 p-4 lg:self-start">
+            <div className="flex max-h-full min-h-0 flex-col rounded-xl bg-ink-900 p-4">
               {/* Named for what the group holds rather than for how the rows in it
                   ended: under "Printed tonight" the amber row reading *Did not
                   print* is an exception to its own heading, and that row is the one
                   a volunteer is here for. */}
-              <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 kiosk:text-base">
+              <div className="shrink-0 px-4 pb-3 text-sm text-ink-400 tall:text-base">
                 {t('tagsTonight')}
               </div>
               {printedTonight.length === 0 ? (
-                <div className="px-4 text-sm text-ink-500 kiosk:text-base">
+                <div className="px-4 text-sm text-ink-500 tall:text-base">
                   {t('nothingPrinted')}
                 </div>
               ) : (
@@ -1147,7 +1127,7 @@ export function PrinterScreen({
                         type="button"
                         tabIndex={-1}
                         {...rowTap(entry)}
-                        className={`flex h-14 w-full shrink-0 items-center justify-between rounded-lg bg-ink-800 px-4 text-left active:bg-ink-700 kiosk:h-16 ${
+                        className={`flex h-14 w-full shrink-0 items-center justify-between rounded-lg bg-ink-800 px-4 text-left active:bg-ink-700 tall:h-16 ${
                           /* The row a volunteer most wants — a label that never came
                              out — was distinguished by fourteen pixels of amber text
                              on the right edge of a five-row list.
@@ -1163,11 +1143,11 @@ export function PrinterScreen({
                             : ''
                         }`}
                       >
-                        <span className="min-w-0 truncate text-base font-semibold text-ink-100 kiosk:text-lg">
+                        <span className="min-w-0 truncate text-base font-semibold text-ink-100 tall:text-lg">
                           {entry.name}
                         </span>
                         <span
-                          className={`shrink-0 pl-3 text-sm whitespace-nowrap kiosk:text-base ${
+                          className={`shrink-0 pl-3 text-sm whitespace-nowrap tall:text-base ${
                             entry.failed && !owedIds?.has(entry.studentId)
                               ? 'font-semibold text-warn-400'
                               : 'text-ink-500'
@@ -1214,7 +1194,7 @@ export function PrinterScreen({
             */}
           {hasConfig || detection ? (
             <details className="shrink-0 rounded-xl bg-ink-900">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0 truncate">
                   {model} ·{' '}
                   {printing.labelName(
@@ -1223,11 +1203,11 @@ export function PrinterScreen({
                 </span>
                 {/* Quieter than the summary in colour, not in size: this is the
                     affordance that opens the row, read at arm's length. */}
-                <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">Change</span>
+                <span className="shrink-0 text-sm text-ink-400 tall:text-lg">Change</span>
               </summary>
               <div className="flex flex-col gap-4 px-4 pb-4">
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-ink-400 kiosk:text-base">{t('model')}</span>
+                  <span className="text-sm text-ink-400 tall:text-base">{t('model')}</span>
                   <select
                     aria-label={t('model')}
                     value={model}
@@ -1240,11 +1220,11 @@ export function PrinterScreen({
                       </option>
                     ))}
                   </select>
-                  <span className="text-xs text-ink-400 kiosk:text-sm">{t('modelHint')}</span>
+                  <span className="text-xs text-ink-400 tall:text-sm">{t('modelHint')}</span>
                 </label>
 
                 <label className="flex flex-col gap-1">
-                  <span className="text-sm text-ink-400 kiosk:text-base">{t('loadedLabel')}</span>
+                  <span className="text-sm text-ink-400 tall:text-base">{t('loadedLabel')}</span>
                   <select
                     aria-label={t('loadedLabel')}
                     value={labelIsAvailable ? label : (available[0]?.identifier ?? label)}
@@ -1257,11 +1237,11 @@ export function PrinterScreen({
                       </option>
                     ))}
                   </select>
-                  <span className="text-xs text-ink-400 kiosk:text-sm">{t('loadedLabelHint')}</span>
+                  <span className="text-xs text-ink-400 tall:text-sm">{t('loadedLabelHint')}</span>
                 </label>
 
                 {detection && detection.status && detection.status.errors.length > 0 && (
-                  <div className="rounded-xl bg-ink-950 p-4 text-sm text-warn-400 kiosk:text-base">
+                  <div className="rounded-xl bg-ink-950 p-4 text-sm text-warn-400 tall:text-base">
                     {detection.status.errors.map((flag) => (
                       <div key={`${flag.byte}:${flag.bit}`}>{flag.message}</div>
                     ))}
@@ -1292,18 +1272,18 @@ export function PrinterScreen({
             className="shrink-0 rounded-xl bg-ink-900"
             onToggle={(event) => setEventsOpen((event.target as HTMLDetailsElement).open)}
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">{t('recentEvents')}</span>
-              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
+              <span className="shrink-0 text-sm text-ink-400 tall:text-lg">
                 {eventsOpen ? 'Hide' : 'Show'}
               </span>
             </summary>
             <div className="flex flex-col gap-3 px-4 pb-4">
               {events.length === 0 ? (
-                <div className="text-sm text-ink-500 kiosk:text-base">{t('nothingWritten')}</div>
+                <div className="text-sm text-ink-500 tall:text-base">{t('nothingWritten')}</div>
               ) : (
                 <div
-                  className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain scroll-touch font-mono text-xs text-ink-400 kiosk:text-sm"
+                  className="flex max-h-64 flex-col gap-1 overflow-y-auto overscroll-contain scroll-touch font-mono text-xs text-ink-400 tall:text-sm"
                   style={{ touchAction: 'pan-y' }}
                 >
                   {events.map((entry, index) => (
@@ -1321,12 +1301,12 @@ export function PrinterScreen({
                   type="button"
                   tabIndex={-1}
                   {...tap(() => void copy('events', printing.printerLogText()))}
-                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 tall:text-base"
                 >
                   {copyStateOf('events') === 'copied' ? 'Copied' : 'Copy'}
                 </button>
                 {copyStateOf('events') === 'failed' && (
-                  <span className="text-xs text-ink-500 kiosk:text-sm">{t('copyBlocked')}</span>
+                  <span className="text-xs text-ink-500 tall:text-sm">{t('copyBlocked')}</span>
                 )}
                 <span aria-live="polite" className="sr-only">
                   {copyStateOf('events') === 'copied' ? t('eventsCopied') : ''}
@@ -1364,18 +1344,18 @@ export function PrinterScreen({
             className="shrink-0 rounded-xl bg-ink-900"
             onToggle={(event) => setPolicyOpen((event.target as HTMLDetailsElement).open)}
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 kiosk:text-lg [&::-webkit-details-marker]:hidden">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">{t('tabletPolicy')}</span>
-              <span className="shrink-0 text-sm text-ink-400 kiosk:text-lg">
+              <span className="shrink-0 text-sm text-ink-400 tall:text-lg">
                 {policyOpen ? 'Hide' : 'Show'}
               </span>
             </summary>
             <div className="flex flex-col gap-3 px-4 pb-4">
-              <div className="text-sm text-ink-400 kiosk:text-base">{t('tabletPolicyHint')}</div>
+              <div className="text-sm text-ink-400 tall:text-base">{t('tabletPolicyHint')}</div>
               {/* `select-text`, because the copy button is allowed to fail and
                   the whole value is short enough to read and to select by hand
                   — which is why this block has no textarea fallback under it. */}
-              <div className="flex flex-col gap-1 rounded-lg bg-ink-950 p-3 font-mono text-xs break-all text-ink-300 select-text kiosk:text-sm">
+              <div className="flex flex-col gap-1 rounded-lg bg-ink-950 p-3 font-mono text-xs break-all text-ink-300 select-text tall:text-sm">
                 <span className="text-ink-500">{WEB_USB_POLICY_KEY}</span>
                 <span>{policyValue}</span>
               </div>
@@ -1384,18 +1364,18 @@ export function PrinterScreen({
                   type="button"
                   tabIndex={-1}
                   {...tap(() => void copy('policy', policyValue))}
-                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                  className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 tall:text-base"
                 >
                   {copyStateOf('policy') === 'copied' ? 'Copied' : 'Copy'}
                 </button>
                 {copyStateOf('policy') === 'failed' && (
-                  <span className="text-xs text-ink-500 kiosk:text-sm">{t('copyBlocked')}</span>
+                  <span className="text-xs text-ink-500 tall:text-sm">{t('copyBlocked')}</span>
                 )}
                 <span aria-live="polite" className="sr-only">
                   {copyStateOf('policy') === 'copied' ? t('policyCopied') : ''}
                 </span>
               </div>
-              <div className="text-xs text-ink-500 kiosk:text-sm">
+              <div className="text-xs text-ink-500 tall:text-sm">
                 {t('tabletPolicyMore', { url: setupUrl })}
               </div>
 
@@ -1418,7 +1398,7 @@ export function PrinterScreen({
                 * pass is worse than no check at all.
                 */}
               <div className="flex flex-col gap-3 border-t border-ink-800 pt-3">
-                <div className="text-xs text-ink-500 kiosk:text-sm">{t('policyCheckHint')}</div>
+                <div className="text-xs text-ink-500 tall:text-sm">{t('policyCheckHint')}</div>
                 <button
                   type="button"
                   tabIndex={-1}
@@ -1430,7 +1410,7 @@ export function PrinterScreen({
                   {...tap(() => {
                     if (grantCheck !== 'busy') void checkGrant();
                   })}
-                  className="self-start rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 kiosk:text-base"
+                  className="self-start rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 tall:text-base"
                 >
                   {grantCheck === 'busy' ? t('policyCheckBusy') : t('policyCheck')}
                 </button>
@@ -1438,7 +1418,7 @@ export function PrinterScreen({
                     rather than told that a region appeared. */}
                 <div
                   aria-live="polite"
-                  className={`text-xs kiosk:text-sm ${
+                  className={`text-xs tall:text-sm ${
                     grantCheck === 'granted' ? 'text-ink-300' : 'text-ink-500'
                   }`}
                 >
@@ -1469,7 +1449,7 @@ export function PrinterScreen({
           Promoted on the one frame where leaving *is* the next act: a volunteer
           who has just sent a test label has done the last thing this screen is
           for, and the sentence above names this button. */}
-      <div className="mx-auto flex w-full max-w-2xl justify-center pt-7 pb-[max(1rem,var(--spacing-safe-bottom))] lg:max-w-5xl lg:pt-4">
+      <div className="mx-auto flex w-full max-w-2xl justify-center pt-7 pb-[max(1rem,var(--spacing-safe-bottom))]">
         <button
           type="button"
           tabIndex={-1}
@@ -1477,7 +1457,7 @@ export function PrinterScreen({
           /* `min-w-0 shrink truncate`, because this button has two labels now
              and the longer one names where it goes — the same shape the reprint
              screen's way out already wears for the same sentence. */
-          className={`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 kiosk:text-lg ${
+          className={`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 tall:text-lg ${
             setup && !tested
               ? 'bg-ink-900 font-medium text-ink-300 active:bg-ink-800'
               : 'bg-ink-800 font-semibold text-ink-100 active:bg-ink-700'

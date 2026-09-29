@@ -348,13 +348,13 @@ As it stands after the round-4 fix pass; the full statement is in the B
 ideator's final report.
 
 - **Gate.** The foot always renders the door. The panel
-  (`mb-6 rounded-xl bg-ink-900 p-4 kiosk:p-5`) is drawn when
+  (`mb-6 rounded-xl bg-ink-900 p-4 tall:p-5`) is drawn when
   `printerConfigured || bindablePrinting.length > 0`, with
   `printerConfigured = printerConfig !== null` (a new prop from
   `KioskApp.tsx` ~386 — never `printerState !== null`) and
   `bindablePrinting = entries.filter(e => e.labelTemplate !== null && nowMs <= e.endAt)`.
   Without the panel the wrapper keeps its padding and drops the skin
-  (`mb-6 flex items-center justify-end p-4 kiosk:p-5`), so the door lands on
+  (`mb-6 flex items-center justify-end p-4 tall:p-5`), so the door lands on
   the same pixel on a quiet day and on a day with nothing on at all.
 - **Predicates.**
   `selectedPrints = selected !== null && selectedEntry.labelTemplate !== null && nowMs <= selectedEntry.endAt`;
@@ -370,7 +370,7 @@ ideator's final report.
   day — de-duped titles through `Intl.ListFormat`, plural through `count`.
   Omitted only when nothing is picked and `bindablePrinting` is empty, and
   then the state line drops its `pt-1` (the 136px box).
-- **State line** (`pt-1 font-medium <tone> kiosk:text-lg`), first match
+- **State line** (`pt-1 font-medium <tone> tall:text-lg`), first match
   wins: the account after a dismissed list → `text-ink-200`, two lines;
   `!printerConfigured` → *No printer on this kiosk — plug one in, switch it
   on, then connect it.* at `text-ink-200` when the slot holds the connect
@@ -387,7 +387,7 @@ ideator's final report.
   errand's receipt for tomorrow's volunteer). Rule: the state line names a
   press only when that press is in the slot.
 - **Slot**
-  (`h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 kiosk:h-14`,
+  (`h-12 flex-1 rounded-lg border-2 border-ink-600 bg-ink-700 px-4 font-medium text-ink-50 active:bg-ink-600 tall:h-14`,
   494×56): fault → `Printer.lookAgain` (trouble, unsupported) or *Connect
   the printer again* (unpaired settled); else `stillLooking || chunkLoading`
   → the waiting treatment; else `!printerConfigured` → *Connect the
@@ -406,7 +406,7 @@ ideator's final report.
   `components/ui/Button.tsx` ~106), and one label for both waits — *One
   moment…* — while the state line says which wait it is.
 - **Door.**
-  `h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 kiosk:h-14`,
+  `h-12 shrink-0 font-medium text-ink-300 underline underline-offset-4 active:text-ink-100 tall:h-14`,
   last child of `mt-3 flex items-center justify-end gap-4`, at 594,1040
   (122×56) in every state including the two with no panel;
   `onSetUpPrinter`; the only navigation in the strip.
@@ -470,7 +470,7 @@ both ramps.
   `connectLeads = !setup && gatheringPrints && kind !== 'ready'`;
   `rollAmbiguous = detection?.matched.length > 1`.
 - **Primary** (one 672×80 brand control per state:
-  `flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 kiosk:h-20 kiosk:text-xl`):
+  `flex h-16 w-full shrink-0 items-center justify-center rounded-xl bg-brand-600 text-lg font-semibold text-white active:bg-brand-500 tall:h-20 tall:text-xl`):
   ready → set-up `testPrint` / mid-evening `onReprintByName`; trouble →
   `lookAgain`; unpaired, either value of `searching` → `connect` labelled
   *Connect this printer again*; idle → `connect` labelled *Connect the
@@ -478,8 +478,8 @@ both ramps.
   `connectLeads`; otherwise the brand slot is Reprint.
 - **Head** (`mx-auto w-full max-w-2xl pb-4 text-center`, `lg:max-w-5xl`
   mid-evening) holds exactly the title
-  (`text-lg font-medium text-ink-400 kiosk:text-xl`) and the state line
-  (`pt-1 text-sm kiosk:text-base`): idle *No printer set up on this kiosk.*
+  (`text-lg font-medium text-ink-400 tall:text-xl`) and the state line
+  (`pt-1 text-sm tall:text-base`): idle *No printer set up on this kiosk.*
   ink-300 · looking *Looking for the printer this kiosk was set up with…*
   ink-300 with the app's spinner inline · unpaired `notConnected` warn-400 ·
   trouble `message + advice` warn-400 · ready *Connected — model and roll
@@ -487,7 +487,7 @@ both ramps.
   `connectedGuessedRoll` / `connectedGuessedModel` warn-400. Nothing else is
   ever in the head — which is what holds the primary at y96 on every frame,
   both mounts, both ramps, with no padded state.
-- **The slot under a control** (`shrink-0 text-sm kiosk:text-base`; ink-100
+- **The slot under a control** (`shrink-0 text-sm tall:text-base`; ink-100
   for the account of the last press, ink-300 for the standing instruction,
   ink-400 for a reference note). Under the primary: idle → `plugInFirst` +
   `connectOpensWindow`; looking → *It may connect on its own in a few
@@ -520,7 +520,7 @@ both ramps.
   secondary on trouble — replacing `checkPowerAndCable` but never
   `connectOpensWindow`.
 - **Secondaries**
-  (`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 kiosk:text-lg`,
+  (`rounded-xl bg-ink-800 p-4 text-sm text-ink-100 active:bg-ink-700 tall:text-lg`,
   672×60 or 330×60 in a two-column grid; gated ones add `aria-disabled` +
   `opacity-50` and keep `active:`, never the `disabled` attribute): set-up
   idle → none; looking → *Look again* (dimmed); unpaired → *Look again*;
@@ -545,7 +545,7 @@ both ramps.
   between the primary's sentences and the re-pair control, as
   `grid shrink-0 grid-cols-1 gap-3` at the column's own 672px — no
   `bg-ink-950` well, no wrap row. Tiles
-  `flex w-full items-center rounded-xl p-4 text-base kiosk:text-lg`; chosen
+  `flex w-full items-center rounded-xl p-4 text-base tall:text-lg`; chosen
   `bg-brand-600/25 text-brand-200 ring-2 ring-brand-500` + `aria-pressed`
   (the app's selected-tile treatment, `RegistrationFlow.tsx` ~1328, no
   `active:`); others `bg-ink-800 text-ink-100 active:bg-ink-700`. The model
@@ -580,7 +580,7 @@ both ramps.
   benign pair is a full 32px from the one control that re-binds a live
   kiosk]. Every flush-left sentence the screen owns (both slots, the reason
   lines, `autoPowerOff`, `modelPending`) is
-  `max-w-xl shrink-0 text-sm text-ink-{100|300|400} kiosk:text-base` — 576px
+  `max-w-xl shrink-0 text-sm text-ink-{100|300|400} tall:text-base` — 576px
   at x64, 66–74 characters a line; type size unchanged.
   Mid-evening:
   `… flex-col gap-8 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:grid-rows-1 lg:gap-6`,
@@ -590,7 +590,7 @@ both ramps.
   `text-ink-400`) or `modelPending` at ink-400; the log row (summary
   `text-ink-300`); `autoPowerOff` at ink-400 when ready.
 - **Foot.** Centred pill
-  (`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 kiosk:text-lg`):
+  (`flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl px-10 text-base whitespace-nowrap tall:h-16 tall:text-lg`):
   set-up *Back to the gatherings* at
   `bg-ink-900 font-medium text-ink-300 active:bg-ink-800`, promoted to
   `bg-ink-800 font-semibold text-ink-100 active:bg-ink-700` on the tested

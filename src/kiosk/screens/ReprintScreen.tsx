@@ -21,8 +21,8 @@
  * bought with the only thing on the row that matters: the name is `min-w-0
  * truncate` and the cluster beside it is `shrink-0`, so on a phone a list whose
  * whole difficulty is that Alvarez, Alvarez-Bell and Alvarado are all in it read
- * "Ramona A…", "Priya Alv…", "Sam Alvar…". It also put five identical ringed
- * brand chips down the right edge of the landscape kiosk, which made the accent
+ * "Ramona A…", "Priya Alv…", "Sam Alvar…". It also put a column of identical
+ * ringed brand chips down the right edge of the list, which made the accent
  * land on the affordance rather than on the choice — the same reason the
  * shipping search screen dropped the ring from its quiet control.
  */
@@ -40,14 +40,10 @@ import { useTranslations } from 'use-intl';
 /**
  * Fewer than the parent screen's eight, and this screen's own number.
  *
- * The landscape kiosk leaves this list a 250px track, which is three rows at the
- * height a row is read at arm's length. Eight matches balance four-and-four
- * across two columns, so the fourth row of both columns sat under the ramp
- * behind a scroll nobody would guess at; six balance three-and-three and the
- * region shows all of them. The cost is that "more names match" fires two
- * letters earlier — which on this screen is not a cost, because a volunteer
- * standing here already knows the child's name and typing is the cheapest thing
- * they can do.
+ * A volunteer standing here already knows the child's name, so typing is the
+ * cheapest thing they can do and a short list is no cost: "more names match"
+ * firing a letter or two earlier than it would on the parent's screen asks for
+ * nothing they were not about to type anyway.
  */
 export const MAX_REPRINT_RESULTS = 6;
 
@@ -120,7 +116,6 @@ export function ReprintScreen({
 
   const rows = outcome.results.length > 0;
   const truncated = outcome.total > outcome.results.length;
-  const wraps = outcome.results.length >= 4;
 
   return (
     /* The column is the glass, never its widest item: the rows and the
@@ -139,31 +134,21 @@ export function ReprintScreen({
         * touched the register vanished and was replaced by a green sentence
         * with a child's name in it. The receipt has gone to the row it belongs
         * to; this line is a standing property of the surface and does not move.
-        *
-        * Two stacked centred lines on a phone, one line on the landscape kiosk.
-        *
-        * 1280×800 is the shape with the least vertical track in the set and the
-        * most horizontal: the mark and the standing promise are 250px and 340px
-        * of a 1280px band, and stacking them spends thirty-six pixels of the
-        * only track the results list can grow into. It is the same thirty-six
-        * pixels that decides whether three rows and a caption fit under a row
-        * box stepped for arm's length — so the header gives it back where the
-        * width is free, and nowhere else.
         */}
       <div className="px-6 pt-[max(1rem,var(--spacing-safe-top))] pb-2 text-center">
-        <div className="flex flex-col items-center lg:flex-row lg:justify-center lg:gap-5">
+        <div className="flex flex-col items-center">
           <StaffMark />
           {/*
-            * One ink step up at kiosk size, and balanced.
+            * One ink step up at tablet size, and balanced.
             *
             * This is the sentence that makes a volunteer comfortable pressing a
-            * row while a parent watches, and at `ink-500` on the landscape kiosk
-            * it was the dimmest text in the frame at about 4.1:1 — under the
-            * 4.5:1 the rest of this screen clears, on the promise that has to be
-            * read to do its job. It also set ragged, leaving one word alone on
+            * row while a parent watches, and at `ink-500` on a tablet it was
+            * the dimmest text in the frame at about 4.1:1 — under the 4.5:1 the
+            * rest of this screen clears, on the promise that has to be read to
+            * do its job. It also set ragged, leaving one word alone on
             * the last line on every phone frame.
             */}
-          <div className="pt-2 text-base text-balance text-ink-500 kiosk:text-lg kiosk:text-ink-400 lg:pt-0">
+          <div className="pt-2 text-base text-balance text-ink-500 tall:text-lg tall:text-ink-400">
             {t('reprintNoRegisterChange')}
           </div>
         </div>
@@ -179,7 +164,7 @@ export function ReprintScreen({
           * the printer is not right.
           */}
         {printerNeedsAttention && (
-          <div className="pt-1 text-base text-warn-400 kiosk:text-lg">
+          <div className="pt-1 text-base text-warn-400 tall:text-lg">
             {t('reprintPrinterAttention')}
           </div>
         )}
@@ -210,13 +195,11 @@ export function ReprintScreen({
               pixel overrun is the clearance becoming the overflow. */}
           <div ref={contentRef} className="shrink-0">
             <div
-              className={`mx-auto w-full max-w-2xl ${!rows ? 'pb-6' : ''} flex flex-col gap-2 ${
-                wraps ? 'lg:block lg:columns-2 lg:gap-x-8 lg:max-w-5xl' : ''
-              }`}
+              className={`mx-auto w-full max-w-2xl ${!rows ? 'pb-6' : ''} flex flex-col gap-2`}
             >
               {!rows && (
                 <div className="pt-6 text-center">
-                  <div className="text-2xl font-semibold text-ink-200 kiosk:text-3xl">
+                  <div className="text-2xl font-semibold text-ink-200 tall:text-3xl">
                     {t('typeChildName')}
                   </div>
                   {/*
@@ -229,10 +212,10 @@ export function ReprintScreen({
                     * exists to remove. The register guarantee stays: it is the
                     * reason this screen is allowed to exist.
                     */}
-                  {/* Balanced, because it set ragged on both kiosk shapes with
+                  {/* Balanced, because it set ragged on the tablet with
                       "changes." alone on the last line — the invitation is the
                       only prose on an empty screen, so the rag is the frame. */}
-                  <p className="mx-auto max-w-md pt-3 text-lg text-balance text-ink-400 kiosk:text-xl">
+                  <p className="mx-auto max-w-md pt-3 text-lg text-balance text-ink-400 tall:text-xl">
                     {t('reprintInvitation')}
                   </p>
                 </div>
@@ -256,23 +239,10 @@ export function ReprintScreen({
                     type="button"
                     tabIndex={-1}
                     {...rowTap(student)}
-                    /*
-                     * The box steps where the type does.
-                     *
-                     * The height was `tall:` and the type is `kiosk:`, so on the
-                     * landscape kiosk — which is not tall — a 24px name over an
-                     * 18px subline sat in the phone's 64px box: six pixels of ink
-                     * to the top edge against twenty to the side, on the largest
-                     * and furthest glass in the building.
-                     *
-                     * `kiosk:h-18` rather than the portrait kiosk's `h-20`
-                     * because 1280×800 leaves this region under three hundred
-                     * pixels and it has to hold three rows *and* the caption
-                     * under them. Eighty would not fit either, and a row that
-                     * does not fit is answered by a ramp, which is the failure
-                     * this height was raised to avoid.
-                     */
-                    className="flex h-16 w-full shrink-0 flex-col justify-center rounded-xl bg-ink-800 px-5 text-left active:bg-ink-600 kiosk:h-18 tall:h-20 lg:not-first:mt-2 lg:w-full lg:break-inside-avoid"
+                    /* The box steps where the type does: a 24px name over an
+                       18px subline in the phone's 64px box left six pixels of
+                       ink to the top edge against twenty to the side. */
+                    className="flex h-16 w-full shrink-0 flex-col justify-center rounded-xl bg-ink-800 px-5 text-left active:bg-ink-600 tall:h-20"
                   >
                     {/*
                      * The name gets the row's whole width, and everything else
@@ -285,7 +255,7 @@ export function ReprintScreen({
                      * "✓ Checked in" is longer than a grade: the row likeliest to
                      * be a reprint target showed no surname at all.
                      */}
-                    <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
+                    <span className="truncate text-xl font-semibold text-ink-100 tall:text-2xl">
                       {student.firstName} {student.lastName}
                     </span>
                     {/* The receipt leads, and takes the checked-in clause's place
@@ -294,7 +264,7 @@ export function ReprintScreen({
                         at that moment is the one that just happened. Presence is
                         context on this screen — never a gate — and it comes back
                         the moment the receipt clears. */}
-                    <span className="truncate text-sm text-ink-400 kiosk:text-lg">
+                    <span className="truncate text-sm text-ink-400 tall:text-lg">
                       {justSent && (
                         <>
                           <span className="font-semibold text-brand-300">{t('nameTagSent')}</span>
@@ -321,13 +291,11 @@ export function ReprintScreen({
         </div>
 
         {/* What is true of the result set, not of the box — which is why it is
-            out here. "More names than fit" is also read against a list with two
-            rows of empty track under it on the portrait kiosk: the cap is six
-            because the *landscape* kiosk's region holds three rows a column,
-            and a sentence about fitting is a sentence a volunteer can see is
-            false. */}
+            out here. "More names than fit" would be read against a list with
+            empty track under it on a tablet, and a sentence about fitting is a
+            sentence a volunteer can see is false. */}
         {truncated && (
-          <div className="mx-auto w-full max-w-2xl shrink-0 px-6 pt-2 text-center text-base text-ink-400 kiosk:text-lg lg:max-w-5xl">
+          <div className="mx-auto w-full max-w-2xl shrink-0 px-6 pt-2 text-center text-base text-ink-400 tall:text-lg">
             {t('moreNamesMatch')}
           </div>
         )}
@@ -342,7 +310,7 @@ export function ReprintScreen({
         * rather than like the quiet chip it replaced: 44px and 14px type was
         * smaller than every row above it and wore the rows' own fill.
         */}
-      <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-center px-2 pt-2 tall:h-24 lg:max-w-5xl">
+      <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-center px-2 pt-2 tall:h-24">
         <button
           type="button"
           tabIndex={-1}
@@ -350,19 +318,16 @@ export function ReprintScreen({
             haptic(8);
             onDone();
           })}
-          className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-6 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 tall:px-8 kiosk:text-lg"
+          className="flex h-14 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800 px-6 text-base font-semibold whitespace-nowrap text-ink-100 active:bg-ink-700 tall:h-16 tall:px-8 tall:text-lg"
         >
           {t('doneBackToCheckIn')}
         </button>
       </div>
 
       <div className="px-6 pb-1">
-        {/* `lg:h-14`: a 36px glyph in a 64px band is eight pixels of air the
-            landscape kiosk's results list has a better use for. The portrait
-            kiosk keeps its 80. */}
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center text-center tall:h-20 lg:h-14 lg:max-w-5xl">
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center text-center tall:h-20">
           {buffer && (
-            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
+            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl">
               {buffer}
             </span>
           )}
@@ -371,15 +336,15 @@ export function ReprintScreen({
             *
             * "11 names" over a list of eight is a complete-looking answer to an
             * incomplete search, and the sentence that said otherwise was a
-            * sibling below the rows — off the bottom of the landscape kiosk
-            * entirely. A volunteer who cannot see their child concludes the
+            * sibling below the rows, away from the letters a volunteer is
+            * watching. A volunteer who cannot see their child concludes the
             * child is not in the system, or picks the nearest-looking name, and
             * there is no undo. The cap is a property of the result set, so it
             * is said where the eyes already are: beside the letters producing
             * it.
             */}
           {outcome.total > 0 && (
-            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base">
+            <span className="absolute right-0 text-sm text-ink-400 tall:text-base">
               {truncated
                 ? t('someOfNames', { shown: outcome.results.length, total: outcome.total })
                 : t('nameCount', { count: outcome.total })}

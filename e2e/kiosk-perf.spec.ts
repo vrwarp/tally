@@ -55,6 +55,7 @@ import { E2E } from '../playwright.config';
 import {
   bindTo,
   KIOSK_PATH,
+  KIOSK_VIEWPORT,
   leaveGathering,
   pairKiosk,
   recordLabels,
@@ -278,7 +279,7 @@ async function instrumentedKiosk(
   browser: Browser,
   options: { printing?: boolean } = {},
 ): Promise<{ context: BrowserContext; page: Page; cdp: CDPSession }> {
-  const context = await browser.newContext();
+  const context = await browser.newContext({ viewport: KIOSK_VIEWPORT });
   const page = await context.newPage();
   await installProbe(page);
   if (options.printing) await recordLabels(page);

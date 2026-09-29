@@ -11,6 +11,12 @@ result lives now. The round-by-round critiques were working notes and are not
 kept — what survived them is in `src/`, and the reasoning that is still true
 about the shipping product is in the linked documents.
 
+The kiosk has since become portrait-only (see
+`src/kiosk/components/PortraitOnly.tsx`). Where a campaign below argues about a
+landscape tablet or the `kiosk:` variant, that is the record of what was
+settled at the time; the landscape layouts it describes are gone, and `kiosk:`
+folded into `tall:`.
+
 One caveat worth stating once, because the loop learned it twice: **a critique is
 only worth what the frame is worth.** Rounds judged against hand-edited HTML
 produced two phantom findings that were artifacts of the mock rather than defects

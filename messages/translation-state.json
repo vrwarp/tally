@@ -8703,11 +8703,11 @@
     "zh-Hant": "reviewed"
   },
   "KioskBackdrop.guidanceCrop": {
-    "source": "The top of the photo will be covered by kiosk text. Check the previews below for both orientations.",
+    "source": "The top of the photo will be covered by kiosk text, and the kiosk stands upright, so a sideways photo shows only its middle. Check the preview below.",
     "context": "Explains how much of a background photo the kiosk’s own text will cover.",
     "es-MX": "machine",
-    "zh-Hans": "reviewed",
-    "zh-Hant": "reviewed"
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "KioskBackdrop.fieldHint": {
     "source": "Behind the kiosk’s idle screen while it is bound to this gathering, and gone the moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.",
@@ -8724,18 +8724,6 @@
   },
   "KioskBackdrop.storedPhoto": {
     "source": "Photo · uploaded {when}",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.onAShelf": {
-    "source": "On a shelf",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.stoodOnEnd": {
-    "source": "Stood on end",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -12676,6 +12664,20 @@
   },
   "Door.staffPrint": {
     "source": "Staff · print name tags",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Door.turnUprightTitle": {
+    "source": "Turn the screen upright",
+    "context": "Heading of the screen that covers the lobby kiosk while the tablet is turned sideways. The kiosk only works in portrait; read by a parent or a volunteer standing at the tablet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Door.turnUprightBody": {
+    "source": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader.",
+    "context": "Under the heading above: why the kiosk is not showing check-in, and what to do if the tablet is fixed in a stand and cannot be turned.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

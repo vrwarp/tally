@@ -33,8 +33,8 @@
  * at a readable size, and side-by-side is the only arrangement in which the
  * "all the way down" claim can be checked rather than believed.
  *
- * Kiosk frames are the 1280x800 landscape the rest of the kiosk documentation
- * uses — a tablet in a stand, which is the only thing anybody runs this on.
+ * Kiosk frames are 800×1280 — a tablet stood on end in a stand, which is the
+ * only way the kiosk runs.
  *
  * Run it with:
  *   WALKTHROUGH=1 npx playwright test --project=chromium-mobile \
@@ -53,7 +53,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'i18n');
 
 /** The shape a lobby tablet is mounted in. Not a phone, not a laptop. */
-const KIOSK_VIEWPORT = { width: 1280, height: 800 };
+const KIOSK_VIEWPORT = { width: 800, height: 1280 };
 
 /*
  * The four languages, in the order the page shows them — which is the order the
