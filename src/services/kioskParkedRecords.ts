@@ -25,9 +25,16 @@ import type { KioskRecordKind, ParkReason } from '@/lib/kioskLanding';
 import { isRecordable } from '@/lib/kioskSettle';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
-import type { Student } from '@/types';
+import { parseStudentId, type Student } from '@/types';
 
 const REASONS: readonly ParkReason[] = ['frozen', 'gathering-deleted', 'no-arrival', 'arrival-parked', 'unreadable'];
+
+/** Who the kiosk knew the child as, from its own copy of the roster. */
+export interface KioskParkedStudent {
+  firstName: string;
+  lastName: string;
+  grade: number | null;
+}
 
 /** One parked record, as the server keeps it. */
 export interface KioskParkedRecord {
@@ -39,7 +46,7 @@ export interface KioskParkedRecord {
   /** The tap's own time, as the kiosk saw it. */
   tappedAt: Date | null;
   /** The names the kiosk knew — the only ones left for a child the roster no longer shows. */
-  student: { firstName: string; lastName: string } | null;
+  student: KioskParkedStudent | null;
   /** The gathering's title as the kiosk knew it — for one since deleted, the only name left. */
   gathering: string | null;
   deviceId: string | null;
@@ -54,7 +61,7 @@ function str(value: unknown): string {
 export function toParkedRecord(snapshot: DocumentSnapshot<DocumentData>): KioskParkedRecord {
   const d = snapshot.data() ?? {};
   const reason = REASONS.includes(d.reason as ParkReason) ? (d.reason as ParkReason) : 'unreadable';
-  const student = d.student as { firstName?: unknown; lastName?: unknown } | null | undefined;
+  const student = d.student as { firstName?: unknown; lastName?: unknown; grade?: unknown } | null | undefined;
   return {
     id: snapshot.id,
     kind: d.kind === 'check-out' ? 'check-out' : 'check-in',
@@ -65,7 +72,11 @@ export function toParkedRecord(snapshot: DocumentSnapshot<DocumentData>): KioskP
     tappedAt: toDateOrNull(d.tappedAt) ?? (typeof d.tappedAtMs === 'number' ? new Date(d.tappedAtMs) : null),
     student:
       typeof student?.firstName === 'string' && typeof student.lastName === 'string'
-        ? { firstName: student.firstName, lastName: student.lastName }
+        ? {
+            firstName: student.firstName,
+            lastName: student.lastName,
+            grade: typeof student.grade === 'number' ? student.grade : null,
+          }
         : null,
     gathering: typeof d.gathering === 'string' && d.gathering ? d.gathering : null,
     deviceId: typeof d.deviceId === 'string' && d.deviceId ? d.deviceId : null,
@@ -152,16 +163,24 @@ const MAX_HOPS = 5;
  * The student who stands now for a parked record's student id: followed
  * through a re-creation or a merge, step for step as `settleParkedKioskRecord`
  * follows it, so the card offers Record exactly when the server would take it.
- * Null when the roster does not have them, or the chain runs longer than the
+ *
+ * Walked over Tally's own student documents — every one, whatever its status —
+ * as the server walks them, and not over the roster. The roster has no row for
+ * a Planning Center child whose record was deleted there, because Tally holds
+ * no name to put in one; and that document is where a re-creation leaves its
+ * pointer. Walked over the roster, the child a frozen card is about was never
+ * found, before the repair or after it.
+ *
+ * Null when there is no such document, or the chain runs longer than the
  * server will follow.
  */
 export function standingStudent(
   studentId: string,
-  studentsById: ReadonlyMap<string, Student>,
+  documentsById: ReadonlyMap<string, Student>,
 ): Student | null {
   let id = studentId;
   for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
-    const student = studentsById.get(id);
+    const student = documentsById.get(id);
     if (student === undefined) return null;
     const next = student.recreatedAsStudentId || student.mergedIntoStudentId;
     if (!next || next === id) return student;
@@ -175,11 +194,12 @@ export function standingStudent(
  * a frozen child's record put back — or only `let-go`. A card whose reason
  * could never be recorded (a deleted gathering, an arrival that never came)
  * is `let-go` for good; a frozen one still frozen is `frozen`, so the screen
- * can say what would change that.
+ * can say what would change that. Over Tally's own student documents, as
+ * `standingStudent` is.
  */
 export function cardAnswer(
   card: ParkedCard,
-  studentsById: ReadonlyMap<string, Student>,
+  documentsById: ReadonlyMap<string, Student>,
 ): 'record' | 'frozen' | 'let-go' {
   const records = [card.arrival, card.pickup].filter((each): each is KioskParkedRecord => each !== null);
   if (!records.every((each) => isRecordable(each.reason))) return 'let-go';
@@ -187,7 +207,30 @@ export function cardAnswer(
   // there is nothing left for it to close.
   const lonePickup = card.arrival === null ? card.pickup : null;
   if (lonePickup?.reason === 'arrival-parked') return 'let-go';
-  const student = standingStudent(card.studentId, studentsById);
+  const student = standingStudent(card.studentId, documentsById);
   if (student === null) return 'let-go';
   return student.upstreamRecordMissing ? 'frozen' : 'record';
+}
+
+/**
+ * Who a frozen child can be put back in Planning Center as, from the card
+ * itself — or null when the repair belongs elsewhere.
+ *
+ * A child the roster still shows has a page, and the repair is there. One it
+ * does not is a Planning Center membership whose person was deleted: Tally
+ * never stored their name, so there is no row, no page, and nothing to type a
+ * name into. The kiosk kept the name it tapped, and that is what the
+ * re-creation needs (`recreatePlanningCenterPerson`, which looks for the
+ * person before it creates one). Attendees has no re-creation, and a pickup
+ * alone carries no name, so neither is offered.
+ */
+export function putBackAs(
+  card: ParkedCard,
+  standing: Student | null,
+  onRoster: boolean,
+): { studentId: string; name: KioskParkedStudent } | null {
+  if (standing === null || standing.upstreamRecordMissing !== true || onRoster) return null;
+  if (parseStudentId(standing.id)?.backendId !== 'pco') return null;
+  const name = card.arrival?.student ?? null;
+  return name === null ? null : { studentId: standing.id, name };
 }

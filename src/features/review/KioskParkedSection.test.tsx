@@ -12,16 +12,29 @@ import { makeEvent, makeStudent } from '../../../tests/factories';
 
 const show = vi.fn();
 const settleParkedKioskRecord = vi.fn();
+const recreatePlanningCenterPerson = vi.fn();
+const refreshRoster = vi.fn(() => Promise.resolve());
 let parked: KioskParkedRecord[] = [];
 let refuse = false;
 let students: Student[] = [];
+let documents: Student[] | 'refused' = [];
 let events: TallyEvent[] = [];
 
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show }) }));
-vi.mock('@/context/dataContext', () => ({ useData: () => ({ students, events }) }));
+vi.mock('@/context/dataContext', () => ({
+  useData: () => ({ students, events, refreshRoster }),
+}));
+vi.mock('@/services/students', () => ({
+  subscribeStudents: (onRows: (rows: Student[]) => void, onError: (error: Error) => void) => {
+    if (documents === 'refused') onError(new Error('permission-denied'));
+    else onRows(documents);
+    return () => {};
+  },
+}));
 vi.mock('@/services/functions', () => ({
   settleParkedKioskRecord: (...args: unknown[]) => settleParkedKioskRecord(...args),
+  recreatePlanningCenterPerson: (...args: unknown[]) => recreatePlanningCenterPerson(...args),
 }));
 vi.mock('@/services/kioskParkedRecords', async () => {
   const real = (await vi.importActual('@/services/kioskParkedRecords')) as Record<string, unknown>;
@@ -52,7 +65,7 @@ function record(overrides: Partial<KioskParkedRecord> = {}): KioskParkedRecord {
     studentId: 'student-noah',
     reason: 'frozen',
     tappedAt: NINE_FORTY_THREE,
-    student: { firstName: 'Noah', lastName: 'Parke' },
+    student: { firstName: 'Noah', lastName: 'Parke', grade: 3 },
     gathering: 'Sunday Kids',
     deviceId: 'kiosk-lobby-00000001',
     parkedAt: TEN_FIFTY_TWO,
@@ -67,9 +80,14 @@ const PICKUP = record({
   tappedAt: TEN_FIFTY_TWO,
 });
 
-function draw(opts: { cards?: KioskParkedRecord[]; kids?: Student[] } = {}) {
+/**
+ * `kids` is the roster; `docs` is Tally's own documents, which default to the
+ * roster's — true of a child whose document holds their name.
+ */
+function draw(opts: { cards?: KioskParkedRecord[]; kids?: Student[]; docs?: Student[] | 'refused' } = {}) {
   parked = opts.cards ?? [];
   students = opts.kids ?? [];
+  documents = opts.docs ?? students;
   events = [makeEvent({ id: EVENT, title: 'Sunday Kids' })];
   return render(
     <MemoryRouter>
@@ -81,6 +99,8 @@ function draw(opts: { cards?: KioskParkedRecord[]; kids?: Student[] } = {}) {
 afterEach(() => {
   show.mockReset();
   settleParkedKioskRecord.mockReset();
+  recreatePlanningCenterPerson.mockReset();
+  refreshRoster.mockClear();
   refuse = false;
 });
 
@@ -186,6 +206,109 @@ describe('KioskParkedSection', () => {
       await waitFor(() => expect(show).toHaveBeenLastCalledWith(said, { tone: 'error' }));
       unmount();
     }
+  });
+
+  /*
+   * A Planning Center child deleted upstream: the roster has no row for them
+   * (Tally never stored the name), so there is no page to link — the card
+   * puts them back itself, under the name the kiosk kept.
+   */
+  const GONE = makeStudent({ id: 'pco_4100022', firstName: '', lastName: '', upstreamRecordMissing: true });
+  const GONE_CARD = record({ id: `check-in:${EVENT}:pco_4100022`, studentId: 'pco_4100022' });
+
+  it('puts back a child the roster no longer shows, under the name the kiosk kept', async () => {
+    recreatePlanningCenterPerson.mockResolvedValue({
+      data: { status: 'recreated', message: 'Planning Center has a record for them again. Check-ins are unfrozen.' },
+    });
+    draw({ cards: [GONE_CARD], docs: [GONE] });
+
+    expect(screen.getByText(/^Noah Parke’s record in the church’s database is missing/)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Record/ })).toBeNull();
+    expect(
+      screen.getByText('Adds them to Planning Center again under the name the kiosk kept, or links the record already there. Then this can be recorded.'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await waitFor(() =>
+      expect(recreatePlanningCenterPerson).toHaveBeenCalledWith({
+        studentId: 'pco_4100022',
+        firstName: 'Noah',
+        lastName: 'Parke',
+        grade: 3,
+      }),
+    );
+    expect(show).toHaveBeenCalledWith('Planning Center has a record for them again. Check-ins are unfrozen.', {
+      tone: 'success',
+    });
+    expect(refreshRoster).toHaveBeenCalledWith(true);
+  });
+
+  it('sends no grade the kiosk did not know', async () => {
+    recreatePlanningCenterPerson.mockResolvedValue({ data: { status: 'relinked', message: 'Linked.' } });
+    draw({
+      cards: [record({ ...GONE_CARD, student: { firstName: 'Noah', lastName: 'Parke', grade: null } })],
+      docs: [GONE],
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await waitFor(() =>
+      expect(recreatePlanningCenterPerson).toHaveBeenCalledWith({
+        studentId: 'pco_4100022',
+        firstName: 'Noah',
+        lastName: 'Parke',
+      }),
+    );
+    expect(show).toHaveBeenCalledWith('Linked.', { tone: 'success' });
+  });
+
+  it('says what the server said when it would not put them back, and asks the roster nothing', async () => {
+    const off = 'Creating people in Planning Center from Tally is switched off.';
+    recreatePlanningCenterPerson.mockResolvedValue({ data: { status: 'disabled', message: off } });
+    draw({ cards: [GONE_CARD], docs: [GONE] });
+    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await waitFor(() => expect(show).toHaveBeenCalledWith(off, { tone: 'info' }));
+    expect(refreshRoster).not.toHaveBeenCalled();
+  });
+
+  it('says so when putting them back fails', async () => {
+    recreatePlanningCenterPerson.mockRejectedValue(new Error(''));
+    draw({ cards: [GONE_CARD], docs: [GONE] });
+    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await waitFor(() =>
+      expect(show).toHaveBeenCalledWith('Couldn’t put Noah Parke back in Planning Center.', { tone: 'error' }),
+    );
+  });
+
+  it('offers Record once the re-creation leads to a child whose record is back', () => {
+    const moved = makeStudent({
+      id: 'pco_4100022',
+      firstName: '',
+      lastName: '',
+      status: 'inactive',
+      upstreamRecordMissing: true,
+      recreatedAsStudentId: 'pco_4100099',
+    });
+    const back = makeStudent({ id: 'pco_4100099', firstName: 'Noah', lastName: 'Park' });
+    draw({ cards: [GONE_CARD], kids: [back], docs: [moved, back] });
+
+    expect(screen.getByText(/^Noah Park’s record is back, so the 9:43 .* arrival can be recorded now\.$/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Record the 9:43 .* arrival$/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Put / })).toBeNull();
+  });
+
+  it('walks the roster while its own read of the documents is refused', () => {
+    draw({ cards: [record()], kids: [NOAH_BACK], docs: 'refused' });
+    expect(screen.getByRole('button', { name: /^Record the 9:43 .* arrival$/ })).toBeInTheDocument();
+  });
+
+  it('offers no way back without a name to put back under', () => {
+    draw({
+      cards: [record({ ...GONE_CARD, id: `check-out:${EVENT}:pco_4100022`, kind: 'check-out', student: null })],
+      docs: [GONE],
+    });
+    expect(screen.getByText(/^A child’s record in the church’s database is missing/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Put / })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Let it go' })).toBeInTheDocument();
   });
 
   it('says so when the call fails', async () => {

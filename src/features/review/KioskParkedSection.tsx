@@ -9,7 +9,9 @@
  *
  * - **Record** only when the server would take it: a frozen child whose record
  *   has been put back. Until then the card says what would change that, and
- *   links the child's page, where the repair is.
+ *   links the child's page, where the repair is — or, for a Planning Center
+ *   child whose record was deleted there, and who therefore has no page, puts
+ *   them back itself under the name the kiosk kept (`putBackAs`).
  * - **Let it go** always, kept as a decision with the settler's name on it —
  *   never an absence.
  *
@@ -22,18 +24,23 @@ import { useTranslations } from 'use-intl';
 import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
+import { useServerText } from '@/hooks/useServerText';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 import type { SettleDecision, SettleStatus } from '@/lib/kioskSettle';
-import { settleParkedKioskRecord } from '@/services/functions';
+import { recreatePlanningCenterPerson, settleParkedKioskRecord } from '@/services/functions';
 import {
   cardAnswer,
   cardReason,
   parkedCards,
+  putBackAs,
   standingStudent,
   subscribeUnsettledParkedRecords,
   type KioskParkedRecord,
+  type KioskParkedStudent,
   type ParkedCard,
 } from '@/services/kioskParkedRecords';
+import { subscribeStudents } from '@/services/students';
+import { BACKEND_LABELS, type Student } from '@/types';
 
 const CAPTION = 'text-sm text-ink-400 lg:text-xs';
 const STRIP = 'rounded-xl bg-ink-800/50 px-3 py-2 text-sm text-ink-300 ring-1 ring-ink-700';
@@ -51,7 +58,10 @@ function Decision({ caption, children }: { caption: ReactNode; children: ReactNo
 export function KioskParkedSection() {
   const t = useTranslations('Review');
   const { show } = useToast();
+  const serverText = useServerText();
+  const { students, refreshRoster } = useData();
   const [records, setRecords] = useState<KioskParkedRecord[] | null>(null);
+  const [documents, setDocuments] = useState<Student[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -67,7 +77,23 @@ export function KioskParkedSection() {
     [],
   );
 
+  /*
+   * Tally's own student documents, which the cards walk as the server does
+   * (`standingStudent`) — not the roster, which has no row for a Planning
+   * Center child whose record was deleted there, nor for the document a
+   * re-creation leaves its pointer on. The data provider's own query, so the
+   * client answers it from the watch it already holds. Until it answers, or
+   * if it is refused, the roster stands in: what the cards were walked over
+   * before, and right for every child it shows.
+   */
+  useEffect(() => subscribeStudents(setDocuments, () => setDocuments(null)), []);
+
   const cards = useMemo(() => parkedCards(records ?? []), [records]);
+  const studentsById = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
+  const documentsById = useMemo(
+    () => (documents === null ? studentsById : new Map(documents.map((student) => [student.id, student]))),
+    [documents, studentsById],
+  );
 
   const settle = async (card: ParkedCard, decision: SettleDecision) => {
     if (busy) return;
@@ -84,6 +110,32 @@ export function KioskParkedSection() {
       show(said[data.status], { tone: data.status === 'settled' ? 'success' : 'error' });
     } catch {
       show(t('actionFailed'), { tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // The same call, and the same answers, as the repair on a student's page.
+  const putBack = async (card: ParkedCard, studentId: string, as: KioskParkedStudent) => {
+    if (busy) return;
+    setBusy(card.id);
+    const name = `${as.firstName} ${as.lastName}`;
+    try {
+      const { data } = await recreatePlanningCenterPerson({
+        studentId,
+        firstName: as.firstName,
+        lastName: as.lastName,
+        ...(as.grade === null ? {} : { grade: as.grade }),
+      });
+      const back = data.status === 'recreated' || data.status === 'relinked' || data.status === 'still-there';
+      show(data.message, { tone: back ? 'success' : 'info' });
+      // The person is new upstream, so the roster has to be asked again for
+      // their name; the card's own answer follows the documents, live. Not
+      // awaited: a roster that fails to answer is its own banner, not a
+      // failure of what was just put back.
+      if (back) void refreshRoster(true);
+    } catch (cause) {
+      show(serverText(cause, t('parkedPutBackFailed', { name, backend: BACKEND_LABELS.pco })), { tone: 'error' });
     } finally {
       setBusy(null);
     }
@@ -108,9 +160,12 @@ export function KioskParkedSection() {
           <ParkedCardView
             key={card.id}
             card={card}
+            studentsById={studentsById}
+            documentsById={documentsById}
             busy={busy === card.id}
             disabled={busy !== null}
             onSettle={(decision) => void settle(card, decision)}
+            onPutBack={(studentId, as) => void putBack(card, studentId, as)}
           />
         ))}
       </div>
@@ -120,24 +175,32 @@ export function KioskParkedSection() {
 
 function ParkedCardView({
   card,
+  studentsById,
+  documentsById,
   busy,
   disabled,
   onSettle,
+  onPutBack,
 }: {
   card: ParkedCard;
+  /** The roster's rows: names, and whether a child has a page to link. */
+  studentsById: ReadonlyMap<string, Student>;
+  /** Tally's own documents: what happened to a child, as the server reads it. */
+  documentsById: ReadonlyMap<string, Student>;
   busy: boolean;
   disabled: boolean;
   onSettle: (decision: SettleDecision) => void;
+  onPutBack: (studentId: string, as: KioskParkedStudent) => void;
 }) {
   const t = useTranslations('Review');
   const time = useTimeFormats();
-  const { students, events } = useData();
+  const { events } = useData();
 
-  const studentsById = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
-  const standing = standingStudent(card.studentId, studentsById);
+  const standing = standingStudent(card.studentId, documentsById);
+  const row = standing ? studentsById.get(standing.id) : undefined;
   const known = card.arrival?.student ?? card.pickup?.student ?? null;
-  const name = standing
-    ? `${standing.firstName} ${standing.lastName}`
+  const name = row
+    ? `${row.firstName} ${row.lastName}`
     : known
       ? `${known.firstName} ${known.lastName}`
       : t('parkedSomeChild');
@@ -153,7 +216,8 @@ function ParkedCardView({
   };
 
   const reason = cardReason(card);
-  const answer = cardAnswer(card, studentsById);
+  const answer = cardAnswer(card, documentsById);
+  const putBack = putBackAs(card, standing, row !== undefined);
   const why = (() => {
     switch (reason) {
       case 'frozen':
@@ -183,9 +247,9 @@ function ParkedCardView({
       />
       <div className="flex flex-col gap-3 p-3">
         <p className={STRIP}>{why}</p>
-        {answer === 'frozen' && standing ? (
+        {answer === 'frozen' && row ? (
           <Link
-            to={`/students/${standing.id}`}
+            to={`/students/${row.id}`}
             className="self-start text-sm font-semibold text-brand-300 hover:text-brand-200"
           >
             {t('parkedOpenStudent', { name })}
@@ -203,12 +267,23 @@ function ParkedCardView({
                 {t('parkedRecord', taps)}
               </Button>
             </Decision>
+          ) : putBack ? (
+            <Decision caption={t('parkedPutBackCaption', { backend: BACKEND_LABELS.pco })}>
+              <Button
+                className="mt-auto min-h-12 w-full lg:w-auto"
+                loading={busy}
+                disabled={disabled}
+                onClick={() => onPutBack(putBack.studentId, putBack.name)}
+              >
+                {t('parkedPutBack', { name, backend: BACKEND_LABELS.pco })}
+              </Button>
+            </Decision>
           ) : null}
           <Decision caption={t('parkedLetGoCaption')}>
             <Button
               variant="secondary"
               className="mt-auto min-h-12 w-full lg:w-auto"
-              loading={busy && answer !== 'record'}
+              loading={busy && answer !== 'record' && !putBack}
               disabled={disabled}
               onClick={() => onSettle('let-go')}
             >

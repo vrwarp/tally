@@ -319,7 +319,7 @@ grammar, what the press will do:
 
 | Reason | The card says | Its answers |
 |---|---|---|
-| The child's upstream record is gone (frozen) | *Noah's record in the church's database is missing, so Tally can't record his 9:43 arrival yet* — with a link to the repair on his page | **Record Noah's 9:43 arrival**, enabled once the freeze lifts; **Let it go** |
+| The child's upstream record is gone (frozen) | *Noah's record in the church's database is missing, so Tally can't record his 9:43 arrival yet* — with a link to the repair on his page, or, when he has no page, the repair on the card | **Record Noah's 9:43 arrival**, enabled once the freeze lifts; **Put Noah back in Planning Center** where there is no page; **Let it go** |
 | The gathering was deleted after the tap | The names and tap times, so they can be re-recorded on the right night by hand | **Let it go** only — there is nothing to record onto, and guessing a night is how forty check-ins land on the wrong gathering |
 | A pickup whose arrival never appeared | *The register has no arrival for Ava on Sept 27, so her 10:52 pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.* | **Let it go** |
 | A pickup whose arrival was parked | Nothing of its own: it is parked with its arrival, on the same card, and settled with it | — |
@@ -722,8 +722,16 @@ the check that matters most before the first Sunday it is relied on.
   settler's name; nothing is deleted. An arrival and the pickup parked with it are one card and one
   decision, recorded arrival first.
 - **Record is offered only when the server would take it**: a frozen child whose record is back, or
-  a pickup riding with its arrival. Until then a frozen child's card links to the child's page, where
-  the record is put back.
+  a pickup riding with its arrival. The card works this out as the server does, over Tally's own
+  student documents rather than the roster: a Planning Center child whose record was deleted there
+  has no row on the roster, because Tally never stored the name, and it is that child's document a
+  re-creation leaves its pointer on.
+- **Until then, the repair.** A frozen child the roster still shows has a page, and the card links
+  it. One it does not show has no page to link, so the card offers **Put Noah back in Planning
+  Center** itself: the same re-creation the student page runs (`recreatePlanningCenterPerson`, which
+  looks for the person before it creates one, and links a merge's survivor instead), under the name
+  the kiosk kept with the arrival. A pickup alone carries no name, and Attendees has no re-creation,
+  so neither is offered it; *Let it go* is always there.
 - **"Quiet" is judged on the gathering's own day**, by one rule the event page and the register
   share (`quietOn` in `src/lib/kioskQuiet.ts`): not heard from for twelve minutes, and last heard
   from between the start of the day the check-in window opens and the end of the day the gathering

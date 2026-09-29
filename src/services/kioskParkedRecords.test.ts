@@ -10,6 +10,7 @@ import {
   cardReason,
   cardTappedAtMs,
   parkedCards,
+  putBackAs,
   standingStudent,
   subscribeUnsettledParkedRecords,
   toParkedRecord,
@@ -48,7 +49,7 @@ function parked(overrides: Partial<KioskParkedRecord> = {}): KioskParkedRecord {
     studentId: 'student-noah',
     reason: 'frozen',
     tappedAt: new Date(2026, 8, 27, 9, 43),
-    student: { firstName: 'Noah', lastName: 'Park' },
+    student: { firstName: 'Noah', lastName: 'Park', grade: 3 },
     gathering: 'Sunday Kids',
     deviceId: 'kiosk-3f9a1c2e7b4d',
     parkedAt: new Date(2026, 8, 27, 11, 0),
@@ -79,11 +80,20 @@ describe('toParkedRecord', () => {
       studentId: 's1',
       reason: 'gathering-deleted',
       tappedAt: new Date(1_790_000_000_000),
-      student: { firstName: 'Ada', lastName: 'Lovelace' },
+      student: { firstName: 'Ada', lastName: 'Lovelace', grade: 3 },
       gathering: 'Sunday Kids',
       deviceId: 'kiosk-3f9a1c2e7b4d',
       parkedAt: new Date(1_790_000_600_000),
     });
+  });
+
+  it('keeps the grade the kiosk knew only when it is a number', () => {
+    const read = (grade: unknown) =>
+      toParkedRecord(snapshot('x', { student: { firstName: 'Ada', lastName: 'Lovelace', grade } })).student;
+    expect(read(0)).toEqual({ firstName: 'Ada', lastName: 'Lovelace', grade: 0 });
+    for (const grade of [undefined, null, '3']) {
+      expect(read(grade)?.grade, JSON.stringify(grade)).toBeNull();
+    }
   });
 
   it('reads anything it cannot trust as an unreadable record with nothing claimed', () => {
@@ -208,7 +218,22 @@ describe('standingStudent', () => {
     expect(standingStudent('student-noah', byId)).toBe(now);
   });
 
-  it('stops at a student who names themself, and gives up on one the roster has not got', () => {
+  it('follows a re-creation from a membership that holds no name, as the server does', () => {
+    // A Planning Center child deleted upstream: no row on the roster, but the
+    // document is still Tally's, and it carries the re-creation's pointer.
+    const gone = makeStudent({
+      id: 'pco_4100022',
+      firstName: '',
+      lastName: '',
+      status: 'inactive',
+      upstreamRecordMissing: true,
+      recreatedAsStudentId: 'pco_4100099',
+    });
+    const back = makeStudent({ id: 'pco_4100099', firstName: '', lastName: '' });
+    expect(standingStudent('pco_4100022', new Map([gone, back].map((student) => [student.id, student])))).toBe(back);
+  });
+
+  it('stops at a student who names themself, and gives up on one Tally has no document for', () => {
     const loop = makeStudent({ id: 'a', mergedIntoStudentId: 'a' });
     expect(standingStudent('a', new Map([['a', loop]]))).toBe(loop);
     expect(standingStudent('ghost', new Map())).toBeNull();
@@ -261,7 +286,7 @@ describe('cardAnswer', () => {
       const [card] = parkedCards([parked({ reason })]);
       expect(cardAnswer(card!, students)).toBe('let-go');
     }
-    // Nor for a child the roster does not have.
+    // Nor for a child Tally has no document for.
     const [card] = parkedCards([parked()]);
     expect(cardAnswer(card!, new Map())).toBe('let-go');
   });
@@ -290,5 +315,44 @@ describe('cardAnswer', () => {
       parked({ id: 'check-out', kind: 'check-out', reason: 'arrival-parked' }),
     ]);
     expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
+  });
+});
+
+describe('putBackAs', () => {
+  const gone = makeStudent({ id: 'pco_4100022', firstName: '', lastName: '', upstreamRecordMissing: true });
+
+  it('puts back a frozen Planning Center child the roster no longer shows, under the name the kiosk kept', () => {
+    const [card] = parkedCards([parked({ studentId: 'pco_4100022' })]);
+    expect(putBackAs(card!, gone, false)).toEqual({
+      studentId: 'pco_4100022',
+      name: { firstName: 'Noah', lastName: 'Park', grade: 3 },
+    });
+  });
+
+  it('leaves the repair to the child’s page while the roster still shows them', () => {
+    const [card] = parkedCards([parked({ studentId: 'pco_4100022' })]);
+    expect(putBackAs(card!, gone, true)).toBeNull();
+  });
+
+  it('offers nothing for a child who is not frozen, or who has no document', () => {
+    const [card] = parkedCards([parked({ studentId: 'pco_4100022' })]);
+    expect(putBackAs(card!, makeStudent({ id: 'pco_4100022' }), false)).toBeNull();
+    expect(putBackAs(card!, null, false)).toBeNull();
+  });
+
+  it('offers nothing a Planning Center re-creation cannot do', () => {
+    // Attendees has no re-creation; a visitor's own document has a name, and a page.
+    for (const id of ['a32_0b9c5f3e-1f7a-4c1e-9b0a-7d6f2c1a9e44', 'student-noah']) {
+      const [card] = parkedCards([parked({ studentId: id })]);
+      expect(putBackAs(card!, makeStudent({ id, upstreamRecordMissing: true }), false), id).toBeNull();
+    }
+  });
+
+  it('offers nothing without a name to put back under', () => {
+    // The kiosk sends names with an arrival; a pickup alone carries none.
+    const [pickup] = parkedCards([parked({ studentId: 'pco_4100022', kind: 'check-out', student: null })]);
+    expect(putBackAs(pickup!, gone, false)).toBeNull();
+    const [nameless] = parkedCards([parked({ studentId: 'pco_4100022', student: null })]);
+    expect(putBackAs(nameless!, gone, false)).toBeNull();
   });
 });

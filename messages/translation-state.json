@@ -12871,6 +12871,27 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Review.parkedPutBack": {
+    "source": "Put {name} back in {backend}",
+    "context": "Button on a kiosk card whose child's entry in the church's database was deleted, so Tally has no page for the child: pressing it creates the entry again under the name the kiosk kept, or links one already there. {name} is the child; {backend} is the database's name (Planning Center).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedPutBackCaption": {
+    "source": "Adds them to {backend} again under the name the kiosk kept, or links the record already there. Then this can be recorded.",
+    "context": "Sentence above that button: the child's entry is created again in the church's database under the name the kiosk kept, or linked to an entry already there, and then the kiosk's record can be added to the register. {backend} is the database's name (Planning Center).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedPutBackFailed": {
+    "source": "Couldn’t put {name} back in {backend}.",
+    "context": "Shown when putting the child back in the church's database failed. {name} is the child; {backend} is the database's name (Planning Center).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Review.parkedRecordCaption": {
     "source": "Adds it to {gathering}, at the time the kiosk saw it.",
     "context": "Sentence above the Record button on a kiosk card: saying yes adds the records to the gathering {gathering}, with the time the kiosk saw them, not the time of the press.",
