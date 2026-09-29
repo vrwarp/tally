@@ -110,6 +110,13 @@ export const PATHS = {
    * when it last reported in. Written by `claimKioskToken`; see kiosk/devices.ts.
    */
   kioskDevices: 'kioskDevices',
+  /**
+   * When each kiosk bound to a chain was last heard from, copied one way from
+   * `kioskDevices` for the counselors on that chain. See kiosk/presence.ts.
+   */
+  kioskPresence: 'kioskPresence',
+  /** Records no retry can land, waiting for a person. See kiosk/landing.ts. */
+  kioskParkedRecords: 'kioskParkedRecords',
   /** Connection health for the Settings screen. Written only by functions. */
   pcoStatus: 'config/pcoStatus',
   /**

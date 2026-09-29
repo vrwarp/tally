@@ -915,10 +915,19 @@ export interface TallyEvent
 export interface KioskDevice
   extends Omit<
     KioskDeviceDoc,
-    'pairedAt' | 'lastSeenAt' | 'retiredAt' | 'waitingSinceAt' | 'allInAt'
+    | 'pairedAt'
+    | 'lastSeenAt'
+    | 'retiredAt'
+    | 'waitingSinceAt'
+    | 'allInAt'
+    | 'name'
+    | 'firstLandingAt'
+    | 'waitingReportedAt'
   > {
   /** The device id the kiosk minted for itself; the document id. */
   id: string;
+  /** What people call it, or null for a kiosk nobody named — screens then use the id. */
+  name: string | null;
   pairedAt: Date | null;
   lastSeenAt: Date | null;
   retiredAt: Date | null;
@@ -960,11 +969,18 @@ export interface AccessRequest extends Omit<AccessRequestDoc, 'askedAt' | 'clear
  * Written by `claimKioskToken` when a pairing is approved, and the row *is*
  * the kiosk's standing — the rules admit a kiosk session while its row exists
  * and `retiredAt` is null, and read nobody's profile. The kiosk itself may
- * update only `lastSeenAt`, `boundTo` and `boundChain`; core and up may set
- * `retiredAt`/`retiredBy`, and nobody deletes one: the row is the provenance
- * of every morning that kiosk recorded. See `src/lib/kioskDevice.ts`.
+ * update only its report — `lastSeenAt`, `boundTo`, `boundChain` and its
+ * battery; core and up may set `retiredAt`/`retiredBy` and rename it, and
+ * nobody deletes one: the row is the provenance of every morning that kiosk
+ * recorded. See `src/lib/kioskDevice.ts`.
  */
 export interface KioskDeviceDoc {
+  /**
+   * What people call it — *Lobby*, *Nursery door* — given by whoever paired it
+   * and changed by the core team. Absent or null for a kiosk nobody named.
+   * Tidied by `kioskName`.
+   */
+  name?: string | null;
   approvedBy: string;
   /** The approver's display name as of the pairing, like `transitions.releasedByName`. */
   approvedByName: string | null;
@@ -1002,6 +1018,18 @@ export interface KioskDeviceDoc {
   waitingCount?: number;
   waitingSinceAt?: Timestamp | null;
   allInAt?: Timestamp | null;
+  /**
+   * When the call that wrote the counts began, so an older call finishing late
+   * cannot write older news over them. Server-only.
+   */
+  waitingReportedAt?: Timestamp;
+  /**
+   * When this kiosk first sent a record through `landKioskRecords`. From then
+   * on the rules refuse it the direct attendance writes the old bundle made
+   * (`kioskWritesDirectly` in firestore.rules). Server-only, and kept across a
+   * re-pair.
+   */
+  firstLandingAt?: Timestamp;
 }
 
 /**

@@ -88,6 +88,7 @@ import {
   type InviteLife,
 } from './invitations.js';
 import { isDeviceId, kioskUid, readLiveDevice, recordPairedDevice } from './kiosk/devices.js';
+import { kioskName } from './generated/kioskDevice.js';
 import type { ServerCode } from './generated/serverCodes.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { ChainAccessReader, partitionStudentHistory } from './eventAccess.js';
@@ -3213,7 +3214,7 @@ export const startKioskPairing = onCall<void, Promise<StartPairingResult>>(
  * tablet showing this code is the church's, which any member can say.
  */
 export const approveKioskPairing = onCall<
-  { code?: unknown },
+  { code?: unknown; name?: unknown },
   Promise<{ status: ApprovePairingStatus }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   await requireMember(request.auth?.uid);
@@ -3223,7 +3224,17 @@ export const approveKioskPairing = onCall<
     throw new HttpsError('invalid-argument', 'code is required.');
   }
 
-  return { status: await approvePairing(db(), code, request.auth!.uid, new Date()) };
+  // Whoever pairs a kiosk may name it; the core team renames it later, on the
+  // Kiosk page. Anything unusable as a name is simply no name.
+  return {
+    status: await approvePairing(
+      db(),
+      code,
+      request.auth!.uid,
+      new Date(),
+      kioskName(request.data?.name),
+    ),
+  };
 });
 
 /**
@@ -3247,12 +3258,17 @@ export const approveKioskPairing = onCall<
  * reset and a setup wizard sit between minting it and the kiosk first loading.
  */
 export const createKioskPairingLink = onCall<
-  undefined,
+  { name?: unknown } | undefined,
   Promise<{ status: 'created'; code: string; secret: string; expiresInSeconds: number } | { status: 'busy' }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   await requireMember(request.auth?.uid);
 
-  const started = await startPairing(db(), new Date(), request.auth!.uid);
+  const started = await startPairing(
+    db(),
+    new Date(),
+    request.auth!.uid,
+    kioskName(request.data?.name),
+  );
   if (started === 'busy') return { status: 'busy' };
   return { status: 'created', ...started };
 });
@@ -3303,7 +3319,13 @@ export const claimKioskToken = onCall<
     typeof approverData.displayName === 'string' && approverData.displayName.trim()
       ? approverData.displayName.trim()
       : null;
-  await recordPairedDevice(db(), deviceId, { uid: result.uid, name: approverName }, now);
+  await recordPairedDevice(
+    db(),
+    deviceId,
+    { uid: result.uid, name: approverName },
+    now,
+    result.deviceName,
+  );
 
   const token = await getAuth().createCustomToken(kioskUid(deviceId), { kiosk: true, deviceId });
   return { status: 'ready', token };

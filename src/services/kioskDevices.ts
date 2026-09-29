@@ -31,6 +31,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { kioskName } from '@/lib/kioskDevice';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 import type { KioskDevice } from '@/types';
@@ -65,6 +66,7 @@ function toKioskDevice(snapshot: {
   const data = snapshot.data() ?? {};
   return {
     id: snapshot.id,
+    name: kioskName(data.name),
     approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : '',
     approvedByName: typeof data.approvedByName === 'string' ? data.approvedByName : null,
     pairedAt: toDateOrNull(data.pairedAt),
@@ -176,4 +178,17 @@ export async function retireKioskDevice(deviceId: string, byUid: string): Promis
     retiredAt: serverTimestamp(),
     retiredBy: byUid,
   });
+}
+
+/**
+ * Gives a kiosk a name, or takes its name away — the core team's, on the
+ * Kiosk page. Whoever paired it may have named it already; this is the
+ * rename.
+ *
+ * `updateDoc` on the one field, which is all the rules admit from core, tidied
+ * by the same `kioskName` the pairing uses so a name means one thing. A name
+ * that says nothing stores null, and every screen goes back to the id.
+ */
+export async function renameKioskDevice(deviceId: string, name: string): Promise<void> {
+  await updateDoc(doc(db, paths.kioskDevice(deviceId)), { name: kioskName(name) });
 }

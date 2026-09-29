@@ -250,14 +250,32 @@ function parkedRef(db: FirestoreLike, kind: KioskRecordKind, eventId: string, st
   return db.doc(`${PARKED_COLLECTION}/${parkedRecordId(kind, eventId, studentId)}`);
 }
 
-/** What a parked record keeps: enough for a person to decide, and no more. */
-function park(
+/**
+ * What a parked record keeps: enough for a person to decide, and no more.
+ *
+ * One card per child, kind and gathering (`parkedRecordId`), so a tap sent
+ * twice parks once. When another tap for the same card arrives — the same
+ * check-in tapped again after leaving and rebinding cleared the room — the
+ * earlier tap stands, as it does on the register; and a card somebody has
+ * already settled is never reopened, because that decision has a name on it.
+ * Either way the answer is `parked`: Tally has the record, and the tablet may
+ * let it go.
+ */
+async function park(
   tx: TransactionLike,
   ref: DocumentRefLike,
   record: KioskRecordWire,
   reason: ParkReason,
   context: { caller: Caller; now: Date; event: DocumentSnapshotLike },
-): LandingResult {
+): Promise<LandingResult> {
+  const held = await tx.get(ref);
+  if (held.exists) {
+    const data = held.data() ?? {};
+    const heldTapMs = millis(data.tappedAt);
+    if (data.settledAt != null || (heldTapMs !== null && heldTapMs <= record.tappedAtMs)) {
+      return { id: record.id, outcome: 'parked', reason };
+    }
+  }
   const title = context.event.exists ? context.event.data()?.title : undefined;
   tx.set(ref, {
     kind: record.kind,
@@ -271,6 +289,8 @@ function park(
     gathering: typeof title === 'string' ? title : (record.gathering ?? null),
     deviceId: context.caller.deviceId,
     parkedAt: Timestamp.fromDate(context.now),
+    // Null rather than absent, so Review can ask for exactly the unsettled.
+    settledAt: null,
   });
   return { id: record.id, outcome: 'parked', reason };
 }
@@ -494,6 +514,7 @@ export async function runLandKioskRecords(args: {
         recordId: parsed.id,
         deviceId: caller.deviceId,
         parkedAt: Timestamp.fromDate(now),
+        settledAt: null,
       });
       outcomes.push({ id: parsed.id, outcome: 'parked', reason: 'unreadable' });
       continue;
@@ -541,6 +562,17 @@ export async function runLandKioskRecords(args: {
  * holding records, so "all in Tally since Monday 9:02" means the end of an
  * outage rather than the last ordinary tap.
  *
+ * In a transaction, and only as news: `waitingReportedAt` is when the call
+ * that wrote the count began, and a call that began earlier — one the kiosk
+ * gave up on and sent again, finishing after its own retry — leaves the newer
+ * count where it is.
+ *
+ * It also marks the row `firstLandingAt`, once: this kiosk sends its records
+ * through here, and the rules refuse it the direct attendance writes the old
+ * bundle made. The mark is per tablet, so a tablet still running the old
+ * bundle — one that was off all week and booted from its cache on a Sunday —
+ * keeps the road it knows until it updates.
+ *
  * Best effort by design: the records above are already on the register, and a
  * count that fails to update must not make the kiosk send them again.
  */
@@ -561,17 +593,30 @@ async function recordWaiting(
 
   try {
     const ref = db.doc(`${PATHS.kioskDevices}/${deviceId}`);
-    const device = await ref.get();
-    const before = device.data()?.waitingCount;
-    const wasWaiting = typeof before === 'number' && before > 0;
-    await ref.update({
-      waitingCount,
-      waitingSinceAt: oldest === null ? null : Timestamp.fromMillis(oldest),
-      ...(waitingCount > 0
-        ? { allInAt: null }
-        : wasWaiting
-          ? { allInAt: Timestamp.fromDate(now) }
-          : {}),
+    await db.runTransaction(async (tx) => {
+      const device = await tx.get(ref);
+      if (!device.exists) return;
+      const data = device.data() ?? {};
+      const marker = data.firstLandingAt == null ? { firstLandingAt: Timestamp.fromDate(now) } : {};
+      const reportedMs = millis(data.waitingReportedAt);
+      if (reportedMs !== null && reportedMs > now.getTime()) {
+        // A call that began after this one has already said what is waiting.
+        if (data.firstLandingAt == null) tx.update(ref, marker);
+        return;
+      }
+      const before = data.waitingCount;
+      const wasWaiting = typeof before === 'number' && before > 0;
+      tx.update(ref, {
+        waitingCount,
+        waitingSinceAt: oldest === null ? null : Timestamp.fromMillis(oldest),
+        waitingReportedAt: Timestamp.fromDate(now),
+        ...(waitingCount > 0
+          ? { allInAt: null }
+          : wasWaiting
+            ? { allInAt: Timestamp.fromDate(now) }
+            : {}),
+        ...marker,
+      });
     });
   } catch (error) {
     logger.warn('Could not record what a kiosk still holds', {

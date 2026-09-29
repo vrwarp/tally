@@ -17,6 +17,7 @@ import {
   isKioskLive,
   kioskMayHoldRecords,
   kioskOutOfTouchSince,
+  renameKioskDevice,
   retireKioskDevice,
   subscribeKioskDevices,
 } from '@/services/kioskDevices';
@@ -45,6 +46,7 @@ vi.mock('firebase/firestore', () => ({
 function device(overrides: Partial<KioskDevice> = {}): KioskDevice {
   return {
     id: 'lobby-tablet',
+    name: null,
     approvedBy: 'uid-miriam',
     approvedByName: 'Miriam Achebe',
     pairedAt: new Date('2026-09-01T09:00:00Z'),
@@ -69,6 +71,24 @@ describe('retireKioskDevice', () => {
     // Exactly the two fields the rules admit. `approvedBy` and the name it was
     // approved under are the custody record and are not this write's business.
     expect(patch).toEqual({ retiredAt: 'server-timestamp', retiredBy: 'uid-dana' });
+  });
+});
+
+describe('renameKioskDevice', () => {
+  it('writes the one field the rules admit, tidied as the pairing tidies it', async () => {
+    await renameKioskDevice('lobby-tablet', '  Nursery   door ');
+    const [ref, patch] = updateDoc.mock.calls.at(-1) as unknown as [
+      { path: string },
+      Record<string, unknown>,
+    ];
+    expect(ref.path).toBe('kioskDevices/lobby-tablet');
+    expect(patch).toEqual({ name: 'Nursery door' });
+  });
+
+  it('takes the name away when what was typed says nothing', async () => {
+    await renameKioskDevice('lobby-tablet', '   ');
+    const [, patch] = updateDoc.mock.calls.at(-1) as unknown as [unknown, Record<string, unknown>];
+    expect(patch).toEqual({ name: null });
   });
 });
 
@@ -103,6 +123,7 @@ describe('subscribeKioskDevices', () => {
         {
           id: 'lobby-tablet',
           data: () => ({
+            name: 'Lobby',
             approvedBy: 'uid-miriam',
             approvedByName: 'Miriam Achebe',
             pairedAt: new Timestamp(1_767_607_200, 0),
@@ -118,6 +139,7 @@ describe('subscribeKioskDevices', () => {
 
     expect(held[0]).toEqual({
       id: 'lobby-tablet',
+      name: 'Lobby',
       approvedBy: 'uid-miriam',
       approvedByName: 'Miriam Achebe',
       pairedAt: new Date(1_767_607_200_000),
@@ -269,6 +291,12 @@ describe('subscribeKioskDevices', () => {
     expect(allIn).toHaveProperty('allInAt', new Date(1_767_614_400_000));
   });
 
+  it('reads a name that is not one as no name', () => {
+    expect(readBack({ approvedBy: 'uid-miriam', name: '   ' }).name).toBeNull();
+    expect(readBack({ approvedBy: 'uid-miriam', name: 7 }).name).toBeNull();
+    expect(readBack({ approvedBy: 'uid-miriam', name: ' Lobby ' }).name).toBe('Lobby');
+  });
+
   it('leaves the waiting fields off a kiosk that never sent, or sent the wrong type', () => {
     const neverSent = readBack({ approvedBy: 'uid-miriam' });
     expect(neverSent).not.toHaveProperty('waitingCount');
@@ -351,6 +379,7 @@ describe('subscribeKioskDevices', () => {
 
     expect(held[0]).toEqual({
       id: 'lobby-tablet',
+      name: null,
       approvedBy: '',
       approvedByName: null,
       pairedAt: null,

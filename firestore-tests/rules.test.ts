@@ -1270,6 +1270,63 @@ describe('kioskParkedRecords', () => {
     await assertFails(deleteDoc(at(asUser(env, UID.admin))));
     await assertFails(setDoc(at(asKioskDevice(env, DEVICE.live)), { reason: 'frozen' }));
   });
+
+  it('is settled by the server alone — Let it go has a name on it only if Tally writes it', async () => {
+    await assertFails(
+      updateDoc(at(asUser(env, UID.admin)), {
+        settledAt: serverTimestamp(),
+        settledBy: UID.admin,
+        decision: 'let-go',
+      }),
+    );
+  });
+});
+
+describe('kioskPresence', () => {
+  const presence = (db: Firestore, chain: string) => doc(db, paths.kioskPresence(chain));
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore() as unknown as Firestore;
+      for (const chain of [ID.series, ID.restrictedSeries]) {
+        await setDoc(presence(db, chain), {
+          devices: {
+            [DEVICE.live]: {
+              name: 'Lobby',
+              lastSeenAt: Timestamp.fromDate(new Date('2026-02-13T19:41:00Z')),
+            },
+          },
+        });
+      }
+    });
+  });
+
+  it('is read by anybody on the gathering, as its register is', async () => {
+    await assertSucceeds(getDoc(presence(asUser(env, UID.counselor), ID.series)));
+    await assertSucceeds(getDoc(presence(asUser(env, UID.outsider), ID.series)));
+    await assertSucceeds(getDoc(presence(asUser(env, UID.counselor), ID.restrictedSeries)));
+    await assertSucceeds(getDoc(presence(asUser(env, UID.admin), ID.restrictedSeries)));
+  });
+
+  it('is not read by anybody off the gathering, signed out, inactive, or at the door', async () => {
+    await assertFails(getDoc(presence(asUser(env, UID.outsider), ID.restrictedSeries)));
+    await assertFails(getDoc(presence(asUser(env, UID.outsiderCore), ID.restrictedSeries)));
+    await assertFails(getDoc(presence(asUser(env, UID.inactive), ID.series)));
+    await assertFails(getDoc(presence(asUser(env, UID.stranger), ID.series)));
+    await assertFails(getDoc(presence(asAnonymous(env), ID.series)));
+    await assertFails(getDoc(presence(asKioskDevice(env, DEVICE.live), ID.series)));
+  });
+
+  it('is written by nobody but its trigger, and listed by nobody', async () => {
+    await assertFails(
+      setDoc(presence(asUser(env, UID.admin), ID.series), { devices: {} }),
+    );
+    await assertFails(deleteDoc(presence(asUser(env, UID.admin), ID.series)));
+    await assertFails(
+      setDoc(presence(asKioskDevice(env, DEVICE.live), ID.series), { devices: {} }),
+    );
+    await assertFails(getDocs(collection(asUser(env, UID.admin), COLLECTIONS.kioskPresence)));
+  });
 });
 
 describe('the attendance freeze (upstreamRecordMissing)', () => {
@@ -2944,6 +3001,68 @@ describe('kiosk', () => {
         deleteDoc(doc(asKioskDevice(env, DEVICE.live), paths.attendance(ID.event, ID.student))),
       );
     });
+
+    describe('once it has sent a record through Tally', () => {
+      /*
+       * `landKioskRecords` marks the row on the first call. From then on the
+       * tablet runs the bundle that never writes here, and a direct write is
+       * somebody else's; until then, it may still be the old bundle, booted
+       * from its cache on a Sunday, which drops a refused tap behind a tick.
+       */
+      beforeEach(async () => {
+        await env.withSecurityRulesDisabled(async (context) => {
+          await updateDoc(doc(context.firestore() as unknown as Firestore, paths.kioskDevice(DEVICE.live)), {
+            firstLandingAt: Timestamp.fromDate(new Date('2026-02-13T19:05:00Z')),
+          });
+        });
+      });
+
+      it('may not write the register directly — neither a check-in nor a pickup', async () => {
+        const kiosk = asKioskDevice(env, DEVICE.live);
+        await assertFails(
+          setDoc(
+            doc(kiosk, paths.attendance(ID.event, ID.otherStudent)),
+            attendanceDoc({ studentId: ID.otherStudent, checkedInBy: KIOSK }),
+          ),
+        );
+        await assertFails(
+          updateDoc(doc(kiosk, paths.attendance(ID.event, ID.student)), {
+            checkedOutAt: serverTimestamp(),
+            checkedOutBy: KIOSK,
+          }),
+        );
+      });
+
+      it('may not patch a student\u2019s dates either', async () => {
+        await assertFails(
+          setDoc(
+            doc(asKioskDevice(env, DEVICE.live), paths.student(ID.student)),
+            { lastAttendedAt: Timestamp.fromDate(new Date('2026-02-13T19:00:00Z')), updatedBy: KIOSK },
+            { merge: true },
+          ),
+        );
+      });
+
+      it('still reads its register, which is how it sees who is here', async () => {
+        await assertSucceeds(
+          getDocs(collection(asKioskDevice(env, DEVICE.live), paths.attendanceCollection(ID.event))),
+        );
+      });
+
+      it('leaves every other kiosk the road it knows', async () => {
+        // `elsewhere` has never called `landKioskRecords`.
+        await assertSucceeds(
+          setDoc(
+            doc(asKioskDevice(env, DEVICE.elsewhere), paths.attendance(ID.restrictedEvent, ID.otherStudent)),
+            attendanceDoc({
+              studentId: ID.otherStudent,
+              eventId: ID.restrictedEvent,
+              checkedInBy: kioskUid(DEVICE.elsewhere),
+            }),
+          ),
+        );
+      });
+    });
   });
 
   describe('students, from a kiosk session', () => {
@@ -3251,6 +3370,42 @@ describe('kiosk', () => {
       );
       // The kiosk's own three keys are the kiosk's.
       await assertFails(updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { boundTo: 'Nursery' }));
+    });
+
+    it('is renamed by core and up, and nothing else rides along', async () => {
+      const core = asUser(env, UID.core);
+      await assertSucceeds(updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { name: 'Lobby' }));
+      await assertSucceeds(
+        updateDoc(doc(asUser(env, UID.admin), paths.kioskDevice(DEVICE.elsewhere)), {
+          name: 'x'.repeat(40),
+        }),
+      );
+      // Taking a name away is a rename too; the screens fall back to the id.
+      await assertSucceeds(updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { name: null }));
+      await assertSucceeds(updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { name: deleteField() }));
+      await assertFails(
+        updateDoc(doc(core, paths.kioskDevice(DEVICE.live)), { name: 'Lobby', boundTo: 'Nursery' }),
+      );
+    });
+
+    it('refuses a name that is not one, a rename below core, and a kiosk naming itself', async () => {
+      const row = (db: Firestore) => doc(db, paths.kioskDevice(DEVICE.live));
+      const core = asUser(env, UID.core);
+      await assertFails(updateDoc(row(core), { name: '' }));
+      await assertFails(updateDoc(row(core), { name: 'x'.repeat(41) }));
+      await assertFails(updateDoc(row(core), { name: 7 }));
+      await assertFails(updateDoc(row(asUser(env, UID.counselor)), { name: 'Lobby' }));
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), name: 'Lobby' }));
+    });
+
+    it('keeps the server\u2019s marks the server\u2019s: the counts, and that it sends through Tally', async () => {
+      const admin = asUser(env, UID.admin);
+      await assertFails(updateDoc(doc(admin, paths.kioskDevice(DEVICE.live)), { firstLandingAt: null }));
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), firstLandingAt: null }));
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), waitingCount: 0 }));
+      await assertFails(
+        updateDoc(doc(admin, paths.kioskDevice(DEVICE.live)), { waitingReportedAt: serverTimestamp() }),
+      );
     });
 
     it('stays retired: nobody un-retires from a client — pairing again is the server\'s to do', async () => {

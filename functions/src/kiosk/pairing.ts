@@ -36,6 +36,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { FirestoreLike } from '../firestore.js';
 import { toDateOrNull } from '../firestore.js';
+import { kioskName } from '../generated/kioskDevice.js';
 
 export const PAIRING_COLLECTION = 'kioskPairings';
 
@@ -96,6 +97,8 @@ interface PairingDocView {
   secretHash: string;
   status: 'pending' | 'approved';
   approvedBy: string | null;
+  /** What the approver called the kiosk, if anything — see `kioskName`. */
+  deviceName: string | null;
   expiresAt: Date | null;
   claimedAt: Date | null;
 }
@@ -105,6 +108,7 @@ function readPairing(data: Record<string, unknown>): PairingDocView {
     secretHash: typeof data.secretHash === 'string' ? data.secretHash : '',
     status: data.status === 'approved' ? 'approved' : 'pending',
     approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : null,
+    deviceName: kioskName(data.deviceName),
     expiresAt: toDateOrNull(data.expiresAt),
     claimedAt: toDateOrNull(data.claimedAt),
   };
@@ -144,6 +148,8 @@ export async function startPairing(
    * step, not a second way in with its own rules.
    */
   approvedBy: string | null = null,
+  /** The name the approver gave the kiosk, carried to its device row at the claim. */
+  deviceName: string | null = null,
 ): Promise<StartPairingResult | 'busy'> {
   const snapshot = await db.collection(PAIRING_COLLECTION).get();
 
@@ -175,6 +181,7 @@ export async function startPairing(
         expiresAt: Timestamp.fromDate(expiresAt),
         approvedBy,
         approvedAt: approvedBy === null ? null : Timestamp.fromDate(now),
+        deviceName: approvedBy === null ? null : kioskName(deviceName),
         claimedAt: null,
       });
       return { code, secret, expiresInSeconds: Math.floor(ttl / 1000) };
@@ -194,13 +201,16 @@ export type ApprovePairingStatus = 'approved' | 'not-found' | 'expired';
  * typed it — the identity the kiosk will inherit.
  *
  * Approving twice is fine and the second approver wins; the interesting
- * outcomes are the two refusals, which the screen shows as sentences.
+ * outcomes are the two refusals, which the screen shows as sentences. A name
+ * given with the approval goes to the kiosk's row when it claims; a second
+ * approval without one leaves the first approver's.
  */
 export async function approvePairing(
   db: FirestoreLike,
   rawCode: string,
   uid: string,
   now: Date,
+  deviceName: string | null = null,
 ): Promise<ApprovePairingStatus> {
   const code = normalizeCode(rawCode);
   if (code.length !== CODE_LENGTH) return 'not-found';
@@ -212,8 +222,14 @@ export async function approvePairing(
   const pairing = readPairing(snapshot.data() ?? {});
   if (isExpired(pairing, now)) return 'expired';
 
+  const name = kioskName(deviceName);
   await ref.set(
-    { status: 'approved', approvedBy: uid, approvedAt: Timestamp.fromDate(now) },
+    {
+      status: 'approved',
+      approvedBy: uid,
+      approvedAt: Timestamp.fromDate(now),
+      ...(name === null ? {} : { deviceName: name }),
+    },
     { merge: true },
   );
   return 'approved';
@@ -221,7 +237,7 @@ export async function approvePairing(
 
 export type ClaimPairingResult =
   | { status: 'pending' | 'not-found' | 'expired' }
-  | { status: 'ready'; uid: string };
+  | { status: 'ready'; uid: string; deviceName: string | null };
 
 /**
  * The kiosk collecting its identity. Returns the uid to mint a token for —
@@ -253,5 +269,5 @@ export async function claimPairing(
   if (pairing.claimedAt === null) {
     await ref.set({ claimedAt: Timestamp.fromDate(now) }, { merge: true });
   }
-  return { status: 'ready', uid: pairing.approvedBy };
+  return { status: 'ready', uid: pairing.approvedBy, deviceName: pairing.deviceName };
 }

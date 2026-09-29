@@ -81,6 +81,22 @@ export const COLLECTIONS = {
    */
   kioskDevices: 'kioskDevices',
   /**
+   * The lobby kiosk's records that no retry can land — a frozen child, a
+   * deleted gathering, a pickup whose arrival never came — one card per child,
+   * kind and gathering, waiting for the core team on Review. Written by
+   * `landKioskRecords` and settled by `settleParkedKioskRecord`, both on the
+   * server; a settled card is kept, with who decided. See
+   * docs/kiosk-offline-recovery.md §5.
+   */
+  kioskParkedRecords: 'kioskParkedRecords',
+  /**
+   * One document per chain: when each kiosk bound to it was last heard from,
+   * and what it is called. A one-way copy of the device rows, which are
+   * core-only, so a counselor's register can say a kiosk is out of touch.
+   * Written only by the `onKioskDeviceWritten` trigger.
+   */
+  kioskPresence: 'kioskPresence',
+  /**
    * One document per (chain, member) pair: somebody is asking to be put on a
    * gathering they are not on.
    *
@@ -172,6 +188,11 @@ export const paths = {
 
   kioskDevicesCollection: () => COLLECTIONS.kioskDevices,
   kioskDevice: (deviceId: string) => `${COLLECTIONS.kioskDevices}/${deviceId}`,
+
+  kioskParkedRecordsCollection: () => COLLECTIONS.kioskParkedRecords,
+  kioskParkedRecord: (recordId: string) => `${COLLECTIONS.kioskParkedRecords}/${recordId}`,
+
+  kioskPresence: (chainKey: string) => `${COLLECTIONS.kioskPresence}/${chainKey}`,
 
   accessRequestsCollection: () => COLLECTIONS.accessRequests,
   accessRequest: (chainKey: string, uid: string) =>

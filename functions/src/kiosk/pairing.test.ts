@@ -76,7 +76,22 @@ describe('startPairing, pre-approved for a staging link', () => {
     expect(await claimPairing(db, result.code, result.secret, NOW)).toEqual({
       status: 'ready',
       uid: 'leader-1',
+      deviceName: null,
     });
+  });
+
+  it('carries the name the link was made with, and none for a pairing nobody approved', async () => {
+    const db = new FakeFirestore();
+    const named = await startPairing(db, NOW, 'leader-1', ' Welcome desk ');
+    if (named === 'busy') throw new Error('unexpected busy');
+    expect(await claimPairing(db, named.code, named.secret, NOW)).toMatchObject({
+      deviceName: 'Welcome desk',
+    });
+
+    // An ordinary code has nobody to name it yet: the name comes with approval.
+    const plain = await startPairing(db, NOW, null, 'Ignored');
+    if (plain === 'busy') throw new Error('unexpected busy');
+    expect(db.get(`kioskPairings/${plain.code}`)!.deviceName).toBeNull();
   });
 
   it('still stores only a hash of the secret', async () => {
@@ -145,6 +160,31 @@ describe('approvePairing', () => {
     expect(await approvePairing(db, 'short', 'staff-1', NOW)).toBe('not-found');
     expect(await approvePairing(db, code, 'staff-1', LATER)).toBe('expired');
   });
+
+  it('carries the name the approver gave to the claim, tidied', async () => {
+    const db = new FakeFirestore();
+    const { code, secret } = await started(db);
+
+    await approvePairing(db, code, 'staff-1', NOW, '  Nursery   door ');
+    expect(await claimPairing(db, code, secret, NOW)).toEqual({
+      status: 'ready',
+      uid: 'staff-1',
+      deviceName: 'Nursery door',
+    });
+  });
+
+  it('keeps the first approver\u2019s name when a second approves without one', async () => {
+    const db = new FakeFirestore();
+    const { code, secret } = await started(db);
+
+    await approvePairing(db, code, 'staff-1', NOW, 'Lobby');
+    await approvePairing(db, code, 'staff-2', NOW, '   ');
+    expect(await claimPairing(db, code, secret, NOW)).toEqual({
+      status: 'ready',
+      uid: 'staff-2',
+      deviceName: 'Lobby',
+    });
+  });
 });
 
 describe('claimPairing', () => {
@@ -155,9 +195,10 @@ describe('claimPairing', () => {
     expect(await claimPairing(db, code, secret, NOW)).toEqual({ status: 'pending' });
 
     await approvePairing(db, code, 'staff-1', NOW);
-    expect(await claimPairing(db, code, secret, NOW)).toEqual({ status: 'ready', uid: 'staff-1' });
+    const ready = { status: 'ready', uid: 'staff-1', deviceName: null };
+    expect(await claimPairing(db, code, secret, NOW)).toEqual(ready);
     // The kiosk's first claim response fell on the floor; the retry succeeds.
-    expect(await claimPairing(db, code, secret, NOW)).toEqual({ status: 'ready', uid: 'staff-1' });
+    expect(await claimPairing(db, code, secret, NOW)).toEqual(ready);
   });
 
   it('treats a wrong secret exactly like an unknown code', async () => {

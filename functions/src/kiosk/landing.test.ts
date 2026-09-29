@@ -351,7 +351,57 @@ describe('parking', () => {
     const db = dbWithSunday();
     const result = await land(db, [checkIn(START, { id: 'weird-000001', eventId: '..' })], START);
     expect(result.outcomes[0]).toMatchObject({ outcome: 'parked', reason: 'unreadable' });
-    expect(db.get(`${PARKED_COLLECTION}/unreadable:weird-000001`)).toMatchObject({ reason: 'unreadable' });
+    expect(db.get(`${PARKED_COLLECTION}/unreadable:weird-000001`)).toMatchObject({
+      reason: 'unreadable',
+      settledAt: null,
+    });
+  });
+
+  it('marks every card unsettled, so Review can ask for exactly those', async () => {
+    const db = dbWithSunday();
+    db.seed(`students/${ADA}`, { firstName: 'Ada', upstreamRecordMissing: true });
+    await land(db, [checkIn(START)], START + MINUTE);
+    expect(db.get(`${PARKED_COLLECTION}/check-in:${EVENT}:${ADA}`)).toMatchObject({
+      reason: 'frozen',
+      settledAt: null,
+    });
+  });
+
+  it('keeps the earlier tap when the same card is parked twice, in either order', async () => {
+    const parkedTap = (db: FakeFirestore) =>
+      ms(db.get(`${PARKED_COLLECTION}/check-in:${EVENT}:${ADA}`)!.tappedAt);
+
+    // Tapped again after leaving and rebinding cleared the room.
+    const later = dbWithSunday();
+    later.seed(`students/${ADA}`, { firstName: 'Ada', upstreamRecordMissing: true });
+    await land(later, [checkIn(START + 13 * MINUTE)], START + 20 * MINUTE);
+    const again = await land(later, [checkIn(START + 20 * MINUTE)], START + 21 * MINUTE);
+    expect(again.outcomes[0]).toMatchObject({ outcome: 'parked', reason: 'frozen' });
+    expect(parkedTap(later)).toBe(START + 13 * MINUTE);
+
+    // The earlier tap arriving second takes the card.
+    const earlier = dbWithSunday();
+    earlier.seed(`students/${ADA}`, { firstName: 'Ada', upstreamRecordMissing: true });
+    await land(earlier, [checkIn(START + 20 * MINUTE)], START + 21 * MINUTE);
+    await land(earlier, [checkIn(START + 13 * MINUTE)], START + 22 * MINUTE);
+    expect(parkedTap(earlier)).toBe(START + 13 * MINUTE);
+  });
+
+  it('never reopens a card somebody has settled', async () => {
+    const db = dbWithSunday();
+    db.seed(`students/${ADA}`, { firstName: 'Ada', upstreamRecordMissing: true });
+    const settled = {
+      reason: 'frozen',
+      tappedAt: Timestamp.fromMillis(START + 20 * MINUTE),
+      settledAt: Timestamp.fromMillis(END),
+      decision: 'let-go',
+      settledBy: 'uid-dana',
+    };
+    db.seed(`${PARKED_COLLECTION}/check-in:${EVENT}:${ADA}`, settled);
+
+    const result = await land(db, [checkIn(START + 5 * MINUTE)], END + MINUTE);
+    expect(result.outcomes[0]).toMatchObject({ outcome: 'parked' });
+    expect(db.get(`${PARKED_COLLECTION}/check-in:${EVENT}:${ADA}`)).toEqual(settled);
   });
 });
 
@@ -426,5 +476,50 @@ describe('what is still on the tablet', () => {
     // An ordinary tap on a tablet holding nothing leaves the moment alone.
     await land(db, [{ ...checkIn(START), id: 'in-next-aaaa', studentId: 'student-byron' }], monday + MINUTE);
     expect(ms(device(db).allInAt)).toBe(monday);
+  });
+
+  it('is news only when it is newer — a call that finishes after its own retry leaves the count alone', async () => {
+    const db = dbWithSunday();
+    // The retry began at 10:05 and has said three are waiting.
+    const retry = START + 35 * MINUTE;
+    db.seed(`kioskDevices/${DEVICE}`, {
+      waitingCount: 3,
+      waitingReportedAt: Timestamp.fromMillis(retry),
+      firstLandingAt: Timestamp.fromMillis(START),
+    });
+
+    // The call the kiosk gave up on began at 10:04, and finishes now.
+    await land(db, [checkIn(START)], retry - MINUTE, { count: 40, oldestTappedAtMs: START });
+    expect(device(db).waitingCount).toBe(3);
+    expect(ms(device(db).waitingReportedAt)).toBe(retry);
+
+    // A later call is news.
+    await land(db, [], retry + MINUTE, { count: 1, oldestTappedAtMs: START });
+    expect(device(db).waitingCount).toBe(1);
+    expect(ms(device(db).waitingReportedAt)).toBe(retry + MINUTE);
+  });
+
+  it('marks the kiosk as one that sends through Tally, once', async () => {
+    const db = dbWithSunday();
+    await land(db, [checkIn(START)], START + MINUTE);
+    expect(ms(device(db).firstLandingAt)).toBe(START + MINUTE);
+
+    await land(db, [], START + 10 * MINUTE);
+    expect(ms(device(db).firstLandingAt)).toBe(START + MINUTE);
+  });
+
+  it('marks it even when its count is old news', async () => {
+    const db = dbWithSunday();
+    db.seed(`kioskDevices/${DEVICE}`, { waitingReportedAt: Timestamp.fromMillis(END) });
+    await land(db, [], START);
+    expect(ms(device(db).firstLandingAt)).toBe(START);
+    expect(device(db)).not.toHaveProperty('waitingCount');
+  });
+
+  it('writes nothing for a device row that is not there', async () => {
+    const db = dbWithSunday();
+    db.data.delete(`kioskDevices/${DEVICE}`);
+    await land(db, [checkIn(START)], START + MINUTE);
+    expect(db.get(`kioskDevices/${DEVICE}`)).toBeUndefined();
   });
 });

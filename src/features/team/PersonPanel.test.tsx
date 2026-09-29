@@ -83,6 +83,7 @@ const SAM = makeUser({
 function device(overrides: Partial<KioskDevice> = {}): KioskDevice {
   return {
     id: 'lobby-tablet',
+    name: null,
     approvedBy: SAM.id,
     approvedByName: 'Sam Whitfield',
     pairedAt: new Date('2026-09-01T09:00:00Z'),
