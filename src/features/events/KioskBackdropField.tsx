@@ -6,9 +6,9 @@
  * (src/kiosk/components/Backdrop.tsx). What the consultation demanded of
  * *this* side:
  *
- * - **The preview is the shipped truth.** Both orientations, always — a
- *   landscape upload approved from a landscape mock becomes a strip of
- *   ceiling on the portrait shelf — under the very `.kiosk-backdrop-veil`
+ * - **The preview is the shipped truth.** The kiosk's own portrait crop —
+ *   a photograph taken sideways keeps only its middle there, and a leader
+ *   should meet that on Tuesday — under the very `.kiosk-backdrop-veil`
  *   class the kiosk paints, carrying the idle screen's real words, in this
  *   gathering's current colours, repainting live as the theme field beside
  *   it changes. The anchors are scaled through the veil's own custom
@@ -59,15 +59,13 @@ export interface KioskBackdropFieldProps {
 }
 
 /**
- * The two shelves a kiosk actually stands on. One image serves both by
- * cover-cropping, which is exactly why both are always shown: the portrait
- * crop keeps roughly the middle two-fifths of a landscape photograph, and
- * that is a fact to meet on Tuesday rather than at 8:55 on Sunday.
+ * The one shape a kiosk stands in, and the box it is previewed in. One image
+ * serves it by cover-cropping, which keeps roughly the middle two-fifths of a
+ * photograph taken sideways — a fact to meet on Tuesday rather than at 8:55
+ * on Sunday.
  */
-const CROPS = [
-  { label: 'onAShelf', width: 1280, height: 800, box: { width: 232, height: 145 } },
-  { label: 'stoodOnEnd', width: 800, height: 1280, box: { width: 91, height: 145 } },
-] as const;
+const KIOSK = { width: 800, height: 1280 } as const;
+const PREVIEW = { width: 91, height: 145 } as const;
 
 /**
  * The veil, scaled to a preview box through its own custom properties.
@@ -78,40 +76,25 @@ const CROPS = [
  * also uses for its own theme — inline values are what shield the preview
  * from both, and what let it follow the *gathering's* ground instead.
  */
-function veilStyle(scale: number, tall: boolean, ground: 'dark' | 'light'): CSSProperties {
+function veilStyle(scale: number, ground: 'dark' | 'light'): CSSProperties {
   const rem = (value: number) => `${(value * scale).toFixed(3)}rem`;
   const light = ground === 'light';
-  // The same fork the stylesheet makes: portrait carries the canopy — one
-  // grade holding console and instruction together, released on a curve —
-  // while the shelf keeps the short header grade with the card below it.
-  // The portrait crop paints the *phone's* canopy proportion, the deepest
-  // any portrait kiosk paints, so a crop approved here errs toward more of
-  // the photograph covered on Sunday, never less.
-  return tall
-    ? ({
-        '--backdrop-head-hold': rem(24.6),
-        '--backdrop-rel1': rem(light ? 6.8 : 5.7),
-        '--backdrop-rel2': rem(light ? 12.9 : 10.6),
-        '--backdrop-rel3': rem(light ? 17.4 : 14.4),
-        '--backdrop-foot-rise': rem(10),
-        '--backdrop-head': light ? '85%' : '68%',
-        '--backdrop-mid1': light ? '62%' : '42%',
-        '--backdrop-mid2': light ? '38%' : '26%',
-        '--backdrop-wash': light ? '15%' : '18%',
-        '--backdrop-foot': light ? '18%' : '14%',
-      } as CSSProperties)
-    : ({
-        '--backdrop-head-hold': rem(5.5),
-        '--backdrop-rel1': rem(0.5),
-        '--backdrop-rel2': rem(1),
-        '--backdrop-rel3': rem(1.5),
-        '--backdrop-foot-rise': rem(10),
-        '--backdrop-head': light ? '92%' : '85%',
-        '--backdrop-mid1': light ? '66%' : '56%',
-        '--backdrop-mid2': light ? '47%' : '37%',
-        '--backdrop-wash': light ? '30%' : '18%',
-        '--backdrop-foot': light ? '0%' : '14%',
-      } as CSSProperties);
+  // The canopy: one grade holding console and instruction together, released
+  // on a curve. It paints the *phone's* canopy proportion, the deepest the
+  // kiosk paints, so a crop approved here errs toward more of the photograph
+  // covered on Sunday, never less.
+  return {
+    '--backdrop-head-hold': rem(24.6),
+    '--backdrop-rel1': rem(light ? 6.8 : 5.7),
+    '--backdrop-rel2': rem(light ? 12.9 : 10.6),
+    '--backdrop-rel3': rem(light ? 17.4 : 14.4),
+    '--backdrop-foot-rise': rem(10),
+    '--backdrop-head': light ? '85%' : '68%',
+    '--backdrop-mid1': light ? '62%' : '42%',
+    '--backdrop-mid2': light ? '38%' : '26%',
+    '--backdrop-wash': light ? '15%' : '18%',
+    '--backdrop-foot': light ? '18%' : '14%',
+  } as CSSProperties;
 }
 
 /** "12 Oct", for the conscience line. */
@@ -136,6 +119,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
 
   const worn = theme ?? DEFAULT_KIOSK_THEME;
   const colours = useMemo(() => painted(worn), [worn]);
+  const scale = PREVIEW.height / KIOSK.height;
 
   /*
    * The stored image is a third of a megabyte, so it is read only when
@@ -235,104 +219,72 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
         <div className="mt-1 flex flex-col gap-3 rounded-xl bg-ink-950 p-3 ring-1 ring-ink-800">
           {value.kind !== 'none' && (
             /*
-             * Both crops of the one image, under the kiosk's own veil, over
+             * The kiosk's crop of the image, under the kiosk's own veil, over
              * the idle screen's own words, on the gathering's own page —
              * scaled, never mocked up. The container pins the page token so
              * the veil and the ground read this gathering's colours rather
              * than the app's.
              */
-            <div className="flex items-end gap-3">
-              {CROPS.map((crop) => {
-                const scale = crop.box.height / crop.height;
-                const tall = crop.height >= 1000;
-                return (
-                  <div key={crop.label} className="flex min-w-0 flex-col items-center gap-1">
-                    <div
-                      className="relative overflow-hidden rounded-lg ring-1 ring-ink-700"
-                      style={{
-                        width: crop.box.width,
-                        height: crop.box.height,
-                        background: colours['--color-ink-950'],
-                        '--color-ink-950': colours['--color-ink-950'],
-                      } as CSSProperties}
-                    >
-                      {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 animate-pulse bg-ink-900" />
-                      )}
-                      <div
-                        className="kiosk-backdrop-veil absolute inset-0"
-                        style={veilStyle(scale, tall, worn.ground)}
-                      />
-                      {/* The idle screen's words at the veil's own scale —
-                          the same construction the shelf paints, so the
-                          preview cannot oversell the wash. On the portrait
-                          crop the canopy is their whole ground; the shelf
-                          crop keeps the card and its halo. */}
-                      <div
-                        className="absolute inset-x-0 flex justify-center text-center"
-                        style={{ top: `${(8.5 * scale).toFixed(2)}rem` }}
-                      >
-                        <div className="relative px-2.5 py-1">
-                          {!tall && (
-                            <>
-                              <div
-                                aria-hidden="true"
-                                className="absolute"
-                                style={{
-                                  inset: '-90% -45%',
-                                  background: `radial-gradient(ellipse closest-side, color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '55%' : '45%'}, transparent), transparent)`,
-                                }}
-                              />
-                              <div
-                                aria-hidden="true"
-                                className="absolute inset-0 rounded"
-                                style={{
-                                  background: `color-mix(in srgb, ${colours['--color-ink-950']} ${worn.ground === 'light' ? '90%' : '78%'}, transparent)`,
-                                }}
-                              />
-                            </>
-                          )}
-                          <div
-                            className="relative text-[10px] leading-tight font-semibold"
-                            style={{ color: colours['--color-ink-100'] }}
-                          >
-                            {t('previewTypeChildsName')}
-                          </div>
-                          <div
-                            className="relative text-[6px] leading-tight"
-                            style={{ color: colours['--color-ink-300'] }}
-                          >
-                            {t('previewOrPhone')}
-                          </div>
-                        </div>
-                      </div>
-                      {/* The keys, as shapes: what says "machine, for
-                          touching" — tinted the 80% the real keyboard is. */}
-                      <div
-                        className="absolute inset-x-1 bottom-1 grid grid-cols-3 gap-0.5"
-                        aria-hidden="true"
-                      >
-                        {[0, 1, 2, 3, 4, 5].map((key) => (
-                          <div
-                            key={key}
-                            className="h-1.5 rounded-[2px]"
-                            style={{
-                              background: `color-mix(in srgb, ${colours['--color-ink-800']} 80%, transparent)`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-ink-500">{t(crop.label)}</span>
+            <div
+              className="relative self-start overflow-hidden rounded-lg ring-1 ring-ink-700"
+              style={{
+                width: PREVIEW.width,
+                height: PREVIEW.height,
+                background: colours['--color-ink-950'],
+                '--color-ink-950': colours['--color-ink-950'],
+              } as CSSProperties}
+            >
+              {previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 animate-pulse bg-ink-900" />
+              )}
+              <div
+                className="kiosk-backdrop-veil absolute inset-0"
+                style={veilStyle(scale, worn.ground)}
+              />
+              {/* The idle screen's words at the veil's own scale, on the
+                  canopy that is their whole ground on the kiosk — so the
+                  preview cannot oversell the wash. */}
+              <div
+                className="absolute inset-x-0 flex justify-center text-center"
+                style={{ top: `${(8.5 * scale).toFixed(2)}rem` }}
+              >
+                <div className="px-2.5 py-1">
+                  <div
+                    className="text-[10px] leading-tight font-semibold"
+                    style={{ color: colours['--color-ink-100'] }}
+                  >
+                    {t('previewTypeChildsName')}
                   </div>
-                );
-              })}
+                  <div
+                    className="text-[6px] leading-tight"
+                    style={{ color: colours['--color-ink-300'] }}
+                  >
+                    {t('previewOrPhone')}
+                  </div>
+                </div>
+              </div>
+              {/* The keys, as shapes: what says "machine, for
+                  touching" — tinted the 80% the real keyboard is. */}
+              <div
+                className="absolute inset-x-1 bottom-1 grid grid-cols-3 gap-0.5"
+                aria-hidden="true"
+              >
+                {[0, 1, 2, 3, 4, 5].map((key) => (
+                  <div
+                    key={key}
+                    className="h-1.5 rounded-[2px]"
+                    style={{
+                      background: `color-mix(in srgb, ${colours['--color-ink-800']} 80%, transparent)`,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           )}
 

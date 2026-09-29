@@ -41,28 +41,6 @@
  * centimetres a lobby tablet on a stand is read from — half of comfortable —
  * and the budget for the extra came off the word `Staff`, which nobody walked
  * over here to read.
- *
- * ## The type is a distance question; the box is a height one
- *
- * Which is why they are on different variants, and the split is the fix for a
- * real measurement rather than a preference. `kiosk:` matches *either* axis —
- * `min-height: 1000px` or `min-width: 1024px` — because it answers "is anybody
- * holding this", and the answer is no on a tablet stood on end and no on one
- * laid on its side. `tall:` answers "has this glass the room", and only the
- * first of those two clears it.
- *
- * Hanging the row's *height* on `kiosk:` therefore gave a 1280×800 landscape
- * shelf the 96px rows meant for a screen with 1280px to spend them in. With a
- * printer fault (whose warning wraps to two lines), a photograph and the
- * languages row, the menu came to 928px of content in 800px of glass and
- * **Keep checking in** — the one control that gives the kiosk back to the
- * queue — sat 96px below the fold, on a screen whose reader has no reason to
- * suspect it scrolls.
- *
- * So the labels keep `kiosk:`, because the volunteer is at seventy centimetres
- * either way and legibility is not the thing in short supply. The boxes move
- * to `tall:`: 64px is still half again the 44px a thumb needs, and six of them
- * at 30px labels fit the shelf with room over.
  */
 import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
@@ -81,7 +59,7 @@ import { useTap } from '../components/tapGuard';
  */
 const ROW =
   'flex h-16 w-full items-center justify-between gap-3 rounded-xl px-5 text-left ' +
-  'text-xl font-semibold kiosk:px-6 kiosk:text-3xl tall:h-24';
+  'text-xl font-semibold tall:h-24 tall:px-6 tall:text-3xl';
 
 /**
  * A fact, set as prose on the group's shared inset.
@@ -99,7 +77,7 @@ const ROW =
  * the whole point of the state sat at the bottom of the value ladder and
  * dropped out of a squint. The ladder is doors, then this, then status and time.
  */
-const STATEMENT = 'px-5 text-left text-lg text-ink-200 kiosk:px-6 kiosk:text-2xl';
+const STATEMENT = 'px-5 text-left text-lg text-ink-200 tall:px-6 tall:text-2xl';
 
 const DOOR = `${ROW} bg-ink-800 text-ink-100 active:bg-ink-700`;
 
@@ -217,8 +195,8 @@ export function StaffScreen({
      *
      * This menu grows: the trouble sentence under the reprint door wraps to
      * two lines, the photograph adds a row, the languages row is always drawn.
-     * All three at once on a 1280×800 shelf came to 832px in a frame that did
-     * not scroll — the word `Staff` clipped off the top and half of **Keep
+     * All three at once on a short enough screen overran a frame that did not
+     * scroll — the word `Staff` clipped off the top and half of **Keep
      * checking in** off the bottom, which is the one control here that gives
      * the kiosk back to the queue. A volunteer would have waited out the
      * forty-five-second return with a family in front of them.
@@ -230,13 +208,13 @@ export function StaffScreen({
      * `PrinterScreen` and `SearchScreen`.
      */
     <div className="h-full overflow-y-auto overscroll-contain scroll-touch">
-      <div className="flex min-h-full flex-col items-center justify-center gap-8 p-8 text-center kiosk:gap-10">
+      <div className="flex min-h-full flex-col items-center justify-center gap-8 p-8 text-center tall:gap-10">
         <div className="flex flex-col gap-2">
           {/* `Staff` is a label on the screen, not the reason anybody is on it,
               and at 48px it was the largest thing in the frame by half again. The
               ladder is title, then label, then the line you read once. */}
           <div className="text-4xl font-semibold text-ink-100">Staff</div>
-          <p className="mx-auto max-w-xl text-lg text-ink-400 kiosk:text-2xl">
+          <p className="mx-auto max-w-xl text-lg text-ink-400 tall:text-2xl">
             <span className="text-ink-200">
               <EventName path={iconPath} title={title} />
             </span>
@@ -253,7 +231,7 @@ export function StaffScreen({
           </p>
         </div>
 
-        <div className="flex w-full max-w-md flex-col gap-3 kiosk:max-w-xl kiosk:gap-4">
+        <div className="flex w-full max-w-md flex-col gap-3 tall:max-w-xl tall:gap-4">
           {printer === 'none' ? (
             /*
              * No printer, so no door — a statement in its place.
@@ -302,7 +280,7 @@ export function StaffScreen({
                    noise of the leading — so the pair was held together by colour
                    and a shared left edge rather than by proximity, and the row
                    below wears the same amber. */
-                <p className="px-5 text-left text-lg text-warn-400 kiosk:px-6 kiosk:text-2xl">
+                <p className="px-5 text-left text-lg text-warn-400 tall:px-6 tall:text-2xl">
                   {t('troubleLine', {
                     trouble: (printerNote(trouble) || t('printerNeedsAttention')).replace(/\.$/, ''),
                   })}
@@ -390,7 +368,7 @@ export function StaffScreen({
                 there is slack for it; three still give way, which is what the
                 rule above is for. */}
             <span className="shrink-0">{t('languages')}</span>
-            <span className="min-w-0 truncate text-base font-normal text-ink-400 kiosk:text-2xl">
+            <span className="min-w-0 truncate text-base font-normal text-ink-400 tall:text-2xl">
               {/* The status the printer row's grammar asks for: what is set, and
                   never a count. With nothing pinned the true answer is the
                   sentence the old row's label was — English, and only English —
@@ -421,7 +399,7 @@ export function StaffScreen({
           * travelling up from the bottom of the glass meets *Keep checking
           * in* before it meets the one that empties the lobby.
           */}
-        <div className="flex w-full max-w-md flex-col gap-3 kiosk:max-w-xl kiosk:gap-4">
+        <div className="flex w-full max-w-md flex-col gap-3 tall:max-w-xl tall:gap-4">
           <button
             type="button"
             tabIndex={-1}
@@ -443,7 +421,7 @@ export function StaffScreen({
               haptic();
               onStay();
             })}
-            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 kiosk:text-3xl tall:h-24"
+            className="flex h-16 w-full items-center justify-center rounded-xl bg-brand-600 text-xl font-semibold text-white active:bg-brand-500 tall:h-24 tall:text-3xl"
           >
             {t('keepCheckingIn')}
           </button>

@@ -2,7 +2,7 @@
  * What the kiosk would actually paint, for the editor's previews.
  *
  * One resolver feeding two fields — the colour picker's strip and the photo
- * field's orientation crops — and it is the same `kioskPalette()` the kiosk
+ * field's portrait crop — and it is the same `kioskPalette()` the kiosk
  * itself is sent, which is what stops the office and the shelf disagreeing.
  * Its own module rather than a helper inside either field so that the fields
  * stay component-only files (fast refresh) and neither imports the other.

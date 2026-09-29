@@ -47,7 +47,6 @@ const executablePath =
 const VIEWPORTS = {
   phone: { width: 390, height: 844, scale: 2 },
   kiosktall: { width: 800, height: 1280, scale: 1 },
-  kioskwide: { width: 1280, height: 800, scale: 1 },
 } as const;
 
 type ViewportName = keyof typeof VIEWPORTS;
@@ -69,12 +68,12 @@ const SCENES: {
   settle?: number;
   drive?: readonly string[];
 }[] = [
-  { id: 'search-idle', query: '', views: ['phone', 'kiosktall', 'kioskwide'] },
+  { id: 'search-idle', query: '', views: ['phone', 'kiosktall'] },
   { id: 'search-typed', query: 'buffer=Ramona+Al&present=2', views: ['phone', 'kiosktall'] },
   {
     id: 'register-typing',
     query: 'screen=register',
-    views: ['phone', 'kiosktall', 'kioskwide'],
+    views: ['phone', 'kiosktall'],
     drive: ['R', 'O', 'B', 'I', 'N'],
   },
   {
@@ -319,8 +318,8 @@ for (const scene of SCENES) {
   if (only && !scene.id.includes(only)) continue;
   for (const view of scene.views) {
     const { width, scale } = VIEWPORTS[view];
-    const columns = view === 'kioskwide' ? 1 : 2;
-    const cell = view === 'kioskwide' ? 0.6 : view === 'kiosktall' ? 0.55 : 1;
+    const columns = 2;
+    const cell = view === 'kiosktall' ? 0.55 : 1;
     const cards: string[] = [];
     for (const kb of layouts) {
       const file = join(outDir, `${scene.id}--${view}--${kb}-keys.png`);

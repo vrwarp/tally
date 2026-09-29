@@ -1,63 +1,29 @@
 @import 'tailwindcss';
 
 /*
- * `tall:` — a screen with more height than a hand-held device has.
+ * `tall:` — a tablet stood on end, which is the only way the kiosk stands.
  *
  * Height, not width, because the thing it answers is a height problem. The
  * lobby kiosk pins a keyboard to the bottom of the glass and a header to the
  * top, and what is left between them is a track whose content does not grow
  * with it: on an 800×1280 tablet a five-name list left four hundred pixels of
  * nothing under it, and the empty part of the screen became the largest object
- * in the frame. A width breakpoint would have caught that tablet and also
- * caught a phone turned sideways, which has the opposite problem.
+ * in the frame.
  *
  * 1000px is above every phone held upright (844 on the tallest) and below every
  * tablet stood on end (1024 on the smallest). What it buys is not just a filled
  * track: a kiosk is read by somebody standing at arm's length rather than held
- * at reading distance, so the type it steps up wants stepping up anyway.
+ * at reading distance, so the type it steps up wants stepping up anyway. It is
+ * the one question the kiosk asks of the glass — "is anybody holding this?" —
+ * because the kiosk is portrait-only (see components/PortraitOnly.tsx), so a screen that
+ * clears the height is a screen on a stand and one that does not is a phone.
+ *
+ * There used to be a second variant, `kiosk:`, that also matched on a width of
+ * 1024px so a tablet laid on its side would take the stood-on-end type. The
+ * kiosk no longer runs sideways, and on a portrait screen that width implies
+ * this height, so the two had become the same query under two names.
  */
 @custom-variant tall (@media (min-height: 1000px));
-
-/*
- * `kiosk:` — a screen nobody is holding.
- *
- * `tall:` above answers a height question: has this track more room than its
- * content. This one answers a distance question, and they are not the same
- * screen. A 1280×800 lobby tablet fell through `tall:` entirely and ran the
- * phone's type and the phone's target sizes on the largest, furthest piece of
- * glass of the three — sized as if somebody were holding it, when it is on a
- * shelf at arm's length.
- *
- * Either axis is enough to mean "not a phone": a tablet stood on end clears the
- * height, one laid on its side clears the width, and a phone in either
- * orientation clears neither. Both entries exist only in the kiosk's own
- * screens, so a wide desktop window matching it is not a case that arises.
- */
-/*
- * Written as two blocks rather than as one comma-separated query, because the
- * comma-separated form does not survive compilation. Tailwind takes the
- * shorthand `@custom-variant name (@media A, B)` apart on the comma and keeps
- * only the first condition, so
- *
- *     @custom-variant kiosk (@media (min-height: 1000px), (min-width: 1024px));
- *
- * compiled to `@media (height>=1000px)` and nothing else — `kiosk:` was
- * byte-for-byte `tall:`, and the landscape tablet this variant exists for fell
- * through it exactly the way it falls through `tall:`. Every `kiosk:` utility
- * under `src/kiosk/` was inert on a 1280×800 kiosk, silently, because a variant
- * that matches nothing looks the same as a screen nobody stepped up.
- *
- * The block form emits one rule per `@slot`, which is what an "either of these"
- * variant has to be.
- */
-@custom-variant kiosk {
-  @media (min-height: 1000px) {
-    @slot;
-  }
-  @media (min-width: 1024px) {
-    @slot;
-  }
-}
 
 /*
  * Tally design tokens.
@@ -291,7 +257,7 @@
  * at letters, and a half-cut name is a target that offers to check in a child
  * who may not be in the building. A single linear ramp did that on a phone by
  * luck — where the clip lands inside a row is an accident of how the row height
- * divides into the track, and on a landscape kiosk it landed just under the
+ * divides into the track, and at some shapes it landed just under the
  * baseline, leaving two whole rows legible at half strength. Half-strength and
  * legible is what this list already means by *checked out*, so the rows that
  * continue below read as rows already dealt with.
@@ -368,22 +334,6 @@
 }
 
 /*
- * And it runs deeper on the shape with the shortest track.
- *
- * A landscape kiosk leaves the region under three hundred pixels, so where the
- * clip falls inside a row leaves more of that row showing than on a phone: the
- * last card stayed fully drawn and legible at about a third strength, which
- * reads as a row that has been dimmed — already handled — rather than as one
- * continuing below. The cue has to be dissolution, not dimming.
- */
-@media (min-width: 1024px) {
-  .kiosk-list-fade,
-  .kiosk-list-fade-overlay {
-    --kiosk-fade-max: 5.5rem;
-  }
-}
-
-/*
  * The photograph behind the idle search screen, and the veil that makes it
  * lawful. See src/kiosk/components/Backdrop.tsx for when the layer shows at
  * all; this block owns what it looks like while it does.
@@ -415,15 +365,12 @@
  * puts this whole layer at opacity 0), so the bands were armour for states
  * that cannot coexist with the image. What carries the numbers now:
  *
- *   - on portrait, the canopy: one grade holding the console and the idle
- *     instruction together at 68% (85% on light) and releasing once to the
- *     wash — the junction consultation's finding, after the first cut here
- *     stacked a separate plate against the header grade and the two masses
- *     collided edge-on. The image runs at ~82% strength below the release
- *     (85% on light, whose wash dropped to 15% in the same round);
- *   - on the landscape shelf only, `.kiosk-idle-plate` / `.kiosk-idle-halo`:
- *     a page-token card hugging the instruction, legitimate there because
- *     the photograph frames it on every side at full strength;
+ *   - the canopy: one grade holding the console and the idle instruction
+ *     together at 68% (85% on light) and releasing once to the wash — the
+ *     junction consultation's finding, after the first cut here stacked a
+ *     separate plate against the header grade and the two masses collided
+ *     edge-on. The image runs at ~82% strength below the release (85% on
+ *     light, whose wash dropped to 15% in the same round);
  *   - `.kiosk-chip-ground`: the page-token underlay that keeps the register
  *     chip's brand-300 at 7.5:1 wherever the photograph is bright — 78%,
  *     raised from 65% because the parent and newcomer consultants both read
@@ -469,8 +416,8 @@
 }
 
 /*
- * Two composited layers, anchored to opposite ends. On portrait shapes the
- * top layer is a canopy: one grade holding through the console *and* the
+ * Two composited layers, anchored to opposite ends. The top layer is a
+ * canopy: one grade holding through the console *and* the
  * idle instruction — the veil only ever underlies the idle screen, since a
  * photograph shows exactly while the buffer is empty — then one release to
  * the wash. One mass, one edge, and because the instruction's dim lines
@@ -498,8 +445,8 @@
  * mid percentages sit above the straight line between hold and wash, and
  * the light ground's run longer still: its drop is 70 points against
  * dark's 50, and a pure hue swing at constant lightness is where banding
- * lives. Lengths are offsets from the hold, so the per-shape blocks below
- * move one number each.
+ * lives. Lengths are offsets from the hold, so the tablet block below
+ * moves one number.
  */
 .kiosk-backdrop-veil {
   --backdrop-head: 68%;
@@ -556,96 +503,16 @@
 }
 
 /*
- * The deeper hold hangs on the same two conditions as the `kiosk` type
- * variant (the top of this file), never on a width of its own: the hold was
- * measured against each type size, and a shape that takes kiosk type in a
+ * The deeper hold hangs on the same condition as the `tall` type variant
+ * (the top of this file), never on a width of its own: the hold was
+ * measured against each type size, and a shape that takes tablet type in a
  * phone-sized hold would put the last guaranteed line inside the release —
  * the 744×1133 tablet is exactly that shape, and its worst case measures
- * 272px, inside this 280px hold. The landscape block below outranks both by
- * source order for the shelf.
+ * 272px, inside this 280px hold.
  */
 @media (min-height: 1000px) {
   .kiosk-backdrop-veil {
     --backdrop-head-hold: 17.5rem;
-  }
-}
-@media (min-width: 1024px) {
-  .kiosk-backdrop-veil {
-    --backdrop-head-hold: 17.5rem;
-  }
-}
-
-/*
- * The landscape shelf keeps the shipped card construction: a short header
- * grade, the plate and halo under the instruction, and the flanks at full
- * strength — which is that shape's whole point. Its mid stops sit on the
- * straight line the shipped single-leg release drew, so the shelf paints
- * what it always painted. The light overrides sit inside the query so they
- * outrank the global light canopy values above. Booked, not forked: the
- * shelf's own junction (the plate's top ~24px still inside the release)
- * and the light shelf's chip-versus-plate sameness are owned follow-ups —
- * the fix is the head releasing above the plate's top edge, which touches
- * neither the plate nor the flanks.
- */
-@media (min-width: 1024px) and (max-height: 999px) {
-  .kiosk-backdrop-veil {
-    --backdrop-head: 85%;
-    --backdrop-head-hold: 5.5rem;
-    --backdrop-mid1: 56%;
-    --backdrop-mid2: 37%;
-    --backdrop-rel1: 0.5rem;
-    --backdrop-rel2: 1rem;
-    --backdrop-rel3: 1.5rem;
-    --backdrop-wash: 18%;
-    --backdrop-foot: 14%;
-  }
-  [data-theme='light'] .kiosk-backdrop-veil {
-    --backdrop-head: 92%;
-    --backdrop-mid1: 66%;
-    --backdrop-mid2: 47%;
-    --backdrop-rel1: 0.5rem;
-    --backdrop-rel2: 1rem;
-    --backdrop-rel3: 1.5rem;
-    --backdrop-wash: 30%;
-    --backdrop-foot: 0%;
-  }
-  /* The shelf's chip keeps its shipped 65%: at the portrait 78% it became
-     the same material at the same strength as the non-pressable plate
-     beside it, and the shelf is where "an edge over the photograph means
-     press me" has to stay true. */
-  .kiosk-chip-ground {
-    --backdrop-chip: 65%;
-  }
-}
-
-/*
- * The plate under the idle instruction, and the halo that melts it into the
- * wash — landscape only. On the shelf the plate is a genuine card: the
- * photograph frames it on every side at full strength, which is what makes
- * a hard-edged surface legitimate there. On portrait the same rectangle ran
- * nearly bezel to bezel and jammed its corners into the header grade — two
- * finishes colliding — so there the canopy above is the instruction's whole
- * ground and these layers paint nothing at all. Both are the page token: on
- * a kiosk with no photograph they composite to exactly the page and vanish.
- * The plate's radius sits one step above the rounded-xl control family on
- * purpose — it is a surface, not a button.
- */
-@media (min-width: 1024px) and (max-height: 999px) {
-  .kiosk-idle-plate {
-    background: color-mix(in srgb, var(--color-ink-950) var(--backdrop-plate, 78%), transparent);
-  }
-  .kiosk-idle-halo {
-    background: radial-gradient(
-      ellipse closest-side,
-      color-mix(in srgb, var(--color-ink-950) var(--backdrop-halo, 45%), transparent),
-      transparent
-    );
-  }
-  [data-theme='light'] .kiosk-idle-plate {
-    --backdrop-plate: 90%;
-  }
-  [data-theme='light'] .kiosk-idle-halo {
-    --backdrop-halo: 55%;
   }
 }
 
@@ -1120,7 +987,7 @@
  * letters land here" without promising a press.
  *
  * Fixed width and a fixed height in rem — never `1em`, which would differ
- * between `text-3xl` and `kiosk:text-4xl` — and `flex: none`, so it cannot
+ * between `text-3xl` and `tall:text-4xl` — and `flex: none`, so it cannot
  * shrink, cannot grow the row, and cannot take a character off the truncating
  * name beside it. The band's own height is fixed, so nothing below it moves.
  *

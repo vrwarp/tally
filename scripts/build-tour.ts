@@ -10,8 +10,9 @@
  * Each pass writes its own manifest, so re-shooting one shape does not require
  * re-shooting the other; whichever `tour-*.json` files are on disk are what
  * gets built. Frames are paired by title, and a frame only one pass captured —
- * a screen that appears conditionally — is carried on its own rather than
- * dropped.
+ * a screen that appears conditionally, or any kiosk screen, which the wide
+ * pass does not photograph because the kiosk only stands upright — is carried
+ * on its own rather than dropped.
  */
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -94,24 +95,29 @@ const tall = shots.filter((shot) => shot.shape === 'tall');
  * reads as the tour showing two different things side by side. Titles are
  * unique within a pass by construction: they are the file names.
  */
-const tallByTitle = new Map(tall.map((shot) => [shot.title, shot]));
+/*
+ * The tall pass is the spine, because it is the one that photographs every
+ * surface: the wide pass skips the kiosk, which has no wide shape. Walking the
+ * wide pass first would carry every kiosk frame to the end of the tour.
+ */
+const wideByTitle = new Map(wide.map((shot) => [shot.title, shot]));
 const seen = new Set<string>();
 
-const frames: Frame[] = wide.map((shot) => {
+const frames: Frame[] = tall.map((shot) => {
   seen.add(shot.title);
-  const match = tallByTitle.get(shot.title);
+  const match = wideByTitle.get(shot.title);
   return {
     act: shot.act,
     who: shot.who,
     title: shot.title,
     caption: shot.caption,
     device: shot.device,
-    wide: shot,
-    ...(match ? { tall: match } : {}),
+    tall: shot,
+    ...(match ? { wide: match } : {}),
   };
 });
 
-for (const shot of tall) {
+for (const shot of wide) {
   if (seen.has(shot.title)) continue;
   frames.push({
     act: shot.act,
@@ -119,7 +125,7 @@ for (const shot of tall) {
     title: shot.title,
     caption: shot.caption,
     device: shot.device,
-    tall: shot,
+    wide: shot,
   });
 }
 
@@ -130,8 +136,9 @@ for (const frame of frames) {
   else acts.push({ act: frame.act, frames: [frame] });
 }
 
-const DEVICE_LABEL: Record<Device, { wide: string; tall: string }> = {
-  kiosk: { wide: 'Kiosk, landscape · 1280 × 800', tall: 'Kiosk, portrait · 800 × 1280' },
+/** The kiosk has no wide label because it has no wide shape — see the spec. */
+const DEVICE_LABEL: Record<Device, { wide?: string; tall: string }> = {
+  kiosk: { tall: 'Kiosk · 800 × 1280' },
   phone: { wide: "Greeter's phone, landscape · 844 × 420", tall: "Greeter's phone, portrait · 400 × 860" },
   app: { wide: 'Desktop · 1280 × 900', tall: 'Phone · 430 × 932' },
 };
@@ -153,7 +160,7 @@ for (const [actIndex, group] of acts.entries()) {
     index += 1;
     const labels = DEVICE_LABEL[frame.device];
     const pair = [
-      await shotHtml(frame.wide, labels.wide),
+      await shotHtml(frame.wide, labels.wide ?? labels.tall),
       await shotHtml(frame.tall, labels.tall),
     ]
       .filter(Boolean)
@@ -460,7 +467,8 @@ const html = `<title>Tally — every journey, end to end</title>
   }
 
   @media (min-width: 60rem) {
-    .frame__shots--kiosk { grid-template-columns: 1.6fr 1fr; }
+    /* One shot: the kiosk only stands upright. */
+    .frame__shots--kiosk { grid-template-columns: minmax(0, 24rem); }
     .frame__shots--phone { grid-template-columns: 1.9fr 1fr; }
     .frame__shots--app { grid-template-columns: 2.4fr 1fr; }
   }
@@ -572,7 +580,8 @@ const md: string[] = [
   'Nine acts: a family the church already has, a family nobody has met at the kiosk wizard, a',
   "greeter adding a child from their own phone, a family gaining a second child, the review that",
   "turns any of it into a record in the church's database, and the core team's own week. Each",
-  'frame is shown on a wide device and a tall one.',
+  'phone and app frame is shown on a wide device and a tall one; the kiosk, which only stands',
+  'upright, is shown once.',
   '',
 ];
 

@@ -1515,12 +1515,10 @@
     "noPhoto": "Sin foto — solo colores",
     "guidanceNoWords": "Usa fotos sin texto para que las instrucciones del kiosco se sigan leyendo fácil.",
     "guidanceConsent": "Pide permiso a los papás antes de usar fotos de niños. Las fotos de salones o de decoraciones funcionan mejor.",
-    "guidanceCrop": "La parte de arriba de la foto va a quedar tapada por el texto del kiosco. Revisa las vistas previas de abajo en las dos orientaciones.",
+    "guidanceCrop": "La parte de arriba de la foto va a quedar tapada por el texto del kiosco, y el kiosco está en vertical, así que una foto horizontal solo muestra su parte central. Revisa la vista previa de abajo.",
     "fieldHint": "Va detrás de la pantalla en reposo del kiosco mientras esté fijado a esta reunión, y desaparece en cuanto una familia empieza a escribir. Los cambios llegan a un aparato la próxima vez que su kiosco se vuelva a fijar.",
     "newPhoto": "Foto nueva · {detail}",
     "storedPhoto": "Foto · se subió {when}",
-    "onAShelf": "En un estante",
-    "stoodOnEnd": "De pie",
     "readFailed": "No se pudo leer esa foto — prueba con otra.",
     "previewTypeChildsName": "Nombre de su hijo o hija",
     "previewOrPhone": "o los últimos 4 dígitos de su teléfono",
@@ -2194,7 +2192,9 @@
     "space": "Espacio",
     "apostrophe": "Apóstrofo",
     "hyphen": "Guion",
-    "staffPrint": "Personal · imprimir etiquetas"
+    "staffPrint": "Personal · imprimir etiquetas",
+    "turnUprightTitle": "Gire la pantalla a vertical",
+    "turnUprightBody": "Para registrar la entrada, la pantalla tiene que estar en vertical. Si no puede girarla, busque a un líder."
   },
   "Confirm": {
     "back": "← Atrás",

@@ -142,6 +142,16 @@ pairing screen itself. `scripts/check-kiosk-budget.mjs` holds the worker to a by
 the build if the manifest, its icons or the registration go missing, because all three are static
 files whose absence produces a page that runs perfectly and can never be installed.
 
+**It stands upright, and only upright.** Every kiosk screen is laid out for a tablet stood on end;
+there is no landscape layout. Three layers hold it there, each for the device the one before
+cannot reach: the manifest pins an installed kiosk to `"orientation": "portrait"` (and the budget
+check fails the build if that goes missing); `screen.orientation.lock('portrait')` is asked at
+boot and on entering fullscreen, for a browser tab the manifest does not govern; and anything that
+still ends up wider than it is tall — iOS, which honours neither, or a desktop window a leader left
+wide — gets a "Turn the screen upright" screen over the kiosk instead of a portrait layout squeezed
+sideways. The kiosk underneath is made inert rather than unmounted, so turning the tablet back
+resumes it mid-search. See `src/kiosk/components/PortraitOnly.tsx`.
+
 **The screen does not sleep.** The kiosk holds a `navigator.wakeLock` screen lock for as long as its
 page is the visible one, in every phase — pairing included, because the code on that screen is one a
 leader walks away from and comes back to. A dimmed shelf tablet is not a cosmetic problem: waking one

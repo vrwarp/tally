@@ -17,9 +17,9 @@
  * painted in: on a screen whose whole instruction is "tap the thing", the icon
  * was the one plate on the glass that did nothing. It was also the largest
  * object in the header, so an empty grey box out-ranked the gathering it was
- * decorating. It cost the header twenty pixels, which the landscape kiosk pays
- * for out of a results track already under three hundred — enough to push the
- * third name in the list into the fade. And when the title wrapped, the flex row
+ * decorating. It cost the header twenty pixels, which a phone pays for out of
+ * a results track only four rows deep — enough to push the last name in the
+ * list into the fade. And when the title wrapped, the flex row
  * it sat in pushed it against the left padding while the name receded to the
  * middle of the screen, so the one thing an icon exists to say — *this mark
  * belongs to this gathering* — was what the layout stopped saying exactly when

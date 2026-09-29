@@ -19,9 +19,11 @@ import {
   bindTo,
   expectLabelCount,
   hold,
+  KIOSK_VIEWPORT,
   leaveGathering,
   openKiosk,
   pairKiosk,
+  readPairingCode,
   recordLabels,
   recordedLabels,
   typeOnKiosk,
@@ -119,6 +121,34 @@ async function findOnKiosk(kiosk: Page, name: string) {
 }
 
 test.describe('the kiosk', () => {
+  /**
+   * Portrait only, and a tablet knocked onto its side is told so.
+   *
+   * The code a staff member is reading off stays mounted under the screen that
+   * covers it: turning the tablet back finds the same code, not a new one,
+   * because the kiosk was made inert rather than unmounted.
+   */
+  test('covers itself while it is wider than it is tall', async ({ browser }) => {
+    const { context, page: kiosk } = await openKiosk(browser, {
+      viewport: { width: 1280, height: 800 },
+    });
+
+    try {
+      await expect(kiosk.getByRole('alertdialog', { name: /turn the screen upright/i })).toBeVisible();
+
+      await kiosk.setViewportSize(KIOSK_VIEWPORT);
+      await expect(kiosk.getByText(/turn the screen upright/i)).toBeHidden();
+      const code = await readPairingCode(kiosk);
+
+      await kiosk.setViewportSize({ width: 1280, height: 800 });
+      await expect(kiosk.getByText(/turn the screen upright/i)).toBeVisible();
+      await kiosk.setViewportSize(KIOSK_VIEWPORT);
+      expect(await readPairingCode(kiosk)).toBe(code);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('pairs, binds and checks somebody in', async ({ browser, page, signedInAs, firestore }) => {
     await signedInAs('core');
     const { context, page: kiosk } = await openKiosk(browser);

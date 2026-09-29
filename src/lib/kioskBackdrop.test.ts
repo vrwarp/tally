@@ -34,6 +34,9 @@ describe('sanitizeKioskBackdropId', () => {
       'b0123456789abcdeg', // not hex
       'b0123456789abcde/', // a path separator is a different document
       'kioskBackdrops/b0123456789abcdef',
+      // Not a string, though it spells one: a regex would coerce this to
+      // 'b0123456789abcdef' and pass it, and a Firestore field can hold it.
+      ['b0123456789abcdef'],
     ]) {
       expect(sanitizeKioskBackdropId(value)).toBeNull();
     }

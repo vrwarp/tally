@@ -24,15 +24,12 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-type Orientation = 'landscape' | 'portrait';
-
 interface Shot {
   file: string;
   title: string;
   flow: string;
   state: string;
   caption: string;
-  orientation: Orientation;
   step: string;
   taps: number;
 }
@@ -51,29 +48,17 @@ if (shots.length === 0) {
   );
 }
 
-const landscape = shots.filter((shot) => shot.orientation === 'landscape');
-const portrait = shots.filter((shot) => shot.orientation === 'portrait');
-
-if (portrait.length > 0 && portrait.length !== landscape.length) {
-  throw new Error(
-    `The two passes captured different numbers of frames (${landscape.length} landscape, ` +
-      `${portrait.length} portrait), so they cannot be paired. Re-run the capture.`,
-  );
-}
-
 interface Frame extends Shot {
   /** Position in the whole document, 1-based — what a comment cites. */
   number: number;
   /** Taps this screen added over the one before it in its own journey. */
   cost: number;
-  pair?: Shot;
 }
 
-const frames: Frame[] = landscape.map((shot, index) => ({
+const frames: Frame[] = shots.map((shot, index) => ({
   ...shot,
   number: index + 1,
-  cost: index === 0 ? shot.taps : Math.max(0, shot.taps - landscape[index - 1]!.taps),
-  pair: portrait[index],
+  cost: index === 0 ? shot.taps : Math.max(0, shot.taps - shots[index - 1]!.taps),
 }));
 
 /* The journeys, in the order they were walked. */
@@ -124,17 +109,9 @@ async function dataUri(file: string): Promise<string> {
   return `data:image/png;base64,${bytes.toString('base64')}`;
 }
 
-async function shotHtml(
-  shot: Shot | undefined,
-  label: string,
-  size: string,
-  w: number,
-  h: number,
-): Promise<string> {
-  if (!shot) return '';
-  return `        <figure class="shot shot--${shot.orientation}">
-          <img src="${await dataUri(shot.file)}" alt="${escapeHtml(shot.title)} — ${label}" loading="lazy" width="${w}" height="${h}" />
-          <figcaption><span class="shot__what">${label}</span> <span class="shot__size">${size}</span></figcaption>
+async function shotHtml(shot: Shot): Promise<string> {
+  return `        <figure class="shot">
+          <img src="${await dataUri(shot.file)}" alt="${escapeHtml(shot.title)}" loading="lazy" width="800" height="1280" />
         </figure>`;
 }
 
@@ -142,12 +119,7 @@ const sections: string[] = [];
 for (const group of flows) {
   const cards: string[] = [];
   for (const frame of group.frames) {
-    const pair = [
-      await shotHtml(frame, 'Landscape', '1280 × 800', 1280, 800),
-      await shotHtml(frame.pair, 'Portrait', '800 × 1280', 800, 1280),
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const shot = await shotHtml(frame);
     cards.push(`      <article class="step" id="step-${frame.number}">
         <header class="step__head">
           <div class="step__id">
@@ -163,7 +135,7 @@ for (const group of flows) {
         </header>
         <p class="step__caption">${escapeHtml(frame.caption)}</p>
         <div class="step__shots">
-${pair}
+${shot}
         </div>
       </article>`);
   }
@@ -511,21 +483,15 @@ const html = `<title>Every Screen a Family Sees</title>
   .step__caption { max-width: var(--measure); color: var(--ink-soft); margin: 0; }
 
   /*
-   * The same moment on both shapes of tablet. Proportioned so each renders near
-   * its own aspect ratio rather than one being squeezed to match the other, and
-   * stacked below 62rem where side by side makes both too small to read.
+   * The moment on the tablet, stood on end the way the kiosk always stands —
+   * held to a column narrow enough that a whole step fits a laptop's height.
    */
   .step__shots {
     margin-top: 0.5rem;
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 26rem);
     gap: 1rem;
     align-items: start;
-  }
-
-  @media (max-width: 62rem) {
-    .step__shots { grid-template-columns: minmax(0, 1fr); }
-    .shot--portrait { max-width: 26rem; }
   }
 
   .shot { display: flex; flex-direction: column; gap: 0.4rem; margin: 0; }
@@ -538,18 +504,6 @@ const html = `<title>Every Screen a Family Sees</title>
     border-radius: 10px;
     background: var(--panel);
   }
-
-  .shot figcaption {
-    display: flex;
-    gap: 0.6rem;
-    font-family: var(--mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
-  }
-
-  .shot__what { color: var(--ink-soft); }
 
   /* ---- Gaps and colophon ---------------------------------------------------- */
 
@@ -600,8 +554,7 @@ const html = `<title>Every Screen a Family Sees</title>
     </p>
     <p class="provenance">
       <span>${frames.length} steps</span>
-      <span>2 orientations</span>
-      <span>1280 × 800 landscape · 800 × 1280 portrait</span>
+      <span>800 × 1280, the kiosk stood on end</span>
       <span>e2e/registration-walkthrough.spec.ts</span>
     </p>
   </header>

@@ -106,8 +106,8 @@ function WidenButton({
                name would read as a button, and this button carries the same
                fill — so the ring made the *widen* control the strongest edge on
                a screen whose primary targets are the names beside it. */
-            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700 tall:h-14 tall:px-5 kiosk:text-base'
-          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 kiosk:text-xl lg:flex-1'
+            'flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl bg-ink-800/70 px-3 text-sm font-semibold whitespace-nowrap text-ink-300 active:bg-ink-700 tall:h-14 tall:px-5 tall:text-base'
+          : 'flex h-14 w-full items-center justify-center rounded-xl bg-ink-800 px-8 text-lg font-semibold text-ink-100 active:bg-ink-700 tall:h-16 tall:text-xl'
       }
       style={{ touchAction: 'manipulation' }}
     >
@@ -236,9 +236,8 @@ const SearchHeader = memo(function SearchHeader({
         *
         * Inside the title's own line, which is the whole of what keeps this
         * header the header that shipped: cap-height and in `em`, so it adds
-        * no line and no pixel of height — and the landscape kiosk pays for
-        * header height out of a results track already under three hundred
-        * pixels. It also cannot pull the title off the centre the hours line
+        * no line and no pixel of height, which a phone pays for out of a
+        * results track only four rows deep. It also cannot pull the title off the centre the hours line
         * and everything below it share, because it is *in* the line being
         * centred rather than a sibling of it. See EventName, which was a
         * tile beside the title for exactly one round of critique — and hung
@@ -253,10 +252,10 @@ const SearchHeader = memo(function SearchHeader({
         * same way whether or not the gathering wears a mark — which is also
         * what the registration flow's header has always done.
         */}
-      <div className="text-2xl font-semibold text-balance text-ink-100 kiosk:text-3xl">
+      <div className="text-2xl font-semibold text-balance text-ink-100 tall:text-3xl">
         <EventName path={iconPath} title={title} />
       </div>
-      <div className="kiosk-hours-line text-base text-ink-500 kiosk:text-lg">
+      <div className="kiosk-hours-line text-base text-ink-500 tall:text-lg">
         {line}
       </div>
     </div>
@@ -328,7 +327,7 @@ const SearchConsole = memo(function SearchConsole({
             pixel were two apart while every other gap inside the console was
             40 or more, so the edge separated without containing — it read as
             the button's own top border run out to the screen. */
-    <div className="mx-auto flex h-14 w-full max-w-2xl flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6 lg:max-w-5xl">
+    <div className="mx-auto flex h-14 w-full max-w-2xl flex-row-reverse items-center justify-center gap-4 overflow-hidden px-2 pt-2 tall:h-20 tall:gap-6">
       {/*
         * The way out of the scope, standing beside the way out of the search.
         *
@@ -362,7 +361,7 @@ const SearchConsole = memo(function SearchConsole({
              bare page, and what keeps this text readable when the gathering's
              photograph is bright behind it. Its :active lives in the class,
              because a plain class here would outrank the utility. */
-          className="kiosk-chip-ground flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 tall:h-14 tall:px-5 kiosk:text-base"
+          className="kiosk-chip-ground flex h-11 min-w-0 shrink items-center justify-center truncate rounded-xl px-3 text-sm font-semibold whitespace-nowrap text-brand-300 ring-1 ring-brand-500/40 tall:h-14 tall:px-5 tall:text-base"
         >
           {/*
             * The question goes first and, on a narrow screen standing beside
@@ -453,7 +452,7 @@ function Door({
         haptic();
         onPress();
       })}
-      className={`relative flex h-14 w-full items-center justify-center rounded-xl px-6 text-lg font-semibold text-ink-100 tall:h-16 kiosk:text-xl lg:flex-1 ${
+      className={`relative flex h-14 w-full items-center justify-center rounded-xl px-6 text-lg font-semibold text-ink-100 tall:h-16 tall:text-xl ${
         primary ? 'bg-ink-700 ring-1 ring-ink-500 active:bg-ink-600' : 'bg-ink-800 active:bg-ink-700'
       }`}
       style={{ touchAction: 'manipulation' }}
@@ -507,7 +506,7 @@ function NoMatchPanel({
 }) {
   const t = useTranslations('Search');
   return (
-    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-xl tall:justify-end tall:gap-4 lg:max-w-2xl">
+    <div className="mx-auto flex h-full w-full max-w-xs flex-col items-stretch gap-3 pt-6 text-center tall:max-w-xl tall:justify-end tall:gap-4">
       {/* Its own measure, wider than the doors under it, and balanced:
           inheriting the button column broke the sentence inside its own
           phrase on a phone. On a tablet stood on end the whole panel takes
@@ -515,7 +514,7 @@ function NoMatchPanel({
           door carries its question now, and at 448px it broke "Register your
           child" across two lines — in English, and in every other language
           a little sooner. */}
-      <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-xl kiosk:text-4xl">
+      <div className="mx-auto max-w-sm text-center text-3xl font-semibold text-balance text-ink-100 tall:max-w-xl tall:text-4xl">
         {refresh === 'done' ? (
           /*
            * "Still" is the one word that carries the whole answer after the
@@ -534,11 +533,11 @@ function NoMatchPanel({
           t('noMatch')
         )}
       </div>
-      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-ink-100 tall:max-w-xl kiosk:text-2xl">
+      <div className="mx-auto max-w-sm text-center text-xl leading-snug text-ink-100 tall:max-w-xl tall:text-2xl">
         {t(mode === 'phone' ? 'afterPhoneMiss' : 'afterNameMiss')}
         {mode !== 'phone' && <DigitsCue />}
       </div>
-      <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4 lg:flex-row lg:justify-center lg:gap-4">
+      <div className="mt-auto flex flex-col items-stretch gap-3 pt-6 tall:mt-0 tall:gap-4">
         <Door
           label={t('searchEveryone')}
           name={t('searchEveryone')}
@@ -549,7 +548,7 @@ function NoMatchPanel({
         <Door label={t('offerFirstTime')} onPress={onRegister} />
       </div>
       {refresh === 'failed' && (
-        <div className="text-base text-ink-500 kiosk:text-lg">{t('networkFailed')}</div>
+        <div className="text-base text-ink-500 tall:text-lg">{t('networkFailed')}</div>
       )}
     </div>
   );
@@ -599,13 +598,7 @@ const ResultRow = memo(function ResultRow({
        * door. It is the same fill the quiet **Search everyone**
        * carries, so nothing new enters the palette.
        */
-      /* `lg:w-full` is not decoration. Multi-column flow drops these out of
-         the flex column that was stretching them, and a `button` in
-         normal flow is shrink-to-fit — so every card became as wide as
-         its own name, the grade stopped being a right-hand column, and
-         checking a child in *resized their row*, which is the one thing
-         this list promises never to do. */
-      className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 lg:break-inside-avoid lg:not-first:mt-2 ${
+      className={`flex h-16 w-full shrink-0 items-center justify-between rounded-xl px-5 text-left tall:h-20 ${
         checkedOut
           ? 'bg-ink-800/50 opacity-60'
           : present
@@ -613,10 +606,10 @@ const ResultRow = memo(function ResultRow({
             : 'bg-ink-800 active:bg-ink-600'
       } ${inert || checkedOut ? '' : 'active:bg-ink-600'}`}
     >
-      <span className="truncate text-xl font-semibold text-ink-100 kiosk:text-2xl">
+      <span className="truncate text-xl font-semibold text-ink-100 tall:text-2xl">
         {student.firstName} {student.lastName}
       </span>
-      <span className="pl-3 text-base whitespace-nowrap text-ink-400 kiosk:text-lg">
+      <span className="pl-3 text-base whitespace-nowrap text-ink-400 tall:text-lg">
         {checkedOut ? (
           <span className="font-semibold text-ink-400">{t('checkedOut')}</span>
         ) : present && tracksCheckOut ? (
@@ -885,18 +878,6 @@ export function SearchScreen({
   const matchCount = outcome.total ?? outcome.results.length;
   const truncated = matchCount > outcome.results.length;
   /*
-   * Whether the landscape kiosk splits the list in two.
-   *
-   * Not simply "are there rows". A two-column frame with one name in it puts a
-   * half-width card against the left margin with the whole right half of the
-   * page empty beside it — and strands the count, which hangs off the rows'
-   * right edge and would be pointing at an edge no row is flush to. That is the
-   * state a parent most wants to reach: enough letters typed, one child left.
-   * Four is where both columns have something in them.
-   */
-  const wraps = outcome.results.length >= 4;
-
-  /*
    * The no-match panel spans the region rather than sitting in it: its heading
    * is pinned to the top and its doors to the bottom, so the column has to fill
    * the track for either end to mean anything.
@@ -1025,29 +1006,6 @@ export function SearchScreen({
             padding on a scroll container is not reliably scrollable to.
             `mt-auto` sinks the row-less states toward the hand and collapses
             to nothing the moment the content is taller than the box. */}
-        {/*
-          * Two columns on a landscape kiosk, one everywhere else.
-          *
-          * A 1280×800 tablet is the worst of the three shapes for the only
-          * thing this screen does. The fixed chrome — header, offer row,
-          * readout, keyboard — leaves the track under three hundred pixels, so
-          * it showed three matches out of a possible eight, against four on a
-          * phone and all eight on the same tablet stood on end. None of that
-          * height is recoverable: the keys and the rows are already at the
-          * sizes a standing adult needs.
-          *
-          * The axis nobody was using is the one that is free. The rows sat in a
-          * capped column with three hundred pixels of dead page on either side.
-          * `columns` rather than a grid because CSS multi-column fills
-          * column-major — down the first, then the second — so an A–Z list
-          * still reads downward, which a two-column grid would have broken by
-          * laying it out in rows.
-          *
-          * Above `lg` only, which the phone never reaches and the portrait
-          * kiosk (800px wide) does not either. Row height, row fill and the
-          * promise that a tap never moves a row are all untouched; only the
-          * wrap changes.
-          */}
         <div
           className={`mx-auto w-full max-w-2xl ${station} ${
             rowless ? 'pb-6' : truncated ? 'pb-2' : ''
@@ -1070,9 +1028,7 @@ export function SearchScreen({
              * because it is a sibling below this column rather than inside it.
              */
             rows && !truncated ? 'pb-16 tall:pb-20' : ''
-          } flex flex-col gap-2 ${
-            wraps ? 'lg:block lg:columns-2 lg:gap-x-8 lg:max-w-5xl' : ''
-          }`}
+          } flex flex-col gap-2`}
         >
           {/*
             * The screen a parent actually walks up to.
@@ -1102,38 +1058,24 @@ export function SearchScreen({
               {/*
                 * The words, on the veil's own ground.
                 *
-                * On portrait shapes the photograph's canopy — the veil's head
-                * grade, extended to hold the console and these lines as one
-                * mass — is the instruction's whole contrast, so the plate and
-                * halo below paint nothing there; they are the landscape
-                * shelf's card, where the photograph frames it on every side
-                * (numbers and reasoning on `.kiosk-backdrop-veil` and
-                * `.kiosk-idle-plate` in index.css). The ground lives in the
+                * The photograph's canopy — the veil's head grade, extended to
+                * hold the console and these lines as one mass — is the
+                * instruction's whole contrast (numbers and reasoning on
+                * `.kiosk-backdrop-veil` in index.css). The ground lives in the
                 * backdrop layer rather than here on purpose: it fades with
                 * the image, so no keystroke can catch the title over an
-                * unveiled photograph. Paint only: negative insets, so the
-                * lines keep their exact shipped positions — and pure page
-                * token, so a kiosk with no photograph composites all of it
-                * back to the bare page. `isolate` keeps the negative
-                * z-indices inside this block rather than racing the backdrop
-                * layer for the same layer order.
+                * unveiled photograph.
                 *
                 * With a switch standing over the instruction the block is
-                * taller than the canopy was drawn for, so on a portrait shape
-                * with a photograph it wears a card of its own; without one
-                * the page is the ground and nothing is painted.
+                * taller than the canopy was drawn for, so with a photograph
+                * it wears a card of its own; without one the page is the
+                * ground and nothing is painted.
                 */}
               <div
                 className={`relative isolate flex flex-col items-center ${
                   pins.length > 0 ? 'w-full max-w-2xl' : ''
-                } ${
-                  backdrop && pins.length > 0
-                    ? 'max-lg:rounded-2xl max-lg:bg-ink-950/70 max-lg:px-6 max-lg:py-5'
-                    : ''
-                }`}
+                } ${backdrop && pins.length > 0 ? 'rounded-2xl bg-ink-950/70 px-6 py-5' : ''}`}
               >
-                <div aria-hidden="true" className="kiosk-idle-halo absolute -inset-x-24 -inset-y-14 -z-20" />
-                <div aria-hidden="true" className="kiosk-idle-plate absolute -inset-x-10 -inset-y-7 -z-10 rounded-2xl" />
                 {/*
                   * The languages this lobby offers, in their own names, first.
                   *
@@ -1154,10 +1096,10 @@ export function SearchScreen({
                     to do next: the rows themselves say "Tap to check out" or
                     "✓ Checked in", and a sentence about pressing was one more
                     thing for a reader who cannot read it to get past. */}
-                <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 kiosk:text-5xl">
+                <div className="text-4xl leading-tight font-semibold text-balance text-ink-100 tall:text-5xl">
                   {t('typeChildsName')}
                 </div>
-                <div className={`pt-1 text-lg kiosk:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>
+                <div className={`pt-1 text-lg tall:text-xl ${backdrop ? 'text-ink-300' : 'text-ink-400'}`}>
                   {t('orLastFour')}
                   <DigitsCue />
                 </div>
@@ -1229,16 +1171,10 @@ export function SearchScreen({
           * The count in the readout says eleven names over a list of eight, and
           * a parent who reads it still has to find where the list stops; the
           * bottom of the last row is the one place somebody who has run out of
-          * names is guaranteed to be looking. A sibling of the list rather than
-          * its last child, because the landscape shape lays the rows out in
-          * multi-column flow, where source order is column order and `order`
-          * does nothing — as the list's last child this sentence became the
-          * first thing in the left column, a heading over the names that
-          * matched best, and it pushed that column out of register with the
-          * other one.
+          * names is guaranteed to be looking.
           */}
         {truncated && (
-          <div className="mx-auto w-full max-w-2xl pt-2 pb-16 text-center text-base text-ink-400 kiosk:text-lg tall:pb-20 lg:max-w-5xl">
+          <div className="mx-auto w-full max-w-2xl pt-2 pb-16 text-center text-base text-ink-400 tall:text-lg tall:pb-20">
             {t('moreNames')}
           </div>
         )}
@@ -1268,7 +1204,7 @@ export function SearchScreen({
               {...tap(onOwedNotice)}
               className="flex h-16 w-full items-center justify-between gap-4 rounded-xl bg-ink-900 px-5 text-left active:bg-ink-800"
             >
-              <span className="min-w-0 truncate text-xl text-ink-200 kiosk:text-2xl">
+              <span className="min-w-0 truncate text-xl text-ink-200 tall:text-2xl">
                 {t.rich('owedNotice', {
                   count: owedNotice,
                   mark: (chunks: ReactNode) => (
@@ -1400,7 +1336,7 @@ export function SearchScreen({
             failing at the one thing it does. Padding insets the flex content
             only: an absolute child is placed against the padding box, so the
             corners stay in the corners. */}
-        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-36 text-center tall:h-20 lg:max-w-5xl">
+        <div className="relative mx-auto flex h-16 max-w-2xl items-center justify-center px-36 text-center tall:h-20">
           {/*
             * The way out of a language a parent cannot read.
             *
@@ -1427,7 +1363,7 @@ export function SearchScreen({
             </span>
           )}
           {buffer && (
-            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 kiosk:text-4xl">
+            <span className="truncate text-3xl font-semibold tracking-wide text-ink-50 tall:text-4xl">
               {buffer}
             </span>
           )}
@@ -1454,7 +1390,7 @@ export function SearchScreen({
               shape where they never do it was one more thing on the glass
               (the clutter pass, docs/refinements.md). */}
           {matchCount > 0 && (
-            <span className="absolute right-0 text-sm text-ink-400 kiosk:text-base tall:hidden">
+            <span className="absolute right-0 text-sm text-ink-400 tall:text-base tall:hidden">
               {/*
                 * A number while the list is all of it, a sentence when it is
                 * not. `MAX_RESULTS` is eight, and "8 names" over a list that

@@ -33,7 +33,7 @@ export function StaffMark({
   const t = useTranslations('Door');
   return (
     <div className="flex items-center justify-center">
-      <span className="inline-flex items-center rounded-lg bg-ink-800/70 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-300 kiosk:text-base">
+      <span className="inline-flex items-center rounded-lg bg-ink-800/70 px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink-300 tall:text-base">
         {t(label)}
       </span>
     </div>

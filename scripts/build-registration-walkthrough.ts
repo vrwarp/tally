@@ -18,32 +18,20 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-type Orientation = 'landscape' | 'portrait';
-
 interface Shot {
   file: string;
   title: string;
   flow: string;
   state: string;
   caption: string;
-  orientation: Orientation;
   /** The wizard step showing, named as `steps.ts` names it. */
   step: string;
   /** Taps from the resting search screen to this frame. */
   taps: number;
 }
 
-/** One moment in the flow, as it looks on both shapes of tablet. */
-interface Frame {
-  title: string;
-  flow: string;
-  state: string;
-  caption: string;
-  step: string;
-  taps: number;
-  landscape?: Shot;
-  portrait?: Shot;
-}
+/** One moment in the flow, as it looks on the tablet. */
+type Frame = Shot;
 
 const OUT = 'docs/walkthrough/registration';
 
@@ -75,37 +63,7 @@ function escapeHtml(value: string): string {
 /* The page                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/*
- * The two passes walk the same steps in the same order, so the nth landscape
- * frame and the nth portrait frame are the same moment. Paired by position
- * rather than by title, because a title is prose and prose gets edited.
- */
-const byOrientation = (o: Orientation) => shots.filter((shot) => shot.orientation === o);
-const landscape = byOrientation('landscape');
-const portrait = byOrientation('portrait');
-
-if (portrait.length > 0 && portrait.length !== landscape.length) {
-  throw new Error(
-    `The two passes captured different numbers of frames (${landscape.length} landscape, ` +
-      `${portrait.length} portrait), so they cannot be paired. Re-run the capture.`,
-  );
-}
-
-const frames: Frame[] = landscape.map((shot, index) => ({
-  title: shot.title,
-  flow: shot.flow,
-  state: shot.state,
-  caption: shot.caption,
-  step: shot.step,
-  /*
-   * The landscape pass's count, not an average of the two. The taps are the
-   * same on both shapes — the flow does not branch on orientation — and one
-   * number per moment is what makes the column addable down the page.
-   */
-  taps: shot.taps,
-  landscape: shot,
-  portrait: portrait[index],
-}));
+const frames: Frame[] = shots;
 
 const flows: { flow: string; frames: Frame[] }[] = [];
 for (const frame of frames) {
@@ -114,11 +72,9 @@ for (const frame of frames) {
   else flows.push({ flow: frame.flow, frames: [frame] });
 }
 
-async function shotHtml(shot: Shot | undefined, label: string, w: number, h: number): Promise<string> {
-  if (!shot) return '';
-  return `          <figure class="shot shot--${shot.orientation}">
-            <img src="${await dataUri(shot.file)}" alt="${escapeHtml(`${shot.title} — ${label}`)}" loading="lazy" width="${w}" height="${h}" />
-            <figcaption class="shot__label">${label}</figcaption>
+async function shotHtml(shot: Shot): Promise<string> {
+  return `          <figure class="shot">
+            <img src="${await dataUri(shot.file)}" alt="${escapeHtml(shot.title)}" loading="lazy" width="800" height="1280" />
           </figure>`;
 }
 
@@ -128,12 +84,7 @@ for (const group of flows) {
   const items: string[] = [];
   for (const frame of group.frames) {
     index += 1;
-    const pair = [
-      await shotHtml(frame.landscape, 'Landscape', 1280, 800),
-      await shotHtml(frame.portrait, 'Portrait', 800, 1280),
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const shot = await shotHtml(frame);
     items.push(`      <section class="frame">
         <div class="frame__meta">
           <span class="frame__num">${String(index).padStart(2, '0')}</span>
@@ -144,7 +95,7 @@ for (const group of flows) {
         <h3 class="frame__title">${escapeHtml(frame.title)}</h3>
         <p class="frame__caption">${escapeHtml(frame.caption)}</p>
         <div class="frame__shots">
-${pair}
+${shot}
         </div>
       </section>`);
   }
@@ -367,21 +318,16 @@ const html = `<title>Registering a family — Tally</title>
   }
 
   /*
-   * The same moment on both shapes of tablet, side by side — a landscape shelf
-   * mount and a portrait stand. Proportioned so each renders near its own
-   * aspect ratio rather than one being squeezed to match the other, and stacked
-   * below 60rem where side-by-side would make both too small to read.
+   * The moment on the tablet, stood on end the way the kiosk always stands —
+   * held to a column narrow enough that the whole frame fits a laptop's
+   * height without scrolling past it.
    */
   .frame__shots {
     margin-top: 0.9rem;
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 24rem);
     gap: 1rem;
     align-items: start;
-  }
-
-  @media (max-width: 60rem) {
-    .frame__shots { grid-template-columns: minmax(0, 1fr); }
   }
 
   .shot {
@@ -397,14 +343,6 @@ const html = `<title>Registering a family — Tally</title>
     border: 1px solid var(--shot-frame);
     border-radius: 10px;
     background: var(--panel);
-  }
-
-  .shot__label {
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
   }
 
   /* ---- Footer ------------------------------------------------------------ */
@@ -443,8 +381,8 @@ const html = `<title>Registering a family — Tally</title>
       flatter it.
     </p>
     <p class="provenance">
-      <span>${frames.length} frames × 2 orientations</span>
-      <span>1280 × 800 landscape · 800 × 1280 portrait</span>
+      <span>${frames.length} frames</span>
+      <span>800 × 1280, the kiosk stood on end</span>
       <span>captured by e2e/registration-walkthrough.spec.ts</span>
     </p>
   </header>
@@ -497,15 +435,7 @@ for (const group of flows) {
       frame.caption,
       '',
     );
-    if (frame.landscape) {
-      md.push(`![${frame.title} — landscape](shots/${frame.landscape.file})`, '');
-    }
-    if (frame.portrait) {
-      md.push(
-        `<img src="shots/${frame.portrait.file}" width="320" alt="${frame.title} — portrait">`,
-        '',
-      );
-    }
+    md.push(`<img src="shots/${frame.file}" width="320" alt="${frame.title}">`, '');
   }
 }
 

@@ -22,6 +22,11 @@
       its own storage container, so the installed app is also the one that has to
       be paired. See "The kiosk installs as its own app" in the README.
 
+      The manifest also pins the installed app to portrait, the only way the
+      kiosk stands. It is the first of three layers — see
+      src/kiosk/components/PortraitOnly.tsx for the other two, which cover a
+      browser tab and a device that ignores the manifest.
+
       What has *not* changed is the update channel: this page is no-cache and the
       hashed assets it names are immutable, so a deploy reaches a kiosk on its
       next load, which KioskApp schedules for ~4am. public/kiosk-sw.js is written

@@ -1515,12 +1515,10 @@
     "noPhoto": "No photo — colours only",
     "guidanceNoWords": "Use photos without words so kiosk instructions remain easy to read.",
     "guidanceConsent": "Get parental permission before using photos of children. Photos of rooms or decorations work best.",
-    "guidanceCrop": "The top of the photo will be covered by kiosk text. Check the previews below for both orientations.",
+    "guidanceCrop": "The top of the photo will be covered by kiosk text, and the kiosk stands upright, so a sideways photo shows only its middle. Check the preview below.",
     "fieldHint": "Behind the kiosk’s idle screen while it is bound to this gathering, and gone the moment a family starts typing. Changes reach a shelf when its kiosk next rebinds.",
     "newPhoto": "New photo · {detail}",
     "storedPhoto": "Photo · uploaded {when}",
-    "onAShelf": "On a shelf",
-    "stoodOnEnd": "Stood on end",
     "readFailed": "Couldn’t read that photo — try a different one.",
     "previewTypeChildsName": "Type your child’s name",
     "previewOrPhone": "or the last 4 digits of your phone",
@@ -2194,7 +2192,9 @@
     "space": "Space",
     "apostrophe": "Apostrophe",
     "hyphen": "Hyphen",
-    "staffPrint": "Staff · print name tags"
+    "staffPrint": "Staff · print name tags",
+    "turnUprightTitle": "Turn the screen upright",
+    "turnUprightBody": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader."
   },
   "Confirm": {
     "back": "← Back",

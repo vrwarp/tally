@@ -76,7 +76,7 @@ export function ReprintConfirmScreen({
           {/* The one line carrying information — why the volunteer is standing
               at the kiosk. It does not repeat the name: the sticker is one line
               under it and says it in black on white. */}
-          <div className="text-xl text-ink-200 kiosk:text-2xl">
+          <div className="text-xl text-ink-200 tall:text-2xl">
             {printedAt ? t('lastPrintedAt', { when: printedAt }) : t('noTagTonight')}
           </div>
         </div>
@@ -92,8 +92,8 @@ export function ReprintConfirmScreen({
               key={line}
               className={
                 index === 0
-                  ? 'text-3xl font-bold kiosk:text-4xl'
-                  : 'pt-1 text-base text-ink-800 kiosk:text-lg'
+                  ? 'text-3xl font-bold tall:text-4xl'
+                  : 'pt-1 text-base text-ink-800 tall:text-lg'
               }
             >
               {line}
@@ -112,7 +112,7 @@ export function ReprintConfirmScreen({
             the phone it opened line two, so the one warning attached to the
             control that spends a label read for a beat as a bullet. */}
         {printerNeedsAttention && (
-          <div className="pb-3 text-base font-semibold text-balance text-warn-400 kiosk:text-lg">
+          <div className="pb-3 text-base font-semibold text-balance text-warn-400 tall:text-lg">
             {t('printerNeedsPrint')}
           </div>
         )}

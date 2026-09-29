@@ -52,11 +52,13 @@ export const KIOSK_BACKDROP_TARGET_BYTES = 350_000;
 /**
  * The longest edge the editor resizes to, in pixels.
  *
- * One image serves both shapes a kiosk stands in — 1280×800 on a shelf and
- * 800×1280 on an easel — by cover-cropping, so the source has to carry enough
- * pixels for whichever axis the crop stretches. 1920 covers both with room for
- * a 1.5× panel, and past it every further pixel is decode time on hardware
- * this repo measures in Raspberry Pis (see docs/kiosk-performance.md).
+ * The kiosk stands 800×1280 and cover-crops, so the source has to carry
+ * enough pixels for whichever axis the crop stretches — and the photograph
+ * a leader hands over was usually taken sideways, where the axis the crop
+ * stretches is the short one. 1920 on the long edge of a 3:2 photograph is
+ * 1280 on the short one, exactly the kiosk's height, and past it every
+ * further pixel is decode time on hardware this repo measures in Raspberry
+ * Pis (see docs/kiosk-performance.md).
  */
 export const KIOSK_BACKDROP_EDGE_PX = 1920;
 

@@ -15,10 +15,10 @@
  *     well as a search frame, since `confirm` never appears on an idle screen;
  *   - that the allergy line does not move, whatever else does.
  *
- * One shape only. A kiosk is a tablet in a stand — the 1280x800 landscape the
- * rest of the kiosk documentation uses — and photographing a phone would be
- * photographing something nobody runs this on. The editor frames are the same
- * width, so the two acts sit at one size on the page.
+ * One shape per surface. A kiosk is a tablet stood on end in a stand — the
+ * only way it runs — and photographing a phone would be photographing
+ * something nobody runs this on. The editor is a laptop in the office, at the
+ * 1280×800 the rest of the staff documentation uses.
  *
  * Run it with:
  *   WALKTHROUGH=1 npx playwright test --project=chromium-desktop \
@@ -37,7 +37,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(repoRoot, 'docs', 'walkthrough', 'themes');
 
 /** The shape a lobby tablet is mounted in. Not a phone, not a laptop. */
-const KIOSK_VIEWPORT = { width: 1280, height: 800 };
+const KIOSK_VIEWPORT = { width: 800, height: 1280 };
+
+/** Where the colours are chosen: a laptop in the office. */
+const EDITOR_VIEWPORT = { width: 1280, height: 800 };
 
 interface Shot {
   file: string;
@@ -254,7 +257,7 @@ test('capture the theme walkthrough', async ({ browser, page, signedInAs }) => {
     /* ---- Act 1: choosing --------------------------------------------------- */
 
     await signedInAs('core');
-    await page.setViewportSize(KIOSK_VIEWPORT);
+    await page.setViewportSize(EDITOR_VIEWPORT);
     await page.goto('/events');
     await page.getByRole('button', { name: 'New event' }).click();
 

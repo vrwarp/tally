@@ -15,6 +15,10 @@
  * app. An expired binding is left alone: that kiosk is on its way to the
  * chooser, which is not at any gathering yet.
  *
+ * `PortraitOnly` wraps the whole app because the kiosk has exactly one layout,
+ * for a tablet stood on end; see that file for the three layers — manifest,
+ * orientation lock, and a screen of its own — that keep it there.
+ *
  * There *is* a service worker, but not from here: kiosk.html registers
  * public/kiosk-sw.js after `load`, so nothing about installing the kiosk as an
  * app costs this bundle a byte or first paint a millisecond.
@@ -24,6 +28,7 @@ import { createRoot } from 'react-dom/client';
 import '@/index.css';
 import { KioskApp } from './KioskApp';
 import { KioskIntlProvider } from './KioskIntlProvider';
+import { PortraitOnly } from './components/PortraitOnly';
 import { bindingIsLive, readBinding } from './binding';
 import { applyKioskTheme } from './theme';
 
@@ -35,7 +40,9 @@ if (bound && bindingIsLive(bound, Date.now())) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <KioskIntlProvider>
-      <KioskApp />
+      <PortraitOnly>
+        <KioskApp />
+      </PortraitOnly>
     </KioskIntlProvider>
   </StrictMode>,
 );

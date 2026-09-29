@@ -494,6 +494,20 @@ if (manifest.id !== '/kiosk' || manifest.scope !== '/kiosk' || manifest.start_ur
   process.exit(1);
 }
 
+/*
+ * The kiosk has one layout, for a tablet stood on end. The manifest is what
+ * holds an installed kiosk there without anybody touching the rotation lock;
+ * src/kiosk/components/PortraitOnly.tsx covers everything it cannot reach.
+ */
+if (manifest.orientation !== 'portrait') {
+  console.error(
+    'kiosk.webmanifest must keep "orientation": "portrait" — the kiosk has no ' +
+      'landscape layout, and an installed kiosk that can rotate spends its evening ' +
+      `behind the "turn the screen upright" screen.\nFound orientation=${manifest.orientation}.`,
+  );
+  process.exit(1);
+}
+
 // Vite does not check that a manifest's icons exist, and a missing one is only
 // visible on a device: a blank tile in the launcher, or Chrome declining to
 // offer the install at all. See public/icons/README.md.

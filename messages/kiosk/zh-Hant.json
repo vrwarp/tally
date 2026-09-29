@@ -112,7 +112,9 @@
     "space": "空白鍵",
     "apostrophe": "撇號",
     "hyphen": "連字號",
-    "staffPrint": "同工 · 列印名牌"
+    "staffPrint": "同工 · 列印名牌",
+    "turnUprightTitle": "請將螢幕轉為直向",
+    "turnUprightBody": "簽到只能在直向螢幕下使用。如果無法轉動，請找輔導。"
   },
   "Grades": {
     "preK": "幼兒園中班",
