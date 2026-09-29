@@ -1444,6 +1444,25 @@ export function KioskApp() {
   useEffect(() => subscribeTouch(setOutOfTouchAt), []);
 
   /*
+   * Back in touch, the kiosk says so at once rather than on the register
+   * poll's next tick. Tally judges "quiet" by this report (`quietOn`), so until
+   * it lands the event page goes on saying the check-ins are still on the
+   * tablet, and the counselors' list that the kiosk has not been heard from,
+   * for up to five minutes after the uploader has sent every one. Only with a
+   * session: on the pairing screen there is nobody to report as.
+   */
+  const wasOutOfTouch = useRef(outOfTouchAt !== null);
+  useEffect(() => {
+    if (outOfTouchAt !== null) {
+      wasOutOfTouch.current = true;
+      return;
+    }
+    if (!wasOutOfTouch.current || !uid) return;
+    wasOutOfTouch.current = false;
+    standingRef.current();
+  }, [outOfTouchAt, uid]);
+
+  /*
    * Out of touch for ten minutes: past a blip, and — on a Sunday — before
    * anybody has been standing at a "broken" kiosk long enough to reach for the
    * power button. The notice it arms is below, beside the owed one.

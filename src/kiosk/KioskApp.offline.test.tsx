@@ -318,6 +318,24 @@ describe('a tap, with the internet gone', () => {
   });
 });
 
+describe('coming back', () => {
+  it('says so at once, so Tally stops calling it quiet before the next five-minute report', async () => {
+    net = 'down';
+    await mount();
+    await tapThrough(ADA, /^check in$/i);
+    // Twenty minutes out: Tally has been calling this kiosk quiet since twelve.
+    await wait(20 * 60_000);
+    vi.mocked(services.reportStanding).mockClear();
+
+    net = 'up';
+    await wait(RETRY_EVERY_MS);
+
+    expect(journalRecords()).toEqual([]);
+    // The report that clears "quiet", well before the register poll's next tick.
+    expect(services.reportStanding).toHaveBeenCalledWith(expect.objectContaining({ title: 'Sunday Kids' }));
+  });
+});
+
 describe('a connection that hangs rather than fails — failure 5', () => {
   it('runs one pass at a time, loses nothing, and lands everything when it comes back', async () => {
     net = 'hang';

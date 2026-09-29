@@ -736,7 +736,8 @@ the check that matters most before the first Sunday it is relied on.
   share (`quietOn` in `src/lib/kioskQuiet.ts`): not heard from for twelve minutes, and last heard
   from between the start of the day the check-in window opens and the end of the day the gathering
   ends. A row that is still set to Sunday's chain because its tablet never came back does not raise
-  the line every Sunday after.
+  the line every Sunday after. A kiosk that comes back reports at once, rather than on its next five-minute
+  poll, so the line gives way to *arrived late* as soon as the records are in, not minutes after.
 - **Late means more than ten minutes** between the tap and its arrival in Tally (`LATE_AFTER_MS`),
   counted per kiosk from the register itself. The line says *so far* while the kiosk still reports
   records waiting, and stays back while a kiosk set to the gathering is quiet, when the quiet line is
