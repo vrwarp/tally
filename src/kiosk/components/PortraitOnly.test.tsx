@@ -15,12 +15,18 @@ import { lockPortrait } from '@/kiosk/orientation';
 const TITLE = /turn the screen upright/i;
 
 let landscape = false;
-const listeners = new Set<() => void>();
+/** Keyed by event type, so only a listener on `change` hears the turn. */
+const listeners = new Map<string, Set<() => void>>();
+
+function listening(type: string): Set<() => void> {
+  if (!listeners.has(type)) listeners.set(type, new Set());
+  return listeners.get(type)!;
+}
 
 function turn(to: 'landscape' | 'portrait'): void {
   landscape = to === 'landscape';
   act(() => {
-    for (const listener of listeners) listener();
+    for (const listener of listening('change')) listener();
   });
 }
 
@@ -34,8 +40,9 @@ beforeEach(() => {
       return query === '(orientation: landscape)' && landscape;
     },
     media: query,
-    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
-    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+    addEventListener: (type: string, listener: () => void) => listening(type).add(listener),
+    removeEventListener: (type: string, listener: () => void) =>
+      listening(type).delete(listener),
   })) as unknown as typeof window.matchMedia;
 });
 
@@ -89,6 +96,32 @@ describe('PortraitOnly', () => {
     // Mounted once, across both turns: a half-typed name survives the tablet
     // being knocked sideways and stood back up.
     expect(mounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops listening for turns once it is gone', () => {
+    const { unmount } = render(
+      <PortraitOnly>
+        <div>Kiosk</div>
+      </PortraitOnly>,
+    );
+    expect(listening('change').size).toBeGreaterThan(0);
+
+    unmount();
+    expect(listening('change').size).toBe(0);
+  });
+
+  it('shows the kiosk where the engine cannot answer the question at all', () => {
+    Reflect.deleteProperty(window, 'matchMedia');
+    window.matchMedia = undefined as unknown as typeof window.matchMedia;
+
+    render(
+      <PortraitOnly>
+        <div>Kiosk</div>
+      </PortraitOnly>,
+    );
+
+    expect(screen.getByText('Kiosk')).toBeInTheDocument();
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
   });
 
   it('asks the device to hold portrait on boot and again on entering fullscreen', () => {

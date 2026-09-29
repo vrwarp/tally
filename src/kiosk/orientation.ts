@@ -19,17 +19,22 @@ interface LockableOrientation {
   lock?: (orientation: 'portrait') => Promise<void>;
 }
 
-/** Ask the device to hold portrait. Refusal is the common answer and is fine. */
+/**
+ * Ask the device to hold portrait. Refusal is the common answer and is fine.
+ *
+ * One `try` covers every way of not getting it: an engine without the API
+ * (`orientation` or `lock` missing throws the TypeError it would anyway), an
+ * engine that throws synchronously, and — through `catch` on the promise —
+ * the rejection a tab that is not fullscreen gets. The screen in
+ * PortraitOnly covers all of them.
+ */
 export function lockPortrait(): void {
-  const orientation = (globalThis.screen as { orientation?: LockableOrientation } | undefined)
-    ?.orientation;
   try {
-    void orientation?.lock?.('portrait').catch(() => {
-      // Not fullscreen, not supported, or not allowed — the screen below
-      // covers every one of those.
-    });
+    (screen as unknown as { orientation: Required<LockableOrientation> }).orientation
+      .lock('portrait')
+      .catch(() => {});
   } catch {
-    // Engines that throw synchronously rather than rejecting.
+    // See above: nothing to do but let the fallback screen answer.
   }
 }
 
@@ -44,7 +49,12 @@ function isSideways(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(LANDSCAPE).matches;
 }
 
-/** Whether the kiosk is currently wider than it is tall. */
+/**
+ * Whether the kiosk is currently wider than it is tall.
+ *
+ * No server snapshot: the kiosk is rendered by `createRoot` in a browser and
+ * never on a server, so there is no first paint for one to describe.
+ */
 export function useSideways(): boolean {
-  return useSyncExternalStore(subscribe, isSideways, () => false);
+  return useSyncExternalStore(subscribe, isSideways);
 }
