@@ -230,6 +230,56 @@ describe('subscribeKioskDevices', () => {
     expect(held[0]).not.toHaveProperty('charging');
   });
 
+  /** One stored row, read back through the listener. */
+  function readBack(data: Record<string, unknown>): KioskDevice {
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+    onNext({ docs: [{ id: 'lobby-tablet', data: () => data }] });
+    return held[0];
+  }
+
+  it('carries what the tablet last said it was still holding', () => {
+    // What arms Retire on a kiosk set to nothing with a pickup still waiting —
+    // `landKioskRecords` writes all three on every call.
+    const holding = readBack({
+      approvedBy: 'uid-miriam',
+      waitingCount: 3,
+      waitingSinceAt: new Timestamp(1_767_610_800, 0),
+      allInAt: null,
+    });
+    expect(holding).toHaveProperty('waitingCount', 3);
+    expect(holding).toHaveProperty('waitingSinceAt', new Date(1_767_610_800_000));
+    expect(holding).toHaveProperty('allInAt', null);
+
+    // Nothing waiting is a reading too, and 0 is the value a falsy test drops.
+    const allIn = readBack({
+      approvedBy: 'uid-miriam',
+      waitingCount: 0,
+      waitingSinceAt: null,
+      allInAt: new Timestamp(1_767_614_400, 0),
+    });
+    expect(allIn).toHaveProperty('waitingCount', 0);
+    expect(allIn).toHaveProperty('waitingSinceAt', null);
+    expect(allIn).toHaveProperty('allInAt', new Date(1_767_614_400_000));
+  });
+
+  it('leaves the waiting fields off a kiosk that never sent, or sent the wrong type', () => {
+    const neverSent = readBack({ approvedBy: 'uid-miriam' });
+    expect(neverSent).not.toHaveProperty('waitingCount');
+    expect(neverSent).not.toHaveProperty('waitingSinceAt');
+    expect(neverSent).not.toHaveProperty('allInAt');
+
+    expect(readBack({ approvedBy: 'uid-miriam', waitingCount: '3' })).not.toHaveProperty(
+      'waitingCount',
+    );
+  });
+
   it('answers the defaults for a field stored as the wrong type', () => {
     let held: KioskDevice[] = [];
     subscribeKioskDevices((next) => {
