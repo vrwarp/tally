@@ -39,7 +39,7 @@ import { useParams } from 'react-router-dom';
 import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { EmptyState, ErrorBanner, SkeletonRows } from '@/components/ui';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useCanSee, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { EventHeader } from '@/features/checkin/EventHeader';
@@ -173,7 +173,15 @@ export function CheckInPage() {
   );
 
   const { students, settings, loading: dataLoading, rosterError, canWork } = useData();
-  const { user, can } = useAuth();
+  const { user } = useAuth();
+  const canSee = useCanSee();
+  /*
+   * A viewer reads this register and works none of it: no tap checks anybody
+   * in, no quick-add, and nothing is brought into existence on their behalf.
+   * The rules refuse every write they could make; this is what stops the
+   * screen offering one.
+   */
+  const readOnly = useReadOnly();
   const { show } = useToast();
 
   /*
@@ -340,7 +348,7 @@ export function CheckInPage() {
   useEffect(() => {
     // `locked` first: this one runs on a timer, so a refused gathering would
     // retry a write it can never land for as long as the tab is open.
-    if (locked) return;
+    if (locked || readOnly) return;
     if (!event || event.materialized || !isCheckInOpen(event, now)) return;
     if (materializing.current === event.id) return;
 
@@ -348,7 +356,7 @@ export function CheckInPage() {
     void ensureMaterialized(event).catch(() => {
       materializing.current = null;
     });
-  }, [event, now, locked]);
+  }, [event, now, locked, readOnly]);
 
   // Published for the roster heading below it, which sticks to the underside of
   // the search box rather than to the top of the window.
@@ -887,9 +895,10 @@ export function CheckInPage() {
         setExpandedId((current) => (current === entry.student.id ? null : entry.student.id));
         return;
       }
+      if (readOnly) return;
       void handleCheckIn(entry);
     },
-    [swapForId, handleSwapPick, handleCheckIn],
+    [swapForId, handleSwapPick, handleCheckIn, readOnly],
   );
 
   const onUndo = useCallback(
@@ -1212,7 +1221,7 @@ export function CheckInPage() {
                 /* Quick-add is stood down while a check-in is being moved: it
                    creates a *new* student and checks them in on the server clock,
                    which is the one thing this correction exists to avoid. */
-                onQuickAdd={swapSource ? undefined : () => setQuickAddOpen(true)}
+                onQuickAdd={swapSource || readOnly ? undefined : () => setQuickAddOpen(true)}
               />
             </div>
 
@@ -1276,7 +1285,9 @@ export function CheckInPage() {
             description={
               swapSource
                 ? t("noMatchSwapBody")
-                : t("noMatchBody")
+                : readOnly
+                  ? t("noMatchReadOnlyBody")
+                  : t("noMatchBody")
             }
             action={
               /* A brand-new student is not somewhere a check-in can be *moved*
@@ -1291,7 +1302,7 @@ export function CheckInPage() {
                 >
                   {t("swapLeave")}
                 </button>
-              ) : (
+              ) : readOnly ? null : (
                 <button
                   type="button"
                   onClick={() => setQuickAddOpen(true)}
@@ -1322,13 +1333,17 @@ export function CheckInPage() {
                       roster.participationSource === "gathering"
                       ? t("hintParticipatedHere", { count: counts.participationWindow })
                       : t("hintParticipatedEver")
-                    : appliedFocus === "checkedIn"
-                      ? t("hintCheckedIn")
-                      : appliedFocus === "inRoom"
-                        ? t("hintInRoom")
-                        : appliedFocus === "checkedOut"
-                          ? t("hintCheckedOut")
-                          : undefined
+                    : // Every hint below is an instruction to tap, and a
+                      // viewer's taps do nothing.
+                      readOnly
+                      ? t("hintReadOnly")
+                      : appliedFocus === "checkedIn"
+                        ? t("hintCheckedIn")
+                        : appliedFocus === "inRoom"
+                          ? t("hintInRoom")
+                          : appliedFocus === "checkedOut"
+                            ? t("hintCheckedOut")
+                            : undefined
               }
               emptyLabel={t(FOCUS_EMPTY[appliedFocus])}
               tone={
@@ -1343,7 +1358,8 @@ export function CheckInPage() {
               mode={swapSource ? "swap" : "checkin"}
               swapSourceId={swapSource?.student.id ?? null}
               expandedId={expandedId}
-              canOpenProfile={can("core")}
+              canOpenProfile={canSee("core")}
+              readOnly={readOnly}
               flashing={flashing}
               busy={pending}
               allergyNotes={allergyNotes}

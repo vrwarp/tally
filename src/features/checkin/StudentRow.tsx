@@ -73,6 +73,17 @@ export interface StudentRowProps {
    */
   canOpenProfile?: boolean;
   /**
+   * A register to read, not a door to work — the viewer's roster.
+   *
+   * The row still says who is here and when, in the same place and the same
+   * colour, so a viewer reads the screen a counselor reads. What goes is every
+   * verb: the row body checks nobody in, the trailing slot is a clock rather
+   * than an undo, and the strip under a checked-in row carries `Profile` alone.
+   * Handlers are not enough to say this — the row draws its buttons whether or
+   * not one was passed.
+   */
+  readOnly?: boolean;
+  /**
    * What the allergy is, when Planning Center has been asked and answered.
    *
    * Absent — no answer yet, no note on file, or a read that failed — leaves the
@@ -134,6 +145,7 @@ export const StudentRow = memo(function StudentRow({
   flashing = false,
   busy = false,
   canOpenProfile = false,
+  readOnly = false,
   allergyNote,
   onCheckOut,
   onUndoCheckOut,
@@ -159,9 +171,16 @@ export const StudentRow = memo(function StudentRow({
    * dimmed rows behind carrying a state nothing on screen explains.
    */
   const gone = tracksCheckOut && attendance?.checkedOutAt != null;
+  /*
+   * Whether the strip would hold anything. A read-only strip is `Profile` or
+   * nothing, and a strip of nothing is a row that opens onto a blank line.
+   */
+  const hasActions = !readOnly || (canOpenProfile && !former);
   // The action strip belongs to a check-in. While the screen is picking a
   // person it would be a second, contradictory meaning for the same row.
-  const open = expanded && here && !swapping;
+  const open = expanded && here && !swapping && hasActions;
+  /** A read-only row with nothing to open is a line of text wearing a button's shape. */
+  const inert = readOnly && !(here && hasActions);
 
   /*
    * A row that cannot take the check-in being moved.
@@ -194,7 +213,9 @@ export const StudentRow = memo(function StudentRow({
       ? t('ariaMoreCheckedOut', { who, time: time.clock(attendance!.checkedOutAt!) })
       : here
         ? t('ariaMoreCheckedIn', { who, time: time.clock(attendance.checkedInAt) })
-        : t('ariaCheckIn', { who });
+        : readOnly
+          ? t('ariaNotCheckedIn', { who })
+          : t('ariaCheckIn', { who });
   /*
    * Nothing inside the row is announced on its own, so the note has to be part
    * of a label or it is not read out at all — and this is the label it belongs
@@ -268,10 +289,10 @@ export const StudentRow = memo(function StudentRow({
                `RosterList`. */
             data-roster-row=""
             onClick={() => onPress(entry)}
-            disabled={busy || unavailable}
+            disabled={busy || unavailable || inert}
             aria-busy={busy || undefined}
             aria-label={label}
-            aria-expanded={here && !swapping ? open : undefined}
+            aria-expanded={here && !swapping && hasActions ? open : undefined}
             aria-controls={open ? actionsId : undefined}
             className={cn(
               'flex min-h-16 min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left',
@@ -282,6 +303,7 @@ export const StudentRow = memo(function StudentRow({
               // the student directory, the MIA list and the calendar all respond —
               // on the screen where the tap has the largest consequence.
               !unavailable &&
+                !inert &&
                 (here
                   ? 'hover:bg-present-500/10 active:bg-present-500/10'
                   : 'hover:bg-ink-800 active:bg-ink-800'),
@@ -470,49 +492,66 @@ export const StudentRow = memo(function StudentRow({
                 gone ? 'border-ink-800' : 'border-present-500/20',
               )}
             >
-              <button
-                type="button"
-                onClick={() =>
-                  gone ? onUndoCheckOut?.(entry) : tracksCheckOut ? onCheckOut?.(entry) : onUndo?.(entry)
-                }
-                disabled={busy}
-                aria-busy={busy || undefined}
-                aria-label={
-                  gone
-                    ? t('ariaPutBack', { who, time: time.clock(attendance.checkedOutAt!) })
-                    : tracksCheckOut
-                      ? t('ariaCheckOut', { who, time: time.clock(attendance.checkedInAt) })
-                      : t('ariaUndoCheckIn', { who, time: time.clock(attendance.checkedInAt) })
-                }
-                className={cn(
-                  // `ml-2` is the dead strip: a transparent margin inside the
-                  // slot, so the hit region starts where the eye already reads
-                  // the button as starting. `px-1` gives the clock back the
-                  // 47px it had between the old padding.
-                  'ml-2 flex flex-1 flex-col items-center justify-center gap-0.5 px-1',
-                  // The right-hand end of the card, minus its bottom corner
-                  // whenever the actions strip is open underneath. See `rowCorners`.
-                  'rounded-tr-xl',
-                  !open && 'rounded-br-xl',
-                  'disabled:opacity-60',
-                  gone
-                    ? 'text-ink-400 hover:bg-ink-800/60 active:bg-ink-800/60'
-                    : 'text-present-400 hover:bg-present-500/15 active:bg-present-500/15',
-                )}
-              >
+              {readOnly ? (
+                /* The same mark and clock, as a fact rather than a target: the
+                   row body's label already says both aloud. */
                 <span
                   aria-hidden="true"
                   className={cn(
-                    'leading-none',
-                    gone || !tracksCheckOut ? 'text-xl' : 'text-[13px] font-semibold',
+                    'ml-2 flex flex-1 flex-col items-center justify-center gap-0.5 px-1',
+                    gone ? 'text-ink-400' : 'text-present-400',
                   )}
                 >
-                  {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
+                  <span className="text-xl leading-none">{gone ? '↺' : '✓'}</span>
+                  <span className="text-[11px] tabular-nums text-ink-500">
+                    {time.clock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
+                  </span>
                 </span>
-                <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
-                  {time.clock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
-                </span>
-              </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    gone ? onUndoCheckOut?.(entry) : tracksCheckOut ? onCheckOut?.(entry) : onUndo?.(entry)
+                  }
+                  disabled={busy}
+                  aria-busy={busy || undefined}
+                  aria-label={
+                    gone
+                      ? t('ariaPutBack', { who, time: time.clock(attendance.checkedOutAt!) })
+                      : tracksCheckOut
+                        ? t('ariaCheckOut', { who, time: time.clock(attendance.checkedInAt) })
+                        : t('ariaUndoCheckIn', { who, time: time.clock(attendance.checkedInAt) })
+                  }
+                  className={cn(
+                    // `ml-2` is the dead strip: a transparent margin inside the
+                    // slot, so the hit region starts where the eye already reads
+                    // the button as starting. `px-1` gives the clock back the
+                    // 47px it had between the old padding.
+                    'ml-2 flex flex-1 flex-col items-center justify-center gap-0.5 px-1',
+                    // The right-hand end of the card, minus its bottom corner
+                    // whenever the actions strip is open underneath. See `rowCorners`.
+                    'rounded-tr-xl',
+                    !open && 'rounded-br-xl',
+                    'disabled:opacity-60',
+                    gone
+                      ? 'text-ink-400 hover:bg-ink-800/60 active:bg-ink-800/60'
+                      : 'text-present-400 hover:bg-present-500/15 active:bg-present-500/15',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'leading-none',
+                      gone || !tracksCheckOut ? 'text-xl' : 'text-[13px] font-semibold',
+                    )}
+                  >
+                    {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
+                  </span>
+                  <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
+                    {time.clock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
+                  </span>
+                </button>
+              )}
             </div>
           ) : null}
         </div>
@@ -531,15 +570,17 @@ export const StudentRow = memo(function StudentRow({
               a pickup recorded against somebody who was never here is not
               worth keeping either.
             */}
-            <button
-              type="button"
-              onClick={() => onUndo?.(entry)}
-              disabled={busy}
-              aria-label={t('ariaUndoShort', { name })}
-              className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
-            >
-              {tCommon('undo')}
-            </button>
+            {readOnly ? null : (
+              <button
+                type="button"
+                onClick={() => onUndo?.(entry)}
+                disabled={busy}
+                aria-label={t('ariaUndoShort', { name })}
+                className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
+              >
+                {tCommon('undo')}
+              </button>
+            )}
 
             {/* Nothing to open for a former student: the id names a record,
                 not a profile. */}
@@ -553,18 +594,20 @@ export const StudentRow = memo(function StudentRow({
               </Link>
             ) : null}
 
-            <button
-              type="button"
-              onClick={() => onSwap?.(entry)}
-              disabled={busy}
-              aria-label={t('ariaWrongPerson', { name })}
-              className={cn(
-                ACTION,
-                'bg-brand-500/10 text-brand-300 ring-brand-500/30 hover:bg-brand-500/20',
-              )}
-            >
-              {t('wrongPerson')}
-            </button>
+            {readOnly ? null : (
+              <button
+                type="button"
+                onClick={() => onSwap?.(entry)}
+                disabled={busy}
+                aria-label={t('ariaWrongPerson', { name })}
+                className={cn(
+                  ACTION,
+                  'bg-brand-500/10 text-brand-300 ring-brand-500/30 hover:bg-brand-500/20',
+                )}
+              >
+                {t('wrongPerson')}
+              </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -581,6 +624,7 @@ export const StudentRow = memo(function StudentRow({
   prev.flashing === next.flashing &&
   prev.busy === next.busy &&
   prev.canOpenProfile === next.canOpenProfile &&
+  prev.readOnly === next.readOnly &&
   prev.allergyNote === next.allergyNote &&
   prev.onCheckOut === next.onCheckOut &&
   prev.onUndoCheckOut === next.onUndoCheckOut &&

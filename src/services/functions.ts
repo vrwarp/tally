@@ -18,6 +18,7 @@ import type {
   PcoRosterPerson,
   PcoStatus,
   PcoPersonDetails,
+  Role,
 } from '@/types';
 
 /**
@@ -62,7 +63,7 @@ export interface GatheringName {
 export interface ProvisionAccessResult {
   /** `granted` — a `users/{uid}` document now exists and is active. */
   status: 'granted' | 'not-on-roster' | 'inactive';
-  role: 'counselor' | 'core' | 'admin' | null;
+  role: Role | null;
   message: string;
   /**
    * The gatherings the invitation asked for, as titles, and what became of

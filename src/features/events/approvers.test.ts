@@ -134,6 +134,21 @@ describe('who is named', () => {
     ).toEqual(['jo', 'sam']);
   });
 
+  it('never names a viewer, who can read the gathering and add nobody', () => {
+    // Opened Tally today, which would otherwise put them first.
+    const pat = makeUser({
+      id: 'pat',
+      displayName: 'Pat Moreno',
+      role: 'viewer',
+      lastSeenAt: new Date(2026, 1, 13, 18, 5),
+    });
+
+    expect(approvers(t, friday, restricted('pat', 'sam'), directory(pat, sam), { now: NOW })).toBe(
+      'Sam can add you',
+    );
+    expect(approvers(t, friday, restricted('pat'), directory(pat), { now: NOW })).toBeNull();
+  });
+
   it('skips a uid the directory does not know', () => {
     const who = approvers(t, friday, restricted('ghost', 'sam'), directory(sam), { now: NOW });
 

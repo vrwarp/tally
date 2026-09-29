@@ -114,7 +114,7 @@ export default function App() {
                               <Route
                                 path="dashboard"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <DashboardPage />
                                   </RequireRole>
                                 }
@@ -122,7 +122,7 @@ export default function App() {
                               <Route
                                 path="events"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <EventsPage />
                                   </RequireRole>
                                 }
@@ -130,7 +130,7 @@ export default function App() {
                               <Route
                                 path="events/:eventId"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <EventDetailPage />
                                   </RequireRole>
                                 }
@@ -138,7 +138,7 @@ export default function App() {
                               <Route
                                 path="students"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <StudentsPage />
                                   </RequireRole>
                                 }
@@ -146,7 +146,7 @@ export default function App() {
                               <Route
                                 path="students/:studentId"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <StudentDetailPage />
                                   </RequireRole>
                                 }
@@ -166,7 +166,7 @@ export default function App() {
                               <Route
                                 path="team"
                                 element={
-                                  <RequireRole role="core">
+                                  <RequireRole role="core" viewers>
                                     <TeamPage />
                                   </RequireRole>
                                 }

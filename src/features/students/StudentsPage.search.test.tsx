@@ -54,7 +54,16 @@ vi.mock('@/components/ui/Feedback', async (importOriginal) => {
 });
 
 vi.mock('@/context/dataContext', () => ({ useData }));
-vi.mock('@/context/authContext', () => ({ useAuth }));
+vi.mock('@/context/authContext', () => ({
+  useAuth,
+  useCanSee: () => {
+    const auth = useAuth() as { can?: (r: string) => boolean; profile?: { role?: string } | null };
+    return (required: 'viewer' | 'counselor' | 'core' | 'admin') =>
+      auth.can?.(required) === true || (auth.profile?.role === 'viewer' && required !== 'admin');
+  },
+  useReadOnly: () =>
+    (useAuth() as { profile?: { role?: string; active?: boolean } | null }).profile?.role === 'viewer',
+}));
 vi.mock('@/hooks/useAdultContact', () => ({
   useAdultContact,
   invalidateAdultContact: vi.fn(),

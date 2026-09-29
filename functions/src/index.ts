@@ -372,6 +372,23 @@ async function requireMember(uid: string | undefined): Promise<void> {
 }
 
 /**
+ * Any active member who may change something — everybody but a viewer.
+ *
+ * `requireMember` answers "is this somebody on the team", and a viewer is: they
+ * read registers and insights. What they may not do is write, and the rules
+ * refuse them every direct write by ranking the role below counselor. A callable
+ * writes through the Admin SDK and skips the rules, so the ones any member may
+ * call and that change something say so here instead.
+ */
+async function requireWriter(uid: string | undefined): Promise<void> {
+  await requireMember(uid);
+  const caller = await readCaller(uid!);
+  if (caller.role === 'viewer') {
+    throw refuse('permission-denied', 'auth.readOnly', 'This account can look but not change anything.');
+  }
+}
+
+/**
  * The gathering gate, for callables.
  *
  * The rules cover what a client writes directly. These cover what it asks a
@@ -3210,7 +3227,7 @@ export const approveKioskPairing = onCall<
   { code?: unknown },
   Promise<{ status: ApprovePairingStatus }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  await requireWriter(request.auth?.uid);
 
   const code = request.data?.code;
   if (typeof code !== 'string' || code.trim().length === 0) {
@@ -3244,7 +3261,7 @@ export const createKioskPairingLink = onCall<
   undefined,
   Promise<{ status: 'created'; code: string; secret: string; expiresInSeconds: number } | { status: 'busy' }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  await requireWriter(request.auth?.uid);
 
   const started = await startPairing(db(), new Date(), request.auth!.uid);
   if (started === 'busy') return { status: 'busy' };
@@ -3668,7 +3685,7 @@ export const recordVisitorParent = onCall<
   Record<string, unknown>,
   Promise<RecordVisitorParentResult>
 >({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
-  await requireMember(request.auth?.uid);
+  await requireWriter(request.auth?.uid);
   const uid = request.auth?.uid;
   if (typeof uid !== 'string') {
     throw refuse('unauthenticated', 'auth.signIn', 'Sign in first.');

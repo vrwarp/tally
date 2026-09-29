@@ -57,6 +57,7 @@ export interface LockedGatheringProps {
 }
 
 const ROLE_LABEL = {
+  viewer: 'roleViewer',
   counselor: 'roleCounselor',
   core: 'roleCore',
   admin: 'roleAdmin',

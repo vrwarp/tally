@@ -610,7 +610,10 @@ export function TeamPage() {
                       {t(ROLE_LABEL[member.role])}
                     </span>
                   ) : (
-                    <Badge tone="brand" className="-mx-1.5">
+                    <Badge
+                      tone={member.role === 'viewer' ? 'neutral' : 'brand'}
+                      className="-mx-1.5"
+                    >
                       {t(ROLE_LABEL[member.role])}
                     </Badge>
                   )}
@@ -676,7 +679,7 @@ export function TeamPage() {
               <>
                 <span className="flex items-center gap-1.5">
                   <Badge
-                    tone={member.role === 'counselor' ? 'neutral' : 'brand'}
+                    tone={member.role === 'counselor' || member.role === 'viewer' ? 'neutral' : 'brand'}
                     className="-ml-1.5"
                   >
                     {t(ROLE_LABEL[member.role])}
@@ -690,7 +693,7 @@ export function TeamPage() {
                  team out of user management entirely. */
               <>
                 <Badge
-                  tone={member.role === 'counselor' ? 'neutral' : 'brand'}
+                  tone={member.role === 'counselor' || member.role === 'viewer' ? 'neutral' : 'brand'}
                   className="-ml-1.5"
                 >
                   {t(ROLE_LABEL[member.role])}

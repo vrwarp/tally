@@ -68,7 +68,7 @@ export { canonicalEmail, emailKey, sameAccount } from '../generated/emailKey.js'
 /* -------------------------------------------------------------------------- */
 
 export type StudentStatus = 'active' | 'inactive';
-export type Role = 'counselor' | 'core' | 'admin';
+export type Role = 'viewer' | 'counselor' | 'core' | 'admin';
 
 /** Exactly the fields Planning Center owns on a student (PCO_MANAGED_STUDENT_FIELDS). */
 export interface MappedStudent {

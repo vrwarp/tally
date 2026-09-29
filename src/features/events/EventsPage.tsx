@@ -37,7 +37,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, EmptyState, EventIcon, SkeletonRows } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { NarrowedBadge } from '@/features/events/NarrowedBadge';
 import { useNarrowedCount } from '@/hooks/useNarrowedCount';
@@ -86,7 +86,8 @@ function EventRow({
 }: {
   event: TallyEvent;
   now: Date;
-  onUncancel: (event: TallyEvent) => void;
+  /** Absent for a viewer, who reads that a gathering was cancelled and cannot undo it. */
+  onUncancel?: (event: TallyEvent) => void;
   uncancelling: boolean;
 }) {
   const time = useTimeFormats();
@@ -180,7 +181,7 @@ function EventRow({
 
       {/* Outside the link rather than inside it: nesting a button in an anchor
           makes both targets ambiguous to a thumb and to a screen reader. */}
-      {cancelled ? (
+      {cancelled && onUncancel ? (
         <button
           type="button"
           onClick={() => onUncancel(event)}
@@ -206,7 +207,7 @@ function RowSection({
   title: string;
   events: readonly TallyEvent[];
   now: Date;
-  onUncancel: (event: TallyEvent) => void;
+  onUncancel?: (event: TallyEvent) => void;
   uncancelling: string | null;
   /** Rendered after the rows, inside the band — the *show more* control. */
   children?: ReactNode;
@@ -442,6 +443,12 @@ export function EventsPage() {
   const t = useTranslations('Events');
   const { events, series, loading, canWork } = useData();
   const { user } = useAuth();
+  /*
+   * A viewer reads the calendar — tonight, the week, what was held — and makes
+   * none of it: no new event, no import, no next Friday scheduled, nothing
+   * un-cancelled. Export stays, because a file changes nothing.
+   */
+  const readOnly = useReadOnly();
   const { show } = useToast();
   const now = useNow(60_000);
 
@@ -583,7 +590,10 @@ export function EventsPage() {
     );
   }
 
-  const onUncancel = (target: TallyEvent) => void handleUncancel(target);
+  const onUncancel = readOnly ? undefined : (target: TallyEvent) => void handleUncancel(target);
+  // A viewer keeps the "already scheduled" rows, which are links, and loses
+  // the "schedule next" ones, which are writes.
+  const shownQuickActions = readOnly ? quickActions.filter(({ existing }) => existing) : quickActions;
   const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
 
   return (
@@ -598,10 +608,14 @@ export function EventsPage() {
           </Button>
           {/* Quieter than "New event" on purpose: importing history happens a
               handful of times in an install's life, scheduling happens weekly. */}
-          <Button variant="secondary" onClick={() => setImporting(true)}>
-            {t('import')}
-          </Button>
-          <Button onClick={() => setEditor({ event: null })}>{t('newEvent')}</Button>
+          {readOnly ? null : (
+            <>
+              <Button variant="secondary" onClick={() => setImporting(true)}>
+                {t('import')}
+              </Button>
+              <Button onClick={() => setEditor({ event: null })}>{t('newEvent')}</Button>
+            </>
+          )}
         </div>
       </header>
 
@@ -653,7 +667,7 @@ export function EventsPage() {
             "+ Schedule next …", so the explainer under the title was forty
             pixels restating them.
           */}
-          {quickActions.length > 0 ? (
+          {shownQuickActions.length > 0 ? (
             <section aria-labelledby="events-series">
               <h3
                 id="events-series"
@@ -662,7 +676,7 @@ export function EventsPage() {
                 {t('nextInEachSeries')}
               </h3>
               <ul className="flex flex-col gap-2">
-                {quickActions.map(({ series: candidate, existing }) => (
+                {shownQuickActions.map(({ series: candidate, existing }) => (
                   <QuickAction
                     key={candidate.id}
                     series={candidate}
@@ -685,9 +699,11 @@ export function EventsPage() {
               // install with none was being told to use a shortcut that was not
               // on the screen, on the one screen where nothing else was either.
               description={
-                quickActions.length > 0
-                  ? t('emptyBodyQuick')
-                  : t('emptyBody')
+                readOnly
+                  ? undefined
+                  : quickActions.length > 0
+                    ? t('emptyBodyQuick')
+                    : t('emptyBody')
               }
             />
           ) : null}

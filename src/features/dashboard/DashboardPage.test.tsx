@@ -29,6 +29,7 @@ vi.mock('@/context/authContext', () => ({
     user: { uid: 'uid-core', email: 'core@example.org' },
     profile: { displayName: 'Dana Ruiz' },
   }),
+  useReadOnly: () => false,
 }));
 vi.mock('@/services/functions', () => ({
   getPersonDetails: vi.fn().mockResolvedValue({ data: null }),

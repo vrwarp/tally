@@ -718,6 +718,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Errors.auth.readOnly": {
+    "source": "This account can look but not change anything.",
+    "context": "Refusal: the reader has the read-only Viewer role and tried something that changes data. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Errors.auth.notOnGathering": {
     "source": "Only people added to that gathering can work it.",
     "context": "Refusal: this gathering was limited to a named set of people and the reader is not among them. \"Work it\" means take attendance for it. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
@@ -1370,6 +1377,13 @@
   },
   "Account.signedIn": {
     "source": "Signed in",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Account.roleViewer": {
+    "source": "viewer",
+    "context": "The reader's own role, as a small uppercase caption beside their email in the account menu. The read-only role: may open the core team's screens and change nothing. Lowercase like the other three role captions.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -2724,6 +2738,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "CheckIn.noMatchReadOnlyBody": {
+    "source": "Nobody on this roster matches. Try a shorter part of the name.",
+    "context": "Body of the empty state when a search on the check-in roster matches nobody, shown to a Viewer (read-only role), who cannot add a visitor. Replaces the version that offers adding them as a visitor.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "CheckIn.hintSwap": {
     "source": "tap the right student",
     "es-MX": "machine",
@@ -2756,6 +2777,13 @@
   },
   "CheckIn.hintCheckedOut": {
     "source": "tap ↺ to put somebody back",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "CheckIn.hintReadOnly": {
+    "source": "read only — checking in is for the team at the door",
+    "context": "Lowercase hint under the roster heading, shown only to a Viewer (the read-only role). It replaces the other hints, which all tell the reader to tap something. Says the register is for reading; checking in is done by the team at the door.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -3097,6 +3125,13 @@
   },
   "StudentRow.ariaCheckIn": {
     "source": "Check in {who}",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "StudentRow.ariaNotCheckedIn": {
+    "source": "{who}, not checked in",
+    "context": "Screen-reader label for a roster row a Viewer (read-only role) is reading: the student has not been checked in, and the row does nothing when pressed. {who} is the student's name, with grade.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -4324,6 +4359,13 @@
   },
   "Team.roleAdmin": {
     "source": "Admin",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.roleViewer": {
+    "source": "Viewer",
+    "context": "Role name on the Team screen: in the role select, as a badge on a person's row, and in 'X is now {role}'. The read-only role — a pastor or board member who may see registers and insights and change nothing, not even check a child in. Sits beside Counselor, Core team and Admin.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -6870,6 +6912,13 @@
   },
   "EventDetail.takeAttendance": {
     "source": "Take attendance",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.seeRegister": {
+    "source": "See the register",
+    "context": "The main button on a gathering's page for a Viewer (read-only role), in place of 'Take attendance'. Opens the same check-in screen, where they can read who is here but not check anyone in.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9967,6 +10016,13 @@
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
+  },
+  "Students.actionsDescriptionReadOnly": {
+    "source": "Export the roster.",
+    "context": "Subtitle of the phone's Actions sheet on the Students screen for a Viewer (read-only role), whose only action is exporting. Replaces 'Add students or export the roster.'",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Students.exportBlockedLoading": {
     "source": "Still reading the roster — nothing to export yet.",

@@ -120,8 +120,16 @@ export interface VerifiedCaller {
 }
 
 
+/**
+ * A stored role, or `null`. `viewer` is named rather than falling through to
+ * the `counselor` default below: an invitation that says "may look, may not
+ * touch" provisioned as somebody who may tick children in would be the one
+ * wrong answer that grants more than was written.
+ */
 function readRole(value: unknown): Role | null {
-  return value === 'admin' || value === 'core' || value === 'counselor' ? value : null;
+  return value === 'admin' || value === 'core' || value === 'counselor' || value === 'viewer'
+    ? value
+    : null;
 }
 
 /**

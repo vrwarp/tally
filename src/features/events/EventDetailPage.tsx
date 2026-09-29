@@ -41,7 +41,7 @@ import {
   StatTile,
 } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useEvent } from '@/hooks/useEvent';
 import { LockedGathering } from '@/features/events/LockedGathering';
@@ -88,6 +88,13 @@ export function EventDetailPage() {
   const { eventId } = useParams();
   const { events, series, students, loading, canWork, access, rosterBackends } = useData();
   const { user } = useAuth();
+  /*
+   * A viewer reads the gathering, its register and who is on it, and changes
+   * none of it: no edit, no cancel, no fence, no delete, no RSVP. "Take
+   * attendance" becomes "See the register", which opens the same check-in
+   * screen with its taps withheld.
+   */
+  const readOnly = useReadOnly();
   const { show } = useToast();
   const navigate = useNavigate();
   const now = useNow(60_000);
@@ -333,51 +340,54 @@ export function EventDetailPage() {
                   to={`/event/${event.id}`}
                   className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-brand-500 px-5 text-base font-semibold text-white active:bg-brand-600"
                 >
-                  {t('takeAttendance')}
+                  {readOnly ? t('seeRegister') : t('takeAttendance')}
                 </Link>
-                <div className="flex gap-2">
-                  <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
-                    {t('edit')}
-                  </Button>
-
-                  {/*
-                    * Cancelling used to be one tap, sitting right beside Edit with
-                    * only colour between them — a stray thumb calls off a gathering
-                    * forty families are expecting. Un-cancelling stays one tap,
-                    * because putting friction on the recovery is backwards.
-                    */}
-                  {cancelled ? (
-                    <Button
-                      variant="secondary"
-                      className="flex-1"
-                      loading={busy}
-                      onClick={() => void toggleStatus()}
-                    >
-                      {t('unCancel')}
+                {readOnly ? null : (
+                  <div className="flex gap-2">
+                    <Button variant="secondary" className="flex-1" onClick={() => setEditorOpen(true)}>
+                      {t('edit')}
                     </Button>
-                  ) : confirmingCancel ? (
-                    <div className="flex flex-1 gap-2">
-                      <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
-                        {t('keepIt')}
-                      </Button>
+
+                    {/*
+                      * Cancelling used to be one tap, sitting right beside Edit with
+                      * only colour between them — a stray thumb calls off a gathering
+                      * forty families are expecting. Un-cancelling stays one tap,
+                      * because putting friction on the recovery is backwards.
+                      */}
+                    {cancelled ? (
                       <Button
-                        variant="danger"
+                        variant="secondary"
                         className="flex-1"
                         loading={busy}
-                        onClick={() => {
-                          setConfirmingCancel(false);
-                          void toggleStatus();
-                        }}
+                        onClick={() => void toggleStatus()}
                       >
-                        {t('yesCancel')}
+                        {t('unCancel')}
                       </Button>
-                    </div>
-                  ) : (
-                    <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
-                      {t('cancelEvent')}
-                    </Button>
-                  )}
-                </div>
+                    ) : confirmingCancel ? (
+                      <div className="flex flex-1 gap-2">
+                        <Button variant="ghost" className="flex-1" onClick={() => setConfirmingCancel(false)}>
+                          {t('keepIt')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="flex-1"
+                          loading={busy}
+                          onClick={() => {
+                            setConfirmingCancel(false);
+                            void toggleStatus();
+                          }}
+                        >
+                          {t('yesCancel')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="secondary" className="flex-1" onClick={() => setConfirmingCancel(true)}>
+                        {t('cancelEvent')}
+                      </Button>
+                    )}
+                  </div>
+
+                )}
 
                 {confirmingCancel ? (
                   <p role="alert" className="text-center text-xs text-ink-400">
@@ -511,17 +521,21 @@ export function EventDetailPage() {
                     : t('whoOpen')}
                 </p>
               </div>
-              <Button variant="secondary" onClick={() => setAccessOpen(true)}>
-                {accessList?.restricted ? t('change') : t('limit')}
-              </Button>
+              {readOnly ? null : (
+                <Button variant="secondary" onClick={() => setAccessOpen(true)}>
+                  {accessList?.restricted ? t('change') : t('limit')}
+                </Button>
+              )}
             </div>
           </Card>
 
-          <EventDangerZone
-            event={event}
-            checkedIn={attendance.length}
-            onDeleted={() => navigate('/events', { replace: true })}
-          />
+          {readOnly ? null : (
+            <EventDangerZone
+              event={event}
+              checkedIn={attendance.length}
+              onDeleted={() => navigate('/events', { replace: true })}
+            />
+          )}
         </div>
       </div>
 

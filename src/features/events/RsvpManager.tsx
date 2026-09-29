@@ -37,7 +37,7 @@ import {
   SkeletonRows,
   StatTile,
 } from '@/components/ui';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useRsvps } from '@/hooks/useAttendance';
@@ -253,6 +253,8 @@ export function RsvpManager({ event }: RsvpManagerProps) {
   const t = useTranslations('Rsvp');
   const { students } = useData();
   const { user } = useAuth();
+  // A viewer reads who is coming and answers for nobody.
+  const readOnly = useReadOnly();
   const { show } = useToast();
   const { rsvps, loading, error } = useRsvps(event.id);
 
@@ -394,7 +396,9 @@ export function RsvpManager({ event }: RsvpManagerProps) {
             ? t('descriptionLimited')
             : t('descriptionOpen')
         }
-        action={<Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>}
+        action={
+          readOnly ? undefined : <Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>
+        }
       />
 
       <div className="flex flex-col gap-3 p-3">
@@ -417,7 +421,11 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                 ? t('emptyBodyLimited')
                 : t('emptyBodyOpen')
             }
-            action={<Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>}
+            action={
+              readOnly ? undefined : (
+                <Button onClick={() => setAddOpen(true)}>{t('addStudents')}</Button>
+              )
+            }
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -454,50 +462,59 @@ export function RsvpManager({ event }: RsvpManagerProps) {
                     ) : null}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(row)}
-                    disabled={pending.has(`${rsvp.studentId}:remove`)}
-                    aria-label={t('removeAria', { name: row.name })}
-                    className="order-2 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 hover:bg-ink-800 active:bg-ink-800 disabled:opacity-50 lg:order-3"
-                  >
-                    <span aria-hidden="true">×</span>
-                  </button>
+                  {readOnly ? (
+                    /* The answer as a word, where the three buttons would be. */
+                    <span className="order-2 shrink-0 text-sm font-semibold text-ink-300">
+                      {t(STATUS_OPTIONS.find((option) => option.value === rsvp.status)?.label ?? 'statusMaybe')}
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(row)}
+                        disabled={pending.has(`${rsvp.studentId}:remove`)}
+                        aria-label={t('removeAria', { name: row.name })}
+                        className="order-2 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-xl text-xl leading-none text-ink-500 hover:bg-ink-800 active:bg-ink-800 disabled:opacity-50 lg:order-3"
+                      >
+                        <span aria-hidden="true">×</span>
+                      </button>
 
-                  {/*
-                    Three equal columns with air between them, 48px tall.
-                    "No" is the destructive third — it takes a student off the
-                    roster entirely on an RSVP-only event — and it used to be
-                    the smallest target on the row.
-                  */}
-                  <div
-                    role="group"
-                    aria-label={t('rsvpForAria', { name: row.name })}
-                    className="order-3 grid w-full max-w-xs grid-cols-3 gap-2 lg:order-2 lg:w-64 lg:shrink-0"
-                  >
-                    {STATUS_OPTIONS.map((option) => {
-                      const active = rsvp.status === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          aria-pressed={active}
-                          aria-label={t('statusOptionAria', { option: t(option.label), name: row.name })}
-                          disabled={pending.has(`${rsvp.studentId}:status`)}
-                          onClick={() => handleStatus(row, option.value)}
-                          className={cn(
-                            'min-h-12 w-full rounded-xl px-2 text-sm font-semibold ring-1',
-                            'transition-colors disabled:opacity-50 pointer-fine:min-h-10',
-                            active
-                              ? option.active
-                              : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 hover:text-ink-200 active:bg-ink-800',
-                          )}
-                        >
-                          {t(option.label)}
-                        </button>
-                      );
-                    })}
-                  </div>
+                      {/*
+                        Three equal columns with air between them, 48px tall.
+                        "No" is the destructive third — it takes a student off the
+                        roster entirely on an RSVP-only event — and it used to be
+                        the smallest target on the row.
+                      */}
+                      <div
+                        role="group"
+                        aria-label={t('rsvpForAria', { name: row.name })}
+                        className="order-3 grid w-full max-w-xs grid-cols-3 gap-2 lg:order-2 lg:w-64 lg:shrink-0"
+                      >
+                        {STATUS_OPTIONS.map((option) => {
+                          const active = rsvp.status === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              aria-pressed={active}
+                              aria-label={t('statusOptionAria', { option: t(option.label), name: row.name })}
+                              disabled={pending.has(`${rsvp.studentId}:status`)}
+                              onClick={() => handleStatus(row, option.value)}
+                              className={cn(
+                                'min-h-12 w-full rounded-xl px-2 text-sm font-semibold ring-1',
+                                'transition-colors disabled:opacity-50 pointer-fine:min-h-10',
+                                active
+                                  ? option.active
+                                  : 'bg-ink-900 text-ink-400 ring-ink-800 hover:bg-ink-800 hover:text-ink-200 active:bg-ink-800',
+                              )}
+                            >
+                              {t(option.label)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </li>
               );
             })}

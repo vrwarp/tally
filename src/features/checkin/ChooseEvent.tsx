@@ -22,7 +22,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFrame } from '@/components/PageFrame';
 import { EmptyState } from '@/components/ui';
-import { useAuth } from '@/context/authContext';
+import { useCanSee } from '@/context/authContext';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
 import { LockedGatherings } from '@/features/events/LockedGatherings';
 import { PastEventRow } from '@/features/events/PastGatherings';
@@ -122,7 +122,7 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
 
 export function ChooseEvent({ events, now }: ChooseEventProps) {
   const t = useTranslations('ChooseEvent');
-  const { can } = useAuth();
+  const canSee = useCanSee();
   const { canWork } = useData();
 
   const { dayStart, today } = useMemo(() => {
@@ -239,12 +239,12 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
             description={
               locked.length > 0
                 ? t('emptyLockedBody', { count: locked.length })
-                : can('core')
+                : canSee('core')
                   ? t('emptyCoreBody')
                   : t('emptyBody')
             }
             action={
-              can('core') ? (
+              canSee('core') ? (
                 <Link
                   to="/events"
                   className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"

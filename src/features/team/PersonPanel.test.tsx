@@ -38,7 +38,16 @@ const subscribeKioskDevices = vi.hoisted(() => vi.fn());
 const retireKioskDevice = vi.hoisted(() => vi.fn());
 const subscribeChainRequests = vi.hoisted(() => vi.fn());
 
-vi.mock('@/context/authContext', () => ({ useAuth }));
+vi.mock('@/context/authContext', () => ({
+  useAuth,
+  useCanSee: () => {
+    const auth = useAuth() as { can?: (r: string) => boolean; profile?: { role?: string } | null };
+    return (required: 'viewer' | 'counselor' | 'core' | 'admin') =>
+      auth.can?.(required) === true || (auth.profile?.role === 'viewer' && required !== 'admin');
+  },
+  useReadOnly: () =>
+    (useAuth() as { profile?: { role?: string; active?: boolean } | null }).profile?.role === 'viewer',
+}));
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 vi.mock('@/services/eventAccess', () => ({ addChainMembers, removeChainMember }));
 vi.mock('@/services/kioskDevices', async () => {

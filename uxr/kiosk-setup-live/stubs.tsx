@@ -46,7 +46,7 @@ const PROFILE: UserProfile = {
   accessRestoredAt: null,
 };
 
-const RANK: Record<Role, number> = { counselor: 0, core: 1, admin: 2 };
+const RANK: Record<Role, number> = { viewer: -1, counselor: 0, core: 1, admin: 2 };
 
 export function useAuth() {
   return {

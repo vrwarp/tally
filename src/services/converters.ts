@@ -19,6 +19,7 @@ import {
   normalizeRecurrence,
 } from '@/lib/recurrence';
 import {
+  asRole,
   isBackendId,
   parseStudentId,
   DEFAULT_SETTINGS,
@@ -394,8 +395,9 @@ export function toUserProfile(snapshot: DocumentSnapshot<DocumentData>): UserPro
     id: snapshot.id,
     email: str(data.email),
     displayName: strOrNull(data.displayName),
-    // Unknown or missing role means the least privilege we hand out.
-    role: role === 'admin' || role === 'core' ? role : 'counselor',
+    // Unknown or missing role reads as a counselor: the fewest screens. The
+    // rules rank an unknown role below every write, so nothing it draws lands.
+    role: asRole(role) ?? 'counselor',
     active: bool(data.active, false),
     createdAt: toDate(data.createdAt, pendingFallback(snapshot)),
     lastSeenAt: toDateOrNull(data.lastSeenAt),

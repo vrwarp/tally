@@ -2,7 +2,8 @@
 
 Tally is an attendance app for a church's youth and children's ministry. Two audiences, one app.
 **Counselors** get exactly one screen — check-in. **Core team and admins** also get the dashboard,
-the roster, event and RSVP management, and settings.
+the roster, event and RSVP management, and settings. **Viewers** — a pastor, an elder, a board
+member — read what the core team reads and change nothing: see *The read-only role* below.
 
 This file is the product's reasoning: what each screen is for, and which alternative was tried and
 rejected. For a screenshotted tour of the same ground, see
@@ -416,3 +417,28 @@ exactly one.
 Setup, configuration parameters, role mapping and troubleshooting live in
 [Planning Center People integration](planning-center.md); the abstraction itself is in
 [People backends](backends.md).
+
+---
+
+## The read-only role
+
+A **viewer** opens Insights, Events and each event's register, Students and each student's page,
+and the Team list — the screens a core member reads — and is offered no control that writes. Not a
+check-in, not an undo, not an RSVP, not an edit, not an invitation, not adding somebody to a
+gathering, not pairing a kiosk. The check-in roster draws for them as a register to read. CSV
+exports stay, because an export changes nothing.
+
+Two core screens stay closed to a viewer, because of what is on them rather than what they do:
+**Review**, the only screen that shows a parent's phone number, and **Settings**, the church's
+integration config. For the same reason a viewer's student page leaves out the Planning Center
+contact card, and the Team screen leaves out the pending invitations and the kiosks a person paired.
+
+A viewer is fenced by narrowed gatherings the way a counselor is: a gathering somebody has narrowed
+is read only by the people on it, and an admin — or anybody on it who may write — can add a viewer
+there. A viewer is never offered as "somebody who can add you", because they cannot.
+
+The role is off the ladder rather than a rung on it. It sees more than a counselor and does less,
+so the code asks two different questions: `roleAtLeast` for what a person may *do*, where a viewer
+ranks below counselor, and `seesAsRole` for which screens open. The rules rank the role below every
+write, so a control a screen forgot to withhold is refused rather than obeyed.
+

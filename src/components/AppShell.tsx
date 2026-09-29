@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { LanguageChoice } from '@/components/LanguageChoice';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useCanSee } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,8 @@ interface NavItem {
   icon: string;
   /** Core-team only. */
   core?: boolean;
+  /** …and open to a viewer as well, because the screen only reads for one. */
+  viewers?: boolean;
 }
 
 /**
@@ -54,6 +56,7 @@ interface NavItem {
  * the key set stays greppable and a new role is a compile error here.
  */
 const ROLE_LABEL = {
+  viewer: 'Account.roleViewer',
   counselor: 'Account.roleCounselor',
   core: 'Account.roleCore',
   admin: 'Account.roleAdmin',
@@ -61,9 +64,9 @@ const ROLE_LABEL = {
 
 const NAV: NavItem[] = [
   { to: '/', labelKey: 'checkIn', icon: '✓' },
-  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true },
-  { to: '/events', labelKey: 'events', icon: '▤', core: true },
-  { to: '/students', labelKey: 'students', icon: '☰', core: true },
+  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true, viewers: true },
+  { to: '/events', labelKey: 'events', icon: '▤', core: true, viewers: true },
+  { to: '/students', labelKey: 'students', icon: '☰', core: true, viewers: true },
   /*
    * Review used to live only inside the account menu, on the argument that the
    * thumb bar is for the four things somebody does at a door. That argument
@@ -89,6 +92,7 @@ const NAV: NavItem[] = [
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { profile, signOut, can } = useAuth();
+  const canSee = useCanSee();
   const { error } = useData();
   const location = useLocation();
   const t = useTranslations();
@@ -113,7 +117,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // this comes out to.
   const header = useHeightVar<HTMLElement>('--app-header-h');
 
-  const items = NAV.filter((item) => !item.core || can('core'));
+  const items = NAV.filter(
+    (item) => !item.core || (item.viewers ? canSee('core') : can('core')),
+  );
   const showNav = items.length > 1;
 
   const displayName = profile?.displayName || profile?.email || t('Account.signedIn');
@@ -166,28 +172,35 @@ export function AppShell({ children }: { children: ReactNode }) {
           asking to be claimed is usually a counselor — and until this item
           existed there was no link to that screen for one. The kiosk's own
           screen sent them to Settings, which a counselor cannot open. */}
-      <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-        {t('Nav.kiosk')}
-      </NavLink>
+      {/* Not a viewer's: pairing vouches that a tablet is the church's and
+          stands it up to record attendance, which is a write however it is
+          reached. */}
+      {can('counselor') ? (
+        <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+          {t('Nav.kiosk')}
+        </NavLink>
+      ) : null}
+      {/* Review moved into the nav itself; these two stay here, because
+          they are things somebody does a few times a year rather than every
+          week. Team is listed first and separately from Settings: it used
+          to be the last card on that page, which put "who can see a roster
+          of minors" below a colour picker and an API connection. A viewer
+          reads Team and not Settings, which is the church's integration
+          config. */}
+      {canSee('core') ? (
+        <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+          {t('Nav.team')}
+        </NavLink>
+      ) : null}
       {can('core') ? (
-        <>
-          {/* Review moved into the nav itself; these two stay here, because
-              they are things somebody does a few times a year rather than every
-              week. Team is listed first and separately from Settings: it used
-              to be the last card on that page, which put "who can see a roster
-              of minors" below a colour picker and an API connection. */}
-          <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-            {t('Nav.team')}
-          </NavLink>
-          <NavLink
-            to="/settings"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-            className={MENU_ITEM}
-          >
-            {t('Nav.settings')}
-          </NavLink>
-        </>
+        <NavLink
+          to="/settings"
+          role="menuitem"
+          onClick={() => setMenuOpen(false)}
+          className={MENU_ITEM}
+        >
+          {t('Nav.settings')}
+        </NavLink>
       ) : null}
       {/*
         * The language, last and set apart from the rows above it.

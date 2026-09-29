@@ -111,6 +111,7 @@ import { useTranslations } from 'use-intl';
 const PREFILL_NIGHTS = 3;
 
 const ROLE_LABEL = {
+  viewer: 'roleViewer',
   counselor: 'roleCounselor',
   core: 'roleCore',
   admin: 'roleAdmin',
@@ -276,7 +277,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
    * that is hidden here is still refused there.
    */
   const onIt = !restricted || list?.members.has(uid) === true || can('admin');
-  const mayAdd = onIt;
+  // Anybody on it who may write: a viewer on a gathering reads its list and
+  // hands nobody anything, so the sheet is the list and nothing else for them.
+  const mayAdd = can('counselor') && onIt;
   const mayRemove = can('core') && onIt;
   const mayFlip = can('core') && onIt;
 
@@ -604,7 +607,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
           * `e2e/layout-shift.spec.ts` holds to a landing budget of zero. What
           * the roster carries instead is a dot on the chip that opens this.
           */}
-        {restricted && onIt && asks.outstanding.length > 0 ? (
+        {/* The asks are somebody waiting on a decision a viewer cannot make,
+            so a viewer is not the person shown them — Clear included. */}
+        {restricted && mayAdd && asks.outstanding.length > 0 ? (
           <section>
             <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">
               {t('askHeading')}
@@ -902,8 +907,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
         ) : null}
 
         {/* Only for somebody who can change it — the sentence is about a
-            change, and a reader the gathering refuses is not making one. */}
-        {onIt ? (
+            change, and neither a reader the gathering refuses nor a viewer is
+            making one. */}
+        {mayAdd ? (
           <p className="text-xs text-ink-500">
             {event.mode === 'oneoff'
               ? t('appliesToThis')

@@ -202,6 +202,15 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
 
   const uid = profile?.id ?? '';
   const isAdmin = can('admin');
+  /*
+   * A viewer reads this panel for the facts — role, dates, gatherings — and is
+   * offered none of its acts. Adding somebody to a gathering is open to anybody
+   * on it, but "anybody" means anybody who may write; and the kiosk rows are
+   * core's to read, so a viewer never asks for them rather than drawing a
+   * refusal as a failure.
+   */
+  const mayAct = can('counselor');
+  const seesKiosks = can('core');
   const name = member.displayName || member.email;
   const nowMs = now.getTime();
 
@@ -225,14 +234,16 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
    */
   useEffect(
     () =>
-      subscribeKioskDevices(
-        (rows) => {
-          setDevicesFailed(false);
-          setDevices(rows);
-        },
-        () => setDevicesFailed(true),
-      ),
-    [],
+      seesKiosks
+        ? subscribeKioskDevices(
+            (rows) => {
+              setDevicesFailed(false);
+              setDevices(rows);
+            },
+            () => setDevicesFailed(true),
+          )
+        : undefined,
+    [seesKiosks],
   );
 
   /** Every narrowed gathering, named, in the order a reader would look for one. */
@@ -247,10 +258,10 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
         // would say they are on nothing.
         title: chainTitles.get(list.id) ?? list.id,
         onIt: list.members.has(member.id),
-        readerOn: isAdmin || list.members.has(uid),
+        readerOn: mayAct && (isAdmin || list.members.has(uid)),
       }));
     return rows.sort((a, b) => a.title.localeCompare(b.title));
-  }, [access, chainTitles, member.id, uid, isAdmin]);
+  }, [access, chainTitles, member.id, uid, isAdmin, mayAct]);
 
   const memberChains = useMemo(
     () => narrowed.filter((row) => row.onIt).map((row) => row.chain),
@@ -419,85 +430,87 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
         )}
       </section>
 
-      <section className="flex flex-col gap-1.5">
-        <PanelHeading>{t('kiosksHeading')}</PanelHeading>
-        {devicesFailed ? (
-          <p className="text-sm text-warn-400">{t('kiosksNotLoaded')}</p>
-        ) : theirKiosks.length === 0 ? (
-          <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {theirKiosks.map((device) => {
-              const live = isKioskLive(device, nowMs);
-              return (
-                <li key={device.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-ink-100">{device.id}</span>
-                    <span className="block text-xs text-ink-400">
-                      {device.retiredAt
-                        ? t('kioskRetiredOn', { when: time.weekdayDate(device.retiredAt) })
-                        : live
-                          ? t('kioskLive', { gathering: device.boundTo ?? '' })
-                          : t('kioskIdle', {
-                              when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
-                            })}
-                    </span>
-                    {/*
-                      Said only when it is worth saying. A shelf tablet lives on
-                      mains, so "87%, charging" is a fact nobody can act on and
-                      one more line on a screen that is already dense — but a
-                      kiosk running on its battery means somebody unplugged it,
-                      and that is worth finding out before Sunday rather than
-                      during. A retired row says nothing: it is not expected to
-                      be anywhere.
-                    */}
-                    {!device.retiredAt && device.charging === false && device.batteryLevel != null && (
-                      <span className="block text-xs text-warn-400">
-                        {t('kioskOffCharger', {
-                          percent: Math.round(device.batteryLevel * 100),
-                        })}
+      {seesKiosks ? (
+        <section className="flex flex-col gap-1.5">
+          <PanelHeading>{t('kiosksHeading')}</PanelHeading>
+          {devicesFailed ? (
+            <p className="text-sm text-warn-400">{t('kiosksNotLoaded')}</p>
+          ) : theirKiosks.length === 0 ? (
+            <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {theirKiosks.map((device) => {
+                const live = isKioskLive(device, nowMs);
+                return (
+                  <li key={device.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-ink-100">{device.id}</span>
+                      <span className="block text-xs text-ink-400">
+                        {device.retiredAt
+                          ? t('kioskRetiredOn', { when: time.weekdayDate(device.retiredAt) })
+                          : live
+                            ? t('kioskLive', { gathering: device.boundTo ?? '' })
+                            : t('kioskIdle', {
+                                when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
+                              })}
                       </span>
-                    )}
-                  </span>
-
-                  {device.retiredAt ? null : armedRetire === device.id ? (
-                    <span className="flex items-center gap-2">
-                      <Button variant="ghost" onClick={() => setArmedRetire(null)}>
-                        {t('keepItRunning')}
-                      </Button>
-                      <Button
-                        variant="danger"
-                        loading={busy === device.id}
-                        onClick={() => void retire(device)}
-                      >
-                        {t('yesRetire')}
-                      </Button>
+                      {/*
+                        Said only when it is worth saying. A shelf tablet lives on
+                        mains, so "87%, charging" is a fact nobody can act on and
+                        one more line on a screen that is already dense — but a
+                        kiosk running on its battery means somebody unplugged it,
+                        and that is worth finding out before Sunday rather than
+                        during. A retired row says nothing: it is not expected to
+                        be anywhere.
+                      */}
+                      {!device.retiredAt && device.charging === false && device.batteryLevel != null && (
+                        <span className="block text-xs text-warn-400">
+                          {t('kioskOffCharger', {
+                            percent: Math.round(device.batteryLevel * 100),
+                          })}
+                        </span>
+                      )}
                     </span>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      disabled={busy === device.id}
-                      onClick={() => (live ? setArmedRetire(device.id) : void retire(device))}
-                    >
-                      {t('retireKiosk')}
-                    </Button>
-                  )}
 
-                  {/* The consequence on its own line inside the row, the shape
-                      Withdraw already uses: short, because the row is
-                      shrink-to-fit in the tablet band and a long sentence sets
-                      its width. */}
-                  {armedRetire === device.id ? (
-                    <p role="alert" className="basis-full text-xs text-ink-400">
-                      {t('retireLiveWarning', { gathering: device.boundTo ?? '' })}
-                    </p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                    {device.retiredAt ? null : armedRetire === device.id ? (
+                      <span className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={() => setArmedRetire(null)}>
+                          {t('keepItRunning')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          loading={busy === device.id}
+                          onClick={() => void retire(device)}
+                        >
+                          {t('yesRetire')}
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        disabled={busy === device.id}
+                        onClick={() => (live ? setArmedRetire(device.id) : void retire(device))}
+                      >
+                        {t('retireKiosk')}
+                      </Button>
+                    )}
+
+                    {/* The consequence on its own line inside the row, the shape
+                        Withdraw already uses: short, because the row is
+                        shrink-to-fit in the tablet band and a long sentence sets
+                        its width. */}
+                    {armedRetire === device.id ? (
+                      <p role="alert" className="basis-full text-xs text-ink-400">
+                        {t('retireLiveWarning', { gathering: device.boundTo ?? '' })}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {/* Nothing at all in a week nobody asked: a heading over an empty list is
           chrome saying something happened when it did not. */}

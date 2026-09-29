@@ -25,6 +25,7 @@ import { useParentContactHost } from '@/features/students/parentContactHostConte
 import { cn } from '@/lib/utils';
 import { studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
+import { useReadOnly } from '@/context/authContext';
 
 /** The warn-tinted pill these rows have always used. */
 const PILL =
@@ -50,6 +51,13 @@ export function AddParentContactButton({
   const t = useTranslations('FollowUp');
   const host = useParentContactHost();
   const name = studentFullName(student);
+  /*
+   * Nothing for a viewer. The list above says who cannot be reached, which is
+   * what a viewer came to read; adding the number is somebody else's to do,
+   * and the form behind this would open on details a viewer is not given.
+   */
+  const readOnly = useReadOnly();
+  if (readOnly) return null;
 
   /*
    * A student who exists only in Tally has no upstream record to hang an adult

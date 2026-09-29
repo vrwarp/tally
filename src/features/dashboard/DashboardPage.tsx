@@ -36,7 +36,7 @@ import {
   TabBar,
 } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
@@ -111,6 +111,8 @@ export function DashboardPage() {
   const now = useNow(60_000);
   const [selected, setSelected] = useState<string>(ALL);
   const { user, profile } = useAuth();
+  // A viewer reads every list here and releases, undoes and adds nothing.
+  const readOnly = useReadOnly();
   const { show } = useToast();
 
   /*
@@ -817,9 +819,9 @@ export function DashboardPage() {
               gatheringTitle={activeGathering?.title ?? null}
               onContactAdded={adultContact.refresh}
               exportContext={exportContext}
-              onResolve={handleResolve}
+              onResolve={readOnly ? undefined : handleResolve}
               sessionReleases={sessionReleases}
-              onUndoSessionRelease={handleUndoSessionRelease}
+              onUndoSessionRelease={readOnly ? undefined : handleUndoSessionRelease}
               undoBusyKey={undoBusyKey}
             />
           )}
@@ -832,7 +834,7 @@ export function DashboardPage() {
             <TransitionLedger
               rows={ledgerRows}
               showGathering={activeGathering === null}
-              onUndo={handleLedgerUndo}
+              onUndo={readOnly ? undefined : handleLedgerUndo}
               undoBusyId={ledgerUndoBusyId}
             />
           )}
