@@ -334,13 +334,35 @@ describe('toAttendance', () => {
     expect(record.laterCheckOut).toEqual({ at: null, by: null });
   });
 
-  it('leaves them off a record the kiosk never sent, rather than reading them as null', () => {
-    const record = toAttendance(
-      fakeSnapshot({ data: { checkedInAt: ts(new Date(2026, 8, 27, 9, 41)), laterCheckIn: 'x' } }),
+  it('carries a kiosk time Tally cannot vouch for as exactly that, and nothing else as it', () => {
+    const tap = ts(new Date(2026, 8, 27, 9, 41));
+    const flagged = toAttendance(
+      fakeSnapshot({ data: { checkedInAt: tap, timeUncertain: true, checkedOutTimeUncertain: true } }),
       'event-1',
     );
-    for (const key of ['recordedAt', 'checkedOutRecordedAt', 'laterCheckIn', 'laterCheckOut']) {
-      expect(record).not.toHaveProperty(key);
+    expect(flagged.timeUncertain).toBe(true);
+    expect(flagged.checkedOutTimeUncertain).toBe(true);
+
+    for (const value of [false, 'true', 1, null]) {
+      const record = toAttendance(
+        fakeSnapshot({ data: { checkedInAt: tap, timeUncertain: value, checkedOutTimeUncertain: value } }),
+        'event-1',
+      );
+      expect(record, JSON.stringify(value)).not.toHaveProperty('timeUncertain');
+      expect(record, JSON.stringify(value)).not.toHaveProperty('checkedOutTimeUncertain');
+    }
+  });
+
+  it('leaves them off a record the kiosk never sent, rather than reading them as null', () => {
+    const tap = ts(new Date(2026, 8, 27, 9, 41));
+    for (const data of [
+      { checkedInAt: tap, laterCheckIn: 'x', laterCheckOut: null },
+      { checkedInAt: tap, laterCheckIn: [], laterCheckOut: [{ at: tap, by: 'uid-casey' }] },
+    ]) {
+      const record = toAttendance(fakeSnapshot({ data }), 'event-1');
+      for (const key of ['recordedAt', 'checkedOutRecordedAt', 'laterCheckIn', 'laterCheckOut']) {
+        expect(record).not.toHaveProperty(key);
+      }
     }
   });
 
