@@ -357,16 +357,16 @@ answer at the door.
 **On the kiosk — in every phase that can hold records.**
 
 - **Bound, behind the staff gate.** When nothing waits, the staff menu says *All check-ins are in
-  Tally* as a line of text in the screen's statement style — not another row on a menu that already
-  overflows a landscape shelf. When something waits, it becomes a row, worded from what the last
+  Tally* as a line of text in the screen's statement style — not another row on a menu already long
+  enough. When something waits, it becomes a row, worded from what the last
   attempt hit:
-  - *12 waiting for the internet since 9:41* — the network.
-  - *12 waiting — Tally isn't taking them right now. Tell the office.* — a server error, which should
-    reach a person rather than wait politely.
-  - *2 check-ins aren't saved yet — don't reload or restart; get it online.* — held in memory.
+  - *No internet since 9:41.* — the network.
+  - *Tally won't take them — tell the office.* — a server error, which should reach a person rather
+    than wait politely.
+  - *2 aren't saved yet — don't reload or restart; get it online.* — held in memory.
 - **The Check-ins screen** behind that row lists what is waiting, oldest first — child, gathering,
-  tap time, what the last attempt said — under the heading *These go to Tally by themselves. Don't
-  reset or reinstall this tablet until this says All check-ins are in Tally.* It shows progress while
+  tap time, what the last attempt said — under the heading *These send themselves. Don't reset or
+  reinstall this tablet until it says "All check-ins are in Tally".* It shows progress while
   it sends (*Sending 12 … 7 left*), offers **Try now**, and stays open while somebody is scrolling or
   photographing it rather than timing out at the staff screen's forty-five seconds.
 - **On the chooser**, where a kiosk spends the week between gatherings, one quiet line while anything
