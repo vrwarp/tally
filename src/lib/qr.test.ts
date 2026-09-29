@@ -890,24 +890,56 @@ describe('encodeQr', () => {
     expect(decoded.level).toBe(0);
   });
 
-  it('reads back at every size it can produce', () => {
-    // One payload per version boundary at level M in byte mode: the last
-    // length that fits, and the first that does not. Both are where an
-    // off-by-one in the capacity table or the terminator shows up.
-    const lengths = [
-      1, 14, 15, 26, 27, 42, 43, 62, 63, 84, 85, 106, 107, 122, 123, 152, 153, 180, 181, 213, 214,
-      251, 252, 287, 288, 331, 332, 362, 363, 412,
-    ];
-    const versions = new Set<number>();
-    for (const length of lengths) {
-      const text = filler(length);
+  it('reads back at every size it can produce, and fills each one exactly', () => {
+    /*
+     * One pass over the version table, at the boundary of each version: the
+     * last payload that fits it, and the one byte more that has to move up.
+     * Encoding is what costs here — under Stryker it is the instrumented copy
+     * — so each symbol is encoded once and asked everything it can answer.
+     *
+     * - **It reads back.** At capacity and one past it, which is where an
+     *   off-by-one in the capacity arithmetic or the terminator shows up. The
+     *   byte past it is also the only payload here with pad codewords in a
+     *   big symbol.
+     * - **It fills exactly the modules the symbol leaves free.** What a pinned
+     *   matrix would have caught for versions 11 to 15, caught from the
+     *   geometry instead: `functionMap` works out the free modules from the
+     *   size alone, so a block table typed one codeword out disagrees with
+     *   the squares themselves.
+     * - **Its check bytes are really check bytes.** The read-back never looks
+     *   at the error correction — it reads the data and stops — so this is
+     *   the only place that fails if the generator, the block split or the
+     *   interleave is wrong in a way the data survives. A block either
+     *   divides by its generator or it does not.
+     */
+    for (const [version, capacity] of CAPACITIES) {
+      const text = filler(capacity);
       const code = encodeQr(text);
-      versions.add(code.version);
-      expect(decode(code.modules).text, `${length} bytes`).toBe(text);
+      expect(code.version, `${capacity} bytes`).toBe(version);
+
+      const decoded = decode(code.modules);
+      expect(decoded.text, `${capacity} bytes`).toBe(text);
+
+      const free = functionMap(version, code.size)
+        .flat()
+        .filter((owned) => !owned).length;
+      const data = BLOCKS[version]!.reduce((sum, block) => sum + block, 0);
+      const ec = BLOCKS[version]!.length * EC_PER_BLOCK[version]!;
+      expect(data + ec, `version ${version}`).toBe(Math.floor(free / 8));
+
+      decoded.blocks.forEach((block, index) => {
+        const where = `version ${version}, block ${index}`;
+        expect(block.length - BLOCKS[version]![index]!, where).toBe(EC_PER_BLOCK[version]!);
+        expect(syndromesClear(block, EC_PER_BLOCK[version]!), where).toBe(true);
+      });
+
+      // The byte past the last version is the refusal test's, below.
+      if (version === 15) continue;
+      const over = filler(capacity + 1);
+      const next = encodeQr(over);
+      expect(next.version, `${capacity + 1} bytes`).toBe(version + 1);
+      expect(decode(next.modules).text, `${capacity + 1} bytes`).toBe(over);
     }
-    expect([...versions].sort((a, b) => a - b)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-    ]);
   });
 
   it('reads back under every mask it can choose', () => {
@@ -961,40 +993,6 @@ describe('encodeQr', () => {
     expect(code.size).toBe(code.version * 4 + 17);
     expect(code.modules).toHaveLength(code.size);
     for (const row of code.modules) expect(row).toHaveLength(code.size);
-  });
-
-  it('fills exactly the modules the symbol leaves free, at every version', () => {
-    // What a pinned matrix would have caught for versions 11 to 15, caught
-    // from the geometry instead: a version's data and check codewords together
-    // are whatever fits in the modules its function patterns do not own.
-    // `functionMap` works those out from the size alone, so a block table
-    // typed one codeword out disagrees with the squares themselves.
-    for (const [version, capacity] of CAPACITIES) {
-      const code = encodeQr(filler(capacity));
-      expect(code.version, `${capacity} bytes`).toBe(version);
-      const free = functionMap(version, code.size)
-        .flat()
-        .filter((owned) => !owned).length;
-      const data = BLOCKS[version]!.reduce((sum, block) => sum + block, 0);
-      const ec = BLOCKS[version]!.length * EC_PER_BLOCK[version]!;
-      expect(data + ec, `version ${version}`).toBe(Math.floor(free / 8));
-    }
-  });
-
-  it('writes check bytes that are really check bytes, at every version', () => {
-    // The other half of the same job. The round trip never looks at the error
-    // correction — it reads the data and stops — so this is the only test that
-    // fails if the generator, the block split or the interleave is wrong in a
-    // way the data survives. It is arithmetic rather than a fixture: a block
-    // either divides by its generator or it does not.
-    for (const [version, capacity] of CAPACITIES) {
-      const decoded = decode(encodeQr(filler(capacity)).modules);
-      decoded.blocks.forEach((block, index) => {
-        const where = `version ${version}, block ${index}`;
-        expect(block.length - BLOCKS[version]![index]!, where).toBe(EC_PER_BLOCK[version]!);
-        expect(syndromesClear(block, EC_PER_BLOCK[version]!), where).toBe(true);
-      });
-    }
   });
 
   it('draws the provisioning payload the setup page shows a factory-reset tablet', () => {

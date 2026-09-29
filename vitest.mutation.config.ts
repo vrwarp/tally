@@ -44,5 +44,17 @@ export default defineConfig({
     include,
     restoreMocks: true,
     mockReset: true,
+    /*
+     * The code under test here is Stryker's instrumented copy: every branch
+     * asks which mutant is active and every statement counts itself for the
+     * per-test coverage map. That is several times slower than the code
+     * `npm test` runs, so Vitest's default five seconds is a budget for a
+     * different program. The QR read-back tests encode and decode a symbol at
+     * every version, and on a CI runner the instrumented encoder took one of
+     * them past five seconds — which Stryker reads as a failing test and
+     * refuses to start. Stryker's own `timeoutMS` governs mutant runs, not the
+     * dry run, so the ceiling for the dry run has to be set here.
+     */
+    testTimeout: 30_000,
   },
 });
