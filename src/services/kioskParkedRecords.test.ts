@@ -103,6 +103,14 @@ describe('toParkedRecord', () => {
     });
   });
 
+  it('claims no names, gathering or kiosk it cannot read', () => {
+    for (const student of [null, 'Noah Park', { firstName: 'Noah' }, { lastName: 'Park' }]) {
+      expect(toParkedRecord(snapshot('x', { student })).student, JSON.stringify(student)).toBeNull();
+    }
+    expect(toParkedRecord(snapshot('x', { gathering: 7, deviceId: 7 }))).toMatchObject({ gathering: null, deviceId: null });
+    expect(toParkedRecord(snapshot('x', { deviceId: '' })).deviceId).toBeNull();
+  });
+
   it('reads the kiosk’s own number for an unreadable record’s tap', () => {
     const record = toParkedRecord(snapshot('unreadable:r1', { reason: 'unreadable', tappedAtMs: 1_790_000_000_000 }));
     expect(record.tappedAt).toEqual(new Date(1_790_000_000_000));
@@ -166,10 +174,28 @@ describe('parkedCards', () => {
     expect(cards.map((card) => card.id)).toEqual(['b', 'a', 'c', 'unreadable:1', 'unreadable:2']);
   });
 
-  it('answers for a pickup alone by its own reason', () => {
-    const [card] = parkedCards([parked({ kind: 'check-out', reason: 'no-arrival' })]);
+  it('answers for a pickup alone by its own reason, and its own tap', () => {
+    const tappedAt = new Date(2026, 8, 27, 10, 52);
+    const [card] = parkedCards([parked({ kind: 'check-out', reason: 'no-arrival', tappedAt })]);
     expect(card!.arrival).toBeNull();
     expect(cardReason(card!)).toBe('no-arrival');
+    expect(cardTappedAtMs(card!)).toBe(tappedAt.getTime());
+  });
+
+  it('puts a card with no tap time after every card with one', () => {
+    const untimed = [parked({ tappedAt: null }), parked({ id: 'out', kind: 'check-out', tappedAt: null })];
+    const [card] = parkedCards(untimed);
+    expect(cardTappedAtMs(card!)).toBe(Number.POSITIVE_INFINITY);
+    const timed = parked({ id: 'ava', studentId: 'student-ava' });
+    expect(parkedCards([...untimed, timed]).map((each) => each.id)).toEqual(['ava', untimed[0]!.id]);
+  });
+
+  it('keeps apart anything it cannot pin to one child at one gathering', () => {
+    // An unreadable record is its own card, even carrying the ids of a card that exists.
+    expect(parkedCards([parked(), parked({ id: 'unreadable:1', reason: 'unreadable' })])).toHaveLength(2);
+    // So is one missing either id.
+    expect(parkedCards([parked({ id: 'a', eventId: '' }), parked({ id: 'b', eventId: '' })])).toHaveLength(2);
+    expect(parkedCards([parked({ id: 'a', studentId: '' }), parked({ id: 'b', studentId: '' })])).toHaveLength(2);
   });
 });
 
@@ -190,11 +216,23 @@ describe('standingStudent', () => {
     expect(standingStudent('a', new Map([['a', dangling]]))).toBeNull();
   });
 
-  it('gives up after a handful of hops rather than following a cycle forever', () => {
+  it('follows five steps, as the server does, and gives up on a sixth or a cycle', () => {
+    const chain = (length: number) =>
+      new Map(
+        Array.from({ length: length + 1 }, (_, index) => {
+          const student = makeStudent({
+            id: `s${index}`,
+            ...(index < length ? { mergedIntoStudentId: `s${index + 1}` } : {}),
+          });
+          return [student.id, student] as const;
+        }),
+      );
+    expect(standingStudent('s0', chain(5))?.id).toBe('s5');
+    expect(standingStudent('s0', chain(6))).toBeNull();
+
     const a = makeStudent({ id: 'a', mergedIntoStudentId: 'b' });
     const b = makeStudent({ id: 'b', mergedIntoStudentId: 'a' });
-    const byId = new Map([a, b].map((student) => [student.id, student]));
-    expect(['a', 'b']).toContain(standingStudent('a', byId)!.id);
+    expect(standingStudent('a', new Map([a, b].map((student) => [student.id, student])))).toBeNull();
   });
 });
 
@@ -230,6 +268,19 @@ describe('cardAnswer', () => {
 
   it('lets go of a pickup whose arrival was decided on its own', () => {
     const [card] = parkedCards([parked({ kind: 'check-out', reason: 'arrival-parked' })]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('let-go');
+  });
+
+  it('records a frozen child’s pickup parked on its own, once their record is back', () => {
+    const [card] = parkedCards([parked({ kind: 'check-out' })]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
+  });
+
+  it('lets go of a pair when either half has nothing to record onto', () => {
+    const [card] = parkedCards([
+      parked(),
+      parked({ id: 'check-out', kind: 'check-out', reason: 'gathering-deleted' }),
+    ]);
     expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('let-go');
   });
 

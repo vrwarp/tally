@@ -54,10 +54,7 @@ function str(value: unknown): string {
 export function toParkedRecord(snapshot: DocumentSnapshot<DocumentData>): KioskParkedRecord {
   const d = snapshot.data() ?? {};
   const reason = REASONS.includes(d.reason as ParkReason) ? (d.reason as ParkReason) : 'unreadable';
-  const student =
-    typeof d.student === 'object' && d.student !== null
-      ? (d.student as { firstName?: unknown; lastName?: unknown })
-      : null;
+  const student = d.student as { firstName?: unknown; lastName?: unknown } | null | undefined;
   return {
     id: snapshot.id,
     kind: d.kind === 'check-out' ? 'check-out' : 'check-in',
@@ -67,7 +64,7 @@ export function toParkedRecord(snapshot: DocumentSnapshot<DocumentData>): KioskP
     // The unreadable card keeps the kiosk's number rather than a timestamp.
     tappedAt: toDateOrNull(d.tappedAt) ?? (typeof d.tappedAtMs === 'number' ? new Date(d.tappedAtMs) : null),
     student:
-      student && typeof student.firstName === 'string' && typeof student.lastName === 'string'
+      typeof student?.firstName === 'string' && typeof student.lastName === 'string'
         ? { firstName: student.firstName, lastName: student.lastName }
         : null,
     gathering: typeof d.gathering === 'string' && d.gathering ? d.gathering : null,
@@ -153,21 +150,24 @@ const MAX_HOPS = 5;
 
 /**
  * The student who stands now for a parked record's student id: followed
- * through a re-creation or a merge, as `settleParkedKioskRecord` follows it,
- * so the card can say whether a repair has happened. Null when the roster does
- * not have them at all.
+ * through a re-creation or a merge, step for step as `settleParkedKioskRecord`
+ * follows it, so the card offers Record exactly when the server would take it.
+ * Null when the roster does not have them, or the chain runs longer than the
+ * server will follow.
  */
 export function standingStudent(
   studentId: string,
   studentsById: ReadonlyMap<string, Student>,
 ): Student | null {
-  let student = studentsById.get(studentId) ?? null;
-  for (let hop = 0; hop < MAX_HOPS && student !== null; hop += 1) {
+  let id = studentId;
+  for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+    const student = studentsById.get(id);
+    if (student === undefined) return null;
     const next = student.recreatedAsStudentId || student.mergedIntoStudentId;
-    if (!next || next === student.id) break;
-    student = studentsById.get(next) ?? null;
+    if (!next || next === id) return student;
+    id = next;
   }
-  return student;
+  return null;
 }
 
 /**
@@ -185,7 +185,8 @@ export function cardAnswer(
   if (!records.every((each) => isRecordable(each.reason))) return 'let-go';
   // A pickup parked with its arrival, whose arrival was decided on its own:
   // there is nothing left for it to close.
-  if (card.arrival === null && card.pickup?.reason === 'arrival-parked') return 'let-go';
+  const lonePickup = card.arrival === null ? card.pickup : null;
+  if (lonePickup?.reason === 'arrival-parked') return 'let-go';
   const student = standingStudent(card.studentId, studentsById);
   if (student === null) return 'let-go';
   return student.upstreamRecordMissing ? 'frozen' : 'record';

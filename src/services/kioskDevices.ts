@@ -91,6 +91,7 @@ export function isKioskLive(device: KioskDevice, nowMs: number): boolean {
   if (device.retiredAt) return false;
   if (!device.boundChain) return false;
   const seen = device.lastSeenAt?.getTime();
+  // Stryker disable next-line ConditionalExpression: with no report, `nowMs - undefined` is NaN, and NaN is below nothing — the guard names the case, it cannot change the answer.
   return seen !== undefined && nowMs - seen < KIOSK_LIVE_WITHIN_MS;
 }
 
