@@ -8,6 +8,12 @@ rules_version = '2';
  * counselor < core < admin, and every collection below is expressed as
  * "read by anyone authorised, write by role X, plus these shape constraints".
  *
+ * `viewer` is off that ladder, and no rule below names it: `rank()` gives it 0,
+ * so every `hasRole()` refuses it and it writes nothing but its own sign-in
+ * heartbeat and an ask to be added to a gathering. It reads what any active
+ * member reads; the core team's own reads (invitations, integration config,
+ * kiosk devices, the upstream-edit queue) stay the core team's.
+ *
  * Cloud Functions run on the Admin SDK and bypass rules entirely, so anything
  * only a function may do — writing the Planning Center linkage, the sync
  * cursor, the access allowlist — is flatly denied to clients here rather than
@@ -212,7 +218,7 @@ service cloud.firestore {
         let d = request.resource.data;
         return d.email is string
           && d.email.size() > 0
-          && d.role in ['counselor', 'core', 'admin']
+          && d.role in ['viewer', 'counselor', 'core', 'admin']
           && d.active is bool;
       }
 
@@ -298,7 +304,7 @@ service cloud.firestore {
         return d.keys().hasOnly(clientKeys().concat(serverKeys()))
           && d.email is string
           && d.email.size() > 0
-          && d.role in ['counselor', 'core', 'admin']
+          && d.role in ['viewer', 'counselor', 'core', 'admin']
           && (!('note' in d.keys()) || d.note is string)
           /*
            * What is *in* the list is checked on the server — rules cannot walk

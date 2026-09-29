@@ -61,6 +61,11 @@ export const UID = {
   outsider: 'uid-outsider',
   /** Core, and deliberately not on the restricted chain either. */
   outsiderCore: 'uid-outsider-core',
+  /**
+   * The read-only role, active and on no restricted gathering. Every write it
+   * is refused is refused by its rank alone, which no rule names.
+   */
+  viewer: 'uid-viewer',
 } as const;
 
 /**
@@ -378,6 +383,10 @@ export async function seedUsers(env: RulesTestEnvironment): Promise<void> {
     await setDoc(
       doc(db, paths.user(UID.outsiderCore)),
       userDoc({ email: 'outsider-core@example.org', role: 'core' }),
+    );
+    await setDoc(
+      doc(db, paths.user(UID.viewer)),
+      userDoc({ email: 'viewer@example.org', role: 'viewer' }),
     );
   });
 }

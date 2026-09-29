@@ -3152,6 +3152,102 @@ describe('kiosk', () => {
   });
 });
 
+/*
+ * The read-only role. No rule names it: `rank()` gives it 0, so every write
+ * gate refuses it, and every read open to an active member admits it. What
+ * these pin is both halves — that it reads what the screens it opens need, and
+ * that nothing it could write lands — plus the two role lists that let an admin
+ * grant it at all.
+ */
+describe('the viewer role', () => {
+  const viewer = () => asUser(env, UID.viewer);
+
+  it('can be granted by an admin, on a profile and on an invitation', async () => {
+    const admin = asUser(env, UID.admin);
+    await assertSucceeds(updateDoc(doc(admin, paths.user(UID.outsider)), { role: 'viewer' }));
+    await assertSucceeds(
+      setDoc(
+        doc(admin, paths.invitation('pastor@example,org')),
+        invitationDoc({ email: 'pastor@example.org', role: 'viewer' }),
+      ),
+    );
+  });
+
+  it('is not a core member\'s to hand out — core invites counselors only', async () => {
+    await assertFails(
+      setDoc(
+        doc(asUser(env, UID.core), paths.invitation('pastor@example,org')),
+        invitationDoc({ email: 'pastor@example.org', role: 'viewer', invitedBy: UID.core }),
+      ),
+    );
+  });
+
+  it('reads the team, the roster, the calendar, a register and the settings', async () => {
+    const db = viewer();
+    await assertSucceeds(getDocs(collection(db, paths.users())));
+    await assertSucceeds(getDocs(collection(db, paths.students())));
+    await assertSucceeds(getDoc(doc(db, paths.event(ID.event))));
+    await assertSucceeds(getDocs(collection(db, paths.attendanceCollection(ID.event))));
+    await assertSucceeds(getDoc(doc(db, paths.settings())));
+    await assertSucceeds(getDoc(doc(db, paths.eventAccess(ID.restrictedSeries))));
+  });
+
+  it('is fenced out of a narrowed gathering it is not on, like anybody else', async () => {
+    await assertFails(
+      getDocs(collection(viewer(), paths.attendanceCollection(ID.restrictedEvent))),
+    );
+  });
+
+  it('leaves the core team\'s own reads with the core team', async () => {
+    const db = viewer();
+    await assertFails(getDocs(collection(db, paths.invitations())));
+    await assertFails(getDoc(doc(db, paths.planningCenter())));
+    await assertFails(getDocs(collection(db, paths.kioskDevicesCollection())));
+    await assertFails(getDocs(collection(db, paths.upstreamEdits())));
+  });
+
+  it('checks nobody in, and undoes nothing', async () => {
+    const db = viewer();
+    await assertFails(
+      setDoc(
+        doc(db, paths.attendance(ID.event, ID.otherStudent)),
+        attendanceDoc({ studentId: ID.otherStudent, checkedInBy: UID.viewer }),
+      ),
+    );
+    await assertFails(deleteDoc(doc(db, paths.attendance(ID.event, ID.student))));
+  });
+
+  it('adds, edits and schedules nothing', async () => {
+    const db = viewer();
+    await assertFails(
+      setDoc(
+        doc(db, paths.student('student-new')),
+        studentDoc({ isVisitor: true, pcoPersonId: null, upstreamPushPending: true }),
+      ),
+    );
+    await assertFails(updateDoc(doc(db, paths.event(ID.event)), { title: 'Renamed' }));
+    await assertFails(setDoc(doc(db, paths.rsvp(ID.event, ID.otherStudent)), rsvpDoc()));
+    await assertFails(setDoc(doc(db, paths.settings()), settingsDoc()));
+  });
+
+  it('stamps its own heartbeat, and cannot promote itself', async () => {
+    const db = viewer();
+    await assertSucceeds(updateDoc(doc(db, paths.user(UID.viewer)), { lastSeenAt: new Date() }));
+    await assertFails(updateDoc(doc(db, paths.user(UID.viewer)), { role: 'counselor' }));
+  });
+
+  it('may ask to be added to a gathering it is not on', async () => {
+    await assertSucceeds(
+      setDoc(doc(viewer(), paths.accessRequest(ID.restrictedSeries, UID.viewer)), {
+        chainKey: ID.restrictedSeries,
+        uid: UID.viewer,
+        name: 'Pat Moreno',
+        askedAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
 describe('default deny', () => {
   it('denies an unmodelled collection to every role', async () => {
     await assertFails(getDoc(doc(asUser(env, UID.admin), 'auditLog/entry-1')));
