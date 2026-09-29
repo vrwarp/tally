@@ -135,6 +135,39 @@ export function kioskMayHoldRecords(device: KioskDevice, nowMs: number): boolean
   );
 }
 
+/** What people call a kiosk: its name, or — for one nobody named — its id. */
+export function kioskLabel(device: Pick<KioskDevice, 'id' | 'name'>): string {
+  return device.name ?? device.id;
+}
+
+/**
+ * How many records a kiosk told Tally it still holds — none for a retired
+ * one, which is not expected to be anywhere, and none for one that has never
+ * sent through `landKioskRecords`.
+ */
+export function kioskWaitingCount(device: KioskDevice): number {
+  return device.retiredAt ? 0 : (device.waitingCount ?? 0);
+}
+
+/**
+ * How long *All in Tally since …* stays on a row after an outage ends.
+ *
+ * It is the answer to Monday's question — did everything from Sunday arrive?
+ * — and a week later the same sentence is only noise under a tablet that has
+ * been fine since.
+ */
+export const KIOSK_ALL_IN_SHOWN_FOR_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * When a kiosk that had been holding records emptied — the end of an outage —
+ * or null: still holding some, retired, never held any, or long enough ago
+ * that it is no longer news.
+ */
+export function kioskAllInSince(device: KioskDevice, nowMs: number): Date | null {
+  if (device.retiredAt || kioskWaitingCount(device) > 0 || !device.allInAt) return null;
+  return nowMs - device.allInAt.getTime() < KIOSK_ALL_IN_SHOWN_FOR_MS ? device.allInAt : null;
+}
+
 /**
  * Every device row, live. Core and up; a kiosk session may not read this.
  *

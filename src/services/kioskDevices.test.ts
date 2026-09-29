@@ -13,8 +13,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
 import {
+  KIOSK_ALL_IN_SHOWN_FOR_MS,
   KIOSK_LIVE_WITHIN_MS,
   isKioskLive,
+  kioskAllInSince,
+  kioskLabel,
+  kioskWaitingCount,
   kioskMayHoldRecords,
   kioskOutOfTouchSince,
   renameKioskDevice,
@@ -472,5 +476,44 @@ describe('kioskOutOfTouchSince and kioskMayHoldRecords', () => {
 
     const retired = device({ lastSeenAt: nineFortyOne, retiredAt: new Date(nowMs - 1_000) });
     expect(kioskMayHoldRecords(retired, nowMs)).toBe(false);
+  });
+});
+
+describe('kioskLabel', () => {
+  it('calls a kiosk by its name, and one nobody named by its id', () => {
+    expect(kioskLabel(device({ name: 'Lobby' }))).toBe('Lobby');
+    expect(kioskLabel(device())).toBe('lobby-tablet');
+  });
+});
+
+describe('kioskWaitingCount and kioskAllInSince', () => {
+  const nowMs = new Date('2026-09-28T16:02:00Z').getTime();
+  const mondayMorning = new Date('2026-09-28T16:00:00Z');
+
+  it('says what the tablet last told Tally it holds', () => {
+    expect(kioskWaitingCount(device({ waitingCount: 12 }))).toBe(12);
+    expect(kioskWaitingCount(device())).toBe(0);
+    // A retired tablet is not expected to be anywhere.
+    expect(kioskWaitingCount(device({ waitingCount: 12, retiredAt: mondayMorning }))).toBe(0);
+  });
+
+  it('says when an outage ended, while that is still news', () => {
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), nowMs)).toEqual(
+      mondayMorning,
+    );
+    const aWeekOn = mondayMorning.getTime() + KIOSK_ALL_IN_SHOWN_FOR_MS;
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), aWeekOn - 1)).toEqual(
+      mondayMorning,
+    );
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), aWeekOn)).toBeNull();
+  });
+
+  it('says nothing of it while records wait, for a retired tablet, or one that never held any', () => {
+    expect(kioskAllInSince(device({ waitingCount: 2, allInAt: mondayMorning }), nowMs)).toBeNull();
+    expect(
+      kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning, retiredAt: mondayMorning }), nowMs),
+    ).toBeNull();
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: null }), nowMs)).toBeNull();
+    expect(kioskAllInSince(device(), nowMs)).toBeNull();
   });
 });

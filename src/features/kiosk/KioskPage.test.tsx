@@ -20,7 +20,7 @@ import { cleanup, render, screen, waitFor } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Role } from '@/types';
+import type { KioskDevice, Role } from '@/types';
 import type { KioskStatus } from '@/services/functions';
 
 const getKioskStatus = vi.fn();
@@ -37,6 +37,27 @@ vi.mock('@/services/functions', () => ({
 vi.mock('@/context/toastContext', () => ({
   useToast: () => ({ show: vi.fn() }),
 }));
+
+/** The device rows the list draws, as the core team's listener would deliver them. */
+let kiosks: KioskDevice[] = [];
+const renameKioskDevice = vi.fn(async () => {});
+const retireKioskDevice = vi.fn(async () => {});
+
+vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('@/services/kioskDevices', async () => {
+  // The predicates are the real ones: what a row says about a kiosk is the
+  // behaviour under test.
+  const real = (await vi.importActual('@/services/kioskDevices')) as Record<string, unknown>;
+  return {
+    ...real,
+    subscribeKioskDevices: (onRows: (rows: KioskDevice[]) => void) => {
+      onRows(kiosks);
+      return () => {};
+    },
+    renameKioskDevice: (...args: unknown[]) => renameKioskDevice(...(args as [])),
+    retireKioskDevice: (...args: unknown[]) => retireKioskDevice(...(args as [])),
+  };
+});
 
 let role: Role = 'admin';
 const RANK: Record<Role, number> = { counselor: 0, core: 1, admin: 2 };
@@ -139,6 +160,17 @@ describe('a staging link, for a tablet nobody will be standing at', () => {
     expect(screen.queryByRole('button', { name: 'Make a link' })).not.toBeInTheDocument();
   });
 
+  it('names the tablet the link is for, and keeps the name for the next one', async () => {
+    createKioskPairingLink.mockResolvedValue({ data: LINK });
+    renderAs('core', OK);
+
+    const staging = screen.getAllByLabelText('Name it (optional)').at(-1)!;
+    await userEvent.type(staging, 'Welcome desk');
+    await userEvent.click(screen.getByRole('button', { name: 'Make a link' }));
+    await waitFor(() => expect(createKioskPairingLink).toHaveBeenCalledWith({ name: 'Welcome desk' }));
+    expect(staging).toHaveValue('Welcome desk');
+  });
+
   it('shows the whole URL the tablet needs, with the warning that it is a credential', async () => {
     createKioskPairingLink.mockResolvedValue({ data: LINK });
     renderAs('core', OK);
@@ -172,7 +204,114 @@ describe('a staging link, for a tablet nobody will be standing at', () => {
   });
 });
 
+function kiosk(overrides: Partial<KioskDevice> = {}): KioskDevice {
+  return {
+    id: 'kiosk-3f9a1c2e7b4d',
+    name: null,
+    approvedBy: 'uid-sam',
+    approvedByName: 'Sam Whitfield',
+    pairedAt: new Date('2026-09-01T16:00:00Z'),
+    lastSeenAt: new Date(),
+    boundTo: 'Sunday Kids',
+    boundChain: 'sunday-kids',
+    retiredAt: null,
+    retiredBy: null,
+    ...overrides,
+  };
+}
+
+describe('the list of kiosks', () => {
+  afterEach(() => {
+    kiosks = [];
+  });
+
+  it('lists every kiosk for the core team — by name, who paired it, and what it is doing', async () => {
+    kiosks = [kiosk({ name: 'Lobby' }), kiosk({ id: 'kiosk-8b13aa2c90ff', boundTo: null, boundChain: null })];
+    renderAs('core', OK);
+
+    expect(await screen.findByText('Lobby')).toBeInTheDocument();
+    expect(screen.getByText('kiosk-8b13aa2c90ff')).toBeInTheDocument();
+    expect(screen.getAllByText('Paired by Sam Whitfield')).toHaveLength(2);
+    expect(screen.getByText('Recording Sunday Kids right now')).toBeInTheDocument();
+  });
+
+  it('is not the counselor’s: the rows say who paired a tablet and what it holds', () => {
+    kiosks = [kiosk({ name: 'Lobby' })];
+    renderAs('counselor', OK);
+    expect(screen.queryByText('Kiosks')).toBeNull();
+    expect(screen.queryByText('Lobby')).toBeNull();
+  });
+
+  it('says what a tablet still holds, and when it all got in', async () => {
+    const nineFortyOne = new Date(Date.now() - 3 * 60 * 60_000);
+    kiosks = [
+      kiosk({ name: 'Lobby', lastSeenAt: nineFortyOne, waitingCount: 12, waitingSinceAt: nineFortyOne }),
+      kiosk({ id: 'kiosk-8b13aa2c90ff', name: 'Nursery door', waitingCount: 0, allInAt: new Date() }),
+    ];
+    renderAs('core', OK);
+
+    expect(await screen.findByText(/^12 check-ins waiting on this tablet since/)).toBeInTheDocument();
+    expect(screen.getByText(/^All in Tally since/)).toBeInTheDocument();
+  });
+
+  it('keeps retired kiosks behind a toggle', async () => {
+    kiosks = [kiosk({ name: 'Lobby' }), kiosk({ id: 'kiosk-drawer-00000003', retiredAt: new Date('2026-08-01') })];
+    renderAs('core', OK);
+
+    expect(screen.queryByText('kiosk-drawer-00000003')).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Show 1 retired kiosk' }));
+    expect(screen.getByText('kiosk-drawer-00000003')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Hide retired kiosks' }));
+    expect(screen.queryByText('kiosk-drawer-00000003')).toBeNull();
+  });
+
+  it('says so when there are none, and when the list could not be read', async () => {
+    renderAs('core', OK);
+    expect(await screen.findByText('No kiosk is paired yet.')).toBeInTheDocument();
+  });
+
+  it('names a kiosk nobody named, and renames one somebody did', async () => {
+    kiosks = [kiosk()];
+    renderAs('core', OK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Name it' }));
+    const field = screen.getByLabelText('Name');
+    await userEvent.type(field, 'Lobby');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(renameKioskDevice).toHaveBeenCalledWith('kiosk-3f9a1c2e7b4d', 'Lobby'));
+  });
+
+  it('puts a named kiosk’s name in the field to rename it, and gives up on Cancel', async () => {
+    kiosks = [kiosk({ name: 'Lobby' })];
+    renderAs('core', OK);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('Lobby');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    expect(renameKioskDevice).not.toHaveBeenCalled();
+  });
+});
+
 describe('approving a code', () => {
+  it('sends the name it was given, tidied — and none when nobody gave one', async () => {
+    approveKioskPairing.mockResolvedValue({ data: { status: 'approved' } });
+    renderAs('counselor', OK);
+
+    await userEvent.type(screen.getByLabelText('Pairing code'), 'HJ4K2P');
+    await userEvent.type(screen.getByLabelText('Name it (optional)'), '  Nursery   door ');
+    await userEvent.click(screen.getByRole('button', { name: 'Approve this kiosk' }));
+    await waitFor(() =>
+      expect(approveKioskPairing).toHaveBeenCalledWith({ code: 'HJ4K2P', name: 'Nursery door' }),
+    );
+    // Cleared with the code: the next kiosk is somebody else's name.
+    expect(screen.getByLabelText('Name it (optional)')).toHaveValue('');
+
+    await userEvent.type(screen.getByLabelText('Pairing code'), 'HJ4K2Q');
+    await userEvent.click(screen.getByRole('button', { name: 'Approve this kiosk' }));
+    await waitFor(() => expect(approveKioskPairing).toHaveBeenLastCalledWith({ code: 'HJ4K2Q' }));
+  });
+
   it('will not submit until six characters are in', async () => {
     renderAs('admin', OK);
     const approve = screen.getByRole('button', { name: 'Approve this kiosk' });

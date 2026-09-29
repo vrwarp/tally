@@ -28,12 +28,13 @@
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui';
+import { Button, TextField } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useNow } from '@/hooks/useNow';
 import { cn } from '@/lib/utils';
+import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskDevice';
 import {
   approveKioskPairing,
   createKioskPairingLink,
@@ -43,6 +44,14 @@ import {
 } from '@/services/functions';
 import { useTranslations } from 'use-intl';
 import { useTimeStrings } from '@/hooks/useTimeFormats';
+import { KioskDeviceRow } from '@/features/kiosk/KioskDeviceRow';
+import {
+  isKioskLive,
+  kioskLabel,
+  kioskOutOfTouchSince,
+  subscribeKioskDevices,
+} from '@/services/kioskDevices';
+import type { KioskDevice } from '@/types';
 import { formatRelative, type TimeStrings } from '@/lib/time';
 
 const COPY_FEEDBACK_MS = 2000;
@@ -99,6 +108,8 @@ export function KioskPage() {
       </header>
 
       <PairForm blocked={signing.status?.state === 'denied'} />
+
+      {core ? <KioskList /> : null}
 
       {/* The shell draws neither a rail nor a tab bar for a role with one
           destination, so this page is a dead end without its own way out — and
@@ -161,6 +172,85 @@ export function KioskPage() {
 }
 
 /**
+ * Every kiosk, and what Tally can say about each — the list this page never
+ * had (docs/kiosk-offline-recovery.md §7). Before it, a kiosk was findable
+ * only inside the panel of whoever paired it, as a hex id.
+ *
+ * Core and up, as the device rows are: they say who paired a tablet and what
+ * it still holds. The kiosks that matter on a Sunday come first — recording
+ * now, then out of touch — and retired ones wait behind their own toggle: the
+ * rows are kept as provenance, and a list that grew by one every time a tablet
+ * was replaced would bury the ones in the lobby.
+ */
+function KioskList() {
+  const t = useTranslations('KioskPair');
+  const now = useNow(30_000);
+  const [devices, setDevices] = useState<KioskDevice[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [showRetired, setShowRetired] = useState(false);
+
+  useEffect(
+    () =>
+      subscribeKioskDevices(
+        (rows) => {
+          setFailed(false);
+          setDevices(rows);
+        },
+        () => setFailed(true),
+      ),
+    [],
+  );
+
+  const nowMs = now.getTime();
+  const rank = (device: KioskDevice) =>
+    isKioskLive(device, nowMs) ? 0 : kioskOutOfTouchSince(device, nowMs) ? 1 : 2;
+  const standing = (devices ?? [])
+    .filter((device) => !device.retiredAt)
+    .sort((a, b) => rank(a) - rank(b) || kioskLabel(a).localeCompare(kioskLabel(b)));
+  const retired = (devices ?? [])
+    .filter((device) => device.retiredAt)
+    .sort((a, b) => (b.retiredAt?.getTime() ?? 0) - (a.retiredAt?.getTime() ?? 0));
+
+  return (
+    <section className="flex flex-col gap-3 border-t border-ink-800 pt-6">
+      <h2 className="text-sm font-semibold text-ink-200">{t('kiosksHeading')}</h2>
+      {failed ? (
+        <p className="text-sm text-warn-400">{t('kiosksNotLoaded')}</p>
+      ) : devices === null ? null : standing.length === 0 ? (
+        <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
+      ) : (
+        <ul className="flex max-w-3xl flex-col gap-3">
+          {standing.map((device) => (
+            <KioskDeviceRow key={device.id} device={device} now={now} showPairedBy />
+          ))}
+        </ul>
+      )}
+      {retired.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            aria-expanded={showRetired}
+            onClick={() => setShowRetired((shown) => !shown)}
+            className="self-start text-xs text-ink-400 underline-offset-2 hover:text-ink-200 hover:underline"
+          >
+            {showRetired
+              ? t('hideRetiredKiosks')
+              : t('showRetiredKiosks', { count: retired.length })}
+          </button>
+          {showRetired ? (
+            <ul className="flex max-w-3xl flex-col gap-3">
+              {retired.map((device) => (
+                <KioskDeviceRow key={device.id} device={device} now={now} showPairedBy />
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
  * The job: six characters off a screen across the room.
  *
  * The field is set at the size of what it receives and capped to its own
@@ -172,6 +262,7 @@ function PairForm({ blocked }: { blocked: boolean }) {
   const t = useTranslations('KioskPair');
   const id = useId();
   const [code, setCode] = useState('');
+  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -180,9 +271,16 @@ function PairForm({ blocked }: { blocked: boolean }) {
     setBusy(true);
     setOutcome(null);
     try {
-      const { data } = await approveKioskPairing({ code: code.trim() });
+      const named = kioskName(name);
+      const { data } = await approveKioskPairing({
+        code: code.trim(),
+        ...(named === null ? {} : { name: named }),
+      });
       setOutcome(data.status);
-      if (data.status === 'approved') setCode('');
+      if (data.status === 'approved') {
+        setCode('');
+        setName('');
+      }
     } catch {
       setOutcome('failed');
     } finally {
@@ -250,6 +348,19 @@ function PairForm({ blocked }: { blocked: boolean }) {
           </Button>
         </div>
 
+        {/* Below the code and quieter than it: the six characters are the
+            job, and a name is something whoever is pairing may know — *Lobby*
+            — or may leave for the core team, who can rename it on this page. */}
+        <TextField
+          className="lg:max-w-sm"
+          label={t('nameLabel')}
+          hint={t('nameHint')}
+          value={name}
+          maxLength={KIOSK_NAME_MAX}
+          autoComplete="off"
+          onChange={(event) => setName(event.target.value)}
+        />
+
         {/* One line, one place: the verdict replaces the hint rather than
             arriving beneath it, so the page does not move under a thumb while
             somebody is looking at the kiosk rather than at their phone. */}
@@ -293,6 +404,7 @@ function PairForm({ blocked }: { blocked: boolean }) {
 function StagingLinkSection() {
   const t = useTranslations('KioskPair');
   const [link, setLink] = useState<string | null>(null);
+  const [name, setName] = useState('');
   const [problem, setProblem] = useState<'busy' | 'failed' | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -303,7 +415,8 @@ function StagingLinkSection() {
     setProblem(null);
     setCopied(false);
     try {
-      const { data } = await createKioskPairingLink();
+      const named = kioskName(name);
+      const { data } = await createKioskPairingLink(named === null ? {} : { name: named });
       if (data.status === 'busy') {
         setLink(null);
         setProblem('busy');
@@ -333,6 +446,17 @@ function StagingLinkSection() {
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-semibold text-ink-200">{t('stagingHeading')}</h2>
       <p className="max-w-prose text-sm text-ink-400">{t('stagingWhat')}</p>
+
+      {/* Staging is often several tablets in a row, so the name stays for the
+          next link rather than clearing: change it, make another. */}
+      <TextField
+        label={t('nameLabel')}
+        hint={t('stagingNameHint')}
+        value={name}
+        maxLength={KIOSK_NAME_MAX}
+        autoComplete="off"
+        onChange={(event) => setName(event.target.value)}
+      />
 
       {link ? (
         <>
