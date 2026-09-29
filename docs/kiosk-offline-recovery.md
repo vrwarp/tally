@@ -746,9 +746,10 @@ names), the presence copy, the counts' transaction and the parking rule; rules t
 presence document, settling being the server's alone, the stamp closing one tablet's direct road and
 no other's, and a core rename; unit and component tests for the quiet and late rules, the parked
 cards, the event page's line, the register's line, the Review section, the navigation's count and
-the CSV; the whole unit, functions and rules suites; the kiosk byte budget; and the mutation sweep
-of the changed modules. **Not yet run:** Review's cards end to end against the emulators, and the
-first Sunday that leans on them.
+the CSV; the whole unit, functions and rules suites; the kiosk byte budget, unchanged from Phase 1;
+the mutation sweep of the changed modules; and `e2e/kiosk-parked.spec.ts` against the emulators — a
+parked card drawn on Review, counted beside it, and let go through the real callable, with the
+settler's name kept. **Not yet run:** *Record* end to end, and the first Sunday that leans on it.
 
 ### Optional
 
