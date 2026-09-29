@@ -311,6 +311,39 @@ describe('fromRosterPerson', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('toAttendance', () => {
+  it('reads when a kiosk record reached Tally, and the entries an earlier tap replaced', () => {
+    const tap = new Date(2026, 8, 27, 9, 41);
+    const monday = new Date(2026, 8, 28, 9, 2);
+    const counselor = new Date(2026, 8, 27, 10, 5);
+    const record = toAttendance(
+      fakeSnapshot({
+        data: {
+          checkedInAt: ts(tap),
+          recordedAt: ts(monday),
+          checkedOutRecordedAt: ts(monday),
+          laterCheckIn: { at: ts(counselor), by: 'uid-casey', method: 'search' },
+          laterCheckOut: { at: null, by: 7 },
+        },
+      }),
+      'event-1',
+    );
+    expect(record.recordedAt).toEqual(monday);
+    expect(record.checkedOutRecordedAt).toEqual(monday);
+    expect(record.laterCheckIn).toEqual({ at: counselor, by: 'uid-casey' });
+    // A displaced entry is read defensively, as every stored value is.
+    expect(record.laterCheckOut).toEqual({ at: null, by: null });
+  });
+
+  it('leaves them off a record the kiosk never sent, rather than reading them as null', () => {
+    const record = toAttendance(
+      fakeSnapshot({ data: { checkedInAt: ts(new Date(2026, 8, 27, 9, 41)), laterCheckIn: 'x' } }),
+      'event-1',
+    );
+    for (const key of ['recordedAt', 'checkedOutRecordedAt', 'laterCheckIn', 'laterCheckOut']) {
+      expect(record).not.toHaveProperty(key);
+    }
+  });
+
   it('dates a locally-pending check-in to now, not to the epoch', () => {
     // What `onSnapshot` delivers between the tap and the server ack.
     const before = Date.now();

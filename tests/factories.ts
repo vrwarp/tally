@@ -64,6 +64,12 @@ export function makeStudent(overrides: Partial<Student> = {}): Student {
     ...(overrides.mergedFromStudentIds === undefined
       ? {}
       : { mergedFromStudentIds: overrides.mergedFromStudentIds }),
+    ...(overrides.mergedIntoStudentId === undefined
+      ? {}
+      : { mergedIntoStudentId: overrides.mergedIntoStudentId }),
+    ...(overrides.recreatedAsStudentId === undefined
+      ? {}
+      : { recreatedAsStudentId: overrides.recreatedAsStudentId }),
     searchName: pick(overrides, 'searchName', buildSearchName(firstName, lastName)),
     firstAttendedAt: pick(overrides, 'firstAttendedAt', null),
     lastAttendedAt: pick(overrides, 'lastAttendedAt', null),
@@ -129,6 +135,11 @@ export function makeAttendance(overrides: Partial<AttendanceRecord> = {}): Atten
     ...(overrides.checkedOutTimeUncertain
       ? { checkedOutTimeUncertain: overrides.checkedOutTimeUncertain }
       : {}),
+    // What only `landKioskRecords` writes, likewise absent unless asked for.
+    ...(overrides.recordedAt ? { recordedAt: overrides.recordedAt } : {}),
+    ...(overrides.checkedOutRecordedAt ? { checkedOutRecordedAt: overrides.checkedOutRecordedAt } : {}),
+    ...(overrides.laterCheckIn ? { laterCheckIn: overrides.laterCheckIn } : {}),
+    ...(overrides.laterCheckOut ? { laterCheckOut: overrides.laterCheckOut } : {}),
   };
 }
 

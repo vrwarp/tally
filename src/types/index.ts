@@ -318,6 +318,14 @@ export interface StudentDoc {
    */
   mergedIntoStudentId?: string | null;
   /**
+   * Set on a student whose Planning Center record was re-created: this row went
+   * inactive and the student lives on as the one it names. Server-written, by
+   * `recreatePlanningCenterPerson`. Followed wherever something recorded against
+   * the old row has to land on the student who stands now — a parked kiosk
+   * record, say.
+   */
+  recreatedAsStudentId?: string | null;
+  /**
    * Set on the winner: the rows folded into this one. Their attendance is not
    * re-keyed — the profile unions the histories at read time instead.
    */
@@ -1131,6 +1139,24 @@ export interface AttendanceRecord
    */
   timeUncertain?: boolean;
   checkedOutTimeUncertain?: boolean;
+  /**
+   * When a record the lobby kiosk sent reached Tally — `checkedInAt` is when
+   * it happened. Absent on everything else. The gap between the two is how the
+   * event page tells an outage's late arrivals from the ordinary morning.
+   */
+  recordedAt?: Date;
+  /** As `recordedAt`, for the pickup. */
+  checkedOutRecordedAt?: Date;
+  /** The entry an earlier kiosk tap replaced — who and when — kept rather than lost. */
+  laterCheckIn?: LaterEntry;
+  /** As `laterCheckIn`, for the pickup. */
+  laterCheckOut?: LaterEntry;
+}
+
+/** A displaced arrival or pickup: when it was, and who recorded it, as far as the record says. */
+export interface LaterEntry {
+  at: Date | null;
+  by: string | null;
 }
 
 /* -------------------------------------------------------------------------- */

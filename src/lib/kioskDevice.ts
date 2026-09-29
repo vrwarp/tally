@@ -79,3 +79,17 @@ export function kioskName(value: unknown): string | null {
   name = name.trimEnd();
   return name.length > 0 ? name : null;
 }
+
+/**
+ * How recently a bound kiosk must have reported to count as live.
+ *
+ * The kiosk writes `lastSeenAt` on every register poll, which is every five
+ * minutes while it is bound (`PRESENT_REFRESH_MS` in `KioskApp`) — so twelve
+ * minutes is two missed reports and some slack. It was three, on a comment
+ * that said the poll ran every thirty seconds: a healthy kiosk read *not
+ * recording* two minutes in every five, and was retired on one unconfirmed
+ * tap while it did (docs/kiosk-offline-recovery.md). Widened rather than
+ * reported more often, because a report is a write per kiosk per poll and the
+ * window only has to be true.
+ */
+export const KIOSK_LIVE_WITHIN_MS = 12 * 60_000;

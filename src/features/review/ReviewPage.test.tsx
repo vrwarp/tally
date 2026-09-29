@@ -29,6 +29,9 @@ vi.mock('@/services/functions', () => ({
   amendRegistration,
 }));
 vi.mock('@/context/toastContext', () => ({ useToast: () => ({ show }) }));
+// The kiosk's parked records have their own tests (KioskParkedSection.test.tsx);
+// here, nothing is parked.
+vi.mock('@/features/review/KioskParkedSection', () => ({ KioskParkedSection: () => null }));
 vi.mock('@/context/dataContext', () => ({
   useData: () => ({ events: [{ id: 'friday-today', title: 'Friday Fellowship' }] }),
 }));

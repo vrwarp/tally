@@ -89,6 +89,21 @@ describe('buildRegisterCsv — conditional columns', () => {
     expect(headers).toContain('checked_out_at');
     expect(headers).toContain('checked_out_by');
     expect(headers).toContain('checked_out_by_uid');
+    expect(headers).toContain('checked_out_recorded_at');
+    expect(headers).toContain('later_checked_out_at');
+    expect(headers).toContain('later_checked_out_by');
+  });
+
+  it('carries when a record reached Tally, and the entry an earlier tap replaced, on every gathering', () => {
+    for (const requiresCheckOut of [true, false]) {
+      const headers = registerCsvHeaders(grades, context(makeEvent({ requiresCheckOut })));
+      expect(headers).toContain('recorded_at');
+      expect(headers).toContain('later_checked_in_at');
+      expect(headers).toContain('later_checked_in_by');
+    }
+    expect(registerCsvHeaders(grades, context(makeEvent({ requiresCheckOut: false })))).not.toContain(
+      'later_checked_out_at',
+    );
   });
 
   it('carries the RSVP columns only on a one-off', () => {
@@ -164,6 +179,44 @@ describe('buildRegisterCsv — a lobby kiosk', () => {
     expect(row.checked_in_by_uid).toBe('kiosk_kiosk-3f9a1c2e7b4d5e6f7a8b9c0d');
     expect(row.checked_out_by).toBe('Lobby kiosk');
     expect(row.method).toBe('kiosk');
+  });
+
+  it('says when a kiosk record reached Tally, and keeps the entry an earlier tap replaced', () => {
+    // 9:41 at the door, reaching Tally on Monday — and the counselor's 10:05
+    // entry, which the earlier tap moved aside rather than erased.
+    const row = rowFor(
+      makeAttendance({
+        studentId: 'pco_1',
+        checkedInAt: new Date('2026-09-27T16:41:00Z'),
+        recordedAt: new Date('2026-09-28T16:02:00Z'),
+        laterCheckIn: { at: new Date('2026-09-27T17:05:00Z'), by: 'u1' },
+        checkedOutAt: new Date('2026-09-27T17:52:00Z'),
+        checkedOutRecordedAt: new Date('2026-09-28T16:02:00Z'),
+        laterCheckOut: { at: new Date('2026-09-27T18:15:00Z'), by: 'kiosk_kiosk-8b13aa2c90ff' },
+        method: 'kiosk',
+      }),
+    );
+    expect(row.recorded_at).toMatch(/^2026-09-28T/);
+    expect(row.later_checked_in_at).toMatch(/^2026-09-27T/);
+    expect(row.later_checked_in_by).toBe('Miriam');
+    expect(row.checked_out_recorded_at).toMatch(/^2026-09-28T/);
+    expect(row.later_checked_out_by).toBe('Lobby kiosk');
+  });
+
+  it('leaves those blank for a record that never came from a kiosk', () => {
+    const row = rowFor(makeAttendance({ studentId: 'pco_1', checkedInBy: 'u1', method: 'tap' }));
+    expect(row.recorded_at).toBe('');
+    expect(row.later_checked_in_at).toBe('');
+    expect(row.later_checked_in_by).toBe('');
+    expect(row.later_checked_out_by).toBe('');
+  });
+
+  it('names nobody for a displaced entry whose recorder is unknown', () => {
+    const row = rowFor(
+      makeAttendance({ studentId: 'pco_1', laterCheckIn: { at: null, by: 'ghost' }, method: 'kiosk' }),
+    );
+    expect(row.later_checked_in_at).toBe('');
+    expect(row.later_checked_in_by).toBe('');
   });
 
   it('leaves a time blank that came from a tablet whose clock could not be believed', () => {

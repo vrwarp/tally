@@ -31,7 +31,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { kioskName } from '@/lib/kioskDevice';
+import { KIOSK_LIVE_WITHIN_MS, kioskName } from '@/lib/kioskDevice';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 import type { KioskDevice } from '@/types';
@@ -45,19 +45,9 @@ import type { KioskDevice } from '@/types';
  * that trusted the type would print "Invalid Date" beside a kiosk somebody is
  * standing in front of.
  */
-/**
- * How recently a bound kiosk must have reported to count as live.
- *
- * The kiosk writes `lastSeenAt` on every register poll, which is every five
- * minutes while it is bound (`PRESENT_REFRESH_MS` in `KioskApp`) — so twelve
- * minutes is two missed reports and some slack. It was three, on a comment
- * that said the poll ran every thirty seconds: a healthy kiosk read *not
- * recording* two minutes in every five, and was retired on one unconfirmed
- * tap while it did (docs/kiosk-offline-recovery.md). Widened rather than
- * reported more often, because a report is a write per kiosk per poll and the
- * window only has to be true.
- */
-export const KIOSK_LIVE_WITHIN_MS = 12 * 60_000;
+// Defined beside the device id, where the counselors' register can reach it
+// without this module's listeners; see `src/lib/kioskQuiet.ts`.
+export { KIOSK_LIVE_WITHIN_MS };
 
 function toKioskDevice(snapshot: {
   id: string;

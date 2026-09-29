@@ -1,0 +1,243 @@
+/**
+ * What the core team sees of the lobby kiosk's parked records: read
+ * defensively, gathered into one decision per child and gathering, and
+ * answered only with what the server would accept.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import { Timestamp } from 'firebase/firestore';
+import {
+  cardAnswer,
+  cardReason,
+  cardTappedAtMs,
+  parkedCards,
+  standingStudent,
+  subscribeUnsettledParkedRecords,
+  toParkedRecord,
+  type KioskParkedRecord,
+} from '@/services/kioskParkedRecords';
+import { makeStudent } from '../../tests/factories';
+
+const onSnapshot = vi.hoisted(() => vi.fn(() => () => {}));
+const where = vi.hoisted(() => vi.fn((field: string, op: string, value: unknown) => ({ field, op, value })));
+
+vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('firebase/firestore', () => ({
+  Timestamp: class {
+    constructor(readonly seconds: number) {}
+    toDate() {
+      return new Date(this.seconds * 1000);
+    }
+  },
+  collection: (_db: unknown, path: string) => ({ path }),
+  query: (source: { path: string }, ...constraints: unknown[]) => ({ source, constraints }),
+  where,
+  onSnapshot,
+}));
+
+const EVENT = 'sunday-kids-2026-09-27';
+
+function snapshot(id: string, data: Record<string, unknown>) {
+  return { id, data: () => data } as unknown as Parameters<typeof toParkedRecord>[0];
+}
+
+function parked(overrides: Partial<KioskParkedRecord> = {}): KioskParkedRecord {
+  return {
+    id: `check-in:${EVENT}:student-noah`,
+    kind: 'check-in',
+    eventId: EVENT,
+    studentId: 'student-noah',
+    reason: 'frozen',
+    tappedAt: new Date(2026, 8, 27, 9, 43),
+    student: { firstName: 'Noah', lastName: 'Park' },
+    gathering: 'Sunday Kids',
+    deviceId: 'kiosk-3f9a1c2e7b4d',
+    parkedAt: new Date(2026, 8, 27, 11, 0),
+    ...overrides,
+  };
+}
+
+describe('toParkedRecord', () => {
+  it('reads a card whole', () => {
+    const record = toParkedRecord(
+      snapshot('check-in:e1:s1', {
+        kind: 'check-in',
+        eventId: 'e1',
+        studentId: 's1',
+        reason: 'gathering-deleted',
+        tappedAt: new Timestamp(1_790_000_000, 0),
+        student: { firstName: 'Ada', lastName: 'Lovelace', grade: 3, searchName: 'ada lovelace' },
+        gathering: 'Sunday Kids',
+        deviceId: 'kiosk-3f9a1c2e7b4d',
+        parkedAt: new Timestamp(1_790_000_600, 0),
+        settledAt: null,
+      }),
+    );
+    expect(record).toEqual({
+      id: 'check-in:e1:s1',
+      kind: 'check-in',
+      eventId: 'e1',
+      studentId: 's1',
+      reason: 'gathering-deleted',
+      tappedAt: new Date(1_790_000_000_000),
+      student: { firstName: 'Ada', lastName: 'Lovelace' },
+      gathering: 'Sunday Kids',
+      deviceId: 'kiosk-3f9a1c2e7b4d',
+      parkedAt: new Date(1_790_000_600_000),
+    });
+  });
+
+  it('reads anything it cannot trust as an unreadable record with nothing claimed', () => {
+    const record = toParkedRecord(
+      snapshot('unreadable:r1', { kind: 'visit', reason: 'weather', student: { firstName: 7 }, gathering: '' }),
+    );
+    expect(record).toMatchObject({
+      kind: 'check-in',
+      reason: 'unreadable',
+      eventId: '',
+      studentId: '',
+      tappedAt: null,
+      student: null,
+      gathering: null,
+      deviceId: null,
+      parkedAt: null,
+    });
+  });
+
+  it('reads the kiosk’s own number for an unreadable record’s tap', () => {
+    const record = toParkedRecord(snapshot('unreadable:r1', { reason: 'unreadable', tappedAtMs: 1_790_000_000_000 }));
+    expect(record.tappedAt).toEqual(new Date(1_790_000_000_000));
+    expect(toParkedRecord(snapshot('x', { kind: 'check-out' })).kind).toBe('check-out');
+  });
+});
+
+describe('subscribeUnsettledParkedRecords', () => {
+  it('asks for exactly the unsettled, and hands a refusal to the caller', () => {
+    const onError = vi.fn();
+    const rows = vi.fn();
+    subscribeUnsettledParkedRecords(rows, onError);
+
+    expect(where).toHaveBeenCalledWith('settledAt', '==', null);
+    const [source, onNext, failed] = onSnapshot.mock.calls.at(-1) as unknown as [
+      { source: { path: string } },
+      (snap: { docs: unknown[] }) => void,
+      (error: Error) => void,
+    ];
+    expect(source.source.path).toBe('kioskParkedRecords');
+
+    onNext({ docs: [snapshot('check-in:e1:s1', { reason: 'frozen', eventId: 'e1', studentId: 's1' })] });
+    expect(rows.mock.calls[0]![0]).toHaveLength(1);
+
+    const refusal = new Error('permission-denied');
+    failed(refusal);
+    expect(onError).toHaveBeenCalledWith(refusal);
+  });
+
+  it('survives not having anybody to hand a refusal to', () => {
+    subscribeUnsettledParkedRecords(() => {});
+    const [, , failed] = onSnapshot.mock.calls.at(-1) as unknown as [unknown, unknown, (e: Error) => void];
+    expect(() => failed(new Error('x'))).not.toThrow();
+  });
+});
+
+describe('parkedCards', () => {
+  it('makes one decision of a child’s arrival and the pickup parked with it', () => {
+    const arrival = parked();
+    const pickup = parked({
+      id: `check-out:${EVENT}:student-noah`,
+      kind: 'check-out',
+      reason: 'arrival-parked',
+      tappedAt: new Date(2026, 8, 27, 10, 52),
+    });
+    const [card, ...rest] = parkedCards([pickup, arrival]);
+    expect(rest).toEqual([]);
+    expect(card).toMatchObject({ id: arrival.id, arrival, pickup });
+    expect(cardReason(card!)).toBe('frozen');
+    expect(cardTappedAtMs(card!)).toBe(arrival.tappedAt!.getTime());
+  });
+
+  it('keeps each child, each gathering and each unreadable record apart, oldest tap first', () => {
+    const cards = parkedCards([
+      parked({ id: 'c', studentId: 'student-cy', tappedAt: new Date(2026, 8, 27, 10, 0) }),
+      parked({ id: 'a', tappedAt: new Date(2026, 8, 27, 9, 0) }),
+      parked({ id: 'b', eventId: 'friday', tappedAt: new Date(2026, 8, 26, 19, 0) }),
+      parked({ id: 'unreadable:1', reason: 'unreadable', eventId: '', studentId: '', tappedAt: null }),
+      parked({ id: 'unreadable:2', reason: 'unreadable', eventId: '', studentId: '', tappedAt: null }),
+    ]);
+    expect(cards.map((card) => card.id)).toEqual(['b', 'a', 'c', 'unreadable:1', 'unreadable:2']);
+  });
+
+  it('answers for a pickup alone by its own reason', () => {
+    const [card] = parkedCards([parked({ kind: 'check-out', reason: 'no-arrival' })]);
+    expect(card!.arrival).toBeNull();
+    expect(cardReason(card!)).toBe('no-arrival');
+  });
+});
+
+describe('standingStudent', () => {
+  it('follows a re-creation and a merge to the student who stands now', () => {
+    const old = makeStudent({ id: 'student-noah', recreatedAsStudentId: 'student-noah-2' });
+    const middle = makeStudent({ id: 'student-noah-2', mergedIntoStudentId: 'student-noah-3' });
+    const now = makeStudent({ id: 'student-noah-3' });
+    const byId = new Map([old, middle, now].map((student) => [student.id, student]));
+    expect(standingStudent('student-noah', byId)).toBe(now);
+  });
+
+  it('stops at a student who names themself, and gives up on one the roster has not got', () => {
+    const loop = makeStudent({ id: 'a', mergedIntoStudentId: 'a' });
+    expect(standingStudent('a', new Map([['a', loop]]))).toBe(loop);
+    expect(standingStudent('ghost', new Map())).toBeNull();
+    const dangling = makeStudent({ id: 'a', mergedIntoStudentId: 'gone' });
+    expect(standingStudent('a', new Map([['a', dangling]]))).toBeNull();
+  });
+
+  it('gives up after a handful of hops rather than following a cycle forever', () => {
+    const a = makeStudent({ id: 'a', mergedIntoStudentId: 'b' });
+    const b = makeStudent({ id: 'b', mergedIntoStudentId: 'a' });
+    const byId = new Map([a, b].map((student) => [student.id, student]));
+    expect(['a', 'b']).toContain(standingStudent('a', byId)!.id);
+  });
+});
+
+describe('cardAnswer', () => {
+  const byId = (...students: ReturnType<typeof makeStudent>[]) =>
+    new Map(students.map((student) => [student.id, student]));
+
+  it('records a frozen child once their record is back, and not before', () => {
+    const [card] = parkedCards([parked()]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah', upstreamRecordMissing: true })))).toBe('frozen');
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
+  });
+
+  it('records a re-created child through the student who stands now', () => {
+    const [card] = parkedCards([parked()]);
+    const students = byId(
+      makeStudent({ id: 'student-noah', upstreamRecordMissing: true, recreatedAsStudentId: 'student-noah-2' }),
+      makeStudent({ id: 'student-noah-2' }),
+    );
+    expect(cardAnswer(card!, students)).toBe('record');
+  });
+
+  it('only lets go of what there is nothing to record onto', () => {
+    const students = byId(makeStudent({ id: 'student-noah' }));
+    for (const reason of ['gathering-deleted', 'no-arrival', 'unreadable'] as const) {
+      const [card] = parkedCards([parked({ reason })]);
+      expect(cardAnswer(card!, students)).toBe('let-go');
+    }
+    // Nor for a child the roster does not have.
+    const [card] = parkedCards([parked()]);
+    expect(cardAnswer(card!, new Map())).toBe('let-go');
+  });
+
+  it('lets go of a pickup whose arrival was decided on its own', () => {
+    const [card] = parkedCards([parked({ kind: 'check-out', reason: 'arrival-parked' })]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('let-go');
+  });
+
+  it('records an arrival and the pickup parked with it together', () => {
+    const [card] = parkedCards([
+      parked(),
+      parked({ id: 'check-out', kind: 'check-out', reason: 'arrival-parked' }),
+    ]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
+  });
+});

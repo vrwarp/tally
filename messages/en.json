@@ -48,7 +48,8 @@
     "review": "Review",
     "kiosk": "Kiosk",
     "team": "Team",
-    "settings": "Settings"
+    "settings": "Settings",
+    "waitingCount": "{count, plural, one {1 waiting} other {# waiting}}"
   },
   "Dashboard": {
     "title": "Insights",
@@ -545,7 +546,8 @@
     "formerStudent": "Former student",
     "swapBody": "Tap the right student. {name}’s check-in moves across, still {time}.",
     "refusedBanner": "This gathering isn't letting you check in — see Who's on",
-    "refusedSee": "See"
+    "refusedSee": "See",
+    "kioskQuiet": "{named, select, yes {{kiosk}} other {The lobby kiosk}} hasn’t been heard from since {when}. Check-ins and pickups made there aren’t on this list yet — a child wearing today’s name tag was checked in."
   },
   "PastChange": {
     "titleCheckIn": "Check {name} in to a past gathering?",
@@ -1263,7 +1265,12 @@
     "whoRestricted": "{count, plural, one {# person} other {# people}} — everybody else sees it locked",
     "whoOpen": "Everyone on the team can take attendance here",
     "change": "Change who is on it",
-    "limit": "Limit who is on it"
+    "limit": "Limit who is on it",
+    "kioskQuiet": "{named, select, yes {{kiosk}} other {The lobby kiosk}} was last heard from at {when} while set to this gathering. Check-ins and pickups made there after that are still on the tablet.",
+    "kioskLate": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late — all in Tally since {when}.",
+    "kioskLateSending": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late so far. It’s still sending the rest.",
+    "kioskParked": "{count, plural, one {1 record from the kiosk needs} other {# records from the kiosk need}} a decision.",
+    "kioskParkedLink": "Open Review"
   },
   "DangerZone": {
     "heading": "Danger zone",
@@ -2195,7 +2202,31 @@
     "wouldLinkByDefault": "Tally’s closest match.",
     "noneOfThem": "None of them — {name} is new",
     "samePhoneDigits": "Same phone digits on file.",
-    "differentPhoneDigits": "Different phone digits on file."
+    "differentPhoneDigits": "Different phone digits on file.",
+    "parkedHeading": "From the lobby kiosk",
+    "parkedIntro": "Records the kiosk kept through an outage that couldn’t go on the register by themselves. Each waits here for a decision.",
+    "parkedNotLoaded": "Couldn’t load what the kiosk left for review.",
+    "parkedSomeChild": "A child",
+    "parkedSomeGathering": "A gathering",
+    "parkedTimeNotKnown": "time not known",
+    "parkedWhere": "{gathering} · {date}",
+    "parkedFrozen": "{name}’s record in the church’s database is missing, so Tally can’t record {kinds, select, both {the {arrival} arrival or the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}} yet.",
+    "parkedFrozenBack": "{name}’s record is back, so {kinds, select, both {the {arrival} arrival and the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}} can be recorded now.",
+    "parkedGatheringDeleted": "The gathering {name} was tapped in for has been deleted: {kinds, select, both {the {arrival} arrival and the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}}. If it belongs on another night, record it there by hand.",
+    "parkedNoArrival": "The register has no arrival for {name} on {date}, so the {pickup} pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.",
+    "parkedArrivalLetGo": "The {pickup} pickup waited for its arrival, which was let go, so it has nothing to close.",
+    "parkedUnreadable": "The kiosk sent a record Tally couldn’t read, so there’s nothing to record it onto.",
+    "parkedOpenStudent": "Open {name}’s page to put the record back",
+    "parkedRecordCaption": "Adds it to {gathering}, at the time the kiosk saw it.",
+    "parkedRecord": "Record {kinds, select, both {the {arrival} arrival and pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}}",
+    "parkedLetGoCaption": "Keeps this as decided, with your name on it. Nothing is added to the register.",
+    "parkedLetGo": "Let it go",
+    "parkedRecordedToast": "Recorded.",
+    "parkedLetGoToast": "Let go, with your name on it.",
+    "parkedAlreadySettled": "Somebody decided this one already.",
+    "parkedStillFrozen": "That record is still missing from the church’s database, so it can’t be recorded yet.",
+    "parkedCannotRecord": "There’s nothing to record that onto any more. You can still let it go.",
+    "parkedNotFound": "That record isn’t there any more."
   },
   "Door": {
     "loading": "Loading…",

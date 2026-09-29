@@ -67,6 +67,7 @@ import { gradeLabel } from '@/lib/grades';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';
 import { useTranslations } from 'use-intl';
+import { KioskEventLine } from '@/features/events/KioskEventLine';
 import { useRecurrenceStrings, useGrades } from '@/hooks/usePureStrings';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
@@ -421,6 +422,10 @@ export function EventDetailPage() {
             ) : (
               <div className="flex flex-col gap-3 p-3">
                 {attendanceError ? <ErrorBanner message={attendanceError} /> : null}
+
+                {/* Above the tiles: when a kiosk is holding this gathering's
+                    check-ins, the number below is not how many came. */}
+                {locked ? null : <KioskEventLine event={event} attendance={attendance} now={now} />}
 
                 <StatTile
                   label={t('tileCheckedIn')}
