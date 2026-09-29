@@ -19,7 +19,7 @@ import { Button, TextField } from '@/components/ui';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
-import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskDevice';
+import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskName';
 import {
   isKioskLive,
   kioskAllInSince,

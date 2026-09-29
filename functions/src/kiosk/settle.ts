@@ -28,15 +28,13 @@ import type { DocumentSnapshotLike, FirestoreLike, FunctionLogger } from '../fir
 import { PATHS, toDateOrNull } from '../firestore.js';
 import { kioskUid } from '../generated/kioskDevice.js';
 import {
-  isRecordable,
   parkedRecordId,
   type KioskRecordKind,
   type KioskRecordStudent,
   type KioskRecordWire,
   type ParkReason,
-  type SettleDecision,
-  type SettleParkedResponse,
 } from '../generated/kioskLanding.js';
+import { isRecordable, type SettleDecision, type SettleParkedResponse } from '../generated/kioskSettle.js';
 import { PARKED_COLLECTION, landOne } from './landing.js';
 
 /** How far a chain of re-creations and grafts is followed before giving up. */

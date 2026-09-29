@@ -39,6 +39,10 @@ describe('toPresence', () => {
     expect(toPresence({ devices: { 'kiosk-lobby-00000001': 'x' } })).toEqual([
       { deviceId: 'kiosk-lobby-00000001', name: null, lastSeenAt: null },
     ]);
+    expect(toPresence({ devices: { 'kiosk-lobby-00000001': null, 'kiosk-nursery-000002': undefined } })).toEqual([
+      { deviceId: 'kiosk-lobby-00000001', name: null, lastSeenAt: null },
+      { deviceId: 'kiosk-nursery-000002', name: null, lastSeenAt: null },
+    ]);
   });
 });
 

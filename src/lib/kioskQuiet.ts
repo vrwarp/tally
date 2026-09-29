@@ -20,8 +20,22 @@
  * that sat on the tablet through a blip is not worth a line.
  */
 import { endOfDay, startOfDay } from 'date-fns';
-import { KIOSK_LIVE_WITHIN_MS, deviceIdOfUid } from '@/lib/kioskDevice';
+import { deviceIdOfUid } from '@/lib/kioskDevice';
 import type { AttendanceRecord } from '@/types';
+
+/**
+ * How recently a bound kiosk must have reported to count as live.
+ *
+ * The kiosk writes `lastSeenAt` on every register poll, which is every five
+ * minutes while it is bound (`PRESENT_REFRESH_MS` in `KioskApp`) — so twelve
+ * minutes is two missed reports and some slack. It was three, on a comment
+ * that said the poll ran every thirty seconds: a healthy kiosk read *not
+ * recording* two minutes in every five, and was retired on one unconfirmed
+ * tap while it did (docs/kiosk-offline-recovery.md). Widened rather than
+ * reported more often, because a report is a write per kiosk per poll and the
+ * window only has to be true.
+ */
+export const KIOSK_LIVE_WITHIN_MS = 12 * 60_000;
 
 /**
  * A record that reached Tally this long after its tap sat on the tablet
@@ -76,6 +90,7 @@ export function lateFromKiosks(attendance: readonly AttendanceRecord[]): LateFro
       return;
     }
     held.count += 1;
+    // Stryker disable next-line EqualityOperator: equal instants are one moment, whichever Date carries it.
     if (recordedAt > held.allInAt) held.allInAt = recordedAt;
   };
   for (const record of attendance) {

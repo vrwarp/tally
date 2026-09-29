@@ -23,7 +23,7 @@ import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
-import type { SettleDecision, SettleStatus } from '@/lib/kioskLanding';
+import type { SettleDecision, SettleStatus } from '@/lib/kioskSettle';
 import { settleParkedKioskRecord } from '@/services/functions';
 import {
   cardAnswer,

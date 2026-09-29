@@ -20,7 +20,8 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import type { FirestoreLike } from '../firestore.js';
-import { isDeviceId, kioskName } from '../generated/kioskDevice.js';
+import { isDeviceId } from '../generated/kioskDevice.js';
+import { kioskName } from '../generated/kioskName.js';
 
 export { DEVICE_ID_PATTERN, deviceIdOfUid, isDeviceId, kioskUid } from '../generated/kioskDevice.js';
 

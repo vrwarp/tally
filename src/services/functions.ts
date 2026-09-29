@@ -9,7 +9,7 @@
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
 import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
-import type { SettleParkedRequest, SettleParkedResponse } from '@/lib/kioskLanding';
+import type { SettleParkedRequest, SettleParkedResponse } from '@/lib/kioskSettle';
 import type {
   BackendId,
   BackendStatuses,

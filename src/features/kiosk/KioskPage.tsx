@@ -34,7 +34,7 @@ import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useNow } from '@/hooks/useNow';
 import { cn } from '@/lib/utils';
-import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskDevice';
+import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskName';
 import {
   approveKioskPairing,
   createKioskPairingLink,

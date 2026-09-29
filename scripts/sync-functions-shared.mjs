@@ -45,7 +45,9 @@ export const SHARED_FILES = [
   'participation.ts',
   'eventAccess.ts',
   'kioskDevice.ts',
+  'kioskName.ts',
   'kioskLanding.ts',
+  'kioskSettle.ts',
   'emailKey.ts',
 ];
 

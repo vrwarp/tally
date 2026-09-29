@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIOSK_LIVE_WITHIN_MS } from '@/lib/kioskDevice';
-import { LATE_AFTER_MS, lateFromKiosks, quietOn } from '@/lib/kioskQuiet';
+import { KIOSK_LIVE_WITHIN_MS, LATE_AFTER_MS, lateFromKiosks, quietOn } from '@/lib/kioskQuiet';
 import { makeAttendance } from '../../tests/factories';
 
 const MINUTE = 60_000;
@@ -30,6 +29,8 @@ describe('quietOn', () => {
     const later = new Date(2026, 8, 28, 9, 0).getTime();
     expect(quietOn(new Date(2026, 8, 27, 0, 0), SUNDAY, later)).toBe(true);
     expect(quietOn(new Date(2026, 8, 27, 23, 59, 59), SUNDAY, later)).toBe(true);
+    // The day's last millisecond is still the day.
+    expect(quietOn(new Date(2026, 8, 27, 23, 59, 59, 999), SUNDAY, later)).toBe(true);
   });
 
   it('says nothing about a kiosk that went quiet on another occurrence of the chain', () => {

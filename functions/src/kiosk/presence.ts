@@ -17,7 +17,7 @@
  */
 import type { FirestoreLike } from '../firestore.js';
 import { PATHS, toDateOrNull } from '../firestore.js';
-import { kioskName } from '../generated/kioskDevice.js';
+import { kioskName } from '../generated/kioskName.js';
 
 /** One kiosk, as a register sees it. */
 export interface PresenceEntry {

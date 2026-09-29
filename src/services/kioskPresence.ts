@@ -10,7 +10,7 @@
  */
 import { doc, onSnapshot, type DocumentData, type Unsubscribe } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { kioskName } from '@/lib/kioskDevice';
+import { kioskName } from '@/lib/kioskName';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 

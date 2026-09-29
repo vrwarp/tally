@@ -36,7 +36,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { FirestoreLike } from '../firestore.js';
 import { toDateOrNull } from '../firestore.js';
-import { kioskName } from '../generated/kioskDevice.js';
+import { kioskName } from '../generated/kioskName.js';
 
 export const PAIRING_COLLECTION = 'kioskPairings';
 

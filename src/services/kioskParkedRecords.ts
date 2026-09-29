@@ -21,7 +21,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { isRecordable, type KioskRecordKind, type ParkReason } from '@/lib/kioskLanding';
+import type { KioskRecordKind, ParkReason } from '@/lib/kioskLanding';
+import { isRecordable } from '@/lib/kioskSettle';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 import type { Student } from '@/types';

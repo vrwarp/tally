@@ -31,7 +31,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { KIOSK_LIVE_WITHIN_MS, kioskName } from '@/lib/kioskDevice';
+import { kioskName } from '@/lib/kioskName';
+import { KIOSK_LIVE_WITHIN_MS } from '@/lib/kioskQuiet';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
 import type { KioskDevice } from '@/types';

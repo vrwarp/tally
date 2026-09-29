@@ -88,7 +88,7 @@ import {
   type InviteLife,
 } from './invitations.js';
 import { isDeviceId, kioskUid, readLiveDevice, recordPairedDevice } from './kiosk/devices.js';
-import { kioskName } from './generated/kioskDevice.js';
+import { kioskName } from './generated/kioskName.js';
 import type { ServerCode } from './generated/serverCodes.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import { ChainAccessReader, partitionStudentHistory } from './eventAccess.js';
@@ -135,7 +135,7 @@ import {
 } from './kiosk/landing.js';
 import { syncKioskPresence } from './kiosk/presence.js';
 import { runSettleParked } from './kiosk/settle.js';
-import type { SettleParkedResponse } from './generated/kioskLanding.js';
+import type { SettleParkedResponse } from './generated/kioskSettle.js';
 import type { LandKioskRecordsResponse } from './generated/kioskLanding.js';
 import {
   amendRegistration as runAmendRegistration,
