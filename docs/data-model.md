@@ -45,6 +45,7 @@ events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
 accessRequests/{chainKey}__{uid}         somebody asking to be put on a gathering
 kioskDevices/{deviceId}                  a paired lobby kiosk's standing
 kioskParkedRecords/{recordId}            a kiosk tap that reached Tally but not the register
+kioskPresence/{chainKey}                 which kiosks are set to a gathering, for the people on it
 transitions/{chainKey}__{studentId}      this gathering no longer expects this student
 config/settings                          tunable thresholds
 config/planningCenter                    the non-secret Planning Center settings
@@ -248,6 +249,7 @@ before they exist anywhere upstream.
 | `registrationId` | string, or absent | Written only by `registerFamily`: this child arrived through the kiosk's "first time here" wizard rather than a leader's thumb. Provenance, and only that — it points back at the [review record](#kioskregistrationsregistrationid) a support question or a reviewer needs. It used to double as the push gate, on the reasoning that a self-registration pushed its own children; `pendingReview` below is that job now, and it is the job the field was doing by accident rather than by meaning. Not writable from a kiosk session: the key set pinned by `kioskDatePatchKeys()` does not include it. |
 | `pendingReview` | boolean, or absent | **The hold.** `true` while a self-registered family is waiting for somebody to approve them, and the *only* thing that keeps them out of the church's people database: every push path consults it — both backends' `pushStudent`, both pending sweeps, `onStudentCreated`, and the re-create repair. `upstreamPushPending` stays `true` alongside it, because the child genuinely is queued; what the hold adds is that the queue does not drain on its own. Cleared by `approveRegistration`, which then pushes. Server-written in both directions: `reviewHoldUnchanged()` in the rules refuses a client that sets *or* clears it, because a kiosk that could clear its own hold would be a kiosk with a direct line into Planning Center. Counted apart from `queued` on the Settings card — a family waiting for a person is not a stuck queue. |
 | `mergedIntoStudentId` | string, or absent | Set on the loser of a merge: this row is really the student it names. The document stays, inactive, because every attendance record points at it. |
+| `recreatedAsStudentId` | string, or absent | Set on a student whose Planning Center person was re-created (or re-linked) as a new document: this row is really the student it names, the same shape as a merge. Followed, with `mergedIntoStudentId`, when a kiosk record parked for the old id is settled. |
 | `mergedFromStudentIds` | string[], or absent | Set on the winner: the rows folded into it. Attendance is never re-keyed by a merge — that would be a write per night against records already reported on — so the student's profile unions the histories at read time instead (`useStudentHistory`). A list rather than the older single-valued `mergedFromStudentId`, which silently overwrote the first duplicate when a keeper absorbed a second. |
 | `createdAt`, `updatedAt`, `createdBy` | — | `createdBy` is a uid, or a source sentinel — `'planning-center'`, `'attendees32'` — for records an import created. For a student a history import touches, `createdAt` is their earliest attended gathering rather than the moment of import — `predictiveRoster` and the MIA derivation both drop history from before this date, so "created today" would excuse a student from every past night *and* leave their whole imported attendance somewhere no screen counts it. The import moves an existing `createdAt` earlier for the same reason: a student first checked in through Tally last week carries last week's date, and their two years of kiosk history sit before it. |
 
@@ -696,15 +698,18 @@ person who approved the pairing touches nothing.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `approvedBy`, `approvedByName` | — | Who vouched for the code, and their name as of that moment — denormalised the way `transitions.releasedByName` is, because the row outlives the profile. |
+| `name` | string, or absent | What the church calls the tablet — *Lobby*, *Nursery door* — tidied and at most 40 characters (`kioskName`). Given by whoever pairs it, on the pairing form or the staging link (carried on the pairing to the claim), and changed afterwards by core and up. Absent, the device id stands in. The event page, the counselors' register line and the Kiosk page's list all say it. |
 | `pairedAt` | timestamp | |
 | `lastSeenAt` | timestamp or null | Written by the kiosk on every register poll while bound. Null until it first reports in. |
 | `boundTo`, `boundChain` | string or null | The title and chain of the gathering the kiosk is bound to, written by the kiosk at bind time and null between gatherings. `boundChain` is **the whole of the kiosk's reach** in the rules: a kiosk session may read the register of that chain and no other — a fence on the chain included, since `eventAccess` is about people and a kiosk stands in whichever room a leader pointed it at. (What it records goes through `landKioskRecords`, which judges each record against its own gathering.) A kiosk that loses the internet keeps its gathering here, because the report that would clear it never lands — which is how the Team page can say *out of touch since 9:41 while at Sunday Kids* rather than *not recording*. |
 | `waitingCount`, `waitingSinceAt`, `allInAt` | number / timestamp, or absent | What the kiosk said, on its last call to `landKioskRecords`, was still on the tablet: how many, and since when the oldest. `allInAt` is the moment a tablet that had been holding records reported none. Written only by the callable; absent on a kiosk that has never sent one. |
-| `retiredAt`, `retiredBy` | — | Set by core and up, in their own name. Never cleared from a client: pairing again is how a retired tablet comes back, and the claim replaces the row wholesale. |
+| `waitingReportedAt` | timestamp, or absent | When the report behind those counts was made. The callable writes them in a transaction and ignores a report older than the one it holds, so a call that times out and finishes after its retry cannot put an older count back. |
+| `firstLandingAt` | timestamp, or absent | When this tablet first sent a record through `landKioskRecords`. **Once set, the rules refuse the tablet's own attendance and student writes** — the road the kiosk bundle before `landKioskRecords` used, which dropped a refused check-in behind a green tick. A tablet that has never spoken through the callable keeps that road, so one that was switched off all week and boots last month's bundle on Sunday still records; see [kiosk-offline-recovery.md, Phase 2](./kiosk-offline-recovery.md#phase-2--tally-says-what-it-knows). |
+| `retiredAt`, `retiredBy` | — | Set by core and up, in their own name. Never cleared from a client: pairing again is how a retired tablet comes back, and the claim resets the row's standing — who approved it, when, its binding, its retirement and its battery — while keeping its name (unless the pairing gave it a new one), its counts and `firstLandingAt`. |
 
-**Who writes: the server, at claim time, wholesale.** The kiosk may update only `lastSeenAt`,
+**Who writes: the server, at claim time.** The kiosk may update only `lastSeenAt`,
 `boundTo` and `boundChain` on its own row, and only while the row is not retired. Core and up may
-set `retiredAt`/`retiredBy` and nothing else. Nobody creates or deletes one from a client, and
+set `retiredAt`/`retiredBy`, or `name`, and nothing else. Nobody creates or deletes one from a client, and
 there is no sweep: the row is the provenance of every morning that kiosk recorded, and a device row
 costs nothing to keep. Core and up read them; a kiosk cannot read even its own.
 
@@ -738,11 +743,40 @@ record that did not parse.
 | `student?` | `{ firstName, lastName, grade, searchName }` | A check-in's names, as the kiosk had them — so a card can name a child whose record is gone. |
 | `gathering` | string or null | The gathering's title, from the event if it still exists. |
 | `deviceId`, `parkedAt` | — | Which kiosk, and when it arrived. |
+| `settledAt` | timestamp or null | Null while the record waits for a decision — the Review page reads `settledAt == null`. |
+| `settledBy`, `settledByName` | — | Who decided, in their own name as of that moment. |
+| `decision` | `'recorded' \| 'let-go'` | Recorded onto the register, or kept as decided with nothing added. A decision is never an absence: a card let go stays, with the name on it. |
+| `recordedAs` | string, or absent | The student it was recorded onto, when that is not the one tapped — the child was re-created or merged while the record waited. |
 
-**Who reads and writes:** core and up read (the Review page is where they are settled — Phase 2 of
-the proposal); nobody writes from a client, a kiosk session included. Names of minors, so it is
+**Parked once, earliest tap kept.** Parking again — the same child tapped in twice while their
+record was missing — keeps the card's earlier tap and never reopens a settled card.
+
+**Who reads and writes:** core and up read, on the Review page, which settles them through
+`settleParkedKioskRecord` (core and up): **record** re-runs the landing for the card — an arrival
+and the pickup parked with it together, arrival first — onto the student who stands for the child
+now (following `recreatedAsStudentId` and `mergedIntoStudentId`), with the tap's own time; **let go**
+marks it decided. Nobody writes from a client, a kiosk session included. Names of minors, so it is
 held to the same retention as the register it stands in for — see
 [minors-data.md](./minors-data.md).
+
+### `kioskPresence/{chainKey}`
+
+What a counselor's register may know about the lobby kiosks: which kiosks are set to this gathering,
+what they are called, and when each was last heard from. The device rows are core-only — they say
+who paired a tablet and what it still holds — so this is one fact copied one way, for the people on
+the gathering, and the register says *the lobby kiosk hasn't been heard from since 9:41* from it,
+with no counts.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `chainKey` | string | The gathering's chain, as the document id. |
+| `devices` | map | `deviceId -> { name, lastSeenAt }` for every unretired kiosk whose row is set to this chain. |
+
+**Who writes:** only the `onKioskDeviceWritten` trigger (`functions/src/kiosk/presence.ts`), on every
+change to a device row: a kiosk joins the chain its row is set to and leaves the one it was set to
+before, and leaves every chain when retired. Derived and disposable — if the copy lags, counselors
+simply see no line. **Who reads:** anybody active on the chain, one document at a time (`get`, never
+`list`).
 
 ### `kioskIndex/phones`
 

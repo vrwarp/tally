@@ -661,6 +661,12 @@ bricked afternoon.
   pair it, *then* set the policy. The pairing screen is what an unpaired kiosk shows and the only
   thing it shows, so the printer screen is not reachable before pairing anyway — and doing it this
   way proves the tablet works as a kiosk before anything about it is locked down.
+
+  **Name it while you pair it.** The Kiosk page takes an optional name beside the pairing code — or
+  beside **Make a link**, for a tablet staged with one — and the name is what the event page and the
+  counselors' register call the tablet when it goes quiet: *Nursery door hasn't been heard from since
+  9:41* tells a room which shelf to look at, and a label with the same name on the tablet helps
+  whoever is sent to look. The core team can rename it later from the Kiosk page's list.
 - **Otherwise what you type is the URL, not the value.** A short path you can type without error
   gets you a long value you must not. That is the whole trick, and §6.3 is Tally serving that page —
   which is still the place to go for the other ten keys of §4.2, and for a tablet being staged
@@ -1208,7 +1214,8 @@ coincidence. Small, and it stops two numbers that must agree from being invisibl
 
 **Shipped.** `startPairing` takes an optional approver, `createKioskPairingLink` mints one,
 `src/kiosk/pairLink.ts` reads it out of the URL and strips it before any network call, and core and
-up get a section on the kiosk page that shows one once.
+up get a section on the kiosk page that shows one once — with an optional name for the tablet it
+pairs, kept for the next link until it is changed.
 
 `src/kiosk/` reads no URL parameters today. Add `?pair=` to the kiosk boot, entering the existing
 `startKioskPairing` → `approveKioskPairing` → `claimKioskToken` handshake

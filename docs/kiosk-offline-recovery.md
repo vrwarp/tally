@@ -1,7 +1,8 @@
 # Kiosk records that outlast an outage
 
-**Status: Phase 1 is built; Phase 2 is proposed.** What was built, and where it differs from what
-is written below, is under [Phase 1](#phase-1--nothing-is-lost-and-nothing-tells-anyone-to-lose-it).
+**Status: Phases 1 and 2 are built.** What was built, and where it differs from what is written
+below, is under [Phase 1](#phase-1--nothing-is-lost-and-nothing-tells-anyone-to-lose-it) and
+[Phase 2](#phase-2--tally-says-what-it-knows).
 The proposal was written against `main` at `9aae8cc`, and the rest of this document still describes
 the kiosk as it was then where it says *today*. Every failure
 below was reproduced rather than inferred: against the real `firestore.rules` in the emulator, and
@@ -669,8 +670,8 @@ cupboard, and the first draft's visibility lived only in the states where nothin
 - **Not yet:** a parked check-in tapped a second time — possible only if the room was cleared by
   leaving and rebinding — replaces the first parked copy, so its card would show the later time; and
   the device row's counts are written outside a transaction, so a call that times out and finishes
-  after its retry can leave an older count. Both are read only by Phase 2's screens and are worth
-  fixing with them. A record migrated from the old queue goes up with the time its old write failed,
+  after its retry can leave an older count. Both are read only by Phase 2's screens, and were fixed
+  with them. A record migrated from the old queue goes up with the time its old write failed,
   which is minutes after the tap at most and never before it; it is marked *about* on the tablet but
   not on the register. And the callable takes a live kiosk's word for which gathering a record
   belongs to — the reach [§3](#3-one-road-to-the-register) chose over a binding log — so a stolen
@@ -695,6 +696,59 @@ the check that matters most before the first Sunday it is relied on.
 - Parked cards on Review, per reason, linked from the event page, counted in the navigation.
 - The counselor's register line, with `kioskPresence/{chain}` and its trigger.
 - The kiosk session's direct attendance-write rules removed, once no kiosk runs the old bundle.
+
+**Built**, with these differences from the design above:
+
+- **Kiosk names**, as the owner answered the open question: whoever pairs a kiosk may name it — on
+  the pairing form, or beside **Make a link** for a managed tablet — and the core team renames it
+  from the Kiosk page's list or the Team panel. At most forty characters. A kiosk with no name is
+  its device id on the Kiosk and Team pages and *the lobby kiosk* in a sentence.
+- **The direct-write rules close one tablet at a time, not all at once.** Removing them outright is
+  safe only once no tablet can run the old bundle, and that cannot be known from here: the old bundle
+  drops a refused check-in behind a green tick and deletes a refused replay, and a tablet switched
+  off since the update boots whatever shell its worker cached if the lobby's internet is slow or down
+  that morning — on a Sunday, in an outage, which is exactly when its queue fills. So
+  `landKioskRecords` stamps `firstLandingAt` on a device row the first time that tablet sends through
+  it, and from then on the rules refuse that tablet's own attendance and student writes
+  (`kioskWritesDirectly()`). A tablet that has never sent through the callable keeps its old road
+  until it does. The rules themselves can go once every unretired device row carries the stamp.
+- **The counts stay true.** The device row's counts are written in a transaction that ignores a
+  report older than the one it holds (`waitingReportedAt`), and parking a record again keeps the
+  earlier tap and never reopens a settled card — the two *not yets* of Phase 1.
+- **Settling is a callable**, `settleParkedKioskRecord`, for core and up. *Record* re-runs the landing
+  for the card with the tap's own time, onto whoever stands for the child now — a student re-created
+  or merged while the record waited is followed — and answers *still missing* or *nothing to record
+  onto* when the register still cannot take it. *Let it go* keeps the card as decided, with the
+  settler's name; nothing is deleted. An arrival and the pickup parked with it are one card and one
+  decision, recorded arrival first.
+- **Record is offered only when the server would take it**: a frozen child whose record is back, or
+  a pickup riding with its arrival. Until then a frozen child's card links to the child's page, where
+  the record is put back.
+- **"Quiet" is judged on the gathering's own day**, by one rule the event page and the register
+  share (`quietOn` in `src/lib/kioskQuiet.ts`): not heard from for twelve minutes, and last heard
+  from between the start of the day the check-in window opens and the end of the day the gathering
+  ends. A row that is still set to Sunday's chain because its tablet never came back does not raise
+  the line every Sunday after.
+- **Late means more than ten minutes** between the tap and its arrival in Tally (`LATE_AFTER_MS`),
+  counted per kiosk from the register itself. The line says *so far* while the kiosk still reports
+  records waiting, and stays back while a kiosk set to the gathering is quiet, when the quiet line is
+  the truer one.
+- **The navigation counts cards**, not records — the number of decisions — and a screen reader
+  hears *Review 3 waiting*.
+- **The CSV** gains `recorded_at` and who changed a kiosk's record afterwards
+  (`later_checked_in_at`, `later_checked_in_by`), and their pickup twins where the gathering checks
+  out.
+- **The counselor's line** reads `kioskPresence/{chain}`, kept by the `onKioskDeviceWritten`
+  trigger: each unretired kiosk set to the chain, its name and its last report, and nothing else.
+
+**Checked** as built: functions tests for settling (every answer, the pair, a followed student, the
+names), the presence copy, the counts' transaction and the parking rule; rules tests for the
+presence document, settling being the server's alone, the stamp closing one tablet's direct road and
+no other's, and a core rename; unit and component tests for the quiet and late rules, the parked
+cards, the event page's line, the register's line, the Review section, the navigation's count and
+the CSV; the whole unit, functions and rules suites; the kiosk byte budget; and the mutation sweep
+of the changed modules. **Not yet run:** Review's cards end to end against the emulators, and the
+first Sunday that leans on them.
 
 ### Optional
 
@@ -750,8 +804,9 @@ For the build:
 
 - **Backend first.** Rules and functions deploy on merge; kiosks pick up a new bundle at their 4am
   reload. A new kiosk that meets old functions finds no callable, keeps its records and says so on the
-  staff row — nothing lost, only late until the functions deploy. An old kiosk keeps writing directly,
-  which is why the direct-write rules stay until Phase 2.
+  staff row — nothing lost, only late until the functions deploy. An old kiosk keeps writing directly
+  until it first sends through the callable, when its device row is stamped and its direct road
+  closes (Phase 2) — so an old bundle's queue is never refused.
 - **The standing report does not change**, so a rules mismatch cannot make a kiosk believe it was
   retired.
 - **The migration** runs once, on the first boot of the new bundle.
@@ -759,5 +814,5 @@ For the build:
 
 ## Open questions
 
-1. Who names kiosks — the person who pairs one, or only the core team? Phase 2; it blocks nothing in
-   Phase 1.
+None open. The one that was — who names kiosks — the owner answered: the person who pairs one may
+name it, and the core team can rename it.
