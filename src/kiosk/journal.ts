@@ -170,9 +170,9 @@ export function noteAttempt(id: string, problem: NonNullable<KioskRecord['lastPr
   if (!record) return;
   const next: KioskRecord = { ...record, attempts: record.attempts + 1, lastProblem: problem };
   if (heldInMemory.has(id)) heldInMemory.set(id, next);
-  else if (!tryStore(RECORD_PREFIX + id, JSON.stringify(next))) {
-    // The count is a courtesy; the record is already on the disk as it was.
-  }
+  // The count is a courtesy: if it cannot be written, the record is still on
+  // the disk as it was.
+  else tryStore(RECORD_PREFIX + id, JSON.stringify(next));
   emit();
 }
 
