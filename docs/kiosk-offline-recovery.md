@@ -262,6 +262,10 @@ oldest tapped at T*, and the function writes `waitingCount`, `waitingSinceAt` an
 device row. Because every record goes through the callable, the call that lands the last one reports
 zero: the count cannot go stale, and nothing extra is sent to keep it true. The kiosk's standing
 report — the write that also tells a kiosk whether it has been retired — gains no fields.
+`allInAt` marks the end of an outage, not the last ordinary tap: it is set by a call that leaves the
+tablet empty when an earlier call said records were waiting, or when this call brings records held
+more than ten minutes (`HELD_LATE_MS`, the event page's own *arrived late*). The second is the usual
+case — a tablet with no internet reaches nobody to say that anything is waiting.
 
 **Its authority is the kiosk's own, plus the owner's one decision.** It may add a check-in that is not
 there and record a pickup — no undo, and the same frozen-student check `attendanceFrozen()` makes in

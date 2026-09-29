@@ -39,7 +39,10 @@ export const KIOSK_LIVE_WITHIN_MS = 12 * 60_000;
 
 /**
  * A record that reached Tally this long after its tap sat on the tablet
- * through an outage. The kiosk's own `OFFLINE_NOTICE_AFTER_MS`.
+ * through an outage. The kiosk's own `OFFLINE_NOTICE_AFTER_MS`, and the
+ * landing's `HELD_LATE_MS`, so the event page's "arrived late" and the Kiosk
+ * page's "all in Tally since" agree. A copy rather than an import: this module
+ * is the main app's, and `kioskLanding` is the kiosk's first paint.
  */
 export const LATE_AFTER_MS = 10 * 60_000;
 

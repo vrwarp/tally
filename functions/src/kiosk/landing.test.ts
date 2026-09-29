@@ -473,9 +473,41 @@ describe('what is still on the tablet', () => {
     expect(device(db).waitingCount).toBe(0);
     expect(ms(device(db).allInAt)).toBe(monday);
 
-    // An ordinary tap on a tablet holding nothing leaves the moment alone.
-    await land(db, [{ ...checkIn(START), id: 'in-next-aaaa', studentId: 'student-byron' }], monday + MINUTE);
+    // An ordinary tap, sent as it was made, on a tablet holding nothing, leaves the moment alone.
+    const ordinary = { ...checkIn(monday), id: 'in-next-aaaa', studentId: 'student-byron' };
+    await land(db, [ordinary], monday + MINUTE);
     expect(ms(device(db).allInAt)).toBe(monday);
+  });
+
+  it('says so after an outage no call could report — the records held late are the news', async () => {
+    // With no internet the tablet reached nobody, so the row never heard a
+    // count; the first call back sends everything it kept.
+    const db = dbWithSunday();
+    const back = START + 15 * MINUTE;
+    await land(db, [checkIn(START), checkOut(START + 5 * MINUTE)], back);
+    expect(device(db).waitingCount).toBe(0);
+    expect(ms(device(db).allInAt)).toBe(back);
+  });
+
+  it('holds a record ten minutes old to be a blip, and a moment older to be an outage', async () => {
+    const db = dbWithSunday();
+    await land(db, [checkIn(START)], START + 10 * MINUTE);
+    expect(device(db)).not.toHaveProperty('allInAt');
+
+    await land(db, [{ ...checkIn(START + 1), id: 'in-later-aaaa', studentId: 'student-byron' }], START + 1 + 10 * MINUTE + 1);
+    expect(ms(device(db).allInAt)).toBe(START + 1 + 10 * MINUTE + 1);
+  });
+
+  it('is not all in while a record held late is still on the tablet', async () => {
+    const db = dbWithSunday();
+    await land(db, [checkIn(START)], START + 15 * MINUTE, { count: 3, oldestTappedAtMs: START + MINUTE });
+    expect(device(db).allInAt).toBeNull();
+  });
+
+  it('reads nothing late into a record it could not read', async () => {
+    const db = dbWithSunday();
+    await land(db, [{ id: 'unreadable-aaaa', kind: 'visit' }], START + 15 * MINUTE);
+    expect(device(db)).not.toHaveProperty('allInAt');
   });
 
   it('is news only when it is newer — a call that finishes after its own retry leaves the count alone', async () => {

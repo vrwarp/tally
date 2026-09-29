@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HELD_LATE_MS } from '@/lib/kioskLanding';
 import { KIOSK_LIVE_WITHIN_MS, LATE_AFTER_MS, lateFromKiosks, quietOn } from '@/lib/kioskQuiet';
 import { makeAttendance } from '../../tests/factories';
 
@@ -93,6 +94,10 @@ describe('lateFromKiosks', () => {
       ]);
     expect(one(LATE_AFTER_MS)).toEqual([]);
     expect(one(LATE_AFTER_MS + 1)).toHaveLength(1);
+  });
+
+  it('is the landing’s own measure, so "arrived late" and "all in Tally since" agree', () => {
+    expect(LATE_AFTER_MS).toBe(HELD_LATE_MS);
   });
 
   it('says nothing of what a person recorded, or a kiosk record with no recorded moment', () => {

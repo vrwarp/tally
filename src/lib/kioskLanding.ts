@@ -151,6 +151,16 @@ export const TAP_SLACK_MS = 15 * 60_000;
  */
 export const PICKUP_WAIT_MS = 24 * 60 * 60_000;
 
+/**
+ * A record that reaches Tally more than this long after its tap was held on
+ * the tablet through an outage, not a blip: the kiosk's own
+ * `OFFLINE_NOTICE_AFTER_MS`. A call that lands one and leaves the tablet empty
+ * is the end of an outage — the device row's `allInAt` — even when no call
+ * could say during it that anything was waiting. The event page's "arrived
+ * late" is the same measure (`LATE_AFTER_MS`, held to it by a test).
+ */
+export const HELD_LATE_MS = 10 * 60_000;
+
 /** The length and alphabet of a record id: opaque, bounded, one path segment. */
 export const RECORD_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
