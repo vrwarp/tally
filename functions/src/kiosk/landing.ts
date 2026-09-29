@@ -204,7 +204,7 @@ export function parseLandRequest(data: unknown): ParsedLanding {
 /* One record                                                                  */
 /* -------------------------------------------------------------------------- */
 
-interface Caller {
+export interface Caller {
   uid: string;
   deviceId: string;
 }
@@ -295,7 +295,12 @@ async function park(
   return { id: record.id, outcome: 'parked', reason };
 }
 
-async function landOne(
+/**
+ * One record, in its own transaction: landed, already recorded, waiting, or
+ * parked. Exported for `settle.ts`, which lands a parked record through this
+ * same path once the reason it was parked has gone.
+ */
+export async function landOne(
   db: FirestoreLike,
   record: KioskRecordWire,
   caller: Caller,

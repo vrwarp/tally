@@ -133,6 +133,9 @@ import {
   parseLandRequest,
   runLandKioskRecords,
 } from './kiosk/landing.js';
+import { syncKioskPresence } from './kiosk/presence.js';
+import { runSettleParked } from './kiosk/settle.js';
+import type { SettleParkedResponse } from './generated/kioskLanding.js';
 import type { LandKioskRecordsResponse } from './generated/kioskLanding.js';
 import {
   amendRegistration as runAmendRegistration,
@@ -3717,6 +3720,68 @@ export const landKioskRecords = onCall<Record<string, unknown>, Promise<LandKios
       now: new Date(),
       logger,
     });
+  },
+);
+
+/**
+ * The core team deciding about a record the lobby kiosk could not land: let it
+ * go, with their name on it, or record it now that the reason it was parked
+ * has gone. See kiosk/settle.ts.
+ *
+ * Core and up, as Review is: a parked card holds a child's name and times, and
+ * recording one writes the register. The settler's name is denormalised onto
+ * the card, the way a kiosk's row carries its approver's, because the card is
+ * the record of the decision and profiles come and go.
+ */
+export const settleParkedKioskRecord = onCall<
+  { id?: unknown; decision?: unknown },
+  Promise<SettleParkedResponse>
+>({ timeoutSeconds: 60, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+
+  const id = request.data?.id;
+  if (typeof id !== 'string' || id.length === 0 || id.length > 500 || id.includes('/')) {
+    throw new HttpsError('invalid-argument', 'id is required.');
+  }
+  const decision = request.data?.decision;
+  if (decision !== 'record' && decision !== 'let-go') {
+    throw new HttpsError('invalid-argument', 'decision is record or let-go.');
+  }
+
+  const uid = request.auth!.uid;
+  const profile = await db().doc(`${PATHS.users}/${uid}`).get();
+  const displayName = profile.exists ? profile.data()?.displayName : null;
+  return runSettleParked({
+    db: db(),
+    id,
+    decision,
+    settler: {
+      uid,
+      name: typeof displayName === 'string' && displayName.trim() ? displayName.trim() : null,
+    },
+    now: new Date(),
+    logger,
+  });
+});
+
+/**
+ * Keeps `kioskPresence/{chain}` — the counselors' copy of when each kiosk set
+ * to their gathering was last heard from — in step with the device rows, one
+ * way. See kiosk/presence.ts.
+ *
+ * No retry: the copy is disposable, and the next report rewrites it. A
+ * report that changes nothing a register shows writes nothing, so this costs
+ * one write per kiosk report and none for the counts `landKioskRecords` keeps.
+ */
+export const onKioskDeviceWritten = onDocumentWritten(
+  { document: 'kioskDevices/{deviceId}', timeoutSeconds: 60, memory: '256MiB', retry: false },
+  async (event) => {
+    await syncKioskPresence(
+      db(),
+      event.params.deviceId,
+      event.data?.before?.data(),
+      event.data?.after?.data(),
+    );
   },
 );
 
