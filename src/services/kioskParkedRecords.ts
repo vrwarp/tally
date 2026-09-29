@@ -160,19 +160,15 @@ export function cardReason(card: ParkedCard): ParkReason {
 const MAX_HOPS = 5;
 
 /**
- * The student who stands now for a parked record's student id: followed
- * through a re-creation or a merge, step for step as `settleParkedKioskRecord`
- * follows it, so the card offers Record exactly when the server would take it.
+ * The student who stands now for a parked record's student id, following
+ * re-creations and merges step for step as `settleParkedKioskRecord` does, so
+ * the card offers Record exactly when the server would take it.
  *
- * Walked over Tally's own student documents — every one, whatever its status —
- * as the server walks them, and not over the roster. The roster has no row for
- * a Planning Center child whose record was deleted there, because Tally holds
- * no name to put in one; and that document is where a re-creation leaves its
- * pointer. Walked over the roster, the child a frozen card is about was never
- * found, before the repair or after it.
+ * Walks Tally's own student documents, as the server does — not the roster,
+ * which has no row for a child deleted upstream (Tally holds no name for one),
+ * the very document a re-creation leaves its pointer on.
  *
- * Null when there is no such document, or the chain runs longer than the
- * server will follow.
+ * Null when there is no such document, or the chain outruns the server's.
  */
 export function standingStudent(
   studentId: string,
@@ -213,16 +209,12 @@ export function cardAnswer(
 }
 
 /**
- * Who a frozen child can be put back in Planning Center as, from the card
- * itself — or null when the repair belongs elsewhere.
+ * The re-creation a frozen child's card can offer itself, or null.
  *
- * A child the roster still shows has a page, and the repair is there. One it
- * does not is a Planning Center membership whose person was deleted: Tally
- * never stored their name, so there is no row, no page, and nothing to type a
- * name into. The kiosk kept the name it tapped, and that is what the
- * re-creation needs (`recreatePlanningCenterPerson`, which looks for the
- * person before it creates one). Attendees has no re-creation, and a pickup
- * alone carries no name, so neither is offered.
+ * A child the roster shows has a page, and the repair is there. A Planning
+ * Center child deleted upstream has no row and no page, but the kiosk kept the
+ * name `recreatePlanningCenterPerson` needs. Not for Attendees (no
+ * re-creation) or a pickup alone (no name).
  */
 export function putBackAs(
   card: ParkedCard,

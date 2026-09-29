@@ -250,7 +250,7 @@ describe('the list of kiosks', () => {
     ];
     renderAs('core', OK);
 
-    expect(await screen.findByText(/^12 check-ins waiting on this tablet since/)).toBeInTheDocument();
+    expect(await screen.findByText(/^12 check-ins waiting since/)).toBeInTheDocument();
     expect(screen.getByText(/^All in Tally since/)).toBeInTheDocument();
   });
 
@@ -267,7 +267,7 @@ describe('the list of kiosks', () => {
 
   it('says so when there are none, and when the list could not be read', async () => {
     renderAs('core', OK);
-    expect(await screen.findByText('No kiosk is paired yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No kiosks yet.')).toBeInTheDocument();
   });
 
   it('names a kiosk nobody named, and renames one somebody did', async () => {

@@ -710,7 +710,7 @@ describe('check-ins still on the tablet', () => {
     });
     expect(
       screen.getByText(
-        '12 check-ins from Sunday Kids haven’t reached Tally yet — keep this tablet plugged in and on the Wi-Fi.',
+        '12 check-ins from Sunday Kids not sent yet — keep it plugged in and on Wi-Fi.',
       ),
     ).toBeInTheDocument();
   });
@@ -719,7 +719,7 @@ describe('check-ins still on the tablet', () => {
     await renderChooser(servicesWith(vi.fn()), vi.fn(), {
       unsent: { count: 1, gathering: null, sending: null },
     });
-    expect(screen.getByText(/^1 check-in hasn’t reached Tally yet/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 check-in not sent yet/)).toBeInTheDocument();
   });
 
   it('shows a pass under way', async () => {
@@ -740,11 +740,11 @@ describe('check-ins still on the tablet', () => {
       unsent: { count: 3, gathering: 'Sunday Kids', sending: null },
     });
     expect(screen.getByText(/Couldn’t load the calendar/)).toBeInTheDocument();
-    expect(screen.getByText(/3 check-ins from Sunday Kids haven’t reached Tally yet/)).toBeInTheDocument();
+    expect(screen.getByText(/3 check-ins from Sunday Kids not sent yet/)).toBeInTheDocument();
   });
 
   it('says nothing when nothing waits', async () => {
     await renderChooser(servicesWith(vi.fn()));
-    expect(screen.queryByText(/reached Tally yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not sent yet/)).not.toBeInTheDocument();
   });
 });

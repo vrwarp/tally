@@ -8,10 +8,9 @@
  * Review's grammar, a sentence above every control saying what the press does:
  *
  * - **Record** only when the server would take it: a frozen child whose record
- *   has been put back. Until then the card says what would change that, and
- *   links the child's page, where the repair is — or, for a Planning Center
- *   child whose record was deleted there, and who therefore has no page, puts
- *   them back itself under the name the kiosk kept (`putBackAs`).
+ *   is back. Until then the card links the child's page, where the repair is,
+ *   or — for a child deleted upstream, who has no page — offers the
+ *   re-creation itself (`putBackAs`).
  * - **Let it go** always, kept as a decision with the settler's name on it —
  *   never an absence.
  *
@@ -79,12 +78,9 @@ export function KioskParkedSection() {
 
   /*
    * Tally's own student documents, which the cards walk as the server does
-   * (`standingStudent`) — not the roster, which has no row for a Planning
-   * Center child whose record was deleted there, nor for the document a
-   * re-creation leaves its pointer on. The data provider's own query, so the
-   * client answers it from the watch it already holds. Until it answers, or
-   * if it is refused, the roster stands in: what the cards were walked over
-   * before, and right for every child it shows.
+   * (`standingStudent`). The data provider's own query, so the client serves
+   * it from the watch it already holds. Until it answers, or if refused, the
+   * roster stands in.
    */
   useEffect(() => subscribeStudents(setDocuments, () => setDocuments(null)), []);
 
@@ -129,10 +125,8 @@ export function KioskParkedSection() {
       });
       const back = data.status === 'recreated' || data.status === 'relinked' || data.status === 'still-there';
       show(data.message, { tone: back ? 'success' : 'info' });
-      // The person is new upstream, so the roster has to be asked again for
-      // their name; the card's own answer follows the documents, live. Not
-      // awaited: a roster that fails to answer is its own banner, not a
-      // failure of what was just put back.
+      // The roster must be asked again for the new person's name. Not
+      // awaited: a roster failure is its own banner, not this call's.
       if (back) void refreshRoster(true);
     } catch (cause) {
       show(serverText(cause, t('parkedPutBackFailed', { name, backend: BACKEND_LABELS.pco })), { tone: 'error' });

@@ -59,19 +59,19 @@ describe('the check-ins slot on the staff menu', () => {
 
   it('words the reason from what the last attempt hit', () => {
     renderMenu({ count: 12, problem: 'network', oldestAtMs: NINE_FORTY_ONE });
-    expect(screen.getByText(/^Waiting for the internet since 9:41/)).toBeTruthy();
+    expect(screen.getByText(/^No internet since 9:41/)).toBeTruthy();
   });
 
   it('sends a server problem to the office rather than letting it wait politely', () => {
     renderMenu({ count: 3, problem: 'server', oldestAtMs: NINE_FORTY_ONE });
-    expect(screen.getByText(/Tally isn’t taking them right now — tell the office/)).toBeTruthy();
+    expect(screen.getByText(/Tally won’t take them — tell the office/)).toBeTruthy();
   });
 
   it('puts the one urgent instruction first when a record is held only in the page', () => {
     renderMenu({ count: 3, held: 2, problem: 'network', oldestAtMs: NINE_FORTY_ONE });
     expect(
-      screen.getByText(/2 aren’t saved on this tablet yet — don’t reload or restart it/),
+      screen.getByText(/2 aren’t saved yet — don’t reload or restart/),
     ).toBeTruthy();
-    expect(screen.queryByText(/Waiting for the internet/)).toBeNull();
+    expect(screen.queryByText(/No internet/)).toBeNull();
   });
 });

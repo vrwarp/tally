@@ -46,13 +46,13 @@ describe('QuietKiosks', () => {
   it('names a kiosk gone quiet on the day, and says where its check-ins are', () => {
     draw([{ deviceId: 'kiosk-lobby-00000001', name: 'Lobby', lastSeenAt: NINE_FORTY_ONE }]);
     const line = screen.getByRole('status');
-    expect(line).toHaveTextContent(/^Lobby hasn’t been heard from since 9:41/);
-    expect(line).toHaveTextContent(/aren’t on this list yet — a child wearing today’s name tag was checked in\.$/);
+    expect(line).toHaveTextContent(/^No word from Lobby since 9:41/);
+    expect(line).toHaveTextContent(/aren’t listed yet; today’s name tag means checked in\.$/);
   });
 
   it('calls a kiosk nobody named the lobby kiosk', () => {
     draw([{ deviceId: 'kiosk-lobby-00000001', name: null, lastSeenAt: NINE_FORTY_ONE }]);
-    expect(screen.getByRole('status')).toHaveTextContent(/^The lobby kiosk hasn’t been heard from since 9:41/);
+    expect(screen.getByRole('status')).toHaveTextContent(/^No word from the lobby kiosk since 9:41/);
   });
 
   it('says the day, not just the time, when read on another day', () => {
@@ -74,7 +74,7 @@ describe('QuietKiosks', () => {
       { deviceId: 'kiosk-lobby-00000001', name: 'Lobby', lastSeenAt: NINE_FORTY_ONE },
       { deviceId: 'kiosk-nursery-000002', name: 'Nursery door', lastSeenAt: NINE_FORTY_ONE },
     ]);
-    expect(screen.getByText(/^Lobby hasn’t/)).toBeInTheDocument();
-    expect(screen.getByText(/^Nursery door hasn’t/)).toBeInTheDocument();
+    expect(screen.getByText(/^No word from Lobby since/)).toBeInTheDocument();
+    expect(screen.getByText(/^No word from Nursery door since/)).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@ import { render, screen } from '@/test/rtl';
 import { describe, expect, it } from 'vitest';
 import { ChangeEventScreen } from '@/kiosk/screens/ChangeEventScreen';
 
-const OFFLINE = /can’t be set to a gathering again until it can/;
+const OFFLINE = /can’t pick another gathering until it’s back online/;
 
 describe('ChangeEventScreen', () => {
   it('warns only about the queue at the door while the kiosk is in touch', () => {

@@ -72,7 +72,7 @@ describe('what a row says', () => {
 
   it('says nothing a retired tablet told Tally, and offers nothing to do', () => {
     draw({ retiredAt: new Date('2026-08-01T12:00:00Z'), waitingCount: 4, charging: false, batteryLevel: 0.3 });
-    expect(screen.queryByText(/waiting on this tablet/)).toBeNull();
+    expect(screen.queryByText(/waiting since/)).toBeNull();
     expect(screen.queryByText(/On battery/)).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
@@ -99,7 +99,7 @@ describe('renaming', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
-      expect(show).toHaveBeenCalledWith('Name taken off. It’s kiosk-3f9a1c2e7b4d again.', {
+      expect(show).toHaveBeenCalledWith('Name removed.', {
         tone: 'success',
       }),
     );
@@ -112,7 +112,7 @@ describe('renaming', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
-      expect(show).toHaveBeenCalledWith('Couldn’t rename that kiosk. Try again in a moment.', {
+      expect(show).toHaveBeenCalledWith('Couldn’t rename. Try again.', {
         tone: 'error',
       }),
     );
@@ -124,7 +124,7 @@ describe('retiring', () => {
   it('asks first for a kiosk recording now, and names it in the toast', async () => {
     draw();
     await userEvent.click(screen.getByRole('button', { name: 'Retire' }));
-    expect(screen.getByRole('alert')).toHaveTextContent(/recording Sunday Kids right now/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/^It’s recording Sunday Kids\./);
     await userEvent.click(screen.getByRole('button', { name: 'Yes, retire' }));
 
     await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('kiosk-3f9a1c2e7b4d', 'uid-dana'));

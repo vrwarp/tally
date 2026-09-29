@@ -55,7 +55,7 @@ describe('the Check-ins screen', () => {
   it('says the one sentence that matters before the list: don’t reset it', () => {
     renderScreen({ records: [record()] });
     expect(
-      screen.getByText(/Don’t reset or reinstall this tablet until this screen says “All check-ins are in Tally”/),
+      screen.getByText(/Don’t reset or reinstall this tablet until it says “All check-ins are in Tally”/),
     ).toBeTruthy();
   });
 
@@ -92,7 +92,7 @@ describe('the Check-ins screen', () => {
       records: [held, record({ id: 'record-new', studentId: 'student-cleo', attempts: 0, lastProblem: undefined })],
       isHeld: (id) => id === held.id,
     });
-    expect(screen.getByText('Not saved on this tablet')).toBeTruthy();
+    expect(screen.getByText('Not saved yet')).toBeTruthy();
     expect(screen.getByText('Not sent yet')).toBeTruthy();
   });
 

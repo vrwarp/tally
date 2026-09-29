@@ -63,14 +63,14 @@ test.describe('what the kiosk parked', () => {
 
     await expect(page.getByText('From the lobby kiosk')).toBeVisible();
     await expect(page.getByText(NAME, { exact: true })).toBeVisible();
-    await expect(page.getByText(/was tapped in for has been deleted/)).toBeVisible();
+    await expect(page.getByText(/^Its gathering was deleted\./)).toBeVisible();
     // Nothing to record onto: only the decision that keeps it.
     await expect(page.getByRole('button', { name: /^Record/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Review 1 waiting' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Let it go' }).click();
 
-    await expect(page.getByText('Let go, with your name on it.')).toBeVisible();
+    await expect(page.getByText('Let go.', { exact: true })).toBeVisible();
     await expect(page.getByText(NAME, { exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Review', exact: true })).toBeVisible();
 
@@ -159,17 +159,17 @@ test.describe('what the kiosk parked', () => {
     await signedInAs('core');
     await gotoReady(page, '/review');
     await expect(page.getByText(`${first} ${last}`, { exact: true })).toBeVisible();
-    await expect(page.getByText(/’s record in the church’s database is missing/)).toBeVisible();
+    await expect(page.getByText('Missing from the church’s database, so this can’t be recorded yet.')).toBeVisible();
     // No page to link: the roster has no row for a child whose name was Planning Center's.
-    await expect(page.getByRole('link', { name: /page to put the record back/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Fix on their page' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Record/ })).toHaveCount(0);
 
-    await page.getByRole('button', { name: `Put ${first} ${last} back in Planning Center` }).click();
+    await page.getByRole('button', { name: 'Re-create in Planning Center' }).click();
     await expect(page.getByText('Planning Center has a record for them again. Check-ins are unfrozen.')).toBeVisible();
 
     const record = page.getByRole('button', { name: /^Record the .* arrival$/ });
     await expect(record).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/’s record is back, so the .* arrival can be recorded now\./)).toBeVisible();
+    await expect(page.getByText('Back in the church’s database. Ready to record.')).toBeVisible();
     await record.click();
     await expect(page.getByText('Recorded.')).toBeVisible();
 

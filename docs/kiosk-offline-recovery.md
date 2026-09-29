@@ -262,10 +262,9 @@ oldest tapped at T*, and the function writes `waitingCount`, `waitingSinceAt` an
 device row. Because every record goes through the callable, the call that lands the last one reports
 zero: the count cannot go stale, and nothing extra is sent to keep it true. The kiosk's standing
 report — the write that also tells a kiosk whether it has been retired — gains no fields.
-`allInAt` marks the end of an outage, not the last ordinary tap: it is set by a call that leaves the
-tablet empty when an earlier call said records were waiting, or when this call brings records held
-more than ten minutes (`HELD_LATE_MS`, the event page's own *arrived late*). The second is the usual
-case — a tablet with no internet reaches nobody to say that anything is waiting.
+`allInAt` marks the end of an outage, not the last tap: a call that empties the tablet sets it when
+an earlier call reported records waiting, or when this one brings records held over ten minutes
+(`HELD_LATE_MS`). A tablet with no internet can't report, so the second is the usual case.
 
 **Its authority is the kiosk's own, plus the owner's one decision.** It may add a check-in that is not
 there and record a pickup — no undo, and the same frozen-student check `attendanceFrozen()` makes in
@@ -323,9 +322,9 @@ grammar, what the press will do:
 
 | Reason | The card says | Its answers |
 |---|---|---|
-| The child's upstream record is gone (frozen) | *Noah's record in the church's database is missing, so Tally can't record his 9:43 arrival yet* — with a link to the repair on his page, or, when he has no page, the repair on the card | **Record Noah's 9:43 arrival**, enabled once the freeze lifts; **Put Noah back in Planning Center** where there is no page; **Let it go** |
+| The child's upstream record is gone (frozen) | *Missing from the church's database, so this can't be recorded yet* — with *Fix on their page*, or, when there is no page, **Re-create in Planning Center** on the card | **Record the 9:43 arrival**, once it's back; **Let it go** |
 | The gathering was deleted after the tap | The names and tap times, so they can be re-recorded on the right night by hand | **Let it go** only — there is nothing to record onto, and guessing a night is how forty check-ins land on the wrong gathering |
-| A pickup whose arrival never appeared | *The register has no arrival for Ava on Sept 27, so her 10:52 pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.* | **Let it go** |
+| A pickup whose arrival never appeared | *No arrival on the register for this pickup to close. It may have been removed.* | **Let it go** |
 | A pickup whose arrival was parked | Nothing of its own: it is parked with its arrival, on the same card, and settled with it | — |
 
 **Let it go** is kept as a decision with a name on it, not as an absence. The Review item in the
@@ -372,10 +371,10 @@ answer at the door.
   photographing it rather than timing out at the staff screen's forty-five seconds.
 - **On the chooser**, where a kiosk spends the week between gatherings, one quiet line while anything
   waits — beside *Couldn't load the calendar* too, which on its own reads as broken: *12 check-ins
-  from Sunday Kids haven't reached Tally yet — keep this tablet plugged in and on the Wi-Fi.* With
+  from Sunday Kids not sent yet — keep it plugged in and on Wi-Fi.* With
   progress while it sends.
-- **On the pairing screen**, retired or unpaired: *12 check-ins are waiting on this tablet. Pair it
-  and they'll go to Tally.* The install prompt is hidden while records wait.
+- **On the pairing screen**, retired or unpaired: *12 check-ins waiting. Pair this tablet to send
+  them.* The install prompt is hidden while records wait.
 - **On untouched glass, for staff** — §8.
 
 **In Tally — from what it can infer.** A tablet holding records is almost always one that cannot
@@ -384,27 +383,26 @@ the row when it unbinds offline), the gathering's window, and when it was last h
 enough to say the true thing without any new report:
 
 - **The Team page's kiosk row** replaces *"Paired … · not recording"*, for a kiosk last heard from while
-  set to a gathering, with *Out of touch since 9:41 while at Sunday Kids — probably the church's
-  internet. It keeps recording on the tablet.* When the callable has reported, it adds *12 waiting on
-  this tablet*, and later *All in Tally since Mon 9:02*.
+  set to a gathering, with *No word since 9:41, at Sunday Kids. Likely the internet; it keeps
+  recording.* When the callable has reported, it adds *12 check-ins waiting since 9:41*, and later
+  *All in Tally since Mon 9:02*.
 - **Retire asks first** for every kiosk that may hold records — anything last heard from while set to
-  a gathering — and says what it costs: *Retiring stops it at its next connection and shows a pairing
-  code, possibly mid-pickup. Anything still on the tablet waits until it's paired again.* The toast is
-  reworded to match.
+  a gathering — and says what it costs: *It may still hold check-ins from Sunday Kids. Retiring shows
+  a pairing code when it reconnects; they wait on it until it's paired again.* The toast is reworded
+  to match.
 - **The liveness window is made true** by widening it, not by reporting more often:
   `KIOSK_LIVE_WITHIN_MS` becomes twelve minutes, two missed five-minute reports and some slack. No new
   writes.
 - **The Kiosk page lists every kiosk** and its state in its core section — today it lists none, and a
   kiosk is findable only inside the panel of whoever paired it, as a hex id — and a kiosk can be given
   a name: *Lobby*, *Nursery door*.
-- **The gathering's event page**, for the core team: *The lobby kiosk was last heard from at 9:41 while
-  set to this gathering. Check-ins and pickups made there after that are still on the tablet.* Later:
+- **The gathering's event page**, for the core team: *No word from the lobby kiosk since 9:41.
+  Anything tapped there since is still on the tablet.* Later:
   *12 check-ins from the lobby kiosk arrived late — all in Tally since Mon 9:02.* One quiet summary
   line, not a badge on every row; the CSV gains `recorded_at` and the later entries.
 - **The counselor's register** says only that the kiosk is out of touch — no counts, the owner's
-  choice of the smaller option: *The lobby kiosk hasn't been heard from since 9:41. Check-ins and
-  pickups made there aren't on this list yet — a child wearing this morning's name tag was checked
-  in.* Device rows are core-only by design, so a trigger copies one field — when each kiosk bound to a
+  choice of the smaller option: *No word from the lobby kiosk since 9:41. Its check-ins and pickups
+  aren't listed yet; today's name tag means checked in.* Device rows are core-only by design, so a trigger copies one field — when each kiosk bound to a
   gathering was last heard from — into `kioskPresence/{chain}`, readable by anybody on that gathering.
   It is derived and one-way: if the trigger lags or fails, counselors simply see no line.
 
@@ -419,8 +417,8 @@ enough to say the true thing without any new report:
   may not write student documents — so a leader quick-adds the family on a phone instead.
 - **A line for staff on untouched glass** — the owner's decision. After ten minutes out of touch, in
   the grammar of the owed-tags notice ([kiosk-owed.md](kiosk-owed.md) §3: its first word says who it
-  is for, it asks nothing, the first keystroke removes it, never on a confirm or a tick): *For staff:
-  this kiosk can't reach Tally. Check-ins are kept here and send themselves — please don't reset it.*
+  is for, it asks nothing, the first keystroke removes it, never on a confirm or a tick): *Staff —
+  can't reach Tally. Check-ins are saved here and will send; don't reset it.*
   It reaches the person deciding the kiosk is broken before they reach the power button.
 - **Moving the kiosk.** While out of touch, **Leave** says what it costs: the kiosk cannot be set to a
   gathering again until it can reach Tally.
@@ -726,22 +724,19 @@ the check that matters most before the first Sunday it is relied on.
   settler's name; nothing is deleted. An arrival and the pickup parked with it are one card and one
   decision, recorded arrival first.
 - **Record is offered only when the server would take it**: a frozen child whose record is back, or
-  a pickup riding with its arrival. The card works this out as the server does, over Tally's own
-  student documents rather than the roster: a Planning Center child whose record was deleted there
-  has no row on the roster, because Tally never stored the name, and it is that child's document a
-  re-creation leaves its pointer on.
-- **Until then, the repair.** A frozen child the roster still shows has a page, and the card links
-  it. One it does not show has no page to link, so the card offers **Put Noah back in Planning
-  Center** itself: the same re-creation the student page runs (`recreatePlanningCenterPerson`, which
-  looks for the person before it creates one, and links a merge's survivor instead), under the name
-  the kiosk kept with the arrival. A pickup alone carries no name, and Attendees has no re-creation,
-  so neither is offered it; *Let it go* is always there.
+  a pickup riding with its arrival. The card decides as the server does, over Tally's own student
+  documents: a child deleted upstream has no roster row, and a re-creation leaves its pointer on that
+  child's document.
+- **Until then, the repair.** A child the roster shows gets *Fix on their page*. One it doesn't —
+  deleted upstream, and Tally never stored the name — gets **Re-create in Planning Center** on the
+  card: the student page's re-creation (`recreatePlanningCenterPerson`), under the name the kiosk kept.
+  Not offered for a pickup alone (no name) or for Attendees (no re-creation).
 - **"Quiet" is judged on the gathering's own day**, by one rule the event page and the register
   share (`quietOn` in `src/lib/kioskQuiet.ts`): not heard from for twelve minutes, and last heard
   from between the start of the day the check-in window opens and the end of the day the gathering
   ends. A row that is still set to Sunday's chain because its tablet never came back does not raise
-  the line every Sunday after. A kiosk that comes back reports at once, rather than on its next five-minute
-  poll, so the line gives way to *arrived late* as soon as the records are in, not minutes after.
+  the line every Sunday after. A kiosk reports the moment it reconnects, so the line gives way to
+  *arrived late* as soon as the records are in.
 - **Late means more than ten minutes** between the tap and its arrival in Tally (`LATE_AFTER_MS`),
   counted per kiosk from the register itself. The line says *so far* while the kiosk still reports
   records waiting, and stays back while a kiosk set to the gathering is quiet, when the quiet line is

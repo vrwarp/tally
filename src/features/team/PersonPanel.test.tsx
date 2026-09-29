@@ -291,7 +291,7 @@ describe('PersonPanel — the kiosks they paired', () => {
     await user.click(screen.getByRole('button', { name: 'Retire' }));
 
     expect(retireKioskDevice).not.toHaveBeenCalled();
-    expect(screen.getByText(/recording Sunday School right now\./)).toBeInTheDocument();
+    expect(screen.getByText(/^It’s recording Sunday School\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Yes, retire' }));
     await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('lobby-tablet', MIRIAM.id));
@@ -308,7 +308,7 @@ describe('PersonPanel — the kiosks they paired', () => {
 
     expect(
       screen.getByText(
-        /^Out of touch since .+ while at Sunday School — probably the church’s internet\. It keeps recording on the tablet\.$/,
+        /^No word since .+, at Sunday School\. Likely the internet; it keeps recording\.$/,
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/not recording/)).not.toBeInTheDocument();
@@ -324,9 +324,9 @@ describe('PersonPanel — the kiosks they paired', () => {
     await user.click(screen.getByRole('button', { name: 'Retire' }));
     expect(retireKioskDevice).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/last heard from while at Sunday School, so it may still have check-ins on it/),
+      screen.getByText(/^It may still hold check-ins from Sunday School\./),
     ).toBeInTheDocument();
-    expect(screen.getByText(/waits there until it’s paired again/)).toBeInTheDocument();
+    expect(screen.getByText(/they wait on it until it’s paired again\.$/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Yes, retire' }));
     await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('lobby-tablet', MIRIAM.id));
@@ -342,7 +342,7 @@ describe('PersonPanel — the kiosks they paired', () => {
     await user.click(screen.getByRole('button', { name: 'Retire' }));
     expect(retireKioskDevice).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/still has 2 check-ins on it that haven’t reached Tally/),
+      screen.getByText(/^2 check-ins are still on it\./),
     ).toBeInTheDocument();
   });
 

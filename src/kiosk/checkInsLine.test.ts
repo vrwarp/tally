@@ -26,7 +26,7 @@ describe('useCheckInsLine', () => {
 
   it('gives the oldest tap to the minute', () => {
     expect(lineFor({ count: 2, problem: 'network', oldestAtMs: NINE_FORTY_ONE })).toMatch(
-      /^Waiting for the internet since 9:41\sAM\.$/,
+      /^No internet since 9:41\sAM\.$/,
     );
   });
 

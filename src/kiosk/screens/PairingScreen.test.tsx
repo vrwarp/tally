@@ -240,7 +240,7 @@ describe('check-ins still on the tablet', () => {
     await tick();
 
     expect(
-      screen.getByText('12 check-ins are waiting on this tablet. Pair it and they’ll go to Tally.'),
+      screen.getByText('12 check-ins waiting. Pair this tablet to send them.'),
     ).toBeInTheDocument();
   });
 
@@ -255,7 +255,7 @@ describe('check-ins still on the tablet', () => {
     render(<PairingScreen services={servicesWith(poll)} onPaired={vi.fn()} waiting={1} />);
     await tick();
     expect(screen.queryByText(/Add to Home Screen/)).not.toBeInTheDocument();
-    expect(screen.getByText(/1 check-in is waiting on this tablet/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 check-in waiting\./)).toBeInTheDocument();
   });
 });
 

@@ -79,7 +79,7 @@ describe('KioskEventLine', () => {
     draw({ kiosks: [kiosk()] });
     expect(
       screen.getByText(
-        'Lobby was last heard from at 9:41 AM while set to this gathering. Check-ins and pickups made there after that are still on the tablet.',
+        'No word from Lobby since 9:41 AM. Anything tapped there since is still on the tablet.',
         { normalizer: (text) => text.replace(/\s+/g, ' ') },
       ),
     ).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('KioskEventLine', () => {
 
   it('calls a kiosk nobody named the lobby kiosk', () => {
     draw({ kiosks: [kiosk({ name: null })] });
-    expect(screen.getByText(/^The lobby kiosk was last heard from/)).toBeInTheDocument();
+    expect(screen.getByText(/^No word from the lobby kiosk since/)).toBeInTheDocument();
   });
 
   it('says nothing about a kiosk reporting, set elsewhere, retired, or quiet since another week', () => {
@@ -99,7 +99,7 @@ describe('KioskEventLine', () => {
         kiosk({ id: 'd', lastSeenAt: new Date(2026, 8, 20, 9, 41) }),
       ],
     });
-    expect(screen.queryByText(/last heard from/)).toBeNull();
+    expect(screen.queryByText(/No word from/)).toBeNull();
   });
 
   it('says afterwards how many arrived late, and when the last one did', () => {
@@ -122,7 +122,7 @@ describe('KioskEventLine', () => {
       ],
       now: new Date(2026, 8, 28, 9, 3),
     });
-    expect(screen.getByText('1 check-in from Lobby arrived late so far. It’s still sending the rest.')).toBeInTheDocument();
+    expect(screen.getByText('1 late check-in from Lobby so far; more on the way.')).toBeInTheDocument();
   });
 
   it('keeps the late line back while a kiosk is still quiet — the quiet line is the truer one', () => {
@@ -158,7 +158,7 @@ describe('KioskEventLine', () => {
       parkedAt: TEN_FIFTEEN,
     };
     draw({ cards: [record, { ...record, id: 'other', eventId: 'friday' }] });
-    expect(screen.getByText(/^1 record from the kiosk needs a decision\./)).toBeInTheDocument();
+    expect(screen.getByText(/^1 kiosk record needs a decision\./)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '/review');
   });
 

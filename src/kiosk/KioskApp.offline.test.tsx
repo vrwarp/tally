@@ -285,7 +285,7 @@ describe('a tap, with the internet gone', () => {
     // Said where the kiosk will sit all week, beside the calendar that failed.
     expect(screen.getByText(/Couldn’t load the calendar/)).toBeTruthy();
     expect(
-      screen.getByText(/^1 check-in from Sunday Kids hasn’t reached Tally yet — keep this tablet plugged in/),
+      screen.getByText(/^1 check-in from Sunday Kids not sent yet — keep it plugged in/),
     ).toBeTruthy();
 
     // Monday: the internet is back, and nobody has set the kiosk to anything.
@@ -299,7 +299,7 @@ describe('a tap, with the internet gone', () => {
     // whatever the kiosk is on now.
     expect(sent).toMatchObject({ eventId: 'sunday-kids-2026-09-27', studentId: ADA.id });
     expect(screen.getByText(CHOOSER)).toBeTruthy();
-    expect(screen.queryByText(/reached Tally yet/)).toBeNull();
+    expect(screen.queryByText(/not sent yet/)).toBeNull();
   });
 
   it('sends a pickup behind its own arrival, in the order they happened', async () => {
@@ -502,9 +502,9 @@ describe('when storage is full — failure 7', () => {
       expect(heldInMemoryCount()).toBe(1);
 
       // The corner mark, and what it opens: the one record a reload would lose.
-      await press(screen.getByLabelText('Check-ins on this tablet need attention'));
-      expect(screen.getByText('Not saved on this tablet')).toBeTruthy();
-      expect(screen.getByText(/1 isn’t saved on this tablet yet — don’t reload or restart it/)).toBeTruthy();
+      await press(screen.getByLabelText('Check-ins need attention'));
+      expect(screen.getByText('Not saved yet')).toBeTruthy();
+      expect(screen.getByText(/1 isn’t saved yet — don’t reload or restart/)).toBeTruthy();
       await press(screen.getByText(/Done — back to check-in/).closest('button')!);
 
       // Past four, unbound and untouched: the moment the kiosk reloads itself.
@@ -544,7 +544,7 @@ describe('a kiosk retired with records on it', () => {
     expect(waitingIds()).toEqual([`check-in:${ADA.id}`]);
     // And it says what pairing it again is for.
     expect(
-      screen.getByText('1 check-in is waiting on this tablet. Pair it and it’ll go to Tally.'),
+      screen.getByText('1 check-in waiting. Pair this tablet to send it.'),
     ).toBeTruthy();
   });
 });
@@ -592,7 +592,7 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await tapThrough(ADA, /^check in$/i);
     await holdClear();
     expect(screen.getByText('1 waiting')).toBeTruthy();
-    expect(screen.getByText(/^Waiting for the internet since /)).toBeTruthy();
+    expect(screen.getByText(/^No internet since /)).toBeTruthy();
 
     // The list behind the row: who, and what the last attempt ran into.
     await press(screen.getByText('Check-ins').closest('button')!);
@@ -611,17 +611,17 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await mount();
     await loseTouch();
     await wait(9 * 60_000);
-    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
 
     // The ten minutes, and then the few seconds of stillness the front door's
     // staff notices wait for.
     await wait(60_000);
     await wait(5_000);
-    const notice = screen.getByText(/this kiosk can’t reach Tally/);
-    expect(notice.textContent).toMatch(/Check-ins are kept here and send themselves; please don’t reset it/);
+    const notice = screen.getByText(/can’t reach Tally\. Check-ins are saved here/);
+    expect(notice.textContent).toMatch(/Check-ins are saved here and will send; don’t reset it/);
 
     await type('a');
-    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
   });
 
   it('opens the list from the notice, and comes back to the door', async () => {
@@ -630,13 +630,13 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await wait(10 * 60_000);
     await wait(5_000);
 
-    await press(screen.getByText(/this kiosk can’t reach Tally/).closest('button')!);
+    await press(screen.getByText(/can’t reach Tally\. Check-ins are saved here/).closest('button')!);
     expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
     await press(screen.getByText(/Done — back to check-in/).closest('button')!);
     // Back at the door, and — once the glass is still again — so is the notice.
-    expect(screen.queryByText(/this kiosk can’t reach Tally/)).toBeNull();
+    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
     await wait(5_000);
-    expect(screen.getByText(/this kiosk can’t reach Tally/)).toBeTruthy();
+    expect(screen.getByText(/can’t reach Tally\. Check-ins are saved here/)).toBeTruthy();
   });
 
   it('sends a new family to a leader before the first question, not after the last', async () => {
@@ -645,7 +645,7 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
 
     await press(screen.getByText(/Register your child/).closest('button')!);
     expect(screen.getByText('A leader will get you started')).toBeTruthy();
-    expect(screen.getByText(/so it can’t add a new family/)).toBeTruthy();
+    expect(screen.getByText(/so it can’t add new families/)).toBeTruthy();
 
     // And the wizard as usual once Tally answers again.
     await wait(10_000);
@@ -662,6 +662,6 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await loseTouch();
     await holdClear();
     await press(screen.getByText('Change gathering').closest('button')!);
-    expect(screen.getByText(/can’t be set to a gathering again until it can/)).toBeTruthy();
+    expect(screen.getByText(/can’t pick another gathering until it’s back online/)).toBeTruthy();
   });
 });

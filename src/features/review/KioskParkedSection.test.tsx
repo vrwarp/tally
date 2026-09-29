@@ -116,16 +116,16 @@ describe('KioskParkedSection', () => {
   it('says so when the list could not be read', () => {
     refuse = true;
     draw();
-    expect(screen.getByText('Couldn’t load what the kiosk left for review.')).toBeInTheDocument();
+    expect(screen.getByText('Couldn’t load kiosk records.')).toBeInTheDocument();
   });
 
   it('says why a frozen child’s arrival waits, where to put it right, and offers only Let it go', () => {
     draw({ cards: [record()], kids: [FROZEN_NOAH] });
     expect(screen.getByText('From the lobby kiosk')).toBeInTheDocument();
     expect(
-      screen.getByText(/^Noah Park’s record in the church’s database is missing, so Tally can’t record the 9:43/),
+      screen.getByText('Missing from the church’s database, so this can’t be recorded yet.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Noah Park’s page to put the record back' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Fix on their page' })).toHaveAttribute(
       'href',
       '/students/student-noah',
     );
@@ -137,7 +137,7 @@ describe('KioskParkedSection', () => {
     settleParkedKioskRecord.mockResolvedValue({ data: { status: 'settled' } });
     draw({ cards: [record()], kids: [NOAH_BACK] });
 
-    expect(screen.getByText(/^Noah Park’s record is back, so the 9:43 .* arrival can be recorded now\.$/)).toBeInTheDocument();
+    expect(screen.getByText('Back in the church’s database. Ready to record.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Record the 9:43 .* arrival$/ }));
     await waitFor(() =>
       expect(settleParkedKioskRecord).toHaveBeenCalledWith({ id: `check-in:${EVENT}:student-noah`, decision: 'record' }),
@@ -161,29 +161,29 @@ describe('KioskParkedSection', () => {
     settleParkedKioskRecord.mockResolvedValue({ data: { status: 'settled' } });
     draw({ cards: [record({ reason: 'gathering-deleted' })], kids: [NOAH_BACK] });
 
-    expect(screen.getByText(/^The gathering Noah Park was tapped in for has been deleted/)).toBeInTheDocument();
+    expect(screen.getByText(/^Its gathering was deleted\./)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Record/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Let it go' }));
     await waitFor(() =>
       expect(settleParkedKioskRecord).toHaveBeenCalledWith({ id: `check-in:${EVENT}:student-noah`, decision: 'let-go' }),
     );
-    expect(show).toHaveBeenCalledWith('Let go, with your name on it.', { tone: 'success' });
+    expect(show).toHaveBeenCalledWith('Let go.', { tone: 'success' });
   });
 
   it('says a pickup with no arrival has nothing to close', () => {
     draw({ cards: [record({ id: 'out', kind: 'check-out', reason: 'no-arrival', tappedAt: TEN_FIFTY_TWO })], kids: [NOAH_BACK] });
-    expect(screen.getByText(/^The register has no arrival for Noah Park on .*, so the 10:52 .* pickup has nothing to close\./)).toBeInTheDocument();
+    expect(screen.getByText('No arrival on the register for this pickup to close. It may have been removed.')).toBeInTheDocument();
   });
 
   it('says a pickup waited for an arrival that was let go', () => {
     draw({ cards: [PICKUP], kids: [NOAH_BACK] });
-    expect(screen.getByText(/^The 10:52 .* pickup waited for its arrival, which was let go/)).toBeInTheDocument();
+    expect(screen.getByText('Its arrival was let go, so this pickup has nothing to close.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Record/ })).toBeNull();
   });
 
   it('says a record could not be read', () => {
     draw({ cards: [record({ id: 'unreadable:x', reason: 'unreadable', eventId: '', studentId: '', student: null, tappedAt: null })] });
-    expect(screen.getByText(/^The kiosk sent a record Tally couldn’t read/)).toBeInTheDocument();
+    expect(screen.getByText('Tally couldn’t read this record.')).toBeInTheDocument();
     expect(screen.getByText('A child')).toBeInTheDocument();
   });
 
@@ -194,10 +194,10 @@ describe('KioskParkedSection', () => {
 
   it('says what the server answered when it would not settle', async () => {
     const answers = [
-      ['still-frozen', 'That record is still missing from the church’s database, so it can’t be recorded yet.'],
-      ['cannot-record', 'There’s nothing to record that onto any more. You can still let it go.'],
-      ['already-settled', 'Somebody decided this one already.'],
-      ['not-found', 'That record isn’t there any more.'],
+      ['still-frozen', 'Still missing from the church’s database.'],
+      ['cannot-record', 'Nothing left to record it onto. You can let it go.'],
+      ['already-settled', 'Already decided.'],
+      ['not-found', 'That record is gone.'],
     ] as const;
     for (const [status, said] of answers) {
       settleParkedKioskRecord.mockResolvedValueOnce({ data: { status } });
@@ -222,14 +222,14 @@ describe('KioskParkedSection', () => {
     });
     draw({ cards: [GONE_CARD], docs: [GONE] });
 
-    expect(screen.getByText(/^Noah Parke’s record in the church’s database is missing/)).toBeInTheDocument();
+    expect(screen.getByText('Missing from the church’s database, so this can’t be recorded yet.')).toBeInTheDocument();
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Record/ })).toBeNull();
     expect(
-      screen.getByText('Adds them to Planning Center again under the name the kiosk kept, or links the record already there. Then this can be recorded.'),
+      screen.getByText('Uses the name the kiosk kept, or links a match already there.'),
     ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Re-create in Planning Center' }));
     await waitFor(() =>
       expect(recreatePlanningCenterPerson).toHaveBeenCalledWith({
         studentId: 'pco_4100022',
@@ -250,7 +250,7 @@ describe('KioskParkedSection', () => {
       cards: [record({ ...GONE_CARD, student: { firstName: 'Noah', lastName: 'Parke', grade: null } })],
       docs: [GONE],
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Re-create in Planning Center' }));
     await waitFor(() =>
       expect(recreatePlanningCenterPerson).toHaveBeenCalledWith({
         studentId: 'pco_4100022',
@@ -265,7 +265,7 @@ describe('KioskParkedSection', () => {
     const off = 'Creating people in Planning Center from Tally is switched off.';
     recreatePlanningCenterPerson.mockResolvedValue({ data: { status: 'disabled', message: off } });
     draw({ cards: [GONE_CARD], docs: [GONE] });
-    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Re-create in Planning Center' }));
     await waitFor(() => expect(show).toHaveBeenCalledWith(off, { tone: 'info' }));
     expect(refreshRoster).not.toHaveBeenCalled();
   });
@@ -273,9 +273,9 @@ describe('KioskParkedSection', () => {
   it('says so when putting them back fails', async () => {
     recreatePlanningCenterPerson.mockRejectedValue(new Error(''));
     draw({ cards: [GONE_CARD], docs: [GONE] });
-    await userEvent.click(screen.getByRole('button', { name: 'Put Noah Parke back in Planning Center' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Re-create in Planning Center' }));
     await waitFor(() =>
-      expect(show).toHaveBeenCalledWith('Couldn’t put Noah Parke back in Planning Center.', { tone: 'error' }),
+      expect(show).toHaveBeenCalledWith('Couldn’t re-create Noah Parke.', { tone: 'error' }),
     );
   });
 
@@ -291,9 +291,10 @@ describe('KioskParkedSection', () => {
     const back = makeStudent({ id: 'pco_4100099', firstName: 'Noah', lastName: 'Park' });
     draw({ cards: [GONE_CARD], kids: [back], docs: [moved, back] });
 
-    expect(screen.getByText(/^Noah Park’s record is back, so the 9:43 .* arrival can be recorded now\.$/)).toBeInTheDocument();
+    expect(screen.getByText('Back in the church’s database. Ready to record.')).toBeInTheDocument();
+    expect(screen.getByText('Noah Park')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Record the 9:43 .* arrival$/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Put / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Re-create/ })).toBeNull();
   });
 
   it('walks the roster while its own read of the documents is refused', () => {
@@ -306,8 +307,9 @@ describe('KioskParkedSection', () => {
       cards: [record({ ...GONE_CARD, id: `check-out:${EVENT}:pco_4100022`, kind: 'check-out', student: null })],
       docs: [GONE],
     });
-    expect(screen.getByText(/^A child’s record in the church’s database is missing/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Put / })).toBeNull();
+    expect(screen.getByText('A child')).toBeInTheDocument();
+    expect(screen.getByText('Missing from the church’s database, so this can’t be recorded yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Re-create/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Let it go' })).toBeInTheDocument();
   });
 

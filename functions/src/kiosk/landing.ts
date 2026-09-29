@@ -550,7 +550,7 @@ export async function runLandKioskRecords(args: {
     }
   }
 
-  // Anything held on the tablet through an outage, rather than sent as it was tapped.
+  // Held through an outage rather than sent as tapped.
   const heldLate = request.records.some(
     (parsed) => parsed.ok && now.getTime() - parsed.record.tappedAtMs > HELD_LATE_MS,
   );
@@ -570,11 +570,9 @@ export async function runLandKioskRecords(args: {
  *
  * `allInAt` is set only on the call that empties a tablet that had been
  * holding records, so "all in Tally since Monday 9:02" means the end of an
- * outage rather than the last ordinary tap. Holding them is known either way
- * it can be: an earlier call said records were waiting, or this call brings
- * records tapped more than `HELD_LATE_MS` ago. The second is the usual one: a
- * tablet with no internet reaches nobody to say so, and the first call back
- * sends everything it kept.
+ * outage rather than the last ordinary tap. It held records if an earlier call
+ * said so, or if this call brings any tapped over `HELD_LATE_MS` ago — the
+ * usual case, since a tablet with no internet reports nothing.
  *
  * In a transaction, and only as news: `waitingReportedAt` is when the call
  * that wrote the count began, and a call that began earlier — one the kiosk
