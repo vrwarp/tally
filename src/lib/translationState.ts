@@ -222,6 +222,9 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
   // And the Kiosk page's footnote, which tells people the same thing from Tally.
   { message: 'KioskPair.retire', quotes: 'Staff.checkInsAllIn' },
   { message: 'KioskPair.retireCore', quotes: 'Staff.checkInsAllIn' },
+  // The event page's line about the kiosk's parked records ends in a link that
+  // names the destination, so it says whatever the navigation calls Review.
+  { message: 'EventDetail.kioskParkedLink', quotes: 'Nav.review' },
 ];
 
 /**

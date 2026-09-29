@@ -328,6 +328,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Nav.waitingCount": {
+    "source": "{count, plural, one {1 waiting} other {# waiting}}",
+    "context": "Read by a screen reader only, straight after the Review destination's name in the navigation (\"Review 3 waiting\"); the eye sees just the number on a small badge. {count} is how many of the lobby kiosk's parked records wait for somebody to decide them. Never shown at zero.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Dashboard.title": {
     "source": "Insights",
     "es-MX": "machine",
@@ -2982,6 +2989,13 @@
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
+  "CheckIn.kioskQuiet": {
+    "source": "{named, select, yes {{kiosk}} other {The lobby kiosk}} hasn’t been heard from since {when}. Check-ins and pickups made there aren’t on this list yet — a child wearing today’s name tag was checked in.",
+    "context": "One line on the counselors' check-in list, only on the gathering's own day, when a lobby kiosk set to this gathering has not been heard from for over twelve minutes (usually the church's internet). The kiosk goes on checking children in on its own storage, so a child the list shows as not arrived may be wearing today's printed name tag — that tag is the proof. {kiosk} is the name the core team gave the tablet (Lobby, Nursery door); with no name it is the lobby kiosk. {when} is a time today (9:41 AM) or a date. Deliberately no counts.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "PastChange.titleCheckIn": {
     "source": "Check {name} in to a past gathering?",
     "context": "Title of the confirmation that appears before a check-in is recorded on a gathering from an earlier day. {name} is a student. Asked every time, so it must read as a question about this one student.",
@@ -5160,6 +5174,83 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Team.kioskWaitingOnTablet": {
+    "source": "{count, plural, one {1 check-in} other {# check-ins}} waiting on this tablet since {when}",
+    "context": "Status line under a lobby kiosk on the Team and Kiosk pages: the kiosk told Tally it holds {count} check-ins or pickups it has not managed to send, the oldest since {when} (a time today or a date). \"Check-ins\" is the kiosk's general word for its records, pickups included, as in its all-clear Staff.checkInsAllIn.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskAllInSince": {
+    "source": "All in Tally since {when}",
+    "context": "Status line under a lobby kiosk on the Team and Kiosk pages, shown for a week after a kiosk that had been holding records sent the last of them. {when} is when (a time today or a date). The reassurance that nothing is left on the tablet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskPairedBy": {
+    "source": "Paired by {name}",
+    "context": "Line under a lobby kiosk in the Kiosk page's list: who approved its pairing. {name} is a person.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.nameKiosk": {
+    "source": "Name it",
+    "context": "Button under a lobby kiosk that has no name yet (core team only). Opens a name field in place.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.renameKiosk": {
+    "source": "Rename",
+    "context": "Button under a lobby kiosk that already has a name (core team only). Opens the name field in place.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskNameLabel": {
+    "source": "Name",
+    "context": "Label of the field that names a lobby kiosk.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskNameHint": {
+    "source": "What the event page and the counselors’ register call it: Lobby, Nursery door. Leave it empty to go back to {device}.",
+    "context": "Hint under the kiosk name field. The name is what the event page and the counselors' check-in list use for this tablet; the two examples are names a church would give a tablet and should read as such in the target language. {device} is the tablet's device id (for example kiosk-3f9a1c2e7b4d), which is what it is called again when the field is left empty.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.saveKioskName": {
+    "source": "Save",
+    "context": "Button that saves a lobby kiosk's name.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskRenamedToast": {
+    "source": "Renamed to {name}.",
+    "context": "Toast after a lobby kiosk was given a name. {name} is the new name.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskNameRemovedToast": {
+    "source": "Name taken off. It’s {device} again.",
+    "context": "Toast after the name field was emptied and saved: the kiosk goes back to its device id, {device} (for example kiosk-3f9a1c2e7b4d).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.renameKioskFailed": {
+    "source": "Couldn’t rename that kiosk. Try again in a moment.",
+    "context": "Error toast when saving a lobby kiosk's name failed.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Team.kioskRetiredOn": {
     "source": "Retired {when}",
     "es-MX": "machine",
@@ -5288,8 +5379,8 @@
     "zh-Hant": "machine"
   },
   "KioskPair.retireCore": {
-    "source": "To retire a kiosk, open the person who paired it on the Team page and press Retire. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
-    "context": "Footnote on the Kiosk page for the core team, who can retire a kiosk from the Team page (on the panel of whoever paired it). Never by wiping the tablet: it may still hold check-ins it has not sent. The quoted phrase must be exactly the kiosk's all-clear (Staff.checkInsAllIn).",
+    "source": "To retire a kiosk, press Retire beside it in the list above. Don’t clear a kiosk’s site data or reset the tablet until it says “All check-ins are in Tally”. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "context": "Footnote on the Kiosk page for the core team, under the list of kiosks, each of which has its own Retire button (Team.retireKiosk). Never retire by wiping the tablet: it may still hold check-ins it has not sent. The quoted phrase must be exactly the kiosk's all-clear (Staff.checkInsAllIn).",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -5323,6 +5414,20 @@
     "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "reviewed"
+  },
+  "KioskPair.nameLabel": {
+    "source": "Name it (optional)",
+    "context": "Optional field beside the pairing-code field on the Kiosk page: what to call the tablet being approved. Whoever pairs a kiosk may name it; the core team can rename it later.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.nameHint": {
+    "source": "What the event page and the counselors’ register will call it: Lobby, Nursery door. The core team can rename it later.",
+    "context": "Hint under the optional name field on the Kiosk page. The two examples are names a church would give a tablet and should read as such in the target language.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "KioskPair.outcomeApproved": {
     "source": "Approved — the kiosk signs itself in on its next poll. What it records is the kiosk’s own, not under your name.",
@@ -5512,6 +5617,13 @@
     "zh-Hans": "reviewed",
     "zh-Hant": "machine"
   },
+  "KioskPair.stagingNameHint": {
+    "source": "The next link names its tablet this, so change it before making one for another.",
+    "context": "Hint under the optional name field beside \"Make a link\", which makes a sign-in link for one managed tablet. The field keeps its value after a link is made, so the next link would give its tablet the same name unless it is changed.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "KioskPair.stagingMake": {
     "source": "Make a link",
     "context": "Button that creates a one-time pairing link.",
@@ -5564,6 +5676,41 @@
   "KioskPair.stagingCopied": {
     "source": "Copied",
     "context": "The copy button just after it worked.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.kiosksHeading": {
+    "source": "Kiosks",
+    "context": "Heading of the core team's list of every lobby kiosk on the Kiosk page.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.kiosksNone": {
+    "source": "No kiosk is paired yet.",
+    "context": "Shown under the Kiosks heading when no kiosk has ever been paired.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.kiosksNotLoaded": {
+    "source": "Couldn’t load the kiosks.",
+    "context": "Shown under the Kiosks heading when the list could not be read.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.showRetiredKiosks": {
+    "source": "{count, plural, one {Show 1 retired kiosk} other {Show # retired kiosks}}",
+    "context": "Button under the Kiosk page's list that reveals the kiosks that were retired. {count} is how many.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskPair.hideRetiredKiosks": {
+    "source": "Hide retired kiosks",
+    "context": "Button that hides the retired kiosks again.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -7033,6 +7180,41 @@
   },
   "EventDetail.limit": {
     "source": "Limit who is on it",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.kioskQuiet": {
+    "source": "{named, select, yes {{kiosk}} other {The lobby kiosk}} was last heard from at {when} while set to this gathering. Check-ins and pickups made there after that are still on the tablet.",
+    "context": "One line on a gathering's page for the core team, on the gathering's own day, while a lobby kiosk set to this gathering has not been heard from for over twelve minutes. What was checked in or picked up there since is stored on the tablet and will arrive when it reconnects, so the page's counts are short, not wrong. {kiosk} is the name the core team gave the tablet; with no name it is the lobby kiosk. {when} is a time today (9:41 AM) or a date.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.kioskLate": {
+    "source": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late — all in Tally since {when}.",
+    "context": "One line on a gathering's page afterwards: {count} of the lobby kiosk's check-ins and pickups reached Tally more than ten minutes after they were tapped (it had lost its connection), and the last of them arrived at {when} (a time today or a date). \"Check-ins\" is the kiosk's general word for its records, pickups included. {kiosk} is the tablet's name; with no name it is the lobby kiosk.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.kioskLateSending": {
+    "source": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late so far. It’s still sending the rest.",
+    "context": "The same line as EventDetail.kioskLate while the kiosk is still sending records it held: {count} have arrived late so far, and more are on the way.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.kioskParked": {
+    "source": "{count, plural, one {1 record from the kiosk needs} other {# records from the kiosk need}} a decision.",
+    "context": "One line on a gathering's page: {count} records the lobby kiosk kept through an outage could not go on the register by themselves and wait in Review for somebody to decide them. Followed by the link EventDetail.kioskParkedLink.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.kioskParkedLink": {
+    "source": "Open Review",
+    "context": "Link after EventDetail.kioskParked that opens the Review page. Must quote the Review destination's name exactly (Nav.review).",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -12587,6 +12769,174 @@
   },
   "Review.differentPhoneDigits": {
     "source": "Different phone digits on file.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedHeading": {
+    "source": "From the lobby kiosk",
+    "context": "Heading of the section on the Review page that holds what the lobby kiosk could not record by itself. Only shown while something waits.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedIntro": {
+    "source": "Records the kiosk kept through an outage that couldn’t go on the register by themselves. Each waits here for a decision.",
+    "context": "Line under Review.parkedHeading. The kiosk keeps every check-in and pickup through an internet outage and sends them later; a few cannot go on the gathering's register without a person deciding, and wait here.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedNotLoaded": {
+    "source": "Couldn’t load what the kiosk left for review.",
+    "context": "Shown on the Review page when the kiosk's waiting records could not be read.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedSomeChild": {
+    "source": "A child",
+    "context": "Card title when the child's name is not known (the kiosk's record could not be read).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedSomeGathering": {
+    "source": "A gathering",
+    "context": "Stands in for a gathering's title when it is not known.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedTimeNotKnown": {
+    "source": "time not known",
+    "context": "Stands in for a clock time inside Review's kiosk sentences when the record carried none. Rare.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedWhere": {
+    "source": "{gathering} · {date}",
+    "context": "Line under a kiosk card's title: the gathering's title and the date of the tap.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedFrozen": {
+    "source": "{name}’s record in the church’s database is missing, so Tally can’t record {kinds, select, both {the {arrival} arrival or the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}} yet.",
+    "context": "Why a kiosk card waits: the child's entry in the church's database (Planning Center) is missing, and Tally will not record anything onto a child in that state until somebody puts the entry back. {name} is the child. {arrival} and {pickup} are clock times (9:43 AM). {kinds} says which records the card holds: both, the arrival alone, or the pickup alone.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedFrozenBack": {
+    "source": "{name}’s record is back, so {kinds, select, both {the {arrival} arrival and the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}} can be recorded now.",
+    "context": "Why a kiosk card waits, once the child's database entry is back: the records can now be recorded with the button below. {name} is the child; {arrival} and {pickup} are clock times; {kinds} as in Review.parkedFrozen.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedGatheringDeleted": {
+    "source": "The gathering {name} was tapped in for has been deleted: {kinds, select, both {the {arrival} arrival and the {pickup} pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}}. If it belongs on another night, record it there by hand.",
+    "context": "Why a kiosk card waits: the occurrence the child was tapped in for was deleted before the kiosk could send the record. It can only be let go here; if it belongs on another occurrence, somebody records it there by hand. {name} is the child; {arrival} and {pickup} are clock times; {kinds} as in Review.parkedFrozen.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedNoArrival": {
+    "source": "The register has no arrival for {name} on {date}, so the {pickup} pickup has nothing to close. An arrival may have been removed; Tally keeps no record of removals.",
+    "context": "Why a kiosk card waits: the kiosk sent a pickup, but the register has no arrival for that child that day to close. {date} is the day; {pickup} is a clock time. Tally does not remember arrivals that were removed, so it cannot say more.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedArrivalLetGo": {
+    "source": "The {pickup} pickup waited for its arrival, which was let go, so it has nothing to close.",
+    "context": "Why a kiosk card waits: a pickup was waiting for its arrival, and somebody let that arrival go (Review.parkedLetGo), so the pickup has nothing to close. {pickup} is a clock time.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedUnreadable": {
+    "source": "The kiosk sent a record Tally couldn’t read, so there’s nothing to record it onto.",
+    "context": "Why a kiosk card waits: the kiosk sent something Tally could not read. It can only be let go.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedOpenStudent": {
+    "source": "Open {name}’s page to put the record back",
+    "context": "Link on a kiosk card whose child's database entry is missing: opens the child's page, where the entry is put back. {name} is the child.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedRecordCaption": {
+    "source": "Adds it to {gathering}, at the time the kiosk saw it.",
+    "context": "Sentence above the Record button on a kiosk card: saying yes adds the records to the gathering {gathering}, with the time the kiosk saw them, not the time of the press.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedRecord": {
+    "source": "Record {kinds, select, both {the {arrival} arrival and pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}}",
+    "context": "Button on a kiosk card that records what the kiosk kept. {arrival} and {pickup} are clock times; {kinds} as in Review.parkedFrozen.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedLetGoCaption": {
+    "source": "Keeps this as decided, with your name on it. Nothing is added to the register.",
+    "context": "Sentence above the Let it go button on a kiosk card: the card is kept as a decision, with the name of whoever pressed it, and nothing goes on the register.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedLetGo": {
+    "source": "Let it go",
+    "context": "Button on a kiosk card: decide not to record it. Not a deletion — the decision is kept with the person's name.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedRecordedToast": {
+    "source": "Recorded.",
+    "context": "Toast after a kiosk card was recorded.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedLetGoToast": {
+    "source": "Let go, with your name on it.",
+    "context": "Toast after a kiosk card was let go (Review.parkedLetGo): the decision is kept with the person's name.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedAlreadySettled": {
+    "source": "Somebody decided this one already.",
+    "context": "Error toast: somebody else decided this kiosk card first.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedStillFrozen": {
+    "source": "That record is still missing from the church’s database, so it can’t be recorded yet.",
+    "context": "Error toast after pressing Record: the child's entry is still missing from the church's database, so nothing was recorded.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedCannotRecord": {
+    "source": "There’s nothing to record that onto any more. You can still let it go.",
+    "context": "Error toast after pressing Record: the register can no longer take it (for example the gathering was deleted meanwhile). Letting it go still works.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Review.parkedNotFound": {
+    "source": "That record isn’t there any more.",
+    "context": "Error toast: the kiosk card is no longer there.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
