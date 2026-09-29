@@ -87,8 +87,8 @@ export function afterRead(room: KioskRoom, read: RegisterRead, readStartedAtMs: 
   return {
     ...room,
     register: {
-      present: [...read.present].sort(),
-      checkedOut: [...read.checkedOut].sort(),
+      present: [...read.present],
+      checkedOut: [...read.checkedOut],
       arrivals: Object.fromEntries(read.arrivals),
     },
     taken: room.taken.filter((tap) => tap.parked || tap.takenAtMs > readStartedAtMs),

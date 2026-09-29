@@ -30,6 +30,22 @@ describe('being in touch', () => {
     reached();
     expect(heard.mock.calls).toEqual([[1_000], [null]]);
   });
+
+  it('stops telling a listener that has let go', () => {
+    const heard = vi.fn();
+    const stop = subscribeTouch(heard);
+    stop();
+    unreached(1_000);
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('forgets every listener on a reset, so one test cannot hear the next', () => {
+    const heard = vi.fn();
+    subscribeTouch(heard);
+    resetTouchForTests();
+    unreached(1_000);
+    expect(heard).not.toHaveBeenCalled();
+  });
 });
 
 describe('isAnswer', () => {

@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LandKioskRecordsRequest, LandKioskRecordsResponse } from '@/lib/kioskLanding';
 import type { KioskRecord } from './journal';
 import {
+  DeadlineError,
   RETRY_EVERY_MS,
   UPLOAD_DEADLINE_MS,
   createUploader,
+  toWire,
+  withDeadline,
   type UploaderDeps,
 } from './uploader';
 
@@ -61,8 +64,56 @@ function harness(initial: KioskRecord[] = []) {
   };
 }
 
+/** What a dropped connection looks like from the Functions SDK. */
+async function dropped(): Promise<never> {
+  throw Object.assign(new Error('internal'), { code: 'functions/internal' });
+}
+
+/** Tally taking everything it is sent. */
+function landAll(request: LandKioskRecordsRequest): LandKioskRecordsResponse {
+  return { outcomes: request.records.map((r) => ({ id: r.id, outcome: 'landed' as const })) };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
+});
+
+describe('withDeadline', () => {
+  it('gives up with the code a timed-out call carries, and says after how long', async () => {
+    const caught = withDeadline(new Promise(() => {}), 1_000).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const error = await caught;
+    expect(error).toBeInstanceOf(DeadlineError);
+    expect(error).toMatchObject({ code: 'deadline-exceeded', message: 'No answer within 1000 ms' });
+  });
+
+  it('leaves no timer behind once the work answers', async () => {
+    await expect(withDeadline(Promise.resolve('landed'), 1_000)).resolves.toBe('landed');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('toWire', () => {
+  it('sends what Tally needs, and nothing the tablet keeps for itself', () => {
+    expect(toWire(rec(1, { arrivalId: 'arrival-1', attempts: 3, lastProblem: 'network' }))).toEqual({
+      id: 'record-0001',
+      kind: 'check-in',
+      eventId: 'sunday',
+      studentId: 'student-1',
+      tappedAtMs: NINE + 1,
+      arrivalId: 'arrival-1',
+      student: { firstName: 'Kid', lastName: '1', grade: 3, searchName: 'kid 1' },
+      gathering: 'Sunday Kids',
+    });
+    // A pickup names nobody new, and the old queue never knew a gathering's title.
+    expect(toWire(rec(2, { kind: 'check-out', student: undefined, gathering: '' }))).toEqual({
+      id: 'record-0002',
+      kind: 'check-out',
+      eventId: 'sunday',
+      studentId: 'student-2',
+      tappedAtMs: NINE + 2,
+    });
+  });
 });
 
 afterEach(() => {
@@ -150,6 +201,63 @@ describe('a pass', () => {
   });
 });
 
+describe('what it says while it works', () => {
+  it('starts idle, and says how far a pass has got while it runs', async () => {
+    const h = harness(Array.from({ length: 30 }, (_, i) => rec(i + 1)));
+    const answers: Array<() => void> = [];
+    h.answerWith((request) => new Promise((resolve) => answers.push(() => resolve(landAll(request)))));
+    const uploader = createUploader(h.deps);
+    expect(uploader.state()).toEqual({ sending: null, lastProblem: null });
+
+    const pass = uploader.kick();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploader.state().sending).toEqual({ total: 30, left: 30 });
+
+    answers.shift()!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploader.state().sending).toEqual({ total: 30, left: 5 });
+
+    answers.shift()!();
+    await pass;
+    expect(uploader.state()).toEqual({ sending: null, lastProblem: null });
+  });
+
+  it('says nothing is being sent when there is nothing to send', async () => {
+    const uploader = createUploader(harness([]).deps);
+    const heard = vi.fn();
+    uploader.subscribe(heard);
+    await uploader.kick();
+    expect(heard.mock.calls).toEqual([[{ sending: null, lastProblem: null }]]);
+  });
+
+  it('clears the last problem once nothing is left to send — another tab landed them', async () => {
+    const h = harness([rec(1)]);
+    h.answerWith(dropped);
+    const uploader = createUploader(h.deps);
+    await uploader.kick();
+    expect(uploader.state().lastProblem).toBe('network');
+
+    h.journal.length = 0;
+    await uploader.kick();
+    expect(uploader.state().lastProblem).toBeNull();
+  });
+
+  it('stops telling a listener that has let go', async () => {
+    const uploader = createUploader(harness([rec(1)]).deps);
+    const heard = vi.fn();
+    uploader.subscribe(heard)();
+    await uploader.kick();
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('lands records for a caller that does not ask what settled', async () => {
+    const h = harness([rec(1)]);
+    delete h.deps.settled;
+    await createUploader(h.deps).kick();
+    expect(h.journal).toEqual([]);
+  });
+});
+
 describe('what it lets go of', () => {
   it('keeps a record whose answer it does not know, or that was not answered for', async () => {
     const h = harness([rec(1), rec(2)]);
@@ -188,6 +296,41 @@ describe('what it lets go of', () => {
     expect(sent).not.toContain('record-pickup');
     expect(h.journal.map((r) => r.id)).toEqual(['record-0001', 'record-pickup']);
     expect(h.deps.noteAttempt).toHaveBeenCalledWith('record-pickup', 'arrival');
+  });
+
+  it('holds back only the pickup whose own arrival waits', async () => {
+    const h = harness([
+      ...Array.from({ length: 25 }, (_, i) => rec(i + 1)),
+      rec(100, { id: 'record-pickup-1', kind: 'check-out', studentId: 'student-1', student: undefined }),
+      rec(101, { id: 'record-pickup-2', kind: 'check-out', studentId: 'student-2', student: undefined }),
+    ]);
+    h.answerWith(async (request) => ({
+      outcomes: request.records.map((r) =>
+        r.id === 'record-0001'
+          ? { id: r.id, outcome: 'waiting' as const, waitingFor: 'retry' as const }
+          : { id: r.id, outcome: 'landed' as const },
+      ),
+    }));
+    await createUploader(h.deps).kick();
+
+    expect(h.calls[1]!.records.map((r) => r.id)).toEqual(['record-pickup-2']);
+    expect(h.journal.map((r) => r.id)).toEqual(['record-0001', 'record-pickup-1']);
+  });
+
+  it('sends no empty call when all that is left is held back', async () => {
+    const h = harness([
+      ...Array.from({ length: 25 }, (_, i) => rec(i + 1)),
+      rec(100, { id: 'record-pickup', kind: 'check-out', studentId: 'student-1', student: undefined }),
+    ]);
+    h.answerWith(async (request) => ({
+      outcomes: request.records.map((r) =>
+        r.id === 'record-0001'
+          ? { id: r.id, outcome: 'waiting' as const, waitingFor: 'retry' as const }
+          : { id: r.id, outcome: 'landed' as const },
+      ),
+    }));
+    await createUploader(h.deps).kick();
+    expect(h.calls).toHaveLength(1);
   });
 
   it('counts a tap made while a call is out among what is still on the tablet', async () => {
@@ -278,11 +421,17 @@ describe('when a call fails', () => {
     h.answerWith(async () => {
       throw Object.assign(new Error('retired'), { code: 'functions/permission-denied' });
     });
-    await createUploader(h.deps).kick();
+    const uploader = createUploader(h.deps);
+    await uploader.kick();
 
     expect(h.journal).toHaveLength(2);
     expect(h.deps.onRefused).toHaveBeenCalledTimes(1);
     expect(h.deps.probe).not.toHaveBeenCalled();
+    // A refusal is an answer: Tally was reached, and it is Tally saying no.
+    expect(h.deps.reached).toHaveBeenCalled();
+    expect(h.deps.unreached).not.toHaveBeenCalled();
+    expect(h.deps.noteAttempt).toHaveBeenCalledWith('record-0001', 'server');
+    expect(uploader.state()).toEqual({ sending: null, lastProblem: 'server' });
   });
 
   it('stops the pass at the first failed call rather than hammering the rest', async () => {
@@ -317,9 +466,51 @@ describe('start', () => {
 
   it('sends nothing and asks nothing while the tablet holds nothing', async () => {
     const h = harness([]);
-    const stop = createUploader(h.deps).start();
+    const uploader = createUploader(h.deps);
+    const heard = vi.fn();
+    uploader.subscribe(heard);
+    const stop = uploader.start();
     await vi.advanceTimersByTimeAsync(5 * RETRY_EVERY_MS);
     expect(h.calls).toHaveLength(0);
+    // The first look finds nothing, and the timer does not look again.
+    expect(heard).toHaveBeenCalledTimes(1);
     stop();
+  });
+
+  it('tries again when the page is shown or brought back into view, and not while it is hidden', async () => {
+    const h = harness([rec(1)]);
+    h.answerWith(dropped);
+    const stop = createUploader(h.deps).start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toHaveLength(1);
+
+    window.dispatchEvent(new Event('pageshow'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toHaveLength(2);
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toHaveLength(3);
+
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.calls).toHaveLength(3);
+    hidden.mockRestore();
+    stop();
+  });
+
+  it('hears nothing once stopped', async () => {
+    const h = harness([rec(1)]);
+    h.answerWith(dropped);
+    const stop = createUploader(h.deps).start();
+    await vi.advanceTimersByTimeAsync(0);
+    stop();
+
+    window.dispatchEvent(new Event('online'));
+    window.dispatchEvent(new Event('pageshow'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(RETRY_EVERY_MS);
+    expect(h.calls).toHaveLength(1);
   });
 });

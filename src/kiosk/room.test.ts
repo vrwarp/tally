@@ -110,6 +110,25 @@ describe('this tablet’s half', () => {
     expect(sorted(roomView(room, []).present)).toEqual([]);
   });
 
+  it('lets a read begun the moment Tally answered speak for the tap', () => {
+    // Tally wrote it before it answered, so a read sent at that moment saw it.
+    let room = afterLanding(emptyRoom(EVENT), tap(), 'landed', NINE);
+    room = afterRead(room, read([]), NINE);
+    expect(room.taken).toEqual([]);
+  });
+
+  it('does not let a tap with no arrival of its own erase the one the register knows', () => {
+    // A check-in carried over from the old queue may not know its arrival.
+    const room = afterRead(emptyRoom(EVENT), read(['student-ada'], [], { 'student-ada': 'a1' }), NINE);
+    const view = roomView(room, [tap({ arrivalId: undefined })]);
+    expect(view.arrivals.get('student-ada')).toBe('a1');
+  });
+
+  it('has nobody in it before the kiosk is set to a gathering', () => {
+    const view = roomView(null, [tap()]);
+    expect([view.present.size, view.checkedOut.size, view.arrivals.size]).toEqual([0, 0, 0]);
+  });
+
   it('keeps a parked tap through every read: the child is here, and the register never will be', () => {
     let room = afterLanding(emptyRoom(EVENT), tap(), 'parked', NINE);
     room = afterRead(room, read([]), NINE + 60_000);
@@ -136,6 +155,67 @@ describe('this tablet’s half', () => {
     const view = roomView(room, []);
     expect(sorted(view.present)).toEqual(['student-dee', 'student-eli']);
     expect(view.arrivals.get('student-eli')).toBe('reg-7');
+  });
+
+  it('keeps a family the kiosk registered through a reboot', () => {
+    writeRoom(afterRegistration(emptyRoom(EVENT), ['student-dee'], 'reg-7', NINE));
+    const view = roomView(readRoom(EVENT), []);
+    expect(sorted(view.present)).toEqual(['student-dee']);
+    expect(view.arrivals.get('student-dee')).toBe('reg-7');
+  });
+});
+
+describe('reading the disk back, one fault at a time', () => {
+  const REGISTER = { present: ['student-ada'], checkedOut: [], arrivals: { 'student-ada': 'a1' } };
+  const ARRIVAL = { kind: 'check-in', studentId: 'student-byron', arrivalId: 'a2', takenAtMs: NINE };
+  const PICKUP = { kind: 'check-out', studentId: 'student-cy', takenAtMs: NINE, parked: true };
+
+  function stored(overrides: Record<string, unknown>) {
+    localStorage.setItem(
+      KIOSK_KEYS.room,
+      JSON.stringify({ v: 1, eventId: EVENT, register: REGISTER, taken: [ARRIVAL, PICKUP], ...overrides }),
+    );
+    return readRoom(EVENT);
+  }
+
+  it('reads back whole a room it wrote', () => {
+    expect(stored({})).toEqual({ v: 1, eventId: EVENT, register: REGISTER, taken: [ARRIVAL, PICKUP] });
+  });
+
+  it('answers an empty room for a shape it does not know', () => {
+    expect(stored({ v: 2 })).toEqual(emptyRoom(EVENT));
+  });
+
+  it('drops a register it cannot read, and keeps the taps', () => {
+    for (const register of [
+      null,
+      { ...REGISTER, present: 'student-ada' },
+      { ...REGISTER, present: ['student-ada', 7] },
+      { ...REGISTER, checkedOut: [7] },
+      { ...REGISTER, arrivals: null },
+      { ...REGISTER, arrivals: 'a1' },
+      { ...REGISTER, arrivals: { 'student-ada': 7 } },
+    ]) {
+      expect(stored({ register })).toEqual({
+        v: 1,
+        eventId: EVENT,
+        register: null,
+        taken: [ARRIVAL, PICKUP],
+      });
+    }
+  });
+
+  it('drops a tap it cannot read, and keeps the rest', () => {
+    for (const bad of [
+      null,
+      { ...ARRIVAL, kind: 'x' },
+      { ...ARRIVAL, studentId: 7 },
+      { ...ARRIVAL, takenAtMs: '9:00' },
+      { ...ARRIVAL, arrivalId: 7 },
+    ]) {
+      expect(stored({ taken: [bad, PICKUP] }).taken).toEqual([PICKUP]);
+    }
+    expect(stored({ taken: 'none' }).taken).toEqual([]);
   });
 });
 
