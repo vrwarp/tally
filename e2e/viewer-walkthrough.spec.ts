@@ -158,7 +158,9 @@ test('capture the viewer walkthrough', async ({ page, signedInAs }) => {
     title: 'The same front door',
     caption:
       'Pat signs in with Google like everybody else and lands where everybody lands: today’s ' +
-      'gatherings. The nav carries Insights, Events and Students; Review is not in it.',
+      'gatherings. Each card offers “Open the register” rather than “Start check-in”, and the ' +
+      'Catch up list is described as recent registers rather than work to finish. The nav ' +
+      'carries Insights, Events and Students; Review is not in it.',
   });
 
   const menu = page.getByRole('button', { name: /pat|@/i }).first();
@@ -186,7 +188,7 @@ test('capture the viewer walkthrough', async ({ page, signedInAs }) => {
     caption:
       'The same roster Sam just worked, with the same three children green and the time each ' +
       'arrived. What is gone is every verb: no check mark to undo, no quick-add, and the hint ' +
-      'under the heading says so — “read only — checking in is for the team at the door”. ' +
+      'under the heading says so, short enough to fit a phone: “read only — you can’t check in”. ' +
       'Pressing a child who is not here does nothing.',
   });
 

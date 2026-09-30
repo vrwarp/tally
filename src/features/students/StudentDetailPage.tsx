@@ -1377,6 +1377,8 @@ function BirthdaySection({
   onSaved: () => void;
 }) {
   const t = useTranslations('StudentDetail');
+  // A viewer is told where the birthday lives, not sent there to change it.
+  const readOnly = useReadOnly();
   const locale = useLocale();
   const [editing, setEditing] = useState(false);
 
@@ -1467,16 +1469,21 @@ function BirthdaySection({
             <p className="mt-1 text-xs text-ink-500">{t('readingPermissions')}</p>
           ) : (
             <p className="mt-1 text-xs text-ink-500">
-              {t('birthdayKeptIn')}{' '}
-              <a
-                href={upstream}
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-brand-300 underline"
-              >
-                {day ? t('changeItThere') : t('addOneThere')}
-              </a>
-              .
+              {t('birthdayKeptIn')}
+              {readOnly ? null : (
+                <>
+                  {' '}
+                  <a
+                    href={upstream}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-brand-300 underline"
+                  >
+                    {day ? t('changeItThere') : t('addOneThere')}
+                  </a>
+                  .
+                </>
+              )}
             </p>
           )}
         </>

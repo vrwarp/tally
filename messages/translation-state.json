@@ -2796,8 +2796,8 @@
     "zh-Hant": "machine"
   },
   "CheckIn.hintReadOnly": {
-    "source": "read only — checking in is for the team at the door",
-    "context": "Lowercase hint under the roster heading, shown only to a Viewer (the read-only role). It replaces the other hints, which all tell the reader to tap something. Says the register is for reading; checking in is done by the team at the door.",
+    "source": "read only — you can’t check in",
+    "context": "Lowercase hint under the roster heading, shown only to a Viewer (the read-only role). Replaces the other hints, which all tell the reader to tap something. Says the reader can look but not check anyone in. Must stay short: it shares one truncating line with the heading and its count on a 390px phone, so keep it near 30 characters.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -3320,6 +3320,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "ChooseEvent.catchUpBodyViewer": {
+    "source": "Recent gatherings and how many were checked in.",
+    "context": "One-line description under the 'Catch up' heading on the 'Which gathering?' screen, shown only to a Viewer (the read-only role). The list below is recent finished gatherings with how many were checked in. Replaces the version that invites the reader to open one and add check-ins, which a viewer cannot do.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "ChooseEvent.headingOne": {
     "source": "On today",
     "es-MX": "machine",
@@ -3352,6 +3359,13 @@
   },
   "ChooseEvent.ctaTakeAttendance": {
     "source": "Take attendance",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "ChooseEvent.ctaOpenRegister": {
+    "source": "Open the register",
+    "context": "Button on a gathering's card on the 'Which gathering?' screen, shown only to a Viewer (the read-only role) in place of 'Start check-in' and 'Take attendance'. Opens the same roster, where they can read who is here but not check anyone in.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
