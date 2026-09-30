@@ -62,6 +62,7 @@ const COMPARED = [
   'upstreamPersonId',
   'pendingReview',
   'mergedIntoStudentId',
+  'recreatedAsStudentId',
   'searchName',
   'fromPlanningCenter',
   'profileComplete',

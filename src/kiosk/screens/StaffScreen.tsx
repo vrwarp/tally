@@ -44,6 +44,7 @@
  */
 import { useTranslations } from 'use-intl';
 import { haptic } from '@/lib/utils';
+import { useCheckInsLine, type CheckInsSummary } from '../checkInsLine';
 import { LOCALE_LABELS, type Locale } from '@/lib/locales';
 import { usePrinterNote } from '../printerNote';
 import type { PrinterNote } from '../printing';
@@ -81,6 +82,10 @@ const STATEMENT = 'px-5 text-left text-lg text-ink-200 tall:px-6 tall:text-2xl';
 
 const DOOR = `${ROW} bg-ink-800 text-ink-100 active:bg-ink-700`;
 
+/** A condition, on the door it belongs to — the printer's trouble line's shape. */
+const CONDITION = 'px-5 text-left text-lg text-warn-400 tall:px-6 tall:text-2xl';
+
+
 export function StaffScreen({
   title,
   iconPath,
@@ -95,6 +100,8 @@ export function StaffScreen({
   onHideBackdrop,
   pins,
   onLanguages,
+  checkIns,
+  onCheckIns,
   onStay,
 }: {
   title: string;
@@ -150,11 +157,16 @@ export function StaffScreen({
   pins: readonly Locale[];
   /** Opens the screen that sets them — see `LanguagesScreen`. */
   onLanguages: () => void;
+  /** What this tablet has not got to Tally yet. */
+  checkIns: CheckInsSummary;
+  /** Opens the list — see `CheckInsScreen`. */
+  onCheckIns: () => void;
   onStay: () => void;
 }) {
   const t = useTranslations('Staff');
   const printerNote = usePrinterNote();
   const tap = useTap();
+  const checkInsLine = useCheckInsLine(checkIns);
 
   /*
    * One or two words, never a sentence — the full sentence lives on the printer
@@ -280,7 +292,7 @@ export function StaffScreen({
                    noise of the leading — so the pair was held together by colour
                    and a shared left edge rather than by proximity, and the row
                    below wears the same amber. */
-                <p className="px-5 text-left text-lg text-warn-400 tall:px-6 tall:text-2xl">
+                <p className={CONDITION}>
                   {t('troubleLine', {
                     trouble: (printerNote(trouble) || t('printerNeedsAttention')).replace(/\.$/, ''),
                   })}
@@ -303,6 +315,42 @@ export function StaffScreen({
               {printerLine.text}
             </span>
           </button>
+
+          {/*
+            * The records, in one slot that is a statement or a door.
+            *
+            * When nothing waits it says so, as prose on the group's inset rather
+            * than as another row: a door whose whole content is *nothing here*
+            * reads as switched off (see `STATEMENT`), and this menu is long
+            * enough on a bad evening. When something waits
+            * it becomes a door onto the list, with the count as its status and,
+            * under it, what the last attempt ran into — the printer's trouble
+            * line's shape, for the same reason: the condition belongs on the
+            * door it is about. After the printer rather than first, because the
+            * reprint is still the errand somebody walks over for, and these send
+            * themselves; the sentence says so when they cannot.
+            */}
+          {checkIns.count === 0 ? (
+            <p className={STATEMENT}>{t('checkInsAllIn')}</p>
+          ) : (
+            <div className="flex flex-col">
+              <button
+                type="button"
+                tabIndex={-1}
+                {...tap(() => {
+                  haptic();
+                  onCheckIns();
+                })}
+                className={DOOR}
+              >
+                <span className="min-w-0 truncate">{t('checkIns')}</span>
+                <span className="shrink-0 font-normal whitespace-nowrap text-warn-400">
+                  {t('checkInsWaiting', { count: checkIns.count })}
+                </span>
+              </button>
+              {checkInsLine && <p className={CONDITION}>{checkInsLine}</p>}
+            </div>
+          )}
 
           {/*
             * The photograph's off switch, for the Sunday it is wrong on the

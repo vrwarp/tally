@@ -435,6 +435,27 @@ describe('StudentRow: check-out', () => {
     expect(screen.queryByText(/missed|overdue/i)).not.toBeInTheDocument();
   });
 
+  it('says time not known rather than a time the recording tablet could not vouch for', () => {
+    // A kiosk whose clock was badly wrong: Tally kept the check-in and the
+    // pickup, and pulled each time to a bound it could have been — which is
+    // not the same as the time it was.
+    withCheckOut(
+      entryFor(
+        JORDAN,
+        makeAttendance({
+          studentId: JORDAN.id,
+          checkedInAt: new Date('2026-02-15T09:30:00'),
+          checkedOutAt: new Date('2026-02-15T10:15:00'),
+          timeUncertain: true,
+          checkedOutTimeUncertain: true,
+        }),
+      ),
+    );
+
+    expect(screen.getByText('Out time not known')).toBeInTheDocument();
+    expect(screen.queryByText(/10:15/)).not.toBeInTheDocument();
+  });
+
   it('leaves the row alone on a gathering that does not track check-out', async () => {
     const entry = present(JORDAN);
     const { onUndo } = show(entry);

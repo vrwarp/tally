@@ -105,6 +105,13 @@ export function registerRows(
 function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<RegisterRow>[] {
   const { event, namesByUid, backends } = context;
 
+  /** Who recorded a displaced entry, named as the columns beside name people and kiosks. */
+  const byName = (by: string | null | undefined): string => {
+    if (!by) return '';
+    if (deviceIdOfUid(by)) return 'Lobby kiosk';
+    return namesByUid.get(by) ?? '';
+  };
+
   const base: CsvColumn<RegisterRow>[] = [
     { header: 'student_id', value: (row) => row.studentId },
     // Blank rather than the "Former student" the page renders: that phrase is
@@ -118,7 +125,18 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
     { header: 'event_date', value: () => isoDate(event.startAt) },
     { header: 'event_start', value: () => isoDateTime(event.startAt) },
     { header: 'checked_in', value: (row) => row.attendance !== null },
-    { header: 'checked_in_at', value: (row) => isoDateTime(row.attendance?.checkedInAt) },
+    /*
+     * Blank when the device that recorded it had a clock too far wrong to
+     * believe: the stored moment is the bound it was pulled to, plausible and
+     * not what happened, and a spreadsheet cannot say *time not known* beside a
+     * timestamp any more than the register can (see `formatAttendanceClock`).
+     * `checked_in` still says they came.
+     */
+    {
+      header: 'checked_in_at',
+      value: (row) =>
+        row.attendance?.timeUncertain ? '' : isoDateTime(row.attendance?.checkedInAt),
+    },
     {
       header: 'checked_in_by',
       value: (row) => {
@@ -140,11 +158,28 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
     { header: 'checked_in_by_uid', value: (row) => row.attendance?.checkedInBy ?? '' },
     { header: 'method', value: (row) => row.attendance?.method ?? '' },
     { header: 'first_ever', value: (row) => (row.attendance ? row.attendance.isFirstEver : '') },
+    /*
+     * When a lobby kiosk's record reached Tally — blank for everything else.
+     * `checked_in_at` is when it happened; the two apart by more than a few
+     * seconds is an outage the kiosk rode out (docs/kiosk-offline-recovery.md
+     * §4), and the file is where somebody reconciling a Sunday would look.
+     */
+    { header: 'recorded_at', value: (row) => isoDateTime(row.attendance?.recordedAt) },
+    // The entry an earlier kiosk tap replaced: kept, never lost.
+    {
+      header: 'later_checked_in_at',
+      value: (row) => isoDateTime(row.attendance?.laterCheckIn?.at),
+    },
+    { header: 'later_checked_in_by', value: (row) => byName(row.attendance?.laterCheckIn?.by) },
   ];
 
   if (event.requiresCheckOut) {
     base.push(
-      { header: 'checked_out_at', value: (row) => isoDateTime(row.attendance?.checkedOutAt) },
+      {
+        header: 'checked_out_at',
+        value: (row) =>
+          row.attendance?.checkedOutTimeUncertain ? '' : isoDateTime(row.attendance?.checkedOutAt),
+      },
       {
         header: 'checked_out_by',
         value: (row) => {
@@ -155,6 +190,15 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
         },
       },
       { header: 'checked_out_by_uid', value: (row) => row.attendance?.checkedOutBy ?? '' },
+      {
+        header: 'checked_out_recorded_at',
+        value: (row) => isoDateTime(row.attendance?.checkedOutRecordedAt),
+      },
+      {
+        header: 'later_checked_out_at',
+        value: (row) => isoDateTime(row.attendance?.laterCheckOut?.at),
+      },
+      { header: 'later_checked_out_by', value: (row) => byName(row.attendance?.laterCheckOut?.by) },
     );
   }
 

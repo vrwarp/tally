@@ -192,6 +192,24 @@ service cloud.firestore {
       return isLiveKiosk() && kioskDevice().get('boundChain', '') == key;
     }
 
+    /**
+     * A kiosk that has sent its records through `landKioskRecords` writes the
+     * register only through it (docs/kiosk-offline-recovery.md §3). The
+     * callable marks the row `firstLandingAt` on its first call, and from then
+     * on the direct writes the old bundle made — attendance, and the date
+     * patch on the student — are refused.
+     *
+     * Per tablet rather than all at once, because a tablet that was off all
+     * week can boot the old bundle from its cache on a Sunday — the wifi not up
+     * yet when it launches — and the old bundle shows a green tick for a
+     * refused check-in and drops it. Until a tablet has run the new bundle it
+     * keeps the road it knows; the new bundle never takes that road at all.
+     * Call only after `isLiveKiosk()`, which is what makes the row readable.
+     */
+    function kioskWritesDirectly() {
+      return kioskDevice().get('firstLandingAt', null) == null;
+    }
+
     /*
      * Field-level diffing. Firestore evaluates both the create and the update
      * rule for a `set()` and picks the one matching the document's actual
@@ -534,7 +552,7 @@ service cloud.firestore {
       // firstAttendedAt/lastAttendedAt, so counselors need create and update.
       // A kiosk is admitted on the same terms, and `kioskWriteAllowed` pins
       // it to the eight keys a check-in's date patch touches.
-      allow create: if (isCounselor() || isLiveKiosk())
+      allow create: if (isCounselor() || (isLiveKiosk() && kioskWritesDirectly()))
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnclaimed()
@@ -542,7 +560,7 @@ service cloud.firestore {
                     && kioskWriteAllowed()
                     && reviewHoldUnchanged()
                     && request.resource.data.get('upstreamRecordMissing', false) == false;
-      allow update: if (isCounselor() || isLiveKiosk())
+      allow update: if (isCounselor() || (isLiveKiosk() && kioskWritesDirectly()))
                     && validStudent()
                     && noMirroredPersonalData()
                     && pcoLinkageUnchanged()
@@ -794,7 +812,48 @@ service cloud.firestore {
                  .data.get('upstreamRecordMissing', false) == true;
         }
 
-        function checkOutKeys() { return ['checkedOutAt', 'checkedOutBy']; }
+        /**
+         * The pickup's fields. The last three are the server's (see
+         * `serverAttendanceKeys`) and are listed so that an undo — which clears
+         * every one of them — still touches only a pickup.
+         */
+        function checkOutKeys() {
+          return ['checkedOutAt', 'checkedOutBy',
+                  'checkedOutRecordedAt', 'laterCheckOut', 'checkedOutTimeUncertain'];
+        }
+
+        /**
+         * What only `landKioskRecords` writes: when a record reached Tally, the
+         * record it came from, the later entry an earlier tap replaced, and a
+         * time the server could not vouch for. See
+         * functions/src/kiosk/landing.ts.
+         *
+         * A client may carry them forward or remove them — a counselor's undo
+         * removes a pickup's — and nothing else. A forged `recordedAt` would be
+         * a register claiming a record arrived late, or on time, on nobody's
+         * word but a browser's.
+         */
+        function serverAttendanceKeys() {
+          return ['recordedAt', 'kioskRecordId', 'laterCheckIn', 'timeUncertain',
+                  'checkedOutRecordedAt', 'laterCheckOut', 'checkedOutTimeUncertain'];
+        }
+
+        function keptOrRemoved(key) {
+          return !(key in request.resource.data)
+            || (resource != null
+                && key in resource.data
+                && request.resource.data[key] == resource.data[key]);
+        }
+
+        function serverFieldsUntouched() {
+          return keptOrRemoved('recordedAt')
+            && keptOrRemoved('kioskRecordId')
+            && keptOrRemoved('laterCheckIn')
+            && keptOrRemoved('timeUncertain')
+            && keptOrRemoved('checkedOutRecordedAt')
+            && keptOrRemoved('laterCheckOut')
+            && keptOrRemoved('checkedOutTimeUncertain');
+        }
 
         /**
          * A pickup, recorded by whoever was at the door for it.
@@ -843,16 +902,21 @@ service cloud.firestore {
          * why the rule down there had to be denied outright instead.
          */
         /*
-         * A kiosk reads and writes the one register it is bound to, and no
-         * other: `kioskBoundTo` is its whole gate, where a person's is their
-         * profile plus the chain. The read is also the kiosk's way of noticing
-         * it has been retired — a refused *read* can never be a frozen student,
+         * A kiosk reads the one register it is bound to, and no other:
+         * `kioskBoundTo` is its whole gate, where a person's is their profile
+         * plus the chain. The read is also the kiosk's way of noticing it has
+         * been retired — a refused *read* can never be a frozen student,
          * because `attendanceFrozen()` guards writes alone.
+         *
+         * It writes that register directly only until it has sent a record
+         * through `landKioskRecords` (`kioskWritesDirectly`): the current
+         * bundle never writes here at all, and these writes are for a tablet
+         * still running the old one.
          */
         allow get, list: if kioskBoundTo(eventChain(eventId))
                          || (isActive() && onChain(eventChain(eventId)));
-        allow create: if validAttendance() && !attendanceFrozen()
-                      && (kioskBoundTo(eventChain(eventId))
+        allow create: if validAttendance() && !attendanceFrozen() && serverFieldsUntouched()
+                      && ((kioskBoundTo(eventChain(eventId)) && kioskWritesDirectly())
                           || (isCounselor() && onChain(eventChain(eventId))));
         /**
          * A kiosk may add a record, and may record a first pickup. It may not
@@ -861,9 +925,10 @@ service cloud.firestore {
          * this and renders an already-collected student as done rather than
          * re-writing them.
          */
-        allow update: if !attendanceFrozen()
+        allow update: if !attendanceFrozen() && serverFieldsUntouched()
                       && (isKioskSession()
-                            ? (kioskBoundTo(eventChain(eventId)) && kioskCheckOutAllowed())
+                            ? (kioskBoundTo(eventChain(eventId)) && kioskWritesDirectly()
+                               && kioskCheckOutAllowed())
                             : (isCounselor() && onChain(eventChain(eventId))
                                && (validAttendance() || validCheckOut())));
         allow delete: if isCounselor() && !attendanceFrozen() && !isKioskSession()
@@ -1430,8 +1495,10 @@ service cloud.firestore {
      * may not touch who approved it or whether it is retired.
      *
      * Core team and up read the collection and may **retire** a row by
-     * marking it, from the person page or the pair-kiosk screen. Never a
-     * delete: the row is the provenance of every morning that kiosk recorded
+     * marking it, from the person page or the pair-kiosk screen, and may
+     * **rename** it — whoever paired it may have named it at the claim, and a
+     * name is how the event page and the counselors' register speak of it.
+     * Never a delete: the row is the provenance of every morning that kiosk recorded
      * — a pickup from last March carries `kiosk_<deviceId>` and this is the
      * document that says who stood the device up — and the same argument
      * refuses to delete a person.
@@ -1462,6 +1529,15 @@ service cloud.firestore {
         return d.retiredAt is timestamp && d.retiredBy == request.auth.uid;
       }
 
+      // `kioskName` in src/lib/kioskDevice.ts tidies a name and holds it to 40
+      // UTF-16 units, which bounds any count of characters made here. Null, or
+      // no name at all, is a kiosk every screen calls by its id.
+      function validKioskName() {
+        let d = request.resource.data;
+        return d.get('name', null) == null
+          || (d.name is string && d.name.size() > 0 && d.name.size() <= 40);
+      }
+
       allow get, list: if isCore() && !isKioskSession();
       allow create: if false;
       allow update: if (isKioskSession()
@@ -1473,8 +1549,36 @@ service cloud.firestore {
                         && validKioskReport())
                     || (isCore() && !isKioskSession()
                         && touchesOnly(['retiredAt', 'retiredBy'])
-                        && validRetirement());
+                        && validRetirement())
+                    || (isCore() && !isKioskSession()
+                        && touchesOnly(['name'])
+                        && validKioskName());
       allow delete: if false;
+    }
+
+    /**
+     * When each kiosk bound to a gathering's chain was last heard from, and
+     * what it is called — copied one way from the device rows, which are
+     * core-only by design, by `onKioskDeviceWritten` alone. A counselor on the
+     * gathering reads it so their register can say a kiosk is out of touch;
+     * nobody writes it. If the copy lags or fails, they simply see no line.
+     */
+    match /kioskPresence/{chain} {
+      allow get: if isActive() && onChain(chain);
+      allow list, write: if false;
+    }
+
+    /**
+     * Records the lobby kiosk kept that no retry can land — a child whose
+     * record upstream has gone, a gathering deleted after the tap, a pickup
+     * whose arrival never came. Written only by `landKioskRecords`, through the
+     * Admin SDK, and settled by the core team; see
+     * docs/kiosk-offline-recovery.md. Holds names and times, which is why a
+     * counselor and the lobby's own session may not read it.
+     */
+    match /kioskParkedRecords/{recordId} {
+      allow get, list: if isCore() && !isKioskSession();
+      allow write: if false;
     }
 
     /**

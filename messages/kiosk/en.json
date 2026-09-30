@@ -26,7 +26,9 @@
     "connectThePrinterAgain": "Connect the printer again",
     "oneMoment": "One moment…",
     "printerSettings": "Printer settings",
-    "nameTagsWontPrint": "name tags won’t print"
+    "nameTagsWontPrint": "name tags won’t print",
+    "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi."
   },
   "Common": {
     "language": "Language",
@@ -113,6 +115,9 @@
     "apostrophe": "Apostrophe",
     "hyphen": "Hyphen",
     "staffPrint": "Staff · print name tags",
+    "staffCheckIns": "Staff · check-ins",
+    "leaderTitle": "A leader will get you started",
+    "leaderWhy": "This kiosk can’t reach Tally, so it can’t add new families. A leader can add you on their phone.",
     "turnUprightTitle": "Turn the screen upright",
     "turnUprightBody": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader."
   },
@@ -134,7 +139,8 @@
     "retired": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again.",
     "pinLanguages": "Languages families here speak",
     "pinHint": "English is always offered.",
-    "pinPreview": "What families will see"
+    "pinPreview": "What families will see",
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} waiting. Pair this tablet to send {count, plural, one {it} other {them}}."
   },
   "Printer": {
     "troubleReported": "The printer reported a problem.",
@@ -300,7 +306,10 @@
     "offerFirstTime": "First time here? Register your child",
     "offerShort": "Not yours? Register",
     "networkFailed": "No connection just now.",
-    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}"
+    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}",
+    "offlineNotice": "<mark>Staff</mark> — offline. Check-ins are saved.",
+    "checkInsNeedAttention": "Check-ins need attention",
+    "markBoth": "Printer and check-ins need attention"
   },
   "Staff": {
     "changeEventTitle": "Change gathering?",
@@ -346,6 +355,26 @@
     "owedCost": "{count, plural, one {The unticked one is skipped.} other {The # unticked are skipped.}}",
     "owedPrint": "{count, plural, one {Print 1 name tag} other {Print # name tags}}",
     "owedSkip": "{count, plural, one {Skip 1 name tag} other {Skip # name tags}}",
-    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}"
+    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsAllIn": "All check-ins are in Tally",
+    "checkIns": "Check-ins",
+    "checkInsWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsNetwork": "No internet since {time}.",
+    "checkInsServer": "Tally won’t take them — tell the office.",
+    "checkInsHeld": "{count, plural, one {1 isn’t} other {# aren’t}} saved yet — don’t reload or restart; get it online.",
+    "checkInsAbout": "These send themselves.",
+    "checkInsNothingWaiting": "Nothing waiting.",
+    "checkInsSending": "Sending {total} … {left} left",
+    "checkInsTryNow": "Try now",
+    "recordIn": "Check-in",
+    "recordOut": "Check-out",
+    "recordAbout": "about {time}",
+    "recordHeld": "Not saved yet",
+    "recordNotSent": "Not sent yet",
+    "recordNoInternet": "No internet",
+    "recordServer": "Tally didn’t take it",
+    "recordArrival": "Waiting for their check-in",
+    "someone": "A child",
+    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online."
   }
 }

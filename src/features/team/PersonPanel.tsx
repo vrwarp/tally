@@ -24,8 +24,10 @@
  *   are already written; neither enforces anything.
  * - **The kiosks this person paired**, because a device row records who
  *   approved it and their name at the time, and "whose tablet is that" has no
- *   other answer. Retire arms while the kiosk is live: retiring a working
- *   lobby screen mid-morning takes something away, and an installed tablet
+ *   other answer. Retire arms for any kiosk that may be holding records — one
+ *   recording now, or one last heard from while set to a gathering, which is
+ *   almost always a lobby whose internet went rather than a tablet that
+ *   stopped: retiring either takes something away, and an installed tablet
  *   that has been re-paired leaves duplicate rows, which is exactly the shape
  *   of list a mis-tap happens in.
  * - **The week's unanswered asks** on the gatherings this person could act on
@@ -54,12 +56,9 @@ import { useChainTitles } from '@/features/team/gatherings';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 import { isOutstanding, subscribeChainRequests } from '@/services/accessRequests';
 import { addChainMembers, removeChainMember } from '@/services/eventAccess';
-import {
-  isKioskLive,
-  retireKioskDevice,
-  subscribeKioskDevices,
-} from '@/services/kioskDevices';
-import type { AccessRequest, UserProfile, KioskDevice} from '@/types';
+import { subscribeKioskDevices } from '@/services/kioskDevices';
+import { KioskDeviceRow } from '@/features/kiosk/KioskDeviceRow';
+import type { AccessRequest, UserProfile, KioskDevice } from '@/types';
 import { useTranslations } from 'use-intl';
 
 /**
@@ -215,15 +214,6 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
   const nowMs = now.getTime();
 
   const [busy, setBusy] = useState<string | null>(null);
-  /**
-   * Which kiosk, if any, is one tap from being put down.
-   *
-   * One id rather than a set, like the withdrawal on the invite card: arming a
-   * second row disarms the first, which is what a half-finished confirmation
-   * should do.
-   */
-  const [armedRetire, setArmedRetire] = useState<string | null>(null);
-
   const [devices, setDevices] = useState<KioskDevice[] | null>(null);
   const [devicesFailed, setDevicesFailed] = useState(false);
 
@@ -293,22 +283,6 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
       show(t('removedFromGathering', { name, gathering: title }), { tone: 'success' });
     } catch {
       show(t('removeFromGatheringFailed'), { tone: 'error' });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const retire = async (device: KioskDevice) => {
-    setArmedRetire(null);
-    setBusy(device.id);
-    try {
-      await retireKioskDevice(device.id, uid);
-      // No Undo, and the toast says what happens instead of leaving a gap
-      // where one usually is: the rules refuse un-retiring, because the row is
-      // the provenance of every morning that kiosk recorded.
-      show(t('kioskRetiredToast', { device: device.id }), { tone: 'success' });
-    } catch {
-      show(t('retireKioskFailed'), { tone: 'error' });
     } finally {
       setBusy(null);
     }
@@ -439,74 +413,9 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
             <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {theirKiosks.map((device) => {
-                const live = isKioskLive(device, nowMs);
-                return (
-                  <li key={device.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-ink-100">{device.id}</span>
-                      <span className="block text-xs text-ink-400">
-                        {device.retiredAt
-                          ? t('kioskRetiredOn', { when: time.weekdayDate(device.retiredAt) })
-                          : live
-                            ? t('kioskLive', { gathering: device.boundTo ?? '' })
-                            : t('kioskIdle', {
-                                when: device.pairedAt ? time.weekdayDate(device.pairedAt) : '',
-                              })}
-                      </span>
-                      {/*
-                        Said only when it is worth saying. A shelf tablet lives on
-                        mains, so "87%, charging" is a fact nobody can act on and
-                        one more line on a screen that is already dense — but a
-                        kiosk running on its battery means somebody unplugged it,
-                        and that is worth finding out before Sunday rather than
-                        during. A retired row says nothing: it is not expected to
-                        be anywhere.
-                      */}
-                      {!device.retiredAt && device.charging === false && device.batteryLevel != null && (
-                        <span className="block text-xs text-warn-400">
-                          {t('kioskOffCharger', {
-                            percent: Math.round(device.batteryLevel * 100),
-                          })}
-                        </span>
-                      )}
-                    </span>
-
-                    {device.retiredAt ? null : armedRetire === device.id ? (
-                      <span className="flex items-center gap-2">
-                        <Button variant="ghost" onClick={() => setArmedRetire(null)}>
-                          {t('keepItRunning')}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          loading={busy === device.id}
-                          onClick={() => void retire(device)}
-                        >
-                          {t('yesRetire')}
-                        </Button>
-                      </span>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        disabled={busy === device.id}
-                        onClick={() => (live ? setArmedRetire(device.id) : void retire(device))}
-                      >
-                        {t('retireKiosk')}
-                      </Button>
-                    )}
-
-                    {/* The consequence on its own line inside the row, the shape
-                        Withdraw already uses: short, because the row is
-                        shrink-to-fit in the tablet band and a long sentence sets
-                        its width. */}
-                    {armedRetire === device.id ? (
-                      <p role="alert" className="basis-full text-xs text-ink-400">
-                        {t('retireLiveWarning', { gathering: device.boundTo ?? '' })}
-                      </p>
-                    ) : null}
-                  </li>
-                );
-              })}
+              {theirKiosks.map((device) => (
+                <KioskDeviceRow key={device.id} device={device} now={now} />
+              ))}
             </ul>
           )}
         </section>

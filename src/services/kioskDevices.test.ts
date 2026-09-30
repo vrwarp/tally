@@ -13,8 +13,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
 import {
+  KIOSK_ALL_IN_SHOWN_FOR_MS,
   KIOSK_LIVE_WITHIN_MS,
   isKioskLive,
+  kioskAllInSince,
+  kioskLabel,
+  kioskWaitingCount,
+  kioskMayHoldRecords,
+  kioskOutOfTouchSince,
+  renameKioskDevice,
   retireKioskDevice,
   subscribeKioskDevices,
 } from '@/services/kioskDevices';
@@ -43,6 +50,7 @@ vi.mock('firebase/firestore', () => ({
 function device(overrides: Partial<KioskDevice> = {}): KioskDevice {
   return {
     id: 'lobby-tablet',
+    name: null,
     approvedBy: 'uid-miriam',
     approvedByName: 'Miriam Achebe',
     pairedAt: new Date('2026-09-01T09:00:00Z'),
@@ -67,6 +75,24 @@ describe('retireKioskDevice', () => {
     // Exactly the two fields the rules admit. `approvedBy` and the name it was
     // approved under are the custody record and are not this write's business.
     expect(patch).toEqual({ retiredAt: 'server-timestamp', retiredBy: 'uid-dana' });
+  });
+});
+
+describe('renameKioskDevice', () => {
+  it('writes the one field the rules admit, tidied as the pairing tidies it', async () => {
+    await renameKioskDevice('lobby-tablet', '  Nursery   door ');
+    const [ref, patch] = updateDoc.mock.calls.at(-1) as unknown as [
+      { path: string },
+      Record<string, unknown>,
+    ];
+    expect(ref.path).toBe('kioskDevices/lobby-tablet');
+    expect(patch).toEqual({ name: 'Nursery door' });
+  });
+
+  it('takes the name away when what was typed says nothing', async () => {
+    await renameKioskDevice('lobby-tablet', '   ');
+    const [, patch] = updateDoc.mock.calls.at(-1) as unknown as [unknown, Record<string, unknown>];
+    expect(patch).toEqual({ name: null });
   });
 });
 
@@ -101,6 +127,7 @@ describe('subscribeKioskDevices', () => {
         {
           id: 'lobby-tablet',
           data: () => ({
+            name: 'Lobby',
             approvedBy: 'uid-miriam',
             approvedByName: 'Miriam Achebe',
             pairedAt: new Timestamp(1_767_607_200, 0),
@@ -116,6 +143,7 @@ describe('subscribeKioskDevices', () => {
 
     expect(held[0]).toEqual({
       id: 'lobby-tablet',
+      name: 'Lobby',
       approvedBy: 'uid-miriam',
       approvedByName: 'Miriam Achebe',
       pairedAt: new Date(1_767_607_200_000),
@@ -228,6 +256,62 @@ describe('subscribeKioskDevices', () => {
     expect(held[0]).not.toHaveProperty('charging');
   });
 
+  /** One stored row, read back through the listener. */
+  function readBack(data: Record<string, unknown>): KioskDevice {
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+    onNext({ docs: [{ id: 'lobby-tablet', data: () => data }] });
+    return held[0];
+  }
+
+  it('carries what the tablet last said it was still holding', () => {
+    // What arms Retire on a kiosk set to nothing with a pickup still waiting —
+    // `landKioskRecords` writes all three on every call.
+    const holding = readBack({
+      approvedBy: 'uid-miriam',
+      waitingCount: 3,
+      waitingSinceAt: new Timestamp(1_767_610_800, 0),
+      allInAt: null,
+    });
+    expect(holding).toHaveProperty('waitingCount', 3);
+    expect(holding).toHaveProperty('waitingSinceAt', new Date(1_767_610_800_000));
+    expect(holding).toHaveProperty('allInAt', null);
+
+    // Nothing waiting is a reading too, and 0 is the value a falsy test drops.
+    const allIn = readBack({
+      approvedBy: 'uid-miriam',
+      waitingCount: 0,
+      waitingSinceAt: null,
+      allInAt: new Timestamp(1_767_614_400, 0),
+    });
+    expect(allIn).toHaveProperty('waitingCount', 0);
+    expect(allIn).toHaveProperty('waitingSinceAt', null);
+    expect(allIn).toHaveProperty('allInAt', new Date(1_767_614_400_000));
+  });
+
+  it('reads a name that is not one as no name', () => {
+    expect(readBack({ approvedBy: 'uid-miriam', name: '   ' }).name).toBeNull();
+    expect(readBack({ approvedBy: 'uid-miriam', name: 7 }).name).toBeNull();
+    expect(readBack({ approvedBy: 'uid-miriam', name: ' Lobby ' }).name).toBe('Lobby');
+  });
+
+  it('leaves the waiting fields off a kiosk that never sent, or sent the wrong type', () => {
+    const neverSent = readBack({ approvedBy: 'uid-miriam' });
+    expect(neverSent).not.toHaveProperty('waitingCount');
+    expect(neverSent).not.toHaveProperty('waitingSinceAt');
+    expect(neverSent).not.toHaveProperty('allInAt');
+
+    expect(readBack({ approvedBy: 'uid-miriam', waitingCount: '3' })).not.toHaveProperty(
+      'waitingCount',
+    );
+  });
+
   it('answers the defaults for a field stored as the wrong type', () => {
     let held: KioskDevice[] = [];
     subscribeKioskDevices((next) => {
@@ -299,6 +383,7 @@ describe('subscribeKioskDevices', () => {
 
     expect(held[0]).toEqual({
       id: 'lobby-tablet',
+      name: null,
       approvedBy: '',
       approvedByName: null,
       pairedAt: null,
@@ -331,7 +416,7 @@ describe('isKioskLive', () => {
 
   it('is false exactly at the window, and true a millisecond inside it', () => {
     // The boundary is the whole of what the constant means, and `<=` here would
-    // arm Retire on a tablet whose last word was three minutes ago.
+    // call a kiosk live on the very report that says it is not.
     expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS) }), nowMs))
       .toBe(false);
     expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - KIOSK_LIVE_WITHIN_MS + 1) }), nowMs))
@@ -346,5 +431,89 @@ describe('isKioskLive', () => {
 
   it('is false for a row that has never reported', () => {
     expect(isKioskLive(device({ lastSeenAt: null }), nowMs)).toBe(false);
+  });
+
+  it('holds a healthy kiosk live between its five-minute reports, and past one missed', () => {
+    // The window used to be three minutes against a five-minute report, so a
+    // kiosk in perfect health read "not recording" two minutes in every five.
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - 4 * 60_000) }), nowMs)).toBe(true);
+    expect(isKioskLive(device({ lastSeenAt: new Date(nowMs - 9 * 60_000) }), nowMs)).toBe(true);
+  });
+});
+
+describe('kioskOutOfTouchSince and kioskMayHoldRecords', () => {
+  const nowMs = new Date('2026-09-06T11:00:00Z').getTime();
+  const nineFortyOne = new Date('2026-09-06T09:41:00Z');
+
+  it('says when a kiosk went quiet while set to a gathering', () => {
+    const quiet = device({ lastSeenAt: nineFortyOne });
+    expect(kioskOutOfTouchSince(quiet, nowMs)).toEqual(nineFortyOne);
+    // It may be holding that gathering's check-ins, so Retire asks first.
+    expect(kioskMayHoldRecords(quiet, nowMs)).toBe(true);
+  });
+
+  it('says nothing of a live kiosk, though retiring it would still take something away', () => {
+    expect(kioskOutOfTouchSince(device({ lastSeenAt: new Date(nowMs - 60_000) }), nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(device({ lastSeenAt: new Date(nowMs - 60_000) }), nowMs)).toBe(true);
+  });
+
+  it('asks before retiring a kiosk set to nothing that told Tally it still holds records', () => {
+    // Online, idle — and a pickup waiting a day for another device's arrival.
+    const holding = device({
+      boundTo: null,
+      boundChain: null,
+      lastSeenAt: new Date(nowMs - 60_000),
+      waitingCount: 1,
+    });
+    expect(kioskOutOfTouchSince(holding, nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(holding, nowMs)).toBe(true);
+  });
+
+  it('asks nothing of a kiosk last set to nothing, or already retired', () => {
+    const idle = device({ boundTo: null, boundChain: null, lastSeenAt: nineFortyOne });
+    expect(kioskOutOfTouchSince(idle, nowMs)).toBeNull();
+    expect(kioskMayHoldRecords(idle, nowMs)).toBe(false);
+
+    const retired = device({ lastSeenAt: nineFortyOne, retiredAt: new Date(nowMs - 1_000) });
+    expect(kioskMayHoldRecords(retired, nowMs)).toBe(false);
+  });
+});
+
+describe('kioskLabel', () => {
+  it('calls a kiosk by its name, and one nobody named by its id', () => {
+    expect(kioskLabel(device({ name: 'Lobby' }))).toBe('Lobby');
+    expect(kioskLabel(device())).toBe('lobby-tablet');
+  });
+});
+
+describe('kioskWaitingCount and kioskAllInSince', () => {
+  const nowMs = new Date('2026-09-28T16:02:00Z').getTime();
+  const mondayMorning = new Date('2026-09-28T16:00:00Z');
+
+  it('says what the tablet last told Tally it holds', () => {
+    expect(kioskWaitingCount(device({ waitingCount: 12 }))).toBe(12);
+    expect(kioskWaitingCount(device())).toBe(0);
+    // A retired tablet is not expected to be anywhere.
+    expect(kioskWaitingCount(device({ waitingCount: 12, retiredAt: mondayMorning }))).toBe(0);
+  });
+
+  it('says when an outage ended, while that is still news', () => {
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), nowMs)).toEqual(
+      mondayMorning,
+    );
+    const aWeekOn = mondayMorning.getTime() + KIOSK_ALL_IN_SHOWN_FOR_MS;
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), aWeekOn - 1)).toEqual(
+      mondayMorning,
+    );
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning }), aWeekOn)).toBeNull();
+  });
+
+  it('says nothing of it while records wait, for a retired tablet, or one that never held any', () => {
+    expect(kioskAllInSince(device({ waitingCount: 2, allInAt: mondayMorning }), nowMs)).toBeNull();
+    expect(
+      kioskAllInSince(device({ waitingCount: 0, allInAt: mondayMorning, retiredAt: mondayMorning }), nowMs),
+    ).toBeNull();
+    expect(kioskAllInSince(device({ waitingCount: 0, allInAt: null }), nowMs)).toBeNull();
+    expect(kioskAllInSince(device(), nowMs)).toBeNull();
   });
 });

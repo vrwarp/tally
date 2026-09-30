@@ -384,11 +384,19 @@ describe('checkOut', () => {
    * load-bearing: a pending `serverTimestamp()` reads back as null locally, and
    * null is exactly the state that means "still in the room".
    */
-  it('undoes by deleting both fields, never by writing null', async () => {
+  it('undoes by deleting every pickup field, never by writing null', async () => {
     await undoCheckOut('event-1', 'student-1');
 
+    // The pickup's own two, and the three the kiosk's callable may have written
+    // beside them — so an undone pickup leaves nothing of itself behind.
     const [, payload] = updateDoc.mock.calls[0]!;
-    expect(payload).toEqual({ checkedOutAt: 'deleted', checkedOutBy: 'deleted' });
+    expect(payload).toEqual({
+      checkedOutAt: 'deleted',
+      checkedOutBy: 'deleted',
+      checkedOutRecordedAt: 'deleted',
+      laterCheckOut: 'deleted',
+      checkedOutTimeUncertain: 'deleted',
+    });
   });
 });
 

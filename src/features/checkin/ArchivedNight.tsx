@@ -95,7 +95,7 @@ export function ArchivedNight({ event, attendance, students, now }: ArchivedNigh
                   </span>
                 ) : null}
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {time.clock(record.checkedInAt)}
+                  {time.attendanceClock(record.checkedInAt, record.timeUncertain)}
                 </span>
               </li>
             ))}

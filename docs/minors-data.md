@@ -102,6 +102,19 @@ The list itself is
 [one precomputed document](data-model.md#kioskindexparticipation) — the kiosk holds no event
 history and could not download the code that reads it.
 
+**What a kiosk holds while it cannot reach Tally.** Every check-in and pickup is written to the
+tablet's own storage before its tick paints, and stays there until Tally has it — seconds on an
+ordinary morning, as long as an outage lasts on a bad one ([kiosk-offline-recovery.md](kiosk-offline-recovery.md)).
+A record is the same facts the register holds and no more: the child's id, their name and grade for a
+check-in, the gathering's title, the time of the tap. No contact, no note. So a kiosk that has been
+offline is, until it reconnects, the one place those children's attendance exists, and the rules for
+the tablet follow from that: it stays in the lobby, plugged in and on the Wi-Fi, and nobody resets,
+wipes or reinstalls it until it says *All check-ins are in Tally* ([the card at the desk](tablet-management.md#44-enrolling)).
+The Check-ins screen that lists them is staff glass, behind the gate, and hands the kiosk back after
+five minutes untouched. A record Tally took but could not put on the register — a child whose record
+upstream is gone, a gathering deleted since — is kept in `kioskParkedRecords` for the core team,
+with the same names, until somebody settles it.
+
 ## What the CSV exports contain
 
 The core team can download four files — the roster, one gathering's register, the follow-up lists,

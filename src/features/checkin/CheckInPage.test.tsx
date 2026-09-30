@@ -167,6 +167,8 @@ vi.mock('@/services/attendance', () => ({
 }));
 vi.mock('@/services/events', () => ({ ensureMaterialized: services.ensureMaterialized }));
 vi.mock('@/services/skippedNights', () => ({ clearSkippedNight: vi.fn(async () => {}) }));
+// The kiosk line has its own tests (QuietKiosks.test.tsx); here, no kiosk is quiet.
+vi.mock('@/services/kioskPresence', () => ({ subscribeKioskPresence: () => () => {} }));
 vi.mock('@/services/functions', () => ({ recordVisitorParent: vi.fn(async () => ({ data: null })) }));
 
 /*

@@ -166,10 +166,18 @@ describe('checkOutPayload', () => {
     });
   });
 
-  it('undoes by deleting both fields, never by writing null', () => {
+  it('undoes by deleting every field of the pickup, never by writing null', () => {
     const payload = undoCheckOutPayload(clock);
 
-    expect(payload).toEqual({ checkedOutAt: DELETED, checkedOutBy: DELETED });
+    // The server's three go with the pickup they describe — when it reached
+    // Tally, the later entry it replaced, a time it could not vouch for.
+    expect(payload).toEqual({
+      checkedOutAt: DELETED,
+      checkedOutBy: DELETED,
+      checkedOutRecordedAt: DELETED,
+      laterCheckOut: DELETED,
+      checkedOutTimeUncertain: DELETED,
+    });
     expect(payload.checkedOutAt).not.toBeNull();
   });
 });

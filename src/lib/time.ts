@@ -182,7 +182,16 @@ export function nextSeriesOccurrence(
 export interface TimeStrings {
   locale: string;
   t: (
-    key: 'today' | 'tomorrow' | 'yesterday' | 'weeksAgo' | 'monthsAgo' | 'yearsAgo' | 'window' | 'dateTime',
+    key:
+      | 'today'
+      | 'tomorrow'
+      | 'yesterday'
+      | 'weeksAgo'
+      | 'monthsAgo'
+      | 'yearsAgo'
+      | 'window'
+      | 'dateTime'
+      | 'notKnown',
     values?: Record<string, string | number>,
   ) => string;
 }
@@ -312,6 +321,26 @@ export function formatShortDate(strings: TimeStrings, date: Date): string {
 
 export function formatClock(strings: TimeStrings, date: Date): string {
   return dateFormat(strings.locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+/**
+ * A check-in's or a pickup's time, or *time not known* when Tally cannot vouch
+ * for it.
+ *
+ * `landKioskRecords` keeps the kiosk's own moment of the tap, bounded by what
+ * could have happened — not before the gathering's check-in opened, not after
+ * the server's now. A tap outside those bounds by more than ordinary clock
+ * drift came from a tablet whose clock was badly wrong, and the time stored is
+ * the bound it was pulled to: plausible, and not what happened. So the register
+ * says it does not know rather than print it (docs/kiosk-offline-recovery.md
+ * §4).
+ */
+export function formatAttendanceClock(
+  strings: TimeStrings,
+  date: Date,
+  uncertain: boolean | undefined,
+): string {
+  return uncertain ? strings.t('notKnown') : formatClock(strings, date);
 }
 
 /**

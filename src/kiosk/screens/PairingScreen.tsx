@@ -63,6 +63,7 @@ export function PairingScreen({
   onPaired,
   pins = NO_PINS,
   onPins,
+  waiting = 0,
 }: {
   services: KioskServices;
   /**
@@ -76,6 +77,11 @@ export function PairingScreen({
   pins?: readonly Locale[];
   /** Absent on a harness that only wants the code; the chips are drawn only with it. */
   onPins?: (pins: Locale[]) => void;
+  /**
+   * How many check-ins made on this tablet have not reached Tally — kept on
+   * the tablet, and sent once it is paired again (see `journal.ts`).
+   */
+  waiting?: number;
 }) {
   const t = useTranslations('Pairing');
   const locale = useLocale();
@@ -278,14 +284,31 @@ export function PairingScreen({
       )}
 
       {/*
+        * The records this tablet still holds, and why pairing is the way to
+        * them: a retired or signed-out kiosk has no session to send with, and
+        * pairing it again — the same device id, so the same kiosk — is what
+        * lets them go. Said here because this is the screen somebody reaches
+        * for the reset on.
+        */}
+      {waiting > 0 && (
+        <div className="max-w-md text-lg leading-relaxed text-warn-400">
+          {t('waiting', { count: waiting })}
+        </div>
+      )}
+
+      {/*
         * The best moment to install, and the reason the offer is here rather
         * than only on the chooser: this device is unpaired, so installing now
         * costs nothing, while installing after pairing costs a second code on
         * iOS — where the installed app gets storage of its own and comes up
         * knowing nothing about the pairing done in Safari. Renders nothing when
         * the kiosk is already installed, which is every boot after the first.
+        *
+        * Not while records wait, because then it does cost something: on iOS
+        * the installed app starts with empty storage, and the records stay
+        * behind in Safari, where nothing will ever send them.
         */}
-      <InstallPrompt className="max-w-md" />
+      {waiting === 0 && <InstallPrompt className="max-w-md" />}
     </div>
   );
 }

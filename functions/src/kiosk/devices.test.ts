@@ -75,6 +75,55 @@ describe('recordPairedDevice', () => {
     expect(row.retiredAt).toBeNull();
     expect(row.boundChain).toBeNull();
   });
+
+  it('keeps what describes the tablet across a re-pair: its name, what it holds, and how it sends', async () => {
+    const db = new FakeFirestore();
+    const since = Timestamp.fromDate(new Date('2026-09-06T09:41:00Z'));
+    db.seed(`${DEVICES_COLLECTION}/kiosk-lobby-0001`, {
+      approvedBy: 'uid-marcus',
+      name: 'Lobby',
+      waitingCount: 12,
+      waitingSinceAt: since,
+      firstLandingAt: since,
+      batteryLevel: 0.2,
+      charging: false,
+      retiredAt: Timestamp.fromDate(new Date('2026-09-06T12:00:00Z')),
+      retiredBy: 'uid-dana',
+    });
+
+    await recordPairedDevice(db, 'kiosk-lobby-0001', SAM, NOW);
+
+    expect(db.get(`${DEVICES_COLLECTION}/kiosk-lobby-0001`)).toMatchObject({
+      approvedBy: 'uid-sam',
+      name: 'Lobby',
+      waitingCount: 12,
+      waitingSinceAt: since,
+      firstLandingAt: since,
+      // The last session's battery is not this one's.
+      batteryLevel: null,
+      charging: null,
+      retiredAt: null,
+      retiredBy: null,
+    });
+  });
+
+  it('takes the name the approver gave, tidied, over the one it had', async () => {
+    const db = new FakeFirestore();
+    db.seed(`${DEVICES_COLLECTION}/kiosk-lobby-0001`, { approvedBy: 'uid-marcus', name: 'Lobby' });
+
+    await recordPairedDevice(db, 'kiosk-lobby-0001', SAM, NOW, '  Nursery   door ');
+    expect(db.get(`${DEVICES_COLLECTION}/kiosk-lobby-0001`)!.name).toBe('Nursery door');
+
+    // A name that says nothing is no name, and leaves the one it had.
+    await recordPairedDevice(db, 'kiosk-lobby-0001', SAM, NOW, '   ');
+    expect(db.get(`${DEVICES_COLLECTION}/kiosk-lobby-0001`)!.name).toBe('Nursery door');
+  });
+
+  it('writes no name for a kiosk nobody named', async () => {
+    const db = new FakeFirestore();
+    await recordPairedDevice(db, 'kiosk-lobby-0001', SAM, NOW);
+    expect(db.get(`${DEVICES_COLLECTION}/kiosk-lobby-0001`)).not.toHaveProperty('name');
+  });
 });
 
 describe('readLiveDevice', () => {

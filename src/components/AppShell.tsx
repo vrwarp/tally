@@ -5,6 +5,7 @@ import { LanguageChoice } from '@/components/LanguageChoice';
 import { useAuth, useCanSee } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
+import { useKioskParkedCount } from '@/hooks/useKioskParkedCount';
 import { cn } from '@/lib/utils';
 import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { Button, ErrorBanner } from '@/components/ui';
@@ -61,6 +62,43 @@ const ROLE_LABEL = {
   core: 'Account.roleCore',
   admin: 'Account.roleAdmin',
 } as const;
+
+/**
+ * How many things wait for somebody behind a destination, as a number for the
+ * eye. Nothing at all at zero. Hidden from a screen reader, which hears
+ * `NavCountWords` after the destination's name instead — on the phone the
+ * number sits on the icon, before the name.
+ */
+function NavCount({ count, className }: { count: number; className?: string }) {
+  if (count === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'min-w-4 rounded-full bg-warn-500/20 px-1 text-center text-[10px] font-semibold leading-4 text-warn-300',
+        className,
+      )}
+    >
+      {count}
+    </span>
+  );
+}
+
+/**
+ * The same count in words, read after the destination's name: "Review 3
+ * waiting". The space is its own text beside the label, where it collapses
+ * away on screen but keeps the two words apart in the link's name.
+ */
+function NavCountWords({ count }: { count: number }) {
+  const t = useTranslations('Nav');
+  if (count === 0) return null;
+  return (
+    <>
+      {' '}
+      <span className="sr-only">{t('waitingCount', { count })}</span>
+    </>
+  );
+}
 
 const NAV: NavItem[] = [
   { to: '/', labelKey: 'checkIn', icon: '✓' },
@@ -120,6 +158,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const items = NAV.filter(
     (item) => !item.core || (item.viewers ? canSee('core') : can('core')),
   );
+  // What the lobby kiosk left for somebody to decide, beside Review.
+  const parkedCount = useKioskParkedCount(can('core'));
+  const countFor = (item: NavItem) => (item.labelKey === 'review' ? parkedCount : 0);
   const showNav = items.length > 1;
 
   const displayName = profile?.displayName || profile?.email || t('Account.signedIn');
@@ -320,6 +361,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {item.icon}
                 </span>
                 {t(`Nav.${item.labelKey}`)}
+                <NavCountWords count={countFor(item)} />
+                <NavCount count={countFor(item)} className="ml-auto" />
               </NavLink>
             ))}
           </nav>
@@ -405,10 +448,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                       )
                     }
                   >
-                    <span aria-hidden="true" className="text-base leading-none">
+                    <span aria-hidden="true" className="relative text-base leading-none">
                       {item.icon}
+                      <NavCount count={countFor(item)} className="absolute -top-1.5 left-3.5" />
                     </span>
                     {t(`Nav.${item.labelKey}`)}
+                    <NavCountWords count={countFor(item)} />
                   </NavLink>
                 </li>
               ))}

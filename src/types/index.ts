@@ -345,6 +345,14 @@ export interface StudentDoc {
    */
   mergedIntoStudentId?: string | null;
   /**
+   * Set on a student whose Planning Center record was re-created: this row went
+   * inactive and the student lives on as the one it names. Server-written, by
+   * `recreatePlanningCenterPerson`. Followed wherever something recorded against
+   * the old row has to land on the student who stands now — a parked kiosk
+   * record, say.
+   */
+  recreatedAsStudentId?: string | null;
+  /**
    * Set on the winner: the rows folded into this one. Their attendance is not
    * re-keyed — the profile unions the histories at read time instead.
    */
@@ -940,12 +948,26 @@ export interface TallyEvent
  * acknowledges it, and the Team screen has to draw the row either way.
  */
 export interface KioskDevice
-  extends Omit<KioskDeviceDoc, 'pairedAt' | 'lastSeenAt' | 'retiredAt'> {
+  extends Omit<
+    KioskDeviceDoc,
+    | 'pairedAt'
+    | 'lastSeenAt'
+    | 'retiredAt'
+    | 'waitingSinceAt'
+    | 'allInAt'
+    | 'name'
+    | 'firstLandingAt'
+    | 'waitingReportedAt'
+  > {
   /** The device id the kiosk minted for itself; the document id. */
   id: string;
+  /** What people call it, or null for a kiosk nobody named — screens then use the id. */
+  name: string | null;
   pairedAt: Date | null;
   lastSeenAt: Date | null;
   retiredAt: Date | null;
+  waitingSinceAt?: Date | null;
+  allInAt?: Date | null;
 }
 
 /**
@@ -982,11 +1004,18 @@ export interface AccessRequest extends Omit<AccessRequestDoc, 'askedAt' | 'clear
  * Written by `claimKioskToken` when a pairing is approved, and the row *is*
  * the kiosk's standing — the rules admit a kiosk session while its row exists
  * and `retiredAt` is null, and read nobody's profile. The kiosk itself may
- * update only `lastSeenAt`, `boundTo` and `boundChain`; core and up may set
- * `retiredAt`/`retiredBy`, and nobody deletes one: the row is the provenance
- * of every morning that kiosk recorded. See `src/lib/kioskDevice.ts`.
+ * update only its report — `lastSeenAt`, `boundTo`, `boundChain` and its
+ * battery; core and up may set `retiredAt`/`retiredBy` and rename it, and
+ * nobody deletes one: the row is the provenance of every morning that kiosk
+ * recorded. See `src/lib/kioskDevice.ts`.
  */
 export interface KioskDeviceDoc {
+  /**
+   * What people call it — *Lobby*, *Nursery door* — given by whoever paired it
+   * and changed by the core team. Absent or null for a kiosk nobody named.
+   * Tidied by `kioskName`.
+   */
+  name?: string | null;
   approvedBy: string;
   /** The approver's display name as of the pairing, like `transitions.releasedByName`. */
   approvedByName: string | null;
@@ -1015,6 +1044,27 @@ export interface KioskDeviceDoc {
   charging?: boolean;
   retiredAt: Timestamp | null;
   retiredBy: string | null;
+  /**
+   * What the tablet still holds that has not reached the register, and the
+   * oldest of it — written by `landKioskRecords` on every call, never by the
+   * kiosk's own report. `allInAt` is the moment a tablet that had been holding
+   * records emptied. All absent until the kiosk first sends a record this way.
+   */
+  waitingCount?: number;
+  waitingSinceAt?: Timestamp | null;
+  allInAt?: Timestamp | null;
+  /**
+   * When the call that wrote the counts began, so an older call finishing late
+   * cannot write older news over them. Server-only.
+   */
+  waitingReportedAt?: Timestamp;
+  /**
+   * When this kiosk first sent a record through `landKioskRecords`. From then
+   * on the rules refuse it the direct attendance writes the old bundle made
+   * (`kioskWritesDirectly` in firestore.rules). Server-only, and kept across a
+   * re-pair.
+   */
+  firstLandingAt?: Timestamp;
 }
 
 /**
@@ -1060,16 +1110,80 @@ export interface AttendanceRecordDoc {
    * volunteer who takes a child in is rarely the one who hands them back.
    */
   checkedOutBy?: string;
+
+  /*
+   * The rest is written only by `landKioskRecords`, the road every record from
+   * the lobby kiosk now takes (functions/src/kiosk/landing.ts), and the rules
+   * let no client set any of it — see docs/kiosk-offline-recovery.md. All
+   * optional: absent on everything the main app writes and on every record
+   * from before the road existed.
+   */
+
+  /** When the arrival reached Tally. `checkedInAt` is when it happened. */
+  recordedAt?: Timestamp;
+  /** The kiosk record it came from — the key its landing is idempotent on. */
+  kioskRecordId?: string;
+  /**
+   * The entry an earlier kiosk tap replaced. Two devices saw the same arrival,
+   * and the earlier moment is when the child was handed over, so it stands;
+   * the later one is kept here rather than lost.
+   */
+  laterCheckIn?: { at: Timestamp | null; by: string | null; method: string | null };
+  /** The kiosk's clock was too far out to vouch for `checkedInAt`. */
+  timeUncertain?: boolean;
+  /** When the pickup reached Tally. */
+  checkedOutRecordedAt?: Timestamp;
+  /** The pickup an earlier kiosk tap replaced, as `laterCheckIn`. */
+  laterCheckOut?: { at: Timestamp | null; by: string | null };
+  /** As `timeUncertain`, for the pickup. */
+  checkedOutTimeUncertain?: boolean;
 }
 
 export interface AttendanceRecord
-  extends Omit<AttendanceRecordDoc, 'checkedInAt' | 'checkedOutAt' | 'checkedOutBy'> {
+  extends Omit<
+    AttendanceRecordDoc,
+    | 'checkedInAt'
+    | 'checkedOutAt'
+    | 'checkedOutBy'
+    | 'recordedAt'
+    | 'kioskRecordId'
+    | 'laterCheckIn'
+    | 'timeUncertain'
+    | 'checkedOutRecordedAt'
+    | 'laterCheckOut'
+    | 'checkedOutTimeUncertain'
+  > {
   /** Equal to `studentId`. */
   id: string;
   checkedInAt: Date;
   /** Null while they are still in the room. */
   checkedOutAt: Date | null;
   checkedOutBy: string | null;
+  /**
+   * The kiosk's clock could not vouch for the arrival's time, or the pickup's.
+   * Every screen that prints the clock time says "time not known" instead.
+   * Absent (false) for nearly every record.
+   */
+  timeUncertain?: boolean;
+  checkedOutTimeUncertain?: boolean;
+  /**
+   * When a record the lobby kiosk sent reached Tally — `checkedInAt` is when
+   * it happened. Absent on everything else. The gap between the two is how the
+   * event page tells an outage's late arrivals from the ordinary morning.
+   */
+  recordedAt?: Date;
+  /** As `recordedAt`, for the pickup. */
+  checkedOutRecordedAt?: Date;
+  /** The entry an earlier kiosk tap replaced — who and when — kept rather than lost. */
+  laterCheckIn?: LaterEntry;
+  /** As `laterCheckIn`, for the pickup. */
+  laterCheckOut?: LaterEntry;
+}
+
+/** A displaced arrival or pickup: when it was, and who recorded it, as far as the record says. */
+export interface LaterEntry {
+  at: Date | null;
+  by: string | null;
 }
 
 /* -------------------------------------------------------------------------- */

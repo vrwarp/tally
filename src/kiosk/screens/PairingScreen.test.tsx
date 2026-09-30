@@ -219,6 +219,47 @@ describe('the reason a paired kiosk is here again', () => {
 });
 
 /*
+ * What a retired or signed-out kiosk still holds. Pairing it again is the way
+ * those records reach Tally, and this is the screen somebody reaches for the
+ * reset on — so it says both, and stops offering the one thing that would
+ * strand them: on iOS an installed copy of the kiosk starts with empty storage.
+ */
+describe('check-ins still on the tablet', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window.navigator as object, 'standalone');
+  });
+
+  /** iOS Safari, where the install offer is a line of instructions. */
+  function asIosSafari(): void {
+    Object.defineProperty(window.navigator, 'standalone', { value: false, configurable: true });
+  }
+
+  it('says how many are waiting, and that pairing sends them', async () => {
+    const poll = vi.fn(async () => 'pending' as const);
+    render(<PairingScreen services={servicesWith(poll)} onPaired={vi.fn()} waiting={12} />);
+    await tick();
+
+    expect(
+      screen.getByText('12 check-ins waiting. Pair this tablet to send them.'),
+    ).toBeInTheDocument();
+  });
+
+  it('offers to install only while nothing waits', async () => {
+    asIosSafari();
+    const poll = vi.fn(async () => 'pending' as const);
+    const { unmount } = render(<PairingScreen services={servicesWith(poll)} onPaired={vi.fn()} />);
+    await tick();
+    expect(screen.getByText(/Add to Home Screen/)).toBeInTheDocument();
+    unmount();
+
+    render(<PairingScreen services={servicesWith(poll)} onPaired={vi.fn()} waiting={1} />);
+    await tick();
+    expect(screen.queryByText(/Add to Home Screen/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^1 check-in waiting\./)).toBeInTheDocument();
+  });
+});
+
+/*
  * What this lobby speaks, chosen by whoever mounts the tablet. A different
  * fact from the picker above it — that one is the volunteer's own reading
  * language — and kept by the kiosk, not by this screen.

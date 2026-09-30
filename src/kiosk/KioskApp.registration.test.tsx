@@ -28,11 +28,14 @@ import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskA
  */
 import '@/kiosk/registration';
 import { PROCESSING_MS, SNAP_MS } from '@/kiosk/registration/RegistrationFlow';
+import { resetTouchForTests, unreached } from '@/kiosk/touch';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
 import type { RegisterFamilyRequest, RegisterFamilyResult } from '@/types';
+import { landEverything } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 const ADA: KioskStudent = {
   id: 'student-ada',
@@ -160,13 +163,6 @@ const services = {
   refetchRoster: vi.fn(async () => {}),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
   // Passed through to the printing chunk on mount; never called here, because
   // nothing a family registers a second ago has an allergy note on file.
   fetchAllergyNote: vi.fn(async () => null),
@@ -200,6 +196,9 @@ const services = {
       searchName: child.searchName,
     })),
   ),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -324,6 +323,9 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
   localStorage.clear();
+  // In touch, as every test here but one assumes: the kiosk that cannot reach
+  // Tally sends a new family to a leader instead (KioskApp.offline.test.tsx).
+  resetTouchForTests();
   sent = [];
   registerFails = false;
   registerError = { code: 'functions/internal' };
@@ -578,6 +580,27 @@ describe('while the call is in the air', () => {
     await settle();
 
     expect(printing.printLabel).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not print ahead of a save the kiosk already expects to fail', async () => {
+    /*
+     * The early sticker is a bet that a slow save will finish. A kiosk that has
+     * just found it cannot reach Tally at all has lost that bet already, and a
+     * family walking off in tags for a registration that never happened is the
+     * failure docs/kiosk-offline-recovery.md §8 names. If the answer does come,
+     * `onRegistered` prints them then.
+     */
+    configurePrinter();
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+    await act(async () => {
+      unreached();
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+
+    expect(printing.printLabel).not.toHaveBeenCalled();
   });
 
   it('does not print early on the ordinary evening, when the call comes back first', async () => {

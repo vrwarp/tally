@@ -36,10 +36,21 @@ vi.mock('@/context/dataContext', () => ({
   useData: () => ({ error: dataError }),
 }));
 
+/** How many of the kiosk's parked records wait, for whoever may see them. */
+let parked = 0;
+const askedFor: boolean[] = [];
+vi.mock('@/hooks/useKioskParkedCount', () => ({
+  useKioskParkedCount: (enabled: boolean) => {
+    askedFor.push(enabled);
+    return enabled ? parked : 0;
+  },
+}));
+
 const { AppShell } = await import('@/components/AppShell');
 
 beforeEach(() => {
   dataError = null;
+  parked = 0;
 });
 
 function renderShell(who: Role) {
@@ -160,5 +171,29 @@ describe('the shell over a broken stream', () => {
     renderShell('core');
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('the count beside Review', () => {
+  it('says how many of the kiosk’s records wait for a decision, in words for a screen reader', () => {
+    parked = 3;
+    renderShell('core');
+    const links = screen.getAllByRole('link', { name: /Review/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAccessibleName('Review 3 waiting');
+  });
+
+  it('says nothing at zero', () => {
+    renderShell('core');
+    for (const link of screen.getAllByRole('link', { name: /Review/ })) {
+      expect(link).toHaveAccessibleName('Review');
+    }
+  });
+
+  it('asks nothing for anybody below the core team, who have no Review', () => {
+    askedFor.length = 0;
+    renderShell('counselor');
+    expect(askedFor.every((enabled) => enabled === false)).toBe(true);
+    expect(screen.queryByRole('link', { name: /Review/ })).toBeNull();
   });
 });

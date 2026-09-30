@@ -48,7 +48,8 @@
     "review": "Review",
     "kiosk": "Kiosk",
     "team": "Team",
-    "settings": "Settings"
+    "settings": "Settings",
+    "waitingCount": "{count, plural, one {1 waiting} other {# waiting}}"
   },
   "Dashboard": {
     "title": "Insights",
@@ -550,7 +551,8 @@
     "formerStudent": "Former student",
     "swapBody": "Tap the right student. {name}’s check-in moves across, still {time}.",
     "refusedBanner": "This gathering isn't letting you check in — see Who's on",
-    "refusedSee": "See"
+    "refusedSee": "See",
+    "kioskQuiet": "No word from {named, select, yes {{kiosk}} other {the lobby kiosk}} since {when}. Its check-ins and pickups aren’t listed yet; today’s name tag means checked in."
   },
   "PastChange": {
     "titleCheckIn": "Check {name} in to a past gathering?",
@@ -931,17 +933,31 @@
     "kioskLive": "Recording {gathering} right now",
     "kioskIdle": "Paired {when} · not recording",
     "kioskOffCharger": "On battery · {percent}%",
+    "kioskWaitingOnTablet": "{count, plural, one {1 check-in} other {# check-ins}} waiting since {when}",
+    "kioskAllInSince": "All in Tally since {when}",
+    "kioskPairedBy": "Paired by {name}",
+    "nameKiosk": "Name it",
+    "renameKiosk": "Rename",
+    "kioskNameLabel": "Name",
+    "kioskNameHint": "E.g. Lobby, Nursery door. Leave empty to use {device}.",
+    "saveKioskName": "Save",
+    "kioskRenamedToast": "Renamed to {name}.",
+    "kioskNameRemovedToast": "Name removed.",
+    "renameKioskFailed": "Couldn’t rename. Try again.",
     "kioskRetiredOn": "Retired {when}",
     "retireKiosk": "Retire",
-    "retireLiveWarning": "This kiosk is recording {gathering} right now. Retiring it stops that at its next tap, and a leader has to check children in from a phone until it is paired again.",
+    "retireLiveWarning": "It’s recording {gathering}. Retiring shows a pairing code on it, maybe mid-pickup. Anything on it waits until it’s paired again.",
     "keepItRunning": "Keep it",
     "yesRetire": "Yes, retire",
-    "kioskRetiredToast": "{device} retired. It stops recording at its next tap; the row stays as the record of what it took.",
+    "kioskRetiredToast": "{device} retired. Anything still on it waits until it’s paired again.",
     "retireKioskFailed": "Could not retire that kiosk. Try again in a moment.",
     "asksHeading": "Asked to be added this week",
     "askRow": "{name} · {gathering} · {when}",
     "mailboxNote": "{address} looks like a shared mailbox. One account is one person in Tally: if several people sign in to this one, every register any of them takes is filed under this name.",
-    "noHistoryNote": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past."
+    "noHistoryNote": "Tally records when access began and when it ended, and nothing else. It keeps no record of which gatherings somebody was on in the past.",
+    "kioskOutOfTouch": "No word since {when}, at {gathering}. Likely the internet; it keeps recording.",
+    "retireOutOfTouchWarning": "It may still hold check-ins from {gathering}. Retiring shows a pairing code when it reconnects; they wait on it until it’s paired again.",
+    "retireWaitingWarning": "{count, plural, one {1 check-in is} other {# check-ins are}} still on it. Retiring shows a pairing code; {count, plural, one {it waits} other {they wait}} until it’s paired again."
   },
   "KioskPair": {
     "title": "Pair a kiosk",
@@ -949,13 +965,15 @@
     "backToCheckIn": "Check in",
     "whatIsKiosk": "<mono>/kiosk</mono> is a self-serve check-in screen for lobby tablets, allowing families to check in by name or phone number.",
     "setupPage": "Everything a managed tablet needs — the printer rule for its Chrome, the QR that provisions it, and what each one is for — is at <link>/setup</link>.",
-    "retire": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
-    "retireCore": "To retire a kiosk, clear the browser’s site data on the device. A kiosk keeps working whoever paired it: switching a person’s access off does not stop it.",
+    "retire": "The core team retires kiosks on the Team page. Don’t wipe a tablet or clear its site data until it says “All check-ins are in Tally”. Removing someone’s access doesn’t stop a kiosk they paired.",
+    "retireCore": "Retire a kiosk from the list above. Don’t wipe a tablet or clear its site data until it says “All check-ins are in Tally”. Removing someone’s access doesn’t stop a kiosk they paired.",
     "blocked": "Tally cannot sign a kiosk in yet. Approving a code is still recorded, but the lobby screen keeps waiting until somebody runs the setup command below.",
     "codeLabel": "Pairing code",
     "approving": "Approving…",
     "approve": "Approve this kiosk",
     "codeHint": "Codes last ten minutes. If this one is refused, read the code the kiosk is showing now and try again.",
+    "nameLabel": "Name it (optional)",
+    "nameHint": "E.g. Lobby, Nursery door. The core team can rename it.",
     "outcomeApproved": "Approved — the kiosk signs itself in on its next poll. What it records is the kiosk’s own, not under your name.",
     "outcomeNotFound": "No kiosk is showing that code. Codes last ten minutes; read the one on the kiosk screen now — the letters I, L, O and the digits 0 and 1 never appear.",
     "outcomeExpired": "That code has expired. The kiosk is already showing a fresh one — read it off the screen and try again.",
@@ -987,6 +1005,7 @@
     "rebuildFailed": "Could not rebuild the kiosk phone index. Is your church directory reachable?",
     "stagingHeading": "Set up a tablet with no code",
     "stagingWhat": "For a managed tablet that boots into the kiosk by itself, with nobody there to read a code to. Put the link in the tablet’s start URL.",
+    "stagingNameHint": "Used for the next link only. Change it before making another.",
     "stagingMake": "Make a link",
     "stagingMaking": "Making…",
     "stagingAgain": "Make another",
@@ -994,7 +1013,12 @@
     "stagingBusy": "Too many pairings are open at the moment. Try again in a few minutes.",
     "stagingFailed": "That didn’t work. Try again.",
     "stagingCopy": "Copy the link",
-    "stagingCopied": "Copied"
+    "stagingCopied": "Copied",
+    "kiosksHeading": "Kiosks",
+    "kiosksNone": "No kiosks yet.",
+    "kiosksNotLoaded": "Couldn’t load the kiosks.",
+    "showRetiredKiosks": "{count, plural, one {Show 1 retired kiosk} other {Show # retired kiosks}}",
+    "hideRetiredKiosks": "Hide retired kiosks"
   },
   "EventEditor": {
     "titleEdit": "Edit event",
@@ -1249,7 +1273,12 @@
     "whoRestricted": "{count, plural, one {# person} other {# people}} — everybody else sees it locked",
     "whoOpen": "Everyone on the team can take attendance here",
     "change": "Change who is on it",
-    "limit": "Limit who is on it"
+    "limit": "Limit who is on it",
+    "kioskQuiet": "No word from {named, select, yes {{kiosk}} other {the lobby kiosk}} since {when}. Anything tapped there since is still on the tablet.",
+    "kioskLate": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late — all in Tally since {when}.",
+    "kioskLateSending": "{count, plural, one {1 late check-in} other {# late check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} so far; more on the way.",
+    "kioskParked": "{count, plural, one {1 kiosk record needs} other {# kiosk records need}} a decision.",
+    "kioskParkedLink": "Open Review"
   },
   "DangerZone": {
     "heading": "Danger zone",
@@ -2182,7 +2211,34 @@
     "wouldLinkByDefault": "Tally’s closest match.",
     "noneOfThem": "None of them — {name} is new",
     "samePhoneDigits": "Same phone digits on file.",
-    "differentPhoneDigits": "Different phone digits on file."
+    "differentPhoneDigits": "Different phone digits on file.",
+    "parkedHeading": "From the lobby kiosk",
+    "parkedIntro": "Records the kiosk couldn’t add by itself.",
+    "parkedNotLoaded": "Couldn’t load kiosk records.",
+    "parkedSomeChild": "A child",
+    "parkedSomeGathering": "A gathering",
+    "parkedTimeNotKnown": "time not known",
+    "parkedWhere": "{gathering} · {date}",
+    "parkedFrozen": "Missing from the church’s database, so this can’t be recorded yet.",
+    "parkedFrozenBack": "Back in the church’s database. Ready to record.",
+    "parkedGatheringDeleted": "Its gathering was deleted. To keep it, record it by hand on the right night.",
+    "parkedNoArrival": "No arrival on the register for this pickup to close. It may have been removed.",
+    "parkedArrivalLetGo": "Its arrival was let go, so this pickup has nothing to close.",
+    "parkedUnreadable": "Tally couldn’t read this record.",
+    "parkedOpenStudent": "Fix on their page",
+    "parkedPutBack": "Re-create in {backend}",
+    "parkedPutBackCaption": "Uses the name the kiosk kept, or links a match already there.",
+    "parkedPutBackFailed": "Couldn’t re-create {name}.",
+    "parkedRecordCaption": "Adds it at the time it was tapped.",
+    "parkedRecord": "Record {kinds, select, both {the {arrival} arrival and pickup} arrival {the {arrival} arrival} other {the {pickup} pickup}}",
+    "parkedLetGoCaption": "Adds nothing. Kept with your name on it.",
+    "parkedLetGo": "Let it go",
+    "parkedRecordedToast": "Recorded.",
+    "parkedLetGoToast": "Let go.",
+    "parkedAlreadySettled": "Already decided.",
+    "parkedStillFrozen": "Still missing from the church’s database.",
+    "parkedCannotRecord": "Nothing left to record it onto. You can let it go.",
+    "parkedNotFound": "That record is gone."
   },
   "Door": {
     "loading": "Loading…",
@@ -2202,6 +2258,9 @@
     "apostrophe": "Apostrophe",
     "hyphen": "Hyphen",
     "staffPrint": "Staff · print name tags",
+    "staffCheckIns": "Staff · check-ins",
+    "leaderTitle": "A leader will get you started",
+    "leaderWhy": "This kiosk can’t reach Tally, so it can’t add new families. A leader can add you on their phone.",
     "turnUprightTitle": "Turn the screen upright",
     "turnUprightBody": "Check-in only works with the screen taller than it is wide. If you can’t turn it, please see a leader."
   },
@@ -2275,7 +2334,27 @@
     "owedCost": "{count, plural, one {The unticked one is skipped.} other {The # unticked are skipped.}}",
     "owedPrint": "{count, plural, one {Print 1 name tag} other {Print # name tags}}",
     "owedSkip": "{count, plural, one {Skip 1 name tag} other {Skip # name tags}}",
-    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}"
+    "statusWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsAllIn": "All check-ins are in Tally",
+    "checkIns": "Check-ins",
+    "checkInsWaiting": "{count, plural, one {1 waiting} other {# waiting}}",
+    "checkInsNetwork": "No internet since {time}.",
+    "checkInsServer": "Tally won’t take them — tell the office.",
+    "checkInsHeld": "{count, plural, one {1 isn’t} other {# aren’t}} saved yet — don’t reload or restart; get it online.",
+    "checkInsAbout": "These send themselves.",
+    "checkInsNothingWaiting": "Nothing waiting.",
+    "checkInsSending": "Sending {total} … {left} left",
+    "checkInsTryNow": "Try now",
+    "recordIn": "Check-in",
+    "recordOut": "Check-out",
+    "recordAbout": "about {time}",
+    "recordHeld": "Not saved yet",
+    "recordNotSent": "Not sent yet",
+    "recordNoInternet": "No internet",
+    "recordServer": "Tally didn’t take it",
+    "recordArrival": "Waiting for their check-in",
+    "someone": "A child",
+    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online."
   },
   "Search": {
     "searchEveryone": "Search everyone",
@@ -2298,7 +2377,10 @@
     "offerFirstTime": "First time here? Register your child",
     "offerShort": "Not yours? Register",
     "networkFailed": "No connection just now.",
-    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}"
+    "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}",
+    "offlineNotice": "<mark>Staff</mark> — offline. Check-ins are saved.",
+    "checkInsNeedAttention": "Check-ins need attention",
+    "markBoth": "Printer and check-ins need attention"
   },
   "Chooser": {
     "question": "Which gathering is this kiosk for?",
@@ -2327,7 +2409,9 @@
     "connectThePrinterAgain": "Connect the printer again",
     "oneMoment": "One moment…",
     "printerSettings": "Printer settings",
-    "nameTagsWontPrint": "name tags won’t print"
+    "nameTagsWontPrint": "name tags won’t print",
+    "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi."
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",
@@ -2482,7 +2566,8 @@
     "retired": "This kiosk was retired in Tally at {time} and has not recorded anything since. Check children in from a leader’s phone until it is paired again.",
     "pinLanguages": "Languages families here speak",
     "pinHint": "English is always offered.",
-    "pinPreview": "What families will see"
+    "pinPreview": "What families will see",
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} waiting. Pair this tablet to send {count, plural, one {it} other {them}}."
   },
   "Time": {
     "today": "Today",
@@ -2492,7 +2577,8 @@
     "monthsAgo": "{count, plural, one {1 mth ago} other {# mths ago}}",
     "yearsAgo": "{count, plural, one {1 yr ago} other {# yrs ago}}",
     "window": "{start} – {end}",
-    "dateTime": "{date} · {time}"
+    "dateTime": "{date} · {time}",
+    "notKnown": "time not known"
   },
   "Birthday": {
     "finishTheYear": "Finish the year, or take it out — a birthday can go in without one.",
