@@ -39,7 +39,7 @@ gatherings is the one with a safeguarding argument behind it.
 | 4 | Add error reporting, alerting on scheduled jobs and callable error rates, Firestore backups with a restore runbook, and a changelog/tag per deploy | Nothing today tells anyone that Sunday broke, and there is no recovery path from a bad backfill or rules change | M |
 | 5 | Stop building PR previews against the production project | Unmerged code and unmerged rules run against live minors' data on every pull request | M |
 | 6 | Make the registration sweep clear the review hold, claim-before-create in `pushStudent`, and add a scheduled retry for failed visitor pushes | Families can be silently stranded after 30 days; concurrent pushes create duplicate people in a database with no delete | S |
-| 7 | Pickup verification on check-out gatherings — the shape the personas chose (§6.2) | The one control on the kiosk that touches custody is a single unverified tap | M |
+| 7 | Pickup verification on check-out gatherings, in the shape all four consultants converged on: a per-arrival code on the first sticker and a names-free parent receipt, compared by eye at the room door, with the room volunteer's Out becoming the pickup of record (§6.2, P1) | The one control on the kiosk that touches custody is a single unverified tap, and today the lobby tap outranks the volunteer's actual handover | M–L |
 | 8 | Split `KioskApp.tsx` (3,656 lines) and `ReviewPage.tsx` (2,399) along the seams the audits name; bring `src/kiosk/services.ts` and the invite screens under unit and mutation cover | The largest untested surfaces are the ones a Sunday depends on | M |
 | 9 | Bilingual human review of the kiosk slice (358 keys) and the 22 hard-coded English strings; pay the contrast debt | The Chinese congregation was the reason for i18n, and their strings are ~11 % reviewed | M |
 | 10 | Fix the stale status banners and drift the docs audit lists (Appendix B), and add a "what is not yet built" ledger that CI can check | The docs are the product's memory and the only place a second maintainer can start | S |
@@ -184,12 +184,16 @@ ten-round language study and the review-queue work show the product listens to t
    nursery this is the largest product gap in the review, and it is the one the personas were asked
    to settle (§6.2). ◆ No security code, pickup code or parent-tag token exists anywhere in `src/`
    or `functions/`.
-2. **The lobby is enumerable.** Two letters list up to eight names and grades; the four-digit lookup
-   has no rate limit; "Search everyone" widens to the whole ministry from the parent-facing screen;
-   the staff gate is a 2-second hold the code itself calls "not authentication". The scope described
-   in `docs/minors-data.md` is applied on the glass over a roster and phone map that are already on
-   the tablet. The mitigations are physical (a lobby, volunteers) and that is a defensible choice
-   for one small church — but it should be a stated choice, not an accident of the design.
+2. **The lobby is enumerable.** ◆ A single letter lists up to eight names and grades (there is no
+   minimum, and the match is a substring: `src/kiosk/search.ts:87`, `src/lib/utils.ts:341`); the
+   four-digit lookup has no rate limit; "Search everyone" widens to the whole ministry from the
+   parent-facing screen; the staff gate is a 2-second hold the code itself calls "not
+   authentication"; and ◆ the corner mark opens tonight's check-in list, or the printer screen with
+   reprint-by-name, with no hold at all whenever it is lit (`src/kiosk/KioskApp.tsx:2668-2671`). The
+   scope described in `docs/minors-data.md` is applied on the glass over a roster and phone map that
+   are already on the tablet. The mitigations are physical (a lobby, volunteers), and the panel was
+   clear that the searches must not be narrowed at the families' expense — the corner mark is the
+   real gap (§6.2, P2).
 3. **A registration that will fail can still print stickers.** The early print fires 5 s into the
    save; `registerFamily` has no deadline (SDK default ~70 s) and the out-of-touch flag is learned
    from a failed poll, so for roughly 50 s after the Wi-Fi drops a new family gets labels for a
@@ -209,9 +213,14 @@ ten-round language study and the review-queue work show the product listens to t
    recorded anywhere; a one-off with hundreds of visitors has no honest way onto the trend; a
    gathering has one `location` and nothing tells a family which room a child goes to. None of these
    is refused in the docs; they are simply absent (the personas were asked, §6.2).
-7. **Removal is a console job.** `docs/minors-data.md` tells an operator to delete the student and
-   their rows "directly", but rules deny client deletes, and the full erasure also covers
-   transitions, parked records, registrations, the phone index and the copies on phones and kiosks.
+7. **Removal is a console job, and it does not stick.** `docs/minors-data.md` tells an operator to
+   delete the student and their rows "directly", but rules deny client deletes, and the full erasure
+   also covers transitions, parked records, the held registration (the one place a full phone number
+   lives), the phone index and its 14-day overlay, and the copies on phones and kiosks. ◆ Worse, the
+   Check-Ins history import re-creates any missing student document as `active` at the same
+   predictable id and rewrites their attendance (`functions/src/pco/checkins.ts:817-819`; the
+   Attendees history import uses the same writer), so a removal done by hand is undone by the next
+   routine top-up import. A removal tool has to leave a tombstone the imports honour (§6.2, P7).
 8. **The counselor cannot tell a landed tap from a queued one.** Recorded in
    `docs/error-handling.md` as the oldest open gap; a real Sunday has since been watched for the read
    half, not the write half.
@@ -254,6 +263,15 @@ two e2e specs; a docs sweep that forbids reset advice. The feature inventory is 
    mid-service says nothing on the one screen anyone looks at; a kiosk bound before its template was
    set prints nothing all morning with no warning; labels for one-off events; a per-kiosk "no
    printer" flag; the pairing screen's chip composition.
+8. **Found by the consultation, verified in code (◆):** the registration flow tells a family "Name
+   tags printing", and on a failed save "Your name tags have printed", whether or not this kiosk
+   prints anything (`src/kiosk/registration/RegistrationFlow.tsx:401-409` sets the flag while
+   `onEarlyPrint` at `KioskApp.tsx:2786` silently returns); the staff screen reports a gathering
+   with no label template as "No printer on this kiosk — set one up below" (`KioskApp.tsx:3217`),
+   so the 9:05 volunteer re-pairs a working printer; any Back or Cancel from an overlay resets the
+   kiosk's language to English (`KioskApp.tsx:758-764`); and a bound kiosk sees edits to its
+   gathering's template, room or photo only on a rebind, which means Change gathering → Leave and
+   an empty lobby (`src/kiosk/binding.ts`).
 
 ### 4.3 Security and privacy
 
@@ -539,7 +557,27 @@ Pi-3 throttle with the journal write in place; the tablet-management Phase 0 fie
 The twelve proposals put to the consultants are listed here with the panel's verdict. The verdicts
 are summarised in Appendix D; this table gives the outcome and the shape that survived.
 
-<!-- PERSONA-VERDICTS -->
+| # | Proposal | Panel verdict | The shape that survived | Effort | Priority |
+|---|---|---|---|---|---|
+| P6 | Pre-service readiness | **Build first.** Every consultant ranked it first or second; the parent called the silent-printer morning the worst thing on the list | On the tablet, split "this gathering has no label layout — a core member sets it in the app" from "no printer", and fix the existing staff rows rather than adding a card. Push template, room and photo edits to a bound kiosk through the pulse it already polls (or a "Pick up changes" row), so saving is the whole fix. In the app, a card readable at 8:40 *before* binding: each gathering's needs against each kiosk's facts (printer and roll, template, languages, records waiting, on charger, photo with its upload date), fed by a best-effort write at bind and on printer change — never by the standing report, which doubles as the retirement check. The proactive line goes in the idle screen's staff-notice slot, never on the tick screen | M | 1 |
+| P11 | Saving indicator at the counselor's door | **Build.** The journey critic ranked it second: unacknowledged check-ins and door quick-adds live only in the tab and vanish with it, then resurface as false "we've missed you" calls | Appears only after writes have waited a few seconds, in header space so no row moves; worded as the action that saves them ("3 check-ins are only on this phone — keep Tally open until this clears"; after a minute, "try mobile data"); explains why a pending row will not undo; no per-child toast. Record separately the lasting fix — an on-device journal like the kiosk's — as a product decision against the online-only posture | S (indicator) / M–L (journal) | 2 |
+| P1 | Pickup verification | **Build shape (c) with (b) as its token; do not build (a).** All four rejected (a): it challenges exactly the adults whose digits already failed (the second parent, a grandmother, a quick-added family with no number), lets through anyone who knows the household's number, and re-imposes the cost the removed 2-second hold had | On gatherings that track check-out and print: one code per family per arrival (from `arrivalId`), printed on each child's *first* sticker and on a names-free parent receipt; the room volunteer compares them by eye; the counselor app's In-room row shows the code as the fallback and says "no code yet" or "no receipt — printer out 9:05–9:20" rather than nothing. The verified room handover becomes the pickup of record: a lobby tap marks the child "being collected" and leaves them on the room list until the volunteer's Out, which is never blocked. No code on any reprint or owed tag. "All done" tells the family how pickup works. Kiosks that cannot print keep the volunteer's question | M–L | 3 |
+| P7 | Family-removal tool | **Build, rebuilt around a tombstone.** Journey critic: blocker as specified, because the history import re-creates a deleted child | Admin-only. A tombstone keyed by the upstream id, honoured by both history imports, Add from Planning Center and the phone-index build. Reaches the held registration and the 14-day overlay; removes *this child's id* from index entries, never the household's entry (siblings share the digits); marks any later parked record for the child "let go" with no re-create offer. A server-counted preview like Journey 7's delete dialog (nights whose head count drops, held registrations, parked records). The confirmation carries a safeguarding-lead sentence; the runbook names who decides, the order (Planning Center first), how the requester is verified, and what to tell the family. The parent consultant asked for the commoner request too: remove *one phone number* from a family without removing the children, taking effect at the kiosk at once | M | 4 |
+| P4 | Labels for one-off events | **Build.** Newcomers are most likely to arrive at a holiday club, where nothing prints today | "Start from another gathering's label" as the first control; ship after P6's no-template line. Fix the "Name tags printing" copy first (Appendix A, A29) | S–M | 5 |
+| P3 | Hold the kiosk's language | **Build as specified**, paired with clearing an abandoned half-typed search on the same two-minute clock, and keeping the language through Back and Cancel | The next family must never meet a stranger's letters and language; today Back/Cancel resets to English (A32) | S | 6 |
+| P5 | Rooms by grade | **Build only as a guide to where to walk.** Liked by parent and newcomer; the journey critic showed the grade is wrong for a cohort every autumn and for every nursery child (no grade) | Rooms by grade band with a No-grade row, set beside the label template; shown per child on the arrival success screens (held longer when siblings split, tap to dismiss) and printed automatically on the label; keep the grade line on the confirm; never on the pickup confirm; keep the room volunteer's question ("they're with us" ends it); say in the editor that the nursery cannot be split; trial across the August-to-promotion window | M | 7 |
+| P10 | "What this tablet keeps" | **Build, with accurate words, after P7.** The proposed "kept 30 days" wording was called misleading by three consultants: after approval the number lives in Planning Center | Under the wizard's phone field: "Once a leader has checked this, you're added to the church's records. This tablet keeps only the last 4 digits so you can find yourselves next week." At most a small About mark on the idle screen, never a sentence competing with the instruction. A desk card printed from Tally, in every kiosk language, with a church-wide removal contact set by an admin | S | 8 |
+| P9 | Head-count-only events | **Build, one-off only and enforced.** | Change the one predicate (`src/lib/sessionHistory.ts`) so a head count means the event was held; show "about 240" on the calendar row and in the one-offs section beside any named check-ins; label it an estimate everywhere; keep it out of every trend line; never allow it on a recurring night | S–M | 9 |
+| P8 | Leader attendance | **Do not build the self-report or the kiosk variant.** Staff and journey critic: an incomplete list that looks complete is worse than none for a safeguarding question; a kiosk record cannot be tied to a person; ratios are policy | Show the attribution Tally already records on the event page: "Recorded tonight by: Priya 14 · Marcus 9 · lobby kiosk 31" from `checkedInBy`/`checkedOutBy`. A nursery self-report can come later, off by default, in the header, never a ratio | S | 10 |
+| P2 | Lobby hardening | **Do not raise a flat minimum, do not gate "Search everyone", no PIN at pairing.** All four: two-letter surnames (Wu, Li, Ng, Xu) and the promotion-Sunday family lose their only self-rescue, and a PIN ends up taped to the stand | First, the real gap: the corner mark opens only the printer's status and fix controls; tonight's name lists and reprint-by-name stay behind the hold. Then one- and two-letter queries match word starts only (the Wus still find the Wus; a lone "a" no longer lists everyone). "Search everyone" widens only on a whole first name or four digits. If a credential is ever printed (P1), one church-wide PIN readable in the app by anyone on the bound gathering, gating reprint-by-name and Change gathering on every route including the dot | S | 11 |
+| P12 | Planning Center Workflows hand-off | **Low priority; only for a church whose follow-up already lives in Workflows.** | Church-wide admin opt-in naming the workflow, with a sentence about who can see it; skip students with an open card and say so; flag students who have attended since; minimal fields (name, gathering, last seen); Attendees students stay in the CSV and are counted; honour write-back off | M | 12 |
+
+Three things the panel said that reach beyond the twelve: **the lobby tap must stop outranking
+the volunteer's handover** on check-out gatherings (today `checkedOutBy` names a shelf, and an
+offline volunteer's Out is displaced by the kiosk's earlier tap); **the family's four digits are
+not a credential** and must not appear beside minors' names on volunteers' phones; and **anything
+printed as a credential must never print from a reprint or an owed batch**, which is why P1's code
+and P2's corner-mark fix belong together.
 
 ### 6.3 Platform and code health
 
@@ -598,15 +636,19 @@ Four of the product's refusals were right when made and are worth re-examining n
 **Weeks 1–2.** N1–N15 (each a day or less); the four field validations; merge Dependabot. Ship as
 several small PRs, not one.
 
-**Weeks 3–6.** O1, O2, O4, O7; C1 (the kiosk split, before any new kiosk feature); P1's chosen shape
-and P6 (§6.2); N-level i18n fixes already done, start C8's kiosk-slice review.
+**Weeks 3–6.** O1, O2, O4, O7; C1 (the kiosk split, before any new kiosk feature); P6 in full and
+P3, then P11's indicator (§6.2); the corner-mark half of P2; start C8's kiosk-slice review.
 
-**Weeks 7–12.** O3 (staging or emulator previews, per decision 1); C2–C5; the remaining §6.2
-features the panel ranked; C9; the documentation restructure (§4.9: an operator's index, a status
-ledger, one home per fact).
+**Weeks 7–12.** P1 in its (c)+(b) shape, P7 with its tombstone, P4; O3 (staging or emulator
+previews, per decision 1); C2–C5; C9; the documentation restructure (§4.9: an operator's index, a
+status ledger, one home per fact).
 
-**After.** C10 and the second-church path if decision 1 says so; the Attendees simulator's fault
-model; the parked aging-out shapes (S3, S6) if the autumn cohort proves painful again.
+**After.** P5, P9, P10, P8's attribution line and the rest of P2 as the panel shaped them; P12
+only if the church adopts Workflows; then C10 and the second-church path if decision 1 says so.
+
+**Later still.** The Attendees simulator's fault model; the parked aging-out shapes (S3, S6) if the
+autumn cohort proves painful again; the counselor app's own journal if P11's indicator shows how
+often taps are lost.
 
 ---
 
@@ -626,7 +668,11 @@ model; the parked aging-out shapes (S3, S6) if the autumn cohort proves painful 
 - **Verified directly (◆):** the uncaught registration import and the bind-order race in
   `KioskApp.tsx`; the registration sweep and the Review listing source; that `main` is unprotected
   and four Dependabot PRs are open; that no pickup/security code, monitoring, error reporting or
-  backup configuration exists in the repository.
+  backup configuration exists in the repository; the `ReviewPage` state guard, the PWA
+  `autoUpdate`/`immediate` pair, the `usePastEvents` translator dependency, the no-backend
+  `failed-precondition`, the hard-coded Students heading; the translation review counts (es-MX
+  111, zh-Hans 365, zh-Hant 322 of 2,440 reviewed; 506 keys with a context note); and, from the
+  consultation, A29–A34 and A36.
 - **Not done:** no test suite was run (no `node_modules` in the review container); no production
   data or console was inspected; the clone is shallow, so history before 5 September is inferred
   from the docs; bundle sizes are reasoned from configuration, not measured.
@@ -668,6 +714,14 @@ model; the parked aging-out shapes (S3, S6) if the autumn cohort proves painful 
 | A26 | `src/features/dashboard/DashboardPage.tsx:729`, `StudentDetailPage.tsx:1051` | Raw `{error}` interpolated | Firestore's English inside a Chinese banner |
 | A27 | `src/features/checkin/FilterBar.tsx:81, 143-144` | `shrink-0` chip, 16-char Spanish label | "Llegaror" truncated mid-word on the roster |
 | A28 | `src/components/ui/…` tokens (`tokens.test.ts:359-365`) | Contrast below AA at ~173 hint sites, phone nav, light wordmark | Recorded as `it.todo` |
+| A29 ◆ | `src/kiosk/registration/RegistrationFlow.tsx:401-409`; `KioskApp.tsx:2786` | "Name tags printing" / "have printed" shown whether or not this kiosk prints | A family at a one-off or a non-printing kiosk waits at a silent printer, then goes to find someone |
+| A30 ◆ | `src/kiosk/KioskApp.tsx:3217` → `StaffScreen` | A gathering with no label template is reported as "No printer on this kiosk" | The 9:05 volunteer re-pairs a working printer while families queue |
+| A31 ◆ | `src/kiosk/KioskApp.tsx:2668-2671` | The corner mark opens the check-in list or the printer screen (reprint-by-name) with no hold | Tonight's names, grades and reprints one tap from the parent-facing screen whenever the mark is lit |
+| A32 ◆ | `src/kiosk/KioskApp.tsx:758-764` | Any return from an overlay resets the locale to English | A Chinese-reading family that backs out of the wizard returns to an English screen |
+| A33 ◆ | `src/kiosk/binding.ts` (template, location and photo travel on the binding) | Edits reach a bound kiosk only on rebind | A template saved at 8:44 does nothing until someone empties the lobby with Change gathering → Leave |
+| A34 ◆ | `functions/src/pco/checkins.ts:817-819`; `attendees32/history.ts:342` | History import re-creates a missing student as `active` | A removed child returns with their full record on the next top-up import |
+| A35 | `functions/src/kiosk/landing.ts:456`; `docs/kiosk-offline-recovery.md` (earlier wins) | The lobby tap is the pickup of record; `checkedOutBy` is the kiosk uid; a volunteer's earlier-landed Out is displaced | "Who collected Ada on the 14th?" answers with a shelf, and the verified handover has no record |
+| A36 ◆ | `src/kiosk/search.ts:87`; `src/lib/utils.ts:341` | No minimum query length; substring match | One letter lists eight children; "an" matches Daniel, Brian and Hannah |
 
 ## Appendix B — Documentation drift to fix
 
@@ -735,9 +789,85 @@ limitation, or refused. The deferrals that still stand are (doc → item):
 - `deployment-setup.md` / `ci.md`: WIF, required reviewers on `production`.
 - `kiosk-performance.md`: keeping the search screen mounted under overlays awaits React's Activity.
 
-The refusals, consolidated, are in §2.4; each is cited in the docs audit's own table (available on
-request in the review's working files) and this review endorses them except as noted in §6.4.
+The refusals, consolidated, are in §2.4. Each is stated, with its reason, in one of:
+`docs/data-model.md` §5 and *What is not stored*; `docs/minors-data.md`; `docs/product.md` Journeys
+4, 4c, 5b and 8 and *Asking to be added*; `docs/team-access.md` §5; `docs/kiosk-owed.md` and
+`docs/kiosk-offline-recovery.md` (*The refusals*); `docs/tablet-management.md` §2 and *What is
+deliberately not in the plan*; `docs/aging-out.md` (*Cut, with epitaphs*); `docs/label-printing.md`
+(*What a label can say*); `docs/i18n.md` §4.3; `docs/kiosk-performance.md` (the latency
+assertion). This review endorses them except as noted in §6.4.
 
 ## Appendix D — The persona consultation
 
-<!-- PERSONA-APPENDIX -->
+The twelve proposals in §6.2 were put, with the evidence lines from §4 behind each, to the four
+consultant agents defined in `.claude/agents/`. Each returned its position, findings graded
+blocker/major/minor, and a ranked list of asks, grounded in the screens and docs it read. This is
+the substance of the four responses.
+
+**The parent** (two children, a hundredth Sunday, a toddler on one hip). Would notice only pickup
+and the sticker. Chose P1(c) with (a) alongside "as long as they ask everyone, every time — if they
+only ask people they don't recognise, grandma feels accused"; would accept (b) only paired with a
+real lock on reprints and never typed into the tablet, because "anyone who knows the hold-Clear
+trick can print another copy of my kid's sticker". Called P6 the thing that would change the worst
+morning ("green tick, silent printer, two families behind me wondering if I did it wrong") and asked
+that no warning ever appear on the tick screen. Liked P5 for the Sunday the children move up. On P2:
+"don't do these for my sake — I wouldn't feel them protecting my kids, and I would feel the family
+ahead of me getting stuck" (the Ng/Li/Wu families of the Chinese congregation). On P7: the request a
+parent can actually picture is "this phone number shouldn't find my kids any more", not "delete my
+kids". On P10: plain words at the desk card, and "don't tell us we can ask for removal until the
+office really can".
+
+**The newcomer** (first visit, a friend said "just check the kids in at the tablet"). Nothing in
+the set changes the first four seconds, as long as P10's small print stays off the idle screen.
+What reaches them is the "All done" screen a registering family actually sees, which today names one
+room for the whole gathering: P5 belongs there, one line per child, and on every sticker, using the
+name on the door. P1(c) is "the one I'd trust most" because a person asks before handing the child
+back and it works with a dead printer; (a) strands the parent who did not register ("my husband
+types Marcus and his own phone fails"); (b) needs the slip to say in words what it is for. Found
+A29 (the "Name tags printing" copy on a kiosk that will not print) and A32 (Back/Cancel resets the
+language). On P2(b): before removing "Search everyone", make a child a greeter added this morning
+findable by name without a hidden button, or "the church gets my kids twice". On P10: "kept 30 days"
+reads as "they forget my number", and a text in week six would feel like the tablet lied.
+
+**Church staff** (the director on Tuesday, the coordinator at 9:05). Would turn on P6 first, then
+P1 as (b)+(c) together "with delight" for the nursery and preschool: one code per family per arrival,
+paper matched to paper at the door, the code on the In-room row for the toddler who pulled the
+sticker off, Out never blocked, codes never on a reprint or an owed tag. Found A30 (no template
+reported as no printer), A33 (a bound kiosk cannot pick up a fix without emptying the lobby) and the
+corner-mark route (A31), and insisted readiness facts never ride the standing report because it is
+the retirement oracle. Refused P1(a) (blocker: "stops honest adults and doesn't stop dishonest
+ones"), P2(b) (blocker: removes the self-rescue greeters are trained on), P2(c) (blocker: "within a
+month it's taped to the back of the tablet") and the kiosk half of P8 (blocker: a record anyone in
+the lobby could have written is worse than none). Asked for P8 in its derived form ("Took the
+register: Priya (31), Sam (4)"), P9 one-off-only and enforced because a head count must never reach
+a recurring night's cancelled-if-empty rule, P10 in Tally's own translations with a church-wide
+removal contact and a desk card that prints from Tally, P11 as "3 not saved yet, keep Tally open" in
+the header, and P12 only for a church already following up in Workflows, with no duplicate cards.
+On P7: count the head-count drops and warn about offline kiosks whose later records would offer
+"Re-create in Planning Center" for a removed child; remove the child's id from the digits, never the
+digits.
+
+**The journey critic.** "The strongest proposals are the ones that show a hidden failure to the
+person who can fix it, at the moment they can fix it: P6 at 8:40, P11 at the Friday door, P7 for
+the admin, P4 for the holiday-club volunteer." Found that P1 targets the wrong moment — the lobby
+tap records, it does not release, and today the parent's lobby tap is the pickup of record while
+the verified handover has none (A35) — so only shape (c) protects a child, with a per-arrival code
+compared at the room door and the room's Out outranking the lobby tap; the family's digits must not
+be the credential (they are the kiosk's lookup key, would be said aloud, and would put family phone
+digits beside minors' names on volunteers' phones). Corrected the brief on P2(a): there is no
+minimum today and the match is a substring (A36), so word-start matching for one- and two-letter
+queries is the fix, not a length rule. Found P7's blocker (A34) and its missing stores. Showed P5
+routes by a grade that is wrong for a cohort every autumn and cannot route the nursery at all, so it
+must stay a guide and keep the volunteer's question. Showed P9 collides with the cancelled-if-empty
+predicate. Showed P11's underlying cause — the counselor app's in-memory cache means a door
+quick-add can vanish entirely and return as a false missing-in-action call — and that an in-flight
+row cannot be undone offline with nothing saying why. Ranked the asks: P6, P11, P1(c), P7, P4, P5,
+P10, P9, P3, P12, P2 (word starts only; no (a)/(b); a church-wide PIN only if a credential is ever
+printed), and P8 as attribution only.
+
+**Where they disagreed.** The parent would accept P1(a) as a free extra; staff and the journey
+critic would not build it (it blocks the least-known families and the second parent). The parent
+preferred a check at the door over any slip; staff wanted the slip; the journey critic reconciled
+them — the slip is the token, the door is the check, and the phone row is the fallback. The parent
+liked P10 at the desk card; the newcomer and the journey critic wanted it under the phone field and
+off the idle screen; all three agreed the "30 days" wording must go.
