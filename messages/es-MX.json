@@ -2369,7 +2369,7 @@
     "offerShort": "¿No es suya? Inscribir",
     "networkFailed": "Sin conexión.",
     "owedNotice": "<mark>Personal</mark> — {count, plural, one {1 etiqueta pendiente} other {# etiquetas pendientes}}",
-    "offlineNotice": "<mark>Personal</mark> — sin conexión. Los registros están guardados y se enviarán.",
+    "offlineNotice": "<mark>Personal</mark> — sin conexión. Los registros están guardados.",
     "checkInsNeedAttention": "Los registros necesitan atención",
     "markBoth": "La impresora y los registros necesitan atención"
   },

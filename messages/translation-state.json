@@ -13787,8 +13787,8 @@
     "zh-Hant": "machine"
   },
   "Search.offlineNotice": {
-    "source": "<mark>Staff</mark> — offline. Check-ins are saved and will send.",
-    "context": "A line on the idle kiosk screen, for staff, after the kiosk has been unable to reach Tally for ten minutes. Its first word says who it is for (same grammar as the name-tags notice). It reassures whoever walks past that nothing is lost and nothing needs doing: the check-ins are kept on the tablet and send themselves once it is back online. It asks nothing of anybody.",
+    "source": "<mark>Staff</mark> — offline. Check-ins are saved.",
+    "context": "A line on the idle kiosk screen, for staff, after the kiosk has been unable to reach Tally for ten minutes. Its first word says who it is for (same grammar as the name-tags notice). It reassures whoever walks past that nothing is lost: the check-ins are kept on the tablet, and send themselves once it is back online. It asks nothing of anybody.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

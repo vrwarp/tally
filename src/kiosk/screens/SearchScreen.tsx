@@ -1233,7 +1233,7 @@ export function SearchScreen({
           <div className="mx-auto mt-auto flex w-full max-w-xl flex-col gap-3 pt-6 pb-6">
             {offlineNotice && (
               /*
-               * Wraps where the owed notice truncates: the second half — that
+               * Never truncated like the owed notice: its second half — that
                * the check-ins are saved — is the half that does the work.
                */
               <button

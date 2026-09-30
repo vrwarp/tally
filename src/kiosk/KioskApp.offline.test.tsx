@@ -611,17 +611,17 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await mount();
     await loseTouch();
     await wait(9 * 60_000);
-    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved\./)).toBeNull();
 
     // The ten minutes, and then the few seconds of stillness the front door's
     // staff notices wait for.
     await wait(60_000);
     await wait(5_000);
-    const notice = screen.getByText(/offline\. Check-ins are saved and will send\./);
-    expect(notice.textContent).toBe('Staff — offline. Check-ins are saved and will send.');
+    const notice = screen.getByText(/offline\. Check-ins are saved\./);
+    expect(notice.textContent).toBe('Staff — offline. Check-ins are saved.');
 
     await type('a');
-    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved\./)).toBeNull();
   });
 
   it('opens the list from the notice, and comes back to the door', async () => {
@@ -630,13 +630,13 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await wait(10 * 60_000);
     await wait(5_000);
 
-    await press(screen.getByText(/offline\. Check-ins are saved and will send\./).closest('button')!);
+    await press(screen.getByText(/offline\. Check-ins are saved\./).closest('button')!);
     expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
     await press(screen.getByText(/Done — back to check-in/).closest('button')!);
     // Back at the door, and — once the glass is still again — so is the notice.
-    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved\./)).toBeNull();
     await wait(5_000);
-    expect(screen.getByText(/offline\. Check-ins are saved and will send\./)).toBeTruthy();
+    expect(screen.getByText(/offline\. Check-ins are saved\./)).toBeTruthy();
   });
 
   it('sends a new family to a leader before the first question, not after the last', async () => {

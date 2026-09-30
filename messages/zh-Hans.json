@@ -2369,7 +2369,7 @@
     "offerShort": "不是您家的？登记",
     "networkFailed": "现在连不上网络。",
     "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 张名牌在等着打印}}",
-    "offlineNotice": "<mark>同工</mark> — 离线中。签到记录已保存，联网后会自动上传。",
+    "offlineNotice": "<mark>同工</mark> — 离线中。签到记录已保存。",
     "checkInsNeedAttention": "签到记录需要处理",
     "markBoth": "打印机和签到记录都需要处理"
   },

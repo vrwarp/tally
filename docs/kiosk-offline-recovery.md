@@ -417,7 +417,7 @@ enough to say the true thing without any new report:
 - **A line for staff on untouched glass** — the owner's decision. After ten minutes out of touch, in
   the grammar of the owed-tags notice ([kiosk-owed.md](kiosk-owed.md) §3: its first word says who it
   is for, it asks nothing, the first keystroke removes it, never on a confirm or a tick): *Staff —
-  offline. Check-ins are saved and will send.* Reassurance, not an instruction: a volunteer is very
+  offline. Check-ins are saved.* Reassurance, not an instruction: a volunteer is very
   unlikely to wipe a tablet, and "reset" would be read as "restart", which is harmless — the journal
   and the room survive it.
 - **Moving the kiosk.** While out of touch, **Leave** says what it costs: the kiosk cannot be set to a
