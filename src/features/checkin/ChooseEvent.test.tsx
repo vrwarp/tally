@@ -60,18 +60,21 @@ function event(overrides: Partial<TallyEvent> & { startAt: Date; endAt: Date }):
   });
 }
 
-function auth(role: 'counselor' | 'core'): AuthContextValue {
+type Who = 'viewer' | 'counselor' | 'core';
+
+function auth(role: Who): AuthContextValue {
   return {
     status: 'ready',
     stage: null,
     user: null,
-    profile: null,
+    profile: role === 'viewer' ? ({ role: 'viewer', active: true } as never) : null,
     error: null,
     signInWithGoogle: async () => {},
     signOut: async () => {},
     refreshProfile: async () => {},
     clearError: () => {},
-    can: (required) => required === 'counselor' || role === 'core',
+    can: (required) =>
+      role === 'viewer' ? required === 'viewer' : required === 'counselor' || role === 'core',
   } as AuthContextValue;
 }
 
@@ -87,7 +90,7 @@ function data(canWork: (event: TallyEvent) => boolean = () => true): DataContext
 
 function wrap(
   children: ReactNode,
-  role: 'counselor' | 'core',
+  role: Who,
   canWork?: (event: TallyEvent) => boolean,
 ) {
   return (
@@ -101,14 +104,14 @@ function wrap(
 
 function show(
   events: readonly TallyEvent[],
-  role: 'counselor' | 'core' = 'core',
+  role: Who = 'core',
   canWork?: (event: TallyEvent) => boolean,
 ) {
   return render(wrap(<ChooseEvent events={events} now={NOW} />, role, canWork));
 }
 
 /** The same, at an hour of the caller's choosing — for the night that runs late. */
-function showAt(events: readonly TallyEvent[], now: Date, role: 'counselor' | 'core' = 'core') {
+function showAt(events: readonly TallyEvent[], now: Date, role: Who = 'core') {
   return render(wrap(<ChooseEvent events={events} now={now} />, role));
 }
 
@@ -458,5 +461,40 @@ describe('the catch-up tail', () => {
 
     await settle();
     expect(screen.queryByRole('region', { name: /catch up/i })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * A viewer lands on the same question and is offered the same gatherings — as
+ * registers to open, not doors to work.
+ */
+describe('a viewer', () => {
+  it('opens a gathering as a register, not a check-in', async () => {
+    show(
+      [event({ id: 'tonight', title: 'Friday Fellowship', startAt: at(29, 19), endAt: at(29, 21) })],
+      'viewer',
+    );
+
+    expect(screen.getByText('Open the register')).toBeInTheDocument();
+    expect(screen.queryByText('Start check-in')).not.toBeInTheDocument();
+    expect(screen.queryByText('Take attendance')).not.toBeInTheDocument();
+
+    await settle();
+  });
+
+  it('is not asked to add check-ins to the recent registers', async () => {
+    fetchPastEvents.mockResolvedValue({
+      events: [
+        event({ id: 'last-friday', title: 'Friday Fellowship', startAt: at(24, 19), endAt: at(24, 21) }),
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+
+    show([], 'viewer');
+
+    const tail = await screen.findByRole('region', { name: /catch up/i });
+    expect(within(tail).getByText('Recent gatherings and how many were checked in.')).toBeInTheDocument();
+    expect(within(tail).queryByText(/add them now/)).not.toBeInTheDocument();
   });
 });

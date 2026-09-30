@@ -72,9 +72,12 @@ function rank(profile: UserProfile, now: Date): number {
 /**
  * The people on a list who could actually add somebody, best first.
  *
- * Resolved against the directory, suspended profiles dropped, and sorted by
- * the ranking above. The sort is stable, so two people of the same rank keep
- * the order the document holds them in.
+ * Resolved against the directory, suspended profiles and viewers dropped, and
+ * sorted by the ranking above. A viewer on a gathering can read its register
+ * and add nobody — the rules rank the role below every write — so naming one
+ * as the way in sends the reader to the one person on the list who cannot
+ * help. The sort is stable, so two people of the same rank keep the order the
+ * document holds them in.
  */
 export function rankApprovers(
   uids: Iterable<string>,
@@ -83,7 +86,10 @@ export function rankApprovers(
 ): UserProfile[] {
   return [...uids]
     .map((uid) => byUid.get(uid))
-    .filter((profile): profile is UserProfile => profile !== undefined && profile.active)
+    .filter(
+      (profile): profile is UserProfile =>
+        profile !== undefined && profile.active && profile.role !== 'viewer',
+    )
     .sort((a, b) => rank(a, now) - rank(b, now));
 }
 

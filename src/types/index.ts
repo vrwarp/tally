@@ -80,22 +80,49 @@ export function asGrade(value: unknown): Grade | null {
 export type StudentStatus = 'active' | 'inactive';
 
 /**
+ * `viewer`     — read-only. Sees what core sees, bar Review and Settings, and
+ *                changes nothing. The pastor, the elder, the board member.
  * `counselor`  — check-in only. The door volunteer.
  * `core`       — counselor plus dashboard, roster editing, event/RSVP management.
  * `admin`      — core plus user management (granting roles).
  */
-export type Role = 'counselor' | 'core' | 'admin';
+export type Role = 'viewer' | 'counselor' | 'core' | 'admin';
 
+/**
+ * What each role may *do*. A viewer is below the door volunteer here, because
+ * ticking a child in is a write and a viewer makes none; what a viewer may
+ * *see* is `seesAsRole`, which is the one place the ladder bends.
+ */
 /* Stryker disable next-line all: static — see docs/mutation-testing.md. */
-export const ROLE_RANK: Record<Role, number> = { counselor: 1, core: 2, admin: 3 };
+export const ROLE_RANK: Record<Role, number> = { viewer: 0, counselor: 1, core: 2, admin: 3 };
 
-/** True when `role` meets or exceeds `required`. */
+/** True when `role` meets or exceeds `required` — may do what `required` may do. */
 export function roleAtLeast(role: Role | null | undefined, required: Role): boolean {
   // Stryker disable next-line ConditionalExpression: nobody has a rank of
   // `undefined`, and `undefined >= n` is already false, so the guard refuses
   // nothing the comparison would let through. It is here so the lookup is typed.
   if (!role) return false;
   return ROLE_RANK[role] >= ROLE_RANK[required];
+}
+
+/**
+ * True when `role` may *see* what `required` sees.
+ *
+ * The same as `roleAtLeast` for everybody but a viewer, who sees every screen
+ * a core member sees and none of an admin's. The screens a viewer opens still
+ * draw no control that writes — that is `roleAtLeast` at the control — and the
+ * rules refuse the write regardless.
+ */
+export function seesAsRole(role: Role | null | undefined, required: Role): boolean {
+  if (role === 'viewer') return required !== 'admin';
+  return roleAtLeast(role, required);
+}
+
+/** A stored role, or `null` for anything that is not one. */
+export function asRole(value: unknown): Role | null {
+  return value === 'viewer' || value === 'counselor' || value === 'core' || value === 'admin'
+    ? value
+    : null;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -151,7 +151,11 @@ function linked(overrides: Partial<Student> = {}): Student {
   });
 }
 
-function openProfile(student: Student, over: Partial<DataContextValue> = {}) {
+function openProfile(
+  student: Student,
+  over: Partial<DataContextValue> = {},
+  who: 'core' | 'viewer' = 'core',
+) {
   vi.setSystemTime(NOW);
 
   const data = {
@@ -172,7 +176,15 @@ function openProfile(student: Student, over: Partial<DataContextValue> = {}) {
     ...over,
   } as unknown as DataContextValue;
 
-  const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
+  const auth = (
+    who === 'viewer'
+      ? {
+          user: { uid: 'viewer-1' },
+          profile: { role: 'viewer', active: true },
+          can: (required: string) => required === 'viewer',
+        }
+      : { user: { uid: 'core-1' }, can: () => true }
+  ) as unknown as AuthContextValue;
   const toast: ToastContextValue = { show, dismiss: vi.fn(), toasts: [] };
 
   const wrap = (children: ReactNode) => (
@@ -351,6 +363,15 @@ describe('the birthday on a student profile', () => {
     expect(screen.getByRole('link', { name: 'Change it there' }).getAttribute('href')).toContain(
       '4200003',
     );
+  });
+
+  // A viewer is told where the birthday lives and not sent there to change it.
+  it('says where the birthday lives, without a link, to a viewer', () => {
+    personDetails.current = details({ profileWritable: false });
+    openProfile(linked({ birthday: '03-14' }), {}, 'viewer');
+
+    expect(screen.getByText('Kept in Planning Center.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Change it there' })).toBeNull();
   });
 
   /**

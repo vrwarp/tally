@@ -20,7 +20,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
 import { EditBirthday } from '@/features/students/EditBirthday';
 import { ParentContactPanel } from '@/features/students/ParentContactModal';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { invalidateAdultContact } from '@/hooks/useAdultContact';
@@ -66,6 +66,7 @@ const TITLES = {
 export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalProps) {
   const t = useTranslations('RowBadge');
   const name = studentFullName(student);
+  const readOnly = useReadOnly();
   // Queued names where the push is going, which depends on the student.
   const title =
     action === 'queued'
@@ -75,7 +76,11 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
   return (
     <Modal open onClose={onClose} title={title} description={name} size="sm">
       {action === 'allergy' ? <AllergyPanel student={student} /> : null}
-      {action === 'contact' ? <ParentContactPanel student={student} onDone={onClose} /> : null}
+      {/* Not for a viewer: the panel opens on a parent's phone number. The title
+          already says what the badge means. */}
+      {action === 'contact' && !readOnly ? (
+        <ParentContactPanel student={student} onDone={onClose} />
+      ) : null}
       {action === 'visitor' ? <VisitorPanel student={student} onDone={onClose} /> : null}
       {action === 'birthday' ? (
         <BirthdayPanel student={student} now={now} onDone={onClose} />
@@ -89,6 +94,22 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
         </Link>
       </p>
     </Modal>
+  );
+}
+
+/**
+ * A viewer's way out of a panel whose decision is not theirs.
+ *
+ * The panel still says what the badge means; the choice under it — promote,
+ * reactivate, push — is a write, and "Leave it" or "Later" would be answering
+ * a question nobody asked a viewer.
+ */
+function ReadOnlyClose({ onDone }: { onDone: () => void }) {
+  const tCommon = useTranslations('Common');
+  return (
+    <Button variant="secondary" onClick={onDone}>
+      {tCommon('close')}
+    </Button>
   );
 }
 
@@ -177,6 +198,7 @@ function AllergyPanel({ student }: { student: Student }) {
  * list is built on the same flag.
  */
 function VisitorPanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const readOnly = useReadOnly();
   const time = useTimeFormats();
   const t = useTranslations('RowBadge');
   const { user } = useAuth();
@@ -211,12 +233,18 @@ function VisitorPanel({ student, onDone }: { student: Student; onDone: () => voi
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onDone} disabled={busy}>
-          {t('leaveIt')}
-        </Button>
-        <Button onClick={() => void promote()} disabled={busy || !user}>
-          {busy ? t('saving') : t('notAVisitor')}
-        </Button>
+        {readOnly ? (
+          <ReadOnlyClose onDone={onDone} />
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onDone} disabled={busy}>
+              {t('leaveIt')}
+            </Button>
+            <Button onClick={() => void promote()} disabled={busy || !user}>
+              {busy ? t('saving') : t('notAVisitor')}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -263,7 +291,10 @@ function BirthdayPanel({
   // student's record has no stable public URL to offer.
   const upstream =
     backend === 'pco' && student.pcoPersonId ? pcoPersonUrl(student.pcoPersonId) : null;
-  const { details, loading, loaded } = usePersonDetails(student);
+  // A viewer is shown the day the roster holds and asked for nothing more: the
+  // details read carries a parent's contact, and the edit under it is a write.
+  const readOnly = useReadOnly();
+  const { details, loading, loaded } = usePersonDetails(readOnly ? null : student);
   const writable = backend !== null && details?.profileWritable === true;
   /*
    * The whole date once the read lands, the roster's day until then. The badge
@@ -307,7 +338,7 @@ function BirthdayPanel({
         </div>
       )}
 
-      {writable ? (
+      {readOnly ? null : writable ? (
         <EditBirthday student={student} onFile={onFile} onDone={onDone} />
       ) : loading && !loaded ? (
         <p className="text-sm text-ink-500">{t('readingPermissions', { backend: label })}</p>
@@ -338,6 +369,7 @@ function BirthdayPanel({
 /* -------------------------------------------------------------------------- */
 
 function InactivePanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const readOnly = useReadOnly();
   const t = useTranslations('RowBadge');
   const { user } = useAuth();
   const { show } = useToast();
@@ -369,12 +401,18 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onDone} disabled={busy}>
-          {t('leaveIt')}
-        </Button>
-        <Button onClick={() => void reactivate()} disabled={busy || !user}>
-          {busy ? t('saving') : t('makeActiveAgain')}
-        </Button>
+        {readOnly ? (
+          <ReadOnlyClose onDone={onDone} />
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onDone} disabled={busy}>
+              {t('leaveIt')}
+            </Button>
+            <Button onClick={() => void reactivate()} disabled={busy || !user}>
+              {busy ? t('saving') : t('makeActiveAgain')}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -392,6 +430,7 @@ function InactivePanel({ student, onDone }: { student: Student; onDone: () => vo
  * a button is the right shape rather than a schedule.
  */
 function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void }) {
+  const readOnly = useReadOnly();
   const t = useTranslations('RowBadge');
   const { show } = useToast();
   const { refreshRoster } = useData();
@@ -435,12 +474,18 @@ function QueuedPanel({ student, onDone }: { student: Student; onDone: () => void
       </p>
       {problem ? <ErrorBanner message={problem} /> : null}
       <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={onDone} disabled={busy}>
-          {t('later')}
-        </Button>
-        <Button onClick={() => void push()} disabled={busy}>
-          {busy ? t('pushing') : t('pushNow')}
-        </Button>
+        {readOnly ? (
+          <ReadOnlyClose onDone={onDone} />
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onDone} disabled={busy}>
+              {t('later')}
+            </Button>
+            <Button onClick={() => void push()} disabled={busy}>
+              {busy ? t('pushing') : t('pushNow')}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

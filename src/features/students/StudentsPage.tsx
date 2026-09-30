@@ -39,7 +39,7 @@ import {
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useAdultContact } from '@/hooks/useAdultContact';
 import { isUnreachable } from '@/features/dashboard/insights';
@@ -123,6 +123,8 @@ export function StudentsPage() {
   // for where students come from — the buttons say the neutral thing instead.
   const multiBackend = rosterBackends.length >= 2;
   const { user } = useAuth();
+  // A viewer finds and reads students, and exports them; adding one is a write.
+  const readOnly = useReadOnly();
 
   const [query, setQuery] = useState('');
   /*
@@ -400,12 +402,16 @@ export function StudentsPage() {
             search, and search is an input rather than a button; at `lg` it
             takes the top line of the toolbar to itself.
           */}
-          <Button variant="secondary" onClick={() => setEditorOpen(true)}>
-            {t('newVisitor')}
-          </Button>
-          <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
-            {multiBackend ? t('addFromDirectory') : t('addFromPco')}
-          </Button>
+          {readOnly ? null : (
+            <>
+              <Button variant="secondary" onClick={() => setEditorOpen(true)}>
+                {t('newVisitor')}
+              </Button>
+              <Button variant="secondary" onClick={() => setAddFromPcoOpen(true)}>
+                {multiBackend ? t('addFromDirectory') : t('addFromPco')}
+              </Button>
+            </>
+          )}
           {/*
             The third control, and the only one on this page whose output leaves
             the app. It exports what is on screen under the filters applied —
@@ -431,32 +437,36 @@ export function StudentsPage() {
           open
           onClose={() => setActionsOpen(false)}
           title={t('actionsTitle')}
-          description={t('actionsDescription')}
+          description={readOnly ? t('actionsDescriptionReadOnly') : t('actionsDescription')}
           size="sm"
         >
           <div className="flex flex-col gap-2">
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                // Closed first, so the editor is the only sheet on screen
-                // rather than a second one stacked on this.
-                setActionsOpen(false);
-                setEditorOpen(true);
-              }}
-            >
-              {t('newVisitor')}
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                setActionsOpen(false);
-                setAddFromPcoOpen(true);
-              }}
-            >
-              {multiBackend ? t('addFromDirectory') : t('addFromPco')}
-            </Button>
+            {readOnly ? null : (
+              <>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => {
+                    // Closed first, so the editor is the only sheet on screen
+                    // rather than a second one stacked on this.
+                    setActionsOpen(false);
+                    setEditorOpen(true);
+                  }}
+                >
+                  {t('newVisitor')}
+                </Button>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => {
+                    setActionsOpen(false);
+                    setAddFromPcoOpen(true);
+                  }}
+                >
+                  {multiBackend ? t('addFromDirectory') : t('addFromPco')}
+                </Button>
+              </>
+            )}
             <ExportCsvButton
               build={buildExport}
               count={visible.length}
@@ -659,14 +669,16 @@ export function StudentsPage() {
               description={
                 isFiltered
                   ? t('emptyFilteredBody')
-                  : t('emptyBody')
+                  : readOnly
+                    ? undefined
+                    : t('emptyBody')
               }
               action={
                 isFiltered ? (
                   <Button variant="secondary" onClick={clearFilters}>
                     {t('clearFilters')}
                   </Button>
-                ) : (
+                ) : readOnly ? undefined : (
                   <Button onClick={() => setAddFromPcoOpen(true)}>
                     {multiBackend ? t('addFromDirectory') : t('addFromPco')}
                   </Button>
@@ -716,7 +728,7 @@ export function StudentsPage() {
         />
       ) : null}
 
-      {user ? (
+      {user && !readOnly ? (
         <StudentEditorModal open={editorOpen} onClose={() => setEditorOpen(false)} />
       ) : null}
 

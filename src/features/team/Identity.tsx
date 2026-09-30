@@ -13,12 +13,17 @@ import type { Role } from '@/types';
 import { useTranslations } from 'use-intl';
 
 export const ROLE_LABEL = {
+  viewer: 'roleViewer',
   counselor: 'roleCounselor',
   core: 'roleCore',
   admin: 'roleAdmin',
 } as const satisfies Record<Role, string>;
 
-export const ROLE_OPTIONS: readonly Role[] = ['counselor', 'core', 'admin'];
+/**
+ * Least to most. Viewer first: it may see more than a counselor, but may do
+ * nothing at all, and the select is read as "what may this person do".
+ */
+export const ROLE_OPTIONS: readonly Role[] = ['viewer', 'counselor', 'core', 'admin'];
 
 /** A person's name, and — only when there is one — what is wrong with it. */
 export function Identity({
@@ -64,13 +69,14 @@ export function Identity({
  *
  * Counselor is plain text because it is what nearly everybody is, and eleven
  * badges reading "Counselor" teach the eye to skip the lane the one "Admin" is
- * hiding in.
+ * hiding in. A viewer is an exception too, but not an elevation — a quiet badge,
+ * so it is found without reading as a rank above the door.
  */
 export function RoleTag({ role }: { role: Role }) {
   const t = useTranslations('Team');
   if (role === 'counselor') return <span>{t(ROLE_LABEL[role])}</span>;
   return (
-    <Badge tone="brand" className="first:-ml-1.5">
+    <Badge tone={role === 'viewer' ? 'neutral' : 'brand'} className="first:-ml-1.5">
       {t(ROLE_LABEL[role])}
     </Badge>
   );

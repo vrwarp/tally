@@ -33,7 +33,7 @@ import type { AuthContextValue } from '@/context/authContext';
 import type { DataContextValue } from '@/context/dataContext';
 import type { ToastContextValue } from '@/context/toastContext';
 import type { RosterListProps } from '@/features/checkin/RosterList';
-import type { AttendanceRecord, TallyEvent } from '@/types';
+import type { AttendanceRecord, Role, TallyEvent, UserProfile } from '@/types';
 import { makeAttendance, makeEvent, makeSettings, makeStudent, NOW } from '../../../tests/factories';
 
 /**
@@ -122,7 +122,12 @@ vi.mock('@/hooks/useAllergyNotes', () => ({ useAllergyNotes: () => live.noNotes 
 vi.mock('@/context/dataContext', () => ({
   useData: () => data,
 }));
-vi.mock('@/context/authContext', () => ({ useAuth: () => auth }));
+vi.mock('@/context/authContext', () => ({
+  useAuth: () => auth,
+  useCanSee: () => (required: Role) =>
+    auth.can(required) || (auth.profile?.role === 'viewer' && required !== 'admin'),
+  useReadOnly: () => auth.profile?.role === 'viewer',
+}));
 vi.mock('@/context/toastContext', () => ({ useToast: () => toast }));
 
 vi.mock('@/features/checkin/EventHeader', () => ({ EventHeader: () => null }));
@@ -212,7 +217,11 @@ const data = {
   canWork: () => true,
 } as unknown as DataContextValue;
 
-const auth = { user: { uid: 'counselor-1' }, can: () => true } as unknown as AuthContextValue;
+const auth = {
+  user: { uid: 'counselor-1' },
+  profile: null,
+  can: () => true,
+} as unknown as AuthContextValue;
 
 const toast = {
   toasts: live.nothing,
@@ -252,6 +261,9 @@ beforeEach(() => {
   services.undoCheckIn.mockClear();
   services.checkIn.mockImplementation(async () => {});
   services.ensureMaterialized.mockImplementation(async () => {});
+  services.ensureMaterialized.mockClear();
+  auth.profile = null;
+  auth.can = () => true;
 });
 
 /**
@@ -379,6 +391,48 @@ describe('quick add', () => {
 
     expect(document.querySelector('dialog')).not.toBeNull();
     expect(screen.getByLabelText(/^first name/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * A viewer's register: the same screen, read. The rules refuse every write a
+ * viewer could make; this is the screen not offering one.
+ */
+describe('a viewer', () => {
+  function asViewer() {
+    auth.profile = { role: 'viewer', active: true } as UserProfile;
+    auth.can = (required: Role) => required === 'viewer';
+  }
+
+  it('hands the roster over read-only, with the profile still one tap away', () => {
+    asViewer();
+    open();
+
+    expect(handed().readOnly).toBe(true);
+    expect(handed().canOpenProfile).toBe(true);
+  });
+
+  it('checks nobody in when a row is pressed', async () => {
+    asViewer();
+    open();
+
+    const ada = handed().entries.find((row) => row.student.id === 'ada')!;
+    await act(async () => {
+      handed().onPress(ada);
+    });
+
+    expect(services.checkIn).not.toHaveBeenCalled();
+  });
+
+  it('offers no quick add, and brings no gathering into existence', () => {
+    asViewer();
+    // Tonight's projection, with its window open: a counselor opening this
+    // would materialise it.
+    live.now = new Date('2026-02-13T19:30:00');
+    open({ ...FRIDAY, materialized: false });
+
+    expect(screen.queryByRole('button', { name: 'Quick add a visitor' })).not.toBeInTheDocument();
+    expect(services.ensureMaterialized).not.toHaveBeenCalled();
   });
 });
 

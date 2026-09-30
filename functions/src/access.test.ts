@@ -107,6 +107,19 @@ describe('provisionAccessForCaller', () => {
     expect(result.role).toBe('counselor');
   });
 
+  it('provisions a viewer as a viewer, never as the counselor default', async () => {
+    // The default is for a role nobody recognises. A viewer is recognised, and
+    // reading it as a counselor would hand somebody who may only look the
+    // right to check children in.
+    const db = new FakeFirestore();
+    db.seed(invitationPath(CALLER.email), { role: 'viewer' });
+
+    const result = await provisionAccessForCaller(db, CALLER, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'viewer' });
+    expect(db.get(userPath())?.role).toBe('viewer');
+  });
+
   it('refuses a role the invitation made up', async () => {
     // An invitation is written by an admin through the app, but it is still a
     // database document; a `role: "superuser"` must not become anything.
@@ -336,6 +349,16 @@ describe('provisionAccessForCaller', () => {
 
       expect(result.role).toBe('core');
       expect(db.get(userPath())?.role).toBe('core');
+    });
+
+    it('stays a viewer on every sign-in after the first', async () => {
+      const db = new FakeFirestore();
+      db.seed(userPath(), { email: CALLER.email, role: 'viewer', active: true });
+
+      const result = await provisionAccessForCaller(db, CALLER, NOW, []);
+
+      expect(result.role).toBe('viewer');
+      expect(db.get(userPath())?.role).toBe('viewer');
     });
 
     it('is refused once an admin deactivates them', async () => {

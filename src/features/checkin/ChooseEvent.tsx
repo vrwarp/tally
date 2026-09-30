@@ -22,7 +22,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PageFrame } from '@/components/PageFrame';
 import { EmptyState } from '@/components/ui';
-import { useAuth } from '@/context/authContext';
+import { useCanSee, useReadOnly } from '@/context/authContext';
 import { EventHeroCard } from '@/features/events/EventHeroCard';
 import { LockedGatherings } from '@/features/events/LockedGatherings';
 import { PastEventRow } from '@/features/events/PastGatherings';
@@ -55,6 +55,7 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
   const t = useTranslations('ChooseEvent');
   const { events, loading } = usePastEvents(before, CATCH_UP);
   const { canWork } = useData();
+  const readOnly = useReadOnly();
 
   /*
    * "Before midnight" and "finished" are not the same thing.
@@ -102,7 +103,10 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
         {t('catchUpTitle')}
       </h2>
       <p className="pb-2 text-xs text-ink-500">
-        {t('catchUpBody')}
+        {/* The catch-up is an errand for somebody at a door. For a viewer the
+            same rows are just the recent registers, and saying "add them now"
+            asks for the one thing they cannot do. */}
+        {readOnly ? t('catchUpBodyViewer') : t('catchUpBody')}
       </p>
       <ul className="flex flex-col gap-2">
         {finished.map((event) => (
@@ -122,7 +126,8 @@ function CatchUp({ before, now }: { before: Date; now: Date }) {
 
 export function ChooseEvent({ events, now }: ChooseEventProps) {
   const t = useTranslations('ChooseEvent');
-  const { can } = useAuth();
+  const canSee = useCanSee();
+  const readOnly = useReadOnly();
   const { canWork } = useData();
 
   const { dayStart, today } = useMemo(() => {
@@ -220,7 +225,14 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
                   event={event}
                   now={now}
                   to={`/event/${event.id}`}
-                  cta={isCheckInOpen(event, now) ? t('ctaStart') : t('ctaTakeAttendance')}
+                  cta={
+                    // A viewer opens the same roster, and ticks nobody in on it.
+                    readOnly
+                      ? t('ctaOpenRegister')
+                      : isCheckInOpen(event, now)
+                        ? t('ctaStart')
+                        : t('ctaTakeAttendance')
+                  }
                 />
               ))}
             </div>
@@ -239,12 +251,12 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
             description={
               locked.length > 0
                 ? t('emptyLockedBody', { count: locked.length })
-                : can('core')
+                : canSee('core')
                   ? t('emptyCoreBody')
                   : t('emptyBody')
             }
             action={
-              can('core') ? (
+              canSee('core') ? (
                 <Link
                   to="/events"
                   className="inline-flex min-h-11 items-center rounded-xl bg-ink-800 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 hover:bg-ink-700"

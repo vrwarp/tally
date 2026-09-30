@@ -347,6 +347,48 @@ describe('StudentRow', () => {
  * is the rare correction. Nothing is lost: the strip carries undo in both
  * states.
  */
+/*
+ * A viewer's roster: the register, read. Every row still says who is here and
+ * when; nothing on it writes.
+ */
+describe('StudentRow: read only', () => {
+  it('does nothing when a student who is not here is pressed', async () => {
+    const entry = entryFor(JORDAN);
+    const { onPress } = show(entry, { readOnly: true, canOpenProfile: true });
+
+    const row = screen.getByRole('button', { name: 'Jordan Reyes, 9th grade, not checked in' });
+    expect(row).toBeDisabled();
+    await userEvent.click(row);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('shows when a student arrived without offering to undo it', () => {
+    show(present(JORDAN), { readOnly: true, canOpenProfile: true });
+
+    expect(screen.queryByRole('button', { name: /^Undo/ })).not.toBeInTheDocument();
+    // The one button left is the row, which opens the profile strip.
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /^More actions for Jordan Reyes/ })).toHaveAccessibleName(
+      /checked in at/,
+    );
+  });
+
+  it('opens onto the profile alone', () => {
+    show(present(JORDAN), { readOnly: true, expanded: true, canOpenProfile: true });
+
+    expect(screen.getByRole('link', { name: 'Open the profile for Jordan Reyes' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Undo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Wrong person/ })).not.toBeInTheDocument();
+  });
+
+  it('is inert when there is no profile to open either', () => {
+    show(present(JORDAN), { readOnly: true, expanded: true, canOpenProfile: false });
+
+    expect(screen.getByRole('button', { name: /Jordan Reyes/ })).toBeDisabled();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
 describe('StudentRow: check-out', () => {
   const withCheckOut = (entry: RosterEntry, props: Partial<StudentRowProps> = {}) => {
     const onCheckOut = vi.fn();

@@ -55,6 +55,8 @@ export interface RosterListProps {
   expandedId?: string | null;
   /** Whether rows may offer `Profile`. Core team only — see `StudentRow`. */
   canOpenProfile?: boolean;
+  /** A viewer's roster: every row reads, none writes. See `StudentRow`. */
+  readOnly?: boolean;
   flashing: ReadonlySet<string>;
   busy: ReadonlySet<string>;
   /**
@@ -106,6 +108,7 @@ export const RosterList = memo(function RosterList({
   swapSourceId = null,
   expandedId = null,
   canOpenProfile = false,
+  readOnly = false,
   flashing,
   busy,
   allergyNotes = NO_NOTES,
@@ -236,6 +239,7 @@ export const RosterList = memo(function RosterList({
               isSwapSource={entry.student.id === swapSourceId}
               expanded={entry.student.id === expandedId}
               canOpenProfile={canOpenProfile}
+              readOnly={readOnly}
               flashing={flashing.has(entry.student.id)}
               busy={busy.has(entry.student.id)}
               allergyNote={allergyNotes.get(entry.student.id)}

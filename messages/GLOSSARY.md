@@ -67,6 +67,7 @@ of `zh-Hans`: 登录→登錄 is a real word and the wrong one — Taiwan says �
 | team member / somebody on the team | integrante del equipo | 同工 | 同工 | the generic word when the English says *somebody*, *anybody on this gathering*, *volunteer*. Not a rendering of *leader* |
 | core team | equipo central | 核心同工 | 核心同工 |  |
 | admin | administrador | 管理员 | 管理員 |  |
+| viewer | observador | 查看者 | 檢視者 | the read-only role: sees the core team's screens, changes nothing. Not *espectador* — that is an audience |
 | grade | grado | 年级 | 年級 | the **US** ladder these children actually attend — 6.º grado … 12.º grado. Never *secundaria* / *preparatoria* |
 | allergy / allergies | alergia / alergias | 过敏 | 過敏 | the label carries it; the roster only records *that* there is one |
 | kiosk | kiosco | 签到台 | 簽到台 | a self-service terminal. Spelled *kiosco*, as Mexico writes it, not *quiosco* |

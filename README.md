@@ -6,7 +6,8 @@ every other counselor's phone. The core team uses the same data to see who has g
 turned up for the first time, and whose profile still has no way to reach a parent.
 
 Two audiences, one app. **Counselors** get exactly one screen — check-in. **Core team and admins**
-also get the dashboard, the roster, event and RSVP management, and settings.
+also get the dashboard, the roster, event and RSVP management, and settings. A read-only
+**viewer** role sees the core team's screens and changes nothing.
 
 A gathering can also be narrowed to the people who actually work it, which is about clutter rather
 than secrecy: the Sunday-morning nursery team's screen should not carry Friday's youth night, the

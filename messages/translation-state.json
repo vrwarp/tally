@@ -725,6 +725,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Errors.auth.readOnly": {
+    "source": "This account can look but not change anything.",
+    "context": "Refusal: the reader has the read-only Viewer role and tried something that changes data. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Errors.auth.notOnGathering": {
     "source": "Only people added to that gathering can work it.",
     "context": "Refusal: this gathering was limited to a named set of people and the reader is not among them. \"Work it\" means take attendance for it. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
@@ -1381,6 +1388,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Account.roleViewer": {
+    "source": "viewer",
+    "context": "The reader's own role, as a small uppercase caption beside their email in the account menu. The read-only role: may open the core team's screens and change nothing. Lowercase like the other three role captions.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Account.viewOnlyBadge": {
+    "source": "View only",
+    "context": "A small uppercase badge in the account button (top right on a phone, foot of the sidebar on a laptop), shown on every screen to a Viewer — the read-only role — in place of their initial. Says the reader can look but not change anything. Two words at most: it shares one pill with the person's email.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Account.roleCounselor": {
     "source": "counselor",
     "es-MX": "machine",
@@ -1438,6 +1459,13 @@
   "Auth.coreOnlyBody": {
     "source": "This part of Tally is for the core team. Checking students in is all yours.",
     "es-MX": "reviewed",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Auth.coreOnlyBodyViewer": {
+    "source": "This part of Tally is for the core team.",
+    "context": "Body of the refusal card a Viewer (the read-only role) sees on a screen only the core team may open, such as Review or Settings. Replaces the version that ends 'Checking students in is all yours', which is untrue for a viewer: they cannot check anybody in.",
+    "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
@@ -2731,6 +2759,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "CheckIn.noMatchReadOnlyBody": {
+    "source": "Nobody on this roster matches. Try a shorter part of the name.",
+    "context": "Body of the empty state when a search on the check-in roster matches nobody, shown to a Viewer (read-only role), who cannot add a visitor. Replaces the version that offers adding them as a visitor.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "CheckIn.hintSwap": {
     "source": "tap the right student",
     "es-MX": "machine",
@@ -2763,6 +2798,13 @@
   },
   "CheckIn.hintCheckedOut": {
     "source": "tap ↺ to put somebody back",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "CheckIn.hintReadOnly": {
+    "source": "read only — you can’t check in",
+    "context": "Lowercase hint under the roster heading, shown only to a Viewer (the read-only role). Replaces the other hints, which all tell the reader to tap something. Says the reader can look but not check anyone in. Must stay short: it shares one truncating line with the heading and its count on a 390px phone, so keep it near 30 characters.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -3115,6 +3157,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "StudentRow.ariaNotCheckedIn": {
+    "source": "{who}, not checked in",
+    "context": "Screen-reader label for a roster row a Viewer (read-only role) is reading: the student has not been checked in, and the row does nothing when pressed. {who} is the student's name, with grade.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "StudentRow.ariaWithAllergy": {
     "source": "{action}. Allergy: {note}",
     "es-MX": "machine",
@@ -3278,6 +3327,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "ChooseEvent.catchUpBodyViewer": {
+    "source": "Recent gatherings and how many were checked in.",
+    "context": "One-line description under the 'Catch up' heading on the 'Which gathering?' screen, shown only to a Viewer (the read-only role). The list below is recent finished gatherings with how many were checked in. Replaces the version that invites the reader to open one and add check-ins, which a viewer cannot do.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "ChooseEvent.headingOne": {
     "source": "On today",
     "es-MX": "machine",
@@ -3310,6 +3366,13 @@
   },
   "ChooseEvent.ctaTakeAttendance": {
     "source": "Take attendance",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "ChooseEvent.ctaOpenRegister": {
+    "source": "Open the register",
+    "context": "Button on a gathering's card on the 'Which gathering?' screen, shown only to a Viewer (the read-only role) in place of 'Start check-in' and 'Take attendance'. Opens the same roster, where they can read who is here but not check anyone in.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -4338,6 +4401,13 @@
   },
   "Team.roleAdmin": {
     "source": "Admin",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.roleViewer": {
+    "source": "Viewer",
+    "context": "Role name on the Team screen: in the role select, as a badge on a person's row, and in 'X is now {role}'. The read-only role — a pastor or board member who may see registers and insights and change nothing, not even check a child in. Sits beside Counselor, Core team and Admin.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -7042,6 +7112,13 @@
   },
   "EventDetail.takeAttendance": {
     "source": "Take attendance",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.seeRegister": {
+    "source": "See the register",
+    "context": "The main button on a gathering's page for a Viewer (read-only role), in place of 'Take attendance'. Opens the same check-in screen, where they can read who is here but not check anyone in.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -10174,6 +10251,13 @@
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
+  },
+  "Students.actionsDescriptionReadOnly": {
+    "source": "Export the roster.",
+    "context": "Subtitle of the phone's Actions sheet on the Students screen for a Viewer (read-only role), whose only action is exporting. Replaces 'Add students or export the roster.'",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "Students.exportBlockedLoading": {
     "source": "Still reading the roster — nothing to export yet.",

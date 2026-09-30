@@ -40,7 +40,8 @@ export interface TransitionLedgerProps {
   /** Scope-filtered by the caller. Nothing renders when empty. */
   rows: readonly LedgerRow[];
   showGathering: boolean;
-  onUndo: (transition: Transition) => void;
+  /** Absent for a viewer: the ledger is still the record, and undoing is a write. */
+  onUndo?: (transition: Transition) => void;
   /** The transition an undo is in flight for, if any. */
   undoBusyId: string | null;
 }
@@ -135,15 +136,17 @@ export function TransitionLedger({ rows, showGathering, onUndo, undoBusyId }: Tr
                   screen that had four. An un-ringed ghost here read brighter
                   than the ringed act it reverses while being less
                   button-shaped than it. */}
-              <Button
-                variant="ghost"
-                size="md"
-                className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100"
-                onClick={() => onUndo(transition)}
-                loading={undoBusyId === transition.id}
-              >
-                {tCommon('undo')}
-              </Button>
+              {onUndo ? (
+                <Button
+                  variant="ghost"
+                  size="md"
+                  className="shrink-0 text-ink-400 ring-1 ring-ink-700 hover:text-ink-100"
+                  onClick={() => onUndo(transition)}
+                  loading={undoBusyId === transition.id}
+                >
+                  {tCommon('undo')}
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>

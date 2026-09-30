@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useAuth, type AuthStage } from '@/context/authContext';
+import { useAuth, useCanSee, useReadOnly, type AuthStage } from '@/context/authContext';
 import { provisionAccess, type ProvisionAccessResult } from '@/services/functions';
 import { Button, ErrorBanner, LoadingScreen, Spinner } from '@/components/ui';
 import { PlacementNotes } from '@/features/auth/placement';
@@ -105,10 +105,28 @@ function RestoringSession({ stage }: { stage: AuthStage }) {
   );
 }
 
-export function RequireRole({ role, children }: { role: Role; children: ReactNode }): ReactNode {
+export function RequireRole({
+  role,
+  viewers = false,
+  children,
+}: {
+  role: Role;
+  /**
+   * Open to a viewer as well — a screen that reads, whose controls that write
+   * are withheld from them where they are drawn. Off by default, so a screen
+   * nobody has checked for a viewer stays closed to one: Review holds parents'
+   * phone numbers and Settings the church's integration config, and neither is
+   * a viewer's.
+   */
+  viewers?: boolean;
+  children: ReactNode;
+}): ReactNode {
   const t = useTranslations('Auth');
   const { can } = useAuth();
-  const allowed = can(role);
+  const canSee = useCanSee();
+  // "Checking students in is all yours" is the one thing untrue of a viewer.
+  const readOnly = useReadOnly();
+  const allowed = viewers ? canSee(role) : can(role);
 
   /*
    * Whether this screen was open to the reader a moment ago.
@@ -135,7 +153,7 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
           {demoted ? t('roleChangedTitle') : t('coreOnlyTitle')}
         </p>
         <p className="text-sm text-ink-500">
-          {demoted ? t('roleChangedBody') : t('coreOnlyBody')}
+          {demoted ? t('roleChangedBody') : readOnly ? t('coreOnlyBodyViewer') : t('coreOnlyBody')}
         </p>
         <Link
           to="/"
@@ -154,6 +172,7 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
 
 /** A role's stored value against the word a person reads. */
 const ROLE_LABEL = {
+  viewer: 'roleViewer',
   counselor: 'roleCounselor',
   core: 'roleCore',
   admin: 'roleAdmin',

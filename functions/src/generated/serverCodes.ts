@@ -53,6 +53,7 @@ export const SERVER_CODES = [
   'auth.googleOnly',
   'auth.coreOnly',
   'auth.adminOnly',
+  'auth.readOnly',
   'auth.notOnGathering',
   'auth.kioskOnly',
   'auth.linkNotYours',

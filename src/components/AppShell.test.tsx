@@ -19,7 +19,7 @@ import type { Role } from '@/types';
 let role: Role = 'counselor';
 /** Whatever `DataProvider` is currently saying about its streams. */
 let dataError: string | null = null;
-const RANK: Record<Role, number> = { counselor: 0, core: 1, admin: 2 };
+const RANK: Record<Role, number> = { viewer: -1, counselor: 0, core: 1, admin: 2 };
 
 vi.mock('@/context/authContext', () => ({
   useAuth: () => ({
@@ -27,6 +27,9 @@ vi.mock('@/context/authContext', () => ({
     signOut: vi.fn(),
     can: (needed: Role) => RANK[role] >= RANK[needed],
   }),
+  useCanSee: () => (needed: Role) =>
+    RANK[role] >= RANK[needed] || (role === 'viewer' && needed !== 'admin'),
+  useReadOnly: () => role === 'viewer',
 }));
 
 vi.mock('@/context/dataContext', () => ({
@@ -87,6 +90,14 @@ describe('the account menu', () => {
     }
   });
 
+  it('offers a viewer Team to read, and neither Settings nor a kiosk to pair', async () => {
+    await openAccountMenu('viewer');
+
+    expect(screen.getAllByRole('menuitem', { name: 'Team' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('menuitem', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Kiosk' })).not.toBeInTheDocument();
+  });
+
   it('keeps sign out attached to the account rather than under the thumb', async () => {
     await openAccountMenu('counselor');
 
@@ -101,6 +112,38 @@ describe('the account menu', () => {
     const items = within(sheet).getAllByRole('menuitem');
     expect(items[0]).toHaveTextContent('Sign out');
     expect(items.at(-1)).toHaveTextContent('Kiosk');
+  });
+});
+
+describe('the view-only badge', () => {
+  it('stands in for a viewer\'s initial, on the button every screen draws', () => {
+    renderShell('viewer');
+
+    const buttons = screen.getAllByRole('button', { name: /Sam Whitfield/ });
+    for (const button of buttons) {
+      expect(button).toHaveTextContent('View only');
+      expect(button).not.toHaveTextContent(/^Sam WhitfieldS$/);
+    }
+  });
+
+  it('leaves everybody else with their initial', () => {
+    renderShell('counselor');
+
+    for (const button of screen.getAllByRole('button', { name: /Sam Whitfield/ })) {
+      expect(button).not.toHaveTextContent('View only');
+      expect(button).toHaveTextContent(/S$/);
+    }
+  });
+});
+
+describe('the viewer\'s navigation', () => {
+  it('holds the screens a viewer reads and leaves Review with the core team', () => {
+    renderShell('viewer');
+
+    for (const label of ['Check in', 'Insights', 'Events', 'Students']) {
+      expect(screen.getAllByRole('link', { name: new RegExp(label) }).length).toBeGreaterThan(0);
+    }
+    expect(screen.queryByRole('link', { name: /Review/ })).not.toBeInTheDocument();
   });
 });
 

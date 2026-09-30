@@ -35,7 +35,7 @@ import {
 } from '@/components/ui';
 import { PageFrame } from '@/components/PageFrame';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { EarlierAttendance } from '@/features/students/EarlierAttendance';
 import { historyWindow, historyWindowStart } from '@/features/students/historyWindow';
@@ -136,6 +136,14 @@ export function StudentDetailPage() {
   const { students, events, series, settings, loading, rosterError, refreshRoster, upstreamEdits } =
     useData();
   const { user, profile } = useAuth();
+  /*
+   * A viewer reads the student — the profile Tally holds, the attendance, the
+   * releases — and is offered nothing that changes one. Nor is a viewer shown
+   * the Planning Center contact card: it is a parent's phone number and email,
+   * the same reason Review is closed to them, so the details read that carries
+   * it is never made.
+   */
+  const readOnly = useReadOnly();
   const { show } = useToast();
   const now = useNow(60_000);
 
@@ -178,7 +186,7 @@ export function StudentDetailPage() {
     loaded: detailsLoaded,
     unavailable: detailsUnavailable,
     refresh: refreshDetails,
-  } = usePersonDetails(student);
+  } = usePersonDetails(readOnly ? null : student);
 
   /*
    * "Not answered yet", not merely "in flight". `loading` is raised inside an
@@ -188,7 +196,7 @@ export function StudentDetailPage() {
    * start; `unavailable` (a student no backend holds) never loads and must not
    * wait forever.
    */
-  const detailsPending = !detailsLoaded && !detailsUnavailable && !detailsError;
+  const detailsPending = !readOnly && !detailsLoaded && !detailsUnavailable && !detailsError;
 
   const recentEvents = useMemo(() => historyWindow(events, now), [events, now]);
 
@@ -688,26 +696,28 @@ export function StudentDetailPage() {
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant={editNeedsAHuman ? 'secondary' : 'primary'}
-          onClick={() => setEditorOpen(true)}
-        >
-          {t('editProfile')}
-        </Button>
-        <Button
-          variant={student.status === 'active' ? 'secondary' : 'success'}
-          onClick={() => void toggleStatus()}
-          loading={statusBusy}
-        >
-          {student.status === 'active' ? t('removeFromRoster') : t('addBackToRoster')}
-        </Button>
-        <span className="text-xs text-ink-500">
-          {backend !== null
-            ? t('removeHintUpstream', { backend: backendName })
-            : t('removeHint')}
-        </span>
-      </div>
+      {readOnly ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={editNeedsAHuman ? 'secondary' : 'primary'}
+            onClick={() => setEditorOpen(true)}
+          >
+            {t('editProfile')}
+          </Button>
+          <Button
+            variant={student.status === 'active' ? 'secondary' : 'success'}
+            onClick={() => void toggleStatus()}
+            loading={statusBusy}
+          >
+            {student.status === 'active' ? t('removeFromRoster') : t('addBackToRoster')}
+          </Button>
+          <span className="text-xs text-ink-500">
+            {backend !== null
+              ? t('removeHintUpstream', { backend: backendName })
+              : t('removeHint')}
+          </span>
+        </div>
+      )}
 
       {/*
         Profile beside Attendance, where there is a window to put them in.
@@ -725,97 +735,99 @@ export function StudentDetailPage() {
         <Card>
           <CardHeader title={tCommon('profile')} />
           <div className="flex flex-col gap-4 px-4 py-3">
-            <div>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                {t('contactHeading')}
-              </h3>
-              {recordGone ? (
-                <p className="mt-1 text-sm text-warn-400">
-                  {t('recordGoneContact', { backend: backendName, name })}
-                </p>
-              ) : detailsError ? (
-                // A backend outage must not read as "this family has no phone
-                // number" — those look identical and mean opposite things.
-                <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
-              ) : detailsPending ? (
-                /*
-                 * Shaped like the answer, not like a sentence about the answer.
-                 *
-                 * This block is the first thing on the page that lands late — the
-                 * contact lives upstream and the read takes as long as Planning
-                 * Center takes. As a line of text it grew ~56px into the buttons
-                 * once the read landed, moving the birthday, the dates and the
-                 * whole attendance card under a leader who was already reading
-                 * them. Two pill-sized bars and a text bar hold the room the
-                 * common answer takes; the rarer, shorter answers leave a little
-                 * air rather than pulling the page up.
-                 */
-                <div className="mt-2" role="status" aria-label={t('lookingUpIn', { backend: backendName })}>
-                  <div aria-hidden="true" className="flex items-center gap-2">
-                    <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
-                    <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
-                  </div>
-                  {/* Two lines of it on a phone, where an adult's name, number
-                      and address are two lines — the same room the settled line
-                      below holds open, so the swap paints rather than moves. */}
-                  <div
-                    aria-hidden="true"
-                    className="mt-2 h-5 w-64 max-w-full animate-pulse rounded-md bg-ink-800/60"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="mt-1 h-5 w-40 max-w-full animate-pulse rounded-md bg-ink-800/60 sm:hidden"
-                  />
-                </div>
-              ) : phone || email ? (
-                <>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {phone ? (
-                      <>
-                        <ContactLink
-                          href={`tel:${dialable(phone)}`}
-                          label={t('callAria', { contact: contactLabel, phone: formatPhone(phone) })}
-                          icon="📞"
-                        >
-                          {tCommon('call')}
-                        </ContactLink>
-                        <ContactLink
-                          href={`sms:${dialable(phone)}`}
-                          label={t('textAria', { contact: contactLabel, phone: formatPhone(phone) })}
-                          icon="💬"
-                        >
-                          {tCommon('text')}
-                        </ContactLink>
-                      </>
-                    ) : null}
-                    {email ? (
-                      <ContactLink
-                        href={`mailto:${email}`}
-                        label={t('emailAria', { contact: contactLabel, email })}
-                        icon="✉"
-                      >
-                        {tCommon('email')}
-                      </ContactLink>
-                    ) : null}
-                  </div>
-                  {/* Two lines' room on a phone whether or not this family needs
-                      them: a name with a number is one line and a name with a
-                      number and an address is two, and which of those a student
-                      has is the last thing this page finds out. Reserving the
-                      second line is what keeps the birthday, the dates and the
-                      whole attendance card below from stepping down when the
-                      answer arrives. */}
-                  <p className="mt-2 min-h-10 text-sm text-ink-300 sm:min-h-5">
-                    {details?.contactName ? t('contactPrefix', { name: details.contactName }) : ''}
-                    {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
-                    {phone && email ? ' · ' : ''}
-                    {email ? <span className="break-all">{email}</span> : null}
+            {readOnly ? null : (
+              <div>
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                  {t('contactHeading')}
+                </h3>
+                {recordGone ? (
+                  <p className="mt-1 text-sm text-warn-400">
+                    {t('recordGoneContact', { backend: backendName, name })}
                   </p>
-                </>
-              ) : (
-                <AddParentContact student={student} details={details} onAdded={refreshDetails} />
-              )}
-            </div>
+                ) : detailsError ? (
+                  // A backend outage must not read as "this family has no phone
+                  // number" — those look identical and mean opposite things.
+                  <p className="mt-1 text-sm text-danger-400">{detailsError}</p>
+                ) : detailsPending ? (
+                  /*
+                   * Shaped like the answer, not like a sentence about the answer.
+                   *
+                   * This block is the first thing on the page that lands late — the
+                   * contact lives upstream and the read takes as long as Planning
+                   * Center takes. As a line of text it grew ~56px into the buttons
+                   * once the read landed, moving the birthday, the dates and the
+                   * whole attendance card under a leader who was already reading
+                   * them. Two pill-sized bars and a text bar hold the room the
+                   * common answer takes; the rarer, shorter answers leave a little
+                   * air rather than pulling the page up.
+                   */
+                  <div className="mt-2" role="status" aria-label={t('lookingUpIn', { backend: backendName })}>
+                    <div aria-hidden="true" className="flex items-center gap-2">
+                      <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
+                      <div className="h-11 w-24 animate-pulse rounded-xl bg-ink-800/60" />
+                    </div>
+                    {/* Two lines of it on a phone, where an adult's name, number
+                        and address are two lines — the same room the settled line
+                        below holds open, so the swap paints rather than moves. */}
+                    <div
+                      aria-hidden="true"
+                      className="mt-2 h-5 w-64 max-w-full animate-pulse rounded-md bg-ink-800/60"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="mt-1 h-5 w-40 max-w-full animate-pulse rounded-md bg-ink-800/60 sm:hidden"
+                    />
+                  </div>
+                ) : phone || email ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {phone ? (
+                        <>
+                          <ContactLink
+                            href={`tel:${dialable(phone)}`}
+                            label={t('callAria', { contact: contactLabel, phone: formatPhone(phone) })}
+                            icon="📞"
+                          >
+                            {tCommon('call')}
+                          </ContactLink>
+                          <ContactLink
+                            href={`sms:${dialable(phone)}`}
+                            label={t('textAria', { contact: contactLabel, phone: formatPhone(phone) })}
+                            icon="💬"
+                          >
+                            {tCommon('text')}
+                          </ContactLink>
+                        </>
+                      ) : null}
+                      {email ? (
+                        <ContactLink
+                          href={`mailto:${email}`}
+                          label={t('emailAria', { contact: contactLabel, email })}
+                          icon="✉"
+                        >
+                          {tCommon('email')}
+                        </ContactLink>
+                      ) : null}
+                    </div>
+                    {/* Two lines' room on a phone whether or not this family needs
+                        them: a name with a number is one line and a name with a
+                        number and an address is two, and which of those a student
+                        has is the last thing this page finds out. Reserving the
+                        second line is what keeps the birthday, the dates and the
+                        whole attendance card below from stepping down when the
+                        answer arrives. */}
+                    <p className="mt-2 min-h-10 text-sm text-ink-300 sm:min-h-5">
+                      {details?.contactName ? t('contactPrefix', { name: details.contactName }) : ''}
+                      {phone ? <span className="tabular-nums">{formatPhone(phone)}</span> : null}
+                      {phone && email ? ' · ' : ''}
+                      {email ? <span className="break-all">{email}</span> : null}
+                    </p>
+                  </>
+                ) : (
+                  <AddParentContact student={student} details={details} onAdded={refreshDetails} />
+                )}
+              </div>
+            )}
 
             {student.hasAllergies ? (
               <div className="rounded-xl bg-warn-500/10 px-3 py-2 ring-1 ring-warn-500/25">
@@ -915,22 +927,24 @@ export function StudentDetailPage() {
                       </div>
                     </div>
                   ) : null}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => void recreate()}
-                      loading={recreateBusy}
-                      disabled={
-                        recreateForm.open &&
-                        (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
-                      }
-                    >
-                      {t('recreateIn', { backend: backendName })}
-                    </Button>
-                    <span className="text-xs text-ink-500">
-                      {t('relinkNote')}
-                    </span>
-                  </div>
+                  {readOnly ? null : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => void recreate()}
+                        loading={recreateBusy}
+                        disabled={
+                          recreateForm.open &&
+                          (!recreateForm.firstName.trim() || !recreateForm.lastName.trim())
+                        }
+                      >
+                        {t('recreateIn', { backend: backendName })}
+                      </Button>
+                      <span className="text-xs text-ink-500">
+                        {t('relinkNote')}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : backend !== null ? (
                 <p className="mt-1 text-sm text-ink-300">
@@ -959,7 +973,7 @@ export function StudentDetailPage() {
                       ? t('createdWaitingPush', { backend: backendName })
                       : t('createdNotLinked', { backend: backendName })}
                   </p>
-                  {student.upstreamPushPending ? (
+                  {student.upstreamPushPending && !readOnly ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
                         variant="secondary"
@@ -1099,8 +1113,8 @@ export function StudentDetailPage() {
                 {group.key !== ONE_OFF_GROUP ? (
                   <ReleaseStanding
                     release={releasesByChain.get(group.key) ?? null}
-                    onRelease={() => openRelease(group)}
-                    onUndo={handleReleaseUndo}
+                    onRelease={readOnly ? undefined : () => openRelease(group)}
+                    onUndo={readOnly ? undefined : handleReleaseUndo}
                     undoBusyId={releaseUndoBusyKey}
                   />
                 ) : null}
@@ -1172,14 +1186,16 @@ function ReleaseStanding({
   undoBusyId,
 }: {
   release: { transition: Transition; inert: boolean } | null;
-  onRelease: () => void;
-  onUndo: (transition: Transition) => void;
+  /** Both absent for a viewer: the standing is still said, and the acts are not theirs. */
+  onRelease?: () => void;
+  onUndo?: (transition: Transition) => void;
   undoBusyId: string | null;
 }) {
   const time = useTimeFormats();
   const t = useTranslations('StudentDetail');
   const tReason = useTranslations('Transitions');
   if (!release) {
+    if (!onRelease) return null;
     return (
       <div className="flex justify-end px-4 pt-2">
         <Button variant="ghost" size="sm" onClick={onRelease}>
@@ -1207,7 +1223,7 @@ function ReleaseStanding({
           date: time.shortDate(transition.releasedAt),
         })}
       </p>
-      {inert ? (
+      {!onRelease || !onUndo ? null : inert ? (
         <Button variant="ghost" size="sm" onClick={onRelease}>
           {t('noLongerExpected')}
         </Button>
@@ -1361,6 +1377,8 @@ function BirthdaySection({
   onSaved: () => void;
 }) {
   const t = useTranslations('StudentDetail');
+  // A viewer is told where the birthday lives, not sent there to change it.
+  const readOnly = useReadOnly();
   const locale = useLocale();
   const [editing, setEditing] = useState(false);
 
@@ -1451,16 +1469,21 @@ function BirthdaySection({
             <p className="mt-1 text-xs text-ink-500">{t('readingPermissions')}</p>
           ) : (
             <p className="mt-1 text-xs text-ink-500">
-              {t('birthdayKeptIn')}{' '}
-              <a
-                href={upstream}
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-brand-300 underline"
-              >
-                {day ? t('changeItThere') : t('addOneThere')}
-              </a>
-              .
+              {t('birthdayKeptIn')}
+              {readOnly ? null : (
+                <>
+                  {' '}
+                  <a
+                    href={upstream}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-brand-300 underline"
+                  >
+                    {day ? t('changeItThere') : t('addOneThere')}
+                  </a>
+                  .
+                </>
+              )}
             </p>
           )}
         </>

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { LanguageChoice } from '@/components/LanguageChoice';
-import { useAuth } from '@/context/authContext';
+import { useAuth, useCanSee, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { useKioskParkedCount } from '@/hooks/useKioskParkedCount';
@@ -47,6 +47,8 @@ interface NavItem {
   icon: string;
   /** Core-team only. */
   core?: boolean;
+  /** …and open to a viewer as well, because the screen only reads for one. */
+  viewers?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ interface NavItem {
  * the key set stays greppable and a new role is a compile error here.
  */
 const ROLE_LABEL = {
+  viewer: 'Account.roleViewer',
   counselor: 'Account.roleCounselor',
   core: 'Account.roleCore',
   admin: 'Account.roleAdmin',
@@ -99,9 +102,9 @@ function NavCountWords({ count }: { count: number }) {
 
 const NAV: NavItem[] = [
   { to: '/', labelKey: 'checkIn', icon: '✓' },
-  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true },
-  { to: '/events', labelKey: 'events', icon: '▤', core: true },
-  { to: '/students', labelKey: 'students', icon: '☰', core: true },
+  { to: '/dashboard', labelKey: 'insights', icon: '◎', core: true, viewers: true },
+  { to: '/events', labelKey: 'events', icon: '▤', core: true, viewers: true },
+  { to: '/students', labelKey: 'students', icon: '☰', core: true, viewers: true },
   /*
    * Review used to live only inside the account menu, on the argument that the
    * thumb bar is for the four things somebody does at a door. That argument
@@ -127,6 +130,8 @@ const NAV: NavItem[] = [
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { profile, signOut, can } = useAuth();
+  const canSee = useCanSee();
+  const readOnly = useReadOnly();
   const { error } = useData();
   const location = useLocation();
   const t = useTranslations();
@@ -151,7 +156,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // this comes out to.
   const header = useHeightVar<HTMLElement>('--app-header-h');
 
-  const items = NAV.filter((item) => !item.core || can('core'));
+  const items = NAV.filter(
+    (item) => !item.core || (item.viewers ? canSee('core') : can('core')),
+  );
   // What the lobby kiosk left for somebody to decide, beside Review.
   const parkedCount = useKioskParkedCount(can('core'));
   const countFor = (item: NavItem) => (item.labelKey === 'review' ? parkedCount : 0);
@@ -207,28 +214,35 @@ export function AppShell({ children }: { children: ReactNode }) {
           asking to be claimed is usually a counselor — and until this item
           existed there was no link to that screen for one. The kiosk's own
           screen sent them to Settings, which a counselor cannot open. */}
-      <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-        {t('Nav.kiosk')}
-      </NavLink>
+      {/* Not a viewer's: pairing vouches that a tablet is the church's and
+          stands it up to record attendance, which is a write however it is
+          reached. */}
+      {can('counselor') ? (
+        <NavLink to="/pair-kiosk" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+          {t('Nav.kiosk')}
+        </NavLink>
+      ) : null}
+      {/* Review moved into the nav itself; these two stay here, because
+          they are things somebody does a few times a year rather than every
+          week. Team is listed first and separately from Settings: it used
+          to be the last card on that page, which put "who can see a roster
+          of minors" below a colour picker and an API connection. A viewer
+          reads Team and not Settings, which is the church's integration
+          config. */}
+      {canSee('core') ? (
+        <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+          {t('Nav.team')}
+        </NavLink>
+      ) : null}
       {can('core') ? (
-        <>
-          {/* Review moved into the nav itself; these two stay here, because
-              they are things somebody does a few times a year rather than every
-              week. Team is listed first and separately from Settings: it used
-              to be the last card on that page, which put "who can see a roster
-              of minors" below a colour picker and an API connection. */}
-          <NavLink to="/team" role="menuitem" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
-            {t('Nav.team')}
-          </NavLink>
-          <NavLink
-            to="/settings"
-            role="menuitem"
-            onClick={() => setMenuOpen(false)}
-            className={MENU_ITEM}
-          >
-            {t('Nav.settings')}
-          </NavLink>
-        </>
+        <NavLink
+          to="/settings"
+          role="menuitem"
+          onClick={() => setMenuOpen(false)}
+          className={MENU_ITEM}
+        >
+          {t('Nav.settings')}
+        </NavLink>
       ) : null}
       {/*
         * The language, last and set apart from the rows above it.
@@ -270,9 +284,35 @@ export function AppShell({ children }: { children: ReactNode }) {
         <span className="max-w-32 truncate lg:order-2 lg:max-w-none lg:flex-1 lg:text-left">
           {displayName}
         </span>
-        <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">
-          {initial}
-        </span>
+        {readOnly ? (
+          /*
+           * A viewer's mark, where everybody else's initial is: on every screen,
+           * in the one control that is always drawn, so nobody reading a roster
+           * wonders why a tap does nothing. Words rather than an eye alone,
+           * because an icon on its own explains nothing, and neutral rather
+           * than brand, which on this screen means "you can press this".
+           */
+          <span className="flex h-6 shrink-0 items-center gap-1 rounded-full bg-ink-800 px-2 text-[11px] font-semibold uppercase tracking-wide text-ink-100 ring-1 ring-ink-600 lg:order-1">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              className="size-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" />
+              <circle cx="8" cy="8" r="1.8" />
+            </svg>
+            {t('Account.viewOnlyBadge')}
+          </span>
+        ) : (
+          <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">
+            {initial}
+          </span>
+        )}
       </button>
       {menuOpen && (anchored || !showNav) ? (
         <div className="hidden lg:block">

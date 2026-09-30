@@ -22,7 +22,16 @@ const useAuth = vi.hoisted(() => vi.fn());
 const provisionAccess = vi.hoisted(() => vi.fn());
 const navigate = vi.hoisted(() => vi.fn());
 
-vi.mock('@/context/authContext', () => ({ useAuth }));
+vi.mock('@/context/authContext', () => ({
+  useAuth,
+  useCanSee: () => {
+    const auth = useAuth() as { can?: (r: string) => boolean; profile?: { role?: string } | null };
+    return (required: 'viewer' | 'counselor' | 'core' | 'admin') =>
+      auth.can?.(required) === true || (auth.profile?.role === 'viewer' && required !== 'admin');
+  },
+  useReadOnly: () =>
+    (useAuth() as { profile?: { role?: string; active?: boolean } | null }).profile?.role === 'viewer',
+}));
 vi.mock('@/services/functions', () => ({ provisionAccess }));
 // The router is real — `Navigate` and `Link` need its context — and only the
 // hook the switch-account button navigates with is replaced, so the test can
@@ -286,6 +295,29 @@ describe('a screen that stops being yours while you are on it', () => {
     );
 
     expect(screen.getByText('Core team only')).toBeInTheDocument();
+  });
+
+  it('opens a reading screen to a viewer, and keeps every other one shut', () => {
+    useAuth.mockReturnValue({
+      can: (required: string) => required === 'viewer',
+      profile: { role: 'viewer', active: true },
+    });
+    render(
+      <MemoryRouter>
+        <RequireRole role="core" viewers>
+          <p>The register</p>
+        </RequireRole>
+        <RequireRole role="core">
+          <p>The settings</p>
+        </RequireRole>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('The register')).toBeInTheDocument();
+    expect(screen.queryByText('The settings')).not.toBeInTheDocument();
+    // Refused without promising the one thing a viewer cannot do.
+    expect(screen.getByText('This part of Tally is for the core team.')).toBeInTheDocument();
+    expect(screen.queryByText(/Checking students in is all yours/)).not.toBeInTheDocument();
   });
 
   it('says the role changed to somebody who had the screen open', () => {

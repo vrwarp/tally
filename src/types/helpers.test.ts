@@ -26,6 +26,7 @@ import {
   UPSTREAM_EDIT_FIELDS,
   UPSTREAM_EDIT_STALLED_MS,
   asGrade,
+  asRole,
   buildSearchName,
   computeProfileComplete,
   editedFields,
@@ -35,6 +36,7 @@ import {
   isStalled,
   needsAHuman,
   roleAtLeast,
+  seesAsRole,
   studentFullName,
 } from '@/types';
 import { testTranslator } from '@/test/translator';
@@ -74,8 +76,15 @@ describe('grades', () => {
 });
 
 describe('roleAtLeast', () => {
-  it('ranks counselor below core below admin', () => {
-    expect(ROLE_RANK).toEqual({ counselor: 1, core: 2, admin: 3 });
+  it('ranks viewer below counselor below core below admin', () => {
+    expect(ROLE_RANK).toEqual({ viewer: 0, counselor: 1, core: 2, admin: 3 });
+  });
+
+  it('lets a viewer do nothing a counselor does', () => {
+    expect(roleAtLeast('viewer', 'counselor')).toBe(false);
+    expect(roleAtLeast('viewer', 'core')).toBe(false);
+    expect(roleAtLeast('viewer', 'admin')).toBe(false);
+    expect(roleAtLeast('viewer', 'viewer')).toBe(true);
   });
 
   it('lets a role clear its own bar and every bar below it', () => {
@@ -94,6 +103,41 @@ describe('roleAtLeast', () => {
   it('refuses nobody at all — being signed in is not a role', () => {
     expect(roleAtLeast(null, 'counselor')).toBe(false);
     expect(roleAtLeast(undefined, 'counselor')).toBe(false);
+  });
+});
+
+describe('seesAsRole', () => {
+  it('opens every screen core sees to a viewer, and none of an admin\'s', () => {
+    expect(seesAsRole('viewer', 'counselor')).toBe(true);
+    expect(seesAsRole('viewer', 'core')).toBe(true);
+    expect(seesAsRole('viewer', 'admin')).toBe(false);
+  });
+
+  it('is roleAtLeast for every other role', () => {
+    const roles = ['counselor', 'core', 'admin'] as const;
+    for (const role of roles) {
+      for (const required of roles) {
+        expect(seesAsRole(role, required)).toBe(roleAtLeast(role, required));
+      }
+    }
+  });
+
+  it('refuses nobody at all', () => {
+    expect(seesAsRole(null, 'counselor')).toBe(false);
+    expect(seesAsRole(undefined, 'core')).toBe(false);
+  });
+});
+
+describe('asRole', () => {
+  it('reads the four stored roles and nothing else', () => {
+    expect(asRole('viewer')).toBe('viewer');
+    expect(asRole('counselor')).toBe('counselor');
+    expect(asRole('core')).toBe('core');
+    expect(asRole('admin')).toBe('admin');
+    expect(asRole('Admin')).toBeNull();
+    expect(asRole('')).toBeNull();
+    expect(asRole(undefined)).toBeNull();
+    expect(asRole(2)).toBeNull();
   });
 });
 

@@ -201,6 +201,15 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
 
   const uid = profile?.id ?? '';
   const isAdmin = can('admin');
+  /*
+   * A viewer reads this panel for the facts — role, dates, gatherings — and is
+   * offered none of its acts. Adding somebody to a gathering is open to anybody
+   * on it, but "anybody" means anybody who may write; and the kiosk rows are
+   * core's to read, so a viewer never asks for them rather than drawing a
+   * refusal as a failure.
+   */
+  const mayAct = can('counselor');
+  const seesKiosks = can('core');
   const name = member.displayName || member.email;
   const nowMs = now.getTime();
 
@@ -215,14 +224,16 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
    */
   useEffect(
     () =>
-      subscribeKioskDevices(
-        (rows) => {
-          setDevicesFailed(false);
-          setDevices(rows);
-        },
-        () => setDevicesFailed(true),
-      ),
-    [],
+      seesKiosks
+        ? subscribeKioskDevices(
+            (rows) => {
+              setDevicesFailed(false);
+              setDevices(rows);
+            },
+            () => setDevicesFailed(true),
+          )
+        : undefined,
+    [seesKiosks],
   );
 
   /** Every narrowed gathering, named, in the order a reader would look for one. */
@@ -237,10 +248,10 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
         // would say they are on nothing.
         title: chainTitles.get(list.id) ?? list.id,
         onIt: list.members.has(member.id),
-        readerOn: isAdmin || list.members.has(uid),
+        readerOn: mayAct && (isAdmin || list.members.has(uid)),
       }));
     return rows.sort((a, b) => a.title.localeCompare(b.title));
-  }, [access, chainTitles, member.id, uid, isAdmin]);
+  }, [access, chainTitles, member.id, uid, isAdmin, mayAct]);
 
   const memberChains = useMemo(
     () => narrowed.filter((row) => row.onIt).map((row) => row.chain),
@@ -393,20 +404,22 @@ export function PersonPanel({ member, byUid, now = new Date() }: PersonPanelProp
         )}
       </section>
 
-      <section className="flex flex-col gap-1.5">
-        <PanelHeading>{t('kiosksHeading')}</PanelHeading>
-        {devicesFailed ? (
-          <p className="text-sm text-warn-400">{t('kiosksNotLoaded')}</p>
-        ) : theirKiosks.length === 0 ? (
-          <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {theirKiosks.map((device) => (
-              <KioskDeviceRow key={device.id} device={device} now={now} />
-            ))}
-          </ul>
-        )}
-      </section>
+      {seesKiosks ? (
+        <section className="flex flex-col gap-1.5">
+          <PanelHeading>{t('kiosksHeading')}</PanelHeading>
+          {devicesFailed ? (
+            <p className="text-sm text-warn-400">{t('kiosksNotLoaded')}</p>
+          ) : theirKiosks.length === 0 ? (
+            <p className="text-sm text-ink-400">{t('kiosksNone')}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {theirKiosks.map((device) => (
+                <KioskDeviceRow key={device.id} device={device} now={now} />
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {/* Nothing at all in a week nobody asked: a heading over an empty list is
           chrome saying something happened when it did not. */}

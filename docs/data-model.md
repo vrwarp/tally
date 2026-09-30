@@ -9,7 +9,9 @@ native `Date`. The converters in `src/services/converters.ts` translate between 
 component ever handles a `Timestamp`. Access rules are in `firestore.rules`; the "who may write"
 column below is a summary of them, not a substitute.
 
-Roles rank `counselor` < `core` < `admin`. "Active" means a `users/{uid}` document exists and carries
+Roles rank `counselor` < `core` < `admin`. `viewer` is off that ladder: it ranks below `counselor`
+for every write — so it writes nothing but its own `lastSeenAt` and an `accessRequests` ask — and
+reads what every active member reads. "Active" means a `users/{uid}` document exists and carries
 `active: true` — being signed in is not, by itself, permission to read anything.
 
 ---
@@ -212,7 +214,7 @@ The authorisation table. Document id is the Firebase Auth uid.
 | --- | --- | --- |
 | `email` | string | The verified address the session signed in with. |
 | `displayName` | string \| null | From the auth token, else from the access roster. |
-| `role` | `'counselor' \| 'core' \| 'admin'` | Ranked; see above. |
+| `role` | `'viewer' \| 'counselor' \| 'core' \| 'admin'` | Ranked; see above. `viewer` is read-only. |
 | `active` | boolean | The switch. `false` means signed in but not admitted. |
 | `createdAt` | Timestamp | Preserved across re-provisioning, so "member since" does not reset on every sign-in. |
 | `lastSeenAt` | Timestamp \| null | Bumped by the app itself. |

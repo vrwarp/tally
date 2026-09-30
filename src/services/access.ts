@@ -44,7 +44,7 @@ import {
 import { db } from '@/lib/firebase';
 import { paths } from '@/lib/paths';
 import { toDateOrNull } from '@/services/converters';
-import { emailKey, type Invitation, type Role } from '@/types';
+import { asRole, emailKey, type Invitation, type Role } from '@/types';
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
@@ -67,7 +67,7 @@ function toInvitation(snapshot: {
       ? { kind: 'link' as const }
       : { email: typeof data.email === 'string' ? data.email : snapshot.id.replace(/,/g, '.') }),
     ...(typeof data.email === 'string' && link ? { email: data.email } : {}),
-    role: (data.role === 'admin' || data.role === 'core' ? data.role : 'counselor') as Role,
+    role: asRole(data.role) ?? 'counselor',
     invitedAt: toDateOrNull(data.invitedAt),
     invitedBy: typeof data.invitedBy === 'string' ? data.invitedBy : null,
     ...(typeof data.note === 'string' && data.note ? { note: data.note } : {}),

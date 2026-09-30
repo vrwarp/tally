@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { User } from 'firebase/auth';
-import type { Role, UserProfile } from '@/types';
+import { seesAsRole, type Role, type UserProfile } from '@/types';
 
 /**
  * `status` is the single thing screens branch on:
@@ -50,7 +50,11 @@ export interface AuthContextValue {
    */
   refreshProfile: () => Promise<void>;
   clearError: () => void;
-  /** True when the signed-in user's role meets `required`. */
+  /**
+   * True when the signed-in user's role meets `required` — may *do* what it
+   * does. A viewer meets no bar but its own. For whether a screen opens at all,
+   * see `useCanSee`.
+   */
   can: (required: Role) => boolean;
 }
 
@@ -60,4 +64,34 @@ export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
   if (!value) throw new Error('useAuth must be used inside <AuthProvider>.');
   return value;
+}
+
+/**
+ * Whether the reader may *see* what `required` sees.
+ *
+ * `can` for everybody but a viewer, who opens every screen a core member opens
+ * and none of an admin's — see `seesAsRole`. Derived from `can` and the profile
+ * rather than carried on the context, so the one role that bends the ladder is
+ * answered in one place.
+ */
+export function useCanSee(): (required: Role) => boolean {
+  const value = useContext(AuthContext);
+  return (required: Role) =>
+    value !== null &&
+    (value.can(required) ||
+      (value.profile?.active === true && seesAsRole(value.profile.role, required)));
+}
+
+/**
+ * True for a viewer: every control that writes is withheld, not refused.
+ *
+ * Read from the context directly rather than through `useAuth`, which throws
+ * outside a provider: this is asked by leaf components — a button on a list, a
+ * panel in a modal — that were written, and are tested, without one. No
+ * provider is nobody signed in, which is nobody a control could be withheld
+ * from; the rules decide the rest.
+ */
+export function useReadOnly(): boolean {
+  const profile = useContext(AuthContext)?.profile;
+  return profile?.active === true && profile.role === 'viewer';
 }
