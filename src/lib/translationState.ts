@@ -212,14 +212,12 @@ export const QUOTED_IN: readonly { message: string; quotes: string; strip?: stri
    */
   { message: 'Backends.pcoQueued', quotes: 'RowBadge.queuedBadge' },
   /*
-   * The kiosk's Check-ins screen tells a volunteer not to reset the tablet
-   * until it says one phrase — the all-clear the same screen shows once the
-   * list is empty, and the phrase the volunteer card teaches. A translation that
+   * The Kiosk page's footnote tells people not to wipe a tablet until it says
+   * one phrase — the all-clear the kiosk's Check-ins screen shows once its list
+   * is empty, and the phrase the volunteer card teaches. A translation that
    * quoted anything else would be an instruction to wait for words that never
    * appear.
    */
-  { message: 'Staff.checkInsAbout', quotes: 'Staff.checkInsAllIn' },
-  // And the Kiosk page's footnote, which tells people the same thing from Tally.
   { message: 'KioskPair.retire', quotes: 'Staff.checkInsAllIn' },
   { message: 'KioskPair.retireCore', quotes: 'Staff.checkInsAllIn' },
   // The event page's line about the kiosk's parked records ends in a link that

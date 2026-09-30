@@ -307,7 +307,7 @@
     "offerShort": "Not yours? Register",
     "networkFailed": "No connection just now.",
     "owedNotice": "<mark>Staff</mark> — {count, plural, one {1 name tag is waiting} other {# name tags are waiting}}",
-    "offlineNotice": "<mark>Staff</mark> — can’t reach Tally. Check-ins are saved here and will send; don’t reset it.",
+    "offlineNotice": "<mark>Staff</mark> — offline. Check-ins are saved and will send.",
     "checkInsNeedAttention": "Check-ins need attention",
     "markBoth": "Printer and check-ins need attention"
   },
@@ -362,7 +362,7 @@
     "checkInsNetwork": "No internet since {time}.",
     "checkInsServer": "Tally won’t take them — tell the office.",
     "checkInsHeld": "{count, plural, one {1 isn’t} other {# aren’t}} saved yet — don’t reload or restart; get it online.",
-    "checkInsAbout": "These send themselves. Don’t reset or reinstall this tablet until it says “All check-ins are in Tally”.",
+    "checkInsAbout": "These send themselves.",
     "checkInsNothingWaiting": "Nothing waiting.",
     "checkInsSending": "Sending {total} … {left} left",
     "checkInsTryNow": "Try now",

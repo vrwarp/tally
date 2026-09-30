@@ -307,7 +307,7 @@
     "offerShort": "不是您家的孩子？登記",
     "networkFailed": "現在連不上網路。",
     "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 張名牌在等著列印}}",
-    "offlineNotice": "<mark>同工</mark> — 連不上 Tally。簽到紀錄已保存在這裡，稍後會上傳；請不要重設。",
+    "offlineNotice": "<mark>同工</mark> — 離線中。簽到紀錄已保存，連線後會自動上傳。",
     "checkInsNeedAttention": "簽到紀錄需要處理",
     "markBoth": "印表機和簽到紀錄都需要處理"
   },
@@ -362,7 +362,7 @@
     "checkInsNetwork": "從 {time} 起沒有網路。",
     "checkInsServer": "Tally 不接收這些紀錄——請告訴辦公室。",
     "checkInsHeld": "{count, plural, other {有 # 筆還沒儲存}}——不要重新整理或重新啟動，先連上網路。",
-    "checkInsAbout": "這些紀錄會自動上傳。在顯示「所有簽到紀錄都已傳到 Tally」之前，不要重設或重新安裝這台平板。",
+    "checkInsAbout": "這些紀錄會自動上傳。",
     "checkInsNothingWaiting": "沒有待上傳的紀錄。",
     "checkInsSending": "正在上傳 {total} 筆……還剩 {left} 筆",
     "checkInsTryNow": "立即重試",

@@ -365,9 +365,8 @@ answer at the door.
     than wait politely.
   - *2 aren't saved yet — don't reload or restart; get it online.* — held in memory.
 - **The Check-ins screen** behind that row lists what is waiting, oldest first — child, gathering,
-  tap time, what the last attempt said — under the heading *These send themselves. Don't reset or
-  reinstall this tablet until it says "All check-ins are in Tally".* It shows progress while
-  it sends (*Sending 12 … 7 left*), offers **Try now**, and stays open while somebody is scrolling or
+  tap time, what the last attempt said — under the heading *These send themselves.* It shows progress
+  while it sends (*Sending 12 … 7 left*), offers **Try now**, and stays open while somebody is scrolling or
   photographing it rather than timing out at the staff screen's forty-five seconds.
 - **On the chooser**, where a kiosk spends the week between gatherings, one quiet line while anything
   waits — beside *Couldn't load the calendar* too, which on its own reads as broken: *12 check-ins
@@ -418,8 +417,9 @@ enough to say the true thing without any new report:
 - **A line for staff on untouched glass** — the owner's decision. After ten minutes out of touch, in
   the grammar of the owed-tags notice ([kiosk-owed.md](kiosk-owed.md) §3: its first word says who it
   is for, it asks nothing, the first keystroke removes it, never on a confirm or a tick): *Staff —
-  can't reach Tally. Check-ins are saved here and will send; don't reset it.*
-  It reaches the person deciding the kiosk is broken before they reach the power button.
+  offline. Check-ins are saved and will send.* Reassurance, not an instruction: a volunteer is very
+  unlikely to wipe a tablet, and "reset" would be read as "restart", which is harmless — the journal
+  and the room survive it.
 - **Moving the kiosk.** While out of touch, **Leave** says what it costs: the kiosk cannot be set to a
   gathering again until it can reach Tally.
 - **Optional — a pickup for a child this tablet did not see.** Only for a church that runs two kiosks
@@ -507,7 +507,7 @@ will read it:
 - **The internet is down? Keep using the kiosk.** Every check-in and pickup is kept on the tablet and
   goes to Tally by itself.
 - **Reloading, or turning the tablet off and on, is safe** — unless the kiosk says check-ins *aren't
-  saved yet*. If it is frozen and the menu will not open, restart it. Never reset it.
+  saved yet*. If it is frozen and the menu will not open, restart it.
 - **Factory reset, clearing Chrome's data, uninstalling or re-enrolling** — only after the kiosk says
   *All check-ins are in Tally*.
 - **You don't need to re-record kiosk check-ins** — they are saved on the tablet. Anything you do

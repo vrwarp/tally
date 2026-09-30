@@ -1461,9 +1461,9 @@ export function KioskApp() {
   }, [outOfTouchAt, uid]);
 
   /*
-   * Out of touch for ten minutes: past a blip, and — on a Sunday — before
-   * anybody has been standing at a "broken" kiosk long enough to reach for the
-   * power button. The notice it arms is below, beside the owed one.
+   * Out of touch for ten minutes: past a blip, and long enough that somebody
+   * may be wondering whether the kiosk still works. The notice it arms is
+   * below, beside the owed one.
    */
   const [longOutOfTouch, setLongOutOfTouch] = useState(false);
   useEffect(() => {

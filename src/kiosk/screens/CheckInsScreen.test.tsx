@@ -52,11 +52,9 @@ async function press(text: RegExp): Promise<void> {
 }
 
 describe('the Check-ins screen', () => {
-  it('says the one sentence that matters before the list: don’t reset it', () => {
+  it('says the one sentence that matters before the list: these send themselves', () => {
     renderScreen({ records: [record()] });
-    expect(
-      screen.getByText(/Don’t reset or reinstall this tablet until it says “All check-ins are in Tally”/),
-    ).toBeTruthy();
+    expect(screen.getByText('These send themselves.')).toBeTruthy();
   });
 
   it('lists each record with its child, gathering, time and what its last attempt ran into', () => {

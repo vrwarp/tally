@@ -307,7 +307,7 @@
     "offerShort": "不是您家的？登记",
     "networkFailed": "现在连不上网络。",
     "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 张名牌在等着打印}}",
-    "offlineNotice": "<mark>同工</mark> — 连不上 Tally。签到记录已保存在这里，稍后会上传；请不要重置。",
+    "offlineNotice": "<mark>同工</mark> — 离线中。签到记录已保存，联网后会自动上传。",
     "checkInsNeedAttention": "签到记录需要处理",
     "markBoth": "打印机和签到记录都需要处理"
   },
@@ -362,7 +362,7 @@
     "checkInsNetwork": "从 {time} 起没有网络。",
     "checkInsServer": "Tally 不接收这些记录——请告诉办公室。",
     "checkInsHeld": "{count, plural, other {有 # 条还没保存}}——不要刷新或重启，先连上网络。",
-    "checkInsAbout": "这些记录会自动上传。在显示“所有签到记录都已传到 Tally”之前，不要重置或重装这台平板。",
+    "checkInsAbout": "这些记录会自动上传。",
     "checkInsNothingWaiting": "没有待上传的记录。",
     "checkInsSending": "正在上传 {total} 条……还剩 {left} 条",
     "checkInsTryNow": "立即重试",

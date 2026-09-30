@@ -445,7 +445,7 @@ One side, laminated:
 - **The internet is down? Keep using the kiosk.** Every check-in and pickup is kept on the tablet and
   goes to Tally by itself.
 - **Reloading, or turning the tablet off and on, is safe** — unless the kiosk says check-ins *aren't
-  saved yet*. If it is frozen and the menu will not open, restart it. Never reset it.
+  saved yet*. If it is frozen and the menu will not open, restart it.
 - **Factory reset, clearing Chrome's data, uninstalling or re-enrolling** — only after the kiosk says
   *All check-ins are in Tally* (hold **Clear** for two seconds; it is on the staff menu).
 - **You don't need to re-record kiosk check-ins** — they are saved on the tablet. Anything you do

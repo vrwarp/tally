@@ -611,17 +611,17 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await mount();
     await loseTouch();
     await wait(9 * 60_000);
-    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
 
     // The ten minutes, and then the few seconds of stillness the front door's
     // staff notices wait for.
     await wait(60_000);
     await wait(5_000);
-    const notice = screen.getByText(/can’t reach Tally\. Check-ins are saved here/);
-    expect(notice.textContent).toMatch(/Check-ins are saved here and will send; don’t reset it/);
+    const notice = screen.getByText(/offline\. Check-ins are saved and will send\./);
+    expect(notice.textContent).toBe('Staff — offline. Check-ins are saved and will send.');
 
     await type('a');
-    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
   });
 
   it('opens the list from the notice, and comes back to the door', async () => {
@@ -630,13 +630,13 @@ describe('what the kiosk says, while it cannot reach Tally', () => {
     await wait(10 * 60_000);
     await wait(5_000);
 
-    await press(screen.getByText(/can’t reach Tally\. Check-ins are saved here/).closest('button')!);
+    await press(screen.getByText(/offline\. Check-ins are saved and will send\./).closest('button')!);
     expect(screen.getByText('All check-ins are in Tally')).toBeTruthy();
     await press(screen.getByText(/Done — back to check-in/).closest('button')!);
     // Back at the door, and — once the glass is still again — so is the notice.
-    expect(screen.queryByText(/can’t reach Tally\. Check-ins are saved here/)).toBeNull();
+    expect(screen.queryByText(/offline\. Check-ins are saved and will send\./)).toBeNull();
     await wait(5_000);
-    expect(screen.getByText(/can’t reach Tally\. Check-ins are saved here/)).toBeTruthy();
+    expect(screen.getByText(/offline\. Check-ins are saved and will send\./)).toBeTruthy();
   });
 
   it('sends a new family to a leader before the first question, not after the last', async () => {

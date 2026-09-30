@@ -701,10 +701,10 @@ export function SearchScreen({
    */
   onOwedNotice: () => void;
   /**
-   * Whether to say, for staff, that this kiosk cannot reach Tally — after ten
-   * minutes of it, on idle glass nobody is touching, in the owed notice's
-   * grammar and slot. It exists for the person about to decide the kiosk is
-   * broken, and reaches them before they reach the power button.
+   * Whether to say, for staff, that this kiosk is offline — after ten minutes
+   * of it, on idle glass nobody is touching, in the owed notice's grammar and
+   * slot. It is reassurance, not an instruction: the check-ins are saved and
+   * send themselves, so whoever walks past has nothing to do.
    */
   offlineNotice: boolean;
   /** The notice, tapped — the Check-ins screen, which says what is waiting. */
@@ -1233,9 +1233,8 @@ export function SearchScreen({
           <div className="mx-auto mt-auto flex w-full max-w-xl flex-col gap-3 pt-6 pb-6">
             {offlineNotice && (
               /*
-               * Two sentences, so it wraps where the owed notice truncates:
-               * the second half — *please don't reset it* — is the half that
-               * does the work.
+               * Wraps where the owed notice truncates: the second half — that
+               * the check-ins are saved — is the half that does the work.
                */
               <button
                 type="button"

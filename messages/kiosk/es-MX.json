@@ -307,7 +307,7 @@
     "offerShort": "¿No es suya? Inscribir",
     "networkFailed": "Sin conexión.",
     "owedNotice": "<mark>Personal</mark> — {count, plural, one {1 etiqueta pendiente} other {# etiquetas pendientes}}",
-    "offlineNotice": "<mark>Personal</mark> — no hay conexión con Tally. Los registros se guardan aquí y se enviarán; no lo restablezcas.",
+    "offlineNotice": "<mark>Personal</mark> — sin conexión. Los registros están guardados y se enviarán.",
     "checkInsNeedAttention": "Los registros necesitan atención",
     "markBoth": "La impresora y los registros necesitan atención"
   },
@@ -362,7 +362,7 @@
     "checkInsNetwork": "Sin internet desde las {time}.",
     "checkInsServer": "Tally no los acepta — avisa a la oficina.",
     "checkInsHeld": "{count, plural, one {1 aún no está guardado} other {# aún no están guardados}} — no recargues ni reinicies; conéctala a internet.",
-    "checkInsAbout": "Se envían solos. No restablezcas ni reinstales esta tableta hasta que diga «Todos los registros están en Tally».",
+    "checkInsAbout": "Se envían solos.",
     "checkInsNothingWaiting": "Nada pendiente.",
     "checkInsSending": "Enviando {total} … faltan {left}",
     "checkInsTryNow": "Intentar ahora",

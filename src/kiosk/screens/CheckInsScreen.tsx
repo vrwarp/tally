@@ -5,9 +5,9 @@
  * could not even be written to the disk. Its reader is a volunteer who has been
  * told the kiosk "isn't working", or somebody from the office on the phone to
  * one — and the most important thing on it is the sentence at the top, not the
- * list: these send themselves, and the tablet must not be reset until this
- * screen says *All check-ins are in Tally*. A reset is the one thing left that
- * can lose a morning (docs/kiosk-offline-recovery.md).
+ * list: these send themselves, so nobody has to do anything. The line under it
+ * says why they are waiting, and asks for something only when a record is not
+ * saved yet (docs/kiosk-offline-recovery.md).
  *
  * The list is oldest first, the order they will go in, and each row says what
  * its last attempt ran into in words a person can repeat to the office. **Try
