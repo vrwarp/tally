@@ -266,6 +266,7 @@
     "signInAgain": "Sign in again",
     "coreOnlyTitle": "Core team only",
     "coreOnlyBody": "This part of Tally is for the core team. Checking students in is all yours.",
+    "coreOnlyBodyViewer": "This part of Tally is for the core team.",
     "roleChangedTitle": "This was open to you a minute ago",
     "roleChangedBody": "Your role changed and you no longer have access to this page. You can still check students in.",
     "backToCheckIn": "Back to check-in",

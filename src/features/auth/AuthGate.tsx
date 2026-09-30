@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useAuth, useCanSee, type AuthStage } from '@/context/authContext';
+import { useAuth, useCanSee, useReadOnly, type AuthStage } from '@/context/authContext';
 import { provisionAccess, type ProvisionAccessResult } from '@/services/functions';
 import { Button, ErrorBanner, LoadingScreen, Spinner } from '@/components/ui';
 import { PlacementNotes } from '@/features/auth/placement';
@@ -124,6 +124,8 @@ export function RequireRole({
   const t = useTranslations('Auth');
   const { can } = useAuth();
   const canSee = useCanSee();
+  // "Checking students in is all yours" is the one thing untrue of a viewer.
+  const readOnly = useReadOnly();
   const allowed = viewers ? canSee(role) : can(role);
 
   /*
@@ -151,7 +153,7 @@ export function RequireRole({
           {demoted ? t('roleChangedTitle') : t('coreOnlyTitle')}
         </p>
         <p className="text-sm text-ink-500">
-          {demoted ? t('roleChangedBody') : t('coreOnlyBody')}
+          {demoted ? t('roleChangedBody') : readOnly ? t('coreOnlyBodyViewer') : t('coreOnlyBody')}
         </p>
         <Link
           to="/"

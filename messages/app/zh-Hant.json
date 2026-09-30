@@ -266,6 +266,7 @@
     "signInAgain": "重新登入",
     "coreOnlyTitle": "僅限核心同工",
     "coreOnlyBody": "Tally 的這一部分是給核心同工的。為學生簽到的部分你隨時都可以用。",
+    "coreOnlyBodyViewer": "Tally 的這一部分是給核心同工的。",
     "roleChangedTitle": "剛才你還可以使用此功能",
     "roleChangedBody": "角色權限已變更，無法再存取此頁面。你仍可為學生簽到。",
     "backToCheckIn": "回到簽到",

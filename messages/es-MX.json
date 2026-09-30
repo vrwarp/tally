@@ -266,6 +266,7 @@
     "signInAgain": "Iniciar sesión de nuevo",
     "coreOnlyTitle": "Solo para el equipo central",
     "coreOnlyBody": "Esta parte de Tally es para el equipo central. Puedes seguir pasando lista.",
+    "coreOnlyBodyViewer": "Esta parte de Tally es para el equipo central.",
     "roleChangedTitle": "Esto estaba abierto para ti hace un minuto",
     "roleChangedBody": "Tu rol cambió y ya no tienes acceso a esta página. Aún puedes pasar lista.",
     "backToCheckIn": "Volver a pasar lista",

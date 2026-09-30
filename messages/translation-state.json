@@ -1448,6 +1448,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Auth.coreOnlyBodyViewer": {
+    "source": "This part of Tally is for the core team.",
+    "context": "Body of the refusal card a Viewer (the read-only role) sees on a screen only the core team may open, such as Review or Settings. Replaces the version that ends 'Checking students in is all yours', which is untrue for a viewer: they cannot check anybody in.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Auth.roleChangedTitle": {
     "source": "This was open to you a minute ago",
     "es-MX": "machine",

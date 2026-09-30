@@ -315,6 +315,9 @@ describe('a screen that stops being yours while you are on it', () => {
 
     expect(screen.getByText('The register')).toBeInTheDocument();
     expect(screen.queryByText('The settings')).not.toBeInTheDocument();
+    // Refused without promising the one thing a viewer cannot do.
+    expect(screen.getByText('This part of Tally is for the core team.')).toBeInTheDocument();
+    expect(screen.queryByText(/Checking students in is all yours/)).not.toBeInTheDocument();
   });
 
   it('says the role changed to somebody who had the screen open', () => {

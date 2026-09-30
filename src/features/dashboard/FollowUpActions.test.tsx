@@ -16,6 +16,7 @@ import { render, screen } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { FollowUpActions } from '@/features/dashboard/FollowUpActions';
 import { ParentContactHost } from '@/features/students/ParentContactHost';
 import { invalidatePersonDetails } from '@/hooks/usePersonDetails';
@@ -270,5 +271,33 @@ describe('FollowUpActions', () => {
       'href',
       'sms:9253366692',
     );
+  });
+});
+
+/*
+ * A viewer reads the call list and is never shown the adult on the other end:
+ * that is a parent's phone number, and the read that fetches it is refused for
+ * the role — which drew a red error and a Try again on every row.
+ */
+describe('FollowUpActions for a viewer', () => {
+  it('makes no read and draws nothing', () => {
+    getPersonDetails.mockReset();
+    const viewer = {
+      can: (required: string) => required === 'viewer',
+      profile: { role: 'viewer', active: true },
+    } as unknown as AuthContextValue;
+
+    const { container } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={viewer}>
+          <ParentContactHost>
+            <FollowUpActions student={inPlanningCenter()} />
+          </ParentContactHost>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+
+    expect(getPersonDetails).not.toHaveBeenCalled();
+    expect(container).toBeEmptyDOMElement();
   });
 });

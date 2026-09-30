@@ -9,6 +9,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { Button, Modal, Spinner } from '@/components/ui';
+import { useReadOnly } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { usePersonDetails } from '@/hooks/usePersonDetails';
 import { cn, formatPhone } from '@/lib/utils';
@@ -293,12 +294,24 @@ export interface FollowUpActionsProps {
 export function FollowUpActions({ student, className, onContactAdded }: FollowUpActionsProps) {
   const t = useTranslations('FollowUp');
   const tErrors = useTranslations('Errors');
-  const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(student);
+  /*
+   * Nothing for a viewer, and no read behind the nothing. What this column
+   * shows is an adult's phone number and email — the same reason Review and the
+   * student page's contact card are closed to a viewer — and the read that
+   * fetches it is refused for one, which drew a red error and a Try again on
+   * every row of the call list.
+   */
+  const readOnly = useReadOnly();
+  const { details, error, loaded, unavailable, retry, refresh } = usePersonDetails(
+    readOnly ? null : student,
+  );
 
   const name = studentFullName(student);
   const label = backendLabelOf(student);
   const phone = details?.contactPhone?.trim() ?? '';
   const email = details?.contactEmail?.trim() ?? '';
+
+  if (readOnly) return null;
 
   let body: ReactNode;
 
