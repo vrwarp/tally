@@ -255,6 +255,7 @@
     "signOut": "Cerrar sesión",
     "signedIn": "Sesión iniciada",
     "roleViewer": "observador",
+    "viewOnlyBadge": "Solo ver",
     "roleCounselor": "líder",
     "roleCore": "equipo central",
     "roleAdmin": "administrador"

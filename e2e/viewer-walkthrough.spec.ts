@@ -160,7 +160,8 @@ test('capture the viewer walkthrough', async ({ page, signedInAs }) => {
       'Pat signs in with Google like everybody else and lands where everybody lands: today’s ' +
       'gatherings. Each card offers “Open the register” rather than “Start check-in”, and the ' +
       'Catch up list is described as recent registers rather than work to finish. The nav ' +
-      'carries Insights, Events and Students; Review is not in it.',
+      'carries Insights, Events and Students; Review is not in it. Where everybody else has ' +
+      'their initial, a viewer’s account button carries a View only badge, on every screen.',
   });
 
   const menu = page.getByRole('button', { name: /pat|@/i }).first();

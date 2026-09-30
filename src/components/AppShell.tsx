@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslations } from 'use-intl';
 import { LanguageChoice } from '@/components/LanguageChoice';
-import { useAuth, useCanSee } from '@/context/authContext';
+import { useAuth, useCanSee, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { useKioskParkedCount } from '@/hooks/useKioskParkedCount';
@@ -131,6 +131,7 @@ const NAV: NavItem[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { profile, signOut, can } = useAuth();
   const canSee = useCanSee();
+  const readOnly = useReadOnly();
   const { error } = useData();
   const location = useLocation();
   const t = useTranslations();
@@ -283,9 +284,35 @@ export function AppShell({ children }: { children: ReactNode }) {
         <span className="max-w-32 truncate lg:order-2 lg:max-w-none lg:flex-1 lg:text-left">
           {displayName}
         </span>
-        <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">
-          {initial}
-        </span>
+        {readOnly ? (
+          /*
+           * A viewer's mark, where everybody else's initial is: on every screen,
+           * in the one control that is always drawn, so nobody reading a roster
+           * wonders why a tap does nothing. Words rather than an eye alone,
+           * because an icon on its own explains nothing, and neutral rather
+           * than brand, which on this screen means "you can press this".
+           */
+          <span className="flex h-6 shrink-0 items-center gap-1 rounded-full bg-ink-800 px-2 text-[11px] font-semibold uppercase tracking-wide text-ink-100 ring-1 ring-ink-600 lg:order-1">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              className="size-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" />
+              <circle cx="8" cy="8" r="1.8" />
+            </svg>
+            {t('Account.viewOnlyBadge')}
+          </span>
+        ) : (
+          <span className="flex size-6 items-center justify-center rounded-full bg-brand-500/20 text-brand-300 lg:order-1">
+            {initial}
+          </span>
+        )}
       </button>
       {menuOpen && (anchored || !showNav) ? (
         <div className="hidden lg:block">

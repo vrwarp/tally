@@ -255,6 +255,7 @@
     "signOut": "退出",
     "signedIn": "已登录",
     "roleViewer": "查看者",
+    "viewOnlyBadge": "仅供查看",
     "roleCounselor": "辅导",
     "roleCore": "核心同工",
     "roleAdmin": "管理员"

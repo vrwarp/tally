@@ -1395,6 +1395,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Account.viewOnlyBadge": {
+    "source": "View only",
+    "context": "A small uppercase badge in the account button (top right on a phone, foot of the sidebar on a laptop), shown on every screen to a Viewer — the read-only role — in place of their initial. Says the reader can look but not change anything. Two words at most: it shares one pill with the person's email.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Account.roleCounselor": {
     "source": "counselor",
     "es-MX": "machine",

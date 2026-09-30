@@ -115,6 +115,27 @@ describe('the account menu', () => {
   });
 });
 
+describe('the view-only badge', () => {
+  it('stands in for a viewer\'s initial, on the button every screen draws', () => {
+    renderShell('viewer');
+
+    const buttons = screen.getAllByRole('button', { name: /Sam Whitfield/ });
+    for (const button of buttons) {
+      expect(button).toHaveTextContent('View only');
+      expect(button).not.toHaveTextContent(/^Sam WhitfieldS$/);
+    }
+  });
+
+  it('leaves everybody else with their initial', () => {
+    renderShell('counselor');
+
+    for (const button of screen.getAllByRole('button', { name: /Sam Whitfield/ })) {
+      expect(button).not.toHaveTextContent('View only');
+      expect(button).toHaveTextContent(/S$/);
+    }
+  });
+});
+
 describe('the viewer\'s navigation', () => {
   it('holds the screens a viewer reads and leaves Review with the core team', () => {
     renderShell('viewer');

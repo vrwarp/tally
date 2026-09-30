@@ -255,6 +255,7 @@
     "signOut": "Sign out",
     "signedIn": "Signed in",
     "roleViewer": "viewer",
+    "viewOnlyBadge": "View only",
     "roleCounselor": "counselor",
     "roleCore": "core",
     "roleAdmin": "admin"
