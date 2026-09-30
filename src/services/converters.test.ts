@@ -311,6 +311,61 @@ describe('fromRosterPerson', () => {
 /* -------------------------------------------------------------------------- */
 
 describe('toAttendance', () => {
+  it('reads when a kiosk record reached Tally, and the entries an earlier tap replaced', () => {
+    const tap = new Date(2026, 8, 27, 9, 41);
+    const monday = new Date(2026, 8, 28, 9, 2);
+    const counselor = new Date(2026, 8, 27, 10, 5);
+    const record = toAttendance(
+      fakeSnapshot({
+        data: {
+          checkedInAt: ts(tap),
+          recordedAt: ts(monday),
+          checkedOutRecordedAt: ts(monday),
+          laterCheckIn: { at: ts(counselor), by: 'uid-casey', method: 'search' },
+          laterCheckOut: { at: null, by: 7 },
+        },
+      }),
+      'event-1',
+    );
+    expect(record.recordedAt).toEqual(monday);
+    expect(record.checkedOutRecordedAt).toEqual(monday);
+    expect(record.laterCheckIn).toEqual({ at: counselor, by: 'uid-casey' });
+    // A displaced entry is read defensively, as every stored value is.
+    expect(record.laterCheckOut).toEqual({ at: null, by: null });
+  });
+
+  it('carries a kiosk time Tally cannot vouch for as exactly that, and nothing else as it', () => {
+    const tap = ts(new Date(2026, 8, 27, 9, 41));
+    const flagged = toAttendance(
+      fakeSnapshot({ data: { checkedInAt: tap, timeUncertain: true, checkedOutTimeUncertain: true } }),
+      'event-1',
+    );
+    expect(flagged.timeUncertain).toBe(true);
+    expect(flagged.checkedOutTimeUncertain).toBe(true);
+
+    for (const value of [false, 'true', 1, null]) {
+      const record = toAttendance(
+        fakeSnapshot({ data: { checkedInAt: tap, timeUncertain: value, checkedOutTimeUncertain: value } }),
+        'event-1',
+      );
+      expect(record, JSON.stringify(value)).not.toHaveProperty('timeUncertain');
+      expect(record, JSON.stringify(value)).not.toHaveProperty('checkedOutTimeUncertain');
+    }
+  });
+
+  it('leaves them off a record the kiosk never sent, rather than reading them as null', () => {
+    const tap = ts(new Date(2026, 8, 27, 9, 41));
+    for (const data of [
+      { checkedInAt: tap, laterCheckIn: 'x', laterCheckOut: null },
+      { checkedInAt: tap, laterCheckIn: [], laterCheckOut: [{ at: tap, by: 'uid-casey' }] },
+    ]) {
+      const record = toAttendance(fakeSnapshot({ data }), 'event-1');
+      for (const key of ['recordedAt', 'checkedOutRecordedAt', 'laterCheckIn', 'laterCheckOut']) {
+        expect(record).not.toHaveProperty(key);
+      }
+    }
+  });
+
   it('dates a locally-pending check-in to now, not to the epoch', () => {
     // What `onSnapshot` delivers between the tap and the server ack.
     const before = Date.now();

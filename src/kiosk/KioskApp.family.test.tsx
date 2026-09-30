@@ -17,6 +17,8 @@ import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything, sentRecords, sentStudentIds } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 function student(id: string, firstName: string, lastName: string): KioskStudent {
   return {
@@ -84,13 +86,9 @@ const services = {
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
   fetchAttendance: vi.fn(async () => ({ present, checkedOut, arrivals })),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -157,18 +155,13 @@ async function tap(text: RegExp | string): Promise<void> {
   await settle();
 }
 
+/** The children a press sent Tally a check-in for. */
 function checkedInIds(): string[] {
-  return vi
-    .mocked(services.performCheckIn)
-    .mock.calls.map((call) => call[0].student.id)
-    .sort();
+  return sentStudentIds(services.landRecords, 'check-in');
 }
 
 function checkOutCalls(): string[] {
-  return vi
-    .mocked(services.performCheckOut)
-    .mock.calls.map((call) => call[0].studentId)
-    .sort();
+  return sentStudentIds(services.landRecords, 'check-out');
 }
 
 beforeEach(() => {
@@ -248,7 +241,7 @@ describe('checking a family in together', () => {
     await tap('Check in');
 
     expect(checkedInIds()).toEqual(['s-marcus']);
-    expect(services.performCheckOut).not.toHaveBeenCalled();
+    expect(checkOutCalls()).toEqual([]);
   });
 
   it('offers nothing beside a child who is already checked in', async () => {
@@ -280,13 +273,8 @@ describe('checking a family out together', () => {
 
     await tap(/check out 2/i);
 
-    expect(
-      vi
-        .mocked(services.performCheckOut)
-        .mock.calls.map((call) => call[0].studentId)
-        .sort(),
-    ).toEqual(['s-amara', 's-marcus']);
-    expect(services.performCheckIn).not.toHaveBeenCalled();
+    expect(checkOutCalls()).toEqual(['s-amara', 's-marcus']);
+    expect(checkedInIds()).toEqual([]);
   });
 
   it('does not offer a sibling who has already been checked out', async () => {
@@ -299,9 +287,7 @@ describe('checking a family out together', () => {
     expect(screen.queryByText(/anyone else/i)).toBeNull();
     await tap(/check out/i);
 
-    expect(vi.mocked(services.performCheckOut).mock.calls.map((call) => call[0].studentId)).toEqual([
-      's-marcus',
-    ]);
+    expect(checkOutCalls()).toEqual(['s-marcus']);
   });
 });
 
@@ -388,7 +374,7 @@ describe('checking out the ones who came in together', () => {
     await toggle('Marcus Osei');
     await tap(/check in 2/i);
 
-    const ids = vi.mocked(services.performCheckIn).mock.calls.map((call) => call[0].arrivalId);
+    const ids = sentRecords(services.landRecords, 'check-in').map((record) => record.arrivalId);
     expect(ids).toHaveLength(2);
     expect(ids[0]).toBeTruthy();
     expect(new Set(ids).size).toBe(1);
@@ -405,7 +391,7 @@ describe('checking out the ones who came in together', () => {
     await pick('Maya Chen');
     await tap(/^check in$/i);
 
-    const first = vi.mocked(services.performCheckIn).mock.calls[0]![0].arrivalId;
+    const first = sentRecords(services.landRecords, 'check-in')[0]!.arrivalId;
     expect(first).toBeTruthy();
   });
 });
@@ -455,12 +441,7 @@ describe('finding a brother or sister the kiosk did not offer', () => {
     expect(screen.getByText(/Check in 2/i)).toBeTruthy();
     await tap(/Check in 2/i);
 
-    expect(
-      vi
-        .mocked(services.performCheckIn)
-        .mock.calls.map((call) => call[0].student.id)
-        .sort(),
-    ).toEqual(['s-amara', 's-maya']);
+    expect(checkedInIds()).toEqual(['s-amara', 's-maya']);
   });
 
   it('does not offer somebody already on the confirm screen', async () => {
@@ -632,26 +613,6 @@ describe('offering a family without ticking any of them', () => {
 
     await tap(/Check in 2/i);
     expect(checkedInIds()).toEqual(['s-amara', 's-maya']);
-  });
-
-  it('does not warm a label for a sibling arriving unticked', async () => {
-    scope = {
-      participated: new Set(['s-amara', 's-marcus']),
-      recent: new Set(['s-amara']),
-    };
-    await mount();
-    await type('7788');
-    await pick('Amara Osei');
-
-    const warmed = vi.mocked(services.warmStudentDates).mock.calls.map((call) => call[0]);
-    expect(warmed).toContain('s-amara');
-    expect(warmed).not.toContain('s-marcus');
-
-    // Until the parent says otherwise, at which point it is worth preparing.
-    await toggle('Marcus Osei');
-    expect(
-      vi.mocked(services.warmStudentDates).mock.calls.map((call) => call[0]),
-    ).toContain('s-marcus');
   });
 
   it('leaves a pickup reading the register, not the prediction', async () => {

@@ -368,6 +368,8 @@ export function Demo() {
             }}
             onReprint={() => say('The reprint screen is not part of this demo.')}
             onPrinter={() => say('The printer screen is not part of this demo.')}
+            checkIns={{ count: 0, held: 0, problem: null, oldestAtMs: null }}
+            onCheckIns={() => say('The check-ins screen is not part of this demo.')}
             onChangeEvent={() => say('Changing the gathering is not part of this demo.')}
             pins={pins}
             onLanguages={() => setScreen('languages')}
@@ -394,10 +396,12 @@ export function Demo() {
               presentIds={present}
               checkedOutIds={EMPTY}
               tracksCheckOut={false}
-              printerNeedsAttention={false}
-              onPrinter={() => {}}
+              mark={null}
+              onMark={() => {}}
               owedNotice={0}
               onOwedNotice={() => {}}
+              offlineNotice={false}
+              onOfflineNotice={() => {}}
               backdrop={photo && idle}
               refresh={refresh}
               widening={widening}

@@ -13,10 +13,14 @@
  * labelled key in a fixed place that can be described over the phone, so it is
  * discoverable by staff, therefore reachable by accident, and therefore asks.
  *
- * Nothing here is destructive: no attendance is touched, and the chooser is one
- * tap from putting the kiosk back. It is *disruptive*, though, and the warning
- * says which — the door shuts for everybody standing at it, and they cannot
- * reopen it themselves. So carrying on is the loud answer and leaving is the
+ * Nothing here is destructive: no attendance is touched — whatever this tablet
+ * still holds goes to Tally from the chooser just the same (`uploader.ts`) —
+ * and the chooser is one tap from putting the kiosk back. With one exception,
+ * which the screen says out loud: the chooser's list comes from Tally, so a
+ * kiosk that cannot reach Tally cannot be set to anything once it has left, and
+ * the lobby is without a kiosk until the internet is back. It is *disruptive*
+ * either way, and the warning says which — the door shuts for everybody
+ * standing at it, and they cannot reopen it themselves. So carrying on is the loud answer and leaving is the
  * quiet one, which is the way round this codebase puts every control whose cost
  * lands on somebody other than the person pressing it.
  */
@@ -28,6 +32,7 @@ import { useTap } from '../components/tapGuard';
 export function ChangeEventScreen({
   title,
   iconPath,
+  outOfTouch = false,
   onStay,
   onLeave,
 }: {
@@ -40,6 +45,8 @@ export function ChangeEventScreen({
    * take anything off.
    */
   iconPath?: string | null;
+  /** Whether the kiosk cannot reach Tally right now — see `touch.ts`. */
+  outOfTouch?: boolean;
   onStay: () => void;
   onLeave: () => void;
 }) {
@@ -76,7 +83,10 @@ export function ChangeEventScreen({
           <span aria-hidden className="text-2xl leading-none text-warn-400">
             ⚠
           </span>
-          <p className="text-lg text-warn-400">{t('changeEventWarning')}</p>
+          <div className="flex flex-col gap-2 text-lg text-warn-400">
+            <p>{t('changeEventWarning')}</p>
+            {outOfTouch && <p>{t('changeEventOffline')}</p>}
+          </div>
         </div>
 
         <p className="mx-auto max-w-xl text-base text-ink-500">{t('changeEventKept')}</p>

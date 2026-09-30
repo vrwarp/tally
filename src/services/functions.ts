@@ -9,6 +9,7 @@
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
 import { USE_EMULATORS, firebaseApp } from '@/lib/firebase';
 import { ROSTER_DEADLINES_MS } from '@/lib/rosterLadder';
+import type { SettleParkedRequest, SettleParkedResponse } from '@/lib/kioskSettle';
 import type {
   BackendId,
   BackendStatuses,
@@ -1085,7 +1086,8 @@ export const deleteEvents = httpsCallable<
  * Any active member may approve; attendance writes need counselor anyway.
  */
 export const approveKioskPairing = httpsCallable<
-  { code: string },
+  /** `name` is what whoever pairs the kiosk calls it; optional, and the core team may rename it. */
+  { code: string; name?: string },
   { status: 'approved' | 'not-found' | 'expired' }
 >(functions, 'approveKioskPairing');
 
@@ -1102,10 +1104,21 @@ export const approveKioskPairing = httpsCallable<
  * device policy that carries the kiosk's URL.
  */
 export const createKioskPairingLink = httpsCallable<
-  void,
+  { name?: string } | void,
   | { status: 'created'; code: string; secret: string; expiresInSeconds: number }
   | { status: 'busy' }
 >(functions, 'createKioskPairingLink');
+
+/**
+ * The core team deciding about a record the lobby kiosk could not land: let it
+ * go, with their name on it, or record it now that the reason it was parked
+ * has gone. A child's arrival and pickup settle together. See
+ * functions/src/kiosk/settle.ts.
+ */
+export const settleParkedKioskRecord = httpsCallable<SettleParkedRequest, SettleParkedResponse>(
+  functions,
+  'settleParkedKioskRecord',
+);
 
 /**
  * Rebuilds the kiosk's search-by-phone index from the backends' household

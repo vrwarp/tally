@@ -39,6 +39,8 @@ describe('the collection names', () => {
       eventAccess: 'eventAccess',
       accessRequests: 'accessRequests',
       kioskDevices: 'kioskDevices',
+      kioskParkedRecords: 'kioskParkedRecords',
+      kioskPresence: 'kioskPresence',
       transitions: 'transitions',
       attendance: 'attendance',
       rsvps: 'rsvps',
@@ -72,6 +74,13 @@ describe('top-level collections and their documents', () => {
   it('addresses the recurring templates', () => {
     expect(paths.eventSeries()).toBe('eventSeries');
     expect(paths.series('friday-fellowship')).toBe('eventSeries/friday-fellowship');
+  });
+
+  it('addresses what the lobby kiosk leaves for people: parked records and presence', () => {
+    expect(paths.kioskParkedRecordsCollection()).toBe('kioskParkedRecords');
+    expect(paths.kioskParkedRecord('check-in:e1:s1')).toBe('kioskParkedRecords/check-in:e1:s1');
+    // Keyed by chain, as `eventAccess` is: a counselor's reach is the chain.
+    expect(paths.kioskPresence('sunday-kids')).toBe('kioskPresence/sunday-kids');
   });
 
   it('addresses students and events', () => {

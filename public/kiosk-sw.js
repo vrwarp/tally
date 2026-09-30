@@ -20,8 +20,8 @@
  * will not offer to install a page with no `fetch` handler — but what it does
  * while it is there is chosen for the shelf: a kiosk whose lobby wifi has
  * dropped still boots, still shows the roster it cached in localStorage, and
- * still queues check-ins for when the network returns. Before this, the same
- * outage was a blank page.
+ * still writes check-ins down for when the network returns. Before this, the
+ * same outage was a blank page.
  *
  * Not on the very first load, though, and the difference is worth knowing when
  * setting one up: registration happens at `load`, by which point the page and
@@ -43,7 +43,7 @@
  *
  * Firestore, Auth and Functions traffic is not touched: it never reaches a
  * handler here, because it is not same-origin. The kiosk's own offline story is
- * the pending-write queue in src/kiosk/services.ts, not a cached POST.
+ * the journal in src/kiosk/journal.ts, not a cached POST.
  *
  * This file itself is served `no-cache` (firebase.json), alongside the main
  * app's worker. The spec already bypasses the HTTP cache when checking a worker

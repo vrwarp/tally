@@ -72,6 +72,7 @@ import { useGrades } from '@/hooks/usePureStrings';
 import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 import { useFieldError } from '@/hooks/useFieldError';
+import { KioskParkedSection } from '@/features/review/KioskParkedSection';
 
 /**
  * The whole screen's translator, as a type.
@@ -227,6 +228,11 @@ export function ReviewPage() {
         </h1>
         <p className="mt-0.5 max-w-2xl text-sm text-ink-500">{t('intro')}</p>
       </header>
+
+      {/* The lobby kiosk's records no retry could land. First when there are
+          any — a Sunday's check-ins waiting on somebody — and nothing at all
+          when there are not. */}
+      <KioskParkedSection />
 
       {error ? <ErrorBanner message={t('loadFailed')} /> : null}
 

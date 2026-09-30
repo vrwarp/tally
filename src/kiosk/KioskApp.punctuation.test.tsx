@@ -20,6 +20,8 @@ import { KioskApp, type KioskServices } from '@/kiosk/KioskApp';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 function student(id: string, firstName: string, lastName: string): KioskStudent {
   return {
@@ -72,14 +74,10 @@ const services = {
     checkedOut: new Set<string>(),
     arrivals: new Map<string, string>(),
   })),
-  replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn(async () => {}),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);

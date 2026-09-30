@@ -100,9 +100,23 @@ export function checkOutPayload(clock: PayloadClock, uid: string): Record<string
   return { checkedOutAt: clock.serverTimestamp(), checkedOutBy: uid };
 }
 
-/** Undoing one. Deletes the keys; see `PayloadClock`. */
+/**
+ * Undoing one. Deletes the keys; see `PayloadClock`.
+ *
+ * The last three are what the server writes beside a pickup that reached Tally
+ * from the lobby kiosk (see functions/src/kiosk/landing.ts) — when it arrived,
+ * the later entry an earlier tap replaced, a time it could not vouch for. They
+ * describe the pickup, so they go with it; the rules let a client remove them
+ * and never set them.
+ */
 export function undoCheckOutPayload(clock: PayloadClock): Record<string, unknown> {
-  return { checkedOutAt: clock.deleteField(), checkedOutBy: clock.deleteField() };
+  return {
+    checkedOutAt: clock.deleteField(),
+    checkedOutBy: clock.deleteField(),
+    checkedOutRecordedAt: clock.deleteField(),
+    laterCheckOut: clock.deleteField(),
+    checkedOutTimeUncertain: clock.deleteField(),
+  };
 }
 
 /**

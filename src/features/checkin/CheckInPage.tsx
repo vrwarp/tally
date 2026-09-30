@@ -73,6 +73,7 @@ import { ensureMaterialized } from '@/services/events';
 import { studentFullName, type Grade, type RosterEntry, type TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { QuietKiosks } from '@/features/checkin/QuietKiosks';
 
 /**
  * The one left edge this screen has.
@@ -1143,6 +1144,11 @@ export function CheckInPage() {
             </button>
           </div>
         ) : null}
+
+        {/* The lobby kiosk gone quiet on this gathering's day: what was
+            checked in there since is on the tablet, not on this list. In the
+            header band for the same reason as the line above. */}
+        <QuietKiosks event={event} now={now} />
       </div>
 
       {/* The one thing that stays. Search is how a counselor finds the student

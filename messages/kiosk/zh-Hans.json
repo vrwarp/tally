@@ -26,7 +26,9 @@
     "connectThePrinterAgain": "重新连接打印机",
     "oneMoment": "请稍候…",
     "printerSettings": "打印机设置",
-    "nameTagsWontPrint": "名牌不会打印"
+    "nameTagsWontPrint": "名牌不会打印",
+    "waitingFrom": "{gathering} 的 {count, plural, other {# 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。",
+    "waiting": "{count, plural, other {有 # 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。"
   },
   "Common": {
     "language": "语言",
@@ -113,6 +115,9 @@
     "apostrophe": "撇号",
     "hyphen": "连字符",
     "staffPrint": "同工 · 打印名牌",
+    "staffCheckIns": "同工 · 签到记录",
+    "leaderTitle": "请找辅导帮您登记",
+    "leaderWhy": "这台签到台连不上 Tally，无法添加新家庭。辅导可以用手机为您添加。",
     "turnUprightTitle": "请把屏幕竖过来",
     "turnUprightBody": "签到只能在竖屏下使用。如果无法转动，请找辅导。"
   },
@@ -134,7 +139,8 @@
     "retired": "此签到台已于 {time} 在 Tally 中停用，此后未再记录任何数据。在重新配对前，请由辅导在手机上为孩子签到。",
     "pinLanguages": "这里的家庭使用的语言",
     "pinHint": "英文一定会有。",
-    "pinPreview": "家庭会看到的画面"
+    "pinPreview": "家庭会看到的画面",
+    "waiting": "{count, plural, other {有 # 条签到记录}}待上传。配对这台平板后即可上传。"
   },
   "Printer": {
     "troubleReported": "打印机报告了故障。",
@@ -300,7 +306,10 @@
     "offerFirstTime": "第一次来？为您的孩子登记",
     "offerShort": "不是您家的？登记",
     "networkFailed": "现在连不上网络。",
-    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 张名牌在等着打印}}"
+    "owedNotice": "<mark>同工</mark> — {count, plural, other {有 # 张名牌在等着打印}}",
+    "offlineNotice": "<mark>同工</mark> — 离线中。签到记录已保存。",
+    "checkInsNeedAttention": "签到记录需要处理",
+    "markBoth": "打印机和签到记录都需要处理"
   },
   "Staff": {
     "changeEventTitle": "更换聚会？",
@@ -346,6 +355,26 @@
     "owedCost": "{count, plural, other {没有勾选的 # 张会跳过。}}",
     "owedPrint": "{count, plural, other {打印 # 张名牌}}",
     "owedSkip": "{count, plural, other {跳过 # 张名牌}}",
-    "statusWaiting": "{count, plural, other {# 张待打印}}"
+    "statusWaiting": "{count, plural, other {# 张待打印}}",
+    "checkInsAllIn": "所有签到记录都已传到 Tally",
+    "checkIns": "签到记录",
+    "checkInsWaiting": "{count, plural, other {# 条待上传}}",
+    "checkInsNetwork": "从 {time} 起没有网络。",
+    "checkInsServer": "Tally 不接收这些记录——请告诉办公室。",
+    "checkInsHeld": "{count, plural, other {有 # 条还没保存}}——不要刷新或重启，先连上网络。",
+    "checkInsAbout": "这些记录会自动上传。",
+    "checkInsNothingWaiting": "没有待上传的记录。",
+    "checkInsSending": "正在上传 {total} 条……还剩 {left} 条",
+    "checkInsTryNow": "立即重试",
+    "recordIn": "签到",
+    "recordOut": "签出",
+    "recordAbout": "约 {time}",
+    "recordHeld": "尚未保存",
+    "recordNotSent": "尚未上传",
+    "recordNoInternet": "没有网络",
+    "recordServer": "Tally 没有接收",
+    "recordArrival": "在等对应的签到",
+    "someone": "一个孩子",
+    "changeEventOffline": "连不上 Tally。一旦离开，要等恢复连接后才能选择其他聚会。"
   }
 }

@@ -27,6 +27,7 @@ import {
   type AppSettings,
   type AppSettingsDoc,
   type AttendanceRecord,
+  type LaterEntry,
   type EventSeries,
   type Grade,
   type PcoRosterPerson,
@@ -161,6 +162,7 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
     upstreamPersonId: strOrNull(data.upstreamPersonId),
     pendingReview: bool(data.pendingReview),
     mergedIntoStudentId: strOrNull(data.mergedIntoStudentId),
+    recreatedAsStudentId: strOrNull(data.recreatedAsStudentId),
     // Both spellings folded into the list the app reads: `mergedFromStudentId`
     // predates a keeper being able to absorb more than one duplicate.
     mergedFromStudentIds: [
@@ -360,7 +362,28 @@ export function toAttendance(
           (snapshot.metadata.hasPendingWrites ? new Date() : null))
         : null,
     checkedOutBy: strOrNull(data.checkedOutBy),
+    // Present only when true — the server's doubt about a kiosk clock, which
+    // every screen that prints the time answers with "time not known".
+    ...(data.timeUncertain === true ? { timeUncertain: true } : {}),
+    ...(data.checkedOutTimeUncertain === true ? { checkedOutTimeUncertain: true } : {}),
+    // What `landKioskRecords` adds, present only when it wrote them.
+    ...present('recordedAt', toDateOrNull(data.recordedAt)),
+    ...present('checkedOutRecordedAt', toDateOrNull(data.checkedOutRecordedAt)),
+    ...present('laterCheckIn', laterEntry(data.laterCheckIn)),
+    ...present('laterCheckOut', laterEntry(data.laterCheckOut)),
   };
+}
+
+/** `{ [key]: value }` when there is a value, and nothing when there is not. */
+function present<K extends string, V>(key: K, value: V | null): Partial<Record<K, V>> {
+  return value === null ? {} : ({ [key]: value } as Record<K, V>);
+}
+
+/** A displaced entry as the server keeps it, or null for anything that is not one. */
+function laterEntry(value: unknown): LaterEntry | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const entry = value as { at?: unknown; by?: unknown };
+  return { at: toDateOrNull(entry.at), by: strOrNull(entry.by) };
 }
 
 /* -------------------------------------------------------------------------- */

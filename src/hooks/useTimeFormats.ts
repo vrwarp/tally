@@ -13,6 +13,7 @@
 import { useMemo } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import {
+  formatAttendanceClock,
   formatClock,
   formatDateTime,
   formatEventDay,
@@ -40,6 +41,8 @@ export interface TimeFormats {
   weekdayDay: (date: Date) => string;
   /** "7:00 PM". */
   clock: (date: Date) => string;
+  /** A check-in or pickup's "7:00 PM", or "time not known" — see `formatAttendanceClock`. */
+  attendanceClock: (date: Date, uncertain: boolean | undefined) => string;
   /** "2 hours ago", and "in 2 hours" for a date that has not happened. */
   relative: (date: Date, now?: Date) => string;
   /** The roster column: "Today", "Fri", "3 wks ago". */
@@ -63,6 +66,7 @@ export function useTimeFormats(): TimeFormats {
       weekdayDate: (date) => formatWeekdayDate(strings, date),
       weekdayDay: (date) => formatWeekdayDay(strings, date),
       clock: (date) => formatClock(strings, date),
+      attendanceClock: (date, uncertain) => formatAttendanceClock(strings, date, uncertain),
       relative: (date, now) => formatRelative(strings, date, now),
       seenShort: (date, now) => formatSeenShort(strings, date, now),
     }),

@@ -1410,9 +1410,9 @@ function jobFor(
 /**
  * Start building this child's label now, because the confirm screen just opened.
  *
- * The counterpart to `services.warmStudentDates`, and the reason a label is
- * moving by the time the tick paints. Callers gate this on the intent being a
- * check-in: a check-out prints nothing, so warming one is work thrown away.
+ * The reason a label is moving by the time the tick paints. Callers gate this
+ * on the intent being a check-in: a check-out prints nothing, so warming one is
+ * work thrown away.
  */
 export function warmLabel(
   grades: GradeStrings,

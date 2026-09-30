@@ -589,6 +589,14 @@ export function Kiosk() {
         backdrop={params.get('backdrop') === '1'}
         onReprint={() => {}}
         onPrinter={() => {}}
+        // `?waiting=12`: the check-ins row as a kiosk out of touch since an hour ago draws it.
+        checkIns={{
+          count: Number(params.get('waiting') ?? 0),
+          held: 0,
+          problem: params.get('waiting') ? 'network' : null,
+          oldestAtMs: Date.now() - 3_600_000,
+        }}
+        onCheckIns={() => {}}
         onChangeEvent={() => {}}
         onHideBackdrop={() => {}}
         pins={[]}
@@ -784,10 +792,13 @@ export function Kiosk() {
          made is a person it needs — so `?owed=N` lights it too, exactly as the
          app does. A frame of the notice with no mark above it would be
          photographing a screen this kiosk never draws. */
-      printerNeedsAttention={params.get('printer') === '1' || OWED_COUNT > 0}
-      onPrinter={() => {}}
+      mark={params.get('printer') === '1' || OWED_COUNT > 0 ? 'printer' : null}
+      onMark={() => {}}
       owedNotice={OWED_COUNT}
       onOwedNotice={() => {}}
+      // `?offline=1`: the staff notice a kiosk out of touch for ten minutes shows.
+      offlineNotice={params.get('offline') === '1'}
+      onOfflineNotice={() => {}}
       backdrop={photoUrl !== null}
       refresh="idle"
       widening={false}

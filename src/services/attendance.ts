@@ -582,5 +582,7 @@ function fromCallableAttendance(
     isFirstEver: data.isFirstEver === true,
     checkedOutAt: millis(data.checkedOutAt),
     checkedOutBy: typeof data.checkedOutBy === 'string' ? data.checkedOutBy : null,
+    ...(data.timeUncertain === true ? { timeUncertain: true } : {}),
+    ...(data.checkedOutTimeUncertain === true ? { checkedOutTimeUncertain: true } : {}),
   };
 }

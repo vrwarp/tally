@@ -70,6 +70,16 @@ vi.mock('@/services/rsvps', () => ({
 }));
 
 vi.mock('@/services/users', () => ({ subscribeUsers: () => () => {} }));
+// The kiosk line has its own tests (KioskEventLine.test.tsx); here, no kiosk and nothing parked.
+vi.mock('@/lib/firebase', () => ({ db: {} }));
+vi.mock('@/services/kioskDevices', () => ({
+  subscribeKioskDevices: () => () => {},
+  kioskWaitingCount: () => 0,
+}));
+vi.mock('@/services/kioskParkedRecords', async () => {
+  const real = (await vi.importActual('@/services/kioskParkedRecords')) as Record<string, unknown>;
+  return { ...real, subscribeUnsettledParkedRecords: () => () => {} };
+});
 
 vi.mock('@/services/kioskBackdrops', () => ({
   putKioskBackdrop: vi.fn(async () => 'b0123456789abcdef'),

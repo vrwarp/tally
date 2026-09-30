@@ -21,6 +21,8 @@ import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { KIOSK_KEYS } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { landEverything } from '@/test/kioskLanding';
+import { createUploader } from '@/kiosk/uploader';
 
 const BACKDROP_ID = 'b0123456789abcdef';
 
@@ -67,16 +69,14 @@ const services = {
   })),
   fetchPulse: vi.fn(async () => null),
   rememberPulse: vi.fn(),
-  replayQueue: vi.fn(async () => 0),
   refreshDirectory: vi.fn(async () => {}),
   fetchBackdrop: vi.fn(async () => ({
     bytes: new Uint8Array([1, 2, 3]),
     contentType: 'image/webp',
   })),
-  performCheckIn: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
-  enqueueCheckIn: vi.fn(),
+  landRecords: vi.fn(landEverything),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);

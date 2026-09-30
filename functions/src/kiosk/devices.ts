@@ -21,6 +21,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import type { FirestoreLike } from '../firestore.js';
 import { isDeviceId } from '../generated/kioskDevice.js';
+import { kioskName } from '../generated/kioskName.js';
 
 export { DEVICE_ID_PATTERN, deviceIdOfUid, isDeviceId, kioskUid } from '../generated/kioskDevice.js';
 
@@ -51,17 +52,29 @@ export interface KioskDeviceRecord {
 /**
  * Records that `deviceId` now holds a session, approved by `approver`.
  *
- * A re-claim by the same device replaces the previous row wholesale — the
- * session it described no longer exists — except that a retired row stays
- * retired: re-pairing is how a retired tablet comes back, and that is a
- * decision for the person approving the new code, so the retirement is
- * cleared here deliberately and visibly.
+ * A re-claim by the same device replaces everything about the session it
+ * described — who vouched for it and when, where it was, its battery — because
+ * that session no longer exists. The retirement goes with it, deliberately and
+ * visibly: re-pairing is how a retired tablet comes back, and that is a
+ * decision for the person approving the new code.
+ *
+ * What it keeps is what describes the tablet rather than the session:
+ *
+ * - **Its name**, unless the approver gave a new one. The core team named it
+ *   *Lobby*, and a re-pair on a Sunday morning should not make it a hex id.
+ * - **What it told Tally it still holds** (`waitingCount` and the rest). A
+ *   re-paired tablet is often one retired with records on it; they are still
+ *   there, and its first upload reports them again.
+ * - **`firstLandingAt`** — that it sends records through `landKioskRecords`.
+ *   The rules refuse a direct attendance write from a kiosk that has, and
+ *   pairing again must not hand that back.
  */
 export async function recordPairedDevice(
   db: FirestoreLike,
   deviceId: string,
   approver: { uid: string; name: string | null },
   now: Date,
+  deviceName: string | null = null,
 ): Promise<void> {
   if (!isDeviceId(deviceId)) return;
   const record: KioskDeviceRecord = {
@@ -74,7 +87,17 @@ export async function recordPairedDevice(
     retiredAt: null,
     retiredBy: null,
   };
-  await db.doc(`${DEVICES_COLLECTION}/${deviceId}`).set({ ...record });
+  const name = kioskName(deviceName);
+  await db.doc(`${DEVICES_COLLECTION}/${deviceId}`).set(
+    {
+      ...record,
+      // The last session's reading, which the next report replaces.
+      batteryLevel: null,
+      charging: null,
+      ...(name === null ? {} : { name }),
+    },
+    { merge: true },
+  );
 }
 
 /** The row for a device, or null when there is none or it has been retired. */

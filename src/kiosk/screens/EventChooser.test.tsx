@@ -694,3 +694,57 @@ describe('the printer strip', () => {
     unmount();
   });
 });
+
+/*
+ * The week between gatherings, with Sunday not all in Tally yet.
+ *
+ * The chooser is where a kiosk sits for days, and where a volunteer walking past
+ * decides whether it is broken — beside *Couldn't load the calendar* most of all.
+ * So while check-ins wait on the tablet it says so, and says what keeps them
+ * going: power and the Wi-Fi.
+ */
+describe('check-ins still on the tablet', () => {
+  it('says how many, from which gathering, and what keeps them going', async () => {
+    await renderChooser(servicesWith(vi.fn()), vi.fn(), {
+      unsent: { count: 12, gathering: 'Sunday Kids', sending: null },
+    });
+    expect(
+      screen.getByText(
+        '12 check-ins from Sunday Kids not sent yet — keep it plugged in and on Wi-Fi.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves the gathering out when they are from more than one', async () => {
+    await renderChooser(servicesWith(vi.fn()), vi.fn(), {
+      unsent: { count: 1, gathering: null, sending: null },
+    });
+    expect(screen.getByText(/^1 check-in not sent yet/)).toBeInTheDocument();
+  });
+
+  it('shows a pass under way', async () => {
+    await renderChooser(servicesWith(vi.fn()), vi.fn(), {
+      unsent: { count: 12, gathering: 'Sunday Kids', sending: { total: 12, left: 7 } },
+    });
+    expect(screen.getByText('Sending 12 … 7 left')).toBeInTheDocument();
+  });
+
+  it('stands beside a calendar that would not load', async () => {
+    const failing = {
+      listEvents: vi.fn(async () => {
+        throw new Error('offline');
+      }),
+      bindEntry: vi.fn(),
+    } as unknown as KioskServices;
+    await renderChooser(failing, vi.fn(), {
+      unsent: { count: 3, gathering: 'Sunday Kids', sending: null },
+    });
+    expect(screen.getByText(/Couldn’t load the calendar/)).toBeInTheDocument();
+    expect(screen.getByText(/3 check-ins from Sunday Kids not sent yet/)).toBeInTheDocument();
+  });
+
+  it('says nothing when nothing waits', async () => {
+    await renderChooser(servicesWith(vi.fn()));
+    expect(screen.queryByText(/not sent yet/)).not.toBeInTheDocument();
+  });
+});

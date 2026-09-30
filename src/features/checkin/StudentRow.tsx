@@ -108,6 +108,9 @@ function sameEntry(a: RosterEntry, b: RosterEntry): boolean {
     // a pickup that never appears on screen.
     (a.attendance?.checkedOutAt?.getTime() ?? null) ===
       (b.attendance?.checkedOutAt?.getTime() ?? null) &&
+    // Read below as "time not known" in place of either clock.
+    a.attendance?.timeUncertain === b.attendance?.timeUncertain &&
+    a.attendance?.checkedOutTimeUncertain === b.attendance?.checkedOutTimeUncertain &&
     sameItems(a.warnings, b.warnings)
   );
 }
@@ -159,6 +162,15 @@ export const StudentRow = memo(function StudentRow({
    * dimmed rows behind carrying a state nothing on screen explains.
    */
   const gone = tracksCheckOut && attendance?.checkedOutAt != null;
+  /*
+   * The two clocks, or *time not known* where the device that recorded one
+   * had a clock too far wrong to believe — see `formatAttendanceClock`. Once,
+   * here, because the row says each of them in three places.
+   */
+  const inClock = attendance ? time.attendanceClock(attendance.checkedInAt, attendance.timeUncertain) : '';
+  const outClock = attendance?.checkedOutAt
+    ? time.attendanceClock(attendance.checkedOutAt, attendance.checkedOutTimeUncertain)
+    : '';
   // The action strip belongs to a check-in. While the screen is picking a
   // person it would be a second, contradictory meaning for the same row.
   const open = expanded && here && !swapping;
@@ -191,9 +203,9 @@ export const StudentRow = memo(function StudentRow({
         ? t('ariaAlreadyCheckedIn', { who })
         : t('ariaMoveTo', { who })
     : gone
-      ? t('ariaMoreCheckedOut', { who, time: time.clock(attendance!.checkedOutAt!) })
+      ? t('ariaMoreCheckedOut', { who, time: outClock })
       : here
-        ? t('ariaMoreCheckedIn', { who, time: time.clock(attendance.checkedInAt) })
+        ? t('ariaMoreCheckedIn', { who, time: inClock })
         : t('ariaCheckIn', { who });
   /*
    * Nothing inside the row is announced on its own, so the note has to be part
@@ -348,7 +360,7 @@ export const StudentRow = memo(function StudentRow({
                   */}
                   {gone ? (
                     <span className="text-[11px] font-medium tabular-nums text-ink-400">
-                      {t('checkedOutAt', { time: time.clock(attendance!.checkedOutAt!) })}
+                      {t('checkedOutAt', { time: outClock })}
                     </span>
                   ) : null}
                   {warnings.map((warning) =>
@@ -479,10 +491,10 @@ export const StudentRow = memo(function StudentRow({
                 aria-busy={busy || undefined}
                 aria-label={
                   gone
-                    ? t('ariaPutBack', { who, time: time.clock(attendance.checkedOutAt!) })
+                    ? t('ariaPutBack', { who, time: outClock })
                     : tracksCheckOut
-                      ? t('ariaCheckOut', { who, time: time.clock(attendance.checkedInAt) })
-                      : t('ariaUndoCheckIn', { who, time: time.clock(attendance.checkedInAt) })
+                      ? t('ariaCheckOut', { who, time: inClock })
+                      : t('ariaUndoCheckIn', { who, time: inClock })
                 }
                 className={cn(
                   // `ml-2` is the dead strip: a transparent margin inside the
@@ -510,7 +522,7 @@ export const StudentRow = memo(function StudentRow({
                   {gone ? '↺' : tracksCheckOut ? 'Out' : '✓'}
                 </span>
                 <span aria-hidden="true" className="text-[11px] tabular-nums text-ink-500">
-                  {time.clock(gone ? attendance.checkedOutAt! : attendance.checkedInAt)}
+                  {gone ? outClock : inClock}
                 </span>
               </button>
             </div>

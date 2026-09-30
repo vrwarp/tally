@@ -238,6 +238,7 @@ export const KIOSK_DEVICES: KioskDevice[] = [
    */
   {
     id: 'lobby-ipad-4a90',
+    name: 'Side door',
     approvedBy: 'user-1',
     approvedByName: 'Miriam Achebe',
     pairedAt: new Date(NOW - 12 * DAY),
@@ -251,6 +252,7 @@ export const KIOSK_DEVICES: KioskDevice[] = [
   },
   {
     id: 'lobby-ipad-2f7c',
+    name: 'Lobby',
     approvedBy: 'user-1',
     approvedByName: 'Miriam Achebe',
     pairedAt: new Date(NOW - 96 * DAY),
@@ -262,6 +264,7 @@ export const KIOSK_DEVICES: KioskDevice[] = [
   },
   {
     id: 'lobby-ipad-8b13',
+    name: null,
     approvedBy: 'user-1',
     approvedByName: 'Miriam Achebe',
     pairedAt: new Date(NOW - 210 * DAY),

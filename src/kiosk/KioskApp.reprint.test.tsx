@@ -25,6 +25,10 @@ import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS, KIOSK_ROSTER_VERSION } from '@/kiosk/storage';
 import type { KioskBinding } from '@/kiosk/binding';
 import type { KioskStudent } from '@/kiosk/search';
+import { fakeRegister } from '@/test/kioskLanding';
+import type { LandKioskRecordsRequest } from '@/lib/kioskLanding';
+import { records as journalRecords } from '@/kiosk/journal';
+import { createUploader } from '@/kiosk/uploader';
 
 const ADA: KioskStudent = {
   id: 'student-ada',
@@ -115,6 +119,9 @@ const printing = {
   describeEntry: vi.fn(() => ''),
 } as unknown as KioskPrinting;
 
+/** Tally, up: what the kiosk sends is on the register at the next read. */
+const tally = fakeRegister();
+
 const services = {
   restoredSession: vi.fn(async () => ({ uid: 'kiosk_kiosk-test-device', reason: null })),
   reportStanding: vi.fn(async () => 'live' as const),
@@ -125,24 +132,16 @@ const services = {
     participated: new Set<string>(),
     recent: new Set<string>(),
   })),
-  fetchAttendance: vi.fn(async () => ({
-    present: new Set<string>(),
-    checkedOut: new Set<string>(),
-    arrivals: new Map<string, string>(),
-  })),
+  fetchAttendance: vi.fn(async () => tally.read()),
   fetchPulse: vi.fn(async () => null),
   rememberPulse: vi.fn(),
   refetchRoster: vi.fn(async () => {}),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
-  replayQueue: vi.fn(async () => 0),
-  performCheckIn: vi.fn(async () => {}),
-  performCheckOut: vi.fn(async () => {}),
-  warmStudentDates: vi.fn(),
-  forgetStudentDates: vi.fn(),
   fetchAllergyNote: vi.fn(async () => null),
-  enqueueCheckIn: vi.fn(),
-  enqueueCheckOut: vi.fn(),
+  landRecords: vi.fn(async (request: LandKioskRecordsRequest) => tally.land(request)),
+  reachTally: vi.fn(async () => true),
+  createUploader,
 } as unknown as KioskServices;
 
 vi.mock('@/kiosk/services', () => services);
@@ -240,6 +239,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
   printerListeners.length = 0;
+  tally.reset();
   localStorage.clear();
   configurePrinter();
 });
@@ -266,9 +266,9 @@ describe('the staff reprint flow', () => {
     expect(printing.reprintLabel).toHaveBeenCalledTimes(1);
     expect(vi.mocked(printing.reprintLabel).mock.calls[0]?.[2]).toMatchObject({ id: ADA.id });
 
-    expect(services.performCheckIn).not.toHaveBeenCalled();
-    expect(services.performCheckOut).not.toHaveBeenCalled();
-    expect(services.enqueueCheckIn).not.toHaveBeenCalled();
+    // Nothing written down, so nothing sent: a reprint is not an arrival.
+    expect(journalRecords()).toEqual([]);
+    expect(services.landRecords).not.toHaveBeenCalled();
   });
 
   it('never takes the kiosk off the gathering to do it', async () => {

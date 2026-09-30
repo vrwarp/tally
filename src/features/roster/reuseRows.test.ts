@@ -69,6 +69,7 @@ const CHANGES: Record<ScalarField, Partial<Student>> = {
   upstreamPersonId: { upstreamPersonId: 'a32-9' },
   pendingReview: { pendingReview: true },
   mergedIntoStudentId: { mergedIntoStudentId: 'pco_9' },
+  recreatedAsStudentId: { recreatedAsStudentId: 'pco_8' },
   searchName: { searchName: 'jaime rivera-chen' },
   fromPlanningCenter: { fromPlanningCenter: false },
   profileComplete: { profileComplete: false },

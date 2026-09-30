@@ -14,10 +14,12 @@
  *    present and refused.
  * 3. **Nobody may take themselves off a gathering.** `writerStays()` refuses
  *    it, so a Remove on your own row could only ever fail.
- * 4. **Retire arms while a kiosk is recording.** Retiring a working lobby
- *    screen mid-morning takes something away from a parent standing in front of
- *    it, and an installed tablet leaves duplicate rows for a thumb to miss.
- *    A kiosk standing idle is one press, because it takes nothing away.
+ * 4. **Retire arms for a kiosk that may be holding records.** Retiring a
+ *    working lobby screen mid-morning takes something away from a parent
+ *    standing in front of it; so does retiring one last heard from while set to
+ *    a gathering, which is almost always still recording in a lobby whose
+ *    internet went. An installed tablet leaves duplicate rows for a thumb to
+ *    miss. A kiosk standing idle is one press, because it takes nothing away.
  * 5. **Tally keeps no per-gathering membership history.** The panel draws
  *    access dates beside a list of gatherings, which reads as a history unless
  *    it says outright that it is not one.
@@ -81,6 +83,7 @@ const SAM = makeUser({
 function device(overrides: Partial<KioskDevice> = {}): KioskDevice {
   return {
     id: 'lobby-tablet',
+    name: null,
     approvedBy: SAM.id,
     approvedByName: 'Sam Whitfield',
     pairedAt: new Date('2026-09-01T09:00:00Z'),
@@ -288,10 +291,70 @@ describe('PersonPanel — the kiosks they paired', () => {
     await user.click(screen.getByRole('button', { name: 'Retire' }));
 
     expect(retireKioskDevice).not.toHaveBeenCalled();
-    expect(screen.getByText(/recording Sunday School right now\./)).toBeInTheDocument();
+    expect(screen.getByText(/^It’s recording Sunday School\./)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Yes, retire' }));
     await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('lobby-tablet', MIRIAM.id));
+  });
+
+  it('says a kiosk that went quiet while set to a gathering is out of touch, not idle', () => {
+    // Heard from at 9:41 while at Sunday School, and nothing since: the lobby's
+    // internet, almost always, and the tablet is still taking check-ins.
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ lastSeenAt: new Date(NOW.getTime() - 40 * 60_000) })]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(
+      screen.getByText(
+        /^No word since .+, at Sunday School\. Likely the internet; it keeps recording\.$/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/not recording/)).not.toBeInTheDocument();
+  });
+
+  it('asks before retiring a kiosk that may still hold check-ins, and says what waits', async () => {
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ lastSeenAt: new Date(NOW.getTime() - 40 * 60_000) })]);
+      return () => {};
+    });
+    const user = show(SAM);
+
+    await user.click(screen.getByRole('button', { name: 'Retire' }));
+    expect(retireKioskDevice).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/^It may still hold check-ins from Sunday School\./),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/they wait on it until it’s paired again\.$/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Yes, retire' }));
+    await waitFor(() => expect(retireKioskDevice).toHaveBeenCalledWith('lobby-tablet', MIRIAM.id));
+  });
+
+  it('asks before retiring an idle kiosk that still holds check-ins, and says how many', async () => {
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ boundTo: null, boundChain: null, waitingCount: 2 })]);
+      return () => {};
+    });
+    const user = show(SAM);
+
+    await user.click(screen.getByRole('button', { name: 'Retire' }));
+    expect(retireKioskDevice).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/^2 check-ins are still on it\./),
+    ).toBeInTheDocument();
+  });
+
+  it('counts a kiosk as recording between its five-minute reports', () => {
+    // Nine minutes since the last report is one missed poll, not a dead tablet.
+    subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
+      next([device({ lastSeenAt: new Date(NOW.getTime() - 9 * 60_000) })]);
+      return () => {};
+    });
+    show(SAM);
+
+    expect(screen.getByText('Recording Sunday School right now')).toBeInTheDocument();
   });
 
   it('retires an idle kiosk on one press, because it takes nothing away', async () => {
