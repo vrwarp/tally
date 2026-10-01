@@ -12,7 +12,7 @@
  * than the roster underneath it.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeDescription, gradeName, type GradeStrings } from '@/lib/grades';
 import { useGrades } from '@/hooks/usePureStrings';
 import { GRADES, type Grade } from '@/types';

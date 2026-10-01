@@ -1,10 +1,10 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-/** Tailwind-aware class name join. */
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
-}
+/*
+ * Helpers both apps share, and on the lobby kiosk's first paint.
+ *
+ * So whatever this module imports, the kiosk downloads, whether or not it calls
+ * the function that needed it. That is why `cn` and tailwind-merge live in
+ * `src/lib/cn.ts` instead; see the note there before adding an import here.
+ */
 
 /**
  * Short confirmation buzz on check-in (Journey 1 asks for a haptic pulse).

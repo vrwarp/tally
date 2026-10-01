@@ -13,7 +13,7 @@
 import type { ReactNode } from 'react';
 import { GradeFilter } from '@/features/checkin/GradeFilter';
 import type { RosterFocus } from '@/features/roster/predictiveRoster';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { Grade } from '@/types';
 import { useTranslations } from 'use-intl';
 

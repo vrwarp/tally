@@ -22,7 +22,7 @@
  */
 import { Link } from 'react-router-dom';
 import { useParentContactHost } from '@/features/students/parentContactHostContext';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { studentFullName, type Student } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useReadOnly } from '@/context/authContext';

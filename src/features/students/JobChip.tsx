@@ -22,7 +22,7 @@
  * row on the list that never resolves itself in with the three that do.
  */
 import { shortAge } from '@/features/students/syncStripCopy';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import {
   isStalled,
   type UpstreamEdit,

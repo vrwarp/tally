@@ -18,7 +18,7 @@ import {
   isCheckInOpen,
 } from '@/lib/time';
 import { eventStatusLine } from '@/features/events/eventStatus';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { TallyEvent } from '@/types';
 import { NarrowedBadge } from '@/features/events/NarrowedBadge';
 import { useNarrowedCount } from '@/hooks/useNarrowedCount';

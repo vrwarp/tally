@@ -10,7 +10,7 @@
  * It lives in its own module so `PageFrame.tsx` stays a component file; the two
  * are read together.
  */
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 /**
  * The phone measure. Kept per-page because these screens genuinely differ at

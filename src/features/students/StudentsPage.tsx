@@ -58,7 +58,8 @@ import {
   type BirthdayState,
 } from '@/lib/birthday';
 import { exportFilename } from '@/lib/csv';
-import { cn, createSearchMatcher, initials } from '@/lib/utils';
+import { createSearchMatcher, initials } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeName, gradeSentence } from '@/lib/grades';
 import {
   GRADES,

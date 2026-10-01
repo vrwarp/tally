@@ -10,7 +10,7 @@
  * and out, and announcing "tab 2 of 3" for a filter is a promise about keyboard
  * behaviour this does not keep.
  */
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 export interface TabOption {
   /** Value handed back to `onSelect`. */

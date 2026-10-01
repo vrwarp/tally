@@ -66,7 +66,8 @@ import {
 import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
-import { cn, formatPhone, initials } from '@/lib/utils';
+import { formatPhone, initials } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeSentence } from '@/lib/grades';
 import {
   addRosterMember,

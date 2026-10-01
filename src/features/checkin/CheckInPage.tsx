@@ -60,7 +60,8 @@ import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnap
 import { chainKey } from '@/lib/materialize';
 import { isPermissionDenied } from '@/lib/permissionDenied';
 import { clearSkippedNight } from '@/services/skippedNights';
-import { cn, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import {
   checkIn,
   checkOut,

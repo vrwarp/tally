@@ -30,7 +30,7 @@ import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
 import { isCheckInOpen, startOfDay } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 

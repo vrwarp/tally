@@ -66,7 +66,8 @@ import {
 } from '@/features/dashboard/insights';
 import { chainKey } from '@/lib/materialize';
 import { presumedCancelled } from '@/lib/sessionHistory';
-import { cn, sameItems } from '@/lib/utils';
+import { sameItems } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { releaseStudent, undoRelease } from '@/services/transitions';
 import { studentFullName, type MiaStudent, type TallyEvent, type Transition, type TransitionReason } from '@/types';
 import { useTimeFormats } from '@/hooks/useTimeFormats';

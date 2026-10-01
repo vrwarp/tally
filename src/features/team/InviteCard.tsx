@@ -51,7 +51,7 @@ import {
   skipId,
   writeDismissedSkips,
 } from '@/features/team/dismissedSkips';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/services/access';
 import { addChainMembers } from '@/services/eventAccess';
 import { refreshInvitationLink, type InviteLife } from '@/services/functions';

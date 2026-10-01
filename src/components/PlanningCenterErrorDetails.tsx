@@ -20,7 +20,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui';
 import { pcoErrorMarkdown, pcoKindKey, prettyBody } from '@/lib/pcoErrors';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { PcoDebugRequest, PcoDebugResponse, PcoErrorReport } from '@/types';
 import { useTranslations } from 'use-intl';
 

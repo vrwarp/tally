@@ -28,7 +28,7 @@
 import { Button } from '@/components/ui';
 import { syncStripCopy } from '@/features/students/syncStripCopy';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import {
   backendLabelOf,
   needsAHuman,

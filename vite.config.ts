@@ -321,9 +321,59 @@ export default defineConfig({
               name: 'firebase',
               test: /[\\/]node_modules[\\/](firebase|@firebase|idb)[\\/]/,
             },
+            /*
+             * React itself, and nothing else.
+             *
+             * This group used to name react-router as well, which put the main
+             * app's router in the one chunk the kiosk cannot boot without: 37 kB
+             * of routing, 13 kB gzipped, on the first paint of a page that has
+             * no routes. The router has a group of its own now, below, and it
+             * took two groups rather than one to get it out — see the next two.
+             */
             {
               name: 'react',
-              test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+            },
+            /*
+             * Vite's dynamic-import helper, claimed before the router can.
+             *
+             * Every `import()` in either app is rewritten to go through
+             * `__vitePreload`, which lives in one virtual module both entries
+             * share. react-router imports it too, and a group takes its modules'
+             * dependencies with it — so a router group on its own swept the
+             * helper into the router's chunk, and every lazy import the kiosk
+             * makes (the Firebase services, printing, registration) then
+             * imported the whole router to reach it. The firebase-bloom lesson
+             * again: a shared module with no group of its own goes to whichever
+             * group reaches it first, and welds that group's chunk to everything
+             * that needs it.
+             *
+             * Ahead of `react-router`, because first match wins. Losing this
+             * group puts the router back on the kiosk's first paint, and
+             * scripts/check-kiosk-budget.mjs fails the build when it does.
+             */
+            {
+              name: 'vite-preload',
+              test: /vite[\\/]preload-helper/,
+            },
+            /*
+             * The main app's router, kept out of the kiosk.
+             *
+             * Still pinned rather than left to the default splitting, for the
+             * reason at the top of this list: it changes on a dependency bump,
+             * not on a deploy, and should stay in the counselors' cache across
+             * app releases.
+             *
+             * Deliberately last. Ahead of `react` it claimed React's own core
+             * module, so React's chunk imported the router's and the kiosk paid
+             * for both. Dependency sweeping stays on: turning it off for this
+             * group also keeps the router out, but rolldown's own documentation
+             * warns that doing so can emit invalid chunks unless execution order
+             * is made strict, which costs runtime wrappers in every chunk.
+             */
+            {
+              name: 'react-router',
+              test: /[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/,
             },
           ],
         },

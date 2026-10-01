@@ -21,7 +21,7 @@
  */
 import { LOCALES, LOCALE_LABELS, type Locale } from '@/lib/locales';
 import { useLocaleControl } from '@/i18n/localeContext';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useTranslations } from 'use-intl';
 
 export function LanguageChoice({ className }: { className?: string }) {

@@ -25,7 +25,7 @@ import { addRosterMember, importPlanningCenterList, searchPlanningCenterPeople }
 import { fetchPlanningCenterLists } from '@/services/planningCenter';
 import { pcoErrorReport } from '@/lib/pcoErrors';
 import { gradeDescription } from '@/lib/grades';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import {
   BACKEND_LABELS,
   parseStudentId,

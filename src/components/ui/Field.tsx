@@ -8,7 +8,8 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
-import { cn, formatPhoneInput, haptic } from '@/lib/utils';
+import { formatPhoneInput, haptic } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useTranslations } from 'use-intl';
 
 /*

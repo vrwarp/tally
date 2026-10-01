@@ -12,7 +12,7 @@
  * so it paints on the first frame with no font to download.
  */
 import { findEventIcon } from '@/lib/eventIcons';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 /** The calendar glyph, for a gathering nobody gave an icon. */
 const FALLBACK = 'event';
