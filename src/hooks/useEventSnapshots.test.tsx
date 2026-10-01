@@ -891,6 +891,34 @@ describe('useEventSnapshots', () => {
     });
   });
 
+  describe('asking again about nights it already holds', () => {
+    it('takes the previous failure down with the question', async () => {
+      const friday = makeEvent({ id: 'evt_1' });
+      const sunday = makeEvent({ id: 'evt_2' });
+
+      const { result, rerender } = renderHook(
+        ({ events }: { events: TallyEvent[] }) => useEventSnapshots(events),
+        { initialProps: { events: [friday] } },
+      );
+      await waitFor(() => expect(result.current.snapshots).toHaveLength(1));
+
+      // The next window fails, and spends its one retry failing.
+      fetchAttendanceByEvent.mockRejectedValue(new Error('offline'));
+      rerender({ events: [sunday] });
+      await waitFor(() => expect(fetchAttendanceByEvent).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(result.current.error).toBe('offline'));
+
+      // Back to the night already read. Nothing is asked, so nothing can
+      // succeed — and a failure that belonged to Sunday's question was left
+      // standing over Friday's answer.
+      rerender({ events: [friday] });
+
+      await waitFor(() => expect(result.current.error).toBeNull());
+      expect(result.current.loading).toBe(false);
+      expect(result.current.snapshots).toHaveLength(1);
+    });
+  });
+
   describe('a refusal that belongs to somebody else’s screen', () => {
     it('hands back the shared empty set rather than a fresh one', async () => {
       fetchAttendanceByEvent.mockImplementation((ids: string[]) =>

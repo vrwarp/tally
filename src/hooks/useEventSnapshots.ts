@@ -115,6 +115,10 @@ export function useEventSnapshots(events: readonly TallyEvent[]): EventSnapshots
       .filter((id) => !cache.has(id) && !refused.has(id));
     if (missing.length === 0) {
       setLoading(false);
+      // A failure belongs to the question that raised it, and this is a
+      // different question — one with nothing to ask, so no read is coming
+      // to clear it on this branch's behalf.
+      setError(null);
       return;
     }
 

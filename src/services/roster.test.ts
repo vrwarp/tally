@@ -212,6 +212,26 @@ describe('the roster parked on this device', () => {
     expect(cachedRoster()).toBeNull();
   });
 
+  it('does not let a read that was out at sign-out park what it brings back', async () => {
+    // Sign-out does not wait for Planning Center. The read was issued on
+    // behalf of a session that has since ended, and the next person on a
+    // shared laptop must not find its answer parked on the device.
+    let land: (value: unknown) => void = () => {};
+    vi.mocked(getRoster).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }) as never,
+    );
+
+    const read = fetchRoster();
+    forgetRoster();
+    land(answer([person()]));
+    await read;
+
+    expect(cachedRoster()).toBeNull();
+  });
+
   it('survives a browser that refuses to forget', () => {
     const boom = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('SecurityError');

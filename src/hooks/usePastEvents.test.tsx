@@ -13,6 +13,7 @@
 import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePastEvents } from '@/hooks/usePastEvents';
+import { useLocaleControl } from '@/i18n/localeContext';
 import { makeEvent } from '../../tests/factories';
 import type { TallyEvent } from '@/types';
 
@@ -325,5 +326,46 @@ describe('usePastEvents', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(fetchPastEvents).toHaveBeenCalledWith(BOUNDARY, null, 12);
+  });
+
+  describe('choosing another language', () => {
+    /** The hook beside the switcher's handle, the way a screen has both. */
+    function withLocale() {
+      return renderHook(() => ({ ...usePastEvents(BOUNDARY, 2), locale: useLocaleControl() }));
+    }
+
+    it('keeps the pages it has rather than starting over', async () => {
+      // The first page from the top, the second from the cursor.
+      fetchPastEvents.mockImplementation((_before: Date, cursor: unknown) =>
+        Promise.resolve(cursor ? page(nights('c'), false) : page(nights('a', 'b'), true)),
+      );
+
+      const { result } = withLocale();
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await act(async () => {
+        result.current.loadMore();
+      });
+      expect(result.current.events.map((event) => event.id)).toEqual(['a', 'b', 'c']);
+
+      act(() => result.current.locale.setLocale('zh-Hant'));
+      await act(async () => {});
+
+      // A tap on the language switcher changes nothing about what happened
+      // in March. Reading it again from page one threw away everything
+      // somebody had scrolled to, and spent Firestore reads doing it.
+      expect(fetchPastEvents).toHaveBeenCalledTimes(2);
+      expect(result.current.events.map((event) => event.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('says a failure already up in the new language', async () => {
+      fetchPastEvents.mockRejectedValue(new Error('offline'));
+
+      const { result } = withLocale();
+      await waitFor(() => expect(result.current.error).toBe('Could not load older gatherings.'));
+
+      act(() => result.current.locale.setLocale('zh-Hant'));
+
+      expect(result.current.error).toBe('無法載入更早的聚會。');
+    });
   });
 });
