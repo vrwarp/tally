@@ -136,6 +136,35 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   };
 }
 
+/** The providers `open` renders inside, for a test that needs to re-render. */
+function providersFor(student: Student | null) {
+  const data = {
+    students: student ? [student] : [],
+    events: [],
+    series: [],
+    settings: makeSettings(),
+    loading: false,
+    error: null,
+    rosterLoading: false,
+    rosterSettled: true,
+    rosterError: null,
+    rosterOffline: false,
+    rosterFetchedAt: null,
+    rosterBackends: [],
+    refreshRoster,
+    applyRosterPerson,
+  } as unknown as DataContextValue;
+  const auth = { user: { uid: 'core-1' }, can: () => true } as unknown as AuthContextValue;
+  const toast: ToastContextValue = { show, dismiss: vi.fn(), toasts: [] };
+  return (children: ReactNode) => (
+    <AuthContext.Provider value={auth}>
+      <DataContext.Provider value={data}>
+        <ToastContext.Provider value={toast}>{children}</ToastContext.Provider>
+      </DataContext.Provider>
+    </AuthContext.Provider>
+  );
+}
+
 function open(student: Student | null, onSaved = vi.fn(), onClose = vi.fn()) {
   const data = {
     students: student ? [student] : [],
@@ -631,5 +660,26 @@ describe('a visitor Tally created', () => {
       firstName: 'Nia',
       lastName: 'Fontaine',
     });
+  });
+});
+
+describe('typing while the roster moves underneath', () => {
+  it('keeps what was typed when the same student arrives as a fresh object', async () => {
+    /*
+     * A check-in at the door moves `lastAttendedAt`, and the roster hands the
+     * page a new object for the same student. The form used to re-seed on
+     * that — the leader's notes gone mid-sentence.
+     */
+    const before = linked();
+    const wrap = providersFor(before);
+    const { rerender } = render(
+      wrap(<StudentEditorModal open onClose={vi.fn()} student={before} onSaved={vi.fn()} />),
+    );
+    await userEvent.type(screen.getByLabelText(/Notes/), 'Rides with the Kims');
+
+    const after = { ...before, lastAttendedAt: new Date('2026-02-20T19:30:00') };
+    rerender(wrap(<StudentEditorModal open onClose={vi.fn()} student={after} onSaved={vi.fn()} />));
+
+    expect(screen.getByLabelText(/Notes/)).toHaveValue('Rides with the Kims');
   });
 });

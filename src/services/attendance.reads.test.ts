@@ -230,9 +230,11 @@ describe('fetchStudentAttendanceSince', () => {
 
     await fetchStudentAttendanceSince('pco_9', new Date('2026-01-01T00:00:00Z'));
 
+    // A day earlier than asked: the server filters on the tap, which lands
+    // before the night starts, and the caller keeps nights by their start.
     expect(getStudentAttendance).toHaveBeenCalledWith({
       studentId: 'pco_9',
-      since: Date.parse('2026-01-01T00:00:00Z'),
+      since: Date.parse('2025-12-31T00:00:00Z'),
     });
   });
 

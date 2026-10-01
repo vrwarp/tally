@@ -400,11 +400,26 @@ export async function fetchAttendanceByEvent(
  * Unpaged deliberately. A year of one student is at most a few hundred small
  * documents, and the profile needs all of them before it can draw anything.
  */
+/**
+ * How far before `since` the server is asked to look.
+ *
+ * The callable filters on when the child was tapped in, and a tap lands
+ * before the gathering starts — the door opens an hour early by default, and
+ * a leader may open it earlier. The caller keeps the nights by the event's
+ * own start and intersects by event id, so asking a day early costs nothing
+ * and stops the oldest night in a window reading as a miss for the hour
+ * before its own anniversary.
+ */
+const SINCE_MARGIN_MS = 24 * 60 * 60_000;
+
 export async function fetchStudentAttendanceSince(
   studentId: string,
   since: Date,
 ): Promise<{ eventIds: Set<string>; withheld: Set<string> }> {
-  const result = await getStudentAttendance({ studentId, since: since.getTime() });
+  const result = await getStudentAttendance({
+    studentId,
+    since: since.getTime() - SINCE_MARGIN_MS,
+  });
 
   return {
     eventIds: new Set(result.data.eventIds ?? []),

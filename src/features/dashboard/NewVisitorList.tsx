@@ -35,6 +35,7 @@ import { gradeLabel } from '@/lib/grades';
 import { studentFullName, type NewVisitor } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useGrades } from '@/hooks/usePureStrings';
+import { useNow } from '@/hooks/useNow';
 import { useTimeFormats } from '@/hooks/useTimeFormats';
 
 export interface NewVisitorListProps {
@@ -152,6 +153,7 @@ function NewVisitorRow({
   onContactAdded?: () => void;
 }) {
   const time = useTimeFormats();
+  const now = useNow(60_000);
   const grades = useGrades();
   const t = useTranslations('NewVisitors');
   const { student, firstEventTitle, firstAttendedAt } = visitor;
@@ -188,8 +190,11 @@ function NewVisitorRow({
             </span>
           </span>
           <span className="truncate text-xs text-ink-500">
-            {firstEventTitle ?? t('unknownEvent')} · {time.shortDate(firstAttendedAt)},{' '}
-            {time.relative(firstAttendedAt)}
+            {/* A first visit is dated to the gathering's start, and a child
+                tapped in during the hour before it is on this list already —
+                "in 14 minutes" is not when anybody met them. */}
+            {firstEventTitle ?? t('unknownEvent')} · {time.shortDate(firstAttendedAt)}
+            {firstAttendedAt > now ? null : `, ${time.relative(firstAttendedAt)}`}
           </span>
         </Link>
 

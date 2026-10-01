@@ -21,7 +21,7 @@
  * answered by the server, because the browser cannot see the setting. Everything
  * Tally owns — notes — stays editable in both.
  */
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent, useRef } from 'react';
 import {
   Button,
   ErrorBanner,
@@ -175,14 +175,23 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     open ? (student ?? null) : null,
   );
 
+  /*
+   * Seeded when the modal opens or the student it is about changes — by id,
+   * not by object. The roster hands the page a fresh object for the same
+   * student whenever a field on it moves, and a check-in at the door moves
+   * `lastAttendedAt`; re-seeding on that wiped whatever the leader had typed.
+   */
+  const latestStudent = useRef(student);
+  latestStudent.current = student;
+  const studentId = student?.id ?? null;
   useEffect(() => {
     if (!open) return;
-    setForm(fromStudent(student ?? null));
+    setForm(fromStudent(latestStudent.current ?? null));
     setErrors({});
     setSaveError(null);
     setAllergiesEdited(false);
     setBirthdayEdited(false);
-  }, [open, student]);
+  }, [open, studentId]);
 
   /*
    * Allergies are the one field that is not on screen when the form opens: they

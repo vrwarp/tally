@@ -623,7 +623,9 @@ export function InviteCard({ members, membersError }: InviteCardProps) {
                             shrink-to-fit and a long sentence sets its width. */}
                         {confirmingWithdrawal === invitation.id ? (
                           <p role="alert" className="basis-full text-xs text-ink-400">
-                            {link ? t('withdrawLinkWarning') : t('withdrawWarning')}
+                            {link
+                              ? t('withdrawLinkWarning', { label: invitation.label ?? '' })
+                              : t('withdrawWarning')}
                           </p>
                         ) : null}
                       </div>
