@@ -312,6 +312,10 @@ export async function listKioskEvents(
       requiresCheckOut: occurrence.source.requiresCheckOut,
       labelTemplate: occurrence.source.labelTemplate,
       allergiesSupported,
+      // The same three looks a stored row carries: the kiosk keeps this row
+      // as its binding and draws from it, and the ordinary weekly gathering
+      // it binds to is the projected one.
+      ...kioskIcon(occurrence.source.icon),
       ...kioskLook(occurrence.source.kioskTheme),
       ...kioskBackdrop(occurrence.source.kioskBackdropId),
     });

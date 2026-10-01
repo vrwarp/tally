@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { FakeFirestore } from './testing/fakeFirestore.js';
 import {
   BACKOFF_MS,
+  LANDED_TTL_MS,
   LEASE_MS,
   MAX_ATTEMPTS,
   messageFor,
@@ -41,6 +42,7 @@ function edit(over: Partial<EditRecord> = {}): EditRecord {
     nextAttemptAtMs: null,
     leaseUntilMs: null,
     createdAtMs: nowMs - 10_000,
+    settledAtMs: null,
     ...over,
   };
 }
@@ -279,6 +281,31 @@ describe('the sweep', () => {
     }
     const result = await sweepEdits(deps(db, async () => ({ kind: 'landed' })), 3);
     expect(result.ran).toBe(3);
+  });
+
+  it('ages a landed job from when it landed, not from when it was asked for', async () => {
+    // A retry that failed yesterday and landed a second ago has only just
+    // earned its green mark; one that landed before the mark's lifetime is
+    // the queue's to tidy.
+    const db = new FakeFirestore();
+    db.seed(`${UPSTREAM_EDITS}/fresh`, {
+      studentId: 'a',
+      state: 'landed',
+      createdAt: new Date(nowMs - 10 * 60_000),
+      settledAt: new Date(nowMs - 1_000),
+    });
+    db.seed(`${UPSTREAM_EDITS}/stale`, {
+      studentId: 'b',
+      state: 'landed',
+      createdAt: new Date(nowMs - 10 * 60_000),
+      settledAt: new Date(nowMs - LANDED_TTL_MS - 1_000),
+    });
+
+    const result = await sweepEdits(deps(db, async () => ({ kind: 'landed' })));
+
+    expect(result.swept).toBe(1);
+    expect(db.data.has(`${UPSTREAM_EDITS}/fresh`)).toBe(true);
+    expect(db.data.has(`${UPSTREAM_EDITS}/stale`)).toBe(false);
   });
 
   it('does not pick up a job that is settled or still backing off', async () => {

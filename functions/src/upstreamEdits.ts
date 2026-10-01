@@ -110,6 +110,8 @@ export interface EditRecord {
   nextAttemptAtMs: number | null;
   leaseUntilMs: number | null;
   createdAtMs: number;
+  /** When it landed or was cancelled; null while it is still open. */
+  settledAtMs: number | null;
 }
 
 /**
@@ -184,6 +186,7 @@ export function toEditRecord(id: string, data: Record<string, unknown>): EditRec
     nextAttemptAtMs: millis(data.nextAttemptAt),
     leaseUntilMs: millis(data.leaseUntil),
     createdAtMs: millis(data.createdAt) ?? 0,
+    settledAtMs: millis(data.settledAt),
   };
 }
 
@@ -575,8 +578,12 @@ export async function sweepEdits(deps: DrainDeps, limit = 5): Promise<SweepResul
 
   let swept = 0;
   for (const edit of edits) {
-    const settledLongAgo = edit.state === 'landed' || edit.state === 'cancelled';
-    if (settledLongAgo && nowMs - (millis(edit.nextAttemptAtMs) ?? edit.createdAtMs) > LANDED_TTL_MS) {
+    const settled = edit.state === 'landed' || edit.state === 'cancelled';
+    // Aged from when it settled, not from when it was asked for: the green
+    // mark is for the minute or two after a job lands, and a retry that
+    // landed a day after it was queued has only just earned one. A row from
+    // before the field was written ages from its creation, as it always did.
+    if (settled && nowMs - (edit.settledAtMs ?? edit.createdAtMs) > LANDED_TTL_MS) {
       // The instruction had a lifetime and it is over. This is what keeps the
       // queue from becoming the copy of a managed field that the whole
       // no-mirror rule exists to forbid.
