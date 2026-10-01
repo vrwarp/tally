@@ -656,7 +656,9 @@ export function PrinterScreen({
     forget();
     setBusy(true);
     try {
-      await printing.ready();
+      // As a press, not a boot: the owed-tags hand-off and the record both
+      // turn on the word.
+      await printing.ready(printing.LOOK_AGAIN);
     } finally {
       setBusy(false);
     }

@@ -407,6 +407,19 @@ describe('opening the printer at boot', () => {
     expect(device.model).toBe('QL-800');
   });
 
+  it('records a press as a press, so the owed hand-off can tell it from a boot', async () => {
+    const device = makeDevice();
+    usb.paired = [device];
+    configured('QL-800', '62');
+    const printing = await load();
+
+    await expect(printing.ready(printing.LOOK_AGAIN)).resolves.toMatchObject({
+      kind: 'ready',
+      cause: 'press',
+    });
+    expect(printing.ready()).resolves.not.toHaveProperty('cause');
+  });
+
   it('watches for the printer coming back, once', async () => {
     // The library reports connect and disconnect but never retries, and its
     // README lists replugging mid-job as unverified.
@@ -1705,6 +1718,23 @@ describe('labelPreview', () => {
     const lines = printing.labelPreview(grades, 'en', { ...ADA, hasAllergies: false }, binding());
 
     expect(lines).not.toContain('');
+  });
+
+  it('drops a line that only prints when filled, for a child it is not filled for', async () => {
+    // `requiresValue` is the renderer's cure for a bare "Grade" on a sticker;
+    // the preview used to promise that very line.
+    const printing = await load();
+    const template = {
+      lines: [
+        { text: '{{firstName}}', size: 'lg', bold: true, align: 'center', requiresValue: false },
+        { text: 'Grade {{grade}}', size: 'sm', bold: false, align: 'center', requiresValue: true },
+      ],
+      copies: 1,
+    } as unknown as NonNullable<KioskBinding['labelTemplate']>;
+
+    const lines = printing.labelPreview(grades, 'en', { ...ADA, grade: null }, binding(template));
+
+    expect(lines).toEqual(['Ada']);
   });
 
   it('has nothing to show for a gathering with no template', async () => {

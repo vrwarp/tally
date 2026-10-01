@@ -54,7 +54,7 @@ import {
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
 import type { Label } from '@vrwarp/brother-ql-webusb/labels';
-import { fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
+import { anyTokenFilled, fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
 import {
@@ -1608,6 +1608,11 @@ export function labelPreview(
   if (!template) return [];
   const values = tokenValuesFor(grades, locale, student, binding);
   return template.lines
+    // The renderer's rule, both halves: a line that only prints when a token
+    // filled it is dropped for a child it did not, and so is one that came
+    // to nothing. Promising "Grade" on the confirm for a sticker that will
+    // not say it is the suspicion this screen exists to settle.
+    .filter((line) => !line.requiresValue || anyTokenFilled(line.text, values))
     .map((line) => fillLabelTokens(line.text, values))
     .filter((text) => text.length > 0);
 }

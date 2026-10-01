@@ -83,6 +83,8 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     checkPrinter: vi.fn(async () => found),
     forgetPrinter: vi.fn(async (): Promise<PrinterConfig | null> => null),
     testPrint: vi.fn(),
+    ready: vi.fn(async () => ({ kind: 'trouble' as const, message: { key: 'troubleNotFound' as const }, advice: null })),
+    LOOK_AGAIN: 'look-again',
     printerLog: () => events,
     printerLogText: () => 'the whole record',
     describeAge,
@@ -773,5 +775,21 @@ describe('the setting that gives a managed tablet its printer', () => {
         `The rest of the tablet settings, and what each one is for, are at ${ORIGIN}/setup.`,
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('pressing Look again', () => {
+  it('tells the printing module it was a press, so the owed hand-off can follow', async () => {
+    // The call used to go out bare, which the module reads as a boot: the
+    // record said 'boot' and the hand-off that waits for a press never fired.
+    const printing = handleWith(null);
+    Object.assign(printing, {
+      currentState: () => ({ kind: 'trouble', message: { key: 'troubleNotFound' }, advice: null }),
+    });
+    mount(printing);
+
+    await press(/look again/i);
+
+    expect(printing.ready).toHaveBeenCalledWith('look-again');
   });
 });

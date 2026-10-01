@@ -1170,7 +1170,7 @@ export function KioskApp() {
 
   const lookAgainForPrinter = useCallback(() => {
     setListCameBackEmpty(false);
-    void printing?.ready();
+    void printing?.ready(printing.LOOK_AGAIN);
   }, [printing]);
 
   const printTestLabel = useCallback(() => {
