@@ -564,9 +564,28 @@ describe('toEvent', () => {
       interval: 1,
       weekdays: [5],
       monthlyMode: 'dayOfMonth',
+      monthlyPosition: null,
       until: null,
       count: 13,
     });
+  });
+
+  it('keeps the weekday reading a monthly rule was written with', () => {
+    // 28 Aug 2026 is the fourth Friday and the last. A rule saved as "the
+    // fourth" stays the fourth on that night; one written before the field
+    // existed, or with a reading the date cannot carry, takes the date's own.
+    const startAt = new Date(2026, 7, 28, 19, 0);
+    const read = (recurrence: Record<string, unknown>) =>
+      toEvent(fakeSnapshot({ data: { startAt: ts(startAt), recurrence } })).recurrence
+        ?.monthlyPosition;
+    const monthly = { frequency: 'monthly', interval: 1, weekdays: [], monthlyMode: 'dayOfWeek' };
+
+    expect(read({ ...monthly, monthlyPosition: 4 })).toBe(4);
+    expect(read({ ...monthly, monthlyPosition: -1 })).toBe(-1);
+    expect(read(monthly)).toBe(-1);
+    expect(read({ ...monthly, monthlyPosition: 2 })).toBe(-1);
+    expect(read({ ...monthly, monthlyPosition: 'fourth' })).toBe(-1);
+    expect(read({ ...monthly, monthlyMode: 'dayOfMonth', monthlyPosition: 4 })).toBeNull();
   });
 
   it('reads anything that is not a recurrence rule as "does not repeat"', () => {

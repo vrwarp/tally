@@ -99,6 +99,7 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
           ? (raw.weekdays as number[])
           : [],
       monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
+      monthlyPosition: typeof raw.monthlyPosition === 'number' ? raw.monthlyPosition : null,
       until: typeof raw.until === 'string' ? raw.until : null,
       count: typeof raw.count === 'number' && Number.isFinite(raw.count) ? raw.count : null,
     },

@@ -10,7 +10,8 @@
  */
 import {
   EVERY_WEEKDAY,
-  monthlyWeekdayPosition,
+  monthlyPositionFor,
+  monthlyPositionLandsOn,
   normalizeRecurrence,
   recurrenceEquals,
   recurrenceOccurrences,
@@ -68,8 +69,11 @@ const ORDINAL_NAMES = ['ordinalFirst', 'ordinalSecond', 'ordinalThird', 'ordinal
  * Only a weekly rule holds a weekday of its own, and only when that weekday is
  * still the one the event sits on is it safe to move: someone who deliberately
  * ticked Monday *and* Wednesday meant those two days, and dragging the event to
- * a Thursday must not quietly rewrite their choice. Everything else is derived
- * from the anchor at render time and needs no migration.
+ * a Thursday must not quietly rewrite their choice. A monthly rule on a weekday
+ * holds which one of them it means, and that follows the date too — the
+ * fourth Friday dragged onto the second is a second-Friday gathering now.
+ * Everything else is derived from the anchor at render time and needs no
+ * migration.
  */
 export function retimeRecurrence(
   rule: RecurrenceRule,
@@ -77,6 +81,9 @@ export function retimeRecurrence(
   nextAnchor: Date,
 ): RecurrenceRule {
   if (!previousAnchor) return rule;
+  if (rule.frequency === 'monthly' && rule.monthlyMode === 'dayOfWeek') {
+    return { ...rule, monthlyPosition: monthlyPositionFor({ monthlyPosition: null }, nextAnchor) };
+  }
   if (rule.frequency !== 'weekly') return rule;
   if (rule.weekdays.length !== 1 || rule.weekdays[0] !== previousAnchor.getDay()) return rule;
   return { ...rule, weekdays: [nextAnchor.getDay()] };
@@ -106,9 +113,16 @@ export interface RecurrenceStrings {
  */
 const NO_STRINGS: RecurrenceStrings = { t: (key) => key, locale: 'en' };
 
-/** "the third Tuesday" / "the last Friday", phrased from the anchor. */
-export function describeMonthlyWeekday({ t }: RecurrenceStrings, anchor: Date): string {
-  const position = monthlyWeekdayPosition(anchor);
+/**
+ * "the third Tuesday" / "the last Friday": the reading the rule carries when
+ * it has one that fits the anchor, else the anchor's own.
+ */
+export function describeMonthlyWeekday(
+  { t }: RecurrenceStrings,
+  anchor: Date,
+  rule: Pick<RecurrenceRule, 'monthlyPosition'> = { monthlyPosition: null },
+): string {
+  const position = monthlyPositionFor(rule, anchor);
   const ordinal = position === -1 ? 'ordinalLast' : ORDINAL_NAMES[position - 1]!;
   return t('whichWeekday', {
     ordinal: t(ordinal),
@@ -140,7 +154,7 @@ function describePattern(strings: RecurrenceStrings, rule: RecurrenceRule, ancho
     case 'monthly': {
       const which =
         monthlyMode === 'dayOfWeek'
-          ? describeMonthlyWeekday(strings, anchor)
+          ? describeMonthlyWeekday(strings, anchor, rule)
           : t('whichDay', { day: anchor.getDate() });
       return interval === 1 ? t('monthlyOn', { which }) : t('everyNMonthsOn', { interval, which });
     }
@@ -248,6 +262,9 @@ export function recurrencePresets(strings: RecurrenceStrings, anchor: Date): Rec
 
   return candidates.map((candidate) => ({
     ...candidate,
+    // Normalised against the date, so the monthly-weekday entry carries the
+    // reading the date gives it rather than none.
+    rule: normalizeRecurrence(candidate.rule, anchor),
     label: describeRecurrence(strings, candidate.rule, anchor),
   }));
 }
@@ -264,8 +281,16 @@ export function matchRecurrencePreset(
   const normalized = normalizeRecurrence(candidate, anchor);
   // Matching is on the *rule*, never on its wording, so this needs no
   // catalogue — the labels it builds are thrown away.
-  const found = recurrencePresets(NO_STRINGS, anchor).find((preset) =>
-    recurrenceEquals(preset.rule, normalized),
+  const found = recurrencePresets(NO_STRINGS, anchor).find(
+    (preset) =>
+      recurrenceEquals(preset.rule, normalized) ||
+      // A date can be both the fourth Friday and the last: a stored rule
+      // saying either of a date that is both is still the shortlist's
+      // "monthly on the <nth> weekday", not a custom one.
+      (preset.id === 'monthlyWeekday' &&
+        normalized.monthlyPosition != null &&
+        monthlyPositionLandsOn(anchor, normalized.monthlyPosition) &&
+        recurrenceEquals({ ...preset.rule, monthlyPosition: normalized.monthlyPosition }, normalized)),
   );
 
   // `monthlyDay` and `monthlyWeekday` coincide when the anchor is, say, the

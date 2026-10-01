@@ -256,7 +256,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
               </option>
               <option value="dayOfWeek">
                 {t('monthlyOnWeekdayOption', {
-                  which: describeMonthlyWeekday(recurrenceStrings, anchor),
+                  which: describeMonthlyWeekday(recurrenceStrings, anchor, value),
                 })}
               </option>
             </SelectField>

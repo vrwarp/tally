@@ -61,12 +61,13 @@ export type MonthlyRecurrenceMode = 'dayOfMonth' | 'dayOfWeek';
  * restating it.
  *
  * The anchoring is the whole design. A rule carries only what the start date
- * cannot imply: which weekdays a weekly rule fires on, and which reading of
- * "monthly" is meant. Day-of-month, the weekday position within the month, the
- * month of a yearly rule and the wall-clock time all come from `startAt`, so
- * moving the event moves its pattern with it and the two can never disagree.
- * That is also why the editor puts the control *below* the date: the options do
- * not exist until there is a date to phrase them against.
+ * cannot imply: which weekdays a weekly rule fires on, which reading of
+ * "monthly" is meant, and — for the weekday reading — which of that weekday
+ * is meant, since a date can be both the fourth Friday and the last. Day of
+ * month, the month of a yearly rule and the wall-clock time all come from
+ * `startAt`, so moving the event moves its pattern with it and the two can
+ * never disagree. That is also why the editor puts the control *below* the
+ * date: the options do not exist until there is a date to phrase them against.
  *
  * Skip semantics follow the RFC: a rule that lands on a date the month has no
  * room for (day 31 in February, 29 February in a common year, a fifth Friday
@@ -83,6 +84,19 @@ export interface RecurrenceRule {
   weekdays: number[];
   /** Only meaningful when `frequency` is `monthly`. */
   monthlyMode: MonthlyRecurrenceMode;
+  /**
+   * RFC 5545 `BYDAY` ordinal for the `dayOfWeek` reading of monthly: 1–4, or
+   * -1 for "last". Null for every other rule.
+   *
+   * Stored rather than re-read off the date, because the projection expands a
+   * chain from whichever of its nights was written down last, and a date can
+   * carry two readings at once: 28 August 2026 is the fourth Friday *and* the
+   * last. A "fourth Friday" gathering that re-derived its position from that
+   * night became a "last Friday" one the first time it met in a five-Friday
+   * month, and stayed that way. A rule without one (written before the field
+   * existed) is read off its anchor, which is what it always was.
+   */
+  monthlyPosition?: number | null;
   /**
    * RFC 5545 `UNTIL`, as an inclusive local calendar day `"YYYY-MM-DD"`.
    *
@@ -155,6 +169,33 @@ export function monthlyWeekdayPosition(date: Date): number {
   const lastOfItsWeekday =
     date.getDate() + 7 > daysInMonth(date.getFullYear(), date.getMonth());
   return lastOfItsWeekday ? -1 : weekdayOrdinalInMonth(date);
+}
+
+/** A `BYDAY` ordinal a rule may carry: 1–4, or -1 for "last". */
+export function isMonthlyPosition(value: unknown): value is number {
+  return value === -1 || value === 1 || value === 2 || value === 3 || value === 4;
+}
+
+/**
+ * Whether `position` is a reading of `date` at all — the fourth Friday of a
+ * month is also its last when the month has four, so a rule can legitimately
+ * say either of a date, but never "the second" of a date in the fourth week.
+ */
+export function monthlyPositionLandsOn(date: Date, position: number): boolean {
+  return (
+    nthWeekdayOfMonth(date.getFullYear(), date.getMonth(), date.getDay(), position) ===
+    date.getDate()
+  );
+}
+
+/**
+ * The position a rule means for its anchor: the one it carries when it still
+ * describes the anchor, otherwise the one the date reads most naturally.
+ */
+export function monthlyPositionFor(rule: Pick<RecurrenceRule, 'monthlyPosition'>, anchor: Date): number {
+  const stored = rule.monthlyPosition;
+  if (isMonthlyPosition(stored) && monthlyPositionLandsOn(anchor, stored)) return stored;
+  return monthlyWeekdayPosition(anchor);
 }
 
 /**
@@ -264,12 +305,20 @@ export function normalizeRecurrence(rule: RecurrenceRule, anchor: Date): Recurre
   if (frequency === 'weekly' && weekdays.length === 0) weekdays.push(anchor.getDay());
 
   const count = rule.count === null ? null : clampInt(rule.count, 1, MAX_COUNT, 1);
+  const monthlyMode = rule.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth';
 
   return {
     frequency,
     interval: clampInt(rule.interval, 1, MAX_INTERVAL, 1),
     weekdays,
-    monthlyMode: rule.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
+    monthlyMode,
+    // Made explicit here so a rule written down carries its reading with it;
+    // one that arrived without a position, or with one that does not land on
+    // this anchor, takes the anchor's own.
+    monthlyPosition:
+      frequency === 'monthly' && monthlyMode === 'dayOfWeek'
+        ? monthlyPositionFor(rule, anchor)
+        : null,
     // RFC 5545: UNTIL and COUNT must not both appear. A count wins because it
     // is the more specific of the two to have typed.
     until: count !== null ? null : (rule.until ?? null),
@@ -298,6 +347,7 @@ export function recurrenceEquals(
     a.frequency === b.frequency &&
     a.interval === b.interval &&
     a.monthlyMode === b.monthlyMode &&
+    (a.monthlyPosition ?? null) === (b.monthlyPosition ?? null) &&
     a.until === b.until &&
     a.count === b.count &&
     a.weekdays.length === b.weekdays.length &&
@@ -337,9 +387,9 @@ function stepsBefore(periods: number, interval: number): number {
  * reaches back far enough to cover it. Reaching back is what lets the projection
  * expand a chain from an instance that is still ahead — see `chainsToProject`
  * in `lib/materialize.ts`. Everything the pattern means is derived from the
- * anchor (the wall-clock time, the day of the month, the position of the
- * weekday within it), so stepping back by whole periods rather than re-anchoring
- * is what keeps a rule saying the same thing in both directions.
+ * anchor (the wall-clock time, the day of the month) or carried by the rule
+ * (which weekday of the month), so stepping back by whole periods rather than
+ * re-anchoring is what keeps a rule saying the same thing in both directions.
  */
 function* patternDates(rule: RecurrenceRule, anchor: Date, from: Date): Generator<Date> {
   const hours = anchor.getHours();
@@ -376,7 +426,7 @@ function* patternDates(rule: RecurrenceRule, anchor: Date, from: Date): Generato
       }
 
       case 'monthly': {
-        const position = monthlyWeekdayPosition(anchor);
+        const position = monthlyPositionFor(rule, anchor);
         const weekday = anchor.getDay();
         const months = (from.getFullYear() - year) * 12 + (from.getMonth() - month);
 

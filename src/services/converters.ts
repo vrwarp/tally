@@ -255,6 +255,9 @@ function toRecurrence(value: unknown, anchor: Date): RecurrenceRule | null {
       // anything that is not `dayOfWeek` as `dayOfMonth`, so the fallback here
       // could say anything and reach the same rule. It says what it means.
       monthlyMode: raw.monthlyMode === 'dayOfWeek' ? 'dayOfWeek' : 'dayOfMonth',
+      // Anything that is not one of the five readings is replaced by the
+      // anchor's own in `normalizeRecurrence`.
+      monthlyPosition: numOrNull(raw.monthlyPosition),
       // A malformed `until` reads as "no end date" rather than as "ended", so a
       // corrupt field never makes a live weekly gathering look finished.
       // Stryker disable next-line ConditionalExpression: `fromDateOnlyValue`

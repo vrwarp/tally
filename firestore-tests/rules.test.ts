@@ -693,12 +693,30 @@ describe('events', () => {
       { ...base, interval: 'weekly' },
       { ...base, weekdays: 'MO' },
       { ...base, monthlyMode: 'whenever' },
+      // Which weekday of the month: 1–4 or -1, nothing else.
+      { ...base, monthlyPosition: 5 },
+      { ...base, monthlyPosition: 0 },
+      { ...base, monthlyPosition: 'fourth' },
       // RFC 5545: an end date and an occurrence tally must not both apply.
       { ...base, until: '2026-10-20', count: 13 },
       'weekly',
     ]) {
       await assertFails(
         setDoc(doc(db, paths.event('event-bad-recurrence')), { ...eventDoc(), recurrence }),
+      );
+    }
+  });
+
+  it('accepts a monthly rule that says which weekday of the month it means', async () => {
+    const db = asUser(env, UID.core);
+    const base = { ...eventDoc().recurrence!, frequency: 'monthly', weekdays: [], monthlyMode: 'dayOfWeek' };
+
+    for (const monthlyPosition of [4, -1, null]) {
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-monthly-weekday')), {
+          ...eventDoc(),
+          recurrence: { ...base, monthlyPosition },
+        }),
       );
     }
   });

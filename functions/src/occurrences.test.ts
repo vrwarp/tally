@@ -32,6 +32,7 @@ const WEEKLY_FRIDAY = {
   interval: 1,
   weekdays: [5],
   monthlyMode: 'dayOfMonth',
+  monthlyPosition: null,
   until: null,
   count: null,
 };

@@ -415,6 +415,48 @@ describe('projectOccurrences', () => {
     });
   });
 
+  describe('which weekday of the month a chain means', () => {
+    const fourthFriday: RecurrenceRule = {
+      ...WEEKLY,
+      frequency: 'monthly',
+      weekdays: [],
+      monthlyMode: 'dayOfWeek',
+      monthlyPosition: 4,
+    };
+
+    it('stays the fourth Friday after a night that is also the last is written down', () => {
+      /*
+       * The projection expands from the newest night, and 28 August 2026 is
+       * the fourth Friday *and* the last. Re-reading the position off that
+       * night turned a fourth-Friday gathering into a last-Friday one from
+       * then on — 30 October instead of the 23rd, and every five-Friday month
+       * after it — the mirror image of the drift `monthlyWeekdayPosition`
+       * was changed to stop.
+       */
+      const root = friday({ recurrence: fourthFriday }); // Fri 24 Jul 2026, the fourth
+      let all: readonly TallyEvent[] = [root];
+      // August and September get checked into, in turn, each on the night.
+      for (let round = 0; round < 2; round += 1) {
+        const tonight = all[all.length - 1]!.startAt;
+        all = materialized(all, projectOccurrences(all, tonight).slice(0, 1));
+      }
+      expect(ids(all)).toEqual([
+        'friday-fellowship-2026-07-24',
+        'friday-fellowship-2026-08-28',
+        'friday-fellowship-2026-09-25',
+      ]);
+
+      const projected = ids(
+        projectOccurrences(all, new Date(2026, 8, 25, 19, 0), { horizonDays: 120 }),
+      );
+      expect(projected.slice(0, 3)).toEqual([
+        'friday-fellowship-2026-10-23',
+        'friday-fellowship-2026-11-27',
+        'friday-fellowship-2026-12-25',
+      ]);
+    });
+  });
+
   /*
    * Where a repeat's tally is counted from.
    *
