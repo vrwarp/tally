@@ -15,7 +15,7 @@
  */
 import type { A32Config } from '../config.js';
 import { cacheKey, type TtlCache } from '../pco/cache.js';
-import type { AdultContactStatus, PersonDetails, PersonSearchResult, RosterPerson, RosterResult } from '../pco/roster.js';
+import type { AdultContactStatus, PersonDetails, PersonSearchResult, RosterResult } from '../pco/roster.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import { isA32GoneError, type A32Client } from './client.js';
 import {
@@ -29,6 +29,7 @@ import {
   adultContactOf,
   statusOf,
 } from './mapping.js';
+import { followA32PersonLink } from './personLink.js';
 import { API, type A32Attendee, type A32FolkAttendee, type A32Relation } from './types.js';
 
 export interface A32FlowOptions {
@@ -118,37 +119,61 @@ export async function fetchRoster(
   const before = cache.stats.misses;
   const swept = await cachedSweep(options);
 
-  const people: RosterPerson[] = [];
+  /*
+   * Keyed by attendee, as the Planning Center roster keys its `found` map: a
+   * merge survivor is reached once through every buried id that leads to them
+   * and once more in their own right — the keeper is usually on the roster
+   * already — and the same human must not become two rows.
+   */
+  const found = new Map<string, A32Attendee>();
   const unresolved: string[] = [];
+  const relinks: RosterResult['relinks'] = [];
   const missing: string[] = [];
 
   const stragglers: string[] = [];
   for (const personId of wanted) {
     const attendee = swept.get(personId);
-    if (attendee) people.push(mapAttendeeToRosterPerson(attendee));
+    if (attendee) found.set(attendee.id, attendee);
     else stragglers.push(personId);
   }
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
     try {
       const attendee = await options.client.get<A32Attendee>(API.attendeeById(personId));
-      people.push(mapAttendeeToRosterPerson(attendee));
+      found.set(attendee.id, attendee);
     } catch (error) {
-      // Soft-deleted upstream is the ordinary case — a thing to report, not a
-      // reason to fail the roster. Attendees has no merges, so there is no
-      // trail to follow: gone is gone.
-      unresolved.push(personId);
-      if (isA32GoneError(error)) missing.push(personId);
+      /*
+       * Soft-deleted upstream is the ordinary case — a thing to report, not a
+       * reason to fail the roster. A *merged* one is better than ordinary:
+       * the `410` names the survivor, so the student is hydrated under the
+       * record the church kept and reported as a relink for `getRoster` to
+       * make permanent. Only a trail that ends dead — the survivor deleted
+       * after the merge — is missing, because missing is what freezes
+       * check-ins.
+       */
+      if (!isA32GoneError(error)) {
+        unresolved.push(personId);
+        continue;
+      }
+      const link = await followA32PersonLink(options.client, personId, error);
+      if (link.outcome !== 'live') {
+        unresolved.push(personId);
+        missing.push(personId);
+        continue;
+      }
+      found.set(link.personId, link.attendee);
+      relinks.push({ fromPersonId: personId, toPersonId: link.personId });
     }
   }
   unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
 
+  const people = [...found.values()].map(mapAttendeeToRosterPerson);
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
 
   return {
     people,
     unresolved,
-    relinks: [],
+    relinks,
     missing,
     cached: cache.stats.misses === before,
     fetchedAt: now.toISOString(),
@@ -280,17 +305,28 @@ async function loadAttendee(
 export async function fetchPersonDetails(
   options: A32FlowOptions & { personId: string; attendees?: AttendeeMemo },
 ): Promise<PersonDetails | null> {
-  const { client, config, cache, personId } = options;
+  const { client, config, cache } = options;
 
+  // Keyed by the id asked for, so the caller's lookup still hits after a merge.
   return cache.get(
-    personDetailsCacheKey(config.baseUrl, personId),
+    personDetailsCacheKey(config.baseUrl, options.personId),
     async () => {
+      /*
+       * A merged student's details are the survivor's details — the family did
+       * not stop existing because an admin folded two records together. This
+       * read follows the trail and answers; the roster read is what makes the
+       * move permanent. `personId` from here down is whoever holds the record.
+       */
+      let personId = options.personId;
       let attendee: A32Attendee;
       try {
         attendee = await client.get<A32Attendee>(API.attendeeById(personId));
       } catch (error) {
-        if (isA32GoneError(error)) return null;
-        throw error;
+        if (!isA32GoneError(error)) throw error;
+        const link = await followA32PersonLink(client, personId, error);
+        if (link.outcome !== 'live') return null;
+        personId = link.personId;
+        attendee = link.attendee;
       }
 
       const [edges, relations] = await Promise.all([
