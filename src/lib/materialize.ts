@@ -247,13 +247,19 @@ function chainsToProject(
  * A tally is a fact about a chain, and the projection expands one instance of
  * it; the only way to carry "four times" onto a walk that starts somewhere in
  * the middle is to work out ahead of time which night the fourth is.
+ *
+ * The bound is that night's *day*, resolved to its last instant the way
+ * `UNTIL` is: the walk below expands at the template's time of day, and a
+ * leader who moved the remaining nights half an hour later has not asked for
+ * one fewer of them.
  */
 function countBound(rule: RecurrenceRule, origin: Date): Date | null {
   if (rule.count === null) return null;
   const dates = recurrenceOccurrences({ ...rule, count: null, until: null }, origin, {
     limit: rule.count,
   });
-  return dates[dates.length - 1] ?? origin;
+  const last = dates[dates.length - 1] ?? origin;
+  return new Date(last.getFullYear(), last.getMonth(), last.getDate(), 23, 59, 59, 999);
 }
 
 export interface HorizonOptions {

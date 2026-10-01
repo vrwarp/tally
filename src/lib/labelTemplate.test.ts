@@ -103,6 +103,13 @@ describe('an optional [...] group', () => {
     expect(fillLabelTokens('Room [[3]]', sparse)).toBe('Room [3]');
   });
 
+  it('keeps a doubled bracket literal around a token, filled or not', () => {
+    // A group used to be free to open on the second `[` of the escape, so
+    // the caption vanished with the grade and `[]` was all that printed.
+    expect(fillLabelTokens('[[Grade {{grade}}]]', full)).toBe('[Grade 8th grade]');
+    expect(fillLabelTokens('[[Grade {{grade}}]]', sparse)).toBe('[Grade ]');
+  });
+
   it('still reports the tokens inside a group', () => {
     // The editor's unknown-token check and `requiresValue` both read this, and
     // a token hidden from them because it sat inside brackets would be a

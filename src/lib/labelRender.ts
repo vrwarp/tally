@@ -327,7 +327,9 @@ function fitLine(
   while (fontPx > MIN_FONT_PX && measure(line.text, fontPx, line.bold) > width) {
     // Two dots at a time: fine enough that the result does not look
     // arbitrarily small, coarse enough to converge in a handful of measures.
-    fontPx -= 2;
+    // Clamped, because a size that started odd would otherwise step from one
+    // dot above the floor to one below it.
+    fontPx = Math.max(MIN_FONT_PX, fontPx - 2);
   }
 
   /*
@@ -403,14 +405,18 @@ export function layoutLabel(
     }[] = [];
     let height = 0;
 
-    lines.forEach((line, index) => {
+    for (const line of lines) {
       const scaled: ResolvedLine = {
         ...line,
         fontPx: Math.max(MIN_FONT_PX, Math.round(line.fontPx * scale)),
       };
       const { fontPx, texts } = fitLine(scaled, innerWidth, measure);
-      if (index > 0) height += fontPx * LINE_GAP;
       for (const text of texts) {
+        // One gap before every row but the first — the rows a line wraps into
+        // included, because that is what the draw pass below puts between
+        // them. The two passes have to agree or the last row prints off the
+        // bottom of the label the height here bought.
+        if (rows.length > 0) height += fontPx * LINE_GAP;
         rows.push({
           text,
           fontPx,
@@ -420,7 +426,7 @@ export function layoutLabel(
         });
         height += fontPx * LINE_HEIGHT;
       }
-    });
+    }
 
     return { rows, height };
   };

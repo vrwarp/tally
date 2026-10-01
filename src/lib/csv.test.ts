@@ -146,6 +146,14 @@ describe('exportFilename', () => {
     );
   });
 
+  it('keeps the marks that are part of a letter in a mark-based script', () => {
+    // Devanagari vowel signs are combining marks; treating them as separators
+    // shredded the title to its consonants.
+    expect(exportFilename({ kind: 'attendance', scope: 'हिंदी सभा', at })).toBe(
+      'tally-attendance-हिंदी-सभा-2026-08-09.csv',
+    );
+  });
+
   it('collapses a run of punctuation to one separator', () => {
     expect(exportFilename({ kind: 'roster', scope: 'Jamie  Rivera — 2026', at })).toBe(
       'tally-roster-jamie-rivera-2026-2026-08-09.csv',

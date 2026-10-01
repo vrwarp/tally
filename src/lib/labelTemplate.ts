@@ -327,14 +327,16 @@ const TOKEN_PATTERN = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
  * possible rather than convenient.
  *
  * The group pattern skips doubled brackets on both sides, so `[[` inside a
- * group does not close it.
+ * group does not close it — and a group never opens on the second half of one,
+ * so `[[Grade {{grade}}]]` is a literal caption around a token rather than a
+ * group that vanishes with the grade.
  */
 /* Stryker disable next-line Regex: static — see docs/mutation-testing.md. A
    module-scope literal, so its mutants are static and unkillable by a test that
    nonetheless covers them: the seven cases under "an optional [...] group" in
    labelTemplate.test.ts exercise this pattern, including the doubled-bracket
    escape both surviving mutants break (`Room [[3]]` reads back as `Room [3]`). */
-const OPTIONAL_GROUP_PATTERN = /\[((?:[^[\]]|\[\[|\]\])*)\]/g;
+const OPTIONAL_GROUP_PATTERN = /(?<!\[)\[((?:[^[\]]|\[\[|\]\])*)\]/g;
 const ESCAPED_BRACKET_PATTERN = /\[\[|\]\]/g;
 
 /** `[[` and `]]` read back as the brackets they stand for. */

@@ -489,6 +489,26 @@ describe('nextSeriesOccurrence', () => {
     expect(endAt.getTime() - startAt.getTime()).toBe(24 * 60 * 60 * 1000);
   });
 
+  it('stays on tonight for a lock-in that has not started, even past its end time', () => {
+    /*
+     * A 22:00-01:00 lock-in on its own day: at 10:00 the clock is past 01:00
+     * but the night has not happened. Reading the end time on the same day
+     * used to roll the series a week, so the quick action named next Friday
+     * and offered to schedule a duplicate of tonight.
+     */
+    const lockIn = { ...fridaySeries, startTime: '22:00', endTime: '01:00' };
+    expect(nextSeriesOccurrence(lockIn, new Date(2026, 1, 13, 10, 0)).startAt.getDate()).toBe(13);
+    expect(nextSeriesOccurrence(lockIn, new Date(2026, 1, 13, 23, 0)).startAt.getDate()).toBe(13);
+    // And an hour into the next morning it is still tonight's.
+    const { startAt, endAt } = nextSeriesOccurrence(lockIn, new Date(2026, 1, 14, 0, 30));
+    expect([startAt.getDate(), endAt.getDate(), endAt.getHours()]).toEqual([13, 14, 1]);
+    // Only once it has really ended does the series roll.
+    expect(nextSeriesOccurrence(lockIn, new Date(2026, 1, 14, 1, 1)).startAt.getDate()).toBe(20);
+
+    const allDay = { ...fridaySeries, startTime: '19:00', endTime: '19:00' };
+    expect(nextSeriesOccurrence(allDay, new Date(2026, 1, 13, 20, 0)).startAt.getDate()).toBe(13);
+  });
+
   it('derives the check-in window from the start and end times', () => {
     const { startAt, endAt, checkInOpensAt, checkInClosesAt } = nextSeriesOccurrence(
       fridaySeries,
@@ -709,9 +729,12 @@ describe('formatWeekdayDay', () => {
     // "dom 15 de feb": the " de " leads to the month, so it goes with it.
     expect(at('es-MX')).toBe('dom 15');
     // 2月15日周日: the 月 follows the month and nothing kept precedes it; the
-    // 日 sits between the day and the weekday and stays.
-    expect(at('zh-Hans')).toBe('15日周日');
-    expect(at('zh-Hant')).toBe('15日週日');
+    // 日 sits between the day and the weekday and stays. Whether a space
+    // follows it is a question for the CLDR data in the runner's ICU, which
+    // has answered it both ways for Traditional Chinese — so the assertion
+    // reads the glyphs and not the spacing.
+    expect(at('zh-Hans').replace(/\s/g, '')).toBe('15日周日');
+    expect(at('zh-Hant').replace(/\s/g, '')).toBe('15日週日');
   });
 });
 
@@ -784,6 +807,18 @@ describe('formatSeenShort', () => {
     expect(formatSeenShort(times, new Date(2025, 9, 13, 19, 30), now)).toBe('4 mths ago');
     expect(formatSeenShort(times, new Date(2025, 1, 13, 19, 30), now)).toBe('1 yr ago');
     expect(formatSeenShort(times, new Date(2023, 1, 13, 19, 30), now)).toBe('3 yrs ago');
+  });
+
+  it('is bounded by the day count at the top end too', () => {
+    // 31 Jan -> 2 Mar is two calendar months by date-fns and thirty days by
+    // the clock. Thirty days is "1 mth ago", not two.
+    expect(formatSeenShort(times, new Date(2026, 0, 31, 19, 30), new Date(2026, 2, 2, 19, 30))).toBe(
+      '1 mth ago',
+    );
+    // 31 Jan 2025 -> 1 Jan 2026 crosses twelve month boundaries in 335 days.
+    expect(formatSeenShort(times, new Date(2025, 0, 31, 19, 30), new Date(2026, 0, 1, 19, 30))).toBe(
+      '11 mths ago',
+    );
   });
 
   it('does not describe a future date in the past tense', () => {

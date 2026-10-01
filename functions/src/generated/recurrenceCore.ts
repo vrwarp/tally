@@ -326,10 +326,14 @@ export function recurrenceEquals(
  *
  * One period of margin, because `periods` is measured between two points inside
  * their periods rather than between period boundaries — a `from` in the middle
- * of a week is still inside the week whose earlier days it wants.
+ * of a week is still inside the week whose earlier days it wants. That margin
+ * applies at zero too: a `from` a couple of days before the anchor rounds to
+ * the anchor's own period, and the earlier days of the week before it are
+ * still the ones being asked for. Only a `from` genuinely later than the
+ * anchor needs no reach-back at all.
  */
 function stepsBefore(periods: number, interval: number): number {
-  if (periods >= 0) return 0;
+  if (periods > 0) return 0;
   return Math.max(-MAX_CANDIDATE_STEPS, Math.floor(periods / interval) - 1);
 }
 

@@ -413,6 +413,20 @@ describe('recurrenceOccurrences', () => {
     expect(days(found)).toEqual(['2026-7-10', '2026-7-17', '2026-7-24', '2026-7-31']);
   });
 
+  it('reaches back from a window that opens only a couple of days before the anchor', () => {
+    /*
+     * `from` two days before the anchor rounds to the anchor's own week, and
+     * the walk used to start there — so the Friday *before* the anchor was
+     * never generated. That is the Thursday-or-Friday-before shape the
+     * projection asks about whenever a later night has been edited.
+     */
+    const found = recurrenceOccurrences(rule(), FRIDAY, {
+      limit: 3,
+      from: new Date(2026, 6, 17, 16, 30),
+    });
+    expect(days(found)).toEqual(['2026-7-17', '2026-7-24', '2026-7-31']);
+  });
+
   it('keeps the phase of an interval when it reaches back', () => {
     const found = recurrenceOccurrences(rule({ interval: 2 }), FRIDAY, {
       limit: 4,
