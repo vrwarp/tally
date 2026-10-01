@@ -114,6 +114,32 @@ describe('toStudent', () => {
     expect(own.profileComplete).toBe(false);
   });
 
+  it('stops answering once an Attendees push has landed, in that spelling of the link', () => {
+    /*
+     * The push to Attendees writes the generic pair and never `pcoPersonId`
+     * — `upstreamBackend` / `upstreamPersonId` is the contract. Reading only
+     * the Planning Center spelling left every visitor pushed there saying
+     * `false` for good, for the same reason the test above exists.
+     */
+    const pushed = toStudent(
+      fakeSnapshot({ data: { upstreamBackend: 'a32', upstreamPersonId: '8c1f2c34' } }),
+    );
+
+    expect(pushed.profileComplete).toBeNull();
+
+    // Half a pair is no link, and neither is a backend nobody has heard of.
+    expect(toStudent(fakeSnapshot({ data: { upstreamBackend: 'a32' } })).profileComplete).toBe(
+      false,
+    );
+    expect(
+      toStudent(fakeSnapshot({ data: { upstreamPersonId: '8c1f2c34' } })).profileComplete,
+    ).toBe(false);
+    expect(
+      toStudent(fakeSnapshot({ data: { upstreamBackend: 'Object', upstreamPersonId: '1' } }))
+        .profileComplete,
+    ).toBe(false);
+  });
+
   it('answers null for a document that holds no grade, rather than inventing a 6', () => {
     // An annotation written against somebody the backend holds no grade for.
     // This used to answer 6 with a `gradeOnFile: false` flag beside it, which

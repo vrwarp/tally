@@ -149,8 +149,15 @@ export function studentDatePatch(
 
   return {
     ...dates,
-    firstName: student.firstName,
-    lastName: student.lastName,
+    /*
+     * Only the halves of the name that exist. Both backends write `lastName:
+     * ''` for a person with no surname on file, and the rules refuse a blank
+     * name on this document — which took the attendance write in the same
+     * batch down with it, on every tap and every retry. The search key is the
+     * roster's own, already built from whatever halves there are.
+     */
+    ...(student.firstName ? { firstName: student.firstName } : {}),
+    ...(student.lastName ? { lastName: student.lastName } : {}),
     /*
      * Left out for somebody nobody holds a grade for — a nursery child, or an
      * adult on a hand-picked roster.

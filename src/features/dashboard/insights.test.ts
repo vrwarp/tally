@@ -25,7 +25,7 @@ import {
   seenAt,
   standingIn,
 } from '@/features/dashboard/insights';
-import { pcoStudentId } from '@/types';
+import { pcoStudentId, studentIdFor } from '@/types';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
 import {
   NOW,
@@ -1325,6 +1325,27 @@ describe('computeIncompleteProfiles', () => {
     // row still has.
     expect(computeIncompleteProfiles([pushed], new Map([['pco_4200099', false]]))).toHaveLength(1);
     expect(computeIncompleteProfiles([pushed], new Map([['pco_4200099', true]]))).toEqual([]);
+  });
+
+  it('takes Attendees\' answer for a visitor whose push landed there', () => {
+    /*
+     * The same gap, for the other backend. The Attendees push writes the
+     * generic linkage pair and never `pcoPersonId`, and its contact check
+     * files the answer under `a32_<id>` — so a lookup that only knew the
+     * Planning Center spelling could never meet it, and the visitor stayed
+     * on this list however complete their household was.
+     */
+    const pushed = makeStudent({
+      id: 'tally-1',
+      isVisitor: true,
+      upstreamBackend: 'a32',
+      upstreamPersonId: '8c1f2c34',
+      profileComplete: null,
+    });
+    const key = studentIdFor('a32', '8c1f2c34');
+
+    expect(computeIncompleteProfiles([pushed], new Map([[key, false]]))).toHaveLength(1);
+    expect(computeIncompleteProfiles([pushed], new Map([[key, true]]))).toEqual([]);
   });
 
   it('still trusts Tally about a visitor who exists nowhere else', () => {

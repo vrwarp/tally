@@ -142,6 +142,20 @@ describe('studentDatePatch', () => {
     const patch = studentDatePatch(clock, student({ grade: null }), event, 'uid-1');
     expect(patch).not.toHaveProperty('grade');
   });
+
+  it('omits a name half nobody holds, and keeps the search key built without it', () => {
+    // The backends write `lastName: ''` for a person with no surname on file,
+    // and the rules refuse a blank name — which took the attendance write in
+    // the same batch down with it, from the kiosk and the app alike.
+    const patch = studentDatePatch(
+      clock,
+      student({ firstName: 'Noor', lastName: '', searchName: 'noor' }),
+      event,
+      'uid-1',
+    );
+    expect(patch).toMatchObject({ firstName: 'Noor', searchName: 'noor' });
+    expect(patch).not.toHaveProperty('lastName');
+  });
 });
 
 describe('isFirstEver', () => {

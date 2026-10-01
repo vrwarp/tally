@@ -143,6 +143,15 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
   const firstName = str(data.firstName);
   const lastName = str(data.lastName);
   const pcoPersonId = strOrNull(data.pcoPersonId);
+  /*
+   * Either spelling of the upstream link. A push to Attendees writes the
+   * generic pair and never `pcoPersonId`, so reading the Planning Center field
+   * alone left every visitor pushed there "unreachable" for good — see
+   * `profileComplete` below, and `linkageOfStudent`.
+   */
+  const linked =
+    pcoPersonId !== null ||
+    (isBackendId(data.upstreamBackend) && strOrNull(data.upstreamPersonId) !== null);
 
   return {
     id: snapshot.id,
@@ -194,7 +203,7 @@ export function toStudent(snapshot: DocumentSnapshot<DocumentData>): Student {
      * upstream left the student on the "incomplete profiles" list for good,
      * because the list was reading a boolean that could never change.
      */
-    profileComplete: pcoPersonId ? null : false,
+    profileComplete: linked ? null : false,
     hasAllergies: false,
     // Planning Center's, like the two above it. A quick-added visitor genuinely
     // has no birthday on file until their push lands and the roster answers.
