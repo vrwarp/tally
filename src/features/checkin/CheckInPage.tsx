@@ -581,9 +581,10 @@ export function CheckInPage() {
    * reload. Live events are untouched — their attendance comes from a listener.
    *
    * `attendanceCount` is handed in rather than read off the stream here,
-   * because this runs in a `finally` after the write has already echoed back
-   * through the listener. Reading it at that point would count the tap that is
-   * still being processed and move the "nearly empty" boundary below by one.
+   * because this runs once the write has landed, by which point it has already
+   * echoed back through the listener. Reading it at that point would count the
+   * tap that is still being processed and move the "nearly empty" boundary
+   * below by one.
    */
   const forgetCachedHistory = useCallback((attendanceCount: number) => {
     if (!event || event.checkInClosesAt >= new Date()) return;
@@ -655,11 +656,11 @@ export function CheckInPage() {
       work: () => Promise<void>,
     ) => {
       /*
-       * Taken here, before anything else this function does, because the
-       * `finally` below runs after the write has echoed back through the
-       * attendance listener — by then the register has grown by the very tap
-       * being made, and `forgetCachedHistory` would be answering a different
-       * question than the one the tap asked.
+       * Taken here, before anything else this function does, because by the
+       * time the write has landed it has echoed back through the attendance
+       * listener — by then the register has grown by the very tap being made,
+       * and `forgetCachedHistory` would be answering a different question than
+       * the one the tap asked.
        */
       const attendanceCount = latest.current.attendanceCount;
 
@@ -671,6 +672,14 @@ export function CheckInPage() {
 
       try {
         await work();
+        /*
+         * Only for a write that landed. A refused one has proved nothing
+         * about the night, and the skipped-night entry this would clear is
+         * never put back by anybody — a night missing from it is read as
+         * held — so clearing it for a failed tap would report a night nobody
+         * attended as an absence for every student, for good.
+         */
+        forgetCachedHistory(attendanceCount);
       } catch (cause) {
         const sentence = typeof failure === 'function' ? failure(cause) : failure;
         if (sentence !== null) {
@@ -678,7 +687,6 @@ export function CheckInPage() {
           show(sentence, { tone: "error" });
         }
       } finally {
-        forgetCachedHistory(attendanceCount);
         for (const id of ids) {
           inFlight.current.delete(id);
           setBusy(id, false);
@@ -1404,8 +1412,8 @@ export function CheckInPage() {
           commoner of the two — and the closed form was costing this screen a
           reconciliation of the whole dialog on every keystroke, since the
           search box and the modal share a parent. Nothing is lost by
-          unmounting: the seeding effect inside clears every field on each
-          open, so a fresh mount and the old reset arrive at the same form. */}
+          unmounting: the form seeds its fields on mount, so a fresh mount is
+          the reset. */}
       {user && quickAddOpen ? (
         <QuickAddVisitorModal
           open
@@ -1413,6 +1421,9 @@ export function CheckInPage() {
           event={event}
           uid={user.uid}
           initialName={query}
+          // A new visitor on last Friday's register is still a write on a
+          // past gathering, and asks like every other one — see `unlessPast`.
+          confirm={unlessPast}
           onAdded={(name) => {
             // Clearing the search is what makes the new visitor visible — they
             // arrive checked in, and every focus keeps checked-in students on
