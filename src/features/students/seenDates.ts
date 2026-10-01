@@ -35,11 +35,15 @@
  *   - A night no longer on the calendar, or one nobody has loaded.
  *
  * The discriminator is therefore narrow on purpose: the stored date is only
- * overruled when the window contains a night on that very day which the student
- * was demonstrably not at. Absence is knowable here — `presentStudentIds` for
- * these snapshots comes from the student's own records, so a night they are
- * missing from is a night they were not checked into, whether or not anybody
- * else was.
+ * overruled when the window contains a night the student was demonstrably not
+ * at, at that very instant — or on that very day, provided the stored instant
+ * is not later than everything the window holds. The proviso is tonight again:
+ * on a Sunday with a class at half nine and youth group at six, the class is
+ * loaded and the evening is not, and a tap at six must not be denied by a
+ * morning the student was never going to. Absence is knowable here —
+ * `presentStudentIds` for these snapshots comes from the student's own records,
+ * so a night they are missing from is a night they were not checked into,
+ * whether or not anybody else was.
  */
 import { isSameDay } from 'date-fns';
 import type { EventAttendanceSnapshot, Student } from '@/types';
@@ -72,13 +76,15 @@ export function reconcileSeen(
 
   let ledgerFirst: Date | null = null;
   let ledgerLast: Date | null = null;
-  /** A loaded night on the stored day, without them. */
-  let firstDenied = false;
-  let lastDenied = false;
+  /** The loaded nights without them. */
+  const absent: Date[] = [];
+  /** The newest night loaded at all, present or not. */
+  let newest: Date | null = null;
 
   for (const snapshot of snapshots) {
     const startAt = snapshot.event.startAt;
     if (!Number.isFinite(startAt.getTime())) continue;
+    if (!newest || startAt > newest) newest = startAt;
 
     if (snapshot.presentStudentIds.has(student.id)) {
       if (!ledgerFirst || startAt < ledgerFirst) ledgerFirst = startAt;
@@ -86,9 +92,19 @@ export function reconcileSeen(
       continue;
     }
 
-    if (storedFirst && isSameDay(startAt, storedFirst)) firstDenied = true;
-    if (storedLast && isSameDay(startAt, storedLast)) lastDenied = true;
+    absent.push(startAt);
   }
+
+  /** A loaded night without them on the stored day — see the header. */
+  const denied = (stored: Date | null): boolean =>
+    stored !== null &&
+    absent.some(
+      (startAt) =>
+        startAt.getTime() === stored.getTime() ||
+        (isSameDay(startAt, stored) && newest !== null && stored <= newest),
+    );
+  const firstDenied = denied(storedFirst);
+  const lastDenied = denied(storedLast);
 
   /*
    * `firstSeenAt` needs no such denial to move: a sighting earlier than the

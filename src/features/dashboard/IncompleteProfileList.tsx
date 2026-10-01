@@ -18,6 +18,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
+import { waitingDays } from '@/features/dashboard/waitingDays';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import {
   buildIncompleteProfileCsv,
@@ -147,19 +148,6 @@ export function IncompleteProfileList({
       )}
     </Card>
   );
-}
-
-/**
- * How long this profile has been waiting, or null when the question does not
- * apply.
- *
- * A student who came from Planning Center carries the epoch as `createdAt` —
- * deliberately, so that no past gathering predates them on the MIA list — and
- * rendering that would tell a leader the profile has been waiting since 1970.
- */
-function waitingDays(student: Student, now: Date): number | null {
-  if (student.createdAt.getTime() <= 0) return null;
-  return Math.max(0, Math.floor((now.getTime() - student.createdAt.getTime()) / 86_400_000));
 }
 
 function IncompleteRow({

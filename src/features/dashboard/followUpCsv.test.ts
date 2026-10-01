@@ -137,6 +137,15 @@ describe('buildIncompleteProfileCsv', () => {
     expect(row.days_waiting).toBe('19');
   });
 
+  it('leaves the age blank for a roster student, who was not added on any day Tally knows', () => {
+    // Planning Center students carry the epoch as `createdAt`, and the list
+    // already says "nobody on file" for them rather than "waiting 20,000 days".
+    const student = makeStudent({ id: 'pco_1', createdAt: new Date(0) });
+    const row = cells(buildIncompleteProfileCsv(grades, [student], NO_EXPORT_CONTEXT, new Date(2026, 4, 20)));
+    expect(row.added_on).toBe('');
+    expect(row.days_waiting).toBe('');
+  });
+
   it('never reports a negative wait for a row added in the future', () => {
     const student = makeStudent({ id: 'pco_1', createdAt: new Date(2026, 5, 1) });
     const row = cells(buildIncompleteProfileCsv(grades, [student], NO_EXPORT_CONTEXT, new Date(2026, 4, 20)));

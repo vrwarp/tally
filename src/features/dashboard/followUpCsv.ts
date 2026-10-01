@@ -31,6 +31,7 @@
  */
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isUnreachable } from '@/features/dashboard/insights';
+import { waitingDays } from '@/features/dashboard/waitingDays';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
 import { gradeLabel, type GradeStrings } from '@/lib/grades';
 import type { RosterBackendStatus } from '@/services/functions';
@@ -163,15 +164,13 @@ export function buildIncompleteProfileCsv(
     [
       ...studentColumns<Student>(grades, (student) => student, context),
       { header: 'is_visitor', value: (student) => student.isVisitor },
-      { header: 'added_on', value: (student) => isoDate(student.createdAt) },
+      // Blank for a roster student, whose `createdAt` is the epoch on purpose:
+      // the list says "nobody on file" for them rather than "since 1970".
       {
-        header: 'days_waiting',
-        value: (student) =>
-          Math.max(
-            0,
-            Math.floor((now.getTime() - student.createdAt.getTime()) / 86_400_000),
-          ),
+        header: 'added_on',
+        value: (student) => (waitingDays(student, now) === null ? '' : isoDate(student.createdAt)),
       },
+      { header: 'days_waiting', value: (student) => waitingDays(student, now) ?? '' },
       { header: 'last_attended', value: (student) => isoDate(student.lastAttendedAt) },
       ...workColumns<Student>(),
     ],

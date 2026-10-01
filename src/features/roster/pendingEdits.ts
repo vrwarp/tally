@@ -24,7 +24,15 @@
  * the copy of a managed field that §4 of docs/planning-center.md exists to
  * forbid.
  */
-import { composeFirstName, isInFlight, splitFirstName, type Student, type UpstreamEdit } from '@/types';
+import {
+  buildSearchName,
+  composeFirstName,
+  isInFlight,
+  needsAHuman,
+  splitFirstName,
+  type Student,
+  type UpstreamEdit,
+} from '@/types';
 
 /** A roster row, plus which of its values are still only typed. */
 export interface PendingStudent extends Student {
@@ -43,7 +51,11 @@ export function latestByStudent(edits: readonly UpstreamEdit[]): Map<string, Ups
     // Newest wins, and a job that needs a human beats one that does not: a
     // failure from last Tuesday matters more to the person looking at this row
     // than the retry queued a second ago, and only one mark fits.
-    if (!held || edit.createdAt > held.createdAt) byStudent.set(edit.studentId, edit);
+    const wins =
+      !held ||
+      (needsAHuman(edit) && !needsAHuman(held)) ||
+      (needsAHuman(edit) === needsAHuman(held) && edit.createdAt > held.createdAt);
+    if (wins) byStudent.set(edit.studentId, edit);
   }
   return byStudent;
 }
@@ -90,6 +102,23 @@ export function applyPendingEdits(
     if (edit.patch.lastName !== undefined) {
       row.lastName = edit.patch.lastName;
       pending.add('lastName');
+    }
+    /*
+     * A row that shows the typed name has to be *found* by it too, or the
+     * search box contradicts the glass. `searchName` opens with the name and
+     * the server appends to it (a romanization, say), and `nameSortKey` reads
+     * that tail by position — so the name's own tokens are swapped and the
+     * tail is kept where it was.
+     */
+    if (pending.has('firstName') || pending.has('lastName')) {
+      const nameTokens = `${student.firstName} ${student.lastName}`
+        .trim()
+        .replace(/\s+/g, ' ')
+        .split(' ').length;
+      const tail = student.searchName.split(' ').slice(nameTokens).join(' ');
+      row.searchName = [buildSearchName(row.firstName, row.lastName), tail]
+        .filter(Boolean)
+        .join(' ');
     }
     if (edit.patch.grade !== undefined) {
       row.grade = edit.patch.grade;

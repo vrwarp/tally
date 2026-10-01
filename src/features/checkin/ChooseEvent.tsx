@@ -147,7 +147,10 @@ export function ChooseEvent({ events, now }: ChooseEventProps) {
      * the one screen that could not see it.
      */
     const dayStart = startOfDay(now);
-    const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+    // The next midnight, not twenty-four hours on: the day the clocks go back
+    // is twenty-five, and a gathering in its last hour is still today's.
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
 
     return {
       dayStart,
