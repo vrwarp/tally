@@ -18,7 +18,7 @@
  * has not finished.
  */
 import type { ReactElement } from 'react';
-import { render, screen, waitFor, within } from '@/test/rtl';
+import { act, render, screen, waitFor, within } from '@/test/rtl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
@@ -76,10 +76,20 @@ const team: UserProfile[] = [
 
 /** The directory the sheet is handed. Tests that need a variation swap it in. */
 let roster: UserProfile[] = team;
+/**
+ * Whether the directory arrives at all. It is a separate read from the
+ * registers with no order between them, so a sheet can have its registers
+ * and not yet — or never — its names.
+ */
+let delivery: 'delivered' | 'pending' | 'failed' = 'delivered';
 
 vi.mock('@/services/users', () => ({
-  subscribeUsers: (onChange: (members: UserProfile[]) => void) => {
-    onChange(roster);
+  subscribeUsers: (
+    onChange: (members: UserProfile[]) => void,
+    onError?: (error: Error) => void,
+  ) => {
+    if (delivery === 'delivered') onChange(roster);
+    if (delivery === 'failed') onError?.(new Error('refused'));
     return () => {};
   },
 }));
@@ -166,6 +176,7 @@ function lastWrite() {
 
 beforeEach(() => {
   roster = team;
+  delivery = 'delivered';
 });
 
 describe('which state looks like the current one', () => {
@@ -395,6 +406,55 @@ describe('the kept list, while the gathering is open', () => {
 
     await user.click(option('Only people I add'));
     await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    expect(lastWrite().seenAtOpen.sort()).toEqual(['jo', 'miriam']);
+  });
+
+  /*
+   * The ticks are resolved through the directory, and the directory is a
+   * separate read from the registers. A sheet whose registers had landed but
+   * whose names had not drew Jo's reopened gathering with no row for Jo, read
+   * "would keep 0 people from last time", and let the press through — handing
+   * `restrictChain` every uid on the document as "shown", which it reads as a
+   * deliberate untick. Jo was erased without a tick ever being drawn.
+   */
+  it('cannot be pressed before the directory has said who would be kept', async () => {
+    delivery = 'pending';
+    show(document(['miriam', 'jo'], false));
+    await waitFor(() => expect(recentRegisterTakers).toHaveBeenCalled());
+    // The registers are in; the names are not.
+    await act(async () => {});
+
+    // No row for Jo yet, so there is nothing to untick — and nothing to decide on.
+    expect(screen.queryByRole('checkbox', { name: /Jo/ })).not.toBeInTheDocument();
+    expect(option('Only people I add')).toBeDisabled();
+    expect(
+      screen.getAllByText('Working out who has been taking attendance here…').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('says so, and stays unpressable, when the directory could not be read', async () => {
+    delivery = 'failed';
+    show(document(['miriam', 'jo'], false));
+    await waitFor(() => expect(recentRegisterTakers).toHaveBeenCalled());
+    await act(async () => {});
+
+    expect(screen.queryByRole('checkbox', { name: /Jo/ })).not.toBeInTheDocument();
+    expect(option('Only people I add')).toBeDisabled();
+    // Not "would keep nobody": the sheet does not know who it would keep.
+    expect(screen.getAllByText(/Couldn't read the team/).length).toBeGreaterThan(0);
+  });
+
+  it('hands the write only the names it could draw, so one it never showed is kept', async () => {
+    const user = userEvent.setup();
+    // A uid on the document with no profile behind it is never a row here.
+    show(document(['miriam', 'jo', 'ghost'], false));
+    await screen.findByText(/Would keep/);
+    expect(screen.queryByRole('checkbox', { name: /ghost/i })).not.toBeInTheDocument();
+
+    await user.click(option('Only people I add'));
+    await waitFor(() => expect(restrictChain).toHaveBeenCalled());
+    // `restrictChain` keeps whoever is on the document and not in this list,
+    // so a name the sheet never resolved belongs in that set, not in this one.
     expect(lastWrite().seenAtOpen.sort()).toEqual(['jo', 'miriam']);
   });
 });

@@ -215,7 +215,12 @@ function RowSection({
   const { canWork } = useData();
   const { own, locked } = partitionBand(events, canWork, 'asc');
 
-  if (events.length === 0) return null;
+  // No rows is not nothing to say. "Later" asks before it lists past the
+  // horizon, and the control it asks with is this band's child — so a retreat
+  // past the horizon with nothing nearer has a control and no row, and a band
+  // that returned null for having no rows took the only way to it off the
+  // screen, and told the reader nothing was scheduled.
+  if (events.length === 0 && !children) return null;
 
   return (
     <section aria-labelledby={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}>
@@ -599,7 +604,9 @@ export function EventsPage() {
   // A viewer keeps the "already scheduled" rows, which are links, and loses
   // the "schedule next" ones, which are writes.
   const shownQuickActions = readOnly ? quickActions.filter(({ existing }) => existing) : quickActions;
-  const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
+  // Something behind the "Later" control is still something scheduled.
+  const nothingAhead =
+    today.length === 0 && thisWeek.length === 0 && later.length === 0 && laterHidden === 0;
 
   return (
     <PageFrame gap="lg" className="pb-8">
@@ -738,6 +745,7 @@ export function EventsPage() {
                 onClick={() => setAllLater(true)}
                 className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
               >
+                {/* English, awaiting its key in the catalogue. */}
                 Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
               </button>
             ) : null}

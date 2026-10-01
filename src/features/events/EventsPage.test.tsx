@@ -14,7 +14,7 @@
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { act, render, screen, within } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
@@ -304,6 +304,29 @@ describe('the bands', () => {
     expect(within(band(/^later$/i)).getByText('Winter Retreat')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /next seven days/i })).not.toBeInTheDocument();
     await settle();
+  });
+
+  /*
+   * The same claim, one step further out. "Later" asks before it lists past
+   * the end of next month, and the control it asks with lived inside the band
+   * — so a retreat past that horizon with nothing nearer took the band, the
+   * control and itself off the screen, and the page said nothing was scheduled.
+   */
+  it('keeps a retreat past the horizon reachable when nothing is nearer', async () => {
+    // Today is 29 July, so the horizon is 1 September; November is past it.
+    show([
+      event({
+        title: 'Winter Retreat',
+        startAt: new Date(2026, 10, 20, 17),
+        endAt: new Date(2026, 10, 22, 15),
+      }),
+    ]);
+    await settle();
+
+    expect(screen.queryByText('Nothing scheduled yet')).not.toBeInTheDocument();
+    const later = band(/^later$/i);
+    fireEvent.click(within(later).getByRole('button', { name: 'Show 1 later gathering' }));
+    expect(within(later).getByText('Winter Retreat')).toBeInTheDocument();
   });
 
   it('claims no band it has nothing to put in', async () => {
