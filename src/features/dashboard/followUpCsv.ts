@@ -30,7 +30,7 @@
  * the honest substitute and it is already a badge on the row.
  */
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
-import { isUnreachable } from '@/features/dashboard/insights';
+import { isUnreachable, reachableFor } from '@/features/dashboard/insights';
 import { waitingDays } from '@/features/dashboard/waitingDays';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
 import { gradeLabel, type GradeStrings } from '@/lib/grades';
@@ -78,7 +78,9 @@ function studentColumns<T>(
       value: (row) => {
         const student = of(row);
         if (isUnreachable(student, context.reachable)) return 'no';
-        const known = student.profileComplete ?? context.reachable.get(student.id);
+        // The same lookup the badge makes: a pushed visitor's answer is filed
+        // under the id the backend gave them, not the one Tally did.
+        const known = student.profileComplete ?? reachableFor(student, context.reachable);
         return known === undefined ? '' : 'yes';
       },
     },

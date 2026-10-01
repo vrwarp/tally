@@ -214,4 +214,54 @@ describe('DashboardPage', () => {
 
     expect(screen.queryByRole('button', { name: 'Sunday School' })).not.toBeInTheDocument();
   });
+
+  /*
+   * The one tile that is a record rather than a head count.
+   *
+   * Head counts come from whichever gathering met last, on purpose — Sunday
+   * School measured against Friday Fellowship is a collapse every week. The
+   * check-out rate is a different kind of number: a record across every
+   * gathering that asked for check-out. Read from the head-count nights, it
+   * vanished under "All" whenever a gathering that never used the feature was
+   * the last to meet, and came back a week later showing one chain's rate.
+   */
+  it('keeps the Checked out tile under All when the last gathering to meet does not track check-out', () => {
+    const sunday = makeEvent({
+      id: 'sunday',
+      seriesId: 'sunday-school',
+      title: 'Sunday Kids',
+      startAt: new Date('2026-02-08T10:00:00'),
+      endAt: new Date('2026-02-08T12:00:00'),
+      requiresCheckOut: true,
+    });
+    // Met since, and never used check-out.
+    const friday = makeEvent({ id: 'friday', seriesId: 'friday-fellowship', title: 'Friday Fellowship' });
+    emptyMinistry({ events: [sunday, friday] });
+    useEventSnapshots.mockReturnValue({
+      snapshots: [
+        {
+          event: friday,
+          presentStudentIds: new Set(['student-1']),
+          checkedOutStudentIds: new Set<string>(),
+          held: true,
+        },
+        {
+          event: sunday,
+          presentStudentIds: new Set(['student-2', 'student-3']),
+          checkedOutStudentIds: new Set(['student-2']),
+          held: true,
+        },
+      ],
+      denied: new Set(),
+      loading: false,
+      error: null,
+    });
+
+    mount();
+
+    // The window holds Sunday — the tab is there — so the tile has to be too.
+    expect(screen.getByRole('button', { name: 'Sunday Kids' })).toBeInTheDocument();
+    expect(screen.getByText('Checked out')).toBeInTheDocument();
+    expect(screen.getByText('50%')).toBeInTheDocument();
+  });
 });

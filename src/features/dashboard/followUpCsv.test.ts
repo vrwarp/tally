@@ -165,4 +165,20 @@ describe('contact_on_file', () => {
     const csv = buildIncompleteProfileCsv(grades, [student], NO_EXPORT_CONTEXT, new Date());
     expect(cells(csv).contact_on_file).toBe('no');
   });
+
+  it('is yes for a pushed visitor whose answer is filed under the backend id', () => {
+    // A quick-add pushed upstream keeps the id Tally gave them while Planning
+    // Center's answer about their family arrives under `pco_<id>`. The badge
+    // on the row already resolves that, and the column is the badge's answer
+    // in file form: "nobody looked" here would contradict the screen.
+    const pushed = makeStudent({
+      id: 'tally-1',
+      isVisitor: true,
+      pcoPersonId: '4200099',
+      profileComplete: null,
+    });
+    const context = { reachable: new Map([['pco_4200099', true]]), backends: [] };
+    const csv = buildNewVisitorCsv(grades, [{ ...VISITORS[0]!, student: pushed }], context);
+    expect(cells(csv).contact_on_file).toBe('yes');
+  });
 });

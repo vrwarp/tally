@@ -814,6 +814,12 @@ export function computeNewVisitors(
   const results: NewVisitor[] = [];
 
   for (const student of students) {
+    // Inactive rows have been dealt with, like everywhere else on the screen.
+    // The one this list kept producing was a quick-add merged into a roster
+    // row this week: the loser keeps its `firstAttendedAt` and stays in the
+    // roster read, and the row linked to a profile that no longer exists.
+    if (student.status !== 'active') continue;
+
     const firstAttendedAt = student.firstAttendedAt;
     // An unusable date fails *every* comparison, including `< windowStart`, so
     // without this check a student with a corrupt timestamp would sit on the
@@ -1159,6 +1165,16 @@ export interface DashboardSummary {
 
 export function computeSummary(args: {
   snapshots: readonly EventAttendanceSnapshot[];
+  /**
+   * The nights `checkOutRate` is read from, when they are not `snapshots`.
+   *
+   * The page hands the head counts one gathering's nights — two crowds
+   * compared is a collapse every week — but the rate is a record across every
+   * gathering that asked for check-out, so under "All" it wants the whole
+   * loaded window. Read from the head-count nights, the tile vanished whenever
+   * a gathering that never used the feature was the last to meet.
+   */
+  checkOut?: readonly EventAttendanceSnapshot[];
   mia: readonly MiaStudent[];
   newVisitors: readonly NewVisitor[];
   incomplete: readonly Student[];
@@ -1177,7 +1193,7 @@ export function computeSummary(args: {
    */
   let tracked = 0;
   let checkedOut = 0;
-  for (const snapshot of args.snapshots) {
+  for (const snapshot of args.checkOut ?? args.snapshots) {
     if (!snapshot.event.requiresCheckOut) continue;
     tracked += snapshot.presentStudentIds.size;
     checkedOut += snapshot.checkedOutStudentIds.size;
