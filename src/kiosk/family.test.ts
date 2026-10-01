@@ -147,4 +147,13 @@ describe('buildFamilyDigits', () => {
     expect([...(digits.get('s-marcus') ?? [])].sort()).toEqual(['0134', '7788']);
     expect([...(digits.get('s-amara') ?? [])]).toEqual(['7788']);
   });
+
+  it('files nobody under an empty number', () => {
+    // Two children registered beside different families, each with no digits
+    // of their own, share nothing — least of all a check-out offer.
+    const digits = buildFamilyDigits({ '': ['s-robin', 's-sam'], '7788': ['s-amara'] });
+    expect(digits.has('s-robin')).toBe(false);
+    expect(digits.has('s-sam')).toBe(false);
+    expect([...(digits.get('s-amara') ?? [])]).toEqual(['7788']);
+  });
 });

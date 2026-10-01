@@ -818,6 +818,7 @@ export function DashboardPage() {
               threshold={settings.miaConsecutiveMisses}
               loading={awaiting}
               gatheringTitle={activeGathering?.title ?? null}
+              gatheringKey={activeGathering?.key ?? null}
               onContactAdded={adultContact.refresh}
               exportContext={exportContext}
               onResolve={readOnly ? undefined : handleResolve}

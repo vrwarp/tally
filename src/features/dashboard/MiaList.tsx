@@ -45,6 +45,12 @@ export interface MiaListProps {
   /** The gathering being shown, or null when every gathering is in the list. */
   gatheringTitle?: string | null;
   /**
+   * Its chain key, or null under All. A row released this session greys in
+   * place on the tab it was made on and under All; on another gathering's tab
+   * it is somebody else's resolution, and must not read as this one's.
+   */
+  gatheringKey?: string | null;
+  /**
    * Called when a row has just put a contact into Planning Center — the
    * screen holds a session-wide answer about who can be reached, and that row
    * has just changed it.
@@ -74,6 +80,7 @@ export function MiaList({
   onContactAdded,
   exportContext = NO_EXPORT_CONTEXT,
   onResolve,
+  gatheringKey = null,
   sessionReleases,
   onUndoSessionRelease,
   undoBusyKey = null,
@@ -90,7 +97,10 @@ export function MiaList({
    * won) renders as a live row, not twice.
    */
   const live = new Set(items.map((item) => sessionReleaseKey(item.gatheringKey, item.student.id)));
-  const releasedRows = [...(sessionReleases?.entries() ?? [])].filter(([key]) => !live.has(key));
+  const releasedRows = [...(sessionReleases?.entries() ?? [])].filter(
+    ([key, release]) =>
+      !live.has(key) && (gatheringKey === null || release.item.gatheringKey === gatheringKey),
+  );
   const entries: Array<
     { kind: 'live'; item: MiaStudent } | { kind: 'released'; key: string; release: SessionRelease }
   > = [

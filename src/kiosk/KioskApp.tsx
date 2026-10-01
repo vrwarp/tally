@@ -2856,12 +2856,17 @@ export function KioskApp() {
         for (const student of added) byId.set(student.id, student);
         return [...byId.values()];
       });
-      setLast4Index((held) => ({
-        ...held,
-        [result.last4]: [
-          ...new Set([...(held[result.last4] ?? []), ...added.map((student) => student.id)]),
-        ].sort(),
-      }));
+      // A sibling registered beside a child who gave no digits comes back
+      // with none, and the stored index refuses an empty key for the same
+      // reason this must: every such child would otherwise be one "family".
+      if (result.last4) {
+        setLast4Index((held) => ({
+          ...held,
+          [result.last4]: [
+            ...new Set([...(held[result.last4] ?? []), ...added.map((student) => student.id)]),
+          ].sort(),
+        }));
+      }
       if (result.checkedIn) {
         /*
          * Into the room under the same arrival the server wrote on their

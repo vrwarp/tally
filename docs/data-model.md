@@ -549,7 +549,7 @@ the design does not make.
 | --- | --- |
 | `chainKey`, `uid` | The pair. The document id is `{chainKey}__{uid}`, so pressing twice addresses the row that already exists rather than stacking a second claim on somebody else's screen. |
 | `name` | Denormalised, so a roster can name the asker without reading `users`. |
-| `askedAt` | Re-stamped by a second press, which is the honest reading of pressing again: the same ask, today. |
+| `askedAt` | Written once: the rules refuse the asker a second write of their own row, and the button is not offered while a row exists or before the listener has said whether one does. |
 | `clearedBy`, `clearedAt` | Set when somebody answers it. |
 
 **Clearing marks; it does not delete.** Without the mark the asker cannot tell "nobody has looked"

@@ -49,6 +49,42 @@ function mount(items: MiaStudent[]) {
   );
 }
 
+describe('a row released this session', () => {
+  const zoe = mia('Zoe', 'Park', 'zoe');
+  const releases = new Map([['friday:zoe', { item: zoe, reason: 'moved-on' as const }]]);
+  const show = (gatheringKey: string | null) =>
+    render(
+      <MemoryRouter>
+        <ParentContactHost>
+          <MiaList
+            items={[]}
+            threshold={3}
+            gatheringTitle={gatheringKey === null ? null : 'Sunday School'}
+            gatheringKey={gatheringKey}
+            sessionReleases={releases}
+          />
+        </ParentContactHost>
+      </MemoryRouter>,
+    );
+
+  it('greys in place under All, where every gathering is in the list', () => {
+    show(null);
+    expect(screen.getByText('Zoe Park')).toBeInTheDocument();
+  });
+
+  it('does not follow the reader onto another gathering’s tab', () => {
+    // A Friday release read on the Sunday tab is somebody else's resolution,
+    // and its Undo would undo the Friday one.
+    show('sunday');
+    expect(screen.queryByText('Zoe Park')).not.toBeInTheDocument();
+  });
+
+  it('stays on the tab it was made on', () => {
+    show('friday');
+    expect(screen.getByText('Zoe Park')).toBeInTheDocument();
+  });
+});
+
 describe('MiaList', () => {
   beforeEach(() => {
     invalidatePersonDetails();

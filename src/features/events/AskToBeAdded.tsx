@@ -48,7 +48,7 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
   const { profile } = useAuth();
   const { show } = useToast();
   const { byUid } = useTeam(enabled);
-  const { mine } = useChainRequests(chain, enabled);
+  const { mine, settled } = useChainRequests(chain, enabled);
   const [busy, setBusy] = useState(false);
 
   if (!chain || !profile) return null;
@@ -119,9 +119,20 @@ export function AskToBeAdded({ chain, approvers, enabled = true }: AskToBeAddedP
     );
   }
 
+  /*
+   * Not pressable until the list has answered whether the reader is already
+   * on it. The row is write-once for its asker — the rules refuse a second
+   * write — so a press that lands before the first snapshot would be refused
+   * as a failure for an ask that already exists.
+   */
   return (
     <div className="pt-3">
-      <Button variant="secondary" loading={busy} onClick={() => void press()}>
+      <Button
+        variant="secondary"
+        loading={busy}
+        disabled={!settled}
+        onClick={() => void press()}
+      >
         {t('askToBeAdded')}
       </Button>
     </div>

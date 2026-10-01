@@ -62,7 +62,9 @@ export type FamilyDigits = ReadonlyMap<string, ReadonlySet<string>>;
 export function buildFamilyDigits(last4Index: Readonly<Record<string, string[]>>): FamilyDigits {
   const byStudent = new Map<string, Set<string>>();
   for (const [digits, ids] of Object.entries(last4Index)) {
-    if (!Array.isArray(ids)) continue;
+    // An empty key is nobody's number, and a bucket under it would make every
+    // child who gave no digits each other's family.
+    if (!Array.isArray(ids) || digits === '') continue;
     for (const id of ids) {
       const held = byStudent.get(id);
       if (held) held.add(digits);
