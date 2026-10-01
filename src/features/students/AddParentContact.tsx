@@ -30,7 +30,8 @@ import { useState, type FormEvent } from 'react';
 import { Button, PhoneField, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { pcoPersonUrl } from '@/lib/planningCenter';
-import { cn, initials } from '@/lib/utils';
+import { initials } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { addParent, setParentContact, type ExistingPerson } from '@/services/functions';
 import {
   backendLabelOf,

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 export function Spinner({ className, label }: { className?: string; label?: string }) {
   const t = useTranslations('Common');

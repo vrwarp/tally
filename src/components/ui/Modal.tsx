@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { swallowTrailingClick, type Press } from '@/components/ui/trailingClick';
 import { useTranslations } from 'use-intl';
 

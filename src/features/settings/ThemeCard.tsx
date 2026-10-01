@@ -14,7 +14,7 @@
 import { Card, CardHeader } from '@/components/ui';
 import { useTheme } from '@/context/themeContext';
 import { THEME_PREFERENCES, type ThemePreference } from '@/lib/theme';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useTranslations } from 'use-intl';
 
 const LABEL = {

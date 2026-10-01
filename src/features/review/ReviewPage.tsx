@@ -53,7 +53,8 @@ import {
 import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { checkAllergyNote, checkName, checkPhone } from '@/lib/registrationFields';
-import { cn, formatPhoneInput, initials } from '@/lib/utils';
+import { formatPhoneInput, initials } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeDescription, gradeSentence, type GradeStrings } from '@/lib/grades';
 import {
   amendRegistration,

@@ -33,7 +33,7 @@ import { PageFrame } from '@/components/PageFrame';
 import { useAuth } from '@/context/authContext';
 import { useToast } from '@/context/toastContext';
 import { useNow } from '@/hooks/useNow';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { KIOSK_NAME_MAX, kioskName } from '@/lib/kioskName';
 import {
   approveKioskPairing,

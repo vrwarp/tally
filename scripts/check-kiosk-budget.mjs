@@ -16,7 +16,9 @@
  *      src/kiosk/ would quietly undo that. The same test is run three times
  *      more, for the libraries the kiosk is deliberately handed the *answers*
  *      from rather than the code: the colour maths, the icon catalogue, and
- *      the ICU parser.
+ *      the ICU parser. And once more for two of the main app's own libraries,
+ *      the router and tailwind-merge, which reached the kiosk through how the
+ *      build was chunked rather than through anything it imports.
  *   2. The gzipped total of the reachable graph stays under the budget, and
  *      the *first-paint* subset (the statically referenced chunks) under its
  *      own smaller one.
@@ -239,6 +241,61 @@ if (withParser.length > 0) {
       'raising this budget.',
   );
   process.exit(1);
+}
+
+/*
+ * The main app's own libraries must never reach the kiosk, and these two got
+ * there without a single import from src/kiosk/.
+ *
+ * react-router is the main app's router; tailwind-merge is what its `cn()`
+ * settles conflicting classes with. The kiosk has no routes and joins its
+ * classes with template literals, yet both were on its first paint, about
+ * 21 kB gzipped between them, because of how the build was chunked:
+ *
+ * - The `react` group in vite.config.ts named the router alongside React, so
+ *   the chunk the kiosk needs for React carried the router as well. A router
+ *   group of its own is only half the fix: it sweeps in Vite's dynamic-import
+ *   helper, which the kiosk needs for every `import()` it makes, unless the
+ *   `vite-preload` group claims that helper first.
+ * - `cn` lived in src/lib/utils.ts beside the search and sort helpers the kiosk
+ *   does use, so the chunk holding them held tailwind-merge. It is in
+ *   src/lib/cn.ts now.
+ *
+ * Both regressions are invisible from src/kiosk/ and both come back quietly: a
+ * reordered or deleted chunk group, or a helper that imports tailwind-merge
+ * added to a module the kiosk shares. Matched on literals for the reason the
+ * guards above give: a minifier renames every identifier and no string. Two
+ * for each library, in case tree-shaking ever drops one.
+ */
+const MAIN_APP_LIBRARIES = [
+  {
+    name: 'react-router',
+    pattern: /__reactRouterVersion|useNavigate\(\) may be used only/,
+    fix:
+      'The kiosk has no routes, so the usual cause is a chunk group rather than an import: ' +
+      'check that the `react` group in vite.config.ts does not name react-router, and that ' +
+      'the `vite-preload` group still claims Vite\'s preload helper ahead of the router\'s group.',
+  },
+  {
+    name: 'tailwind-merge',
+    pattern: /fvn-slashed-zero|touch-pz/,
+    fix:
+      'Something the kiosk loads imports `cn` from src/lib/cn.ts, or tailwind-merge directly. ' +
+      'The kiosk joins class names with template literals; a module both apps share must ' +
+      'not import tailwind-merge at all.',
+  },
+];
+
+for (const library of MAIN_APP_LIBRARIES) {
+  const carriers = [...reachable].filter((name) =>
+    library.pattern.test(readFileSync(join(DIST, `assets/${name}`), 'utf8')),
+  );
+  if (carriers.length > 0) {
+    console.error(
+      `The kiosk graph reaches ${library.name}: ${carriers.join(', ')}\n${library.fix}`,
+    );
+    process.exit(1);
+  }
 }
 
 /*

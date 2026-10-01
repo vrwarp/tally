@@ -56,7 +56,7 @@ import {
   nextSeriesOccurrence,
   startOfDay,
 } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { setEventStatus, type EventDraft } from '@/services/events';
 import type { EventSeries, TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';

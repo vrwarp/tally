@@ -31,7 +31,8 @@ import {
   toDateOnlyValue,
   type RecurrencePresetId,
 } from '@/lib/recurrence';
-import { cn, haptic } from '@/lib/utils';
+import { haptic } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { RecurrenceFrequency, RecurrenceRule } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useRecurrenceStrings } from '@/hooks/usePureStrings';

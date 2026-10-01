@@ -25,7 +25,7 @@ import { partitionBand } from '@/features/events/lockedChains';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
 import { usePastEvents } from '@/hooks/usePastEvents';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { TallyEvent } from '@/types';
 import { useLocale, useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';

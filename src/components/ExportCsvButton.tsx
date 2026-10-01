@@ -24,7 +24,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { Button, type ButtonProps } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useToast } from '@/context/toastContext';
 import { downloadCsv, downloadOpensInViewer } from '@/lib/download';
 

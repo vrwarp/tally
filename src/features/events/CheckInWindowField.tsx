@@ -10,7 +10,7 @@ import { TextField } from '@/components/ui';
 import {
   fromDateTimeLocalValue,
 } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useTimeFormats, type TimeFormats } from '@/hooks/useTimeFormats';
 import { useTranslations } from 'use-intl';
 

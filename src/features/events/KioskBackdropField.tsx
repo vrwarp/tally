@@ -37,7 +37,7 @@ import {
 } from '@/lib/backdropImage';
 import { DEFAULT_KIOSK_THEME, type KioskTheme } from '@/lib/kioskTheme';
 import { fetchKioskBackdrop, type StoredKioskBackdrop } from '@/services/kioskBackdrops';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { painted } from './kioskPreview';
 import { useLocale, useTranslations } from 'use-intl';
 

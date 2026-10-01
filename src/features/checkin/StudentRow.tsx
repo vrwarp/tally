@@ -21,7 +21,8 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { WarningBadge } from '@/components/ui';
-import { cn, initials, sameItems } from '@/lib/utils';
+import { initials, sameItems } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeLabel, gradeSentence } from '@/lib/grades';
 import { studentFullName, type RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';

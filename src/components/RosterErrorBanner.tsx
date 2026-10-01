@@ -20,7 +20,7 @@ import { PlanningCenterErrorDetails } from '@/components/PlanningCenterErrorDeta
 import { Button, ErrorBanner } from '@/components/ui';
 import { useData } from '@/context/dataContext';
 import { useLocale, useTranslations } from 'use-intl';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 export interface RosterErrorBannerProps {
   className?: string;

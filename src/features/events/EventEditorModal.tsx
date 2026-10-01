@@ -54,7 +54,7 @@ import {
   validateRecurrence,
   type RecurrenceProblem,
 } from '@/lib/recurrence';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { addMinutes, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/time';
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import { putKioskBackdrop } from '@/services/kioskBackdrops';

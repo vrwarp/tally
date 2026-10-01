@@ -6,7 +6,7 @@ import { useAuth, useCanSee, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { useKioskParkedCount } from '@/hooks/useKioskParkedCount';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { Button, ErrorBanner } from '@/components/ui';
 

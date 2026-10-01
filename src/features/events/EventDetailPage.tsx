@@ -62,7 +62,7 @@ import { describeRecurrence } from '@/lib/recurrence';
 import {
   isCheckInOpen,
 } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { gradeLabel } from '@/lib/grades';
 import { ensureMaterialized, setEventStatus } from '@/services/events';
 import { studentFullName } from '@/types';

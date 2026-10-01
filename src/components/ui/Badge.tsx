@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { WARNING_META } from '@/components/ui/warnings';
 import type { RosterWarning } from '@/types';
 

@@ -41,7 +41,7 @@ import {
   type LabelLine,
   type LabelTemplate,
 } from '@/lib/labelTemplate';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { labelBoxFor } from '@/lib/labelRender';
 import { LabelPreview } from '@/features/events/LabelPreview';
 import {

@@ -13,7 +13,7 @@ import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import { buildRoster } from '@/features/roster/predictiveRoster';
 import { computeMia } from '@/features/dashboard/insights';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { AppSettings, TallyEvent } from '@/types';
 import { useTranslations } from 'use-intl';
 

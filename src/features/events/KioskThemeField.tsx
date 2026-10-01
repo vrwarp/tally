@@ -26,7 +26,7 @@ import {
   type KioskHue,
   type KioskTheme,
 } from '@/lib/kioskTheme';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { painted } from './kioskPreview';
 import { useTranslations } from 'use-intl';
 

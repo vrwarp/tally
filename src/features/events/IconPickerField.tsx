@@ -17,7 +17,7 @@ import { EventIcon } from '@/components/ui/EventIcon';
 import { TextField } from '@/components/ui';
 import { findEventIcon, type EventIconDef } from '@/lib/eventIcons';
 import { searchEventIcons } from '@/lib/eventIconSearch';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { useTranslations } from 'use-intl';
 
 export interface IconPickerFieldProps {

@@ -88,7 +88,7 @@ import { useChainRequests } from '@/features/events/useAccessRequests';
 import { fullName, useTeam } from '@/features/events/useTeam';
 import { chainKey } from '@/lib/materialize';
 import { isPermissionDenied } from '@/lib/permissionDenied';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import { recentChainInstances } from '@/lib/time';
 import {
   addChainMembers,

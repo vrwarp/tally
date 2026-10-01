@@ -12,7 +12,7 @@
 import { useMemo } from 'react';
 import { Card, CardHeader, EmptyState } from '@/components/ui';
 import { computeAttendanceTrend } from '@/features/dashboard/insights';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { EventAttendanceSnapshot } from '@/types';
 import { useTranslations } from 'use-intl';
 import { useTimeFormats } from '@/hooks/useTimeFormats';

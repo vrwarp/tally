@@ -30,7 +30,7 @@
  */
 import type { ReactNode } from 'react';
 import { pageFrameWidth, type PageFrameWidthOptions } from '@/components/pageFrameWidth';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 
 export interface PageFrameProps extends PageFrameWidthOptions {
   /** Gap between the page's own top-level blocks. */

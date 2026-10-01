@@ -22,7 +22,7 @@
  */
 import { memo, useCallback, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { StudentRow, type StudentRowMode } from '@/features/checkin/StudentRow';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/cn';
 import type { RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';
 
