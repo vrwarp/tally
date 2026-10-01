@@ -9,7 +9,8 @@
  *   the card stays, marked with who let it go and when.
  * - **Record** — for a card whose reason has since gone: the child's record
  *   upstream was missing (`frozen`) and has been put back, or a pickup that was
- *   parked because its arrival was. It lands through `landOne`, the path the
+ *   parked because its arrival was — or had not come, when that arrival is
+ *   now the card beside it. It lands through `landOne`, the path the
  *   kiosk's own upload takes, with the tap's time and the kiosk as its witness,
  *   so the earlier-wins rule and the time bounds hold exactly as they would
  *   have on the Sunday.
@@ -156,7 +157,14 @@ export async function runSettleParked(args: {
     return { status: 'settled' };
   }
 
-  if (!cards.every((each) => isRecordable(each.reason) && each.tappedAtMs !== null && each.deviceId)) {
+  // A pickup parked as one whose arrival never came has something to close
+  // after all when the arrival is the card beside it — it reached Tally later,
+  // from another tablet. Landed behind the arrival, `landOne` finds it on the
+  // register and records the pickup as it would have on the Sunday.
+  const hasArrival = cards.some((each) => each.kind === 'check-in');
+  const recordable = (each: Card) =>
+    isRecordable(each.reason) || (each.kind === 'check-out' && each.reason === 'no-arrival' && hasArrival);
+  if (!cards.every((each) => recordable(each) && each.tappedAtMs !== null && each.deviceId)) {
     return { status: 'cannot-record' };
   }
   const student = await standingStudent(db, card.studentId);

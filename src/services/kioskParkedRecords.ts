@@ -188,17 +188,22 @@ export function standingStudent(
 /**
  * What a card can be answered with now: `record` once its reason has gone —
  * a frozen child's record put back — or only `let-go`. A card whose reason
- * could never be recorded (a deleted gathering, an arrival that never came)
- * is `let-go` for good; a frozen one still frozen is `frozen`, so the screen
- * can say what would change that. Over Tally's own student documents, as
- * `standingStudent` is.
+ * could never be recorded (a deleted gathering, a pickup alone whose arrival
+ * never came) is `let-go` for good; a frozen one still frozen is `frozen`, so
+ * the screen can say what would change that. Over Tally's own student
+ * documents, as `standingStudent` is.
  */
 export function cardAnswer(
   card: ParkedCard,
   documentsById: ReadonlyMap<string, Student>,
 ): 'record' | 'frozen' | 'let-go' {
   const records = [card.arrival, card.pickup].filter((each): each is KioskParkedRecord => each !== null);
-  if (!records.every((each) => isRecordable(each.reason))) return 'let-go';
+  // A pickup parked as one whose arrival never came has something to close
+  // after all when the arrival is on this card: the server lands it behind
+  // the arrival.
+  const recordable = (each: KioskParkedRecord) =>
+    isRecordable(each.reason) || (each.kind === 'check-out' && each.reason === 'no-arrival' && card.arrival !== null);
+  if (!records.every(recordable)) return 'let-go';
   // A pickup parked with its arrival, whose arrival was decided on its own:
   // there is nothing left for it to close.
   const lonePickup = card.arrival === null ? card.pickup : null;
