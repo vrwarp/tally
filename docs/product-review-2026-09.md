@@ -24,31 +24,35 @@ kiosk that outlasts an outage. It has been in production for one church since 12
 
 **The verdict.** The product does not need more features to be good at its job. What it needs next
 is (1) a short list of safety and correctness fixes that the audits found underneath the polish, (2)
-an operational floor — monitoring, backups, a protected `main`, previews kept off production data,
-and a second person who holds the keys — that a system holding minors' data and deploying 52 times
-a month does not yet have, and (3) a handful of product additions that the personas would actually
-use, of which pickup verification on check-out gatherings is the one with a safeguarding argument
-behind it. Tally serves one church, by decision, and the recommendations are sized to that: nothing
-here builds for a second deployment.
+an operational floor — monitoring, alerting, backups, a tag per deploy, scheduled retention sweeps
+— that a system holding minors' data and deploying 52 times a month does not yet have, and (3) a
+handful of product additions that the personas would actually use, of which pickup verification on
+check-out gatherings is the one with a safeguarding argument behind it. Tally serves one church, by
+decision, and the recommendations are sized to that: nothing here builds for a second deployment.
 
 **Top ten recommendations, in order.**
 
 | # | Recommendation | Why first | Effort |
 |---|---|---|---|
-| 1 | Protect `main`, chain both deploy workflows to CI, and require a reviewer on the `production` environment | Today hosting deploys ~60 s after any push to `main` with no tests, and the branch is unprotected (verified on GitHub) | S |
-| 2 | Fix the three kiosk faults that can strand a lobby: the uncaught registration-chunk import, the bind-time read-before-standing race, and the missing deadline on `registerFamily` | Each turns an ordinary Sunday event (a deploy, a re-bind, a Wi-Fi drop) into a stuck screen or a wrong verb | S |
-| 3 | Close the three authorization gaps: client-chosen `invitedBy`, kiosk callables that ignore `boundChain`, and counselor-level kiosk pairing | The documented model ("a kiosk's reach is its room"; restriction fences a register of minors) is not what the callable path enforces | S–M |
-| 4 | Add error reporting, alerting on scheduled jobs and callable error rates, Firestore backups with a restore runbook, and a changelog/tag per deploy | Nothing today tells anyone that Sunday broke, and there is no recovery path from a bad backfill or rules change | M |
-| 5 | Keep PR previews off production: point them at a small seeded preview project, or turn the preview channels off | Unmerged code and unmerged rules run against live minors' data on every pull request | S–M |
-| 6 | Make the registration sweep clear the review hold, claim-before-create in `pushStudent`, and add a scheduled retry for failed visitor pushes | Families can be silently stranded after 30 days; concurrent pushes create duplicate people in a database with no delete | S |
-| 7 | Pickup verification on check-out gatherings, in the shape all four consultants converged on: a per-arrival code on the first sticker and a names-free parent receipt, compared by eye at the room door, with the room volunteer's Out becoming the pickup of record (§6.2, P1) | The one control on the kiosk that touches custody is a single unverified tap, and today the lobby tap outranks the volunteer's actual handover | M–L |
+| 1 | Fix the three kiosk faults that can strand a lobby: the uncaught registration-chunk import, the bind-time read-before-standing race, and the missing deadline on `registerFamily` | Each turns an ordinary Sunday event (a deploy, a re-bind, a Wi-Fi drop) into a stuck screen or a wrong verb | S |
+| 2 | Close the three authorization gaps: client-chosen `invitedBy`, kiosk callables that ignore `boundChain`, and counselor-level kiosk pairing | The documented model ("a kiosk's reach is its room"; restriction fences a register of minors) is not what the callable path enforces | S–M |
+| 3 | Add error reporting, alerting on scheduled jobs and callable error rates, Firestore backups with a restore runbook, and a changelog/tag per deploy | Nothing today tells anyone that Sunday broke, and there is no recovery path from a bad backfill or rules change | M |
+| 4 | Make the registration sweep clear the review hold, claim-before-create in `pushStudent`, and add a scheduled retry for failed visitor pushes | Families can be silently stranded after 30 days; concurrent pushes create duplicate people in a database with no delete | S |
+| 5 | Pre-service readiness: split "no label template" from "no printer" on the staff screen, push a gathering's edits to a bound kiosk through the pulse, and a card readable at 8:40 (§6.2, P6) | Every consultant ranked it first or second; today the one staff sentence that could catch the no-sticker morning sends the volunteer to fix the wrong thing | M |
+| 6 | Pickup verification on check-out gatherings, in the shape all four consultants converged on: a per-arrival code on the first sticker and a names-free parent receipt, compared by eye at the room door, with the room volunteer's Out becoming the pickup of record (§6.2, P1) | The one control on the kiosk that touches custody is a single unverified tap, and today the lobby tap outranks the volunteer's actual handover | M–L |
+| 7 | A saving indicator at the counselor's door, worded as the action that saves the taps (§6.2, P11) | Unacknowledged check-ins and door quick-adds live only in the tab and come back as false missing-in-action calls | S |
 | 8 | Split `KioskApp.tsx` (3,656 lines) and `ReviewPage.tsx` (2,399) along the seams the audits name; bring `src/kiosk/services.ts` and the invite screens under unit and mutation cover | The largest untested surfaces are the ones a Sunday depends on | M |
-| 9 | Bilingual human review of the kiosk slice (358 keys) and the 22 hard-coded English strings; pay the contrast debt | The Chinese congregation was the reason for i18n, and their strings are ~11 % reviewed | M |
+| 9 | Extract the 22 hard-coded English strings, fix the five catalogue defects, backfill the context notes the translation pipeline relies on, and pay the contrast debt; the LLM review of the catalogues continues as the owner prefers | The Chinese and Spanish congregations meet these strings at the glass, and the pipeline's own thesis is that context notes decide draft quality | M |
 | 10 | Fix the stale status banners and drift the docs audit lists (Appendix B), and add a "what is not yet built" ledger that CI can check | The docs are the product's memory and the only place a second maintainer can start | S |
 
-**Decisions the owner should make** (§7): who besides the owner holds the keys; ChromeOS versus
-Android for the shelf tablet; whether the four refusals worth revisiting (§6.4) still hold; who
-reviews the translations; how much of the delivery gate to enforce.
+**Accepted by the owner on 1 October 2026, and therefore parked (§6.5):** the current delivery gate
+(an unprotected `main`, deploys that do not wait for CI, PR previews on the production project), the
+single keyholder, and a human bilingual pass over the translations. The findings behind them stand
+in §4; the exposures they leave open are listed in §6.5 so the acceptance is an informed one.
+
+**Decisions, answered by the owner on 1 October 2026** (§7): one church; one keyholder for now;
+Android for the shelf; the four refusals get a second look, not a reversal; LLM review of the
+translations continues; the current delivery gate stays.
 
 ---
 
@@ -418,11 +422,12 @@ documented; rules are re-tested inside the deploy job; byte budgets fail the bui
 1. ◆ **The gate is advisory.** GitHub reports `main` as unprotected. `firebase-hosting-merge.yml`
    deploys ~60 s after any push to `main` with no tests; `firebase-backend.yml` runs rules and
    functions tests but not the e2e matrix; neither waits for `ci.yml`. The `production` environment
-   has no required reviewers. The "one required status check" in `docs/ci.md` is an intention.
+   has no required reviewers. The "one required status check" in `docs/ci.md` is an intention. The
+   owner has accepted this posture for now (§6.5).
 2. **PR previews run against production.** Previews are built with the production
    `VITE_FIREBASE_CONFIG` and their hosts are authorized on production Auth
    (`firebase-hosting-pull-request.yml`); the PR's own rules are not deployed to them. Live minors'
-   data sits behind unmerged UI running against old rules.
+   data sits behind unmerged UI running against old rules. Accepted for now by the owner (§6.5).
 3. **The weekly mutation run was red for two weeks** (21 and 28 Sep, aborted at the dry run); the fix
    merged 29 Sep is unverified until 5 Oct. Nothing notifies anyone when a scheduled run fails.
 4. **CI cost and timing claims.** ~60 runner-minutes per PR (each browser 13–16 min) plus a mutation
@@ -522,7 +527,7 @@ tap, strand a family, or widen a fence.
 
 | # | Change | Where | Effort |
 |---|---|---|---|
-| N1 | Protect `main` (require the `CI` check and a linear history); gate both deploy workflows on `ci.yml` success via `workflow_run`; add required reviewers to the `production` environment | GitHub settings; `.github/workflows/firebase-*.yml` | S |
+| N1 | *Parked by the owner (§6.5):* protecting `main`, gating the deploy workflows on CI, required reviewers on `production` | — | — |
 | N2 | Catch the registration and printing chunk imports; prefetch registration behind the services chunk as `CheckInsScreen` does; on failure route to "see a leader" and clear `registering` | `src/kiosk/KioskApp.tsx:1183-1191, 1104` | S |
 | N3 | Await the standing report before the first register read, or retry once on `permission-denied`; fix the comment; add a bind-to-new-chain test | `KioskApp.tsx:1532-1537` | S |
 | N4 | Give `registerFamily` a deadline and gate the early print on "last successful contact < 30 s" | `src/kiosk/services.ts:898`, `KioskApp.tsx:2790` | S |
@@ -552,12 +557,12 @@ Pi-3 throttle with the journal write in place; the tablet-management Phase 0 fie
 |---|---|---|---|
 | O1 | Error reporting: a frontend sink (Sentry, or a `clientErrors` collection fed by `ErrorBoundary` and global handlers, kiosk included) and Cloud Monitoring policies on callable error rate, scheduled-job failure, and the edit-queue backlog; a billing budget alert; an issue or email when the weekly mutation run fails | M | The first visibility into a broken Sunday that does not depend on a volunteer phoning |
 | O2 | Firestore point-in-time recovery plus a daily scheduled export to a bucket, with a written restore runbook | S config / M runbook | The only recovery path from a bad backfill, a rules mistake or a deleted gathering |
-| O3 | Keep PR previews off production: a small `tally-preview` project seeded from `scripts/seed.ts`, with the PR's own rules deployed to it; or turn the preview workflow off and review with the emulator and the walkthrough captures the repo already has | S–M | Removes real minors' data from every unmerged code path without a second environment to maintain |
+| O3 | *Parked by the owner (§6.5):* keeping PR previews off production, with a small seeded preview project or by turning the preview workflow off | — | — |
 | O4 | Release identity: tag each merge deploy from the workflow, generate a changelog from PR titles, document `hosting:rollback` and functions redeploy-from-tag, record which backfills ran on production | S | "What is live" and "go back" become answerable |
 | O5 | Security headers (CSP with `frame-ancestors 'none'`, `Referrer-Policy`, `X-Content-Type-Options`), a referrer-restricted browser API key and SHA-pinned actions now; App Check and Workload Identity Federation only if wanted — for one church with one deployer, keys rotated on a calendar and a kiosk without a reCAPTCHA dependency are reasonable | S–M | Baseline web hygiene without new moving parts |
 | O6 | Trim PR CI: `paths-ignore` for `docs/**` and `uxr/**`; two browsers on PR, four on merge and nightly; replace data-dependent `test.skip`s with fixture guarantees; write the five `it.todo`s | S–M | Halves ~60 runner-minutes per PR without losing WebKit |
 | O7 | Closed key sets on `students`, `attendance`, `events`, `users`; a shape check on `eventSeries`; the missing negative rules tests (§4.3); core-only or cooldown-gated index rebuilds | S | Makes the data-minimisation promise enforceable rather than descriptive |
-| O8 | A keys-and-handover runbook — who holds Firebase owner and GitHub admin, where each secret lives and how to rotate it, how to change `TALLY_ADMIN_EMAILS`, how to redeploy from a tag, how to restore a backup, how to re-pair a kiosk — and a second person who actually holds that access | S | A church that can run Tally on the Sunday its maintainer is away; the single largest risk no code change reduces |
+| O8 | *Parked by the owner (§6.5), "fine for now":* a keys-and-handover runbook and a second person who holds the access | — | — |
 
 ### 6.2 Product features
 
@@ -597,7 +602,7 @@ and P2's corner-mark fix belong together.
 | C5 | Head counts via `getCountFromServer`; split the data context from the roster-status context; a main-app gzip budget in `check-kiosk-budget.mjs`; an in-memory journal index on the kiosk | S–M | ~40× fewer billed reads per calendar row; no app-wide re-render every ten minutes; scale headroom |
 | C6 | One `useStableList`, one `useInFlightGuard`, one `describeCallableError`; dedupe `dialable`/`formatPhone`/`DAY_MS`; un-export the dead symbols; move Firebase Auth I/O into `services/auth.ts` | S | Five patterns become one; the layering rule becomes true |
 | C7 | `recommendedTypeChecked` + `no-floating-promises`; pin `noUncheckedIndexedAccess`; a JSX-literal lint scoped to non-test files; `@axe-core/playwright` on check-in, students, review and kiosk search with a violation budget | S | The classes of bug the audits found by hand become CI failures |
-| C8 | Backfill `context` notes on the 1,934 keys lacking them (Errors, CheckIn and the kiosk first); bilingual human review of the kiosk slice, then Review and Team; per-script lints for quotes and banned terms; fold the 30 fragment keys into whole ICU sentences; replace `{error}` interpolation with `Errors.*` codes | M | The strings the Chinese and Spanish congregations meet at the glass are read by a person before they are trusted |
+| C8 | Backfill `context` notes on the 1,934 keys lacking them (Errors, CheckIn and the kiosk first), which the pipeline says is what decides draft quality; per-script lints for quotes and banned terms; fold the 30 fragment keys into whole ICU sentences; replace `{error}` interpolation with `Errors.*` codes. The LLM review of the catalogues continues as the owner prefers; a human bilingual pass over the 358 kiosk keys stays available if a reader ever reports a line that does not sound like the church | M | Better drafts from the same pipeline, and the reviewed-but-wrong case (a banned term marked reviewed) caught by a lint |
 | C9 | Pay the contrast debt (adopt the hexes proposed in `tokens.test.ts:346-357`, un-todo the assertions, sync the kiosk ramp); `aria-live` on the kiosk success and confirm screens; an `h1` per kiosk screen; a TalkBack/VoiceOver pass on the `pointerdown` keyboard; a documented staff-assisted fallback | M | AA where the app is read most, and an honest statement of what the kiosk cannot do for assistive tech |
 | C10 | Fix the cache-invalidation comments, or move to a Firestore roster-generation stamp that every function instance reads | M | The code says what it does, and roster staleness is bounded by a stamp rather than by the TTL alone |
 
@@ -616,44 +621,61 @@ Four of the product's refusals were right when made and are worth re-examining n
    the church's pastoral-care system, and Planning Center has one (Workflows). §6.2 P12 keeps
    "Tally stores no assignment" while removing the spreadsheet.
 
+### 6.5 Parked by the owner's decision, with the exposure each leaves open
+
+Answered on 1 October 2026 (§7). Each is recorded here rather than deleted, so the acceptance is
+informed and the item can be picked up later without re-deriving it.
+
+| Item | Decision | What stays open |
+|---|---|---|
+| N1 — protect `main`, chain deploys to CI, a reviewer on `production` | "What is current is fine" | A red merge still reaches hosting about a minute after the push; a bad ruleset still deploys on merge with only its own tests between it and the roster |
+| O3 — PR previews off the production project | "This is currently fine" | Every pull request still runs unmerged UI against live minors' data under the old rules, on a host authorized for sign-in |
+| O8 — a keys-and-handover runbook and a second keyholder | "Fine for now" | A Sunday on which the maintainer is unavailable has nobody who can redeploy, rotate a secret, change the pinned admin list, re-pair a kiosk or restore a backup |
+| The ChromeOS pricing in `docs/tablet-management.md` §7 | "Android" | Closed rather than parked: the shelf stays Android, so the Test DPC field trial (Phase 0) is the next step and ChromeOS is off the list |
+| A human bilingual review of the catalogues | "LLM review is currently OK" | The invented-fact failure `docs/i18n.md` §8.7 records is not visible to any test; the context-note backfill and the per-script lints in C8 are the mitigations that remain |
+
 ---
 
 ## 7. Decisions for the owner
 
-Settled on 1 October 2026: **Tally serves one church.** Everything in this review is sized to that.
-The single production project, the time-zone constant, the pinned admin list and the two-backend
-registry stay as they are; no staging environment, tenancy, day-one runbook or no-backend mode is
-recommended, and the README should say so in one line.
+Answered on 1 October 2026, in the deck's comment threads. **Tally serves one church.** Everything
+in this review is sized to that: the single production project, the time-zone constant, the pinned
+admin list and the two-backend registry stay as they are; no staging environment, tenancy, day-one
+runbook or no-backend mode is recommended, and the README should say so in one line.
 
-1. **Who else holds the keys?** One maintainer and one production project is the largest risk to a
-   Sunday that no code change reduces. Name a second person with Firebase owner, GitHub admin, the
-   secrets and the kiosk pairing role, and write the handover runbook (O8) they would follow.
-2. **ChromeOS or Android for the shelf.** `docs/tablet-management.md` §7 asks for this to be priced
-   before more Android tablets are bought; the Phase 0 field trial is the input and has not run.
-3. **The four refusals in §6.4.**
-4. **Who reviews the translations.** The pipeline can draft; only a bilingual member of the
-   congregation can say whether the kiosk idle line reads as the church's own voice.
-5. **How much of the delivery gate to enforce.** A protected `main` and deploys that wait for CI
-   cost little. A required reviewer on the `production` environment means the owner approving their
-   own backend deploys with one click: worth it for rules and functions, optional for hosting.
+1. **Who else holds the keys?** — *"Fine for now."* One maintainer on one production project is
+   accepted as the current posture. The handover runbook and the second keyholder (O8) are parked,
+   with the exposure recorded in §6.5.
+2. **ChromeOS or Android for the shelf?** — *"Android."* The pricing question is closed. The next
+   step is the Test DPC field trial `docs/tablet-management.md` calls Phase 0, on the church's own
+   tablet, and folding its answers back into that document and `docs/kiosk-printer-reliability.md`.
+3. **Which refusals to reopen?** — *"This is fine."* Read as accepting the review's treatment: a
+   second look, not a reversal, with the panel's shaped verdicts standing (P1 as (c)+(b), "Search
+   everyone" kept on the parent screen, leader attendance as attribution only, Workflows later). If
+   it meant "leave the refusals as they are", P1 is the one item that would change.
+4. **Who reviews the translations?** — *"LLM review is currently OK."* The pipeline's review
+   continues; the human bilingual pass is parked (§6.5), and C8 keeps the context-note backfill and
+   the per-script lints.
+5. **How much of the delivery gate to enforce?** — *"What is current is fine."* The current gate and
+   the production-backed previews stay; N1 and O3 are parked (§6.5).
 
 ---
 
 ## 8. A sequenced roadmap
 
-**Weeks 1–2.** N1–N15 (each a day or less); the four field validations; merge Dependabot. Ship as
-several small PRs, not one.
+**Weeks 1–2.** N2–N15 (each a day or less); the four field validations, the Test DPC trial on the
+Android tablet among them; merge Dependabot. Ship as several small PRs, not one.
 
-**Weeks 3–6.** O1, O2, O4, O7, O8 (the handover runbook and the second keyholder); C1 (the kiosk
-split, before any new kiosk feature); P6 in full and P3, then P11's indicator (§6.2); the
-corner-mark half of P2; start C8's kiosk-slice review.
+**Weeks 3–6.** O1, O2, O4, O7; C1 (the kiosk split, before any new kiosk feature); P6 in full and
+P3, then P11's indicator (§6.2); the corner-mark half of P2; start C8's context-note backfill.
 
-**Weeks 7–12.** P1 in its (c)+(b) shape, P7 with its tombstone, P4; O3 (previews off production);
-C2–C5; C9; the documentation restructure (§4.9: an operator's index, a status ledger, one home per
-fact).
+**Weeks 7–12.** P1 in its (c)+(b) shape, P7 with its tombstone, P4; C2–C5; C9; the documentation
+restructure (§4.9: an operator's index, a status ledger, one home per fact); the Phase 0 findings
+folded back into the tablet and printer docs.
 
 **After.** P5, P9, P10, P8's attribution line and the rest of P2 as the panel shaped them; P12
-only if the church adopts Workflows; C10.
+only if the church adopts Workflows; C10; and the parked items in §6.5 whenever the owner wants
+them.
 
 **Later still.** The Attendees simulator's fault model, if the church relies on that backend; the
 parked aging-out shapes (S3, S6) if the autumn cohort proves painful again; the counselor app's own
@@ -685,6 +707,8 @@ journal if P11's indicator shows how often taps are lost.
 - **Not done:** no test suite was run (no `node_modules` in the review container); no production
   data or console was inspected; the clone is shallow, so history before 5 September is inferred
   from the docs; bundle sizes are reasoned from configuration, not measured.
+- **Owner decisions:** answered in the deck's comment threads on 1 October 2026 and reflected in
+  §6.5 and §7; the one ambiguous answer (decision 3) is read the way §7 says, and flagged.
 - **Persona consultation:** the twelve proposals in §6.2 were put to the repo's own
   `parent-consultant`, `newcomer-consultant`, `church-staff-consultant` and `uxr-journey-critic`
   agents with the brief reproduced in Appendix D.
