@@ -205,9 +205,10 @@ export function isRunnable(edit: EditRecord, nowMs: number): boolean {
  *
  * `create` is the whole mechanism: the admin SDK rejects rather than
  * overwriting, so two workers racing for one child produce exactly one winner
- * with no transaction. An expired lease is broken and re-taken once — and if
- * that second `create` also loses, the other worker won fairly and this one
- * simply leaves.
+ * with no transaction. An expired lease is broken and re-taken inside one, so
+ * that it is only replaced if it is still the dead lease that was read: two
+ * workers breaking the same one used to be able to both come away holding it,
+ * the second's delete-and-create landing on top of the first's live lease.
  */
 export async function claimStudent(
   db: FirestoreLike,
@@ -222,14 +223,16 @@ export async function claimStudent(
     await ref.create(lease);
     return true;
   } catch {
-    const held = await ref.get();
-    const until = held.exists ? millis(held.data()?.untilMs) : null;
-    if (until !== null && until > nowMs) return false;
-    await ref.delete();
     try {
-      await ref.create(lease);
-      return true;
+      return await db.runTransaction(async (tx) => {
+        const held = await tx.get(ref);
+        const until = held.exists ? millis(held.data()?.untilMs) : null;
+        if (until !== null && until > nowMs) return false;
+        tx.set(ref, lease);
+        return true;
+      });
     } catch {
+      // Too much contention is the other worker winning; leave as before.
       return false;
     }
   }

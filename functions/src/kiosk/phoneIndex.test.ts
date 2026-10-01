@@ -91,6 +91,26 @@ describe('buildPhoneIndex', () => {
     ]);
   });
 
+  it('files a child who has a membership document and a linked visitor under both', async () => {
+    // The roster joins show this child under `pco_p-77` — the membership
+    // wins — so digits filed only under the visitor's id matched a row the
+    // kiosk did not have, and the family could not find the child by phone.
+    const db = new FakeFirestore();
+    db.seed('students/pco_p-77', { status: 'active', pcoPersonId: 'p-77' });
+    db.seed('students/tally-visitor-7', {
+      status: 'active',
+      upstreamBackend: 'pco',
+      upstreamPersonId: 'p-77',
+    });
+
+    const registry = registryOf([backendWith('pco', { 'p-77': ['4242'] })]);
+    await buildPhoneIndex(db, registry, { builtBy: 'test', now: NOW });
+
+    expect(
+      [...(db.get(PHONE_INDEX_DOC)!.last4 as Record<string, string[]>)['4242']!].sort(),
+    ).toEqual(['pco_p-77', 'tally-visitor-7']);
+  });
+
   it('skips inactive students and backends without a collector', async () => {
     const db = new FakeFirestore();
     db.seed('students/pco_1', { status: 'active' });

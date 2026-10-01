@@ -38,6 +38,16 @@ export class FakeFirestore implements FirestoreLike {
   readonly data = new Map<string, Record<string, unknown>>();
   readonly writes: Array<{ path: string; data: Record<string, unknown> }> = [];
   private autoId = 0;
+  /**
+   * How many times each path has been written, deleted included. What a
+   * transaction's reads are checked against when it commits — see
+   * `runTransaction`.
+   */
+  private readonly versions = new Map<string, number>();
+
+  private touched(path: string): void {
+    this.versions.set(path, (this.versions.get(path) ?? 0) + 1);
+  }
 
   seed(path: string, value: Record<string, unknown>): void {
     this.data.set(path, value);
@@ -95,6 +105,7 @@ export class FakeFirestore implements FirestoreLike {
       merge ? FakeFirestore.merged(this.data.get(path) ?? {}, value) : { ...value },
     );
     this.writes.push({ path, data: value });
+    this.touched(path);
   }
 
   private ref(path: string): DocumentRefLike {
@@ -117,6 +128,7 @@ export class FakeFirestore implements FirestoreLike {
       delete: async () => {
         this.data.delete(path);
         this.writes.push({ path, data: { deleted: true } });
+        this.touched(path);
       },
     };
   }
@@ -143,12 +155,30 @@ export class FakeFirestore implements FirestoreLike {
    * caller relies on. There is no contention here to retry, so the callback
    * runs once.
    */
+  /**
+   * Optimistic, like the real one: a transaction whose reads were overtaken by
+   * somebody else's write before it committed is run again from the top, so
+   * two workers racing for one document see each other. A test can hold one
+   * of them between its read and its write to stage exactly that.
+   */
   async runTransaction<T>(update: (transaction: TransactionLike) => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt += 1) {
+      const outcome = await this.attemptTransaction(update);
+      if (outcome.committed) return outcome.result;
+      if (attempt >= 4) throw new Error('ABORTED: too much contention on these documents.');
+    }
+  }
+
+  private async attemptTransaction<T>(
+    update: (transaction: TransactionLike) => Promise<T>,
+  ): Promise<{ committed: true; result: T } | { committed: false }> {
     const queued: Array<() => void> = [];
+    const read = new Map<string, number>();
     let wrote = false;
     const transaction: TransactionLike = {
       get: async (ref) => {
         if (wrote) throw new Error('Firestore transactions require all reads before all writes.');
+        read.set(ref.path, this.versions.get(ref.path) ?? 0);
         return this.snapshot(ref.path);
       },
       set: (ref, value, options) => {
@@ -164,8 +194,11 @@ export class FakeFirestore implements FirestoreLike {
       },
     };
     const result = await update(transaction);
+    for (const [path, version] of read) {
+      if ((this.versions.get(path) ?? 0) !== version) return { committed: false };
+    }
     for (const apply of queued) apply();
-    return result;
+    return { committed: true, result };
   }
 
   batch(): WriteBatchLike {

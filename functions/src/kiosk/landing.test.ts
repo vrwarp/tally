@@ -137,6 +137,29 @@ describe('an arrival', () => {
     expect(ms(child.lastAttendedAt)).toBe(START);
   });
 
+  it('lands a child the roster holds no surname for', async () => {
+    /*
+     * Both backends hand the kiosk `lastName: ''` for a person without one,
+     * and the kiosk copies the row onto the tap. The parser used to read a
+     * blank half as no name at all and park the arrival as unreadable: the
+     * parent saw the tick, the register never did, and every later tap for
+     * that child parked the same way.
+     */
+    const db = dbWithSunday();
+    const tap = START + 11 * MINUTE;
+    const result = await land(
+      db,
+      [checkIn(tap, { student: { ...student, lastName: '', searchName: 'ada' } })],
+      tap + MINUTE,
+    );
+
+    expect(result.outcomes).toEqual([{ id: `in-${tap}-aaaa`, outcome: 'landed' }]);
+    const child = db.get(`students/${ADA}`)!;
+    expect(child).toMatchObject({ firstName: 'Ada', searchName: 'ada' });
+    // Never a blank name on the document — the rules refuse one.
+    expect(child).not.toHaveProperty('lastName');
+  });
+
   it('is not a first visit for a child who has been before, and never moves their first visit', async () => {
     const db = dbWithSunday();
     const lastWeek = START - 7 * 24 * 60 * MINUTE;

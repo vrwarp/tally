@@ -7,6 +7,7 @@
  * without a network, an emulator or a Planning Center simulator.
  */
 import { describe, expect, it } from 'vitest';
+import type { TransactionLike } from './firestore.js';
 import { FakeFirestore } from './testing/fakeFirestore.js';
 import {
   BACKOFF_MS,
@@ -104,6 +105,50 @@ describe('the per-student lease', () => {
     const db = new FakeFirestore();
     db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'dead', untilMs: nowMs - 1 });
     expect(await claimStudent(db, 'pco_101', 'edit-2', nowMs)).toBe(true);
+  });
+
+  it('lets only one of two workers break the same dead lease', async () => {
+    /*
+     * The sweep and a browser's poke both find the lease a dead worker left,
+     * and both read it as expired within one round trip. Breaking it used to
+     * be a read, a delete and a create, so the second worker's delete took
+     * the first worker's fresh lease with it and both came away holding the
+     * child — the torn fold the lease exists to prevent.
+     */
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let gated = false;
+    class Staged extends FakeFirestore {
+      override runTransaction<T>(update: (tx: TransactionLike) => Promise<T>): Promise<T> {
+        return super.runTransaction((tx) =>
+          update({
+            ...tx,
+            // The first worker through is held between its read and its write.
+            get: async (ref) => {
+              const snapshot = await tx.get(ref);
+              if (!gated) {
+                gated = true;
+                await gate;
+              }
+              return snapshot;
+            },
+          }),
+        );
+      }
+    }
+    const db = new Staged();
+    db.seed(`${UPSTREAM_EDIT_LEASES}/pco_101`, { editId: 'dead', untilMs: nowMs - 1 });
+
+    const slow = claimStudent(db, 'pco_101', 'edit-slow', nowMs);
+    await Promise.resolve();
+    const quick = await claimStudent(db, 'pco_101', 'edit-quick', nowMs);
+    release();
+
+    expect(quick).toBe(true);
+    expect(await slow).toBe(false);
+    expect(db.get(`${UPSTREAM_EDIT_LEASES}/pco_101`)?.editId).toBe('edit-quick');
   });
 
   /**
