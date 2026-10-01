@@ -982,6 +982,61 @@ describe('reopening a question', () => {
     expect(second.rows.map((row) => row.state)).toEqual(['done', 'todo', 'todo']);
     expect(second.rows[1]!.resumeHere).toBe(true);
   });
+
+  /** One child's names answered, stopped on their grade with no chip pressed. */
+  function atAnUnansweredGrade(): RegistrationState {
+    const held = advance(typeText(start(), 'Robin'));
+    return advance(typeText(applyKey(held, { kind: 'clear' }), 'Fields'));
+  }
+
+  it('comes back to an unanswered grade still unanswered', () => {
+    /*
+     * `landOn` reads a landing on the grade step as the reopening of a question
+     * answered once already — which it is, from a tapped row, and is not when
+     * the grade is where the parent was stopped. A name fixed from there used
+     * to come back with the gathering's default in the readout and Next live,
+     * one press from filing a year nobody chose.
+     */
+    const held = atAnUnansweredGrade();
+    expect(held).toMatchObject({ step: 'child-grade', gradePicked: false });
+
+    const back = advance(
+      typeText(applyKey(reopen(held, 'child-first', 0), { kind: 'clear' }), 'Robyn'),
+    );
+
+    expect(back.draft.firstName).toBe('Robyn');
+    expect(back).toMatchObject({ step: 'child-grade', gradePicked: false });
+    expect(readoutFor(strings, back)).toBe('');
+    expect(canAdvance(back)).toBe(false);
+  });
+
+  it('is "never mind" on an unanswered grade too, and leaves it unanswered', () => {
+    const back = goBack(reopen(atAnUnansweredGrade(), 'child-last', 0))!;
+
+    expect(back).toMatchObject({ step: 'child-grade', gradePicked: false });
+    expect(canAdvance(back)).toBe(false);
+  });
+
+  it('keeps a later child’s grade unanswered when an earlier child’s is fixed from it', () => {
+    /*
+     * The row tapped is itself a grade here, so the reopened question opens as
+     * picked — rightly, that child answered it once — and what has to come
+     * back is the flag the run had before the tap, not the one the tapped
+     * question left behind.
+     */
+    let held = addChild(start(), 'Ada', 'Lovelace', 4 as Grade);
+    held = addGuardian(held, 'Dana', 'Rivera', '5550103344');
+    held = advance(typeText(addAnotherChild(held), 'Byron'));
+    held = advance(typeText(applyKey(held, { kind: 'clear' }), 'Lovelace'));
+    expect(held).toMatchObject({ step: 'child-grade', gradePicked: false });
+
+    const back = advance(chooseGrade(reopen(held, 'child-grade', 0), 7 as Grade));
+
+    expect(back.children[0]!.grade).toBe(7);
+    expect(back).toMatchObject({ step: 'child-grade', editing: null, gradePicked: false });
+    expect(readoutFor(strings, back)).toBe('');
+    expect(canAdvance(back)).toBe(false);
+  });
 });
 
 /**

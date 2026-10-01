@@ -139,8 +139,14 @@ export interface RegistrationState {
    * — ten digits typed and not yet committed — and coming back to an empty box
    * would lose work they can see on the screen, silently, for having noticed a
    * typo. Their own half-answer is not on any record to be read back off.
+   *
+   * And whether the grade had been picked, for the step that needs it: a row
+   * can be tapped from an unanswered grade question, and `landOn` reads every
+   * landing on that step as the reopening of a question answered once already.
+   * Taken off the run at the moment of the tap, because the tapped question may
+   * itself be a grade and overwrite the flag.
    */
-  resume: { step: StepKind; buffer: string } | null;
+  resume: { step: StepKind; buffer: string; gradePicked: boolean } | null;
   /** Minted once per run and re-sent on every retry — see the callable. */
   registrationId: string;
   /** Children whose three questions are answered. */
@@ -511,7 +517,11 @@ export function reopen(
     ...state,
     editing,
     // Their own half-answer travels with the place it was being given.
-    resume: state.resume ?? { step: state.step, buffer: state.buffer },
+    resume: state.resume ?? {
+      step: state.step,
+      buffer: state.buffer,
+      gradePicked: state.gradePicked,
+    },
   };
   return { ...moved, ...landOn(moved, step) };
 }
@@ -579,13 +589,16 @@ function commitAndMove(state: RegistrationState, value: string): RegistrationSta
    * in front of a queue, to fix one letter.
    */
   if (state.resume !== null) {
-    const { step, buffer } = state.resume;
+    const { step, buffer, gradePicked } = state.resume;
     const committed = { ...commitAnswer(state, value), editing: null, resume: null };
     return {
       ...committed,
       ...landOn(committed, step),
       buffer,
       shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
+      // The run's own answer, not `landOn`'s: that reads a grade step as
+      // answered once already, and the one being returned to may not be.
+      gradePicked,
     };
   }
 
@@ -1048,13 +1061,15 @@ export function goBack(state: RegistrationState): RegistrationState | null {
    * where they were rather than into the run behind the question they tapped.
    */
   if (state.resume !== null) {
-    const { step, buffer } = state.resume;
+    const { step, buffer, gradePicked } = state.resume;
     const cancelled = { ...state, editing: null, resume: null };
     return {
       ...cancelled,
       ...landOn(cancelled, step),
       buffer,
       shift: step === 'guardian-phone' ? 'off' : autoShiftAfter(buffer),
+      // As above: an unanswered grade stays unanswered on the way back.
+      gradePicked,
     };
   }
 

@@ -1320,6 +1320,11 @@ function recorder(): { bytes: number; pageCount: number }[] | null {
 const queue = createLabelQueue({
   raster: async (job) => {
     if (!config) throw new Error('No printer is configured.');
+    // Immediately before the read, and nothing in between: `printOwed`
+    // rasterises each of the batch in turn, and a lookup started here is in
+    // `allergyFor`'s hands before the next one can evict it. See
+    // `LabelJob.prepare`.
+    job.prepare?.();
     const allergy = await allergyFor(job.studentId);
     return rasterInWorker(
       config,
@@ -1553,10 +1558,13 @@ export function printOwedLabels(
 ): void {
   const template = binding.labelTemplate;
   if (!template) return;
-  const jobs = tags.map(({ student, atMs }) => {
-    startAllergyLookup(student, template);
-    return jobFor(grades, locale, student, binding, template, atMs);
-  });
+  const jobs = tags.map(({ student, atMs }) => ({
+    ...jobFor(grades, locale, student, binding, template, atMs),
+    // Not started here, where the live lane starts its own: the lookup cache
+    // holds eight, and nine of these at once evicted the first child's note
+    // before the first sticker was drawn. See `LabelJob.prepare`.
+    prepare: () => startAllergyLookup(student, template),
+  }));
   log.record('kiosk', 'owed-print', { count: jobs.length });
   queue.printOwed(jobs);
 }

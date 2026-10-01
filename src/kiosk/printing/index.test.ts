@@ -181,13 +181,6 @@ const queue = vi.hoisted(() => ({
   idle: vi.fn(async () => {}),
 }));
 
-vi.mock('@/kiosk/printing/queue', () => ({
-  createLabelQueue: (options: QueueOptions) => {
-    queue.options = options;
-    return queue;
-  },
-}));
-
 const allergy = vi.hoisted(() => ({
   note: undefined as string | undefined,
   started: [] as string[],
@@ -195,20 +188,39 @@ const allergy = vi.hoisted(() => ({
   forgotAll: 0,
 }));
 
-vi.mock('@/kiosk/printing/allergy', () => ({
-  ALLERGY_UNREAD: 'Allergy',
-  setAllergySource: vi.fn(),
-  allergyFor: async (studentId: string) => {
-    void studentId;
-    return allergy.note;
-  },
-  startAllergyLookup: (student: { id: string }) => allergy.started.push(student.id),
-  forgetAllergy: (studentId: string) => allergy.forgotten.push(studentId),
-  adoptAllergyNote: vi.fn(),
-  forgetAllergies: () => {
-    allergy.forgotAll += 1;
-  },
+/**
+ * The two stubs as factories, so one describe can lift them and put them back.
+ *
+ * `vi.mock` is file-wide. The batch cases under "the name tags this kiosk
+ * still owes" need the real queue and the real allergy module together,
+ * because what they check is a bound between the two that neither stub has —
+ * so they `doUnmock` these for the test and `doMock` them back after.
+ */
+const stubs = vi.hoisted(() => ({
+  queue: () => ({
+    createLabelQueue: (options: QueueOptions) => {
+      queue.options = options;
+      return queue;
+    },
+  }),
+  allergy: () => ({
+    ALLERGY_UNREAD: 'Allergy',
+    setAllergySource: vi.fn(),
+    allergyFor: async (studentId: string) => {
+      void studentId;
+      return allergy.note;
+    },
+    startAllergyLookup: (student: { id: string }) => allergy.started.push(student.id),
+    forgetAllergy: (studentId: string) => allergy.forgotten.push(studentId),
+    adoptAllergyNote: vi.fn(),
+    forgetAllergies: () => {
+      allergy.forgotAll += 1;
+    },
+  }),
 }));
+
+vi.mock('@/kiosk/printing/queue', () => stubs.queue());
+vi.mock('@/kiosk/printing/allergy', () => stubs.allergy());
 
 /* -------------------------------------------------------------------------- */
 
@@ -1574,6 +1586,108 @@ describe('the name tags this kiosk still owes', () => {
     printing.forgetGathering();
 
     expect(printing.owedLabels()).toEqual([]);
+  });
+
+  describe('what the batch says about an allergy', () => {
+    /*
+     * The real queue and the real allergy module, because the claim is about
+     * a bound between them. The lookup cache holds eight notes and evicts the
+     * oldest — sized for a family at the glass — and a batch is as long as
+     * the outage was: `docs/kiosk-owed.md` calls twelve tags ordinary. What
+     * is asserted is rule 4 of `allergy.ts`, read off what reaches the
+     * worker: a flagged child's sticker says the note, never nothing.
+     */
+    beforeEach(() => {
+      vi.doUnmock('@/kiosk/printing/queue');
+      vi.doUnmock('@/kiosk/printing/allergy');
+    });
+
+    afterEach(() => {
+      vi.doMock('@/kiosk/printing/queue', stubs.queue);
+      vi.doMock('@/kiosk/printing/allergy', stubs.allergy);
+    });
+
+    /** One of the batch, numbered so the note on the sticker says whose it is. */
+    function owedTag(index: number, hasAllergies: boolean) {
+      const student: KioskStudent = {
+        id: `pco_${index}`,
+        firstName: `Kid${index}`,
+        lastName: 'Lee',
+        grade: null,
+        searchName: `kid${index} lee`,
+        hasAllergies,
+      };
+      return { student, atMs: 1_700_000_000_000 + index };
+    }
+
+    /** What `{{allergy}}` was handed to the worker as, by first name. */
+    function allergyOnEachSticker(): Record<string, string | undefined> {
+      return Object.fromEntries(
+        worker.posted.map((request) => {
+          const { values } = request as { values: { firstName: string; allergy?: string } };
+          return [values.firstName, values.allergy];
+        }),
+      );
+    }
+
+    /** A printer that is up, and a source that answers with the child's own id in the note. */
+    async function printerWithNotes() {
+      configured();
+      usb.paired = [makeDevice()];
+      const printing = await load();
+      await printing.ready();
+      printing.setAllergySource(async (studentId) => `Peanuts (${studentId})`);
+      worker.reply = (request) => ({ id: request.id, ok: true, job: new Uint8Array(1), pageCount: 1 });
+      return printing;
+    }
+
+    it('prints every flagged child’s note, however long the batch', async () => {
+      /* Nine: one more than the cache holds. The first in the batch is the
+         child longest in the room, and the one whose note went missing when
+         every lookup was started before the batch was queued — the ninth
+         evicted the first before its sticker was drawn, and `allergyFor`
+         answered as if that child had never asked. */
+      const printing = await printerWithNotes();
+
+      printing.printOwedLabels(
+        grades,
+        'en',
+        binding(),
+        Array.from({ length: 9 }, (_, index) => owedTag(index, true)),
+      );
+      // Past the lookup's own wait, so a sticker that fell back to the bare
+      // word is told apart from one still being drawn.
+      await tick(5_000);
+
+      expect(worker.posted).toHaveLength(9);
+      expect(allergyOnEachSticker()).toEqual(
+        Object.fromEntries(
+          Array.from({ length: 9 }, (_, index) => [`Kid${index}`, `Peanuts (pco_${index})`]),
+        ),
+      );
+    });
+
+    it('keeps the one flagged child’s note through an ordinary outage of twelve', async () => {
+      /* A child with nothing on file takes a slot in the cache too, so one
+         flagged child at the head of a batch of twelve lost the note to
+         eleven children who never had one. */
+      const printing = await printerWithNotes();
+
+      printing.printOwedLabels(
+        grades,
+        'en',
+        binding(),
+        Array.from({ length: 12 }, (_, index) => owedTag(index, index === 0)),
+      );
+      await tick(5_000);
+
+      const stickers = allergyOnEachSticker();
+      expect(Object.keys(stickers)).toHaveLength(12);
+      expect(stickers.Kid0).toBe('Peanuts (pco_0)');
+      // The empty string, which `resolveLines` drops: a tidy label rather than
+      // one with a hole where a warning would go. See `startAllergyLookup`.
+      expect(stickers.Kid11).toBe('');
+    });
   });
 });
 

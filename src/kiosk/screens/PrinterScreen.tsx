@@ -108,6 +108,27 @@ function orderedModels(printing: KioskPrinting): string[] {
 }
 
 /**
+ * The rolls a model takes, or none if the tables refuse the model.
+ *
+ * `labelsForModel` throws on an identifier it does not carry, and a stored
+ * config can still name one — edited by hand, or written by a kiosk whose
+ * tables still had it; `readPrinterConfig` asks only for a non-empty string.
+ * Thrown from a render it took the whole kiosk down, on the one screen that
+ * lets somebody pick a model the tables do know. Same rule as `suggested` in
+ * printing/index.ts.
+ */
+function labelsFor(
+  printing: KioskPrinting,
+  model: string,
+): ReturnType<KioskPrinting['labelsForModel']> {
+  try {
+    return printing.labelsForModel(model);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * What a kiosk set up with a printer it cannot find is told to do.
  *
  * The Android sentence is there because on Android it is the whole story: a
@@ -489,11 +510,17 @@ export function PrinterScreen({
   const policyValue = webUsbPolicyJson(window.location.origin);
   const setupUrl = `${window.location.origin}/setup`;
 
-  const available = printing.labelsForModel(model);
+  const available = labelsFor(printing, model);
   // A model change can leave the stored media unprintable on the new head —
   // 102mm rolls only fit the QL-1xxx — so the list is the authority and the
   // first entry is the fallback.
   const labelIsAvailable = available.some((entry) => entry.identifier === label);
+  /**
+   * What the settings fold names as loaded, or nothing where the tables refused
+   * the model — the fold then says so, in the module's own words for that
+   * error, in the place the roll would have gone.
+   */
+  const summaryLabel = available.find((entry) => entry.identifier === label) ?? available[0];
 
   const apply = useCallback(
     async (next: PrinterConfig) => {
@@ -1197,9 +1224,7 @@ export function PrinterScreen({
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0 truncate">
                   {model} ·{' '}
-                  {printing.labelName(
-                    available.find((entry) => entry.identifier === label) ?? available[0],
-                  )}
+                  {summaryLabel ? printing.labelName(summaryLabel) : t('troubleNotFound')}
                 </span>
                 {/* Quieter than the summary in colour, not in size: this is the
                     affordance that opens the row, read at arm's length. */}

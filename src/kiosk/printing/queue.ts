@@ -64,6 +64,19 @@ export interface LabelJob {
    * rather than about a child.
    */
   owable?: boolean;
+  /**
+   * Work to do at the moment this label is rasterised, if any.
+   *
+   * The owed batch starts its allergy lookup here rather than before it is
+   * queued. The lookup's cache holds eight notes, oldest out first — sized for
+   * a family at the glass — and a batch is as long as the outage was: lookups
+   * started for all of it at once evicted the first children's notes before
+   * their stickers were drawn, and the line came out blank. Started as each
+   * one is drawn, a note is read before the next can push it out. The queue
+   * never calls this; the rasteriser in `index.ts` does, just before it waits
+   * on the note.
+   */
+  prepare?: () => void;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
