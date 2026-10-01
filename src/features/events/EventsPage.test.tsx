@@ -288,6 +288,29 @@ describe('the bands', () => {
     await settle();
   });
 
+  it('keeps a gathering that started before midnight and is still open in today', async () => {
+    /*
+     * The lock-in at half eleven, twenty past midnight. By the calendar it
+     * began yesterday, so it was filed in the history below and the top of
+     * the page said nothing was on — while the counselor on the door was
+     * checking people into it.
+     */
+    const lockIn = event({
+      id: 'lock-in',
+      title: 'Fall Lock-In',
+      startAt: new Date(2026, 6, 28, 23, 30),
+      endAt: new Date(2026, 6, 29, 8, 0),
+    });
+    vi.setSystemTime(new Date(2026, 6, 29, 0, 20));
+    fetchPastEvents.mockResolvedValue({ events: [lockIn], cursor: null, hasMore: false });
+    show([lockIn]);
+
+    expect(within(band(/^today$/i)).getByText('Fall Lock-In')).toBeInTheDocument();
+    const past = await screen.findByRole('region', { name: /past gatherings/i });
+    expect(within(past).queryByText('Fall Lock-In')).not.toBeInTheDocument();
+    await settle();
+  });
+
   it('puts the coming week in the middle band', async () => {
     show([event({ title: 'Sunday School', startAt: at(31, 9, 30), endAt: at(31, 10, 45) })]);
 

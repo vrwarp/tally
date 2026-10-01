@@ -53,6 +53,7 @@ import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import {
+  isCheckInOpen,
   nextSeriesOccurrence,
   startOfDay,
 } from '@/lib/time';
@@ -515,9 +516,17 @@ export function EventsPage() {
       ? everythingLater
       : everythingLater.filter((event) => event.startAt < horizon);
 
+    // A gathering that began before midnight and is still open — a lock-in at
+    // half past twelve, a retreat on its Saturday — is today's, whatever day
+    // it started on. By the calendar it is history, and the history reads
+    // back from the same boundary, so without this it was filed there.
+    const running = events
+      .filter((event) => event.startAt < dayStart && isCheckInOpen(event, now))
+      .sort(byStart);
+
     return {
       dayStart,
-      today: between(dayStart, dayEnd),
+      today: [...running, ...between(dayStart, dayEnd)],
       thisWeek: between(dayEnd, weekEnd),
       later: nearLater,
       laterHidden: everythingLater.length - nearLater.length,

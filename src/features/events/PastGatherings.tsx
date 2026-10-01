@@ -24,7 +24,9 @@ import { LockedChainGroup } from '@/features/events/LockedChainGroup';
 import { partitionBand } from '@/features/events/lockedChains';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useData } from '@/context/dataContext';
+import { useNow } from '@/hooks/useNow';
 import { usePastEvents } from '@/hooks/usePastEvents';
+import { isCheckInOpen } from '@/lib/time';
 import { cn } from '@/lib/cn';
 import type { TallyEvent } from '@/types';
 import { useLocale, useTranslations } from 'use-intl';
@@ -263,8 +265,16 @@ export function PastGatherings({ before }: PastGatheringsProps) {
   const t = useTranslations('PastGatherings');
   const tErrors = useTranslations('Errors');
   const locale = useLocale();
-  const { events, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
+  const { events: fetched, loading, hasMore, error, loadMore, retry } = usePastEvents(before);
   const { canWork } = useData();
+  const now = useNow(60_000);
+  // Read back by when it started, so a gathering that began before midnight
+  // and is still open comes back here too. It is on the calendar above as
+  // today's — see `EventsPage` — and a night is listed once.
+  const events = useMemo(
+    () => fetched.filter((event) => !isCheckInOpen(event, now)),
+    [fetched, now],
+  );
   /*
    * Narrowed to the gatherings this counselor may actually work, before the
    * read rather than after.

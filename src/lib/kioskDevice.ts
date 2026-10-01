@@ -47,3 +47,23 @@ export function deviceIdOfUid(uid: string): string | null {
   const id = uid.slice(KIOSK_UID_PREFIX.length);
   return isDeviceId(id) ? id : null;
 }
+
+/**
+ * The longest `boundTo` a kiosk's standing report may carry — the rules
+ * refuse more (`validKioskReport` in firestore.rules restates this number).
+ */
+export const KIOSK_BOUND_TO_MAX = 120;
+
+/**
+ * A gathering's title as the standing report carries it.
+ *
+ * The report is also the liveness oracle: a refusal reads as retirement, and
+ * a kiosk that reads retired un-pairs itself. A title has no bound of its own,
+ * so one long enough to be refused here would retire every kiosk bound to the
+ * gathering, on every report, after every re-pair. Cut to fit rather than
+ * refused.
+ */
+export function boundToFor(title: string | null | undefined): string | null {
+  if (!title) return null;
+  return title.length > KIOSK_BOUND_TO_MAX ? title.slice(0, KIOSK_BOUND_TO_MAX) : title;
+}

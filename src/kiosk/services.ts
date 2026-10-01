@@ -39,7 +39,7 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
-import { kioskUid } from '@/lib/kioskDevice';
+import { boundToFor, kioskUid } from '@/lib/kioskDevice';
 import type { LandKioskRecordsRequest, LandKioskRecordsResponse } from '@/lib/kioskLanding';
 import {
   KIOSK_BACKDROPS_COLLECTION,
@@ -363,7 +363,7 @@ export async function reportStanding(
     await withDeadline(
       updateDoc(doc(db, paths.kioskDevice(deviceId)), {
         lastSeenAt: serverTimestamp(),
-        boundTo: bound?.title ?? null,
+        boundTo: boundToFor(bound?.title),
         boundChain: bound?.chain ?? null,
         ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
       }),

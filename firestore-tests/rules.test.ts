@@ -3286,6 +3286,10 @@ describe('kiosk', () => {
       await assertFails(
         updateDoc(own(), { lastSeenAt: serverTimestamp(), boundTo: 'x'.repeat(121) }),
       );
+      // The bound the kiosk cuts a title to is itself accepted.
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), boundTo: 'x'.repeat(120) }),
+      );
       await assertFails(updateDoc(own(), { retiredAt: serverTimestamp(), retiredBy: KIOSK }));
     });
 

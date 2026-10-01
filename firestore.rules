@@ -1517,6 +1517,8 @@ service cloud.firestore {
         // (`StandingOutcome`), so refusing it over a battery would turn a
         // browser's privacy decision into a kiosk that believes it was retired.
         return d.lastSeenAt is timestamp
+          // 120 is `KIOSK_BOUND_TO_MAX` in lib/kioskDevice.ts: the kiosk cuts
+          // a title to it, because a report refused here reads as retirement.
           && (d.get('boundTo', null) == null
               || (d.boundTo is string && d.boundTo.size() <= 120))
           && (d.get('boundChain', null) == null

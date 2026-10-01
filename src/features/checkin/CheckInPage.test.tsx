@@ -81,6 +81,7 @@ const live = vi.hoisted(() => {
 });
 
 const services = vi.hoisted(() => ({
+  swapCheckIn: vi.fn(async () => {}),
   checkIn: vi.fn(async () => {}),
   undoCheckIn: vi.fn(async () => {}),
   ensureMaterialized: vi.fn(async () => {}),
@@ -162,7 +163,7 @@ vi.mock('@/features/roster/predictiveRoster', async (importOriginal) => {
 vi.mock('@/services/attendance', () => ({
   checkIn: services.checkIn,
   checkOut: vi.fn(async () => {}),
-  swapCheckIn: vi.fn(async () => {}),
+  swapCheckIn: services.swapCheckIn,
   undoCheckIn: services.undoCheckIn,
   undoCheckOut: vi.fn(async () => {}),
   quickAddAndCheckIn: services.quickAddAndCheckIn,
@@ -260,6 +261,7 @@ beforeEach(() => {
   live.builds.length = 0;
   live.now = null;
   services.checkIn.mockClear();
+  services.swapCheckIn.mockClear();
   services.undoCheckIn.mockClear();
   services.checkIn.mockImplementation(async () => {});
   services.ensureMaterialized.mockImplementation(async () => {});
@@ -490,6 +492,35 @@ describe('a past gathering', () => {
 
     expect(services.checkIn).not.toHaveBeenCalled();
     expect(document.querySelector('dialog')).toBeNull();
+  });
+
+  it('takes the move question down when the other phone undoes the check-in', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open(FRIDAY, [makeAttendance({ studentId: 'ada', eventId: FRIDAY.id })]);
+
+    await act(async () => {
+      handed().onSwap?.(adaRow());
+    });
+    // The right name, found the way a counselor finds it.
+    await user.type(searchBox(), 'Grace');
+    const grace = handed().entries.find((row) => row.student.id === 'grace');
+    if (!grace) throw new Error('Grace is not on the roster');
+    await act(async () => {
+      handed().onPress(grace);
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Move a past check-in from Ada Byron to Grace Hopper?' }),
+    ).toBeInTheDocument();
+
+    // The other counselor undoes Ada while the question is up. Confirming it
+    // would have moved a record that no longer exists — which creates one.
+    await act(async () => {
+      live.attendance.publish([]);
+    });
+
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(services.swapCheckIn).not.toHaveBeenCalled();
   });
 
   it('asks before an undo, too', async () => {

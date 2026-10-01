@@ -432,6 +432,8 @@ export function CheckInPage() {
     // being pointed at a different night.
     setExpandedId(null);
     setSwapForId(null);
+    // And a question parked for the other night is not this night's to ask.
+    setPastChange(null);
   }, [event?.id]);
 
   /**
@@ -457,9 +459,16 @@ export function CheckInPage() {
       : { record, student: formerStudent(record), former: true };
   }, [swapForId, attendance, students]);
 
+  const swapSourceRef = useRef(swapSource);
+  swapSourceRef.current = swapSource;
+
   useEffect(() => {
     if (!swapForId || swapSource) return;
     setSwapForId(null);
+    // The dialog asking whether to move it goes with it: confirmed after the
+    // other phone's undo, it would copy a deleted record's time onto a new
+    // one — precisely the write this mode reads its source live to prevent.
+    setPastChange(null);
     show(t("swapGone"), { tone: "info" });
   }, [swapForId, swapSource, show, t]);
 
@@ -863,6 +872,12 @@ export function CheckInPage() {
       // Cancelling leaves the picker up, so the right name is still one tap
       // away if the wrong one was picked.
       await unlessPast({ kind: "swap", wrong, right }, () => {
+        // Asked again at the moment of the write, for the beat between the
+        // other phone's undo landing and the dialog above noticing it.
+        if (swapSourceRef.current?.record.studentId !== from.record.studentId) {
+          show(t("swapGone"), { tone: "info" });
+          return Promise.resolve();
+        }
         setSwapForId(null);
         setQuery("");
 
