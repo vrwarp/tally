@@ -1367,6 +1367,32 @@ describe('sending', () => {
     await expect(queue.options.send(result)).rejects.toThrow('No printer is connected.');
   });
 
+  it('paints a missing printer in the catalogue’s words, not a sentence of its own', async () => {
+    // The refusal's English sentence is for the log. Handed to the screen it
+    // became `{ text }` — a note the type reserves for words from outside
+    // Tally — so a Chinese kiosk read "No printer is connected." in English.
+    configured();
+    const printing = await load();
+    await printing.ready();
+    const refusal = await queue.options.send(result).catch((error: unknown) => error);
+
+    queue.options.onFailure?.(refusal, {
+      studentId: 'pco_1',
+      name: 'Ada',
+      template: TEMPLATE,
+      values: {},
+    });
+
+    expect(printing.currentState()).toMatchObject({
+      kind: 'trouble',
+      message: { key: 'notConnected' },
+      advice: { key: 'advicePlugBackIn' },
+    });
+    // And the tag is still owed: the failure is painted as trouble, which is
+    // what the owed ledger keys on.
+    expect(printing.owedLabels()).toHaveLength(1);
+  });
+
   it('does not reopen a printer that is already open', async () => {
     const device = makeDevice();
     usb.paired = [device];

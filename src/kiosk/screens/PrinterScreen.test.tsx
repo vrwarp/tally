@@ -97,6 +97,7 @@ function mount(
   printing: KioskPrinting,
   config: PrinterConfig = { model: 'QL-800', label: '62' },
   extra: Partial<ComponentProps<typeof PrinterScreen>> = {},
+  locale?: 'zh-Hant',
 ) {
   render(
     <PrinterScreen
@@ -110,6 +111,7 @@ function mount(
       onDone={vi.fn()}
       {...extra}
     />,
+    locale ? { locale } : undefined,
   );
 }
 
@@ -791,5 +793,22 @@ describe('pressing Look again', () => {
     await press(/look again/i);
 
     expect(printing.ready).toHaveBeenCalledWith('look-again');
+  });
+});
+
+describe('the printer screen, in another language', () => {
+  it('labels its folds and its copy button in the kiosk’s language', async () => {
+    // Change, Show and Copy were the only English words left on a staff
+    // screen whose every other line was translated.
+    const printing = handleWith(null, [
+      { atMs: Date.now(), kind: 'state', detail: 'ready' } as unknown as PrinterLogEntry,
+    ]);
+    mount(printing, undefined, {}, 'zh-Hant');
+
+    for (const word of ['Change', 'Show', 'Copy']) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    expect(screen.getByText('變更')).toBeInTheDocument();
+    expect(screen.getAllByText('顯示').length).toBeGreaterThan(0);
   });
 });

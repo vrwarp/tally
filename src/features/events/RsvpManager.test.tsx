@@ -50,6 +50,7 @@ function show(
   event: TallyEvent = makeEvent({ mode: 'oneoff' }),
   /** Students on the roster but not on this event's list — i.e. candidates. */
   others: Student[] = [],
+  locale?: 'zh-Hant',
 ) {
   rsvps = [makeRsvp({ studentId: ada.id, eventId: event.id, status })];
 
@@ -79,7 +80,7 @@ function show(
     </AuthContext.Provider>
   );
 
-  return { toasts, event, ...render(tree) };
+  return { toasts, event, ...render(tree, locale ? { locale } : undefined) };
 }
 
 describe('removing a student from the RSVP list', () => {
@@ -187,5 +188,21 @@ describe('the add-students sheet', () => {
     // first field in a layout effect keyed on `open`, which runs after the
     // render that gates the sheet in.
     expect(screen.getByRole('searchbox', { name: 'Search students by name' })).toHaveFocus();
+  });
+});
+
+describe('the add-students sheet, in another language', () => {
+  it('counts the students it is about to add in the reader’s language', async () => {
+    // The sheet's primary action was assembled from English fragments, and
+    // with nothing ticked it read "Add  students".
+    const user = userEvent.setup();
+    const grace = makeStudent({ id: 'student-grace', firstName: 'Grace', lastName: 'Hopper' });
+    show('maybe', makeEvent({ mode: 'oneoff' }), [grace], 'zh-Hant');
+
+    await user.click(screen.getByRole('button', { name: '加入學生' }));
+    await user.click(screen.getByRole('checkbox', { name: /Grace Hopper/ }));
+
+    expect(screen.queryByRole('button', { name: /Add 1 student/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '加入 1 名學生' })).toBeInTheDocument();
   });
 });

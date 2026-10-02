@@ -154,6 +154,7 @@ async function renderChooser(
   services: KioskServices,
   onBound = vi.fn(),
   extra: Partial<ComponentProps<typeof EventChooser>> = {},
+  locale?: 'zh-Hant',
 ) {
   function Harness() {
     // The pick lives in `KioskApp` now, so a test that taps a row has to hold
@@ -170,7 +171,7 @@ async function renderChooser(
       />
     );
   }
-  render(<Harness />);
+  render(<Harness />, locale ? { locale } : undefined);
   await tick();
   return onBound;
 }
@@ -436,6 +437,16 @@ describe('the list the chooser narrows to', () => {
     await renderChooser(servicesListing([NURSERY, YOUTH]));
     expect(screen.getByText('Nursery')).toBeInTheDocument();
     expect(screen.getByText('Youth group')).toBeInTheDocument();
+  });
+
+  it('says today in the kiosk’s language', async () => {
+    // The day on every row of a list narrowed to today, and the one English
+    // word left on a translated chooser.
+    await renderChooser(servicesListing([NURSERY]), vi.fn(), {}, 'zh-Hant');
+
+    const line = row('Nursery');
+    expect(line).not.toHaveTextContent('Today');
+    expect(line).toHaveTextContent('今天');
   });
 
   it('does not offer next week, however the server was feeling', async () => {

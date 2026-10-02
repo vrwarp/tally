@@ -683,3 +683,21 @@ describe('typing while the roster moves underneath', () => {
     expect(screen.getByLabelText(/Notes/)).toHaveValue('Rides with the Kims');
   });
 });
+
+describe('the editor, in another language', () => {
+  it('says a name is required in the reader’s language', async () => {
+    // A space defeats the browser's own `required`, so this message is the
+    // one a leader sees — and it was the literal "Required".
+    const wrap = providersFor(null);
+    render(wrap(<StudentEditorModal open onClose={vi.fn()} student={null} onSaved={vi.fn()} />), {
+      locale: 'zh-Hant',
+    });
+
+    await userEvent.type(screen.getByLabelText(/^名字/), ' ');
+    await userEvent.type(screen.getByLabelText(/^姓氏/), ' ');
+    await userEvent.click(screen.getByRole('button', { name: '新增學生' }));
+
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+    expect(screen.getAllByText('請填寫')).toHaveLength(2);
+  });
+});

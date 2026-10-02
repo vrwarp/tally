@@ -86,6 +86,8 @@ interface ShowOptions {
   canWork?: DataContextValue['canWork'];
   /** `can('admin')`, which passes the access gate unconditionally. */
   admin?: boolean;
+  /** The reader's language; English unless a test is about another. */
+  locale?: 'zh-Hant';
 }
 
 function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
@@ -139,7 +141,7 @@ function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
     </AuthContext.Provider>
   );
 
-  return render(tree);
+  return render(tree, options.locale ? { locale: options.locale } : undefined);
 }
 
 describe('what an admin can see that nobody else needs to', () => {
@@ -711,5 +713,67 @@ describe('the week boundary', () => {
     expect(screen.queryByRole('region', { name: /^later$/i })).not.toBeInTheDocument();
 
     await settle();
+  });
+});
+
+/**
+ * The calendar in another language.
+ *
+ * Three things on this screen were English literals beside translated
+ * neighbours: the button that unfolds gatherings past the two-month horizon,
+ * the count on a locked chain's heading, and the badge on a cancelled night
+ * in the history.
+ */
+describe('the calendar, in another language', () => {
+  it('unfolds the far gatherings in the reader’s language', async () => {
+    show([event({ title: 'Winter Retreat', startAt: at(31 + 120, 17), endAt: at(31 + 122, 15) })], {
+      locale: 'zh-Hant',
+    });
+
+    expect(screen.queryByRole('button', { name: /later gathering/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '顯示之後的 1 次聚會' })).toBeInTheDocument();
+    await settle();
+  });
+
+  it('counts a locked chain’s nights in the reader’s language', async () => {
+    const chain = (day: number) =>
+      event({
+        id: `friday-${day}`,
+        title: 'Friday Fellowship',
+        seriesId: 'friday-fellowship',
+        startAt: at(day, 19),
+        endAt: at(day, 21),
+      });
+    // Two nights in one band, so the band draws them as one group with a count.
+    show([chain(30), chain(31)], {
+      canWork: (candidate: { seriesId: string | null }) => candidate.seriesId !== 'friday-fellowship',
+      locale: 'zh-Hant',
+    } as ShowOptions);
+
+    expect(screen.queryByText(/\d+ gatherings/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('2 次聚會').length).toBeGreaterThan(0);
+    await settle();
+  });
+
+  it('marks a cancelled night in the history in the reader’s language', async () => {
+    fetchPastEvents.mockResolvedValue({
+      events: [
+        event({
+          id: 'snowed-off',
+          title: 'Friday Fellowship',
+          status: 'cancelled',
+          startAt: at(24, 19),
+          endAt: at(24, 21),
+        }),
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+
+    show([], { locale: 'zh-Hant' });
+
+    const past = await screen.findByRole('region', { name: '過去的聚會' });
+    expect(within(past).queryByText('Cancelled')).not.toBeInTheDocument();
+    expect(await within(past).findByText('已取消')).toBeInTheDocument();
   });
 });

@@ -349,8 +349,8 @@ export function StudentEditorModal({ open, onClose, student, onSaved }: StudentE
     // field the rest of Tally — and Planning Center's display name — uses.
     if (!form.firstName.trim() || !lastName) {
       setErrors({
-        firstName: form.firstName.trim() ? undefined : 'Required',
-        lastName: lastName ? undefined : 'Required',
+        firstName: form.firstName.trim() ? undefined : tCommon('required'),
+        lastName: lastName ? undefined : tCommon('required'),
       });
       return;
     }

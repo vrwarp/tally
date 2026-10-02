@@ -182,3 +182,22 @@ describe('RecurrenceField', () => {
     expect(screen.getByText(/No more dates after this one/)).toBeInTheDocument();
   });
 });
+
+describe('RecurrenceField, in another language', () => {
+  it('names the units and the dates that follow in the reader’s language', async () => {
+    // The unit options and the "Then …" line were English in every locale.
+    const user = userEvent.setup();
+    render(<Harness />, { locale: 'zh-Hant' });
+
+    const [repeats] = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    await user.selectOptions(repeats!, 'custom');
+    const unit = (screen.getAllByRole('combobox') as HTMLSelectElement[]).find((select) =>
+      // The shortlist has a `yearly` entry too; only the unit has `monthly`.
+      [...select.options].some((option) => option.value === 'monthly'),
+    )!;
+
+    expect([...unit.options].map((option) => option.textContent)).toEqual(['週', '個月', '年']);
+    expect(screen.queryByText(/^Then /)).not.toBeInTheDocument();
+    expect(screen.getByText(/^之後：/)).toBeInTheDocument();
+  });
+});

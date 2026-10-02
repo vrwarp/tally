@@ -155,6 +155,7 @@ function openProfile(
   student: Student,
   over: Partial<DataContextValue> = {},
   who: 'core' | 'viewer' = 'core',
+  locale?: 'zh-Hant',
 ) {
   vi.setSystemTime(NOW);
 
@@ -203,6 +204,7 @@ function openProfile(
         <Route path="/students/:studentId" element={<StudentDetailPage />} />
       </Routes>,
     ),
+    locale ? { locale } : undefined,
   );
 }
 
@@ -386,5 +388,32 @@ describe('the birthday on a student profile', () => {
     expect(screen.getByText('Not on file')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add a birthday' })).toBeNull();
     expect(screen.getByText(/Tally keeps no birthday of its own/)).toBeInTheDocument();
+  });
+});
+
+describe('the profile, in another language', () => {
+  it('says nothing in English beside the translated sections', () => {
+    // The allergy badge, "Never", and the Notes and Birthday headings were
+    // English literals; so was the "Today" under a birthday that is today.
+    openProfile(
+      linked({
+        hasAllergies: true,
+        notes: 'Rides with the Kims',
+        birthday: '03-14',
+        firstAttendedAt: null,
+        lastAttendedAt: null,
+      }),
+      {},
+      'core',
+      'zh-Hant',
+    );
+
+    for (const word of ['Allergies', 'Never', 'Notes', 'Birthday', 'Today']) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    expect(screen.getAllByText('過敏').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('從未').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('備註').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('生日').length).toBeGreaterThan(0);
   });
 });

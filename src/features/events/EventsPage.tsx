@@ -754,8 +754,7 @@ export function EventsPage() {
                 onClick={() => setAllLater(true)}
                 className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
               >
-                {/* English, awaiting its key in the catalogue. */}
-                Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
+                {t('showLater', { count: laterHidden })}
               </button>
             ) : null}
           </RowSection>

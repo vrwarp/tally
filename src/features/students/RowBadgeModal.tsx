@@ -90,7 +90,7 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
 
       <p className="mt-4 border-t border-ink-800 pt-3 text-sm">
         <Link to={`/students/${student.id}`} className="text-brand-300 underline underline-offset-4">
-          Open {student.firstName}'s profile
+          {t('openProfile', { name: student.firstName })}
         </Link>
       </p>
     </Modal>
@@ -159,7 +159,7 @@ function AllergyPanel({ student }: { student: Student }) {
   if (loading || !loaded) {
     return (
       <p className="flex items-center gap-2 text-sm text-ink-400">
-        <Spinner /> Reading {label}…
+        <Spinner /> {t('reading', { backend: label })}
       </p>
     );
   }

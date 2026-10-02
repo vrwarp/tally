@@ -129,9 +129,20 @@ export function AttendanceTrend({
               <div
                 key={point.id}
                 className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${point.title} · ${time.shortDate(point.date)}: ${point.count}${
-                  point.eventIds.length > 1 ? ` across ${point.eventIds.length} gatherings` : ''
-                }`}
+                title={
+                  point.eventIds.length > 1
+                    ? t('barTitleAcross', {
+                        title: point.title,
+                        date: time.shortDate(point.date),
+                        count: point.count,
+                        gatherings: point.eventIds.length,
+                      })
+                    : t('barTitle', {
+                        title: point.title,
+                        date: time.shortDate(point.date),
+                        count: point.count,
+                      })
+                }
               >
                 <span className="text-[10px] font-semibold tabular-nums text-ink-400">
                   {point.count}
@@ -159,16 +170,16 @@ export function AttendanceTrend({
           </div>
 
           <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-ink-500">
-            {points.length} {points.length === 1 ? 'day' : 'days'} · peak {peak} · average {average}
+            {t('summary', { days: points.length, peak, average })}
           </p>
 
           <table className="sr-only">
             <caption>{t('tableCaption')}</caption>
             <thead>
               <tr>
-                <th scope="col">Gathering</th>
-                <th scope="col">Date</th>
-                <th scope="col">Present</th>
+                <th scope="col">{t('columnGathering')}</th>
+                <th scope="col">{t('columnDate')}</th>
+                <th scope="col">{t('columnPresent')}</th>
               </tr>
             </thead>
             <tbody>

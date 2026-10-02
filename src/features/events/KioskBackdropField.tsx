@@ -105,6 +105,7 @@ function uploadedOn(locale: string, date: Date): string {
 
 export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFieldProps) {
   const t = useTranslations('KioskBackdrop');
+  const tCommon = useTranslations('Common');
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -211,7 +212,7 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
           {summary}
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs font-semibold text-brand-300">
-          {open ? 'Done' : 'Change'}
+          {open ? tCommon('done') : tCommon('change')}
         </span>
       </button>
 
@@ -306,10 +307,16 @@ export function KioskBackdropField({ value, theme, onChange }: KioskBackdropFiel
               onClick={() => fileRef.current?.click()}
               className="min-h-11 rounded-lg bg-ink-900 px-4 text-sm font-semibold text-ink-100 ring-1 ring-ink-700 active:bg-ink-800 disabled:opacity-60 pointer-fine:min-h-9"
             >
-              {busy ? 'Reading the photo…' : value.kind === 'none' ? 'Choose a photo' : 'Replace the photo'}
+              {busy
+                ? t('readingPhoto')
+                : value.kind === 'none'
+                  ? t('choosePhoto')
+                  : t('replacePhoto')}
             </button>
             {value.kind === 'new' && (
-              <span className="text-xs text-ink-400">Resized to {describePrepared(value.prepared)}</span>
+              <span className="text-xs text-ink-400">
+                {t('resizedTo', { detail: describePrepared(value.prepared) })}
+              </span>
             )}
           </div>
 

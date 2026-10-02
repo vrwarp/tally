@@ -165,9 +165,9 @@ export function BackendsSection() {
                 ) : !a32.enabled ? (
                   <Badge tone="neutral">{t('switchedOff')}</Badge>
                 ) : a32.reachable ? (
-                  <Badge tone="success">Connected</Badge>
+                  <Badge tone="success">{t('connected')}</Badge>
                 ) : (
-                  <Badge tone="danger">Unreachable</Badge>
+                  <Badge tone="danger">{t('unreachable')}</Badge>
                 )}
 
                 {a32.peopleVisible !== null ? (
@@ -175,7 +175,7 @@ export function BackendsSection() {
                     <span className="font-semibold tabular-nums text-ink-100">
                       {a32.peopleVisible}
                     </span>{' '}
-                    {a32.peopleVisible === 1 ? 'student' : 'students'} visible
+                    {t('studentsVisible', { count: a32.peopleVisible })}
                   </span>
                 ) : null}
               </div>

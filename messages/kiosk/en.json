@@ -28,7 +28,8 @@
     "printerSettings": "Printer settings",
     "nameTagsWontPrint": "name tags won’t print",
     "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
-    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi."
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi.",
+    "today": "Today"
   },
   "Common": {
     "language": "Language",
@@ -69,7 +70,8 @@
     "size": "Size",
     "align": "Align",
     "bold": "Bold",
-    "copies": "Copies"
+    "copies": "Copies",
+    "change": "Change"
   },
   "Confirm": {
     "back": "← Back",
@@ -234,7 +236,11 @@
     "owedWaiting": "{count, plural, one {1 name tag is waiting.} other {# name tags are waiting.}}",
     "owedPrinting": "{count, plural, one {Printing 1 name tag — take it to the room.} other {Printing # name tags — take them to the room.}}",
     "owedPrinted": "{count, plural, one {1 name tag printed — take it to the room.} other {# name tags printed — take them to the room.}}",
-    "owedRowWaiting": "Waiting"
+    "owedRowWaiting": "Waiting",
+    "show": "Show",
+    "hide": "Hide",
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",
@@ -375,6 +381,7 @@
     "recordServer": "Tally didn’t take it",
     "recordArrival": "Waiting for their check-in",
     "someone": "A child",
-    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online."
+    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online.",
+    "title": "Staff"
   }
 }

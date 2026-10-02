@@ -38,7 +38,8 @@
     "size": "Tamaño",
     "align": "Alineación",
     "bold": "Negrita",
-    "copies": "Copias"
+    "copies": "Copias",
+    "change": "Cambiar"
   },
   "Nav": {
     "checkIn": "Pasar lista",
@@ -472,7 +473,13 @@
     "loading": "contando las reuniones recientes",
     "emptyTitle": "Aún no hay reuniones que graficar.",
     "emptyBody": "En cuanto se registre la asistencia de un par de reuniones, la tendencia aparecerá aquí.",
-    "tableCaption": "Conteo por día, del más antiguo primero."
+    "tableCaption": "Conteo por día, del más antiguo primero.",
+    "summary": "{days, plural, one {# día} other {# días}} · máximo {peak} · promedio {average}",
+    "barTitle": "{title} · {date}: {count}",
+    "barTitleAcross": "{title} · {date}: {count} en {gatherings, plural, one {# reunión} other {# reuniones}}",
+    "columnGathering": "Reunión",
+    "columnDate": "Fecha",
+    "columnPresent": "Presentes"
   },
   "Ledger": {
     "summaryHere": "Ya no se espera a {count} aquí · la más reciente, {date}",
@@ -1174,7 +1181,8 @@
     "removeAria": "Quitar a {name} de la lista de confirmaciones",
     "rsvpForAria": "Confirmación de {name}",
     "statusOptionAria": "{option} — {name}",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "addCount": "{count, plural, =0 {Agregar estudiantes} one {Agregar # estudiante} other {Agregar # estudiantes}}"
   },
   "Access": {
     "nobody": "nadie",
@@ -1375,7 +1383,8 @@
     "hueEmber": "Brasa",
     "hueAmber": "Ámbar",
     "hueForest": "Bosque",
-    "hueTeal": "Verde azulado"
+    "hueTeal": "Verde azulado",
+    "ground": "Fondo"
   },
   "Events": {
     "title": "Eventos",
@@ -1432,7 +1441,9 @@
     "iconDone": "Listo",
     "iconChange": "Cambiar",
     "limitedTag": "🔐 {count, number}",
-    "limitedTagLabel": "Limitada a {count, plural, one {# persona} other {# personas}} — todos los demás la ven bloqueada"
+    "limitedTagLabel": "Limitada a {count, plural, one {# persona} other {# personas}} — todos los demás la ven bloqueada",
+    "chainCount": "{count, plural, one {# reunión} other {# reuniones}}",
+    "showLater": "{count, plural, one {Mostrar # reunión posterior} other {Mostrar # reuniones posteriores}}"
   },
   "EventIcons": {
     "event": "Evento",
@@ -1563,7 +1574,11 @@
     "previewTypeChildsName": "Nombre de su hijo o hija",
     "previewOrPhone": "o los últimos 4 dígitos de su teléfono",
     "summaryNone": "Ninguna",
-    "summaryPhoto": "Foto"
+    "summaryPhoto": "Foto",
+    "choosePhoto": "Elegir una foto",
+    "replacePhoto": "Cambiar la foto",
+    "readingPhoto": "Leyendo la foto…",
+    "resizedTo": "Redimensionada a {detail}"
   },
   "Recurrence": {
     "repeatOn": "Repetir los",
@@ -1622,7 +1637,11 @@
     "weekdayInitialThu": "J",
     "weekdayInitialFri": "V",
     "weekdayInitialSat": "S",
-    "monthlyOnDayOption": "Cada mes el día {day}"
+    "monthlyOnDayOption": "Cada mes el día {day}",
+    "unitWeeks": "semanas",
+    "unitMonths": "meses",
+    "unitYears": "años",
+    "thenPreview": "{count, plural, =1 {Después: {first}} =2 {Después: {first}, {second}} other {Después: {first}, {second}, {third}…}}"
   },
   "EventStatus": {
     "cancelled": "Se canceló",
@@ -1653,7 +1672,9 @@
     "rangeLast12Months": "Últimos 12 meses",
     "presumedCancelled": "{count, plural, one {# reunión no tuvo a nadie que haya llegado y se deja fuera, igual que en todas las demás pantallas.} other {# reuniones no tuvieron a nadie que haya llegado y se dejan fuera, igual que en todas las demás pantallas.}}",
     "denied": "{count, plural, one {# reunión no te toca leerla, así que no tiene columna aquí — mejor eso que una columna de ceros diciendo que no vino nadie.} other {# reuniones no te tocan leerlas, así que no tienen columna aquí — mejor eso que columnas de ceros diciendo que no vino nadie.}}",
-    "noRecurring": "No hay reuniones que se repitan y en las que estés para armar un cuadro."
+    "noRecurring": "No hay reuniones que se repitan y en las que estés para armar un cuadro.",
+    "reading": "Leyendo {count, plural, one {# reunión} other {# reuniones}}…",
+    "shape": "<n>{gatherings}</n> {gatherings, plural, one {reunión} other {reuniones}} × <n>{students}</n> {students, plural, one {estudiante} other {estudiantes}}."
   },
   "PastGatherings": {
     "title": "Reuniones pasadas",
@@ -1978,7 +1999,9 @@
     "tryAgain": "Reintentar",
     "noBirthdateHeld": "{backend} no tiene la fecha de nacimiento de {name}, así que Tally no te puede decir cuándo felicitarle.",
     "dayOnly": "Solo el día — {backend} no tiene el año de {name}, así que no muestra ninguna edad.",
-    "noRecordYet": "{name} aún no existe en {backend}. Envíalo primero."
+    "noRecordYet": "{name} aún no existe en {backend}. Envíalo primero.",
+    "openProfile": "Abrir el perfil de {name}",
+    "reading": "Leyendo {backend}…"
   },
   "StudentEditor": {
     "titleEdit": "Editar a {name}",

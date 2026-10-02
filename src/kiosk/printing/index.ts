@@ -170,7 +170,9 @@ export type PrinterNoteKey =
   | 'troubleDidNotPrint'
   | 'troubleUnsupported'
   | 'troubleStale'
-  | 'adviceCheckPrinter';
+  | 'adviceCheckPrinter'
+  | 'notConnected'
+  | 'noPrinter';
 
 export type PrinterState =
   | { kind: 'idle' }
@@ -351,6 +353,12 @@ function describe(error: unknown): { message: PrinterNote; advice: PrinterNote |
   const advice: PrinterNote | null = hint === null ? null : { text: hint };
 
   switch (code) {
+    // Thrown by this module, not the library: the sentence on the Error is for
+    // the log and the caller, and the screen gets the catalogue's words for it.
+    case 'no-printer':
+      return { message: { key: 'notConnected' }, advice: { key: 'advicePlugBackIn' } };
+    case 'no-config':
+      return { message: { key: 'noPrinter' }, advice: null };
     case 'printer-error': {
       const flags = (error as { errors?: { message: string }[] }).errors ?? [];
       const flag = flags[0]?.message;
@@ -1319,7 +1327,7 @@ function recorder(): { bytes: number; pageCount: number }[] | null {
 
 const queue = createLabelQueue({
   raster: async (job) => {
-    if (!config) throw new Error('No printer is configured.');
+    if (!config) throw Object.assign(new Error('No printer is configured.'), { code: 'no-config' });
     // Immediately before the read, and nothing in between: `printOwed`
     // rasterises each of the batch in turn, and a lookup started here is in
     // `allergyFor`'s hands before the next one can evict it. See
@@ -1340,7 +1348,9 @@ const queue = createLabelQueue({
     // A label arriving while the printer is down should reopen it rather than
     // fail: the device may have been replugged without a connect event landing.
     if (!printer?.opened) await reopen('label');
-    if (!printer?.opened) throw new Error('No printer is connected.');
+    if (!printer?.opened) {
+      throw Object.assign(new Error('No printer is connected.'), { code: 'no-printer' });
+    }
     await printer.sendRaw(result.job, { pageCount: result.pageCount });
     if (state.kind === 'trouble' && config) setState({ kind: 'ready', config }, 'label-printed');
   },

@@ -108,8 +108,11 @@ function AttendanceStat({
   locked?: boolean;
 }) {
   const t = useTranslations('PastGatherings');
+  const tEvents = useTranslations('Events');
   if (event.status === 'cancelled') {
-    return <Badge tone="danger">Cancelled</Badge>;
+    // The calendar's own word for it, so the history and the bands above it
+    // say the same thing about the same night.
+    return <Badge tone="danger">{tEvents('badgeCancelled')}</Badge>;
   }
 
   /*

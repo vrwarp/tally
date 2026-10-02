@@ -51,11 +51,16 @@ import type { PrinterState } from "../printing";
 import { usePrinterNote } from "../printerNote";
 import { useLocale, useTranslations } from "use-intl";
 
-function dayLabel(locale: string, startAtMs: number, nowMs: number): string {
+function dayLabel(
+  locale: string,
+  todayWord: string,
+  startAtMs: number,
+  nowMs: number,
+): string {
   const start = new Date(startAtMs);
   const today = new Date(nowMs);
   const sameDay = start.toDateString() === today.toDateString();
-  if (sameDay) return "Today";
+  if (sameDay) return todayWord;
   /*
    * `short`, and the difference is one line on a phone.
    *
@@ -701,7 +706,7 @@ export function EventChooser({
                      * has a job.
                      */}
                     <span className="sm:pe-4">
-                      {dayLabel(locale, entry.startAt, nowMs)}
+                      {dayLabel(locale, t("today"), entry.startAt, nowMs)}
                       {" · "}
                       {/*
                        * The hours, a step louder than the line they are in.

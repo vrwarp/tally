@@ -97,6 +97,7 @@ function renderRoster(
   students: Student[],
   reachable: Record<string, boolean> = {},
   dataOverrides: Record<string, unknown> = {},
+  locale?: 'zh-Hant',
 ) {
   vi.setSystemTime(TODAY);
 
@@ -134,6 +135,7 @@ function renderRoster(
         <StudentsPage />
       </MemoryRouter>
     </ToastProvider>,
+    locale ? { locale } : undefined,
   );
 }
 
@@ -860,5 +862,22 @@ describe('StudentsPage search', () => {
 
     expect(search).toHaveValue('');
     expect(screen.getByRole('link', { name: /Ben/ })).toBeInTheDocument();
+  });
+});
+
+describe('StudentsPage, in another language', () => {
+  it('names the page and marks a birthday in the reader’s language', () => {
+    // The heading was a literal beside a `Students.title` nobody read, and
+    // the cake badge said Today in every language.
+    renderRoster(
+      [makeStudent({ id: 'pco_7', firstName: 'Bea', lastName: 'Okafor', pcoPersonId: '7', birthday: '03-14' })],
+      {},
+      {},
+      'zh-Hant',
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('學生');
+    expect(screen.queryByText('Today')).not.toBeInTheDocument();
+    expect(within(row(/Bea/)).getAllByText('今天').length).toBeGreaterThan(0);
   });
 });

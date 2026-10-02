@@ -367,6 +367,7 @@ export function PrinterScreen({
   onDone: () => void;
 }) {
   const t = useTranslations('Printer');
+  const tCommon = useTranslations('Common');
   // The staff flow's own word for the way out, borrowed for the one entrance
   // that has one: the reprint screen has said it this way since it shipped.
   const tStaff = useTranslations('Staff');
@@ -1230,7 +1231,7 @@ export function PrinterScreen({
                 </span>
                 {/* Quieter than the summary in colour, not in size: this is the
                     affordance that opens the row, read at arm's length. */}
-                <span className="shrink-0 text-sm text-ink-400 tall:text-lg">Change</span>
+                <span className="shrink-0 text-sm text-ink-400 tall:text-lg">{tCommon('change')}</span>
               </summary>
               <div className="flex flex-col gap-4 px-4 pb-4">
                 <label className="flex flex-col gap-1">
@@ -1302,7 +1303,7 @@ export function PrinterScreen({
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">{t('recentEvents')}</span>
               <span className="shrink-0 text-sm text-ink-400 tall:text-lg">
-                {eventsOpen ? 'Hide' : 'Show'}
+                {eventsOpen ? t('hide') : t('show')}
               </span>
             </summary>
             <div className="flex flex-col gap-3 px-4 pb-4">
@@ -1330,7 +1331,7 @@ export function PrinterScreen({
                   {...tap(() => void copy('events', printing.printerLogText()))}
                   className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 tall:text-base"
                 >
-                  {copyStateOf('events') === 'copied' ? 'Copied' : 'Copy'}
+                  {copyStateOf('events') === 'copied' ? t('copied') : t('copy')}
                 </button>
                 {copyStateOf('events') === 'failed' && (
                   <span className="text-xs text-ink-500 tall:text-sm">{t('copyBlocked')}</span>
@@ -1374,7 +1375,7 @@ export function PrinterScreen({
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl p-4 text-base text-ink-300 tall:text-lg [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 truncate">{t('tabletPolicy')}</span>
               <span className="shrink-0 text-sm text-ink-400 tall:text-lg">
-                {policyOpen ? 'Hide' : 'Show'}
+                {policyOpen ? t('hide') : t('show')}
               </span>
             </summary>
             <div className="flex flex-col gap-3 px-4 pb-4">
@@ -1393,7 +1394,7 @@ export function PrinterScreen({
                   {...tap(() => void copy('policy', policyValue))}
                   className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-ink-100 active:bg-ink-700 tall:text-base"
                 >
-                  {copyStateOf('policy') === 'copied' ? 'Copied' : 'Copy'}
+                  {copyStateOf('policy') === 'copied' ? t('copied') : t('copy')}
                 </button>
                 {copyStateOf('policy') === 'failed' && (
                   <span className="text-xs text-ink-500 tall:text-sm">{t('copyBlocked')}</span>

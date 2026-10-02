@@ -156,8 +156,7 @@ function AddStudentsModal({
             disabled={selected.size === 0}
             onClick={() => void submit()}
           >
-            Add {selected.size > 0 ? selected.size : ''}{' '}
-            {selected.size === 1 ? 'student' : 'students'}
+            {t('addCount', { count: selected.size })}
           </Button>
         </>
       }
