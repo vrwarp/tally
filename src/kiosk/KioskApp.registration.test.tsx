@@ -15,7 +15,7 @@
 import { act, fireEvent, render, screen } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
+import { KioskApp, PULSE_POLL_MS, type KioskPrinting, type KioskServices } from '@/kiosk/KioskApp';
 /*
  * Imported for its side effect on the module cache, and not used directly.
  *
@@ -28,6 +28,7 @@ import { KioskApp, type KioskPrinting, type KioskServices } from '@/kiosk/KioskA
  */
 import '@/kiosk/registration';
 import { PROCESSING_MS, SNAP_MS } from '@/kiosk/registration/RegistrationFlow';
+import { HOLD_DELAY_MS, HOLD_MS } from '@/kiosk/components/HoldButton';
 import { resetTouchForTests, unreached } from '@/kiosk/touch';
 import { DEFAULT_LABEL_TEMPLATE } from '@/lib/labelTemplate';
 import { KIOSK_KEYS } from '@/kiosk/storage';
@@ -68,7 +69,13 @@ const printing = {
   printLabel: vi.fn(),
   forgetLabel: vi.fn(),
   currentState: vi.fn(() => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
-  subscribe: vi.fn(() => () => {}),
+  // Pushes on subscribe, because the real one does (`printing/index.ts`): a
+  // fake that does not is a kiosk that never learns it has a printer, and the
+  // staff screen offers no reprint door on one of those.
+  subscribe: vi.fn((listener: (state: unknown) => void) => {
+    listener(printing.currentState());
+    return () => {};
+  }),
   ready: vi.fn(async () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } })),
   reprintLabel: vi.fn(),
   printedTonight: vi.fn(() => []),
@@ -139,6 +146,14 @@ let phoneIndex: Record<string, string[]> = {};
 /** What a forced refresh finds — a family who registered on their own phone. */
 let refreshedStudents: KioskStudent[] = [];
 let refreshedLast4: Record<string, string[]> = {};
+/**
+ * What the pulse says, and what the roster refetch it routes answers with.
+ *
+ * Null by default, so nothing here polls: the only tests that set revs are the
+ * ones about the refetch the server triggers for every registration.
+ */
+let pulse: { roster: number; phones: number; participation: number } | null = null;
+let refetchedRoster: KioskStudent[] = [ADA];
 
 const services = {
   restoredSession: vi.fn(async () => ({ uid: 'kiosk_kiosk-test-device', reason: null })),
@@ -158,9 +173,11 @@ const services = {
     checkedOut: new Set<string>(),
     arrivals: new Map<string, string>(),
   })),
-  fetchPulse: vi.fn(async () => null),
+  fetchPulse: vi.fn(async () => pulse),
   rememberPulse: vi.fn(),
-  refetchRoster: vi.fn(async () => {}),
+  refetchRoster: vi.fn(async (onUpdate: (students: KioskStudent[]) => void) => {
+    onUpdate(refetchedRoster);
+  }),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
   // Passed through to the printing chunk on mount; never called here, because
@@ -186,15 +203,28 @@ const services = {
     },
   ),
   // The real one merges into localStorage and hands back the students; the
-  // shape is all `KioskApp` uses.
-  applyRegistration: vi.fn((result: { children: readonly { studentId: string; firstName: string; lastName: string; grade: number | null; searchName: string }[] }) =>
-    result.children.map((child) => ({
-      id: child.studentId,
-      firstName: child.firstName,
-      lastName: child.lastName,
-      grade: child.grade,
-      searchName: child.searchName,
-    })),
+  // shape is all `KioskApp` uses. The flag is coerced exactly as the real one
+  // coerces it, so a row built from a call that dropped the key reads false
+  // here too — see services.ts `applyRegistration`.
+  applyRegistration: vi.fn(
+    (result: {
+      children: readonly {
+        studentId: string;
+        firstName: string;
+        lastName: string;
+        grade: number | null;
+        searchName: string;
+        hasAllergies?: boolean;
+      }[];
+    }) =>
+      result.children.map((child) => ({
+        id: child.studentId,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        grade: child.grade,
+        searchName: child.searchName,
+        hasAllergies: child.hasAllergies === true,
+      })),
   ),
   landRecords: vi.fn(landEverything),
   reachTally: vi.fn(async () => true),
@@ -319,6 +349,50 @@ async function fillInTheFamily(): Promise<void> {
   await enterChild('Sam', 'Fields', '2');
 }
 
+/** The staff gate: Clear, held. */
+async function holdClear(): Promise<void> {
+  const clear = screen.getByText('Clear', { selector: '[data-key]' });
+  await act(async () => {
+    fireEvent.pointerDown(clear);
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS);
+  });
+  await settle();
+}
+
+/** A row commits on lift — the list scrolls, so it has to tell a tap from a drag. */
+async function pickRow(name: string): Promise<void> {
+  const row = screen.getByText(name).closest('button')!;
+  await act(async () => {
+    fireEvent.pointerDown(row);
+    fireEvent.pointerUp(row);
+  });
+  await settle();
+}
+
+/** One tick of the pulse poll. */
+async function poll(): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(PULSE_POLL_MS);
+  });
+  await settle();
+}
+
+/**
+ * A staff reprint for a named child, from the search screen to the printer —
+ * and the roster row the sticker was rastered from, which is the claim.
+ */
+async function staffReprint(name: string): Promise<KioskStudent> {
+  await holdClear();
+  await tap(/Reprint a name tag/i);
+  await type(name.split(' ')[0]!);
+  await pickRow(name);
+  await tap(/Print name tag/i);
+  expect(printing.reprintLabel).toHaveBeenCalledTimes(1);
+  return vi.mocked(printing.reprintLabel).mock.calls[0]![2] as KioskStudent;
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.clearAllMocks();
@@ -334,6 +408,8 @@ beforeEach(() => {
   phoneIndex = {};
   refreshedStudents = [];
   refreshedLast4 = {};
+  pulse = null;
+  refetchedRoster = [ADA];
   answer = {
     status: 'created',
     children: [
@@ -1058,6 +1134,63 @@ describe('when it does not work', () => {
 
     expect(screen.getByText(/could not finish that/i)).toBeTruthy();
   });
+
+  /**
+   * A save that gave up *after* the early stickers went, with the family still
+   * standing here to try again. The retry re-enters the save under the same
+   * registration id — which is what makes it safe on the server — and that is
+   * exactly the run whose tags are already on the children.
+   */
+  async function giveUpWithTheTagsOut(): Promise<void> {
+    configurePrinter();
+    registerHangs = true;
+    await mount();
+    await fillInTheFamily();
+    await tap('Check in Robin and Sam');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+    expect(printing.printLabel).toHaveBeenCalledTimes(2);
+
+    registerFails = true;
+    registerError = { code: 'functions/deadline-exceeded' };
+    await act(async () => {
+      releaseRegister();
+    });
+    await settle();
+    expect(screen.getByText(/this is not finished/i)).toBeTruthy();
+    // The retry hangs the same way, so the five-second window opens again.
+    registerFails = false;
+  }
+
+  it('does not print the name tags a second time when the family tries again', async () => {
+    /*
+     * The early print is armed by entering `submitting` with nothing back yet,
+     * and "Try again" enters it again — so a slow evening used to put a second
+     * sticker per child on the tape for every retry, for children already
+     * wearing the first one.
+     */
+    await giveUpWithTheTagsOut();
+
+    await tap('Try again');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROCESSING_MS);
+    });
+
+    expect(printing.printLabel).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the retry on the second meter, with the first one already full', async () => {
+    // The first meter's job — the tags — was done on the first attempt, and a
+    // bar drawn running again for it would be the screen promising a print it
+    // must not make.
+    await giveUpWithTheTagsOut();
+
+    await tap('Try again');
+
+    expect(screen.getByText('Name tags printing')).toBeTruthy();
+    expect(document.querySelector('.kiosk-meter-done')).not.toBeNull();
+  });
 });
 
 describe('the clock', () => {
@@ -1261,5 +1394,104 @@ describe('the allergies question, where the backend can carry it', () => {
     await commit('Check in Robin');
 
     expect(printing.rememberAllergyNote).toHaveBeenCalledWith('new-robin', '');
+  });
+
+  /** Robin, as the callable answers for a child whose parent typed a note. */
+  function answerWithRobinFlagged(): void {
+    answer = {
+      status: 'created',
+      children: [
+        {
+          studentId: 'new-robin',
+          firstName: 'Robin',
+          lastName: 'Fields',
+          grade: 4,
+          searchName: 'robin fields',
+          hasAllergies: true,
+        },
+      ],
+      last4: '3344',
+      checkedIn: true,
+    };
+  }
+
+  /** Robin through the wizard with a note, and back out to the search screen. */
+  async function registerRobinWithPeanuts(): Promise<void> {
+    await tap(/Register your child/);
+    await enterChild('Robin', 'Fields', '4');
+    await type('Peanuts');
+    await tap('Next');
+    await enterGuardian('Dana', 'Fields', '5550103344');
+    await commit('Check in Robin');
+    await tap('Done');
+  }
+
+  it('hands applyRegistration the allergy flag the callable answered with', async () => {
+    /*
+     * The echo is the one place tonight's truth lives: the roster read answers
+     * false for every Tally-owned student by rule, and the note itself is on
+     * the registration record. Drop the flag between the callable and the
+     * cache and the kiosk files the child as allergy-free for the evening.
+     */
+    answerWithRobinFlagged();
+    await mount(asking());
+    await registerRobinWithPeanuts();
+
+    const [folded] = vi.mocked(services.applyRegistration).mock.calls[0]!;
+    expect(folded.children[0]).toMatchObject({ studentId: 'new-robin', hasAllergies: true });
+  });
+
+  it('keeps the flag on the roster row a staff reprint is rastered from', async () => {
+    /*
+     * The first sticker is drawn from the remembered note, so it is right
+     * whatever the row says. A staff reprint is drawn from the row — and once
+     * the note has been evicted from the printing module's bounded hold, a
+     * row that says no allergy short-circuits the lookup into a clean label.
+     */
+    configurePrinter();
+    answerWithRobinFlagged();
+    await mount(asking());
+    await registerRobinWithPeanuts();
+
+    expect(await staffReprint('Robin Fields')).toMatchObject({
+      id: 'new-robin',
+      hasAllergies: true,
+    });
+  });
+
+  it('keeps the flag across the roster refetch the registration itself triggers', async () => {
+    /*
+     * The server bumps the roster channel for every registration, so within a
+     * poll this kiosk re-reads the roster — and the read answers false for
+     * Robin's document, by rule, until approval pushes the note upstream. The
+     * flag the callable echoed has to outlive that landing, not only the
+     * moment it was folded in.
+     */
+    configurePrinter();
+    answerWithRobinFlagged();
+    pulse = { roster: 1, phones: 1, participation: 1 };
+    await mount(asking());
+    await poll(); // The first sighting seeds the revs and refetches nothing.
+    await registerRobinWithPeanuts();
+
+    refetchedRoster = [
+      ADA,
+      {
+        id: 'new-robin',
+        firstName: 'Robin',
+        lastName: 'Fields',
+        grade: 4,
+        searchName: 'robin fields',
+        hasAllergies: false,
+      },
+    ];
+    pulse = { roster: 2, phones: 1, participation: 1 };
+    await poll();
+    expect(services.refetchRoster).toHaveBeenCalledTimes(1);
+
+    expect(await staffReprint('Robin Fields')).toMatchObject({
+      id: 'new-robin',
+      hasAllergies: true,
+    });
   });
 });

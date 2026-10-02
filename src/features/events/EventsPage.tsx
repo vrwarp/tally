@@ -53,6 +53,7 @@ import { PastGatherings } from '@/features/events/PastGatherings';
 import { useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { useNow } from '@/hooks/useNow';
 import {
+  isCheckInOpen,
   nextSeriesOccurrence,
   startOfDay,
 } from '@/lib/time';
@@ -215,7 +216,12 @@ function RowSection({
   const { canWork } = useData();
   const { own, locked } = partitionBand(events, canWork, 'asc');
 
-  if (events.length === 0) return null;
+  // No rows is not nothing to say. "Later" asks before it lists past the
+  // horizon, and the control it asks with is this band's child — so a retreat
+  // past the horizon with nothing nearer has a control and no row, and a band
+  // that returned null for having no rows took the only way to it off the
+  // screen, and told the reader nothing was scheduled.
+  if (events.length === 0 && !children) return null;
 
   return (
     <section aria-labelledby={`events-${title.replace(/\s+/g, '-').toLowerCase()}`}>
@@ -480,7 +486,11 @@ export function EventsPage() {
      * boundary, so nothing appears twice and nothing falls between them.
      */
     const dayStart = startOfDay(now);
-    const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+    // The next midnight, not twenty-four hours on: across a clock change the
+    // two differ by an hour, and a gathering in the last hour of the day the
+    // clocks go back is still today's.
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
     /*
      * Inclusive of day seven, and that off-by-one was worth a finding of its own.
      *
@@ -489,7 +499,8 @@ export function EventsPage() {
      * question is *is next Friday on the calendar* read a band that named their
      * gathering's own weekday, did not contain it, and looked complete.
      */
-    const weekEnd = new Date(dayStart.getTime() + (WEEK_DAYS + 1) * 86_400_000);
+    const weekEnd = new Date(dayStart);
+    weekEnd.setDate(weekEnd.getDate() + WEEK_DAYS + 1);
 
     const byStart = (a: TallyEvent, b: TallyEvent) => a.startAt.getTime() - b.startAt.getTime();
     const between = (from: Date, to: Date | null) =>
@@ -505,9 +516,17 @@ export function EventsPage() {
       ? everythingLater
       : everythingLater.filter((event) => event.startAt < horizon);
 
+    // A gathering that began before midnight and is still open — a lock-in at
+    // half past twelve, a retreat on its Saturday — is today's, whatever day
+    // it started on. By the calendar it is history, and the history reads
+    // back from the same boundary, so without this it was filed there.
+    const running = events
+      .filter((event) => event.startAt < dayStart && isCheckInOpen(event, now))
+      .sort(byStart);
+
     return {
       dayStart,
-      today: between(dayStart, dayEnd),
+      today: [...running, ...between(dayStart, dayEnd)],
       thisWeek: between(dayEnd, weekEnd),
       later: nearLater,
       laterHidden: everythingLater.length - nearLater.length,
@@ -594,7 +613,9 @@ export function EventsPage() {
   // A viewer keeps the "already scheduled" rows, which are links, and loses
   // the "schedule next" ones, which are writes.
   const shownQuickActions = readOnly ? quickActions.filter(({ existing }) => existing) : quickActions;
-  const nothingAhead = today.length === 0 && thisWeek.length === 0 && later.length === 0;
+  // Something behind the "Later" control is still something scheduled.
+  const nothingAhead =
+    today.length === 0 && thisWeek.length === 0 && later.length === 0 && laterHidden === 0;
 
   return (
     <PageFrame gap="lg" className="pb-8">
@@ -733,7 +754,7 @@ export function EventsPage() {
                 onClick={() => setAllLater(true)}
                 className="mt-2 min-h-12 w-full rounded-xl bg-ink-900 text-sm font-semibold text-ink-300 ring-1 ring-ink-800 hover:bg-ink-800/40 active:bg-ink-800 pointer-fine:min-h-9"
               >
-                Show {laterHidden} later {laterHidden === 1 ? 'gathering' : 'gatherings'}
+                {t('showLater', { count: laterHidden })}
               </button>
             ) : null}
           </RowSection>

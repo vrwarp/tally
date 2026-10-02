@@ -31,7 +31,7 @@
  * badge. `isUnreachable` is what the chip counts on the screen use, so the
  * column and the count can never disagree.
  */
-import { isUnreachable } from '@/features/dashboard/insights';
+import { isUnreachable, reachableFor } from '@/features/dashboard/insights';
 import { sourceReadAt, studentSource } from '@/features/exports/studentSource';
 import { isoDate, toCsv, type CsvColumn } from '@/lib/csv';
 import { gradeLabel, type GradeStrings } from '@/lib/grades';
@@ -70,7 +70,9 @@ function columns(grades: GradeStrings, context: RosterCsvContext): CsvColumn<Stu
         if (student.status !== 'active') return '';
         const unreachable = isUnreachable(student, context.reachable);
         if (unreachable) return 'no';
-        const known = student.profileComplete ?? context.reachable.get(student.id);
+        // The same lookup the badge makes: a pushed visitor's answer is filed
+        // under the id the backend gave them, not the one Tally did.
+        const known = student.profileComplete ?? reachableFor(student, context.reachable);
         return known === undefined ? '' : 'yes';
       },
     },

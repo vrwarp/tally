@@ -162,3 +162,91 @@ describe('the contact', () => {
     expect(recordVisitorParent).not.toHaveBeenCalled();
   });
 });
+
+describe('a question before saving', () => {
+  it('is asked before the sheet closes, toasts or writes, and the save waits on it', async () => {
+    // What the page hands in for a past gathering. Nothing may happen until it
+    // has been answered — a "no" has to leave the counselor at the form, not
+    // at a toast saying the visitor was added.
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onAdded = vi.fn();
+    let held: (() => Promise<void>) | null = null;
+    const confirm = vi.fn(async (_change: unknown, run: () => Promise<void>) => {
+      held = run;
+    });
+    render(
+      <ToastProvider>
+        <QuickAddVisitorModal
+          open
+          onClose={onClose}
+          event={EVENT}
+          uid="counselor-uid"
+          onAdded={onAdded}
+          confirm={confirm}
+        />
+      </ToastProvider>,
+    );
+    await typeVisitor(user);
+    await user.click(screen.getByRole('button', { name: /save & check in/i }));
+
+    expect(confirm).toHaveBeenCalledWith({ kind: 'checkIn', name: 'Robin Fields' }, expect.any(Function));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(quickAddAndCheckIn).not.toHaveBeenCalled();
+    expect(screen.queryByText(/added and checked in/i)).not.toBeInTheDocument();
+
+    await held!();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onAdded).toHaveBeenCalledWith('Robin Fields');
+    expect(quickAddAndCheckIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('what was typed', () => {
+  it('survives the page handing down a fresh event object and a cleared search', async () => {
+    // Neither is rare on a live page: the events listener maps every snapshot
+    // to new objects for the same night, and a searched check-in landing on a
+    // laptop empties the search box behind the sheet. Neither is a reason to
+    // empty a half-typed visitor.
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ToastProvider>
+        <QuickAddVisitorModal
+          open
+          onClose={() => {}}
+          event={EVENT}
+          uid="counselor-uid"
+          initialName="ro"
+        />
+      </ToastProvider>,
+    );
+    // The letters from the search box arrive as the first name.
+    expect(screen.getByLabelText(/^first name/i)).toHaveValue('ro');
+
+    await user.clear(screen.getByLabelText(/^first name/i));
+    await user.type(screen.getByLabelText(/^first name/i), 'Robin');
+    await user.type(screen.getByLabelText(/^last name/i), 'Fields');
+    await user.selectOptions(screen.getByLabelText(/grade/i), '11');
+    await user.click(screen.getByRole('button', { name: /add a contact/i }));
+    await user.type(screen.getByLabelText(/adult’s first name/i), 'Dana');
+
+    rerender(
+      <ToastProvider>
+        <QuickAddVisitorModal
+          open
+          onClose={() => {}}
+          event={{ ...EVENT }}
+          uid="counselor-uid"
+          initialName=""
+        />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByLabelText(/^first name/i)).toHaveValue('Robin');
+    expect(screen.getByLabelText(/^last name/i)).toHaveValue('Fields');
+    expect(screen.getByLabelText(/grade/i)).toHaveValue('11');
+    expect(screen.getByLabelText(/adult’s first name/i)).toHaveValue('Dana');
+  });
+});

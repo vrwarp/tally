@@ -27,9 +27,10 @@
  * ## Both directions
  *
  * `unmergeStudents` exists because this is a screen built for human judgement
- * and human judgement is wrong sometimes. Undoing is clearing two pointers and
- * reactivating a document — cheap enough that not offering it would be a choice
- * rather than a constraint.
+ * and human judgement is wrong sometimes. Undoing is clearing two pointers,
+ * taking back whatever the merge grafted onto the duplicate, and reactivating a
+ * document — cheap enough that not offering it would be a choice rather than a
+ * constraint.
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
@@ -135,8 +136,9 @@ export async function mergeStudents(options: {
    * upstream person, which is precisely the thing somebody will need when they
    * go and merge these two in Planning Center.
    */
-  if (keeperLinkage && !foldLinkage && !parseStudentId(foldId)) {
-    await migrateStudentMemberships(db, foldId, keeperLinkage);
+  const graft = keeperLinkage && !foldLinkage && !parseStudentId(foldId) ? keeperLinkage : null;
+  if (graft) {
+    await migrateStudentMemberships(db, foldId, graft);
   }
 
   const at = Timestamp.fromDate(now);
@@ -147,6 +149,20 @@ export async function mergeStudents(options: {
       // off so no sweep and no reviewer picks the row up again.
       pendingReview: false,
       upstreamPushPending: false,
+      /*
+       * What the graft and the two flags above overwrote, so an un-merge can
+       * put the row back rather than leave an active visitor pointing at the
+       * keeper's person. Only a grafted row needs it: a duplicate with its own
+       * linkage keeps that linkage through both directions.
+       */
+      ...(graft
+        ? {
+            mergeGraft: {
+              pendingReview: fold.pendingReview === true,
+              upstreamPushPending: fold.upstreamPushPending === true,
+            },
+          }
+        : {}),
       mergedIntoStudentId: keeperId,
       mergedAt: at,
       mergedBy: uid,
@@ -225,8 +241,36 @@ export async function unmergeStudents(options: {
     );
   }
 
+  /*
+   * A merge may have pointed a never-pushed duplicate at the keeper's person
+   * (see `mergeStudents`). Left on a row that is active again, that pointer
+   * makes the duplicate a *linked* student: the roster overlays the keeper's
+   * name on it, the sweep skips it, and a full write-back push rewrites the
+   * keeper's upstream record with whatever was typed at the door. Null is the
+   * documented "not held" value for all three fields, and the flags go back to
+   * what they were before the merge turned them off.
+   */
+  const graft =
+    typeof fold.mergeGraft === 'object' && fold.mergeGraft !== null
+      ? (fold.mergeGraft as Record<string, unknown>)
+      : null;
   await foldRef.set(
-    { status: 'active', mergedIntoStudentId: null, updatedAt: at, updatedBy: uid },
+    {
+      status: 'active',
+      mergedIntoStudentId: null,
+      ...(graft
+        ? {
+            pcoPersonId: null,
+            upstreamBackend: null,
+            upstreamPersonId: null,
+            pendingReview: graft.pendingReview === true,
+            upstreamPushPending: graft.upstreamPushPending === true,
+            mergeGraft: null,
+          }
+        : {}),
+      updatedAt: at,
+      updatedBy: uid,
+    },
     { merge: true },
   );
 

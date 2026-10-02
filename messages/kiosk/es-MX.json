@@ -28,7 +28,8 @@
     "printerSettings": "Configuración de la impresora",
     "nameTagsWontPrint": "las etiquetas no se imprimirán",
     "waitingFrom": "{count, plural, one {1 registro} other {# registros}} de {gathering} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
-    "waiting": "{count, plural, one {1 registro} other {# registros}} sin enviar — mantenla conectada a la corriente y al Wi-Fi."
+    "waiting": "{count, plural, one {1 registro} other {# registros}} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
+    "today": "Hoy"
   },
   "Common": {
     "language": "Idioma",
@@ -69,7 +70,8 @@
     "size": "Tamaño",
     "align": "Alineación",
     "bold": "Negrita",
-    "copies": "Copias"
+    "copies": "Copias",
+    "change": "Cambiar"
   },
   "Confirm": {
     "back": "← Atrás",
@@ -234,7 +236,11 @@
     "owedWaiting": "{count, plural, one {1 etiqueta está pendiente.} other {# etiquetas están pendientes.}}",
     "owedPrinting": "{count, plural, one {Imprimiendo 1 etiqueta — llévala al salón.} other {Imprimiendo # etiquetas — llévalas al salón.}}",
     "owedPrinted": "{count, plural, one {1 etiqueta impresa — llévala al salón.} other {# etiquetas impresas — llévalas al salón.}}",
-    "owedRowWaiting": "Pendiente"
+    "owedRowWaiting": "Pendiente",
+    "show": "Mostrar",
+    "hide": "Ocultar",
+    "copy": "Copiar",
+    "copied": "Copiado"
   },
   "Register": {
     "couldNotSave": "Tally no pudo terminar esto. Pruebe otra vez o busque a un líder.",
@@ -375,6 +381,7 @@
     "recordServer": "Tally no lo aceptó",
     "recordArrival": "Esperando su entrada",
     "someone": "Un niño",
-    "changeEventOffline": "No puede conectarse con Tally. Si sale, no podrá elegir otra reunión hasta que vuelva a conectarse."
+    "changeEventOffline": "No puede conectarse con Tally. Si sale, no podrá elegir otra reunión hasta que vuelva a conectarse.",
+    "title": "Personal"
   }
 }

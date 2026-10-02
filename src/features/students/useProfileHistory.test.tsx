@@ -127,6 +127,38 @@ describe('useProfileHistory, when the registry covers the chain', () => {
   });
 });
 
+describe('useProfileHistory, for a student with a duplicate folded in', () => {
+  it('counts the nights recorded against the duplicate as theirs', async () => {
+    /*
+     * The merge keeps the duplicate's attendance documents under its own id,
+     * and the data model promises the profile unions the two at read time —
+     * the list below the grid already did, so the same night read as present
+     * there and as Missed in the grid and the streak tile above it.
+     */
+    fetchSkippedNights.mockResolvedValue(read(covering([])));
+    fetchStudentAttendanceSince.mockImplementation(async (id: string) => ({
+      eventIds: new Set(id === 'tally-dupe' ? ['missed'] : ['came']),
+      withheld: new Set<string>(),
+    }));
+
+    const { result } = renderHook(() =>
+      useProfileHistory(
+        { ...STUDENT, mergedFromStudentIds: ['tally-dupe'] },
+        [CAME, MISSED],
+        WINDOW_START,
+      ),
+    );
+
+    await waitFor(() => expect(result.current.snapshots).toHaveLength(2));
+    expect(fetchStudentAttendanceSince).toHaveBeenCalledWith('ada', WINDOW_START);
+    expect(fetchStudentAttendanceSince).toHaveBeenCalledWith('tally-dupe', WINDOW_START);
+    const [came, missed] = result.current.snapshots;
+    expect(came.presentStudentIds.has('ada')).toBe(true);
+    // The folded night, as the keeper's.
+    expect(missed.presentStudentIds.has('ada')).toBe(true);
+  });
+});
+
 describe('useProfileHistory, when the registry has not examined a night', () => {
   it('reads the nights it does not know, and only those', async () => {
     // Covered from January, so December is beyond the watermark.

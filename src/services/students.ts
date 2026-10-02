@@ -138,8 +138,12 @@ export async function updateStudent(
   const firstName = (payload.firstName as string | undefined) ?? current?.firstName;
   const lastName = (payload.lastName as string | undefined) ?? current?.lastName;
   if (firstName !== undefined && lastName !== undefined) {
-    payload.firstName ??= firstName;
-    payload.lastName ??= lastName;
+    // Only a half the roster actually holds. The backends write `lastName: ''`
+    // for somebody with no surname on file, and the rules refuse a blank name
+    // — so a note against that student failed every time. The search key is
+    // built from whatever is there, as the roster's own was.
+    if (firstName) payload.firstName ??= firstName;
+    if (lastName) payload.lastName ??= lastName;
     payload.searchName = buildSearchName(firstName, lastName);
   }
   /*

@@ -14,7 +14,7 @@
  */
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { act, render, screen, within } from '@/test/rtl';
+import { act, fireEvent, render, screen, within } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, type AuthContextValue } from '@/context/authContext';
 import { DataContext, type DataContextValue } from '@/context/dataContext';
@@ -86,6 +86,8 @@ interface ShowOptions {
   canWork?: DataContextValue['canWork'];
   /** `can('admin')`, which passes the access gate unconditionally. */
   admin?: boolean;
+  /** The reader's language; English unless a test is about another. */
+  locale?: 'zh-Hant';
 }
 
 function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
@@ -139,7 +141,7 @@ function show(events: readonly TallyEvent[], options: ShowOptions = {}) {
     </AuthContext.Provider>
   );
 
-  return render(tree);
+  return render(tree, options.locale ? { locale: options.locale } : undefined);
 }
 
 describe('what an admin can see that nobody else needs to', () => {
@@ -288,6 +290,29 @@ describe('the bands', () => {
     await settle();
   });
 
+  it('keeps a gathering that started before midnight and is still open in today', async () => {
+    /*
+     * The lock-in at half eleven, twenty past midnight. By the calendar it
+     * began yesterday, so it was filed in the history below and the top of
+     * the page said nothing was on — while the counselor on the door was
+     * checking people into it.
+     */
+    const lockIn = event({
+      id: 'lock-in',
+      title: 'Fall Lock-In',
+      startAt: new Date(2026, 6, 28, 23, 30),
+      endAt: new Date(2026, 6, 29, 8, 0),
+    });
+    vi.setSystemTime(new Date(2026, 6, 29, 0, 20));
+    fetchPastEvents.mockResolvedValue({ events: [lockIn], cursor: null, hasMore: false });
+    show([lockIn]);
+
+    expect(within(band(/^today$/i)).getByText('Fall Lock-In')).toBeInTheDocument();
+    const past = await screen.findByRole('region', { name: /past gatherings/i });
+    expect(within(past).queryByText('Fall Lock-In')).not.toBeInTheDocument();
+    await settle();
+  });
+
   it('puts the coming week in the middle band', async () => {
     show([event({ title: 'Sunday School', startAt: at(31, 9, 30), endAt: at(31, 10, 45) })]);
 
@@ -304,6 +329,29 @@ describe('the bands', () => {
     expect(within(band(/^later$/i)).getByText('Winter Retreat')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /next seven days/i })).not.toBeInTheDocument();
     await settle();
+  });
+
+  /*
+   * The same claim, one step further out. "Later" asks before it lists past
+   * the end of next month, and the control it asks with lived inside the band
+   * — so a retreat past that horizon with nothing nearer took the band, the
+   * control and itself off the screen, and the page said nothing was scheduled.
+   */
+  it('keeps a retreat past the horizon reachable when nothing is nearer', async () => {
+    // Today is 29 July, so the horizon is 1 September; November is past it.
+    show([
+      event({
+        title: 'Winter Retreat',
+        startAt: new Date(2026, 10, 20, 17),
+        endAt: new Date(2026, 10, 22, 15),
+      }),
+    ]);
+    await settle();
+
+    expect(screen.queryByText('Nothing scheduled yet')).not.toBeInTheDocument();
+    const later = band(/^later$/i);
+    fireEvent.click(within(later).getByRole('button', { name: 'Show 1 later gathering' }));
+    expect(within(later).getByText('Winter Retreat')).toBeInTheDocument();
   });
 
   it('claims no band it has nothing to put in', async () => {
@@ -665,5 +713,67 @@ describe('the week boundary', () => {
     expect(screen.queryByRole('region', { name: /^later$/i })).not.toBeInTheDocument();
 
     await settle();
+  });
+});
+
+/**
+ * The calendar in another language.
+ *
+ * Three things on this screen were English literals beside translated
+ * neighbours: the button that unfolds gatherings past the two-month horizon,
+ * the count on a locked chain's heading, and the badge on a cancelled night
+ * in the history.
+ */
+describe('the calendar, in another language', () => {
+  it('unfolds the far gatherings in the reader’s language', async () => {
+    show([event({ title: 'Winter Retreat', startAt: at(31 + 120, 17), endAt: at(31 + 122, 15) })], {
+      locale: 'zh-Hant',
+    });
+
+    expect(screen.queryByRole('button', { name: /later gathering/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '顯示之後的 1 次聚會' })).toBeInTheDocument();
+    await settle();
+  });
+
+  it('counts a locked chain’s nights in the reader’s language', async () => {
+    const chain = (day: number) =>
+      event({
+        id: `friday-${day}`,
+        title: 'Friday Fellowship',
+        seriesId: 'friday-fellowship',
+        startAt: at(day, 19),
+        endAt: at(day, 21),
+      });
+    // Two nights in one band, so the band draws them as one group with a count.
+    show([chain(30), chain(31)], {
+      canWork: (candidate: { seriesId: string | null }) => candidate.seriesId !== 'friday-fellowship',
+      locale: 'zh-Hant',
+    } as ShowOptions);
+
+    expect(screen.queryByText(/\d+ gatherings/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('2 次聚會').length).toBeGreaterThan(0);
+    await settle();
+  });
+
+  it('marks a cancelled night in the history in the reader’s language', async () => {
+    fetchPastEvents.mockResolvedValue({
+      events: [
+        event({
+          id: 'snowed-off',
+          title: 'Friday Fellowship',
+          status: 'cancelled',
+          startAt: at(24, 19),
+          endAt: at(24, 21),
+        }),
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+
+    show([], { locale: 'zh-Hant' });
+
+    const past = await screen.findByRole('region', { name: '過去的聚會' });
+    expect(within(past).queryByText('Cancelled')).not.toBeInTheDocument();
+    expect(await within(past).findByText('已取消')).toBeInTheDocument();
   });
 });

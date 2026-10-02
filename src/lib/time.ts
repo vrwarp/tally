@@ -129,7 +129,11 @@ export function recentChainInstances(
     .slice(0, Math.max(0, count));
 }
 
-/** Materialises the next occurrence of a series on or after `from`. */
+/**
+ * Materialises the next occurrence of a series that has not ended by `from` —
+ * which is tonight's, from the morning of the series day until the gathering
+ * is over, and last night's lock-in at half past midnight.
+ */
 export function nextSeriesOccurrence(
   series: Pick<
     EventSeries,
@@ -139,23 +143,37 @@ export function nextSeriesOccurrence(
 ): { startAt: Date; endAt: Date; checkInOpensAt: Date; checkInClosesAt: Date } {
   const day = startOfDay(from);
   const delta = (series.dayOfWeek - day.getDay() + 7) % 7;
-  day.setDate(day.getDate() + delta);
+  // The series day *before* the first one on or after `from`: a lock-in that
+  // began last night is still the one that matters at half past midnight.
+  day.setDate(day.getDate() + delta - 7);
+
+  /*
+   * When a gathering that starts at `start` ends. A lock-in that runs
+   * 22:00-01:00 ends on the following day — without this the check-in window
+   * would close before it opened — and so does a series written as ending when
+   * it starts. The following day, not twenty-four hours on: across a clock
+   * change those differ by an hour, and the series is written in wall-clock
+   * time like everything else here.
+   */
+  const endOf = (start: Date): Date => {
+    const end = atTimeOfDay(start, series.endTime);
+    if (end <= start) end.setDate(end.getDate() + 1);
+    return end;
+  };
 
   let startAt = atTimeOfDay(day, series.startTime);
-  // If today *is* the series day but the gathering already ended, roll a week.
-  // Stryker disable next-line ConditionalExpression: `delta` is only ever zero
-  // or positive, and a positive one puts `day` on a later date than `from` —
-  // so that day's end time is after `from` and the second clause decides it
-  // alone. The first says which case the roll is *for*.
-  if (delta === 0 && atTimeOfDay(day, series.endTime) < from) {
+  // Forward a week at a time past every occurrence that has already ended.
+  // Decided from when the gathering really ends, not from its end *time* on
+  // the day: on the morning of a 22:00-01:00 lock-in the clock is past 01:00
+  // and the night has not happened. Two steps at most — last week's is over
+  // unless it ran past midnight into today, and this week's either is or is
+  // not.
+  while (endOf(startAt) < from) {
     day.setDate(day.getDate() + 7);
     startAt = atTimeOfDay(day, series.startTime);
   }
 
-  let endAt = atTimeOfDay(startAt, series.endTime);
-  // A lock-in that runs 22:00-01:00 ends on the following day. Without this the
-  // check-in window would close before it opened.
-  if (endAt <= startAt) endAt = new Date(endAt.getTime() + 86_400_000);
+  const endAt = endOf(startAt);
 
   return {
     startAt,
@@ -408,7 +426,7 @@ export function formatSeenShort(
    * days, and 1 Jan to 31 Jan is thirty days and no calendar month at all.
    * Weeks own everything under thirty days; months start at one.
    */
-  const months = Math.max(1, differenceInCalendarMonths(now, date));
+  const months = Math.max(1, Math.min(differenceInCalendarMonths(now, date), Math.floor(days / 30)));
   if (months < 12) return strings.t('monthsAgo', { count: months });
 
   return strings.t('yearsAgo', { count: Math.floor(months / 12) });

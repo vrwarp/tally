@@ -27,6 +27,7 @@ import type {
   PrinterStatus,
 } from '@/kiosk/printing';
 import { describeAge, describeEntry } from '@/kiosk/printing/log';
+import { labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
 
 /**
  * A label, as far as this screen reads one: something to identify and a name to
@@ -82,6 +83,8 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     checkPrinter: vi.fn(async () => found),
     forgetPrinter: vi.fn(async (): Promise<PrinterConfig | null> => null),
     testPrint: vi.fn(),
+    ready: vi.fn(async () => ({ kind: 'trouble' as const, message: { key: 'troubleNotFound' as const }, advice: null })),
+    LOOK_AGAIN: 'look-again',
     printerLog: () => events,
     printerLogText: () => 'the whole record',
     describeAge,
@@ -94,6 +97,7 @@ function mount(
   printing: KioskPrinting,
   config: PrinterConfig = { model: 'QL-800', label: '62' },
   extra: Partial<ComponentProps<typeof PrinterScreen>> = {},
+  locale?: 'zh-Hant',
 ) {
   render(
     <PrinterScreen
@@ -107,6 +111,7 @@ function mount(
       onDone={vi.fn()}
       {...extra}
     />,
+    locale ? { locale } : undefined,
   );
 }
 
@@ -155,6 +160,60 @@ function handleUnpaired(): KioskPrinting {
     currentState: (): PrinterState => ({ kind: 'unpaired', searching: false }),
   } as unknown as KioskPrinting;
 }
+
+/**
+ * The same handle, reading the library's own table for the roll list.
+ *
+ * Stubbed everywhere else here because the tables are `detect.test.ts`'s
+ * business; what this one is for is what the real table does with a model it
+ * does not carry, which is throw.
+ */
+function handleWithRealTables(): KioskPrinting {
+  const printing = handleWith(null);
+  return {
+    ...printing,
+    labelsForModel,
+    currentState: (): PrinterState => ({
+      kind: 'ready',
+      config: { model: 'QL-9999', label: '62x29' },
+    }),
+  } as unknown as KioskPrinting;
+}
+
+describe('a stored model the tables do not carry', () => {
+  /*
+   * `readPrinterConfig` asks only for a non-empty string, so a config edited by
+   * hand — or written by a kiosk whose tables still had the model — reaches
+   * this screen saying whatever it says. The library throws on it, and a throw
+   * from a render took the whole kiosk down with it, on the one screen that
+   * would have let somebody pick a model the tables do know.
+   */
+  const UNKNOWN: PrinterConfig = { model: 'QL-9999', label: '62x29' };
+
+  it('opens rather than throwing, with the model still somebody’s to pick', () => {
+    expect(() => mount(handleWithRealTables(), UNKNOWN)).not.toThrow();
+
+    const select = screen.getByLabelText('Printer model');
+    expect(within(select).getByRole('option', { name: 'QL-810W' })).toBeInTheDocument();
+  });
+
+  it('says so where the roll would have been', () => {
+    mount(handleWithRealTables(), UNKNOWN);
+
+    expect(
+      screen.getByText(/QL-9999 · This kiosk is set up for a printer it cannot find/),
+    ).toBeInTheDocument();
+  });
+
+  it('writes a roll that fits as soon as a real model is picked', () => {
+    const printing = handleWithRealTables();
+    mount(printing, UNKNOWN);
+
+    fireEvent.change(screen.getByLabelText('Printer model'), { target: { value: 'QL-810W' } });
+
+    expect(printing.configure).toHaveBeenCalledWith({ model: 'QL-810W', label: '62x29' });
+  });
+});
 
 describe('a printer the tablet policy granted', () => {
   /*
@@ -718,5 +777,38 @@ describe('the setting that gives a managed tablet its printer', () => {
         `The rest of the tablet settings, and what each one is for, are at ${ORIGIN}/setup.`,
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe('pressing Look again', () => {
+  it('tells the printing module it was a press, so the owed hand-off can follow', async () => {
+    // The call used to go out bare, which the module reads as a boot: the
+    // record said 'boot' and the hand-off that waits for a press never fired.
+    const printing = handleWith(null);
+    Object.assign(printing, {
+      currentState: () => ({ kind: 'trouble', message: { key: 'troubleNotFound' }, advice: null }),
+    });
+    mount(printing);
+
+    await press(/look again/i);
+
+    expect(printing.ready).toHaveBeenCalledWith('look-again');
+  });
+});
+
+describe('the printer screen, in another language', () => {
+  it('labels its folds and its copy button in the kiosk’s language', async () => {
+    // Change, Show and Copy were the only English words left on a staff
+    // screen whose every other line was translated.
+    const printing = handleWith(null, [
+      { atMs: Date.now(), kind: 'state', detail: 'ready' } as unknown as PrinterLogEntry,
+    ]);
+    mount(printing, undefined, {}, 'zh-Hant');
+
+    for (const word of ['Change', 'Show', 'Copy']) {
+      expect(screen.queryByText(word)).not.toBeInTheDocument();
+    }
+    expect(screen.getByText('變更')).toBeInTheDocument();
+    expect(screen.getAllByText('顯示').length).toBeGreaterThan(0);
   });
 });

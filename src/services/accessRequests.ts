@@ -91,9 +91,11 @@ export function isOutstanding(request: AccessRequest, nowMs: number): boolean {
 /**
  * Puts somebody's name on the Add list for a gathering.
  *
- * Written as themselves — the rules pin `uid` to the caller — and idempotent,
- * because the id is the pair. A second press re-stamps `askedAt`, which is the
- * honest reading of pressing again: it is the same ask, today.
+ * Written as themselves — the rules pin `uid` to the caller — and once: the
+ * id is the pair, and the rules refuse the asker a second write of their own
+ * row, so pressing again is refused rather than re-stamped. The button is not
+ * offered while a row exists, nor before the listener has said whether one
+ * does, so the refusal is a fence rather than a path.
  */
 export async function askToBeAdded(
   chainKey: string,

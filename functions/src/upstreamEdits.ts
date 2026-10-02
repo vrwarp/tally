@@ -110,6 +110,8 @@ export interface EditRecord {
   nextAttemptAtMs: number | null;
   leaseUntilMs: number | null;
   createdAtMs: number;
+  /** When it landed or was cancelled; null while it is still open. */
+  settledAtMs: number | null;
 }
 
 /**
@@ -184,6 +186,7 @@ export function toEditRecord(id: string, data: Record<string, unknown>): EditRec
     nextAttemptAtMs: millis(data.nextAttemptAt),
     leaseUntilMs: millis(data.leaseUntil),
     createdAtMs: millis(data.createdAt) ?? 0,
+    settledAtMs: millis(data.settledAt),
   };
 }
 
@@ -202,9 +205,10 @@ export function isRunnable(edit: EditRecord, nowMs: number): boolean {
  *
  * `create` is the whole mechanism: the admin SDK rejects rather than
  * overwriting, so two workers racing for one child produce exactly one winner
- * with no transaction. An expired lease is broken and re-taken once — and if
- * that second `create` also loses, the other worker won fairly and this one
- * simply leaves.
+ * with no transaction. An expired lease is broken and re-taken inside one, so
+ * that it is only replaced if it is still the dead lease that was read: two
+ * workers breaking the same one used to be able to both come away holding it,
+ * the second's delete-and-create landing on top of the first's live lease.
  */
 export async function claimStudent(
   db: FirestoreLike,
@@ -219,14 +223,16 @@ export async function claimStudent(
     await ref.create(lease);
     return true;
   } catch {
-    const held = await ref.get();
-    const until = held.exists ? millis(held.data()?.untilMs) : null;
-    if (until !== null && until > nowMs) return false;
-    await ref.delete();
     try {
-      await ref.create(lease);
-      return true;
+      return await db.runTransaction(async (tx) => {
+        const held = await tx.get(ref);
+        const until = held.exists ? millis(held.data()?.untilMs) : null;
+        if (until !== null && until > nowMs) return false;
+        tx.set(ref, lease);
+        return true;
+      });
     } catch {
+      // Too much contention is the other worker winning; leave as before.
       return false;
     }
   }
@@ -575,8 +581,12 @@ export async function sweepEdits(deps: DrainDeps, limit = 5): Promise<SweepResul
 
   let swept = 0;
   for (const edit of edits) {
-    const settledLongAgo = edit.state === 'landed' || edit.state === 'cancelled';
-    if (settledLongAgo && nowMs - (millis(edit.nextAttemptAtMs) ?? edit.createdAtMs) > LANDED_TTL_MS) {
+    const settled = edit.state === 'landed' || edit.state === 'cancelled';
+    // Aged from when it settled, not from when it was asked for: the green
+    // mark is for the minute or two after a job lands, and a retry that
+    // landed a day after it was queued has only just earned one. A row from
+    // before the field was written ages from its creation, as it always did.
+    if (settled && nowMs - (edit.settledAtMs ?? edit.createdAtMs) > LANDED_TTL_MS) {
       // The instruction had a lifetime and it is over. This is what keeps the
       // queue from becoming the copy of a managed field that the whole
       // no-mirror rule exists to forbid.

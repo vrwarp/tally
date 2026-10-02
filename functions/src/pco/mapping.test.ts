@@ -14,6 +14,7 @@ import {
   pcoGrade,
   splitFirstName,
   UNKNOWN_BIRTH_YEAR,
+  gradeFromGraduationYear,
 } from './mapping.js';
 import type {
   JsonApiResource,
@@ -165,6 +166,14 @@ describe('mapPersonToStudent', () => {
     );
 
     expect(mapped.grade).toBe(9);
+  });
+
+  it('rolls the school year over at midnight where the church is, not in UTC', () => {
+    // 1 August 2026, 03:00 UTC is still 31 July in Los Angeles; 07:00 UTC is
+    // past midnight there. The outgoing seniors used to vanish seven hours
+    // early, and every derived grade read one too high until midnight local.
+    expect(gradeFromGraduationYear(2027, new Date('2026-08-01T03:00:00Z'))).toBe(11);
+    expect(gradeFromGraduationYear(2027, new Date('2026-08-01T07:00:00Z'))).toBe(12);
   });
 
   it('will not extrapolate a graduation year past either end of school', () => {

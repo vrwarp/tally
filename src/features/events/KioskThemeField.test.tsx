@@ -88,7 +88,9 @@ describe('KioskThemeField', () => {
     render(<Harness />);
     await user.click(trigger());
 
-    await user.click(within(group('Ground')).getByRole('button', { name: 'light' }));
+    // Named by the catalogue, as the summary already was — it used to be the
+    // raw value, capitalised by CSS and read out lower case.
+    await user.click(within(group('Ground')).getByRole('button', { name: 'Light' }));
     expect(trigger()).toHaveTextContent('Light');
   });
 
@@ -184,5 +186,24 @@ describe('KioskThemeField', () => {
     // on the backdrop row — and one more for the preview strip, which is
     // memoised on the theme and the theme is exactly what just changed.
     expect(paintings).toHaveBeenCalledTimes(25);
+  });
+});
+
+describe('KioskThemeField, in another language', () => {
+  it('says nothing in English to a leader reading Chinese', async () => {
+    // The trigger's verb, the legend and the two ground buttons were English
+    // literals beside a summary that was already translated.
+    const user = userEvent.setup();
+    const { container } = render(<Harness />, { locale: 'zh-Hant' });
+    const button = container.querySelector('button[aria-expanded]') as HTMLButtonElement;
+    expect(button).not.toHaveTextContent('Change');
+    expect(button).toHaveTextContent('變更');
+
+    await user.click(button);
+
+    expect(button).not.toHaveTextContent('Done');
+    expect(screen.queryByText('Ground')).not.toBeInTheDocument();
+    expect(within(group('底色')).getByRole('button', { name: '淺色' })).toBeInTheDocument();
+    expect(within(group('底色')).getByRole('button', { name: '深色' })).toBeInTheDocument();
   });
 });

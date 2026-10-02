@@ -266,3 +266,25 @@ describe('NewVisitorList', () => {
     expect(screen.getByRole('button', { name: 'Save to Planning Center' })).toBeInTheDocument();
   });
 });
+
+describe('when the first visit is dated ahead of the clock', () => {
+  it('does not say a child in the room is arriving in fourteen minutes', () => {
+    // The first visit is dated to the gathering's start, and the door opens
+    // an hour before it, so a first-timer on this list can be "in the
+    // future" for most of an hour.
+    const soon = new Date(Date.now() + 14 * 60_000);
+    render(
+      <MemoryRouter>
+        <ParentContactHost>
+          <NewVisitorList
+            items={[{ ...visitor(quickAdded()), firstAttendedAt: soon }]}
+            windowDays={7}
+          />
+        </ParentContactHost>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText(/in \d+ minutes/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Friday Night ·/)).toBeInTheDocument();
+  });
+});

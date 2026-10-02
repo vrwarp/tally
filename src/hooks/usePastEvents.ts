@@ -49,7 +49,15 @@ export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): P
   const [events, setEvents] = useState<TallyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  /*
+   * Held raw and worded at render, not stored as a sentence. The translator
+   * is a new function on every language change, and `load` closing over it
+   * made `load` new too — which re-ran the mount effect, read page one again
+   * and threw away every page somebody had scrolled to, on a tap that changed
+   * nothing about what happened in March. Deriving it also lets a banner
+   * already up follow the language, as `DataProvider`'s do.
+   */
+  const [failed, setFailed] = useState(false);
 
   /*
    * The cursor lives in a ref rather than in state.
@@ -104,17 +112,17 @@ export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): P
           return [...base, ...page.events.filter((event) => !seen.has(event.id))];
         });
         setHasMore(page.hasMore);
-        setError(null);
+        setFailed(false);
       } catch {
         // The cursor is left where it was, so a retry asks for the same page
         // rather than skipping one.
-        setError(t('olderGatherings'));
+        setFailed(true);
       } finally {
         inFlight.current = false;
         setLoading(false);
       }
     },
-    [pageSize, t],
+    [pageSize],
   );
 
   useEffect(() => {
@@ -122,14 +130,16 @@ export function usePastEvents(before: Date, pageSize = PAST_EVENTS_PAGE_SIZE): P
   }, [load]);
 
   const loadMore = useCallback(() => {
-    if (error) return;
+    if (failed) return;
     void load(false);
-  }, [load, error]);
+  }, [load, failed]);
 
   const retry = useCallback(() => {
-    setError(null);
+    setFailed(false);
     void load(false);
   }, [load]);
+
+  const error = failed ? t('olderGatherings') : null;
 
   return { events, loading, hasMore, error, loadMore, retry };
 }

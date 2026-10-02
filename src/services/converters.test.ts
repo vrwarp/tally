@@ -114,6 +114,32 @@ describe('toStudent', () => {
     expect(own.profileComplete).toBe(false);
   });
 
+  it('stops answering once an Attendees push has landed, in that spelling of the link', () => {
+    /*
+     * The push to Attendees writes the generic pair and never `pcoPersonId`
+     * — `upstreamBackend` / `upstreamPersonId` is the contract. Reading only
+     * the Planning Center spelling left every visitor pushed there saying
+     * `false` for good, for the same reason the test above exists.
+     */
+    const pushed = toStudent(
+      fakeSnapshot({ data: { upstreamBackend: 'a32', upstreamPersonId: '8c1f2c34' } }),
+    );
+
+    expect(pushed.profileComplete).toBeNull();
+
+    // Half a pair is no link, and neither is a backend nobody has heard of.
+    expect(toStudent(fakeSnapshot({ data: { upstreamBackend: 'a32' } })).profileComplete).toBe(
+      false,
+    );
+    expect(
+      toStudent(fakeSnapshot({ data: { upstreamPersonId: '8c1f2c34' } })).profileComplete,
+    ).toBe(false);
+    expect(
+      toStudent(fakeSnapshot({ data: { upstreamBackend: 'Object', upstreamPersonId: '1' } }))
+        .profileComplete,
+    ).toBe(false);
+  });
+
   it('answers null for a document that holds no grade, rather than inventing a 6', () => {
     // An annotation written against somebody the backend holds no grade for.
     // This used to answer 6 with a `gradeOnFile: false` flag beside it, which
@@ -564,9 +590,28 @@ describe('toEvent', () => {
       interval: 1,
       weekdays: [5],
       monthlyMode: 'dayOfMonth',
+      monthlyPosition: null,
       until: null,
       count: 13,
     });
+  });
+
+  it('keeps the weekday reading a monthly rule was written with', () => {
+    // 28 Aug 2026 is the fourth Friday and the last. A rule saved as "the
+    // fourth" stays the fourth on that night; one written before the field
+    // existed, or with a reading the date cannot carry, takes the date's own.
+    const startAt = new Date(2026, 7, 28, 19, 0);
+    const read = (recurrence: Record<string, unknown>) =>
+      toEvent(fakeSnapshot({ data: { startAt: ts(startAt), recurrence } })).recurrence
+        ?.monthlyPosition;
+    const monthly = { frequency: 'monthly', interval: 1, weekdays: [], monthlyMode: 'dayOfWeek' };
+
+    expect(read({ ...monthly, monthlyPosition: 4 })).toBe(4);
+    expect(read({ ...monthly, monthlyPosition: -1 })).toBe(-1);
+    expect(read(monthly)).toBe(-1);
+    expect(read({ ...monthly, monthlyPosition: 2 })).toBe(-1);
+    expect(read({ ...monthly, monthlyPosition: 'fourth' })).toBe(-1);
+    expect(read({ ...monthly, monthlyMode: 'dayOfMonth', monthlyPosition: 4 })).toBeNull();
   });
 
   it('reads anything that is not a recurrence rule as "does not repeat"', () => {

@@ -16,7 +16,7 @@ import {
   splitFirstName,
   trimmed,
 } from '../backends/mappingShared.js';
-import type { A32Config } from '../config.js';
+import { ABSOLUTE_MAX_GRADE, ABSOLUTE_MIN_GRADE, type A32Config } from '../config.js';
 import { PATHS, SILENT_LOGGER, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { parseStudentId } from '../generated/backendIds.js';
 import type { TtlCache } from '../pco/cache.js';
@@ -213,8 +213,7 @@ export async function pushStudent(
   const resolved = await resolveA32Person(db, studentId);
   const personId = resolved.personId;
 
-  // See backends/pendingReview.ts — and note that Attendees has no merges at
-  // all, so a person created here in error is created for ever.
+  // See backends/pendingReview.ts.
   if (isHeldForReview(data)) {
     return { status: 'skipped', pcoPersonId: personId, message: HELD_FOR_REVIEW_MESSAGE };
   }
@@ -240,18 +239,38 @@ export async function pushStudent(
       return { status: 'skipped', pcoPersonId: personId, message: 'Already linked to Attendees.' };
     }
 
+    /*
+     * The linked person may have been merged away since the push linked them —
+     * an admin tidying duplicates is exactly who generates pushed visitors
+     * with stale links. Attendees answers `410` with the survivor; follow it,
+     * keep the document pointed at somebody real, and sync against them. Only
+     * a trail that ends dead is a skip — and one a leader can act on, rather
+     * than an invitation to push a duplicate of the record just cleaned up.
+     */
+    let linkedId = personId;
     let attendee: A32Attendee;
     try {
-      attendee = await client.get<A32Attendee>(API.attendeeById(personId));
+      attendee = await client.get<A32Attendee>(API.attendeeById(linkedId));
     } catch (error) {
       if (!isA32GoneError(error)) throw error;
-      return {
-        status: 'skipped',
-        pcoPersonId: personId,
-        message:
-          'Attendees no longer has this person — deleted there. ' +
-          'Take the student off the roster, or clear the link to push them as new.',
-      };
+      const link = await followA32PersonLink(client, linkedId, error);
+      if (link.outcome !== 'live') {
+        return {
+          status: 'skipped',
+          pcoPersonId: personId,
+          message:
+            'Attendees no longer has this person — deleted or merged away there. ' +
+            'Take the student off the roster, or clear the link to push them as new.',
+        };
+      }
+      linkedId = link.personId;
+      attendee = link.attendee;
+      await ref.update({ upstreamBackend: 'a32', upstreamPersonId: linkedId, updatedAt: nowTs });
+      logger.info('Followed an Attendees merge while pushing', {
+        studentId,
+        a32AttendeeId: linkedId,
+        mergedFrom: personId,
+      });
     }
 
     const patch: Record<string, unknown> = {};
@@ -264,16 +283,16 @@ export async function pushStudent(
     }
 
     if (Object.keys(patch).length === 0) {
-      return { status: 'skipped', pcoPersonId: personId, message: 'Attendees is already up to date.' };
+      return { status: 'skipped', pcoPersonId: linkedId, message: 'Attendees is already up to date.' };
     }
 
-    await client.patch(API.attendeeById(personId), patch, {
-      'X-Target-Attendee-Id': personId,
+    await client.patch(API.attendeeById(linkedId), patch, {
+      'X-Target-Attendee-Id': linkedId,
     });
     await ref.update({ pcoSyncedAt: nowTs, upstreamPushPending: false, updatedAt: nowTs });
     return {
       status: 'updated',
-      pcoPersonId: personId,
+      pcoPersonId: linkedId,
       message: `Updated ${Object.keys(patch).join(', ')} in Attendees.`,
     };
   }
@@ -301,9 +320,7 @@ export async function pushStudent(
    */
   /*
    * A reviewer's answer, where there is one — read back live and refused rather
-   * than substituted. See the same block in ../pco/pushStudents.ts; the reason
-   * bites harder here, because Attendees has no merges at all and a person
-   * created in error is created for ever.
+   * than substituted. See the same block in ../pco/pushStudents.ts.
    */
   const chosenId = trimmed(options.personId ?? null);
   let existing: A32Attendee | null = null;
@@ -545,17 +562,29 @@ export async function updateStudentProfile(
   if (options.lastName !== undefined && !options.lastName.trim()) {
     return { status: 'invalid', wrote: [], message: 'A last name is required.', person: null, before: null };
   }
-  if (
-    options.grade !== undefined &&
-    (options.grade < config.minGrade || options.grade > config.maxGrade)
-  ) {
-    return {
-      status: 'invalid',
-      wrote: [],
-      message: `Grade must be between ${config.minGrade} and ${config.maxGrade}.`,
-      person: null,
-      before: null,
-    };
+  /*
+   * The absolute bounds, not the configured band. The band decides who is on
+   * the roster, not what grade a child is in: a nursery child's Pre-K is a
+   * real grade this backend holds, and refusing it meant it could never be
+   * corrected from Tally. Going out of the band is warned about below, once
+   * the write has landed — the same as ../pco/profile.ts.
+   */
+  if (options.grade !== undefined) {
+    const grade = options.grade;
+    if (!Number.isInteger(grade) || grade < ABSOLUTE_MIN_GRADE || grade > ABSOLUTE_MAX_GRADE) {
+      // The bottom two grades have names rather than numbers — `-1` is Pre-K
+      // and `0` is kindergarten — and "between -1 and 12" reads like a bug
+      // report rather than a sentence about a child.
+      const NAMED_GRADES: Record<number, string> = { [-1]: 'Pre-K', 0: 'K' };
+      const floor = NAMED_GRADES[ABSOLUTE_MIN_GRADE] ?? String(ABSOLUTE_MIN_GRADE);
+      return {
+        status: 'invalid',
+        wrote: [],
+        message: `Grade has to be between ${floor} and ${ABSOLUTE_MAX_GRADE}.`,
+        person: null,
+        before: null,
+      };
+    }
   }
 
   const resolved = await resolveA32Person(db, studentId);
@@ -697,10 +726,24 @@ export async function updateStudentProfile(
   const updated = await client.patch<A32Attendee>(API.attendeeById(personId), patch, {
     'X-Target-Attendee-Id': personId,
   });
+
+  /*
+   * A grade outside the configured band is a legitimate edit with a
+   * consequence nobody would guess: the roster is built by grade, so the
+   * student is about to vanish from every screen. Said here, once, rather than
+   * left for somebody to discover on Friday.
+   */
+  const outOfBand =
+    options.grade !== undefined &&
+    wrote.includes('grade') &&
+    (options.grade < config.minGrade || options.grade > config.maxGrade);
+
   return {
     status: 'updated',
     wrote,
-    message: `Saved ${wrote.join(', ')} to Attendees.`,
+    message: outOfBand
+      ? `Saved ${wrote.join(', ')} to Attendees. That grade is outside the ${config.minGrade}-${config.maxGrade} band Tally reads, so they will drop off the roster.`
+      : `Saved ${wrote.join(', ')} to Attendees.`,
     person: mapAttendeeToRosterPerson(updated),
     // What was on file when this call looked, which is what lets the edit queue
     // tell "your edit landed" from "somebody had already changed this".
@@ -908,6 +951,12 @@ export async function addParent(
       if (isA32GoneError(error)) return refuse('not-an-adult', 'Attendees has no person with that id.');
       throw error;
     }
+    if (isChildAttendee(chosen, relations)) {
+      // A child cannot be somebody's emergency contact, and the read path
+      // would not rank them as one either — the row would go on saying
+      // unreachable. The same refusal as ../pco/household.ts.
+      return refuse('not-an-adult', 'That person is recorded as a child in Attendees.');
+    }
     parentId = chosen.id;
     contactName = adultContactOf(chosen).contactName;
   } else {
@@ -929,6 +978,10 @@ export async function addParent(
       )) {
         for (const attendee of page.data) {
           if (attendee.id === studentPersonId) continue;
+          // A parent search stays off children — the guard Planning Center
+          // gets from `where[child]=false`. A junior sharing his father's
+          // name is the ordinary case this keeps out of the parent seat.
+          if (isChildAttendee(attendee, relations)) continue;
           const name = buildSearchName(firstName, lastName);
           const theirs = buildSearchName(
             displayFirstNameOf(attendee),
@@ -1620,6 +1673,7 @@ export async function recreateStudent(
   },
 ): Promise<RecreateStudentResult> {
   const { db, client, config, studentId } = options;
+  const logger = options.logger ?? SILENT_LOGGER;
 
   if (config.writeBack === 'off') {
     return {
@@ -1648,6 +1702,25 @@ export async function recreateStudent(
       studentId,
     };
   }
+  if (check.outcome === 'relinked') {
+    // A merge with a living survivor is a relink, never a re-create: creating
+    // here would manufacture the duplicate the admin just cleaned up.
+    const moved = await migrateStudentMemberships(db, studentId, {
+      backendId: 'a32',
+      personId: check.personId,
+    });
+    logger.info('Relinked a student to a merge survivor instead of re-creating', {
+      studentId,
+      a32AttendeeId: check.personId,
+    });
+    return {
+      status: 'relinked',
+      message:
+        'Their record was merged, not deleted — the student now points at the person Attendees kept. Nothing was created.',
+      pcoPersonId: check.personId,
+      studentId: moved.studentId,
+    };
+  }
 
   const firstName = options.firstName?.trim() || readString(resolved.data, 'firstName');
   const lastName = options.lastName?.trim() || readString(resolved.data, 'lastName');
@@ -1658,6 +1731,43 @@ export async function recreateStudent(
     return {
       status: 'needs-details',
       message: 'A name is needed to re-create this student in Attendees.',
+    };
+  }
+
+  /*
+   * Search before creating, on the same terms the push uses.
+   *
+   * The commonest reason a record is *deleted* rather than merged is an office
+   * admin clearing a duplicate by hand — exactly the case where another record
+   * of this child is sitting in Attendees, and the screen offering this button
+   * promises that a second copy will not be made. The match is the strict one
+   * (name and grade, a child with no grade when there is none to match on), so
+   * this cannot graft a child onto a same-named adult.
+   */
+  const match = (
+    await findExistingAttendees(
+      client,
+      firstName,
+      lastName,
+      grade,
+      grade === null ? await allRelations(options) : new Map(),
+    )
+  )[0];
+  if (match) {
+    const moved = await migrateStudentMemberships(db, studentId, {
+      backendId: 'a32',
+      personId: match.id,
+    });
+    logger.info('Found an existing Attendees attendee while re-creating; linked instead', {
+      studentId,
+      a32AttendeeId: match.id,
+    });
+    return {
+      status: 'relinked',
+      message:
+        'Attendees already had a record matching them, so Tally linked to it rather than adding a second.',
+      pcoPersonId: match.id,
+      studentId: moved.studentId,
     };
   }
 

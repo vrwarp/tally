@@ -164,6 +164,45 @@ describe('mergeRoster', () => {
     expect(merged[0]?.notes).toBe('Same kid.');
   });
 
+  it('does not let a merged-away duplicate annotate the student it was folded into', () => {
+    /*
+     * The repair wrote the keeper's linkage onto the fold so its history still
+     * resolves, which also makes it resolve onto the keeper's row here. Its
+     * document is the duplicate's — no notes, a visitor badge, a creation
+     * date from last month — and Firestore hands documents back in id order,
+     * so whether it overwrote the keeper's used to depend on the ids.
+     */
+    const roster = [rosterEntry('900', { firstName: 'Nia', lastName: 'Mbeki' })];
+    const membership = tallyDocument('pco_900', {
+      pcoPersonId: '900',
+      notes: 'Core kid.',
+      isVisitor: false,
+      createdAt: new Date('2025-01-01T00:00:00'),
+    });
+    const fold = tallyDocument('tally-dup', {
+      pcoPersonId: '900',
+      status: 'inactive',
+      mergedIntoStudentId: 'pco_900',
+      isVisitor: true,
+      createdAt: new Date('2026-02-06T00:00:00'),
+    });
+
+    for (const documents of [[membership, fold], [fold, membership]]) {
+      const merged = mergeRoster(roster, documents);
+      expect(merged.map((row) => row.id)).toEqual(['pco_900']);
+      expect(merged[0]?.notes).toBe('Core kid.');
+      expect(merged[0]?.isVisitor).toBe(false);
+      expect(merged[0]?.createdAt).toEqual(new Date('2025-01-01T00:00:00'));
+    }
+  });
+
+  it('still shows a merged-away duplicate that resolves to nobody, under its own id', () => {
+    // Folded into another Tally visitor, it was given no linkage, and the
+    // inactive filter and the profile page still reach it by its own id.
+    const fold = tallyDocument('tally-dup', { status: 'inactive', mergedIntoStudentId: 'tally-keep' });
+    expect(mergeRoster([], [fold]).map((row) => row.id)).toEqual(['tally-dup']);
+  });
+
   it('keeps the document creation date, which is what MIA depends on', () => {
     // A roster row alone carries the epoch, so every past gathering counts as
     // one the student could have attended. A visitor added last Friday has a

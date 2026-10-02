@@ -55,7 +55,15 @@ export function useAdultContact(): AdultContactResult {
   // so the state says the same thing the getter does.
   const [loaded, setLoaded] = useState(() => held !== null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /*
+   * Held raw and worded at render, not stored as a sentence. The translator
+   * is a new function on every language change, and an effect that closed
+   * over it re-ran on every one — and once somebody has pressed refresh the
+   * guard below never short-circuits again, so a tap on the language switcher
+   * was a forced sweep of the church's whole adult directory. Deriving it also
+   * lets a failure already up follow the language, as `DataProvider`'s do.
+   */
+  const [failure, setFailure] = useState<'denied' | 'unreachable' | null>(null);
   /** Bumped by `refresh`, purely to make the fetch effect run again. */
   const [attempt, setAttempt] = useState(0);
 
@@ -79,9 +87,9 @@ export function useAdultContact(): AdultContactResult {
         // can be seen from outside.
         setLoaded(true);
         // Stryker disable next-line CallExpression: the only route to a second
-        // attempt is `refresh`, which clears the error before this can, so
+        // attempt is `refresh`, which clears the failure before this can, so
         // there is never one left here to clear.
-        setError(null);
+        setFailure(null);
       })
       .catch((cause: unknown) => {
         if (stale) return;
@@ -89,11 +97,7 @@ export function useAdultContact(): AdultContactResult {
         // Stryker disable next-line StringLiteral: read only by `includes`,
         // which no sentinel matches, so what it is does not matter.
         const code = (cause as { code?: string })?.code ?? '';
-        setError(
-          code.includes('permission-denied')
-            ? t('incompleteDenied')
-            : t('incompleteUnreachable'),
-        );
+        setFailure(code.includes('permission-denied') ? 'denied' : 'unreachable');
       })
       .finally(() => {
         if (!stale) setLoading(false);
@@ -102,16 +106,23 @@ export function useAdultContact(): AdultContactResult {
     return () => {
       stale = true;
     };
-  }, [attempt, t]);
+  }, [attempt]);
 
   const refresh = useCallback(() => {
-    setError(null);
+    setFailure(null);
     setAttempt((count) => count + 1);
   },
   // Stryker disable next-line ArrayDeclaration: any constant array is the same
   // array to React — the list is compared element by element against the last
   // render's, and a literal that never changes never differs from itself.
   []);
+
+  const error =
+    failure === null
+      ? null
+      : failure === 'denied'
+        ? t('incompleteDenied')
+        : t('incompleteUnreachable');
 
   return { reachable, loading, loaded: loaded || held !== null, error, refresh };
 }

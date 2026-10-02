@@ -28,7 +28,8 @@
     "printerSettings": "打印机设置",
     "nameTagsWontPrint": "名牌不会打印",
     "waitingFrom": "{gathering} 的 {count, plural, other {# 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。",
-    "waiting": "{count, plural, other {有 # 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。"
+    "waiting": "{count, plural, other {有 # 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。",
+    "today": "今天"
   },
   "Common": {
     "language": "语言",
@@ -69,7 +70,8 @@
     "size": "字号",
     "align": "对齐",
     "bold": "加粗",
-    "copies": "份数"
+    "copies": "份数",
+    "change": "更换"
   },
   "Confirm": {
     "back": "← 返回",
@@ -234,7 +236,11 @@
     "owedWaiting": "{count, plural, other {有 # 张名牌在等着打印。}}",
     "owedPrinting": "{count, plural, other {正在打印 # 张名牌 — 请送到教室。}}",
     "owedPrinted": "{count, plural, other {已打印 # 张名牌 — 请送到教室。}}",
-    "owedRowWaiting": "等待中"
+    "owedRowWaiting": "等待中",
+    "show": "显示",
+    "hide": "隐藏",
+    "copy": "复制",
+    "copied": "已复制"
   },
   "Register": {
     "couldNotSave": "Tally 现在没能完成。请再试一次，或者找辅导。",
@@ -375,6 +381,7 @@
     "recordServer": "Tally 没有接收",
     "recordArrival": "在等对应的签到",
     "someone": "一个孩子",
-    "changeEventOffline": "连不上 Tally。一旦离开，要等恢复连接后才能选择其他聚会。"
+    "changeEventOffline": "连不上 Tally。一旦离开，要等恢复连接后才能选择其他聚会。",
+    "title": "同工"
   }
 }

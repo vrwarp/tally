@@ -115,6 +115,70 @@ describe('fetchRoster', () => {
     expect(result.missing).toEqual([gone]);
   });
 
+  /*
+   * A merge is not a deletion. Attendees answers a merged-away id with `410`
+   * and the survivor, so the student belongs under the record the church kept
+   * and the move is reported as a relink — the contract the Planning Center
+   * roster already keeps. Reporting them missing instead froze check-ins for
+   * a child who was still on the books.
+   */
+  it('shows a merged student under the surviving record and reports the relink', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+
+    const result = await fetchRoster({ client, config, cache, personIds: [wei] });
+
+    expect(result.missing).toEqual([]);
+    expect(result.unresolved).toEqual([]);
+    expect(result.relinks).toEqual([{ fromPersonId: wei, toPersonId: salote }]);
+    expect(result.people.map((person) => person.pcoPersonId)).toEqual([salote]);
+  });
+
+  it('shows the survivor once when the roster holds both ids', async () => {
+    // The keeper is usually on the roster in their own right, and a relink
+    // must not make them appear as two rows.
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+
+    const result = await fetchRoster({ client, config, cache, personIds: [wei, salote] });
+
+    expect(result.people.map((person) => person.pcoPersonId)).toEqual([salote]);
+    expect(result.relinks).toEqual([{ fromPersonId: wei, toPersonId: salote }]);
+  });
+
+  it('shows the survivor once when they were not in the sweep either', async () => {
+    // Two records added after the sweep was cached and tidied into one before
+    // the next: both are looked up one at a time, in id order, so the keeper
+    // is reached through the buried id first and then in their own right.
+    // Being reached twice must not make them two rows.
+    await fetchRoster({ client, config, cache, personIds: [idOf('Priya')] });
+    const buried = store.createAttendee({ id: 'yy-added-after-the-sweep', firstName: 'Salote', lastName: 'Fifita' });
+    const keeper = store.createAttendee({ id: 'zz-added-after-the-sweep', firstName: 'Salote', lastName: 'Fifita' });
+    store.mergeAttendee(buried.id, keeper.id);
+
+    const result = await fetchRoster({ client, config, cache, personIds: [buried.id, keeper.id] });
+
+    expect(result.people.map((person) => person.pcoPersonId)).toEqual([keeper.id]);
+    expect(result.relinks).toEqual([{ fromPersonId: buried.id, toPersonId: keeper.id }]);
+  });
+
+  it('still reports a merge whose survivor was deleted as missing', async () => {
+    // A tombstone with nowhere to point is gone for real; only that freezes.
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+    store.attendees.get(salote)!.isRemoved = true;
+
+    const result = await fetchRoster({ client, config, cache, personIds: [wei] });
+
+    expect(result.people).toEqual([]);
+    expect(result.relinks).toEqual([]);
+    expect(result.unresolved).toEqual([wei]);
+    expect(result.missing).toEqual([wei]);
+  });
+
   it('holds the answer for the TTL', async () => {
     const wanted = [idOf('Priya')];
     await fetchRoster({ client, config, cache, personIds: wanted });
@@ -194,6 +258,37 @@ describe('fetchPersonDetails', () => {
     const gone = idOf('Aroha');
     store.attendees.get(gone)!.isRemoved = true;
     expect(await fetchPersonDetails({ client, config, cache, personId: gone })).toBeNull();
+  });
+
+  /*
+   * A merged student's details are the survivor's details: the family did not
+   * stop existing because an admin folded two records together. Answering
+   * null read as "no such person" on the profile, which offers a re-create for
+   * a child who already exists under the survivor's id.
+   */
+  it("answers with the survivor's details rather than nobody", async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+
+    const details = await fetchPersonDetails({ client, config, cache, personId: wei });
+
+    // The survivor's family, not the buried id's: the contact is Salote's mother.
+    expect(details).toMatchObject({
+      pcoPersonId: salote,
+      contactName: 'Losana Fifita',
+      contactPhone: '555-0344',
+      householdAdult: true,
+    });
+  });
+
+  it('answers null when the merge trail ends in a deleted survivor', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    store.mergeAttendee(wei, salote);
+    store.attendees.get(salote)!.isRemoved = true;
+
+    expect(await fetchPersonDetails({ client, config, cache, personId: wei })).toBeNull();
   });
 
   /**

@@ -118,6 +118,33 @@ describe('useAttendance', () => {
     expect(attendanceStream.eventId).toBe('event-2');
   });
 
+  it('drops the last gathering’s failure along with its register', () => {
+    // A refusal is a fact about one gathering. Carried over, it sits as a
+    // banner over the next one's names until that listener has answered —
+    // and over a gathering the reader is on, that is a banner about nothing.
+    const { result, rerender } = renderHook(({ id }) => useAttendance(id), {
+      initialProps: { id: 'event-1' },
+    });
+    act(() => attendanceStream.fail(new Error('Missing or insufficient permissions.')));
+
+    rerender({ id: 'event-2' });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('drops the failure when the gathering is taken away', () => {
+    const { result, rerender } = renderHook(({ id }) => useAttendance(id), {
+      initialProps: { id: 'event-1' as string | null },
+    });
+    act(() => attendanceStream.fail(new Error('Missing or insufficient permissions.')));
+
+    rerender({ id: null });
+
+    // The chooser has no gathering to be refused.
+    expect(result.current.error).toBeNull();
+  });
+
   it('closes the old listener when the gathering changes', () => {
     const { rerender } = renderHook(({ id }) => useAttendance(id), {
       initialProps: { id: 'event-1' },
@@ -221,6 +248,18 @@ describe('useRsvps', () => {
     rerender({ id: 'event-2' });
 
     expect(result.current.rsvps).toEqual([]);
+    expect(result.current.loading).toBe(true);
+  });
+
+  it('drops the last gathering’s failure along with its list', () => {
+    const { result, rerender } = renderHook(({ id }) => useRsvps(id), {
+      initialProps: { id: 'event-1' },
+    });
+    act(() => rsvpStream.fail(new Error('refused')));
+
+    rerender({ id: 'event-2' });
+
+    expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(true);
   });
 

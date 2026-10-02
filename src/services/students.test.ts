@@ -303,6 +303,20 @@ describe('updateStudent', () => {
     });
   });
 
+  it('backfills only the half of a name the roster actually holds', async () => {
+    // The backends write `lastName: ''` for somebody with no surname on file,
+    // and the rules refuse a blank name — so a note against that student
+    // failed every time. The search key is built from whatever is there.
+    await updateStudent('pco_7', { notes: 'left early' }, 'uid-miriam', {
+      firstName: 'Noor',
+      lastName: '',
+      grade: 8,
+    });
+
+    expect(written().data).toMatchObject({ firstName: 'Noor', searchName: 'noor' });
+    expect(written().data).not.toHaveProperty('lastName');
+  });
+
   it('prefers the name in the patch over the one it was handed', async () => {
     await updateStudent('pco_1', { firstName: 'Jaime' }, 'uid-miriam', {
       firstName: 'Jamie',

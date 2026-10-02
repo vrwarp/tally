@@ -316,6 +316,16 @@ describe('cardAnswer', () => {
     ]);
     expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
   });
+
+  it('records a pickup parked before its arrival came, once that arrival is parked beside it', () => {
+    // The pickup reached Tally first, from another tablet after the day's
+    // wait, and was parked as one whose arrival never came; the arrival then
+    // came and was parked frozen. The server records both once the child is
+    // back, so the card offers that rather than only Let it go.
+    const [card] = parkedCards([parked(), parked({ id: 'check-out', kind: 'check-out', reason: 'no-arrival' })]);
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah', upstreamRecordMissing: true })))).toBe('frozen');
+    expect(cardAnswer(card!, byId(makeStudent({ id: 'student-noah' })))).toBe('record');
+  });
 });
 
 describe('putBackAs', () => {

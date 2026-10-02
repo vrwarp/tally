@@ -15,12 +15,18 @@ import { act, render, waitFor } from '@/test/rtl';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataProvider } from '@/context/DataProvider';
 import { useData, type DataContextValue } from '@/context/dataContext';
+import type * as rosterService from '@/services/roster';
 import type { PcoRosterPerson, Student } from '@/types';
 import { makeStudent } from '../../tests/factories';
 import { ROSTER_DEADLINES_MS, ROSTER_RETRY_GAPS_MS } from '@/lib/rosterLadder';
 
 const fetchRoster = vi.hoisted(() => vi.fn());
 const rememberRosterPerson = vi.hoisted(() => vi.fn());
+/**
+ * The callable under the real `fetchRoster`, for the one test that reaches
+ * past the service mock: what the service does with an answer is the bug there.
+ */
+const getRoster = vi.hoisted(() => vi.fn());
 /** What `cachedRoster()` answers, so a test can start the provider warm. */
 const cache = vi.hoisted(() => ({ value: null as { students: Student[] } | null }));
 const auth = vi.hoisted(() => ({
@@ -71,6 +77,7 @@ vi.mock('@/services/events', async () => {
   };
 });
 vi.mock('@/context/authContext', () => ({ useAuth: () => auth }));
+vi.mock('@/services/functions', () => ({ getRoster }));
 vi.mock('@/services/eventAccess', () => ({
   subscribeEventAccess: (next: (value: Map<string, unknown>) => void) => {
     next(new Map());
@@ -87,10 +94,28 @@ function reply(students: Student[] = []) {
 /** A read the test lands by hand, so a second one can arrive while it is out. */
 function held() {
   let land: (value: unknown) => void = () => {};
-  const promise = new Promise((resolve) => {
+  let fail: (cause: unknown) => void = () => {};
+  const promise = new Promise((resolve, reject) => {
     land = resolve;
+    fail = reject;
   });
-  return { promise, land: (value: unknown = reply()) => land(value) };
+  return { promise, land: (value: unknown = reply()) => land(value), fail };
+}
+
+function row(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
+  return {
+    id: 'pco_1',
+    pcoPersonId: '1',
+    firstName: 'Jamie',
+    lastName: 'Rivera',
+    grade: 8,
+    status: 'active',
+    searchName: 'jamie rivera',
+    profileComplete: null,
+    hasAllergies: false,
+    birthday: '03-16',
+    ...overrides,
+  } as PcoRosterPerson;
 }
 
 let latest: DataContextValue | null = null;
@@ -144,6 +169,7 @@ beforeEach(() => {
   fetchRoster.mockReset();
   fetchRoster.mockImplementation(() => Promise.resolve(reply()));
   rememberRosterPerson.mockClear();
+  getRoster.mockReset();
   base = realNow();
   vi.spyOn(Date, 'now').mockImplementation(() => base + offset);
 });
@@ -371,6 +397,31 @@ describe('a second read asked for while one is out', () => {
     // Nothing was queued behind it, so nothing follows it.
     expect(fetchRoster).toHaveBeenCalledTimes(2);
   });
+
+  it('drops the queued one when the provider is gone before the first lands', async () => {
+    const outstanding = held();
+    fetchRoster.mockImplementationOnce(() => outstanding.promise);
+
+    const view = mount();
+    await waitFor(() => expect(fetchRoster).toHaveBeenCalledTimes(1));
+
+    // The network comes back while the first read is out, so a second is
+    // queued behind it — and then the person signs out.
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    view.unmount();
+
+    await act(async () => {
+      outstanding.land();
+    });
+    await act(async () => {});
+
+    // The queue is drained by the read that lands, and that read lands into
+    // a provider nobody is looking at. Running what it finds there is a
+    // Planning Center sweep for a screen that no longer exists.
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('coming back to the tab', () => {
@@ -447,22 +498,6 @@ describe('a read that answered oddly', () => {
 });
 
 describe('correcting one row from a write', () => {
-  function row(overrides: Partial<PcoRosterPerson> = {}): PcoRosterPerson {
-    return {
-      id: 'pco_1',
-      pcoPersonId: '1',
-      firstName: 'Jamie',
-      lastName: 'Rivera',
-      grade: 8,
-      status: 'active',
-      searchName: 'jamie rivera',
-      profileComplete: null,
-      hasAllergies: false,
-      birthday: '03-16',
-      ...overrides,
-    } as PcoRosterPerson;
-  }
-
   it('reads again when the roster on this device is empty', async () => {
     mount();
     await waitFor(() => expect(fetchRoster).toHaveBeenCalledTimes(1));
@@ -680,5 +715,62 @@ describe('after a read fails', () => {
     });
 
     expect(fetchRoster).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a rung for a read that failed after the provider was gone', async () => {
+    /*
+     * The case above has the rung already scheduled when the provider goes,
+     * and the unmount clears it. This one has the first read still out: the
+     * rung is scheduled by that read's own failure, which arrives whenever
+     * Planning Center gets round to it — provider or no provider.
+     */
+    fetchRoster.mockRejectedValue(new Error('nope'));
+    const outstanding = held();
+    fetchRoster.mockImplementationOnce(() => outstanding.promise);
+
+    const view = mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    await act(async () => {
+      outstanding.fail(new Error('nope'));
+    });
+    await runLadder();
+
+    expect(fetchRoster).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a read still out at sign-out', () => {
+  /*
+   * `AuthProvider.signOut` forgets the roster parked on this device and the
+   * gate then takes this provider down. A read that was out through all of
+   * that lands all the same — and `fetchRoster` parks what it reads, so the
+   * children's names were back in `localStorage` seconds after the sign-out
+   * that existed to remove them (docs/roster-resilience.md, section 7).
+   *
+   * The real service for this one, with the callable under it held instead,
+   * because the parking is the bug.
+   */
+  it('does not put the roster back on the device after it was forgotten', async () => {
+    const actual = await vi.importActual<typeof rosterService>('@/services/roster');
+    const outstanding = held();
+    getRoster.mockImplementationOnce(() => outstanding.promise);
+    fetchRoster.mockImplementationOnce(actual.fetchRoster);
+
+    const view = mount();
+    await waitFor(() => expect(getRoster).toHaveBeenCalledTimes(1));
+
+    // What sign-out does, in the order it does it.
+    actual.forgetRoster();
+    view.unmount();
+    await act(async () => {
+      outstanding.land({ data: { people: [row()], fetchedAt: FETCHED_AT.toISOString() } });
+    });
+
+    expect(window.localStorage.getItem('tally:roster')).toBeNull();
   });
 });

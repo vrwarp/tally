@@ -163,7 +163,7 @@ function slug(value: string): string {
       .toLowerCase()
       // Runs, not single characters: `Jamie  Rivera — 2026` collapses to one
       // dash apiece, so there is never a `--` left for a second pass to find.
-      .replace(/[^\p{L}\p{N}]+/gu, '-')
+      .replace(/[^\p{L}\p{N}\p{M}]+/gu, '-')
       .replace(/^-|-$/g, '')
       .slice(0, 40)
       // The slice can land mid-gap, which is the only way a trailing dash gets

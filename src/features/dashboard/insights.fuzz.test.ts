@@ -119,6 +119,9 @@ describe('dashboard insight properties', () => {
     const windowStart = NOW.getTime() - input.settings.newVisitorWindowDays * 86_400_000;
 
     for (const visitor of visitors) {
+      // A merged-away duplicate keeps its first visit and stays in the roster
+      // read; it has been dealt with, and so has anyone else marked inactive.
+      expect(visitor.student.status).toBe('active');
       expect(visitor.student.firstAttendedAt).not.toBeNull();
       expect(visitor.firstAttendedAt.getTime()).toBeGreaterThanOrEqual(windowStart);
     }

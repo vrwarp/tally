@@ -21,6 +21,12 @@ export interface Team {
   members: UserProfile[];
   byUid: Map<string, UserProfile>;
   loading: boolean;
+  /**
+   * The directory could not be read. Distinct from an empty team for the one
+   * caller that is about to *write* against the names — the access sheet's
+   * press — which must not read "nobody could be read" as "nobody".
+   */
+  failed: boolean;
 }
 
 const NONE: UserProfile[] = [];
@@ -28,20 +34,25 @@ const NONE: UserProfile[] = [];
 export function useTeam(enabled: boolean): Team {
   const [members, setMembers] = useState<UserProfile[]>(NONE);
   const [loading, setLoading] = useState(enabled);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
     setLoading(true);
+    setFailed(false);
 
     const unsubscribe = subscribeUsers(
       (next) => {
         setMembers(next);
+        setFailed(false);
         setLoading(false);
       },
       () => {
         // A directory that cannot be read is not worth a banner on a screen
         // about something else: the names simply do not appear, and every
-        // caller already has a sentence for that case.
+        // caller already has a sentence for that case. The flag is for the
+        // one caller whose sentence has to say so before a write.
+        setFailed(true);
         setLoading(false);
       },
     );
@@ -51,7 +62,7 @@ export function useTeam(enabled: boolean): Team {
 
   const byUid = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
 
-  return { members, byUid, loading };
+  return { members, byUid, loading, failed };
 }
 
 /**

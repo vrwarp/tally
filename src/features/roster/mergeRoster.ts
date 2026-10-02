@@ -67,6 +67,16 @@ export function mergeRoster(
         : undefined;
     const target = direct ?? viaLink;
 
+    /*
+     * A document folded into another student describes nobody now. It is kept
+     * because its attendance history still points at it, but its notes, its
+     * visitor badge and its dates were the duplicate's, and the linkage the
+     * fold was given so that history resolves makes it land on the keeper's
+     * row — where, in whichever order the snapshot arrived, it must not
+     * overwrite what the keeper's own document says.
+     */
+    if (!direct && target && document.mergedIntoStudentId) continue;
+
     if (!target) {
       /*
        * A document that names an upstream person the roster did not return is

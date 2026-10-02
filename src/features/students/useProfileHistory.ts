@@ -87,12 +87,27 @@ async function resolve(
   const chained = events.filter(isChained);
   const chains = [...new Set(chained.map(chainKey))];
 
-  const [registries, since] = await Promise.all([
+  /*
+   * A duplicate folded into this student keeps its own attendance documents —
+   * the merge never re-keys history — so the profile unions the two at read
+   * time, as the attendance grid and the earlier-attendance list already do.
+   * Without this the folded nights read as misses on the same page that
+   * lists them as present below.
+   */
+  const ids = [student.id, ...(student.mergedFromStudentIds ?? [])];
+  const [registries, reads] = await Promise.all([
     chains.length > 0
       ? fetchSkippedNights(chains)
       : Promise.resolve({ byChain: new Map<string, SkippedNights>(), denied: new Set<string>() }),
-    fetchStudentAttendanceSince(student.id, windowStart),
+    Promise.all(ids.map((id) => fetchStudentAttendanceSince(id, windowStart))),
   ]);
+  const since =
+    reads.length === 1
+      ? reads[0]!
+      : {
+          eventIds: new Set(reads.flatMap((read) => [...read.eventIds])),
+          withheld: new Set(reads.flatMap((read) => [...read.withheld])),
+        };
 
   const attended = since.eventIds;
   /*
@@ -251,10 +266,12 @@ export function useProfileHistory(
   // `windowStart` moves every minute by construction and is deliberately absent:
   // a year's worth of history does not change because the far edge slid by sixty
   // seconds, and including it would re-read everything once a minute.
+  // The folded duplicates are part of the question too: a merge that lands
+  // while the profile is open changes whose nights these are.
   const key = useMemo(
     () =>
       student
-        ? `${student.id}:${events
+        ? `${[student.id, ...(student.mergedFromStudentIds ?? [])].join('+')}:${events
             .map((event) => event.id)
             .sort()
             .join(',')}`

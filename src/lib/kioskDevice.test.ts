@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deviceIdOfUid, isDeviceId, kioskUid } from '@/lib/kioskDevice';
+import { boundToFor, deviceIdOfUid, isDeviceId, KIOSK_BOUND_TO_MAX, kioskUid } from '@/lib/kioskDevice';
 
 describe('isDeviceId', () => {
   it('accepts the shape the kiosk mints', () => {
@@ -70,5 +70,22 @@ describe('the prefix that separates a device from a person', () => {
     // `checkedInBy` on a register would name a tablet that never existed.
     expect(deviceIdOfUid('abcdefghijklmnop')).toBeNull();
     expect(deviceIdOfUid('kiosk-abcdefghijkl')).toBeNull();
+  });
+});
+
+describe('boundToFor', () => {
+  it('carries an ordinary title whole, and nothing for no gathering', () => {
+    expect(boundToFor('Sunday School')).toBe('Sunday School');
+    expect(boundToFor(null)).toBeNull();
+    expect(boundToFor('')).toBeNull();
+  });
+
+  it('cuts a title to what the rules accept rather than letting the report be refused', () => {
+    // A refused report reads as retirement and un-pairs the kiosk — on every
+    // report, after every re-pair — so a long title must never reach the rule.
+    const long = 'Wednesday night '.repeat(20);
+    expect(long.length).toBeGreaterThan(KIOSK_BOUND_TO_MAX);
+    expect(boundToFor(long)).toBe(long.slice(0, KIOSK_BOUND_TO_MAX));
+    expect(boundToFor(long)!.length).toBe(KIOSK_BOUND_TO_MAX);
   });
 });

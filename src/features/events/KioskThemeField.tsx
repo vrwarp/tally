@@ -89,6 +89,7 @@ function swatch(theme: KioskTheme, slot: Slot, hue: string): string {
 
 export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
   const t = useTranslations('KioskTheme');
+  const tCommon = useTranslations('Common');
   const [open, setOpen] = useState(false);
   const labelId = useId();
   const valueId = useId();
@@ -167,14 +168,14 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
           {summary}
         </span>
         <span aria-hidden="true" className="shrink-0 text-xs font-semibold text-brand-300">
-          {open ? 'Done' : 'Change'}
+          {open ? tCommon('done') : tCommon('change')}
         </span>
       </button>
 
       {open ? (
         <div className="mt-1 flex flex-col gap-3 rounded-xl bg-ink-950 p-3 ring-1 ring-ink-800">
           <fieldset className="flex min-w-0 flex-col gap-1.5">
-            <legend className="mb-1.5 text-xs font-semibold text-ink-400">Ground</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-ink-400">{t('ground')}</legend>
             <div className="flex gap-2">
               {(['dark', 'light'] as KioskGround[]).map((ground) => (
                 <button
@@ -183,13 +184,13 @@ export function KioskThemeField({ value, onChange }: KioskThemeFieldProps) {
                   onClick={() => set({ ground })}
                   aria-pressed={theme.ground === ground}
                   className={cn(
-                    'min-h-11 flex-1 rounded-lg text-sm font-semibold capitalize ring-1',
+                    'min-h-11 flex-1 rounded-lg text-sm font-semibold ring-1',
                     theme.ground === ground
                       ? 'bg-brand-500/20 text-brand-300 ring-brand-500/40'
                       : 'text-ink-300 ring-ink-700 active:bg-ink-900',
                   )}
                 >
-                  {ground}
+                  {t(ground === 'light' ? 'groundLight' : 'groundDark')}
                 </button>
               ))}
             </div>

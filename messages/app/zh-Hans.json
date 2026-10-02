@@ -38,7 +38,8 @@
     "size": "字号",
     "align": "对齐",
     "bold": "加粗",
-    "copies": "份数"
+    "copies": "份数",
+    "change": "更换"
   },
   "Nav": {
     "checkIn": "签到",
@@ -472,7 +473,13 @@
     "loading": "正在统计最近的聚会",
     "emptyTitle": "还没有可以作图的聚会。",
     "emptyBody": "签到过几场聚会之后，趋势就会显示在这里。",
-    "tableCaption": "每天的人数，最早的在前。"
+    "tableCaption": "每天的人数，最早的在前。",
+    "summary": "{days, plural, other {# 天}} · 最高 {peak} · 平均 {average}",
+    "barTitle": "{title} · {date}：{count}",
+    "barTitleAcross": "{title} · {date}：共 {gatherings, plural, other {# 次聚会}}，{count} 人",
+    "columnGathering": "聚会",
+    "columnDate": "日期",
+    "columnPresent": "出席"
   },
   "Ledger": {
     "summaryHere": "{count} 人在这里不再算应到 · 最近 {date}",
@@ -1174,7 +1181,8 @@
     "removeAria": "把 {name} 从报名名单移除",
     "rsvpForAria": "{name} 的报名",
     "statusOptionAria": "{option}——{name}",
-    "undo": "撤销"
+    "undo": "撤销",
+    "addCount": "{count, plural, =0 {添加学生} other {添加 # 名学生}}"
   },
   "Access": {
     "nobody": "没有人",
@@ -1375,7 +1383,8 @@
     "hueEmber": "炭橘",
     "hueAmber": "琥珀",
     "hueForest": "森绿",
-    "hueTeal": "青绿"
+    "hueTeal": "青绿",
+    "ground": "底色"
   },
   "Events": {
     "title": "活动",
@@ -1432,7 +1441,9 @@
     "iconDone": "完成",
     "iconChange": "更换",
     "limitedTag": "🔐 {count, number}",
-    "limitedTagLabel": "{count, plural, other {仅限 # 人}}——其他人看到的是锁定状态"
+    "limitedTagLabel": "{count, plural, other {仅限 # 人}}——其他人看到的是锁定状态",
+    "chainCount": "{count, plural, other {# 次聚会}}",
+    "showLater": "{count, plural, other {显示之后的 # 次聚会}}"
   },
   "EventIcons": {
     "event": "活动",
@@ -1563,7 +1574,11 @@
     "previewTypeChildsName": "输入您孩子的英文名字",
     "previewOrPhone": "或者您电话号码的后 4 位",
     "summaryNone": "无",
-    "summaryPhoto": "照片"
+    "summaryPhoto": "照片",
+    "choosePhoto": "选择照片",
+    "replacePhoto": "更换照片",
+    "readingPhoto": "正在读取照片…",
+    "resizedTo": "已缩放为 {detail}"
   },
   "Recurrence": {
     "repeatOn": "重复于",
@@ -1622,7 +1637,11 @@
     "weekdayInitialThu": "四",
     "weekdayInitialFri": "五",
     "weekdayInitialSat": "六",
-    "monthlyOnDayOption": "每月 {day} 号"
+    "monthlyOnDayOption": "每月 {day} 号",
+    "unitWeeks": "周",
+    "unitMonths": "个月",
+    "unitYears": "年",
+    "thenPreview": "{count, plural, =1 {之后：{first}} =2 {之后：{first}、{second}} other {之后：{first}、{second}、{third}…}}"
   },
   "EventStatus": {
     "cancelled": "已取消",
@@ -1653,7 +1672,9 @@
     "rangeLast12Months": "最近 12 个月",
     "presumedCancelled": "{count, plural, other {有 # 场聚会没有人签到，已略去不列，与其他界面的处理一致。}}",
     "denied": "{count, plural, other {有 # 场聚会不是你能看的，因此这里没有它们的列——总好过用一整列零说没有人来。}}",
-    "noRecurring": "你所在的聚会里没有定期聚会，无法生成表格。"
+    "noRecurring": "你所在的聚会里没有定期聚会，无法生成表格。",
+    "reading": "正在读取 {count, plural, other {# 次聚会}}…",
+    "shape": "<n>{gatherings}</n> {gatherings, plural, other {次聚会}} × <n>{students}</n> {students, plural, other {名学生}}。"
   },
   "PastGatherings": {
     "title": "过去的聚会",
@@ -1978,7 +1999,9 @@
     "tryAgain": "再试一次",
     "noBirthdateHeld": "{backend} 里没有 {name} 的生日，所以 Tally 没法提醒你什么时候该说一声。",
     "dayOnly": "只有月和日——{backend} 里没有 {name} 的年份，所以不显示年龄。",
-    "noRecordYet": "{name} 尚不存在于 {backend} 中。请先发送。"
+    "noRecordYet": "{name} 尚不存在于 {backend} 中。请先发送。",
+    "openProfile": "打开 {name} 的个人资料",
+    "reading": "正在读取 {backend}…"
   },
   "StudentEditor": {
     "titleEdit": "编辑 {name}",

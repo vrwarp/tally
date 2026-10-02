@@ -57,6 +57,38 @@ describe('reconcileSeen', () => {
     expect(seen.lastSeenAt).toEqual(new Date('2026-08-03T19:00:00'));
   });
 
+  it('leaves tonight alone when another gathering met this morning', () => {
+    // Sunday: a class at half nine the student was not at, youth group at
+    // six they were just tapped into. The evening is still open, so it is not
+    // loaded — and the morning must not stand in for it.
+    const seen = reconcileSeen(student('2026-06-26T19:00:00', '2026-08-02T18:00:00'), [
+      night('2026-06-26T19:00:00', true),
+      night('2026-07-26T19:00:00', true),
+      night('2026-08-02T09:30:00', false),
+    ]);
+    expect(seen.lastSeenAt).toEqual(new Date('2026-08-02T18:00:00'));
+    expect(seen.unseenInWindow).toBe(false);
+
+    // The same Sunday as a first visit: tonight is both dates on file.
+    const first = reconcileSeen(student('2026-08-02T18:00:00', '2026-08-02T18:00:00'), [
+      night('2026-08-02T09:30:00', false),
+    ]);
+    expect(first.firstSeenAt).toEqual(new Date('2026-08-02T18:00:00'));
+    expect(first.lastSeenAt).toEqual(new Date('2026-08-02T18:00:00'));
+    expect(first.unseenInWindow).toBe(false);
+  });
+
+  it('still overrules a stored date on a day the window has moved past', () => {
+    // An import wrote the date at a different clock time from the night's
+    // start; with a later night loaded, the day is enough to disprove it.
+    const seen = reconcileSeen(student('2026-06-26T19:00:00', '2026-07-26T20:00:00'), [
+      night('2026-06-26T19:00:00', true),
+      night('2026-07-26T19:00:00', false),
+      night('2026-07-31T19:00:00', false),
+    ]);
+    expect(seen.lastSeenAt).toEqual(new Date('2026-06-26T19:00:00'));
+  });
+
   it('reports the window sighting when the stored date is older', () => {
     const seen = reconcileSeen(student('2025-09-05T19:00:00', '2025-09-05T19:00:00'), [
       night('2026-06-26T19:00:00', true),

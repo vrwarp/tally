@@ -22,7 +22,7 @@
  * record landing from the other counselor's phone, and the page being pointed
  * at a different night while the old night's records are still in hand.
  */
-import { act, render, screen } from '@/test/rtl';
+import { act, render, screen, waitFor } from '@/test/rtl';
 import { CheckInPage } from '@/features/checkin/CheckInPage';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -81,9 +81,12 @@ const live = vi.hoisted(() => {
 });
 
 const services = vi.hoisted(() => ({
+  swapCheckIn: vi.fn(async () => {}),
   checkIn: vi.fn(async () => {}),
   undoCheckIn: vi.fn(async () => {}),
   ensureMaterialized: vi.fn(async () => {}),
+  clearSkippedNight: vi.fn(async () => {}),
+  quickAddAndCheckIn: vi.fn(async () => 'student-new'),
 }));
 
 vi.mock('@/hooks/useAttendance', async () => {
@@ -160,13 +163,13 @@ vi.mock('@/features/roster/predictiveRoster', async (importOriginal) => {
 vi.mock('@/services/attendance', () => ({
   checkIn: services.checkIn,
   checkOut: vi.fn(async () => {}),
-  swapCheckIn: vi.fn(async () => {}),
+  swapCheckIn: services.swapCheckIn,
   undoCheckIn: services.undoCheckIn,
   undoCheckOut: vi.fn(async () => {}),
-  quickAddAndCheckIn: vi.fn(async () => 'student-new'),
+  quickAddAndCheckIn: services.quickAddAndCheckIn,
 }));
 vi.mock('@/services/events', () => ({ ensureMaterialized: services.ensureMaterialized }));
-vi.mock('@/services/skippedNights', () => ({ clearSkippedNight: vi.fn(async () => {}) }));
+vi.mock('@/services/skippedNights', () => ({ clearSkippedNight: services.clearSkippedNight }));
 // The kiosk line has its own tests (QuietKiosks.test.tsx); here, no kiosk is quiet.
 vi.mock('@/services/kioskPresence', () => ({ subscribeKioskPresence: () => () => {} }));
 vi.mock('@/services/functions', () => ({ recordVisitorParent: vi.fn(async () => ({ data: null })) }));
@@ -258,10 +261,13 @@ beforeEach(() => {
   live.builds.length = 0;
   live.now = null;
   services.checkIn.mockClear();
+  services.swapCheckIn.mockClear();
   services.undoCheckIn.mockClear();
   services.checkIn.mockImplementation(async () => {});
   services.ensureMaterialized.mockImplementation(async () => {});
   services.ensureMaterialized.mockClear();
+  services.clearSkippedNight.mockClear();
+  services.quickAddAndCheckIn.mockClear();
   auth.profile = null;
   auth.can = () => true;
 });
@@ -488,6 +494,35 @@ describe('a past gathering', () => {
     expect(document.querySelector('dialog')).toBeNull();
   });
 
+  it('takes the move question down when the other phone undoes the check-in', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open(FRIDAY, [makeAttendance({ studentId: 'ada', eventId: FRIDAY.id })]);
+
+    await act(async () => {
+      handed().onSwap?.(adaRow());
+    });
+    // The right name, found the way a counselor finds it.
+    await user.type(searchBox(), 'Grace');
+    const grace = handed().entries.find((row) => row.student.id === 'grace');
+    if (!grace) throw new Error('Grace is not on the roster');
+    await act(async () => {
+      handed().onPress(grace);
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Move a past check-in from Ada Byron to Grace Hopper?' }),
+    ).toBeInTheDocument();
+
+    // The other counselor undoes Ada while the question is up. Confirming it
+    // would have moved a record that no longer exists — which creates one.
+    await act(async () => {
+      live.attendance.publish([]);
+    });
+
+    expect(document.querySelector('dialog')).toBeNull();
+    expect(services.swapCheckIn).not.toHaveBeenCalled();
+  });
+
   it('asks before an undo, too', async () => {
     const user = userEvent.setup();
     live.now = NEXT_FRIDAY;
@@ -511,5 +546,101 @@ describe('a past gathering', () => {
 
     expect(document.querySelector('dialog')).toBeNull();
     expect(services.checkIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before a quick-added visitor is written, too', async () => {
+    // The one write that also creates a student. It is a deliberate form
+    // rather than a mis-tap, but it is still a record on last Friday's
+    // register, and that is exactly what the question exists to stop.
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open();
+
+    await user.click(screen.getByRole('button', { name: 'Quick add a visitor' }));
+    await user.type(screen.getByLabelText(/^first name/i), 'Robin');
+    await user.type(screen.getByLabelText(/^last name/i), 'Fields');
+    await user.click(screen.getByRole('button', { name: 'Save & check in' }));
+
+    expect(services.quickAddAndCheckIn).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', { name: 'Check Robin Fields in to a past gathering?' }),
+    ).toBeInTheDocument();
+    // The form waits behind the question with the name still in it, so a
+    // "no" costs nothing typed.
+    expect(screen.getByLabelText(/^first name/i)).toHaveValue('Robin');
+
+    await user.click(screen.getByRole('button', { name: 'Check in' }));
+
+    expect(services.quickAddAndCheckIn).toHaveBeenCalledTimes(1);
+    expect(services.quickAddAndCheckIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({ firstName: 'Robin', lastName: 'Fields' }),
+        event: expect.objectContaining({ id: FRIDAY.id }),
+      }),
+    );
+    expect(document.querySelector('dialog')).toBeNull();
+  });
+
+  /*
+   * A finished night with nobody in it is written down as skipped, and every
+   * profile reads it from that one entry. Back-filling the register has to
+   * remove the entry — but only a write that landed has proved the night
+   * happened. Nothing ever puts the entry back: a night missing from it is
+   * read as held, so removing it for a tap that failed turns a night nobody
+   * attended into an absence for every student, with no screen to repair it.
+   */
+  it('clears the skipped-night entry once a confirmed check-in lands', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+    await user.click(screen.getByRole('button', { name: 'Check in' }));
+
+    await waitFor(() =>
+      expect(services.clearSkippedNight).toHaveBeenCalledWith('friday-fellowship', FRIDAY.id),
+    );
+  });
+
+  it('leaves the skipped-night entry alone when the write is refused', async () => {
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    services.checkIn.mockImplementation(async () => {
+      throw new Error('refused');
+    });
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+    await user.click(screen.getByRole('button', { name: 'Check in' }));
+
+    // The failure has been announced, so the write has run its whole course.
+    expect(await screen.findByText('Could not check in Ada Byron. Try again.')).toBeInTheDocument();
+    expect(services.checkIn).toHaveBeenCalledTimes(1);
+    expect(services.clearSkippedNight).not.toHaveBeenCalled();
+  });
+
+  it('leaves the skipped-night entry alone when the gathering could not be materialized', async () => {
+    // The commoner refusal: a projected past night offline. The callable
+    // rejects before the check-in is even attempted, while the entry's own
+    // removal would have queued and landed later.
+    const user = userEvent.setup();
+    live.now = NEXT_FRIDAY;
+    services.ensureMaterialized.mockImplementation(async () => {
+      throw new Error('offline');
+    });
+    open();
+
+    await act(async () => {
+      handed().onPress(adaRow());
+    });
+    await user.click(screen.getByRole('button', { name: 'Check in' }));
+
+    expect(await screen.findByText('Could not check in Ada Byron. Try again.')).toBeInTheDocument();
+    expect(services.checkIn).not.toHaveBeenCalled();
+    expect(services.clearSkippedNight).not.toHaveBeenCalled();
   });
 });

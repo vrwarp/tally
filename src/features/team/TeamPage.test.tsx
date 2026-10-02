@@ -543,6 +543,25 @@ describe('TeamPage — withdrawing an invitation', () => {
     expect(screen.getByRole('button', { name: 'Keep it' })).toBeInTheDocument();
   });
 
+  it('names the link it is about to withdraw', async () => {
+    // The warning takes the link's label; without it the sentence rendered
+    // as its own key path in development and as "for undefined" in the build.
+    const { user } = arrive(
+      makeInvitation({
+        id: 'link_abc',
+        kind: 'link',
+        label: 'Wednesday night volunteer',
+        email: undefined,
+      }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Withdraw' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Withdraws the link for Wednesday night volunteer.',
+    );
+  });
+
   it('lets the second press be "Keep it"', async () => {
     const { user } = arrive();
 

@@ -333,6 +333,54 @@ describe('updateStudentProfile', () => {
     expect(result.person).not.toBeNull();
   });
 
+  /**
+   * The band decides who is on the roster, not what grade a child is in.
+   *
+   * This used to refuse any grade outside the configured 6–12, so a nursery
+   * child's Pre-K or a fifth-grader with an older sibling could never be
+   * corrected from Tally on this backend — while Planning Center's adapter
+   * saved it and said what would happen next.
+   */
+  it('saves a grade outside the band with a warning rather than refusing it', async () => {
+    const salote = idOf('Salote');
+    db.seed(`students/a32_${salote}`, { status: 'active' });
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${salote}`,
+      grade: -1,
+    });
+
+    expect(result.status).toBe('updated');
+    expect(result.wrote).toEqual(['grade']);
+    // The consequence nobody would guess, said once: they will drop off the roster.
+    expect(result.message).toMatch(/outside the 6-12 band/);
+    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(-1);
+  });
+
+  it('refuses a grade that is not a whole number between Pre-K and 12', async () => {
+    const wei = idOf('Wei');
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    const before = (store.attendees.get(wei)!.infos.fixed as Record<string, unknown>).grade;
+
+    for (const grade of [7.5, -2, 13]) {
+      const result = await updateStudentProfile({
+        db,
+        client,
+        config,
+        cache,
+        studentId: `a32_${wei}`,
+        grade,
+      });
+      expect(result.status).toBe('invalid');
+      expect(result.message).toMatch(/Pre-K and 12/);
+    }
+    expect((store.attendees.get(wei)!.infos.fixed as Record<string, unknown>).grade).toBe(before);
+  });
+
   it('refuses when write-back is not full', async () => {
     config = a32Config({ writeBack: 'create' });
     const result = await updateStudentProfile({
@@ -425,6 +473,43 @@ describe('a merged attendee', () => {
     });
 
     expect(result.status).toBe('no-student');
+  });
+
+  /**
+   * A push onto a link that has since been merged away.
+   *
+   * An admin tidying duplicates is exactly who generates pushed visitors with
+   * stale links. This used to report every `410` as "deleted there" and tell
+   * the leader to clear the link and push them as new — inviting the very
+   * duplicate the admin had just removed, with the document still pointing at
+   * the tombstone.
+   */
+  it('pushes a linked visitor onto the survivor rather than calling them deleted', async () => {
+    const wei = idOf('Wei');
+    const survivor = store.createAttendee({
+      firstName: 'Wei',
+      lastName: 'Suzuki',
+      infos: { fixed: { grade: 11 } },
+    });
+    db.seed('students/vis-1', {
+      firstName: 'Wei',
+      lastName: 'Suzuki',
+      grade: 10,
+      status: 'active',
+      upstreamBackend: 'a32',
+      upstreamPersonId: wei,
+    });
+    store.mergeAttendee(wei, survivor.id);
+    const before = store.attendees.size;
+
+    const result = await pushStudent({ db, client, config, cache, studentId: 'vis-1' });
+
+    expect(result.status).toBe('updated');
+    expect(result.pcoPersonId).toBe(survivor.id);
+    // The document points at somebody real now, and the drift landed on them.
+    expect(db.get('students/vis-1')!.upstreamPersonId).toBe(survivor.id);
+    expect((store.attendees.get(survivor.id)!.infos.fixed as Record<string, unknown>).grade).toBe(10);
+    expect(store.attendees.size).toBe(before);
   });
 
   it('relinks rather than reporting a person missing', async () => {
@@ -609,6 +694,67 @@ describe('addParent', () => {
     expect(result.candidates[0]!.reachable).toBe(true);
   });
 
+  /**
+   * A parent search stays off children.
+   *
+   * Attendees records being a child as a relation rather than a field, and
+   * `findAdultCandidates` already reads it; this search did not, so a junior
+   * sharing his father's name was offered as the father — and a chosen id was
+   * never checked either, so he could be filed into the family as its parent.
+   */
+  it('never offers a child as a parent candidate', async () => {
+    const nkechi = idOf('Nkechi');
+    db.seed(`students/a32_${nkechi}`, { status: 'active' });
+    const child = store.seedStudent({
+      firstName: 'Ngozi',
+      lastName: 'Obasanjo',
+      grade: 7,
+      parents: [{ firstName: 'Chukwu', gender: 'MALE', contacts: { phone1: '555-0399' } }],
+    });
+
+    const result = await addParent({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${nkechi}`,
+      firstName: 'Ngozi',
+      lastName: 'Obasanjo',
+      phone: '555-0100',
+    });
+
+    // Nobody adult has that name, so the search finds no one and creates.
+    expect(result.status).toBe('added');
+    expect(result.candidates.map((candidate) => candidate.pcoPersonId)).not.toContain(child.id);
+    expect(result.parentPersonId).not.toBe(child.id);
+  });
+
+  it('refuses a chosen person who is recorded as a child', async () => {
+    const nkechi = idOf('Nkechi');
+    db.seed(`students/a32_${nkechi}`, { status: 'active' });
+    const child = store.seedStudent({
+      firstName: 'Ngozi',
+      lastName: 'Obasanjo',
+      grade: 7,
+      parents: [{ firstName: 'Chukwu', gender: 'MALE' }],
+    });
+
+    const result = await addParent({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${nkechi}`,
+      personId: child.id,
+    });
+
+    expect(result.status).toBe('not-an-adult');
+    // And the child was not filed into anybody's family as its parent.
+    expect(store.folkAttendees.some((edge) => edge.attendeeId === child.id && edge.roleId === 30)).toBe(
+      false,
+    );
+  });
+
   it('builds the family when told to create: folk, membership, contacts', async () => {
     const nkechi = idOf('Nkechi');
     db.seed(`students/a32_${nkechi}`, { status: 'active', lastName: 'Obasanjo' });
@@ -690,6 +836,85 @@ describe('recreateStudent + checkPerson', () => {
     expect(db.get(`students/a32_${dmitri}`)).toMatchObject({
       status: 'inactive',
       mergedIntoStudentId: `a32_${newId}`,
+    });
+  });
+
+  /**
+   * The merge a re-create must not undo.
+   *
+   * A frozen student whose attendee was merged rather than deleted already has
+   * a record: the survivor. `checkPerson` says so, and the answer used to fall
+   * through to the create anyway — a second copy of the record somebody had
+   * just finished de-duplicating, which is the one thing the screen offering
+   * this button promises not to make.
+   */
+  it('grafts a merged student onto the survivor instead of creating a duplicate', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    db.seed(`students/a32_${wei}`, { status: 'active', upstreamRecordMissing: true });
+    store.mergeAttendee(wei, salote);
+    const before = store.attendees.size;
+
+    const result = await recreateStudent({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      firstName: 'Wei',
+      lastName: 'Suzuki',
+      grade: 11,
+    });
+
+    expect(result.status).toBe('relinked');
+    expect(result.pcoPersonId).toBe(salote);
+    expect(result.studentId).toBe(`a32_${salote}`);
+    expect(store.attendees.size).toBe(before);
+    expect(db.get(`students/a32_${salote}`)).toMatchObject({
+      upstreamBackend: 'a32',
+      upstreamPersonId: salote,
+      status: 'active',
+      upstreamRecordMissing: false,
+    });
+    expect(db.get(`students/a32_${wei}`)).toMatchObject({
+      status: 'inactive',
+      mergedIntoStudentId: `a32_${salote}`,
+    });
+  });
+
+  /**
+   * Search before creating.
+   *
+   * The commonest reason a record is deleted rather than merged is an office
+   * admin clearing a duplicate by hand — which is exactly when another record
+   * of the child is sitting in Attendees. Planning Center's re-create searches
+   * first; this one went straight to the POST and added a third.
+   */
+  it('links to a record Attendees already holds rather than adding a second', async () => {
+    const dmitri = idOf('Dmitri');
+    store.attendees.get(dmitri)!.isRemoved = true;
+    const kept = store.seedStudent({ firstName: 'Dmitri', lastName: 'Volkov', grade: 12 });
+    db.seed(`students/a32_${dmitri}`, { status: 'active', upstreamRecordMissing: true });
+    const before = store.attendees.size;
+
+    const result = await recreateStudent({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${dmitri}`,
+      firstName: 'Dmitri',
+      lastName: 'Volkov',
+      grade: 12,
+    });
+
+    expect(result.status).toBe('relinked');
+    expect(result.pcoPersonId).toBe(kept.id);
+    expect(result.studentId).toBe(`a32_${kept.id}`);
+    expect(store.attendees.size).toBe(before);
+    expect(db.get(`students/a32_${dmitri}`)).toMatchObject({
+      status: 'inactive',
+      mergedIntoStudentId: `a32_${kept.id}`,
     });
   });
 

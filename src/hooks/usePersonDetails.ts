@@ -116,7 +116,14 @@ export function usePersonDetails(student: Student | null): PersonDetailsResult {
   }, [key]);
 
   useEffect(() => {
-    if (!personId || cache.has(key)) return;
+    if (!personId || cache.has(key)) {
+      // Lowered here because nothing else will: the previous student's read
+      // is told not to touch the spinner once it is stale, which is right when
+      // the next student's read raises it again — and wrong when there is no
+      // next read, for a student already held or no student at all.
+      setLoading(false);
+      return;
+    }
 
     // Covers both a superseded student and an unmount; the cleanup runs for
     // either, and a late answer to a question nobody is asking must not land.

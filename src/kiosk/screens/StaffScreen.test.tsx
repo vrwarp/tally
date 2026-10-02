@@ -9,7 +9,7 @@ import { StaffScreen } from '@/kiosk/screens/StaffScreen';
 
 const NINE_FORTY_ONE = new Date(2026, 8, 27, 9, 41).getTime();
 
-function renderMenu(checkIns: Partial<CheckInsSummary> = {}) {
+function renderMenu(checkIns: Partial<CheckInsSummary> = {}, locale?: 'zh-Hant') {
   const onCheckIns = vi.fn();
   render(
     <StaffScreen
@@ -27,6 +27,7 @@ function renderMenu(checkIns: Partial<CheckInsSummary> = {}) {
       onCheckIns={onCheckIns}
       onStay={() => {}}
     />,
+    locale ? { locale } : undefined,
   );
   return onCheckIns;
 }
@@ -73,5 +74,15 @@ describe('the check-ins slot on the staff menu', () => {
       screen.getByText(/2 aren’t saved yet — don’t reload or restart/),
     ).toBeTruthy();
     expect(screen.queryByText(/No internet/)).toBeNull();
+  });
+});
+
+describe('the staff menu, in another language', () => {
+  it('heads the menu in the kiosk’s language', () => {
+    // Every row under it was translated and the heading above them was not.
+    renderMenu({}, 'zh-Hant');
+
+    expect(screen.queryByText('Staff')).not.toBeInTheDocument();
+    expect(screen.getByText('同工')).toBeInTheDocument();
   });
 });

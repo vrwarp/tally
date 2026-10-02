@@ -23,7 +23,7 @@ import { chainKey } from '@/lib/materialize';
 import { toDateOnlyValue } from '@/lib/recurrenceCore';
 import { wasHeld } from '@/lib/sessionHistory';
 import { sortByName } from '@/lib/utils';
-import { pcoStudentId } from '@/types';
+import { linkageOfStudent, studentIdFor } from '@/types';
 import type {
   AppSettings,
   EventAttendanceSnapshot,
@@ -814,6 +814,12 @@ export function computeNewVisitors(
   const results: NewVisitor[] = [];
 
   for (const student of students) {
+    // Inactive rows have been dealt with, like everywhere else on the screen.
+    // The one this list kept producing was a quick-add merged into a roster
+    // row this week: the loser keeps its `firstAttendedAt` and stays in the
+    // roster read, and the row linked to a profile that no longer exists.
+    if (student.status !== 'active') continue;
+
     const firstAttendedAt = student.firstAttendedAt;
     // An unusable date fails *every* comparison, including `< windowStart`, so
     // without this check a student with a corrupt timestamp would sit on the
@@ -895,17 +901,17 @@ export function isUnreachable(
 /**
  * Planning Center's answer about one student, under whichever id it arrived.
  *
- * The map is keyed by Planning Center's own ids (`pco_4200014`), because that
- * is what a roster read is a list of. Most students are on screen under exactly
- * that id, so most of the time this is a plain lookup.
+ * The map is keyed by the backends' own ids (`pco_4200014`, `a32_9f0c…`),
+ * because that is what a roster read is a list of. Most students are on screen
+ * under exactly that id, so most of the time this is a plain lookup.
  *
  * The exception is a visitor Tally created and later pushed upstream. They keep
  * the id Tally gave them until a roster read brings them back as a person —
  * which is a moment later at best, and never at all for somebody the read could
- * not resolve — while the answer about their family is filed under the id
- * Planning Center gave them. Looking under one id only meant the two halves of
- * this question could not meet for exactly the students the question is most
- * often about.
+ * not resolve — while the answer about their family is filed under the id the
+ * backend gave them. Looking under one id only meant the two halves of this
+ * question could not meet for exactly the students the question is most often
+ * about.
  */
 export function reachableFor(
   student: Student,
@@ -913,7 +919,10 @@ export function reachableFor(
 ): boolean | undefined {
   const own = reachable.get(student.id);
   if (own !== undefined) return own;
-  return student.pcoPersonId ? reachable.get(pcoStudentId(student.pcoPersonId)) : undefined;
+  // Whichever backend the push landed on: an Attendees check files its answer
+  // under `a32_<id>`, and only the generic pair on the document names that.
+  const link = linkageOfStudent(student);
+  return link ? reachable.get(studentIdFor(link.backendId, link.personId)) : undefined;
 }
 
 /**
@@ -1156,6 +1165,16 @@ export interface DashboardSummary {
 
 export function computeSummary(args: {
   snapshots: readonly EventAttendanceSnapshot[];
+  /**
+   * The nights `checkOutRate` is read from, when they are not `snapshots`.
+   *
+   * The page hands the head counts one gathering's nights — two crowds
+   * compared is a collapse every week — but the rate is a record across every
+   * gathering that asked for check-out, so under "All" it wants the whole
+   * loaded window. Read from the head-count nights, the tile vanished whenever
+   * a gathering that never used the feature was the last to meet.
+   */
+  checkOut?: readonly EventAttendanceSnapshot[];
   mia: readonly MiaStudent[];
   newVisitors: readonly NewVisitor[];
   incomplete: readonly Student[];
@@ -1174,7 +1193,7 @@ export function computeSummary(args: {
    */
   let tracked = 0;
   let checkedOut = 0;
-  for (const snapshot of args.snapshots) {
+  for (const snapshot of args.checkOut ?? args.snapshots) {
     if (!snapshot.event.requiresCheckOut) continue;
     tracked += snapshot.presentStudentIds.size;
     checkedOut += snapshot.checkedOutStudentIds.size;

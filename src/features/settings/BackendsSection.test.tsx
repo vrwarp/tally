@@ -72,11 +72,12 @@ function statuses(overrides: Partial<BackendStatuses> = {}): BackendStatuses {
   };
 }
 
-function mount() {
+function mount(locale?: 'zh-Hant') {
   return render(
     <MemoryRouter>
       <BackendsSection />
     </MemoryRouter>,
+    locale ? { locale } : undefined,
   );
 }
 
@@ -129,5 +130,18 @@ describe('BackendsSection', () => {
     mount();
 
     expect(await screen.findByText('New students')).toBeInTheDocument();
+  });
+});
+
+describe('BackendsSection, in another language', () => {
+  it('reports the Attendees connection the way it reports Planning Center’s', async () => {
+    // The Planning Center card read these from the catalogue; the Attendees
+    // card beside it had them as English literals.
+    mount('zh-Hant');
+
+    expect(await screen.findByText('已連線')).toBeInTheDocument();
+    expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+    expect(screen.queryByText(/students visible/)).not.toBeInTheDocument();
+    expect(screen.getByText(/名學生可見/)).toBeInTheDocument();
   });
 });

@@ -42,11 +42,11 @@ import { useTimeFormats } from '@/hooks/useTimeFormats';
  * No "days". Every day is every weekday of a weekly rule, chosen in the picker
  * below — one control for days rather than a unit that quietly duplicates it.
  */
-const FREQUENCY_UNITS: { value: RecurrenceFrequency; label: string }[] = [
-  { value: 'weekly', label: 'weeks' },
-  { value: 'monthly', label: 'months' },
-  { value: 'yearly', label: 'years' },
-];
+const FREQUENCY_UNITS = [
+  { value: 'weekly', label: 'unitWeeks' },
+  { value: 'monthly', label: 'unitMonths' },
+  { value: 'yearly', label: 'unitYears' },
+] as const satisfies readonly { value: RecurrenceFrequency; label: string }[];
 
 type EndsMode = 'never' | 'on' | 'after';
 
@@ -228,7 +228,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
             >
               {FREQUENCY_UNITS.map((unit) => (
                 <option key={unit.value} value={unit.value}>
-                  {unit.label}
+                  {t(unit.label)}
                 </option>
               ))}
             </SelectField>
@@ -256,7 +256,7 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
               </option>
               <option value="dayOfWeek">
                 {t('monthlyOnWeekdayOption', {
-                  which: describeMonthlyWeekday(recurrenceStrings, anchor),
+                  which: describeMonthlyWeekday(recurrenceStrings, anchor, value),
                 })}
               </option>
             </SelectField>
@@ -299,8 +299,15 @@ export function RecurrenceField({ anchor, value, onChange, error }: RecurrenceFi
 
       {preview.length > 0 ? (
         <p className="text-xs text-ink-500">
-          Then {preview.map((date) => time.shortDate(date)).join(', ')}
-          {preview.length === 3 ? '…' : ''}
+          {/* The dates as separate arguments: no list format gives Chinese a
+              separator for a sequence that trails off, so each language
+              places its own. */}
+          {t('thenPreview', {
+            count: preview.length,
+            first: time.shortDate(preview[0]!),
+            second: preview[1] ? time.shortDate(preview[1]) : '',
+            third: preview[2] ? time.shortDate(preview[2]) : '',
+          })}
         </p>
       ) : (
         <p className="text-xs text-ink-500">{t('onlyGathering')}</p>

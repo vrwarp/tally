@@ -15,7 +15,7 @@
  */
 import { Timestamp } from 'firebase-admin/firestore';
 import type { BackendRegistry } from '../backends/registry.js';
-import { scanRoster } from '../backends/scan.js';
+import { scanRoster, studentDocFor } from '../backends/scan.js';
 import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firestore.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import { bumpPulse } from './pulse.js';
@@ -289,13 +289,25 @@ export async function buildPhoneIndex(
     const collected = await backend.collectPhoneLast4({ personIds, force: options.force });
 
     for (const [personId, last4s] of Object.entries(collected)) {
-      // A pushed visitor's document keeps its Tally id; everyone else's
-      // document id is derived from the person id itself.
-      const studentId =
-        scan.studentIdByLinkedPersonId[backendId][personId] ?? studentIdFor(backendId, personId);
-      let bucket = byStudent.get(studentId);
-      if (!bucket) byStudent.set(studentId, (bucket = new Set()));
-      for (const last4 of last4s) bucket.add(last4);
+      /*
+       * A pushed visitor's document keeps its Tally id; everyone else's
+       * document id is derived from the person id itself. When both exist —
+       * somebody added the person from the backend after the visitor was
+       * pushed — the roster joins show the child under the membership
+       * document, so that is where the digits must be, and the visitor's
+       * id is kept too: the kiosk filters a bucket against the rows it has,
+       * so a surplus id costs nothing, and the child's history lives there.
+       */
+      const linkedId = scan.studentIdByLinkedPersonId[backendId][personId];
+      const studentIds = new Set([
+        studentDocFor(scan, backendId, personId) ?? studentIdFor(backendId, personId),
+        ...(linkedId ? [linkedId] : []),
+      ]);
+      for (const studentId of studentIds) {
+        let bucket = byStudent.get(studentId);
+        if (!bucket) byStudent.set(studentId, (bucket = new Set()));
+        for (const last4 of last4s) bucket.add(last4);
+      }
     }
   }
 

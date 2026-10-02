@@ -131,6 +131,7 @@ export function StudentDetailPage() {
   const grades = useGrades();
   const t = useTranslations('StudentDetail');
   const tCommon = useTranslations('Common');
+  const tEditor = useTranslations('StudentEditor');
   const locale = useLocale();
   const { studentId } = useParams();
   const navigate = useNavigate();
@@ -671,7 +672,7 @@ export function StudentDetailPage() {
             ) : null}
             {unreachable && !recordGone ? <Badge tone="warn">{t('noContactOnFile')}</Badge> : null}
             {student.status === 'inactive' ? <Badge tone="neutral">{t('inactiveBadge')}</Badge> : null}
-            {student.hasAllergies ? <Badge tone="warn">Allergies</Badge> : null}
+            {student.hasAllergies ? <Badge tone="warn">{t('allergiesLabel')}</Badge> : null}
           </div>
         </div>
       </header>
@@ -871,7 +872,7 @@ export function StudentDetailPage() {
               />
               <Detail
                 label={t('firstSeen')}
-                value={seen.firstSeenAt ? time.shortDate(seen.firstSeenAt) : 'Never'}
+                value={seen.firstSeenAt ? time.shortDate(seen.firstSeenAt) : t('lastSeenNever')}
               />
               <Detail
                 label={t('lastSeen')}
@@ -882,14 +883,16 @@ export function StudentDetailPage() {
                       // smaller claim than never having come at all.
                       seen.unseenInWindow
                       ? t('notInLastYear')
-                      : 'Never'
+                      : t('lastSeenNever')
                 }
               />
             </dl>
 
             {student.notes ? (
               <div>
-                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Notes</h3>
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                  {tEditor('notes')}
+                </h3>
                 <p className="mt-1 whitespace-pre-line text-sm text-ink-200">{student.notes}</p>
               </div>
             ) : null}
@@ -1378,6 +1381,8 @@ function BirthdaySection({
   onSaved: () => void;
 }) {
   const t = useTranslations('StudentDetail');
+  const tCommon = useTranslations('Common');
+  const tTime = useTranslations('Time');
   // A viewer is told where the birthday lives, not sent there to change it.
   const readOnly = useReadOnly();
   const locale = useLocale();
@@ -1393,14 +1398,16 @@ function BirthdaySection({
   // Only the three faces worth interrupting a read for. "Quiet" is a birthday
   // in August being looked at in March, and it has nothing to add to the date.
   const NEAR: Record<Exclude<BirthdayState, 'missing' | 'quiet'>, string> = {
-    today: 'Today',
+    today: tTime('today'),
     soon: t('birthdayThisWeek'),
     recent: t('birthdayPastWeek'),
   };
 
   return (
     <div>
-      <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">Birthday</h3>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-ink-400">
+        {tCommon('birthday')}
+      </h3>
 
       {editing ? (
         <div className="mt-2">

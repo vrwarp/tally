@@ -181,7 +181,7 @@ export function LockedChainGroup({ chain, lead, defaultOpen = false }: LockedCha
             aria-hidden="true"
             className="hidden shrink-0 text-xs tabular-nums text-ink-400 lg:block"
           >
-            {chain.events.length} gatherings
+            {t('chainCount', { count: chain.events.length })}
           </span>
         </summary>
 

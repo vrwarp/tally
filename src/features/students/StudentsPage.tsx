@@ -376,7 +376,7 @@ export function StudentsPage() {
       */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-h-11 flex-col justify-center">
-          <h1 className="text-xl font-bold text-ink-50">Students</h1>
+          <h1 className="text-xl font-bold text-ink-50">{t('title')}</h1>
           <p className="mt-0.5 text-sm text-ink-500">
             {/* "1 students" is what this printed for a ministry with one
                 student on it. The filtered branch beside it — "1 of 50" — was
@@ -1235,6 +1235,7 @@ function BirthdayBadge({
   onPress: () => void;
 }) {
   const t = useTranslations('Students');
+  const tTime = useTranslations('Time');
   const locale = useLocale();
   if (state === 'quiet') return null;
 
@@ -1297,7 +1298,7 @@ function BirthdayBadge({
           come from inside the chip instead. */}
       <span className="sr-only lg:hidden">{TITLES[state]}</span>
       <span aria-hidden="true">🎂</span>
-      <span aria-hidden="true">{state === 'today' ? 'Today' : day}</span>
+      <span aria-hidden="true">{state === 'today' ? tTime('today') : day}</span>
     </Badge>
   );
 }

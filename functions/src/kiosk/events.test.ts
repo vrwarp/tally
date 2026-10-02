@@ -342,6 +342,7 @@ describe('listKioskEvents', () => {
       requiresCheckOut: true,
       labelTemplate: DEFAULT_LABEL_TEMPLATE,
       kioskTheme: { ground: 'light', accent: 'ember', confirm: 'teal', backdrop: 'amber' },
+      icon: 'local_fire_department',
     });
 
     const entries = await listKioskEvents(db, NOW, logger);
@@ -353,6 +354,9 @@ describe('listKioskEvents', () => {
       expect(entry.requiresCheckOut).toBe(true);
       expect(entry.ground).toBe('light');
       expect(entry.palette?.['--color-brand-400']).toMatch(/^#[0-9a-f]{6}$/);
+      // The icon too: the stored row carried it and the projected one, which
+      // is the row the kiosk binds to most weeks, did not.
+      expect(entry.iconPath).toMatch(/^[Mm]/);
     }
   });
 

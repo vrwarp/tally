@@ -54,7 +54,7 @@ import {
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
 import type { Label } from '@vrwarp/brother-ql-webusb/labels';
-import { fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
+import { anyTokenFilled, fillLabelTokens, type LabelTemplate } from '@/lib/labelTemplate';
 import type { KioskBinding } from '../binding';
 import type { KioskStudent } from '../search';
 import {
@@ -170,7 +170,9 @@ export type PrinterNoteKey =
   | 'troubleDidNotPrint'
   | 'troubleUnsupported'
   | 'troubleStale'
-  | 'adviceCheckPrinter';
+  | 'adviceCheckPrinter'
+  | 'notConnected'
+  | 'noPrinter';
 
 export type PrinterState =
   | { kind: 'idle' }
@@ -351,6 +353,12 @@ function describe(error: unknown): { message: PrinterNote; advice: PrinterNote |
   const advice: PrinterNote | null = hint === null ? null : { text: hint };
 
   switch (code) {
+    // Thrown by this module, not the library: the sentence on the Error is for
+    // the log and the caller, and the screen gets the catalogue's words for it.
+    case 'no-printer':
+      return { message: { key: 'notConnected' }, advice: { key: 'advicePlugBackIn' } };
+    case 'no-config':
+      return { message: { key: 'noPrinter' }, advice: null };
     case 'printer-error': {
       const flags = (error as { errors?: { message: string }[] }).errors ?? [];
       const flag = flags[0]?.message;
@@ -1319,7 +1327,12 @@ function recorder(): { bytes: number; pageCount: number }[] | null {
 
 const queue = createLabelQueue({
   raster: async (job) => {
-    if (!config) throw new Error('No printer is configured.');
+    if (!config) throw Object.assign(new Error('No printer is configured.'), { code: 'no-config' });
+    // Immediately before the read, and nothing in between: `printOwed`
+    // rasterises each of the batch in turn, and a lookup started here is in
+    // `allergyFor`'s hands before the next one can evict it. See
+    // `LabelJob.prepare`.
+    job.prepare?.();
     const allergy = await allergyFor(job.studentId);
     return rasterInWorker(
       config,
@@ -1335,7 +1348,9 @@ const queue = createLabelQueue({
     // A label arriving while the printer is down should reopen it rather than
     // fail: the device may have been replugged without a connect event landing.
     if (!printer?.opened) await reopen('label');
-    if (!printer?.opened) throw new Error('No printer is connected.');
+    if (!printer?.opened) {
+      throw Object.assign(new Error('No printer is connected.'), { code: 'no-printer' });
+    }
     await printer.sendRaw(result.job, { pageCount: result.pageCount });
     if (state.kind === 'trouble' && config) setState({ kind: 'ready', config }, 'label-printed');
   },
@@ -1553,10 +1568,13 @@ export function printOwedLabels(
 ): void {
   const template = binding.labelTemplate;
   if (!template) return;
-  const jobs = tags.map(({ student, atMs }) => {
-    startAllergyLookup(student, template);
-    return jobFor(grades, locale, student, binding, template, atMs);
-  });
+  const jobs = tags.map(({ student, atMs }) => ({
+    ...jobFor(grades, locale, student, binding, template, atMs),
+    // Not started here, where the live lane starts its own: the lookup cache
+    // holds eight, and nine of these at once evicted the first child's note
+    // before the first sticker was drawn. See `LabelJob.prepare`.
+    prepare: () => startAllergyLookup(student, template),
+  }));
   log.record('kiosk', 'owed-print', { count: jobs.length });
   queue.printOwed(jobs);
 }
@@ -1600,6 +1618,11 @@ export function labelPreview(
   if (!template) return [];
   const values = tokenValuesFor(grades, locale, student, binding);
   return template.lines
+    // The renderer's rule, both halves: a line that only prints when a token
+    // filled it is dropped for a child it did not, and so is one that came
+    // to nothing. Promising "Grade" on the confirm for a sticker that will
+    // not say it is the suspicion this screen exists to settle.
+    .filter((line) => !line.requiresValue || anyTokenFilled(line.text, values))
     .map((line) => fillLabelTokens(line.text, values))
     .filter((text) => text.length > 0);
 }

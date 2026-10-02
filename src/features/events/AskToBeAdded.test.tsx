@@ -146,6 +146,16 @@ describe('once it is on the list', () => {
     expect(screen.queryByRole('button', { name: 'Ask to be added' })).not.toBeInTheDocument();
   });
 
+  it('offers no press until the list has said whether there is one', async () => {
+    // The row is write-once for its asker, so a press that beats the first
+    // snapshot is refused by the rules — and reported as a failed ask for an
+    // ask that already exists.
+    subscribeChainRequests.mockImplementation(() => () => {});
+    show();
+
+    expect(screen.getByRole('button', { name: 'Ask to be added' })).toBeDisabled();
+  });
+
   it('says who answered it and when, so silence and a no are not the same', async () => {
     publish([
       {

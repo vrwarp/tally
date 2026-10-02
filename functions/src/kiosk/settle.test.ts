@@ -168,6 +168,61 @@ describe('recording a record once its reason has gone', () => {
     expect(card(db, OUT_CARD).decision).toBe('recorded');
   });
 
+  it('records a pickup parked before its arrival came, once that arrival is parked beside it', async () => {
+    // Two tablets: the pickup reached Tally first, after the day's wait, so it
+    // was parked as one whose arrival never came. The arrival then came from a
+    // tablet that had been out of touch, by which time Noah was frozen. His
+    // arrival is the card beside the pickup, so the pickup has something to
+    // close after all: both are recorded once he is back.
+    const DAY = 24 * 60 * MINUTE;
+    const DEVICE_B = 'kiosk-lobby-00000002';
+    const db = sunday();
+    db.seed(`kioskDevices/${DEVICE_B}`, { boundChain: 'sunday-kids', retiredAt: null });
+    db.seed(`students/${NOAH}`, { firstName: 'Noah', lastName: 'Park', searchName: 'noah park', grade: 2 });
+    const land = (deviceId: string, records: Record<string, unknown>[], nowMs: number) =>
+      runLandKioskRecords({
+        db,
+        request: parseLandRequest({ records, stillOnTablet: { count: 0, oldestTappedAtMs: null } }),
+        caller: { uid: `kiosk_${deviceId}`, deviceId },
+        now: new Date(nowMs),
+        logger: SILENT_LOGGER,
+      });
+
+    const pickup = await land(
+      DEVICE_B,
+      [{ id: 'out-noah-0000001', kind: 'check-out', eventId: EVENT, studentId: NOAH, tappedAtMs: START + 82 * MINUTE }],
+      END + 2 * DAY,
+    );
+    expect(pickup.outcomes[0]).toMatchObject({ outcome: 'parked', reason: 'no-arrival' });
+
+    db.seed(`students/${NOAH}`, { firstName: 'Noah', lastName: 'Park', upstreamRecordMissing: true });
+    const arrival = await land(
+      DEVICE,
+      [
+        {
+          id: 'in-noah-00000001',
+          kind: 'check-in',
+          eventId: EVENT,
+          studentId: NOAH,
+          tappedAtMs: START + 13 * MINUTE,
+          arrivalId: 'arrival-7',
+          student: { firstName: 'Noah', lastName: 'Park', grade: 2, searchName: 'noah park' },
+        },
+      ],
+      END + 3 * DAY,
+    );
+    expect(arrival.outcomes[0]).toMatchObject({ outcome: 'parked', reason: 'frozen' });
+
+    db.seed(`students/${NOAH}`, { firstName: 'Noah', lastName: 'Park', searchName: 'noah park', grade: 2 });
+    expect(await settle(db, IN_CARD, 'record', END + 4 * DAY)).toEqual({ status: 'settled' });
+    const here = attendanceOf(db)!;
+    expect(ms(here.checkedInAt)).toBe(START + 13 * MINUTE);
+    expect(ms(here.checkedOutAt)).toBe(START + 82 * MINUTE);
+    expect(here.checkedOutBy).toBe(`kiosk_${DEVICE_B}`);
+    expect(card(db, IN_CARD).decision).toBe('recorded');
+    expect(card(db, OUT_CARD).decision).toBe('recorded');
+  });
+
   it('follows a child re-created upstream to the student who stands now, and says so', async () => {
     const db = sunday();
     await parkFrozen(db);

@@ -49,6 +49,21 @@ describe('what a row shows while an edit of it is on its way', () => {
     expect(row?.pendingFields?.has('grade')).toBe(false);
   });
 
+  it('is found by the typed name, not only by the saved one', () => {
+    // The search box matches `searchName`, and a row that reads Okonkwo while
+    // only "chen" finds it contradicts itself. The server's tail past the name
+    // (a romanization) stays where `nameSortKey` reads it by position.
+    const [row] = applyPendingEdits(roster({ searchName: 'ava chen ai' }), [
+      job({ patch: { lastName: 'Okonkwo' } }),
+    ]);
+    expect(row!.searchName).toBe('ava okonkwo ai');
+
+    const [renamed] = applyPendingEdits(roster({ searchName: 'ava chen' }), [
+      job({ patch: { firstName: 'Avery' } }),
+    ]);
+    expect(renamed!.searchName).toBe('avery chen');
+  });
+
   it('leaves every other student alone', () => {
     const students = [...roster(), makeStudent({ id: 'pco_102', lastName: 'Okonkwo' })];
     const rows = applyPendingEdits(students, [job()]);
@@ -109,5 +124,15 @@ describe('which job a row draws', () => {
     const newer = job({ id: 'b', createdAt: new Date('2025-03-14T09:00:00Z') });
     expect(latestByStudent([older, newer]).get('pco_101')?.id).toBe('b');
     expect(latestByStudent([newer, older]).get('pco_101')?.id).toBe('b');
+  });
+
+  it('lets a job that needs a human outrank a newer retry', () => {
+    // "Fix and send again" queues a new job beside the failed one, and the
+    // failed one is the one the row has to wear — otherwise the Students
+    // screen counts the student as in flight rather than as needing somebody.
+    const failed = job({ id: 'a', state: 'failed', createdAt: new Date('2025-03-11T08:00:00Z') });
+    const retry = job({ id: 'b', state: 'queued', createdAt: new Date('2025-03-14T09:00:00Z') });
+    expect(latestByStudent([failed, retry]).get('pco_101')?.id).toBe('a');
+    expect(latestByStudent([retry, failed]).get('pco_101')?.id).toBe('a');
   });
 });

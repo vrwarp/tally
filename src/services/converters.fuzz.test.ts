@@ -23,7 +23,7 @@ import {
   toStudent,
   toUserProfile,
 } from './converters';
-import { GRADES } from '@/types';
+import { GRADES, isBackendId } from '@/types';
 
 interface FakeSnapshotInput {
   id: string;
@@ -48,6 +48,35 @@ const arbitrarySnapshot = (rng: Parameters<typeof arbitraryFirestoreData>[0]) =>
     exists: rng.bool(0.9),
     hasPendingWrites: rng.bool(0.3),
   });
+
+/**
+ * A student document that sometimes carries an upstream link, in either
+ * spelling — `arbitraryFirestoreData` never names those fields on its own, so
+ * without this the property on `profileComplete` would only ever see the
+ * unlinked case. Half a pair, and a backend nobody has heard of, are mixed in
+ * because neither is a link.
+ */
+const arbitraryStudentSnapshot = (rng: Parameters<typeof arbitraryFirestoreData>[0]) => {
+  const data = arbitraryFirestoreData(rng);
+  if (rng.bool(0.3)) data.pcoPersonId = rng.bool(0.8) ? '4200099' : rng.pick(['', null]);
+  if (rng.bool(0.3)) {
+    data.upstreamBackend = rng.pick(['pco', 'a32', 'Object', 7]);
+    data.upstreamPersonId = rng.bool(0.8) ? '8c1f2c34' : rng.pick(['', null]);
+  }
+  return snapshot({
+    id: 'doc-1',
+    data,
+    exists: rng.bool(0.9),
+    hasPendingWrites: rng.bool(0.3),
+  });
+};
+
+/** What `toStudent` is entitled to read as "a push has landed". */
+const hasLinkage = (data: Record<string, unknown>): boolean =>
+  (typeof data.pcoPersonId === 'string' && data.pcoPersonId.length > 0) ||
+  (isBackendId(data.upstreamBackend) &&
+    typeof data.upstreamPersonId === 'string' &&
+    data.upstreamPersonId.length > 0);
 
 const isRealDate = (value: unknown): boolean =>
   value instanceof Date && Number.isFinite(value.getTime());
@@ -89,11 +118,14 @@ describe('converter properties', () => {
    * leftover `profileComplete: true` from before this collection stopped being a
    * mirror — the converter must not assert a fact only Planning Center can know.
    */
-  forAll('toStudent never claims to speak for Planning Center', arbitrarySnapshot, (snap) => {
+  forAll('toStudent never claims to speak for Planning Center', arbitraryStudentSnapshot, (snap) => {
     const student = toStudent(snap);
 
     expect(student.fromPlanningCenter).toBe(false);
-    expect(student.profileComplete).toBe(false);
+    // `false` only while there is nowhere upstream for a parent to live. Once
+    // a push has linked them — in either spelling — the answer is the
+    // backend's, and `null` is what lets it be given.
+    expect(student.profileComplete).toBe(hasLinkage(snap.data() ?? {}) ? null : false);
     expect(student.hasAllergies).toBe(false);
   });
 

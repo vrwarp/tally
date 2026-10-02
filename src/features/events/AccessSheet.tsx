@@ -110,6 +110,14 @@ import { useTranslations } from 'use-intl';
  */
 const PREFILL_NIGHTS = 3;
 
+/**
+ * What the preview says when the directory could not be read. Not "would keep
+ * nobody": the ticks are resolved through the directory, so without it the
+ * sheet does not know who it would keep. English, awaiting its key in the
+ * catalogue.
+ */
+const TEAM_UNREAD = "Couldn't read the team — can't show who would be kept.";
+
 const ROLE_LABEL = {
   viewer: 'roleViewer',
   counselor: 'roleCounselor',
@@ -237,7 +245,7 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   const { access, events } = useData();
   const { profile, can } = useAuth();
   const { show } = useToast();
-  const { members: team, byUid, loading: teamLoading } = useTeam(open);
+  const { members: team, byUid, loading: teamLoading, failed: teamFailed } = useTeam(open);
 
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -405,11 +413,24 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
         ? t('counting')
         : t('openToAnyone');
 
-  const workingOut = !restricted && (prefill.status === 'idle' || prefill.status === 'loading');
+  /*
+   * The press decides on the sentence, and the sentence needs the directory as
+   * much as the registers: `kept` and `takers` are resolved through it. The
+   * two are separate reads with no order between them, and a sheet whose
+   * registers had landed first drew a reopened gathering's kept list as no
+   * rows at all, counted nobody, and let the press hand `restrictChain` every
+   * uid on the document as "shown" — which it reads as a deliberate untick.
+   * So the sentence is not settled until both are in.
+   */
+  const workingOut =
+    !restricted && (prefill.status === 'idle' || prefill.status === 'loading' || teamLoading);
+  /** A directory that could not be read: no name can be drawn, so nothing can be decided. */
+  const teamUnread = !restricted && teamFailed;
 
   const restrictedDetail = (() => {
     if (restricted) return t('restrictedDetail', { count: onList });
     if (workingOut) return t('workingOut');
+    if (teamUnread) return TEAM_UNREAD;
     if (prefill.status === 'failed') {
       return keptCount > 0
         ? t('couldNotReadRegistersKept', { kept: keptCount })
@@ -469,9 +490,9 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
   }
 
   async function close() {
-    // The option is disabled while this is true; belt and braces for a press
+    // The option is disabled while either is true; belt and braces for a press
     // that raced the state.
-    if (workingOut) return;
+    if (workingOut || teamUnread) return;
     setBusy(true);
     try {
       /*
@@ -480,7 +501,14 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
        * reason `seenAtOpen` travels with the list.
        */
       const chosen = [...willKeep.kept, ...willKeep.takers].map((member) => member.id);
-      await restrictChain(chain, chosen, uid, seenAtOpen ?? []);
+      /*
+       * And only the names the sheet could actually draw. `restrictChain`
+       * reads a uid in here and not in `chosen` as a deliberate untick, and a
+       * uid the directory never resolved — a profile that has gone — was never
+       * a tick to clear, so it goes over as "never shown" and is kept.
+       */
+      const shown = [...(seenAtOpen ?? [])].filter((id) => id === uid || byUid.has(id));
+      await restrictChain(chain, chosen, uid, shown);
       show(
         t('nowLimited', { title: event.title, count: written }),
         { tone: 'success' },
@@ -705,9 +733,10 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
                 selected={restricted}
                 label={t('onlyPeopleIAdd')}
                 detail={restrictedDetail}
-                /* Not pressable while the preview still reads "Working out…":
-                   the sentence is what the press decides on. */
-                disabled={busy || workingOut}
+                /* Not pressable while the preview still reads "Working out…",
+                   nor when it never will: the sentence is what the press
+                   decides on. */
+                disabled={busy || workingOut || teamUnread}
                 onPress={restricted ? () => {} : () => void close()}
               />
               {/*
@@ -769,6 +798,8 @@ export function AccessSheet({ open, onClose, event, now }: AccessSheetProps) {
             </p>
             {workingOut ? (
               <p className="pt-2 text-sm text-ink-500">{t('workingOut')}</p>
+            ) : teamUnread ? (
+              <p className="pt-2 text-sm text-ink-500">{TEAM_UNREAD}</p>
             ) : (
               <ul className="flex flex-col pt-1">
                 {you ? (

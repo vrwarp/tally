@@ -106,6 +106,34 @@ describe('calendar arithmetic', () => {
     ]);
   });
 
+  it('keeps "the fourth Friday" on the fourth Friday for a whole year', () => {
+    /*
+     * The mirror of the case above. 28 August 2026 is the fourth Friday *and*
+     * the last, and a rule that re-read its position off that night became a
+     * last-Friday one from then on — 30 October instead of the 23rd. The rule
+     * carries which reading it means, and re-anchoring on a night that fits
+     * both keeps it.
+     */
+    const fourthFridayOfJuly = new Date(2026, 6, 24, 19, 0);
+    const monthly = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek', monthlyPosition: 4 });
+
+    let anchor = fourthFridayOfJuly;
+    const walked: Date[] = [];
+    for (let month = 0; month < 6; month += 1) {
+      anchor = nextRecurrenceOccurrence(monthly, anchor, anchor)!;
+      walked.push(anchor);
+    }
+
+    expect(days(walked)).toEqual([
+      '2026-8-28',
+      '2026-9-25',
+      '2026-10-23',
+      '2026-11-27',
+      '2026-12-25',
+      '2027-1-22',
+    ]);
+  });
+
   it('finds the nth weekday of a month', () => {
     // July 2026 starts on a Wednesday.
     expect(nthWeekdayOfMonth(2026, 6, 3, 1)).toBe(1); // first Wednesday
@@ -172,6 +200,24 @@ describe('normalizeRecurrence', () => {
     const both = normalizeRecurrence(rule({ until: '2026-10-20', count: 13 }), FRIDAY);
     expect(both.count).toBe(13);
     expect(both.until).toBeNull();
+  });
+
+  it('writes down which weekday of the month a monthly-on-weekday rule means', () => {
+    const onWeekday = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' });
+    // Read off the anchor when the rule does not say: the fourth Friday of
+    // July, the last of a month with five.
+    expect(normalizeRecurrence(onWeekday, FRIDAY).monthlyPosition).toBe(4);
+    expect(normalizeRecurrence(onWeekday, new Date(2026, 6, 31, 19, 0)).monthlyPosition).toBe(-1);
+    // Kept when the rule says, and the anchor is that: 28 Aug is both.
+    const bothWays = new Date(2026, 7, 28, 19, 0);
+    expect(normalizeRecurrence({ ...onWeekday, monthlyPosition: 4 }, bothWays).monthlyPosition).toBe(4);
+    expect(normalizeRecurrence({ ...onWeekday, monthlyPosition: -1 }, bothWays).monthlyPosition).toBe(-1);
+    // Replaced when it does not fit the anchor, or is not a reading at all.
+    expect(normalizeRecurrence({ ...onWeekday, monthlyPosition: 2 }, FRIDAY).monthlyPosition).toBe(4);
+    expect(normalizeRecurrence({ ...onWeekday, monthlyPosition: 5 }, FRIDAY).monthlyPosition).toBe(4);
+    // And nothing for a rule the question does not apply to.
+    expect(normalizeRecurrence(rule({ frequency: 'monthly' }), FRIDAY).monthlyPosition).toBeNull();
+    expect(normalizeRecurrence(rule({ monthlyPosition: 4 }), FRIDAY).monthlyPosition).toBeNull();
   });
 });
 
@@ -284,10 +330,39 @@ describe('recurrencePresets', () => {
   });
 });
 
+describe('describeRecurrence, on a night that is both the fourth and the last', () => {
+  const bothWays = new Date(2026, 7, 28, 19, 0);
+  const onWeekday = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' });
+
+  it('says what the rule carries', () => {
+    expect(describeRecurrence(strings, { ...onWeekday, monthlyPosition: 4 }, bothWays)).toBe(
+      'Monthly on the fourth Friday',
+    );
+    expect(describeRecurrence(strings, { ...onWeekday, monthlyPosition: -1 }, bothWays)).toBe(
+      'Monthly on the last Friday',
+    );
+  });
+
+  it('reads a rule written before the field existed off the date', () => {
+    expect(describeRecurrence(strings, onWeekday, bothWays)).toBe('Monthly on the last Friday');
+  });
+});
+
 describe('matchRecurrencePreset', () => {
   it('reopens the dropdown on the entry a rule was saved from', () => {
     expect(matchRecurrencePreset(rule(), FRIDAY)).toBe('weekly');
     expect(matchRecurrencePreset(rule({ weekdays: [...EVERY_WEEKDAY] }), FRIDAY)).toBe('daily');
+  });
+
+  it('reopens on the monthly-weekday entry whichever reading of a both-ways date the rule carries', () => {
+    // A fourth-Friday chain's August night is also the last Friday. Opening
+    // that night in the editor must not drop into the custom panel, and must
+    // not quietly rewrite "fourth" as "last" either.
+    const bothWays = new Date(2026, 7, 28, 19, 0);
+    const onWeekday = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek' });
+    expect(matchRecurrencePreset({ ...onWeekday, monthlyPosition: 4 }, bothWays)).toBe('monthlyWeekday');
+    expect(matchRecurrencePreset({ ...onWeekday, monthlyPosition: -1 }, bothWays)).toBe('monthlyWeekday');
+    expect(matchRecurrencePreset(onWeekday, bothWays)).toBe('monthlyWeekday');
   });
 
   it('reopens on each of the five, not only on weekly', () => {
@@ -413,6 +488,20 @@ describe('recurrenceOccurrences', () => {
     expect(days(found)).toEqual(['2026-7-10', '2026-7-17', '2026-7-24', '2026-7-31']);
   });
 
+  it('reaches back from a window that opens only a couple of days before the anchor', () => {
+    /*
+     * `from` two days before the anchor rounds to the anchor's own week, and
+     * the walk used to start there — so the Friday *before* the anchor was
+     * never generated. That is the Thursday-or-Friday-before shape the
+     * projection asks about whenever a later night has been edited.
+     */
+    const found = recurrenceOccurrences(rule(), FRIDAY, {
+      limit: 3,
+      from: new Date(2026, 6, 17, 16, 30),
+    });
+    expect(days(found)).toEqual(['2026-7-17', '2026-7-24', '2026-7-31']);
+  });
+
   it('keeps the phase of an interval when it reaches back', () => {
     const found = recurrenceOccurrences(rule({ interval: 2 }), FRIDAY, {
       limit: 4,
@@ -515,6 +604,14 @@ describe('retimeRecurrence', () => {
      */
     const picked = rule({ weekdays: [5, 2] });
     expect(retimeRecurrence(picked, FRIDAY, new Date(2026, 6, 25))).toBe(picked);
+  });
+
+  it('follows a monthly-on-weekday rule to the new date’s reading', () => {
+    const fourth = rule({ frequency: 'monthly', monthlyMode: 'dayOfWeek', monthlyPosition: 4 });
+    // Dragged a fortnight earlier, it is a second-Friday gathering now.
+    expect(retimeRecurrence(fourth, FRIDAY, new Date(2026, 6, 10, 19, 0)).monthlyPosition).toBe(2);
+    // Dragged a week later onto the fifth Friday, it is the last.
+    expect(retimeRecurrence(fourth, FRIDAY, new Date(2026, 6, 31, 19, 0)).monthlyPosition).toBe(-1);
   });
 
   it('leaves rules with no weekday of their own alone', () => {

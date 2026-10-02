@@ -172,6 +172,7 @@ import { A32ApiError } from './attendees32/client.js';
 import { createPcoClient, PcoApiError } from './pco/client.js';
 import { fetchLists } from './pco/lists.js';
 import { graftMergedStudent } from './pco/studentPerson.js';
+import { migrateStudentMemberships } from './backends/studentMigration.js';
 
 export { provisionAccess } from './access.js';
 
@@ -748,7 +749,18 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
        */
       for (const relink of result.relinks) {
         const fromDoc = studentDocFor(scan, result.backendId, relink.fromPersonId);
-        if (fromDoc) await graftMergedStudent(database, fromDoc, relink.toPersonId);
+        if (!fromDoc) continue;
+        // Routed by backend: the Planning Center graft writes `pcoPersonId`
+        // and a `pco_` keeper, which is the wrong document for an Attendees
+        // survivor.
+        if (result.backendId === 'pco') {
+          await graftMergedStudent(database, fromDoc, relink.toPersonId);
+        } else {
+          await migrateStudentMemberships(database, fromDoc, {
+            backendId: result.backendId,
+            personId: relink.toPersonId,
+          });
+        }
       }
       /*
        * Known-gone students are frozen; resolved ones thaw. The flag on the

@@ -64,6 +64,19 @@ export interface LabelJob {
    * rather than about a child.
    */
   owable?: boolean;
+  /**
+   * Work to do at the moment this label is rasterised, if any.
+   *
+   * The owed batch starts its allergy lookup here rather than before it is
+   * queued. The lookup's cache holds eight notes, oldest out first — sized for
+   * a family at the glass — and a batch is as long as the outage was: lookups
+   * started for all of it at once evicted the first children's notes before
+   * their stickers were drawn, and the line came out blank. Started as each
+   * one is drawn, a note is read before the next can push it out. The queue
+   * never calls this; the rasteriser in `index.ts` does, just before it waits
+   * on the note.
+   */
+  prepare?: () => void;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
@@ -249,6 +262,16 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
   let nextRecordId = 0;
   /** Temporary key → the id its child turned out to have. See `rekey`. */
   const aliases = new Map<string, string>();
+  /**
+   * A job as the callbacks should see it: under the id its child turned out
+   * to have. The record already reads it this way; the owed ledger reads what
+   * `onFailure` is handed, and a debt filed under a key nobody answers to is
+   * a sticker nobody is offered.
+   */
+  const seen = (job: LabelJob): LabelJob => {
+    const id = aliases.get(job.studentId);
+    return id ? { ...job, studentId: id } : job;
+  };
 
   /** Newest first, bounded, and only for jobs that are about a child. */
   function record(job: LabelJob, failed: boolean): void {
@@ -317,7 +340,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
         // far side of the glass: a child with no sticker, and somebody who can
         // now see so and print it again.
         record(next.job, true);
-        options.onDropped?.('stale', next.job);
+        options.onDropped?.('stale', seen(next.job));
         continue;
       }
 
@@ -325,14 +348,14 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
         const result = await next.result;
         await send(result);
         record(next.job, false);
-        options.onPrinted?.(next.job);
+        options.onPrinted?.(seen(next.job));
       } catch (error) {
         // One label failing must not stall the ones behind it. A jam usually
         // means the next will fail too, and the state the controller keeps is
         // what stops that being silent — but the loop keeps going either way,
         // because the alternative is a queue that never recovers on its own.
         record(next.job, true);
-        options.onFailure?.(error, next.job);
+        options.onFailure?.(error, seen(next.job));
       }
     }
   }
@@ -363,7 +386,7 @@ export function createLabelQueue(options: QueueOptions): LabelQueue {
         // An attempt that failed, because that is what it is from the far side
         // of the glass: a child with no sticker.
         record(dropped.job, true);
-        options.onDropped?.('overflow', dropped.job);
+        options.onDropped?.('overflow', seen(dropped.job));
       }
       pending.push({ job, result, queuedAtMs: now() });
       pump();

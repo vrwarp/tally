@@ -206,6 +206,18 @@ describe('layoutLabel', () => {
     for (const draw of result.draws) expect(draw.fontPx).toBeGreaterThanOrEqual(24);
   });
 
+  it('holds the floor from an odd starting size too', () => {
+    // `lg` at 0.55 is 37 dots, which shrinks by twos through 25 — and used to
+    // step straight past the 24-dot floor to 23.
+    const result = layoutLabel(
+      { ...template([line('W'.repeat(80), 'lg')]), fontScale: 0.55 },
+      {},
+      ENDLESS,
+      measure,
+    );
+    expect(result.draws.map((draw) => draw.fontPx)).toEqual([24]);
+  });
+
   it('wraps on a space once shrinking has hit the floor', () => {
     /*
      * Many short words: too wide even at the floor size, but breakable.
@@ -493,6 +505,57 @@ describe('layoutLabel', () => {
       // to a whole dot because tape is cut in dots.
       expect(result.height).toBe(Math.ceil(3 * 46 * 1.18 + 2 * 46 * 0.16 + 8 + 8));
       expect(result.height).toBe(194);
+    });
+
+    it('keeps the rows a line wraps into inside the length it reports', () => {
+      /*
+       * The draw pass puts a gap before every row, the rows of one wrapped
+       * line included. The length pass used to count a gap per *line*, so a
+       * wrapped allergy note or name ran its last row past the tape the length
+       * bought — and on a die-cut label past the bottom edge, without the
+       * squeeze ever noticing.
+       */
+      const note = Array.from({ length: 30 }, () => 'aaaa').join(' ');
+      const result = layoutLabel(
+        template([line(note, 'sm')]),
+        {},
+        { width: 696, height: null, padding: 0 },
+        measure,
+      );
+      expect(result.draws.length).toBeGreaterThan(1);
+      const last = result.draws[result.draws.length - 1]!;
+      // Three rows, two gaps between them.
+      expect(result.height).toBe(Math.ceil(3 * 24 * 1.18 + 2 * 24 * 0.16));
+      expect(last.y + last.fontPx * 0.18).toBeLessThanOrEqual(result.height);
+    });
+
+    it('notices a wrapped block that only fits a die-cut label without its gaps', () => {
+      const note = Array.from({ length: 48 }, () => 'aaaa').join(' ');
+      // Five rows of 24 dots fit 142 dots exactly only if the gaps are
+      // forgotten — which they were, so the layout called this a fit and
+      // drew the fifth row below the label. Already at the floor, there is
+      // nothing left to squeeze; what matters is that it reports so.
+      const result = layoutLabel(
+        template([line(note, 'sm')]),
+        {},
+        { width: 696, height: 142, padding: 0 },
+        measure,
+      );
+      expect(result.scaledToFit).toBe(true);
+    });
+
+    it('fits a wrapped block into a die-cut label by shrinking the lines around it', () => {
+      const note = Array.from({ length: 30 }, () => 'aaaa').join(' ');
+      const result = layoutLabel(
+        template([line('Ada', 'xl', true), line(note, 'sm')]),
+        {},
+        { width: 696, height: 200, padding: 0 },
+        measure,
+      );
+      expect(result.scaledToFit).toBe(true);
+      for (const draw of result.draws) {
+        expect(draw.y + draw.fontPx * 0.18).toBeLessThanOrEqual(200);
+      }
     });
 
     it('spends the ends it was given, and not each other’s', () => {

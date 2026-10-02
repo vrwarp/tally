@@ -101,13 +101,24 @@ function grade(value: unknown): number | null {
     : null;
 }
 
+/**
+ * One half of a name, which may be blank: both backends hand the kiosk
+ * `lastName: ''` for a person whose record has no surname, and the kiosk
+ * copies the roster row onto every tap. A name is only unreadable when both
+ * halves are.
+ */
+function nameHalf(value: unknown): string | null {
+  return typeof value === 'string' && value.length <= MAX_NAME ? value : null;
+}
+
 function parseStudent(value: unknown): KioskRecordStudent | null {
   if (typeof value !== 'object' || value === null) return null;
   const v = value as Record<string, unknown>;
-  const firstName = boundedString(v.firstName, MAX_NAME);
-  const lastName = boundedString(v.lastName, MAX_NAME);
+  const firstName = nameHalf(v.firstName);
+  const lastName = nameHalf(v.lastName);
   const searchName = boundedString(v.searchName, MAX_SEARCH_NAME);
   if (firstName === null || lastName === null || searchName === null) return null;
+  if (firstName === '' && lastName === '') return null;
   return { firstName, lastName, grade: grade(v.grade), searchName };
 }
 
@@ -403,8 +414,11 @@ export async function landOne(
             ...(dates.lastAttendedAtMs === undefined
               ? {}
               : { lastAttendedAt: Timestamp.fromMillis(dates.lastAttendedAtMs) }),
-            firstName: record.student.firstName,
-            lastName: record.student.lastName,
+            // Only the halves the roster holds: the student document never
+            // carries a blank name, which the rules refuse on the client's
+            // own patch — see `studentDatePatch`.
+            ...(record.student.firstName ? { firstName: record.student.firstName } : {}),
+            ...(record.student.lastName ? { lastName: record.student.lastName } : {}),
             // Left out for somebody nobody holds a grade for, as the kiosk's
             // own patch always has — see `studentDatePatch`.
             ...(record.student.grade === null ? {} : { grade: record.student.grade }),

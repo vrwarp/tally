@@ -707,6 +707,10 @@ describe('fetchAdultContactStatus', () => {
       ...world,
       config: baseConfig(),
       personIds: ROSTER,
+      // Pinned, because the check below looks for "555" and the response
+      // carries the time it was fetched. Read off the wall clock, any run that
+      // landed on 555 milliseconds failed.
+      now: new Date('2026-03-01T10:00:00.000Z'),
     });
 
     // The whole list is students with nobody to ring, so there is nothing to

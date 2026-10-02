@@ -20,6 +20,10 @@ export function useAttendance(eventId: string | null): {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // A refusal is a fact about one gathering. Dropped with its register, so
+    // it does not sit as a banner over the next one until that listener has
+    // answered — or, with no gathering chosen, forever.
+    setError(null);
     if (!eventId) {
       setAttendance([]);
       setLoading(false);
@@ -61,6 +65,8 @@ export function useRsvps(eventId: string | null, enabled = true): {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // As above: the failure goes with the list it was about.
+    setError(null);
     if (!eventId || !enabled) {
       setRsvps([]);
       setLoading(false);

@@ -38,7 +38,8 @@
     "size": "Size",
     "align": "Align",
     "bold": "Bold",
-    "copies": "Copies"
+    "copies": "Copies",
+    "change": "Change"
   },
   "Nav": {
     "checkIn": "Check in",
@@ -472,7 +473,13 @@
     "loading": "counting the recent gatherings",
     "emptyTitle": "No gatherings to chart yet.",
     "emptyBody": "Once a couple of gatherings have been checked in, the trend fills in here.",
-    "tableCaption": "Head count per day, oldest first."
+    "tableCaption": "Head count per day, oldest first.",
+    "summary": "{days, plural, one {# day} other {# days}} · peak {peak} · average {average}",
+    "barTitle": "{title} · {date}: {count}",
+    "barTitleAcross": "{title} · {date}: {count} across {gatherings, plural, one {# gathering} other {# gatherings}}",
+    "columnGathering": "Gathering",
+    "columnDate": "Date",
+    "columnPresent": "Present"
   },
   "Ledger": {
     "summaryHere": "{count} no longer expected here · latest {date}",
@@ -1174,7 +1181,8 @@
     "removeAria": "Remove {name} from the RSVP list",
     "rsvpForAria": "RSVP for {name}",
     "statusOptionAria": "{option} — {name}",
-    "undo": "Undo"
+    "undo": "Undo",
+    "addCount": "{count, plural, =0 {Add students} one {Add # student} other {Add # students}}"
   },
   "Access": {
     "nobody": "nobody",
@@ -1375,7 +1383,8 @@
     "hueEmber": "Ember",
     "hueAmber": "Amber",
     "hueForest": "Forest",
-    "hueTeal": "Teal"
+    "hueTeal": "Teal",
+    "ground": "Ground"
   },
   "Events": {
     "title": "Events",
@@ -1432,7 +1441,9 @@
     "iconDone": "Done",
     "iconChange": "Change",
     "limitedTag": "🔐 {count, number}",
-    "limitedTagLabel": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked"
+    "limitedTagLabel": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked",
+    "chainCount": "{count, plural, one {# gathering} other {# gatherings}}",
+    "showLater": "{count, plural, one {Show # later gathering} other {Show # later gatherings}}"
   },
   "EventIcons": {
     "event": "Event",
@@ -1563,7 +1574,11 @@
     "previewTypeChildsName": "Type your child’s name",
     "previewOrPhone": "or the last 4 digits of your phone",
     "summaryNone": "None",
-    "summaryPhoto": "Photo"
+    "summaryPhoto": "Photo",
+    "choosePhoto": "Choose a photo",
+    "replacePhoto": "Replace the photo",
+    "readingPhoto": "Reading the photo…",
+    "resizedTo": "Resized to {detail}"
   },
   "Recurrence": {
     "repeatOn": "Repeat on",
@@ -1622,7 +1637,11 @@
     "weekdayInitialThu": "T",
     "weekdayInitialFri": "F",
     "weekdayInitialSat": "S",
-    "monthlyOnDayOption": "Monthly on day {day}"
+    "monthlyOnDayOption": "Monthly on day {day}",
+    "unitWeeks": "weeks",
+    "unitMonths": "months",
+    "unitYears": "years",
+    "thenPreview": "{count, plural, =1 {Then {first}} =2 {Then {first}, {second}} other {Then {first}, {second}, {third}…}}"
   },
   "EventStatus": {
     "cancelled": "Cancelled",
@@ -1653,7 +1672,9 @@
     "rangeLast12Months": "Last 12 months",
     "presumedCancelled": "{count, plural, one {# gathering had nobody checked in and is left out, the way every other screen treats them.} other {# gatherings had nobody checked in and are left out, the way every other screen treats them.}}",
     "denied": "{count, plural, one {# gathering is not yours to read, so it has no column here — rather than a column of zeros saying nobody came.} other {# gatherings are not yours to read, so they have no column here — rather than a column of zeros saying nobody came.}}",
-    "noRecurring": "There are no recurring gatherings you are on to build a grid from."
+    "noRecurring": "There are no recurring gatherings you are on to build a grid from.",
+    "reading": "Reading {count, plural, one {# gathering} other {# gatherings}}…",
+    "shape": "<n>{gatherings}</n> {gatherings, plural, one {gathering} other {gatherings}} × <n>{students}</n> {students, plural, one {student} other {students}}."
   },
   "PastGatherings": {
     "title": "Past gatherings",
@@ -1978,7 +1999,9 @@
     "tryAgain": "Try again",
     "noBirthdateHeld": "{backend} holds no birthdate for {name}, so Tally cannot tell you when to say something.",
     "dayOnly": "The day only — {backend} holds no year for {name}, so it shows no age.",
-    "noRecordYet": "{name} does not exist in {backend} yet. Send them first."
+    "noRecordYet": "{name} does not exist in {backend} yet. Send them first.",
+    "openProfile": "Open {name}'s profile",
+    "reading": "Reading {backend}…"
   },
   "StudentEditor": {
     "titleEdit": "Edit {name}",
@@ -2357,7 +2380,8 @@
     "recordServer": "Tally didn’t take it",
     "recordArrival": "Waiting for their check-in",
     "someone": "A child",
-    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online."
+    "changeEventOffline": "Can’t reach Tally. If it leaves, it can’t pick another gathering until it’s back online.",
+    "title": "Staff"
   },
   "Search": {
     "searchEveryone": "Search everyone",
@@ -2414,7 +2438,8 @@
     "printerSettings": "Printer settings",
     "nameTagsWontPrint": "name tags won’t print",
     "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
-    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi."
+    "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi.",
+    "today": "Today"
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",
@@ -2557,7 +2582,11 @@
     "owedWaiting": "{count, plural, one {1 name tag is waiting.} other {# name tags are waiting.}}",
     "owedPrinting": "{count, plural, one {Printing 1 name tag — take it to the room.} other {Printing # name tags — take them to the room.}}",
     "owedPrinted": "{count, plural, one {1 name tag printed — take it to the room.} other {# name tags printed — take them to the room.}}",
-    "owedRowWaiting": "Waiting"
+    "owedRowWaiting": "Waiting",
+    "show": "Show",
+    "hide": "Hide",
+    "copy": "Copy",
+    "copied": "Copied"
   },
   "Pairing": {
     "title": "Pair this kiosk",

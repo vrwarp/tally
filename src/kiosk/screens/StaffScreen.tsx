@@ -225,7 +225,7 @@ export function StaffScreen({
           {/* `Staff` is a label on the screen, not the reason anybody is on it,
               and at 48px it was the largest thing in the frame by half again. The
               ladder is title, then label, then the line you read once. */}
-          <div className="text-4xl font-semibold text-ink-100">Staff</div>
+          <div className="text-4xl font-semibold text-ink-100">{t('title')}</div>
           <p className="mx-auto max-w-xl text-lg text-ink-400 tall:text-2xl">
             <span className="text-ink-200">
               <EventName path={iconPath} title={title} />

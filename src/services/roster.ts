@@ -163,8 +163,25 @@ export function rememberRosterPerson(person: PcoRosterPerson): void {
   });
 }
 
+/**
+ * Counts the times this device has been told to forget the roster.
+ *
+ * Sign-out does not wait for Planning Center. A read is out for as long as a
+ * paged sweep takes, and `forgetRoster` ran, the provider that asked went
+ * away, and then the answer landed and parked itself — the children's names
+ * back on a shared laptop seconds after the sign-out that existed to remove
+ * them. So the count is captured with the request and compared when the
+ * answer lands: a read issued before the forget was issued on behalf of a
+ * session that has ended, and has nothing to say about what this device holds.
+ */
+let forgotten = 0;
+
 /** Called on sign-out: the next person to use this device is not this person. */
 export function forgetRoster(): void {
+  /* Stryker disable next-line AssignmentOperator: which way the number moves
+   * does not matter — nothing reads it, only whether it is still the one the
+   * read in flight was issued under. */
+  forgotten += 1;
   try {
     window.localStorage.removeItem(CACHE_KEY);
   } catch {
@@ -211,6 +228,7 @@ export async function fetchRoster(
   force = false,
   timeoutMs?: number,
 ): Promise<RosterSnapshot> {
+  const issued = forgotten;
   const response = await getRoster({ force }, timeoutMs === undefined ? {} : { timeoutMs });
   const fresh = response.data.people ?? [];
   const perBackend = response.data.perBackend;
@@ -260,7 +278,11 @@ export async function fetchRoster(
     if (at !== undefined) freshAt = { ...(freshAt ?? {}), [entry.backendId]: at };
   }
 
-  writeStored({ people, storedAt: readAt, ...(freshAt ? { freshAt } : {}) });
+  // Not parked when the device was told to forget while this was out. Still
+  // answered: the caller decides what a read that lands late is worth.
+  if (issued === forgotten) {
+    writeStored({ people, storedAt: readAt, ...(freshAt ? { freshAt } : {}) });
+  }
 
   return {
     students: people.map((person) => fromRosterPerson(person, now)),

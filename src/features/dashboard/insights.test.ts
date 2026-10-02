@@ -25,7 +25,7 @@ import {
   seenAt,
   standingIn,
 } from '@/features/dashboard/insights';
-import { pcoStudentId } from '@/types';
+import { pcoStudentId, studentIdFor } from '@/types';
 import type { EventAttendanceSnapshot, TallyEvent } from '@/types';
 import {
   NOW,
@@ -926,6 +926,21 @@ describe('computeNewVisitors', () => {
     expect(computeNewVisitors([student], [], settings, NOW)).toEqual([]);
   });
 
+  it('excludes inactive students, who have already been followed up on', () => {
+    // The commonest inactive first-timer is a quick-add merged into a roster
+    // row this week: the loser keeps its `firstAttendedAt` and stays in the
+    // roster read, so without the guard it is the one row that can appear —
+    // with an "Add a contact" link to a profile that no longer exists.
+    const folded = makeStudent({
+      id: 'tally-dupe',
+      status: 'inactive',
+      mergedIntoStudentId: 'pco_1',
+      firstAttendedAt: new Date(NOW.getTime() - 2 * 86_400_000),
+    });
+
+    expect(computeNewVisitors([folded], [], settings, NOW)).toEqual([]);
+  });
+
   it('includes a visit exactly on the window boundary', () => {
     const onEdge = makeStudent({
       id: 'edge',
@@ -1327,6 +1342,27 @@ describe('computeIncompleteProfiles', () => {
     expect(computeIncompleteProfiles([pushed], new Map([['pco_4200099', true]]))).toEqual([]);
   });
 
+  it('takes Attendees\' answer for a visitor whose push landed there', () => {
+    /*
+     * The same gap, for the other backend. The Attendees push writes the
+     * generic linkage pair and never `pcoPersonId`, and its contact check
+     * files the answer under `a32_<id>` — so a lookup that only knew the
+     * Planning Center spelling could never meet it, and the visitor stayed
+     * on this list however complete their household was.
+     */
+    const pushed = makeStudent({
+      id: 'tally-1',
+      isVisitor: true,
+      upstreamBackend: 'a32',
+      upstreamPersonId: '8c1f2c34',
+      profileComplete: null,
+    });
+    const key = studentIdFor('a32', '8c1f2c34');
+
+    expect(computeIncompleteProfiles([pushed], new Map([[key, false]]))).toHaveLength(1);
+    expect(computeIncompleteProfiles([pushed], new Map([[key, true]]))).toEqual([]);
+  });
+
   it('still trusts Tally about a visitor who exists nowhere else', () => {
     // No upstream id, so there is no upstream answer to prefer — and a stray
     // entry under their own id must not talk the list out of a fact their
@@ -1687,6 +1723,33 @@ describe('computeSummary', () => {
     // "Last gathering 0, down 3" reports a cancelled night as a catastrophe.
     expect(summary.lastEventCount).toBe(3);
     expect(summary.previousEventCount).toBe(2);
+  });
+
+  it('reads the check-out rate from the nights handed to it for that, not the head-count ones', () => {
+    // Under "All" the head counts come from whichever gathering met last — two
+    // crowds compared is a collapse every week — but the rate is a record
+    // across every gathering that asked for check-out. Reading it from the
+    // head-count nights made the tile vanish whenever a gathering that never
+    // used the feature was the last to meet.
+    const nursery = makeWeeklyEvents({
+      count: 1,
+      seriesId: SUNDAY,
+      title: 'Sunday Kids',
+      requiresCheckOut: true,
+    });
+    const sunday = makeSnapshot(nursery[0]!, ['a', 'b'], true, ['a']);
+    const friday = makeSnapshot(events[2]!, ['c']);
+
+    const summary = computeSummary({
+      snapshots: [friday],
+      checkOut: [sunday, friday],
+      mia: [],
+      newVisitors: [],
+      incomplete: [],
+    });
+
+    expect(summary.lastEventCount).toBe(1);
+    expect(summary.checkOutRate).toBe(50);
   });
 
   it('passes the list lengths straight through', () => {

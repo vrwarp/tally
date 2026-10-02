@@ -634,6 +634,20 @@ export function KioskApp() {
    */
   const [registeredIds, setRegisteredIds] = useState<ReadonlySet<string>>(new Set());
   /*
+   * The ones among them whose parent gave an allergy.
+   *
+   * The callable's echo is the only thing on this tablet that knows: the
+   * roster read answers false for every Tally-owned student by rule (see
+   * `fromDocument` in roster.ts), and the server bumps the roster channel for
+   * every registration — so the flag `applyRegistration` folds in would be
+   * reverted by the pulse's own refetch within a poll, and a staff reprint
+   * after that would raster a clean label. `landStudents` puts it back on
+   * these rows. A ref rather than state because its only reader is a landing
+   * callback, and a dependency there would re-arm the pulse interval on every
+   * registration. Goes with the binding, like `registeredIds`.
+   */
+  const allergicTonightRef = useRef<Set<string>>(new Set());
+  /*
    * Whose tag this press will print, while the owed confirm is open.
    *
    * Held here rather than inside the screen for the reason the confirm's
@@ -1156,7 +1170,7 @@ export function KioskApp() {
 
   const lookAgainForPrinter = useCallback(() => {
     setListCameBackEmpty(false);
-    void printing?.ready();
+    void printing?.ready(printing.LOOK_AGAIN);
   }, [printing]);
 
   const printTestLabel = useCallback(() => {
@@ -1214,7 +1228,19 @@ export function KioskApp() {
    * flickers its truth in late.
    */
   const landStudents = useCallback((students: KioskStudent[]) => {
-    startTransition(() => setStudents(students));
+    // What the server cannot tell this tablet tonight, kept over what it did
+    // — see `allergicTonightRef`. The rest of the row is the read's: a
+    // reviewer may have corrected the name or the grade since.
+    const flagged = allergicTonightRef.current;
+    const landed =
+      flagged.size === 0
+        ? students
+        : students.map((student) =>
+            flagged.has(student.id) && !student.hasAllergies
+              ? { ...student, hasAllergies: true }
+              : student,
+          );
+    startTransition(() => setStudents(landed));
   }, []);
   const landLast4 = useCallback((last4: Record<string, string[]>) => {
     startTransition(() => setLast4Index(last4));
@@ -1332,6 +1358,7 @@ export function KioskApp() {
     setCheckedInAtMs(new Map());
     setReprintedIds(new Set());
     setRegisteredIds(new Set());
+    allergicTonightRef.current = new Set();
     setOwedTicked(new Set());
     setOwedSent(null);
     setRecovered(null);
@@ -2788,6 +2815,9 @@ export function KioskApp() {
       // walk off wearing tags for a registration that never happened. The
       // response, if it comes, prints them in `onRegistered`.
       if (outOfTouchSince() !== null) return;
+      // At most once per run, whatever the saving screen asks: a child cannot
+      // wear two of these, and a second copy is a staff reprint.
+      if (printedRunRef.current === registrationId) return;
       printedRunRef.current = registrationId;
       for (const [index, child] of children.entries()) {
         try {
@@ -2847,21 +2877,32 @@ export function KioskApp() {
           lastName: child.lastName,
           grade: child.grade,
           searchName: child.searchName,
+          // The flag rides along, or the row and the cache say allergy-free
+          // for a child whose parent just typed the opposite.
+          hasAllergies: child.hasAllergies,
         })),
         last4: result.last4,
       });
+      for (const student of added) {
+        if (student.hasAllergies) allergicTonightRef.current.add(student.id);
+      }
 
       setStudents((held) => {
         const byId = new Map(held.map((student) => [student.id, student]));
         for (const student of added) byId.set(student.id, student);
         return [...byId.values()];
       });
-      setLast4Index((held) => ({
-        ...held,
-        [result.last4]: [
-          ...new Set([...(held[result.last4] ?? []), ...added.map((student) => student.id)]),
-        ].sort(),
-      }));
+      // A sibling registered beside a child who gave no digits comes back
+      // with none, and the stored index refuses an empty key for the same
+      // reason this must: every such child would otherwise be one "family".
+      if (result.last4) {
+        setLast4Index((held) => ({
+          ...held,
+          [result.last4]: [
+            ...new Set([...(held[result.last4] ?? []), ...added.map((student) => student.id)]),
+          ].sort(),
+        }));
+      }
       if (result.checkedIn) {
         /*
          * Into the room under the same arrival the server wrote on their

@@ -178,18 +178,16 @@ export function AttendanceGridModal({ open, onClose }: AttendanceGridModalProps)
 
             {loading ? (
               <p className="flex items-center gap-2 text-sm text-ink-500">
-                <Spinner /> Reading {occurrences.length}{' '}
-                {occurrences.length === 1 ? 'gathering' : 'gatherings'}…
+                <Spinner /> {t('reading', { count: occurrences.length })}
               </p>
             ) : (
               <div className="flex flex-col gap-1 text-sm text-ink-400">
                 <p>
-                  <span className="tabular-nums text-ink-100">
-                    {grid?.gatherings.length ?? 0}
-                  </span>{' '}
-                  {grid?.gatherings.length === 1 ? 'gathering' : 'gatherings'} ×{' '}
-                  <span className="tabular-nums text-ink-100">{rowCount}</span>{' '}
-                  {rowCount === 1 ? 'student' : 'students'}.
+                  {t.rich('shape', {
+                    gatherings: grid?.gatherings.length ?? 0,
+                    students: rowCount,
+                    n: (chunks) => <span className="tabular-nums text-ink-100">{chunks}</span>,
+                  })}
                 </p>
                 {/*
                   Said out loud rather than left to a shorter file. A grid that

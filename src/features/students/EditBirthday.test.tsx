@@ -122,7 +122,11 @@ function details(overrides: Partial<PcoPersonDetails> = {}): PcoPersonDetails {
   };
 }
 
-function openBadge(student: Student) {
+function openBadge(
+  student: Student,
+  locale?: 'zh-Hant',
+  action: 'birthday' | 'allergy' = 'birthday',
+) {
   const data = {
     students: [student],
     events: [],
@@ -153,7 +157,10 @@ function openBadge(student: Student) {
     </MemoryRouter>
   );
 
-  render(wrap(<RowBadgeModal student={student} action="birthday" onClose={() => {}} now={NOW} />));
+  render(
+    wrap(<RowBadgeModal student={student} action={action} onClose={() => {}} now={NOW} />),
+    locale ? { locale } : undefined,
+  );
 }
 
 function linked(overrides: Partial<Student> = {}): Student {
@@ -351,5 +358,42 @@ describe('the birthday badge', () => {
     openBadge(makeStudent({ id: 'tally-1', pcoPersonId: null, birthday: null }));
 
     expect(screen.getByText(/Send them first/)).toBeInTheDocument();
+  });
+});
+
+describe('the badge panel, in another language', () => {
+  it('links to the profile in the reader’s language', () => {
+    // "Open {name}'s profile" was assembled from English fragments.
+    openBadge(linked(), 'zh-Hant');
+
+    expect(screen.queryByRole('link', { name: /profile/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '開啟 Sofia 的個人資料' })).toBeInTheDocument();
+  });
+
+  it('says it is reading the church database in the reader’s language', () => {
+    personDetails.loading = true;
+    openBadge(linked({ hasAllergies: true }), 'zh-Hant', 'allergy');
+
+    expect(screen.queryByText(/^Reading /)).not.toBeInTheDocument();
+    expect(screen.getByText('正在讀取 Planning Center…')).toBeInTheDocument();
+    personDetails.loading = false;
+  });
+
+  it('says a refused save in the reader’s language', async () => {
+    // The asynchronous failure was translated and the synchronous one beside
+    // it was a hand-written English sentence.
+    enqueueUpstreamEdit.mockImplementationOnce(() => {
+      throw new Error('the SDK is shut');
+    });
+    openBadge(linked({ birthday: null }), 'zh-Hant');
+
+    await userEvent.type(screen.getByRole('textbox'), '4/2');
+    const save = screen
+      .getAllByRole('button')
+      .find((button) => /Planning Center/.test(button.textContent ?? ''))!;
+    await userEvent.click(save);
+
+    expect(await screen.findByText('無法連線 Planning Center。什麼都沒有改動。')).toBeInTheDocument();
+    expect(screen.queryByText(/could not be reached/)).not.toBeInTheDocument();
   });
 });

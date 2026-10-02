@@ -477,6 +477,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
+   * Whether this provider is still on screen.
+   *
+   * `stopLadder` on unmount clears a rung that has already been scheduled. The
+   * rung after a failed read is scheduled by that read's own `finally`, which
+   * runs whenever Planning Center gets round to answering — provider or no
+   * provider — and the same `finally` starts whatever was queued behind the
+   * read. A sign-out mid-read was two more sweeps into a provider nobody
+   * could see. So a read that lands has to ask whether anybody is still here.
+   */
+  const mounted = useRef(true);
+
+  /**
    * Abandons a ladder that has not run out on its own.
    *
    * Called before every deliberate read and on unmount. A deliberate read is a
@@ -576,28 +588,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setRosterOffline(true);
     } finally {
       inFlight.current = false;
-      setRosterLoading(false);
-      setRosterSettled(true);
-
-      const queued = pending.current;
-      pending.current = null;
-      if (queued) {
-        // A deliberate read arrived while this one was in the air. It is a new
-        // ladder, not the next rung of this one — whoever asked for it asked
-        // for a fresh start, and inheriting this attempt's rung would hand them
-        // a shorter deadline than they would have got on their own.
-        void readRoster(queued.force, 0);
+      if (!mounted.current) {
+        // Nothing may fire a read into an unmounted provider — not the rung
+        // this failure would schedule, and not the refresh queued behind it.
+        pending.current = null;
       } else {
-        const gap = failed ? ROSTER_RETRY_GAPS_MS[attempt] : undefined;
-        if (gap === undefined) {
-          // The ladder is over: it landed, or it ran out of rungs. Only now is
-          // there an answer to "when did we last try".
-          lastAttemptAt.current = Date.now();
+        setRosterLoading(false);
+        setRosterSettled(true);
+
+        const queued = pending.current;
+        pending.current = null;
+        if (queued) {
+          // A deliberate read arrived while this one was in the air. It is a
+          // new ladder, not the next rung of this one — whoever asked for it
+          // asked for a fresh start, and inheriting this attempt's rung would
+          // hand them a shorter deadline than they would have got on their own.
+          void readRoster(queued.force, 0);
         } else {
-          retryTimer.current = setTimeout(() => {
-            retryTimer.current = null;
-            void readRoster(false, attempt + 1);
-          }, gap);
+          const gap = failed ? ROSTER_RETRY_GAPS_MS[attempt] : undefined;
+          if (gap === undefined) {
+            // The ladder is over: it landed, or it ran out of rungs. Only now
+            // is there an answer to "when did we last try".
+            lastAttemptAt.current = Date.now();
+          } else {
+            retryTimer.current = setTimeout(() => {
+              retryTimer.current = null;
+              void readRoster(false, attempt + 1);
+            }, gap);
+          }
         }
       }
     }
@@ -671,6 +689,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    // Here and not only in the ref's initialiser: StrictMode runs the cleanup
+    // below once and then this effect again, on the same ref.
+    mounted.current = true;
     void refreshRoster();
 
     const timer = setInterval(() => void refreshRoster(), ROSTER_REFRESH_MS);
@@ -702,7 +723,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', resync);
       window.removeEventListener('online', online);
-      // Nothing may fire a read into an unmounted provider.
+      // Nothing may fire a read into an unmounted provider: the rung already
+      // waiting is cleared here, and the one a read still out would schedule
+      // is refused by the flag.
+      mounted.current = false;
       stopLadder();
     };
   },

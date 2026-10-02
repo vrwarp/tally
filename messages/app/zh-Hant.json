@@ -38,7 +38,8 @@
     "size": "字級",
     "align": "對齊",
     "bold": "粗體",
-    "copies": "份數"
+    "copies": "份數",
+    "change": "變更"
   },
   "Nav": {
     "checkIn": "簽到",
@@ -472,7 +473,13 @@
     "loading": "正在統計最近的聚會",
     "emptyTitle": "還沒有可以作圖的聚會。",
     "emptyBody": "有幾場聚會做過簽到之後，趨勢就會顯示在這裡。",
-    "tableCaption": "每天的人數，最早的在前。"
+    "tableCaption": "每天的人數，最早的在前。",
+    "summary": "{days, plural, other {# 天}} · 最高 {peak} · 平均 {average}",
+    "barTitle": "{title} · {date}：{count}",
+    "barTitleAcross": "{title} · {date}：共 {gatherings, plural, other {# 次聚會}}，{count} 人",
+    "columnGathering": "聚會",
+    "columnDate": "日期",
+    "columnPresent": "出席"
   },
   "Ledger": {
     "summaryHere": "不再預期 {count} 人出席這場聚會 · 最近 {date}",
@@ -1174,7 +1181,8 @@
     "removeAria": "把 {name} 從報名名單移除",
     "rsvpForAria": "{name} 的報名",
     "statusOptionAria": "{option}——{name}",
-    "undo": "復原"
+    "undo": "復原",
+    "addCount": "{count, plural, =0 {加入學生} other {加入 # 名學生}}"
   },
   "Access": {
     "nobody": "沒有人",
@@ -1375,7 +1383,8 @@
     "hueEmber": "炭橘",
     "hueAmber": "琥珀",
     "hueForest": "森綠",
-    "hueTeal": "青綠"
+    "hueTeal": "青綠",
+    "ground": "底色"
   },
   "Events": {
     "title": "活動",
@@ -1432,7 +1441,9 @@
     "iconDone": "完成",
     "iconChange": "變更",
     "limitedTag": "🔐 {count, number}",
-    "limitedTagLabel": "{count, plural, other {僅限 # 人——其他所有人看到皆為鎖定狀態}}"
+    "limitedTagLabel": "{count, plural, other {僅限 # 人——其他所有人看到皆為鎖定狀態}}",
+    "chainCount": "{count, plural, other {# 次聚會}}",
+    "showLater": "{count, plural, other {顯示之後的 # 次聚會}}"
   },
   "EventIcons": {
     "event": "活動",
@@ -1563,7 +1574,11 @@
     "previewTypeChildsName": "輸入您孩子的英文名字",
     "previewOrPhone": "或電話後四碼",
     "summaryNone": "無",
-    "summaryPhoto": "照片"
+    "summaryPhoto": "照片",
+    "choosePhoto": "選擇照片",
+    "replacePhoto": "更換照片",
+    "readingPhoto": "正在讀取照片…",
+    "resizedTo": "已縮放為 {detail}"
   },
   "Recurrence": {
     "repeatOn": "重複於",
@@ -1622,7 +1637,11 @@
     "weekdayInitialThu": "四",
     "weekdayInitialFri": "五",
     "weekdayInitialSat": "六",
-    "monthlyOnDayOption": "每月 {day} 號"
+    "monthlyOnDayOption": "每月 {day} 號",
+    "unitWeeks": "週",
+    "unitMonths": "個月",
+    "unitYears": "年",
+    "thenPreview": "{count, plural, =1 {之後：{first}} =2 {之後：{first}、{second}} other {之後：{first}、{second}、{third}…}}"
   },
   "EventStatus": {
     "cancelled": "已取消",
@@ -1653,7 +1672,9 @@
     "rangeLast12Months": "最近 12 個月",
     "presumedCancelled": "{count, plural, other {有 # 場聚會沒有人簽到，已略去不列，與其他畫面的處理一致。}}",
     "denied": "{count, plural, other {有 # 場聚會不是你能看的，因此這裡沒有這幾場的欄——總好過用一整欄零說沒有人來。}}",
-    "noRecurring": "你所在的聚會裡沒有定期聚會，無法產生表格。"
+    "noRecurring": "你所在的聚會裡沒有定期聚會，無法產生表格。",
+    "reading": "正在讀取 {count, plural, other {# 次聚會}}…",
+    "shape": "<n>{gatherings}</n> {gatherings, plural, other {次聚會}} × <n>{students}</n> {students, plural, other {名學生}}。"
   },
   "PastGatherings": {
     "title": "過去的聚會",
@@ -1978,7 +1999,9 @@
     "tryAgain": "再試一次",
     "noBirthdateHeld": "{backend} 裡沒有 {name} 的生日，所以 Tally 沒法提醒你什麼時候該說一聲。",
     "dayOnly": "只有月和日——{backend} 裡沒有 {name} 的年份，所以不顯示年齡。",
-    "noRecordYet": "{name} 尚不存在於 {backend} 中。請先傳送。"
+    "noRecordYet": "{name} 尚不存在於 {backend} 中。請先傳送。",
+    "openProfile": "開啟 {name} 的個人資料",
+    "reading": "正在讀取 {backend}…"
   },
   "StudentEditor": {
     "titleEdit": "編輯 {name}",

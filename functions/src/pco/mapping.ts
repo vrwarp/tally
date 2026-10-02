@@ -34,6 +34,7 @@ import {
   type PcoPersonAttributes,
   type PcoPhoneNumber,
 } from './types.js';
+import { MINISTRY_TIME_ZONE } from '../occurrences.js';
 
 /**
  * The backend-independent halves of this mapping moved to
@@ -234,9 +235,21 @@ export function phoneNumbersOf(person: PcoPerson, index: IncludedIndex): string[
  * The US school year that ends in the given calendar year. August or later
  * belongs to the year that ends next spring, which is what "graduation year"
  * counts down to.
+ *
+ * Read in the ministry's zone rather than the process's: a function runs in
+ * UTC unless a handler says otherwise, and "flips on 1 August" means midnight
+ * where the church is, not five in the afternoon on 31 July.
  */
 function schoolYearEnding(now: Date): number {
-  return now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: MINISTRY_TIME_ZONE,
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(now);
+  const field = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const month = field('month');
+  const year = field('year');
+  return month >= 8 ? year + 1 : year;
 }
 
 /** Grade implied by a graduation year: seniors graduate in the year they finish 12th. */

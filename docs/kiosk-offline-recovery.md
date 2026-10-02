@@ -324,7 +324,7 @@ grammar, what the press will do:
 |---|---|---|
 | The child's upstream record is gone (frozen) | *Missing from the church's database, so this can't be recorded yet* — with *Fix on their page*, or, when there is no page, **Re-create in Planning Center** on the card | **Record the 9:43 arrival**, once it's back; **Let it go** |
 | The gathering was deleted after the tap | The names and tap times, so they can be re-recorded on the right night by hand | **Let it go** only — there is nothing to record onto, and guessing a night is how forty check-ins land on the wrong gathering |
-| A pickup whose arrival never appeared | *No arrival on the register for this pickup to close. It may have been removed.* | **Let it go** |
+| A pickup whose arrival never appeared | *No arrival on the register for this pickup to close. It may have been removed.* | **Let it go** — unless the arrival then reached Tally from another tablet and was parked beside it: then it is one card with the arrival, and recorded with it |
 | A pickup whose arrival was parked | Nothing of its own: it is parked with its arrival, on the same card, and settled with it | — |
 
 **Let it go** is kept as a decision with a name on it, not as an absence. The Review item in the

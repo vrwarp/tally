@@ -9,6 +9,7 @@
 import { act, renderHook, waitFor } from '@/test/rtl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { invalidateAdultContact, useAdultContact } from '@/hooks/useAdultContact';
+import { useLocaleControl } from '@/i18n/localeContext';
 
 const getParentContactStatus = vi.hoisted(() => vi.fn());
 
@@ -382,5 +383,39 @@ describe('useAdultContact', () => {
     const { result } = renderHook(() => useAdultContact());
 
     await waitFor(() => expect(result.current.reachable.get('pco_1')).toBe(true));
+  });
+
+  describe('choosing another language', () => {
+    /** The hook beside the switcher's handle, the way a screen has both. */
+    function withLocale() {
+      return renderHook(() => ({ ...useAdultContact(), locale: useLocaleControl() }));
+    }
+
+    it('does not sweep the directory again after a refresh', async () => {
+      getParentContactStatus.mockResolvedValue(answer({ pco_1: true }));
+      const { result } = withLocale();
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(getParentContactStatus).toHaveBeenCalledTimes(2));
+
+      act(() => result.current.locale.setLocale('zh-Hant'));
+      await act(async () => {});
+
+      // Once somebody has pressed refresh, nothing held can short-circuit the
+      // read — so a tap on the language switcher was a forced sweep of the
+      // church's whole adult directory, for a list that had not changed.
+      expect(getParentContactStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('says a failure already up in the new language', async () => {
+      getParentContactStatus.mockRejectedValue(new Error('offline'));
+      const { result } = withLocale();
+      await waitFor(() => expect(result.current.error).toContain('did not answer'));
+
+      act(() => result.current.locale.setLocale('zh-Hant'));
+
+      expect(result.current.error).toBe('無法查詢哪些資料不全——教會名錄沒有回應。');
+    });
   });
 });

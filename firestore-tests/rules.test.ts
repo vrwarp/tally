@@ -346,6 +346,30 @@ describe('invitations', () => {
       );
     });
 
+    it('lets an admin re-invite an address a core member invited, by leaving it alone', async () => {
+      /*
+       * The write `inviteToTally` makes on a re-invite: every client field but
+       * `invitedBy`, merged. Naming the admin there instead is refused by the
+       * write-once line above, which is how changing the role on a core
+       * member's invitation used to fail.
+       */
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.core), paths.invitation(key)), invitationDoc({ invitedBy: UID.core })),
+      );
+      const admin = asUser(env, UID.admin);
+      const reinvite = {
+        email: 'newcomer@example.org',
+        role: 'core',
+        active: deleteField(),
+        invitedAt: serverTimestamp(),
+        gatherings: [],
+      };
+      await assertFails(
+        setDoc(doc(admin, paths.invitation(key)), { ...reinvite, invitedBy: UID.admin }, { merge: true }),
+      );
+      await assertSucceeds(setDoc(doc(admin, paths.invitation(key)), reinvite, { merge: true }));
+    });
+
     it('must be somebody on a create, so no row arrives unattributed', async () => {
       await assertFails(
         setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ invitedBy: '' })),
@@ -693,12 +717,30 @@ describe('events', () => {
       { ...base, interval: 'weekly' },
       { ...base, weekdays: 'MO' },
       { ...base, monthlyMode: 'whenever' },
+      // Which weekday of the month: 1–4 or -1, nothing else.
+      { ...base, monthlyPosition: 5 },
+      { ...base, monthlyPosition: 0 },
+      { ...base, monthlyPosition: 'fourth' },
       // RFC 5545: an end date and an occurrence tally must not both apply.
       { ...base, until: '2026-10-20', count: 13 },
       'weekly',
     ]) {
       await assertFails(
         setDoc(doc(db, paths.event('event-bad-recurrence')), { ...eventDoc(), recurrence }),
+      );
+    }
+  });
+
+  it('accepts a monthly rule that says which weekday of the month it means', async () => {
+    const db = asUser(env, UID.core);
+    const base = { ...eventDoc().recurrence!, frequency: 'monthly', weekdays: [], monthlyMode: 'dayOfWeek' };
+
+    for (const monthlyPosition of [4, -1, null]) {
+      await assertSucceeds(
+        setDoc(doc(db, paths.event('event-monthly-weekday')), {
+          ...eventDoc(),
+          recurrence: { ...base, monthlyPosition },
+        }),
       );
     }
   });
@@ -3267,6 +3309,10 @@ describe('kiosk', () => {
       await assertFails(updateDoc(own(), { lastSeenAt: 'now' }));
       await assertFails(
         updateDoc(own(), { lastSeenAt: serverTimestamp(), boundTo: 'x'.repeat(121) }),
+      );
+      // The bound the kiosk cuts a title to is itself accepted.
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), boundTo: 'x'.repeat(120) }),
       );
       await assertFails(updateDoc(own(), { retiredAt: serverTimestamp(), retiredBy: KIOSK }));
     });

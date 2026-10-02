@@ -324,7 +324,9 @@ export function RegistrationFlow({
     if (submittedRef.current) return;
     submittedRef.current = true;
     haptic();
-    setSavePhase('processing');
+    // A retry after the tags went opens on the second meter: the first one's
+    // work is done, and `onEarlyPrint` must not be armed for this run again.
+    setSavePhase(tagsOut ? 'saving' : 'processing');
     dispatch({ type: 'submitting' });
     void submit({
       registrationId: state.registrationId,
@@ -383,6 +385,7 @@ export function RegistrationFlow({
     state.mode,
     anchorIds,
     onRegistered,
+    tagsOut,
   ]);
 
   /* ---- Five seconds in, with nothing back ---------------------------------- */
@@ -399,14 +402,16 @@ export function RegistrationFlow({
    * screen that is certainly true.
    */
   useEffect(() => {
-    if (state.step !== 'submitting' || savePhase !== 'processing') return;
+    // Once per run: "Try again" enters `submitting` again under the same id,
+    // for children already wearing the first attempt's tags.
+    if (state.step !== 'submitting' || savePhase !== 'processing' || tagsOut) return;
     const timer = setTimeout(() => {
       onEarlyPrint(state.registrationId, state.children);
       setTagsOut(true);
       setSavePhase('saving');
     }, PROCESSING_MS);
     return () => clearTimeout(timer);
-  }, [state.step, state.registrationId, state.children, savePhase, onEarlyPrint]);
+  }, [state.step, state.registrationId, state.children, savePhase, tagsOut, onEarlyPrint]);
 
   useEffect(() => {
     if (state.step !== 'success') return;

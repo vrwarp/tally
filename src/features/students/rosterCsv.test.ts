@@ -87,6 +87,16 @@ describe('buildRosterCsv — the three-state contact column', () => {
     const student = makeStudent({ id: 'pco_7', profileComplete: null });
     expect(contact(student, new Map([['pco_7', false]]))).toBe('no');
   });
+
+  it('reads the answer under the backend id for a visitor whose push has landed', () => {
+    // They keep the id Tally gave them until a roster read brings them back as
+    // a person, while the answer about their family is filed under the id the
+    // backend gave them. The badge resolves that; the column counts on the
+    // same lookup, or the file says "nobody looked" about a family the screen
+    // shows as reachable.
+    const pushed = makeStudent({ id: 'tally-1', pcoPersonId: '4200099', profileComplete: null });
+    expect(contact(pushed, new Map([['pco_4200099', true]]))).toBe('yes');
+  });
 });
 
 describe('buildRosterCsv — multi-backend', () => {

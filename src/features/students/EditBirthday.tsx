@@ -182,7 +182,7 @@ export function EditBirthday({ student, onFile, onSaved, onDone }: EditBirthdayP
       show(t('savingBirthday', { name: student.firstName, backend: backendLabelOf(student) }));
       onDone();
     } catch {
-      setProblem(`${backendLabelOf(student)} could not be reached. Nothing was changed.`);
+      setProblem(t('backendUnreachable', { backend: backendLabelOf(student) }));
     } finally {
       setBusy(false);
     }

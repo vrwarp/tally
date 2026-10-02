@@ -511,8 +511,19 @@ export function DashboardPage() {
   const headCount = activeGathering ?? gatherings[0] ?? null;
   const summary = useMemo(
     () =>
-      computeSummary({ snapshots: headCount?.snapshots ?? [], mia, newVisitors, incomplete }),
-    [headCount, mia, newVisitors, incomplete],
+      computeSummary({
+        snapshots: headCount?.snapshots ?? [],
+        // Not the head-count nights: the rate is a record across every
+        // gathering that asked for check-out, one-offs included, so under
+        // "All" it reads the whole loaded window. Read from one chain, the
+        // tile vanished whenever a gathering that never used the feature was
+        // the last to meet, and came back a week later showing Sunday's alone.
+        checkOut: activeGathering ? activeGathering.snapshots : snapshots,
+        mia,
+        newVisitors,
+        incomplete,
+      }),
+    [headCount, activeGathering, snapshots, mia, newVisitors, incomplete],
   );
 
   const oneOffRecaps = useMemo(
@@ -818,6 +829,7 @@ export function DashboardPage() {
               threshold={settings.miaConsecutiveMisses}
               loading={awaiting}
               gatheringTitle={activeGathering?.title ?? null}
+              gatheringKey={activeGathering?.key ?? null}
               onContactAdded={adultContact.refresh}
               exportContext={exportContext}
               onResolve={readOnly ? undefined : handleResolve}

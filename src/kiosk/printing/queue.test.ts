@@ -678,6 +678,32 @@ describe('the label queue', () => {
       ]);
     });
 
+    it('hands a failure the id the child turned out to have', async () => {
+      // The answer lands while the label is still on the wire, then the wire
+      // fails. The ledger files the debt under what it is handed here, and
+      // nothing re-keys a debt after the fact.
+      const blocked = deferred();
+      const onFailure = vi.fn();
+      const queue = createLabelQueue({
+        raster: fakeRaster().fn,
+        send: async () => {
+          await blocked.promise;
+          throw new Error('paper out');
+        },
+        onFailure,
+      });
+
+      queue.print(job('run-7:0', 'Robin'));
+      queue.rekey('run-7:0', 'new-robin');
+      blocked.release();
+      await queue.idle();
+
+      expect(onFailure).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ studentId: 'new-robin', name: 'Robin' }),
+      );
+    });
+
     it('re-keys one the log has already recorded', async () => {
       const queue = createLabelQueue({ raster: fakeRaster().fn, send: fakeSend().fn });
 

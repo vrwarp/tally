@@ -224,6 +224,42 @@ describe('projectOccurrences', () => {
     expect(projected).not.toContain('friday-fellowship-2026-08-21');
   });
 
+  it('does not erase tonight when the template is the Friday after it', () => {
+    /*
+     * The common shape: a leader opened *next* Friday and edited it, or a
+     * kiosk was bound to it a few days early. The walk reaches back from the
+     * template by whole weeks, and a `from` only a day or two before the
+     * template's week used to round to that week and start there — leaving
+     * the Friday in between, tonight's, off the calendar, the chooser and the
+     * kiosk list, with no projection to materialise it from.
+     */
+    const root = friday({ id: 'friday-fellowship-2026-07-10', startAt: new Date(2026, 6, 10, 19, 0) });
+    const ahead = friday({
+      id: 'friday-fellowship-2026-07-31',
+      startAt: new Date(2026, 6, 31, 19, 0),
+      endAt: new Date(2026, 6, 31, 21, 0),
+      checkInOpensAt: new Date(2026, 6, 31, 18, 0),
+      checkInClosesAt: new Date(2026, 6, 31, 22, 0),
+    });
+
+    // The Thursday before.
+    expect(ids(projectOccurrences([root, ahead], new Date(2026, 6, 23, 19, 0)))[0]).toBe(
+      'friday-fellowship-2026-07-24',
+    );
+    // Half an hour into the night itself.
+    expect(ids(projectOccurrences([root, ahead], new Date(2026, 6, 24, 19, 30)))[0]).toBe(
+      'friday-fellowship-2026-07-24',
+    );
+    expect(
+      findProjectedOccurrence(
+        [root, ahead],
+        'friday-fellowship',
+        new Date(2026, 6, 24, 19, 0),
+        new Date(2026, 6, 24, 19, 30),
+      ),
+    ).not.toBeNull();
+  });
+
   /*
    * The invariant the two rules in this module's docblock add up to, and the
    * cheapest way to catch a regression in either: writing a night down says
@@ -337,6 +373,29 @@ describe('projectOccurrences', () => {
       ]);
     });
 
+    it('keeps its fourth night when the remaining nights were moved later in the day', () => {
+      /*
+       * "Four times" is four nights, and a time-of-day edit carries onto the
+       * nights still to come. The bound used to be the fourth night at the
+       * *origin's* clock time, so a template moved from 19:00 to 19:30 put the
+       * fourth night half an hour past it and the repeat ended a week early.
+       */
+      const root = friday({ recurrence: bounded });
+      const moved = friday({
+        id: 'friday-fellowship-2026-07-31',
+        recurrence: bounded,
+        startAt: new Date(2026, 6, 31, 19, 30),
+        endAt: new Date(2026, 6, 31, 21, 30),
+        checkInOpensAt: new Date(2026, 6, 31, 18, 30),
+        checkInClosesAt: new Date(2026, 6, 31, 22, 30),
+      });
+
+      expect(ids(projectOccurrences([root, moved], FRIDAY))).toEqual([
+        'friday-fellowship-2026-08-07',
+        'friday-fellowship-2026-08-14',
+      ]);
+    });
+
     it('does not gain four more each time one of its nights is written down', () => {
       const root = friday({ recurrence: bounded });
       let all: readonly TallyEvent[] = [root];
@@ -352,6 +411,48 @@ describe('projectOccurrences', () => {
         'friday-fellowship-2026-07-31',
         'friday-fellowship-2026-08-07',
         'friday-fellowship-2026-08-14',
+      ]);
+    });
+  });
+
+  describe('which weekday of the month a chain means', () => {
+    const fourthFriday: RecurrenceRule = {
+      ...WEEKLY,
+      frequency: 'monthly',
+      weekdays: [],
+      monthlyMode: 'dayOfWeek',
+      monthlyPosition: 4,
+    };
+
+    it('stays the fourth Friday after a night that is also the last is written down', () => {
+      /*
+       * The projection expands from the newest night, and 28 August 2026 is
+       * the fourth Friday *and* the last. Re-reading the position off that
+       * night turned a fourth-Friday gathering into a last-Friday one from
+       * then on — 30 October instead of the 23rd, and every five-Friday month
+       * after it — the mirror image of the drift `monthlyWeekdayPosition`
+       * was changed to stop.
+       */
+      const root = friday({ recurrence: fourthFriday }); // Fri 24 Jul 2026, the fourth
+      let all: readonly TallyEvent[] = [root];
+      // August and September get checked into, in turn, each on the night.
+      for (let round = 0; round < 2; round += 1) {
+        const tonight = all[all.length - 1]!.startAt;
+        all = materialized(all, projectOccurrences(all, tonight).slice(0, 1));
+      }
+      expect(ids(all)).toEqual([
+        'friday-fellowship-2026-07-24',
+        'friday-fellowship-2026-08-28',
+        'friday-fellowship-2026-09-25',
+      ]);
+
+      const projected = ids(
+        projectOccurrences(all, new Date(2026, 8, 25, 19, 0), { horizonDays: 120 }),
+      );
+      expect(projected.slice(0, 3)).toEqual([
+        'friday-fellowship-2026-10-23',
+        'friday-fellowship-2026-11-27',
+        'friday-fellowship-2026-12-25',
       ]);
     });
   });

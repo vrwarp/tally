@@ -26,11 +26,12 @@
  * still the core team's problem later, and the incomplete profile is still the
  * handoff signal.
  */
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Button, Modal, PhoneField, SelectField, TextField } from '@/components/ui';
 import { useToast } from '@/context/toastContext';
 import { haptic } from '@/lib/utils';
 import { gradeDescription } from '@/lib/grades';
+import type { PastChange } from '@/features/checkin/PastChangeDialog';
 import { quickAddAndCheckIn } from '@/services/attendance';
 import { recordVisitorParent } from '@/services/functions';
 import { GRADES, type Grade, type TallyEvent } from '@/types';
@@ -64,6 +65,12 @@ function newRegistrationId(): string {
   return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+/** What the search box held, split into the two name fields. One word is a first name. */
+function seedName(initialName: string | undefined): { first: string; last: string } {
+  const parts = (initialName ?? '').trim().split(/\s+/).filter(Boolean);
+  return { first: parts[0] ?? '', last: parts.slice(1).join(' ') };
+}
+
 /** Ten digits, however they were punctuated. Mirrors the server's rule. */
 function phoneDigits(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -71,6 +78,10 @@ function phoneDigits(raw: string): string {
 }
 
 export interface QuickAddVisitorModalProps {
+  /**
+   * The fields are seeded on mount, so a caller opens this by mounting it
+   * rather than by flipping this from false — see `CheckInPage`.
+   */
   open: boolean;
   onClose: () => void;
   event: TallyEvent;
@@ -79,6 +90,13 @@ export interface QuickAddVisitorModalProps {
   initialName?: string;
   /** Lets the page announce the add in its aria-live region. */
   onAdded?: (name: string) => void;
+  /**
+   * Asked before anything is closed or written, handed the save to run once
+   * the answer is yes. The page passes its past-gathering question: every
+   * write on a register from an earlier day stops there first, and a visitor
+   * added to last Friday's is no exception. Absent, the save runs at once.
+   */
+  confirm?: (change: PastChange, run: () => Promise<void>) => Promise<void>;
 }
 
 export function QuickAddVisitorModal({
@@ -88,6 +106,7 @@ export function QuickAddVisitorModal({
   uid,
   initialName,
   onAdded,
+  confirm,
 }: QuickAddVisitorModalProps) {
   const grades = useGrades();
   const t = useTranslations('QuickAdd');
@@ -95,8 +114,16 @@ export function QuickAddVisitorModal({
   const { show } = useToast();
   const formId = useId();
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  /*
+   * Seeded once, on mount, and never from the props again. The page mounts
+   * this form only while it is open, so a mount is an open and a fresh form.
+   * An effect keyed on `initialName` and `event` instead emptied a half-typed
+   * visitor whenever the events listener handed down a new object for the
+   * same night, or a searched check-in landing cleared the search box behind
+   * the sheet.
+   */
+  const [firstName, setFirstName] = useState(() => seedName(initialName).first);
+  const [lastName, setLastName] = useState(() => seedName(initialName).last);
   const [grade, setGrade] = useState<Grade | null>(() => defaultGrade(event));
   /** Whether the adult questions exist on screen at all. Never open by default. */
   const [askingAdult, setAskingAdult] = useState(false);
@@ -110,19 +137,6 @@ export function QuickAddVisitorModal({
     adultLast?: string;
     adultPhone?: string;
   }>({});
-
-  useEffect(() => {
-    if (!open) return;
-    const parts = (initialName ?? '').trim().split(/\s+/).filter(Boolean);
-    setFirstName(parts[0] ?? '');
-    setLastName(parts.slice(1).join(' '));
-    setGrade(defaultGrade(event));
-    setAskingAdult(false);
-    setAdultFirst('');
-    setAdultLast('');
-    setAdultPhone('');
-    setErrors({});
-  }, [open, initialName, event]);
 
   /*
    * Whether anybody has actually answered the adult questions.
@@ -179,15 +193,15 @@ export function QuickAddVisitorModal({
       : null;
     const registrationId = newRegistrationId();
 
-    // Close and confirm before the write resolves: Firestore caches the batch
-    // locally and the roster listener echoes it back within a frame, so waiting
-    // here would only hold the counselor at a spinner.
-    onClose();
-    haptic();
-    show(t('added', { name }), { tone: 'success' });
-    onAdded?.(name);
+    const save = async () => {
+      // Close and confirm before the write resolves: Firestore caches the batch
+      // locally and the roster listener echoes it back within a frame, so
+      // waiting here would only hold the counselor at a spinner.
+      onClose();
+      haptic();
+      show(t('added', { name }), { tone: 'success' });
+      onAdded?.(name);
 
-    void (async () => {
       let studentId: string;
       try {
         studentId = await quickAddAndCheckIn({
@@ -218,7 +232,12 @@ export function QuickAddVisitorModal({
       } catch {
         show(t('contactFailed', { name: first }), { tone: 'error' });
       }
-    })();
+    };
+
+    // The question, if there is one, comes before the sheet closes and the
+    // toast says "added": the form waits behind it with the name still typed,
+    // so a "no" costs nothing.
+    void (confirm ? confirm({ kind: 'checkIn', name }, save) : save());
   };
 
   return (

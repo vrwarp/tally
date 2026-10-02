@@ -160,6 +160,21 @@ describe('checkIn', () => {
     expect(written).toMatchObject({ firstName: 'Alan', lastName: 'Wan' });
     expect(written).not.toHaveProperty('grade');
   });
+
+  it('carries no surname for somebody the roster holds none for', async () => {
+    /*
+     * Both backends write `lastName: ''` for a person with no surname on file,
+     * and the rules refuse a blank name on this document — in the app and on
+     * the kiosk alike. The attendance set shares the batch, so every tap on
+     * that child failed, and every retry with it. The half that exists still
+     * goes down, with the search key the roster already built from it.
+     */
+    await tap(makeStudent({ id: 'pco_7', firstName: 'Noor', lastName: '' }));
+
+    const written = studentWrite();
+    expect(written).toMatchObject({ firstName: 'Noor', searchName: 'noor' });
+    expect(written).not.toHaveProperty('lastName');
+  });
 });
 
 /** Ten past seven, and it has to still say ten past seven afterwards. */

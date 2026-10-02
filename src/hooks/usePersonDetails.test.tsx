@@ -471,6 +471,46 @@ describe('refresh, after the panel moved to another student', () => {
   });
 });
 
+describe('moving on while a read is out', () => {
+  /**
+   * The spinner is raised by the read, and the read's own `finally` is told
+   * not to lower it once the student has changed — rightly, because the next
+   * student's read will. These are the next students who have no read: one
+   * the session already holds, and nobody at all.
+   */
+  it('takes the spinner down for a student the session already holds', async () => {
+    const other = renderHook(() => usePersonDetails(makeStudent({ id: 'pco_202' })));
+    await waitFor(() => expect(other.result.current.loaded).toBe(true));
+    other.unmount();
+
+    getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
+    const { result, rerender } = renderHook(({ student }) => usePersonDetails(student), {
+      initialProps: { student: linked() },
+    });
+    expect(result.current.loading).toBe(true);
+
+    // A leader working down the list, back to a child they already opened.
+    // The memo answers at once; a spinner over that answer never comes down.
+    rerender({ student: makeStudent({ id: 'pco_202' }) });
+
+    expect(result.current.loaded).toBe(true);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('takes the spinner down when the panel closes', async () => {
+    getPersonDetails.mockReturnValueOnce(new Promise(() => {}));
+    const { result, rerender } = renderHook(
+      ({ student }: { student: Student | null }) => usePersonDetails(student),
+      { initialProps: { student: linked() as Student | null } },
+    );
+    expect(result.current.loading).toBe(true);
+
+    rerender({ student: null });
+
+    expect(result.current.loading).toBe(false);
+  });
+});
+
 describe('a late answer', () => {
   it('does not land after the student has changed', async () => {
     let answerFirst: (value: { data: PcoPersonDetails | null }) => void = () => {};
