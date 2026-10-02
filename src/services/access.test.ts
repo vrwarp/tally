@@ -22,6 +22,13 @@ import { inviteToTally, subscribeInvitations, withdrawInvitation } from '@/servi
 import type { Invitation } from '@/types';
 
 const setDoc = vi.hoisted(() => vi.fn(async () => {}));
+/** The invitation already at the address, if any. Absent unless a test says. */
+const getDoc = vi.hoisted(() =>
+  vi.fn(async (): Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }> => ({
+    exists: () => false,
+    data: () => undefined,
+  })),
+);
 const deleteDoc = vi.hoisted(() => vi.fn(async () => {}));
 const onSnapshot = vi.hoisted(() => vi.fn(() => () => {}));
 const orderBy = vi.hoisted(() => vi.fn((field: string) => ({ orderBy: field })));
@@ -44,6 +51,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot,
   serverTimestamp: () => 'server-timestamp',
   deleteField: () => 'delete-field',
+  getDoc,
   setDoc,
   deleteDoc,
 }));
@@ -82,23 +90,23 @@ beforeEach(() => {
   orderBy.mockClear();
 });
 
-describe('inviteToTally', () => {
-  it('keys the document on the address, so inviting twice is one invitation', () => {
-    void inviteToTally('Miriam@Example.org', 'core', 'uid-admin');
+describe('inviteToTally', async () => {
+  it('keys the document on the address, so inviting twice is one invitation', async () => {
+    await inviteToTally('Miriam@Example.org', 'core', 'uid-admin');
 
     // Dots become commas because the address is the key and the key is a path
     // segment.
     expect(written().path).toBe('invitations/miriam@example,org');
   });
 
-  it('stores the address folded, so a sign-in finds it however it was typed', () => {
-    void inviteToTally('  Miriam@Example.org  ', 'counselor', 'uid-admin');
+  it('stores the address folded, so a sign-in finds it however it was typed', async () => {
+    await inviteToTally('  Miriam@Example.org  ', 'counselor', 'uid-admin');
 
     expect(written().data).toMatchObject({ email: 'miriam@example.org' });
   });
 
-  it('writes the role and who invited them', () => {
-    void inviteToTally('miriam@example.org', 'admin', 'uid-admin');
+  it('writes the role and who invited them', async () => {
+    await inviteToTally('miriam@example.org', 'admin', 'uid-admin');
 
     expect(written().data).toMatchObject({
       role: 'admin',
@@ -107,52 +115,77 @@ describe('inviteToTally', () => {
     });
   });
 
-  it('takes the retired pause flag off any document it rewrites', () => {
+  it('takes the retired pause flag off any document it rewrites', async () => {
     // The switch is gone, so the field is deleted rather than merged over: a
     // value left on the record is one somebody reads later as still meaning
     // something.
-    void inviteToTally('miriam@example.org', 'core', 'uid-admin');
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin');
 
     expect(written().data).toMatchObject({ active: 'delete-field' });
   });
 
-  it('merges, so changing somebody role does not blank the rest', () => {
-    void inviteToTally('miriam@example.org', 'core', 'uid-admin');
+  it('merges, so changing somebody role does not blank the rest', async () => {
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin');
 
     expect(written().options).toEqual({ merge: true });
   });
 
-  it('keeps a note when there is one', () => {
-    void inviteToTally('miriam@example.org', 'core', 'uid-admin', '  Wednesday volunteer  ');
+  it('keeps a note when there is one', async () => {
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin', '  Wednesday volunteer  ');
 
     expect(written().data).toMatchObject({ note: 'Wednesday volunteer' });
   });
 
-  it('writes no note key at all for whitespace', () => {
+  it('writes no note key at all for whitespace', async () => {
     // An empty string on the document would show as a blank line under the
     // address rather than as no note.
-    void inviteToTally('miriam@example.org', 'core', 'uid-admin', '   ');
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin', '   ');
 
     expect(written().data).not.toHaveProperty('note');
   });
 
-  it('writes no note key when none was given', () => {
-    void inviteToTally('miriam@example.org', 'core', 'uid-admin');
+  it('writes no note key when none was given', async () => {
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin');
 
     expect(written().data).not.toHaveProperty('note');
   });
 
-  it('refuses an empty address rather than writing a document nobody can match', () => {
-    expect(inviteToTally('   ', 'core', 'uid-admin')).rejects.toThrow(
+  it('refuses an empty address rather than writing a document nobody can match', async () => {
+    await expect(inviteToTally('   ', 'core', 'uid-admin')).rejects.toThrow(
       'An email address is required.',
     );
     expect(setDoc).not.toHaveBeenCalled();
   });
+
+  it('leaves the original inviter on a re-invite, because the rules hold it write-once', async () => {
+    /*
+     * The bug: a core member's invitation, re-sent by an admin to change the
+     * role, wrote the admin's uid over `invitedBy`. The rules refuse any update
+     * that changes that field, so the admin's edit failed with a permission
+     * error and the role never changed.
+     */
+    getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ email: 'miriam@example.org', role: 'counselor', invitedBy: 'uid-core' }),
+    });
+
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin');
+
+    expect(written().data).not.toHaveProperty('invitedBy');
+    expect(written().data).toMatchObject({ role: 'core', invitedAt: 'server-timestamp' });
+  });
+
+  it('names the inviter when it is the first invitation at the address', async () => {
+    await inviteToTally('miriam@example.org', 'core', 'uid-admin');
+
+    expect(getDoc).toHaveBeenCalledWith({ path: 'invitations/miriam@example,org' });
+    expect(written().data).toMatchObject({ invitedBy: 'uid-admin' });
+  });
 });
 
-describe('the gatherings an invitation carries', () => {
-  it('writes the ticked chains whole, so unticking one on a re-invite takes it off', () => {
-    void inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, [
+describe('the gatherings an invitation carries', async () => {
+  it('writes the ticked chains whole, so unticking one on a re-invite takes it off', async () => {
+    await inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, [
       'sunday-school',
       'nursery',
     ]);
@@ -160,24 +193,24 @@ describe('the gatherings an invitation carries', () => {
     expect(written().data?.gatherings).toEqual(['sunday-school', 'nursery']);
   });
 
-  it('copies the list rather than storing the caller’s array', () => {
+  it('copies the list rather than storing the caller’s array', async () => {
     // The caller owns a `Set`'s spread or a piece of component state; handing
     // the same reference to Firestore lets a later mutation change what was
     // written.
     const chosen = ['sunday-school'];
-    void inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, chosen);
+    await inviteToTally('jo@example.org', 'counselor', 'uid-admin', undefined, chosen);
     chosen.push('nursery');
 
     expect(written().data?.gatherings).toEqual(['sunday-school']);
   });
 
-  it('writes an empty list when nothing was ticked, rather than leaving the field off', () => {
+  it('writes an empty list when nothing was ticked, rather than leaving the field off', async () => {
     /*
      * The write merges, so an absent key keeps whatever a previous invitation
      * put there — and "I unticked everything" would silently mean "leave it as
      * it was".
      */
-    void inviteToTally('jo@example.org', 'counselor', 'uid-admin');
+    await inviteToTally('jo@example.org', 'counselor', 'uid-admin');
 
     expect(written().data?.gatherings).toEqual([]);
   });

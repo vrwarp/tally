@@ -346,6 +346,30 @@ describe('invitations', () => {
       );
     });
 
+    it('lets an admin re-invite an address a core member invited, by leaving it alone', async () => {
+      /*
+       * The write `inviteToTally` makes on a re-invite: every client field but
+       * `invitedBy`, merged. Naming the admin there instead is refused by the
+       * write-once line above, which is how changing the role on a core
+       * member's invitation used to fail.
+       */
+      await assertSucceeds(
+        setDoc(doc(asUser(env, UID.core), paths.invitation(key)), invitationDoc({ invitedBy: UID.core })),
+      );
+      const admin = asUser(env, UID.admin);
+      const reinvite = {
+        email: 'newcomer@example.org',
+        role: 'core',
+        active: deleteField(),
+        invitedAt: serverTimestamp(),
+        gatherings: [],
+      };
+      await assertFails(
+        setDoc(doc(admin, paths.invitation(key)), { ...reinvite, invitedBy: UID.admin }, { merge: true }),
+      );
+      await assertSucceeds(setDoc(doc(admin, paths.invitation(key)), reinvite, { merge: true }));
+    });
+
     it('must be somebody on a create, so no row arrives unattributed', async () => {
       await assertFails(
         setDoc(doc(asUser(env, UID.admin), paths.invitation(key)), invitationDoc({ invitedBy: '' })),

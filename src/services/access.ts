@@ -36,6 +36,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -122,6 +123,13 @@ function byInvitedAtThenName(a: Invitation, b: Invitation): number {
  * described above from any document this touches — a rewrite that left it
  * behind would keep a value on the record that looks like it still decides
  * something. Deleting a field that is not there is not an error.
+ *
+ * `invitedBy` is written only when the invitation is new. The rules hold it
+ * write-once, because it is who may withdraw the row, so a re-invite that
+ * named its own writer would be refused whenever somebody else sent the first
+ * one: an admin changing the role on a core member's invitation, or a second
+ * core member inviting the same counselor. The original inviter stays on the
+ * row instead.
  */
 export async function inviteToTally(
   email: string,
@@ -138,14 +146,18 @@ export async function inviteToTally(
   const address = email.trim().toLowerCase();
   if (!address) throw new Error('An email address is required.');
 
+  const ref = doc(db, paths.invitation(emailKey(address)));
+  const held = await getDoc(ref);
+  const inviter = held.exists() ? held.data()?.invitedBy : undefined;
+
   await setDoc(
-    doc(db, paths.invitation(emailKey(address))),
+    ref,
     {
       email: address,
       role,
       active: deleteField(),
       invitedAt: serverTimestamp(),
-      invitedBy,
+      ...(typeof inviter === 'string' && inviter ? {} : { invitedBy }),
       gatherings: [...gatherings],
       ...(note?.trim() ? { note: note.trim() } : {}),
     },
