@@ -213,7 +213,7 @@ export function CheckInPage() {
 
   const [query, setQuery] = useState("");
   // Back clears a search before it leaves the screen. See the hook.
-  useBackClearsSearch(query, () => setQuery(""));
+  useBackClearsSearch(query, setQuery);
   const [grades, setGrades] = useState<readonly Grade[]>(() => []);
   // The screen opens on the regulars, because on a recurring gathering they are
   // most of the taps. `buildRoster` quietly downgrades this to the whole roster

@@ -130,7 +130,7 @@ export function StudentsPage() {
 
   const [query, setQuery] = useState('');
   // Back clears a search before it leaves the screen. See the hook.
-  useBackClearsSearch(query, () => setQuery(''));
+  useBackClearsSearch(query, setQuery);
   /*
    * What the roster is read through, one commit behind the box.
    *

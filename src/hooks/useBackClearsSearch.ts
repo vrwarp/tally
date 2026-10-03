@@ -28,29 +28,28 @@ import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 
 const MARK = 'searching';
 
+type HistoryState = Record<string, unknown> | null;
+
+/** The router's state with the marker set or taken off, the rest kept. */
 function stateWith(state: unknown, marked: boolean): Record<string, unknown> {
-  const rest = typeof state === 'object' && state !== null ? { ...state } : {};
+  const rest = { ...(state as HistoryState) };
   if (marked) return { ...rest, [MARK]: true };
-  delete (rest as Record<string, unknown>)[MARK];
+  delete rest[MARK];
   return rest;
 }
 
-function isMarked(state: unknown): boolean {
-  return typeof state === 'object' && state !== null && (state as Record<string, unknown>)[MARK] === true;
-}
-
-export function useBackClearsSearch(query: string, clear: () => void): void {
+/**
+ * `setQuery` rather than a callback that clears: a state setter keeps its
+ * identity across renders, so the effect below re-runs on transitions and not
+ * on every keystroke.
+ */
+export function useBackClearsSearch(query: string, setQuery: (query: string) => void): void {
   const location = useLocation();
   const navigate = useNavigate();
   const navigationType = useNavigationType();
 
   const searching = query !== '';
-  const marked = isMarked(location.state);
-
-  // Read inside the effect without making every keystroke or route render
-  // re-run it: the effect answers to *transitions*, not to values.
-  const latest = useRef({ location, clear });
-  latest.current = { location, clear };
+  const marked = (location.state as HistoryState)?.[MARK] === true;
 
   const wasMarked = useRef(marked);
   /** This mount pushed the marked entry, so stepping back over it is safe. */
@@ -59,33 +58,34 @@ export function useBackClearsSearch(query: string, clear: () => void): void {
   const unwinding = useRef(false);
 
   useEffect(() => {
-    const { location: here, clear: clearQuery } = latest.current;
+    // A PUSH that drops the marker is somewhere new — another event on the
+    // same screen — and the query goes with the reader rather than being lost.
     const popped = wasMarked.current && !marked && navigationType === 'POP';
     wasMarked.current = marked;
 
     if (popped) {
       pushed.current = false;
-      if (unwinding.current) {
-        unwinding.current = false;
-      } else if (searching) {
-        clearQuery();
+      if (!unwinding.current) {
+        setQuery('');
         return;
       }
+      unwinding.current = false;
     }
+    // Waiting on that back. Anything typed meanwhile is marked once it lands,
+    // and a second emptying must not send a second back after the first.
     if (unwinding.current) return;
 
-    const to = { pathname: here.pathname, search: here.search, hash: here.hash };
+    const here = { pathname: location.pathname, search: location.search, hash: location.hash };
     if (searching && !marked) {
       pushed.current = true;
-      navigate(to, { state: stateWith(here.state, true) });
+      navigate(here, { state: stateWith(location.state, true) });
     } else if (!searching && marked) {
       if (pushed.current) {
-        pushed.current = false;
         unwinding.current = true;
         navigate(-1);
       } else {
-        navigate(to, { replace: true, state: stateWith(here.state, false) });
+        navigate(here, { replace: true, state: stateWith(location.state, false) });
       }
     }
-  }, [searching, marked, navigationType, navigate]);
+  }, [searching, marked, navigationType, navigate, location, setQuery]);
 }
