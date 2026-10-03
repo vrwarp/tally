@@ -55,6 +55,7 @@ import { buildRoster, formerStudent, type RosterFocus } from '@/features/roster/
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAllergyNotes } from '@/hooks/useAllergyNotes';
 import { useAttendance, useRsvps } from '@/hooks/useAttendance';
+import { useBackClearsSearch } from '@/hooks/useBackClearsSearch';
 import { useHeightVar } from '@/hooks/useHeightVar';
 import { invalidateSnapshotCache, useEventSnapshots } from '@/hooks/useEventSnapshots';
 import { chainKey } from '@/lib/materialize';
@@ -211,6 +212,8 @@ export function CheckInPage() {
   const { snapshots } = useEventSnapshots(historyEvents);
 
   const [query, setQuery] = useState("");
+  // Back clears a search before it leaves the screen. See the hook.
+  useBackClearsSearch(query, setQuery);
   const [grades, setGrades] = useState<readonly Grade[]>(() => []);
   // The screen opens on the regulars, because on a recurring gathering they are
   // most of the taps. `buildRoster` quietly downgrades this to the whole roster
