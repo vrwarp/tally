@@ -42,6 +42,7 @@ import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { useAuth, useReadOnly } from '@/context/authContext';
 import { useData } from '@/context/dataContext';
 import { useAdultContact } from '@/hooks/useAdultContact';
+import { useBackClearsSearch } from '@/hooks/useBackClearsSearch';
 import { isUnreachable } from '@/features/dashboard/insights';
 import { AddFromPlanningCenterModal } from '@/features/students/AddFromPlanningCenterModal';
 import { PartialRosterDialog } from '@/features/students/PartialRosterDialog';
@@ -128,6 +129,8 @@ export function StudentsPage() {
   const readOnly = useReadOnly();
 
   const [query, setQuery] = useState('');
+  // Back clears a search before it leaves the screen. See the hook.
+  useBackClearsSearch(query, () => setQuery(''));
   /*
    * What the roster is read through, one commit behind the box.
    *
