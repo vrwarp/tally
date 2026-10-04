@@ -586,6 +586,62 @@ describe('redeemLinkForCaller', () => {
     expect(db.get('eventAccess/sunday-school')!.members).toContain('uid-jo');
   });
 
+  it('grants the role an admin minted the link for', async () => {
+    const db = ministry();
+    db.seed(userPath('uid-ada'), { email: 'ada@example.org', role: 'admin', active: true });
+    const { token } = await createLink(db, {
+      invitedBy: 'uid-ada',
+      label: 'Jo, new coordinator',
+      gatherings: [],
+      life: 'link',
+      now: NOW,
+      role: 'core',
+    });
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'core' });
+    expect(db.get(userPath('uid-jo'))).toMatchObject({ role: 'core', active: true });
+  });
+
+  it('grants counselor from an elevated link whose maker is no longer an admin', async () => {
+    // Handing out access you no longer hold is how a link becomes an
+    // escalation, so the rank is re-checked at redemption, not trusted.
+    const db = ministry();
+    db.seed(userPath('uid-ada'), { email: 'ada@example.org', role: 'core', active: true });
+    const { token } = await createLink(db, {
+      invitedBy: 'uid-ada',
+      label: 'Jo',
+      gatherings: [],
+      life: 'link',
+      now: NOW,
+      role: 'admin',
+    });
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'counselor' });
+    expect(db.get(userPath('uid-jo'))).toMatchObject({ role: 'counselor' });
+  });
+
+  it('does not promote an existing member through an elevated link', async () => {
+    const db = ministry();
+    db.seed(userPath('uid-ada'), { email: 'ada@example.org', role: 'admin', active: true });
+    db.seed(userPath('uid-jo'), { email: JO.email, role: 'counselor', active: true });
+    const { token } = await createLink(db, {
+      invitedBy: 'uid-ada',
+      label: 'Jo',
+      gatherings: [],
+      life: 'link',
+      now: NOW,
+      role: 'admin',
+    });
+
+    const result = await redeemLinkForCaller(db, JO, token, NOW, []);
+
+    expect(result).toMatchObject({ status: 'granted', role: 'counselor' });
+  });
+
   it('refuses a suspended account, so a link is not a way back in', async () => {
     const db = ministry();
     db.seed(userPath('uid-jo'), { email: JO.email, role: 'counselor', active: false });

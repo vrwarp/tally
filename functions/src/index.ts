@@ -77,6 +77,7 @@ import {
   countLiveLinks,
   createLink,
   isLinkId,
+  linkRole,
   MAX_LIVE_LINKS,
   readLink,
   refreshLink,
@@ -3425,11 +3426,13 @@ async function requireOwnGatherings(uid: string, gatherings: readonly string[]):
  * Mints an invite link, and hands back the token exactly once.
  *
  * Core and up. See `functions/src/invitations.ts` for why the token is never
- * stored, why the document is keyed by its hash, and why every link grants
- * counselor whoever minted it.
+ * stored, why the document is keyed by its hash, and what a link may grant.
+ *
+ * `role` is counselor unless an admin asks for another: a core member may
+ * invite counselors and nothing above (P4), by link as by address.
  */
 export const createInvitationLink = onCall<
-  { label?: unknown; gatherings?: unknown; life?: unknown },
+  { label?: unknown; gatherings?: unknown; life?: unknown; role?: unknown },
   Promise<{ id: string; token: string; expiresAt: number }>
 >({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
@@ -3442,6 +3445,22 @@ export const createInvitationLink = onCall<
       'invite.labelRequired',
       'Say who the invitation is for before creating it.',
     );
+  }
+
+  const asked = request.data?.role ?? 'counselor';
+  if (asked !== 'counselor' && (await readCaller(uid)).role !== 'admin') {
+    throw refuse(
+      'permission-denied',
+      'auth.adminOnly',
+      'Only an admin can invite somebody as anything other than a counselor.',
+    );
+  }
+  const role = linkRole(asked);
+  if (role !== asked) {
+    // Only reachable by a caller that is not the Team screen. Refused rather
+    // than quietly minted as counselor: a link that grants something other
+    // than what its maker asked for is a surprise found on a Sunday.
+    throw refuse('invalid-argument', 'auth.adminOnly', 'That is not a role Tally knows.');
   }
 
   const gatherings = sanitizeGatherings(request.data?.gatherings);
@@ -3463,6 +3482,7 @@ export const createInvitationLink = onCall<
     gatherings,
     life: inviteLife(request.data?.life),
     now,
+    role,
   });
   return { id: minted.id, token: minted.token, expiresAt: minted.expiresAt.getTime() };
 });

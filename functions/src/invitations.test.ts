@@ -157,9 +157,26 @@ describe('re-minting', () => {
     expect(row.label).toBe('Jo, nursery');
     expect(row.gatherings).toEqual(['sunday-school']);
     expect(row.invitedBy).toBe(MIRIAM);
+    expect(row.role).toBe('counselor');
     // Extending a link is not inviting somebody again.
     expect(row.invitedAt).toEqual(stamp(NOW));
     expect((row.tokenExpiresAt as Timestamp).toMillis()).toBe(later.getTime() + QR_LIFE_MS);
+  });
+
+  it('carries the role a link was minted for', async () => {
+    const db = new FakeFirestore();
+    const first = await createLink(db, {
+      invitedBy: MIRIAM,
+      label: 'Sam, new coordinator',
+      gatherings: [],
+      life: 'link',
+      now: NOW,
+      role: 'core',
+    });
+    expect(db.get(`invitations/${first.id}`)!.role).toBe('core');
+
+    const second = await refreshLink(db, { id: first.id, life: 'link', now: NOW });
+    expect(db.get(`invitations/${second!.id}`)!.role).toBe('core');
   });
 
   it('refuses to reissue a redeemed invitation — that record is not a credential', async () => {

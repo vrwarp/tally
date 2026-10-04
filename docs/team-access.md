@@ -294,9 +294,12 @@ account the volunteer happened to pick, with nothing sent to anybody. Two doors 
   is single-use and lives fourteen days; a QR is the same invitation re-minted with a ten-minute
   life, because its whole safety property is that both people are in the room. The row shows
   "not used yet · expires Sunday 21st" and one tap **extends** it (re-minting, which invalidates
-  the old token). Every link grants **counselor and nothing else**, whoever mints it: a core-team
-  link that leaks in a screenshot would open Insights, Students and Settings, and promoting is one
-  tap on the row once there is a person to promote. At most twenty unredeemed links live at once.
+  the old token). A link grants **counselor** unless an **admin** picks another role when minting
+  it — the same role select the address door has; a core member's links are always counselor (P4).
+  The default stays counselor because a core- or admin-role link that leaks in a screenshot opens
+  Insights, Students and Settings; redemption re-checks that whoever minted an elevated link is
+  still an active admin and grants counselor if not, and a link never changes the role of somebody
+  already on the team. At most twenty unredeemed links live at once.
 - **Invite by address**, for the case where the inviter knows the account — the church's
   Workspace address. It keeps the optional note, and the address hint gains "For Gmail addresses,
   dots and +tags don't matter" (P17).
@@ -706,10 +709,10 @@ never shows as two live rows.
   invitation at the old rank. Fold instead (P12).
 - **Delete a kiosk's device row.** Same argument, for a custody record: retiring marks the row
   (P11), and there is no sweep.
-- **Multi-use invite links, or links that grant more than counselor.** A link that works twice is
-  a password to the children's roster pasted in a group chat; a link that grants core opens the
-  register and Settings to whoever a screenshot reaches. Written down here so neither is added
-  later as a convenience.
+- **Multi-use invite links.** A link that works twice is a password to the children's roster
+  pasted in a group chat. Written down here so it is not added later as a convenience. (Links that
+  grant more than counselor were on this list too; the director has since asked for them, so an
+  admin may now choose the role — see P2 for the guards that came with it.)
 - **Keeping refused sign-in attempts.** Dropped (P3); the link and the canonical key remove the
   need, and Tally holds nothing about people who never got in.
 - **An `eventAccess` cleanup job, or orphan-ACL tidying.** Read-time filtering (P6, P7) is the
@@ -758,7 +761,7 @@ sixteen changes.
 | --- | --- | --- |
 | Losing access mid-shift is unlikely; keep it just-not-broken | The live stream already flips the page; keep the copy honest and drop the machinery | P8 reduced to copy; `checkAccess`, held refusals, the kiosk's lost-identity phase and its debounce dropped (P15, P11); a three-refusals banner is the cheap remainder |
 | Gmail ignores dots — how should Tally handle that? | Canonicalise for `gmail.com`/`googlemail.com` only, everywhere the app compares addresses | New P17; P3 no longer needed |
-| How can onboarding be easier — link, QR? | Single-use links and same-room QRs, counselor-only, named on the row, with the account confirmed before the token is spent | P2 rewritten; P3 dropped; P5 gains the redemption |
+| How can onboarding be easier — link, QR? | Single-use links and same-room QRs, counselor unless an admin chooses, named on the row, with the account confirmed before the token is spent | P2 rewritten; P3 dropped; P5 gains the redemption |
 | Must kiosk authorisation be tied to a person? | No — a kiosk is a room; it holds its own identity, its reach is the room it stands in, retiring marks the row | P11 rewritten; P9 loses its kiosk clause; P10's kiosk list gains live state and an armed Retire |
 
 The director's four earlier decisions stand where they still apply: core may invite counselors

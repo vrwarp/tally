@@ -17,7 +17,7 @@
  *
  * ## Why the id is the hash
  *
- * The token is a bearer credential: whoever holds it becomes a counselor. So
+ * The token is a bearer credential: whoever holds it gets its role. So
  * the plaintext never touches Firestore, exactly as the kiosk's pairing secret
  * does not. Making the *id* the hash rather than a field means the redemption
  * path reads one document by name — no query, no index, and nothing an
@@ -29,13 +29,19 @@
  * the act — the old token stops working the moment a new one exists — and the
  * row a person is looking at is identified by who it is for, not by its id.
  *
- * ## Every link grants counselor
+ * ## What a link grants
  *
- * Whoever mints it. A core-team link that leaks in a screenshot would open
- * Insights, Students and Settings; promoting is one tap on the row once there
- * is a person to promote. Minting is core and up: handing out the access you
- * already hold on one gathering is not the same act as granting sign-in to a
- * ministry, which is why a counselor cannot mint one.
+ * Counselor, unless an admin chose otherwise when minting it. A core member's
+ * link is always counselor — core may invite counselors and nothing above
+ * (P4) — and an admin may mint one for any role, the same choice the address
+ * form has always offered. The cost is plain: a core- or admin-role link that
+ * leaks in a screenshot opens Insights, Students and Settings to whoever it
+ * reaches, which is why the default stays counselor and the redemption
+ * re-checks that whoever minted an elevated link is still an admin.
+ *
+ * Minting is core and up: handing out the access you already hold on one
+ * gathering is not the same act as granting sign-in to a ministry, which is
+ * why a counselor cannot mint one.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -192,6 +198,11 @@ export async function countLiveLinks(db: FirestoreLike, now: Date): Promise<numb
   }).length;
 }
 
+/** The role a link document grants, read defensively: anything unknown is counselor. */
+export function linkRole(value: unknown): Role {
+  return value === 'viewer' || value === 'core' || value === 'admin' ? value : 'counselor';
+}
+
 export function lifeMs(life: InviteLife): number {
   return life === 'qr' ? QR_LIFE_MS : LINK_LIFE_MS;
 }
@@ -212,6 +223,8 @@ export async function createLink(
     gatherings: string[];
     life: InviteLife;
     now: Date;
+    /** Counselor when omitted. Whether the caller may grant it is checked before this. */
+    role?: Role;
   },
 ): Promise<{ id: string; token: string; expiresAt: Date }> {
   const token = mintToken();
@@ -220,8 +233,7 @@ export async function createLink(
 
   await db.doc(`${PATHS.invitations}/${id}`).set({
     kind: 'link',
-    // Counselor, whoever minted it. See the note at the top.
-    role: 'counselor' satisfies Role,
+    role: input.role ?? ('counselor' satisfies Role),
     label: input.label,
     gatherings: input.gatherings,
     invitedBy: input.invitedBy,
@@ -259,7 +271,8 @@ export async function refreshLink(
   const batch = db.batch();
   batch.set(db.doc(`${PATHS.invitations}/${id}`), {
     kind: 'link',
-    role: 'counselor' satisfies Role,
+    // Carried: extending a link is not deciding again what it grants.
+    role: linkRole(held.role),
     label: held.label ?? '',
     gatherings: held.gatherings ?? [],
     invitedBy: held.invitedBy ?? '',

@@ -48,6 +48,7 @@ import { emailKey, sameAccount, type Role } from './pco/mapping.js';
 import { asFirestoreLike, PATHS, type FirestoreLike } from './firestore.js';
 import {
   asToken,
+  linkRole,
   placeOnGatherings,
   readLink,
   recordRedemption,
@@ -293,8 +294,9 @@ export async function redeemLinkForCaller(
    * Somebody already on the team may redeem a link, and it is not a mistake:
    * "Miriam sent me a link for Sunday School" is a counselor being put on a
    * gathering, which is exactly what the invitation carries. Their role is
-   * left alone — a link grants counselor, and demoting an admin who followed
-   * one would be the link deciding something it has no business deciding.
+   * left alone — demoting an admin who followed a counselor link, or promoting
+   * somebody through a link minted for a stranger, would be the link deciding
+   * something it has no business deciding. Promoting is one tap on their row.
    */
   const seeded = seededAdmins.some((admin) => sameAccount(admin, email));
   const existingRole = readRole(existing.role);
@@ -307,7 +309,9 @@ export async function redeemLinkForCaller(
     };
   }
 
-  const role: Role = seeded ? 'admin' : (existingRole ?? 'counselor');
+  const role: Role = seeded
+    ? 'admin'
+    : (existingRole ?? (await grantedByLink(db, lookup.record)));
   await writeProfile(
     userRef,
     caller,
@@ -332,6 +336,24 @@ export async function redeemLinkForCaller(
     linkStatus: 'ok',
     ...outcome,
   };
+}
+
+/**
+ * The role a link grants a newcomer, re-checked rather than trusted from Tuesday.
+ *
+ * Only an admin may mint a link for anything other than counselor, so an
+ * elevated link whose maker is no longer an active admin grants counselor:
+ * the same rule `placeOnGatherings` applies to gatherings — handing out
+ * access you no longer hold is the one way a link becomes an escalation.
+ */
+async function grantedByLink(db: FirestoreLike, record: InvitationRecord): Promise<Role> {
+  const role = linkRole(record.role);
+  if (role === 'counselor') return role;
+  const invitedBy = typeof record.invitedBy === 'string' ? record.invitedBy : '';
+  if (!invitedBy) return 'counselor';
+  const inviter = await db.doc(`${PATHS.users}/${invitedBy}`).get();
+  const data = inviter.exists ? (inviter.data() ?? {}) : {};
+  return data.active === true && data.role === 'admin' ? role : 'counselor';
 }
 
 /**
