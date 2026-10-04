@@ -8,18 +8,19 @@
  * So the link is the default door and the address is the second one, for the
  * case where the account really is known: the church's own Workspace address.
  *
- * The two doors share the gathering tick-boxes, and deliberately do not share
- * anything else. A link is a hand-off — it says who it is for, in the
- * inviter's words, because a row with no address on it has nothing else to be
- * recognised by — and it always grants counselor, whoever mints it, because a
- * link that leaks in a screenshot must not be able to open Settings.
+ * The two doors share the role and the gathering tick-boxes, and deliberately
+ * nothing else. A link is a hand-off — it says who it is for, in the inviter's
+ * words, because a row with no address on it has nothing else to be
+ * recognised by. The role starts at Counselor on both doors: a link that leaks
+ * in a screenshot opens whatever it grants, so anything above counselor is a
+ * choice an admin makes on purpose, never a default.
  *
  * ## What a core member sees
  *
  * The same form with the role fixed, and a line saying so. Core may invite
- * counselors and nothing else (P4); a select whose only value is Counselor
- * would be a control that cannot be used, and no control at all leaves
- * somebody wondering what rank they just handed out.
+ * counselors and nothing else (P4), by either door; a select whose only value
+ * is Counselor would be a control that cannot be used, and no control at all
+ * leaves somebody wondering what rank they just handed out.
  */
 import { useState, type FormEvent } from 'react';
 import {
@@ -104,8 +105,12 @@ export function InviteForm({
         label: named,
         gatherings: [...chosen],
         life: 'link',
+        // Only an admin may send anything but counselor, and only an admin
+        // sees the select; a core member's link says nothing and gets counselor.
+        ...(isAdmin ? { role } : {}),
       });
       setLabel('');
+      setRole('counselor');
       clear();
       onMinted({
         ...data,
@@ -152,6 +157,7 @@ export function InviteForm({
       await inviteToTally(address, role, profile.id, note.trim() || undefined, [...chosen]);
       setEmail('');
       setNote('');
+      setRole('counselor');
       clear();
       show(t('canNowSignIn', { address }), { tone: 'success' });
     } catch (cause) {
@@ -209,21 +215,6 @@ export function InviteForm({
             spellCheck={false}
             hint={t('googleAddressHint')}
           />
-          {isAdmin ? (
-            <SelectField
-              label={tCommon('role')}
-              value={role}
-              onChange={(event) => setRole(event.target.value as Role)}
-            >
-              {ROLE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {t(ROLE_LABEL[option])}
-                </option>
-              ))}
-            </SelectField>
-          ) : (
-            <p className="text-xs text-ink-400">{t('roleFixedToCounselor')}</p>
-          )}
           <TextAreaField
             label={t('noteLabel')}
             value={note}
@@ -232,6 +223,24 @@ export function InviteForm({
             placeholder={t('notePlaceholder')}
           />
         </>
+      )}
+
+      {/* Under both doors, like the gatherings below: what rank this person
+          arrives at is the same question whichever way they were let in. */}
+      {isAdmin ? (
+        <SelectField
+          label={tCommon('role')}
+          value={role}
+          onChange={(event) => setRole(event.target.value as Role)}
+        >
+          {ROLE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {t(ROLE_LABEL[option])}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <p className="text-xs text-ink-400">{t('roleFixedToCounselor')}</p>
       )}
 
       {/* Under both doors, because "what is this person for" is the same

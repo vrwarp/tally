@@ -122,7 +122,8 @@ export interface MintedInvitation {
  * only its hash — so a screen that has it must use it before it navigates.
  */
 export const createInvitationLink = httpsCallable<
-  { label: string; gatherings?: string[]; life?: InviteLife },
+  /** `role` is counselor when omitted; anything else is admin-only. */
+  { label: string; gatherings?: string[]; life?: InviteLife; role?: Role },
   MintedInvitation
 >(functions, 'createInvitationLink');
 

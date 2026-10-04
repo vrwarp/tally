@@ -66,6 +66,7 @@ const removeChainMember = vi.hoisted(() => vi.fn());
 const subscribeKioskDevices = vi.hoisted(() => vi.fn());
 const retireKioskDevice = vi.hoisted(() => vi.fn());
 const subscribeChainRequests = vi.hoisted(() => vi.fn());
+const createInvitationLink = vi.hoisted(() => vi.fn());
 
 vi.mock('@/context/authContext', () => ({
   useAuth,
@@ -97,7 +98,7 @@ vi.mock('@/services/access', () => ({
  */
 vi.mock('@/services/functions', () => ({
   listPinnedAdmins,
-  createInvitationLink: vi.fn(),
+  createInvitationLink,
   refreshInvitationLink: vi.fn(),
 }));
 vi.mock('@/services/eventAccess', () => ({
@@ -225,6 +226,9 @@ beforeEach(() => {
   inviteToTally.mockResolvedValue(undefined);
   withdrawInvitation.mockResolvedValue(undefined);
   listPinnedAdmins.mockResolvedValue({ data: { emails: [] } });
+  createInvitationLink.mockResolvedValue({
+    data: { id: 'link_abc', token: 'tok_abcdefghijklmnop', expiresAt: Date.now() + 86_400_000 },
+  });
 
   subscribeKioskDevices.mockImplementation((next: (devices: KioskDevice[]) => void) => {
     next([]);
@@ -697,6 +701,24 @@ describe('TeamPage — what a core member may do', () => {
     expect(screen.queryByLabelText('Role')).not.toBeInTheDocument();
   });
 
+  it('mints a counselor link without offering a role', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    const create = await screen.findByRole('button', { name: 'Create link' });
+    expect(
+      screen.getByText(/Every invitation you create joins somebody as a counselor/),
+    ).toBeInTheDocument();
+    expect(within(create.closest('form')!).queryByRole('combobox')).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Who is this for/), 'Jo, nursery');
+    await user.click(create);
+
+    await waitFor(() => expect(createInvitationLink).toHaveBeenCalled());
+    expect(createInvitationLink.mock.calls[0][0]).not.toHaveProperty('role');
+  });
+
   it('still announces the roster\u2019s own loading region', () => {
     renderTeam();
 
@@ -715,6 +737,55 @@ describe('TeamPage — what a core member may do', () => {
  * attribution on every register that person took, and the next sign-in would
  * re-provision them from an invitation nothing consumes.
  */
+/*
+ * An admin chooses what an invitation grants, by either door. Counselor is the
+ * default on both: anything above it is a choice made on purpose.
+ */
+describe('TeamPage — an admin picks the role an invitation grants', () => {
+  it('mints a link for the role chosen', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    const create = await screen.findByRole('button', { name: 'Create link' });
+    const form = within(create.closest('form')!);
+    expect(form.getByLabelText('Role')).toHaveValue('counselor');
+
+    await user.type(form.getByLabelText(/Who is this for/), 'Jo, new coordinator');
+    await user.selectOptions(form.getByLabelText('Role'), 'core');
+    await user.click(create);
+
+    await waitFor(() =>
+      expect(createInvitationLink).toHaveBeenCalledWith(
+        expect.objectContaining({ label: 'Jo, new coordinator', role: 'core' }),
+      ),
+    );
+  });
+
+  it('invites an address at the role chosen', async () => {
+    const user = userEvent.setup();
+    renderTeam();
+    settleUsers();
+
+    await user.click(await screen.findByRole('button', { name: 'By email address' }));
+    const submit = screen.getByRole('button', { name: 'Invite' });
+    const form = within(submit.closest('form')!);
+    await user.type(form.getByLabelText(/Google address/), 'viv@example.org');
+    await user.selectOptions(form.getByLabelText('Role'), 'viewer');
+    await user.click(submit);
+
+    await waitFor(() =>
+      expect(inviteToTally).toHaveBeenCalledWith(
+        'viv@example.org',
+        'viewer',
+        ADMIN.id,
+        undefined,
+        [],
+      ),
+    );
+  });
+});
+
 describe('TeamPage — the list folds its leavers', () => {
   const GONE = makeUser({
     id: 'user-9',
