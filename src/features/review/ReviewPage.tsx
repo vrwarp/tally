@@ -35,7 +35,7 @@
  * write, and docs/review-corrections.md for the journeys it serves.
  */
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { PageFrame } from '@/components/PageFrame';
 import {
   Badge,
@@ -1974,9 +1974,9 @@ function ChildRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-ink-100">
             {child.studentId ? (
-              <Link to={`/students/${child.studentId}`} className="hover:underline">
+              <ProfileLink to={`/students/${child.studentId}`} className="hover:underline">
                 {nameOf(child)}
-              </Link>
+              </ProfileLink>
             ) : (
               nameOf(child)
             )}

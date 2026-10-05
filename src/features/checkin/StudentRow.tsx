@@ -19,7 +19,8 @@
  * checked in there is one button and one outcome.
  */
 import { memo } from 'react';
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
+import type { RestoreState } from '@/lib/profileBack';
 import { WarningBadge } from '@/components/ui';
 import { initials, sameItems } from '@/lib/utils';
 import { cn } from '@/lib/cn';
@@ -73,6 +74,8 @@ export interface StudentRowProps {
    * is worse than no button.
    */
   canOpenProfile?: boolean;
+  /** The screen's view, handed back when the profile's back link returns. */
+  profileRestore?: RestoreState;
   /**
    * A register to read, not a door to work — the viewer's roster.
    *
@@ -149,6 +152,7 @@ export const StudentRow = memo(function StudentRow({
   flashing = false,
   busy = false,
   canOpenProfile = false,
+  profileRestore,
   readOnly = false,
   allergyNote,
   onCheckOut,
@@ -598,13 +602,14 @@ export const StudentRow = memo(function StudentRow({
             {/* Nothing to open for a former student: the id names a record,
                 not a profile. */}
             {canOpenProfile && !former ? (
-              <Link
+              <ProfileLink
                 to={`/students/${student.id}`}
+                restore={profileRestore}
                 aria-label={t('ariaOpenProfile', { name })}
                 className={cn(ACTION, 'bg-ink-900 text-ink-100 ring-ink-700 hover:bg-ink-800')}
               >
                 {tCommon('profile')}
-              </Link>
+              </ProfileLink>
             ) : null}
 
             {readOnly ? null : (

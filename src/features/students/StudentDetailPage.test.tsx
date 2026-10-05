@@ -156,6 +156,7 @@ function openProfile(
   over: Partial<DataContextValue> = {},
   who: 'core' | 'viewer' = 'core',
   locale?: 'zh-Hant',
+  state?: unknown,
 ) {
   vi.setSystemTime(NOW);
 
@@ -189,7 +190,7 @@ function openProfile(
   const toast: ToastContextValue = { show, dismiss: vi.fn(), toasts: [] };
 
   const wrap = (children: ReactNode) => (
-    <MemoryRouter initialEntries={[`/students/${student.id}`]}>
+    <MemoryRouter initialEntries={[{ pathname: `/students/${student.id}`, state }]}>
       <AuthContext.Provider value={auth}>
         <DataContext.Provider value={data}>
           <ToastContext.Provider value={toast}>{children}</ToastContext.Provider>
@@ -202,6 +203,7 @@ function openProfile(
     wrap(
       <Routes>
         <Route path="/students/:studentId" element={<StudentDetailPage />} />
+        <Route path="/event/:eventId" element={<p>check-in screen</p>} />
       </Routes>,
     ),
     locale ? { locale } : undefined,
@@ -216,6 +218,22 @@ beforeEach(() => {
   personDetails.current = details();
   personDetails.loading = false;
   profileHistory.withheld = new Set<string>();
+});
+
+describe('the way back from a profile', () => {
+  it('goes to the roster when the profile was reached directly', () => {
+    openProfile(linked());
+    expect(screen.getByRole('link', { name: /All students/ })).toHaveAttribute('href', '/students');
+  });
+
+  it('goes back to the check-in screen it was opened from, under that name', async () => {
+    openProfile(linked(), {}, 'core', undefined, { from: '/event/e1', restore: { focus: 'checkedOut' } });
+    const back = screen.getByRole('link', { name: /Check in/ });
+    expect(back).toHaveAttribute('href', '/event/e1');
+    expect(screen.queryByRole('link', { name: /All students/ })).toBeNull();
+    await userEvent.click(back);
+    expect(screen.getByText('check-in screen')).toBeInTheDocument();
+  });
 });
 
 /**

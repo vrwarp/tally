@@ -24,7 +24,7 @@
  * `RowBadgeModal`.
  */
 import { memo, useCallback, useDeferredValue, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import {
   Badge,
   Button,
@@ -858,7 +858,7 @@ const StudentListRow = memo(function StudentListRow({
           ring traces the border radius, and a square ring over a rounded row
           reads as a misalignment. The ring itself is the app's, from
           `index.css` — drawn inward, so the row cannot clip it. */}
-      <Link
+      <ProfileLink
         to={`/students/${student.id}`}
         aria-label={
           spokenGrade ? t('rowAriaWithGrade', { name, grade: spokenGrade }) : t('rowAriaNoGrade', { name })

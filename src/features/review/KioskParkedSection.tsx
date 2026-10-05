@@ -18,7 +18,7 @@
  * everything this screen inferred; its answer is what the toast says.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { useTranslations } from 'use-intl';
 import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useData } from '@/context/dataContext';
@@ -242,12 +242,12 @@ function ParkedCardView({
       <div className="flex flex-col gap-3 p-3">
         <p className={STRIP}>{why}</p>
         {answer === 'frozen' && row ? (
-          <Link
+          <ProfileLink
             to={`/students/${row.id}`}
             className="self-start text-sm font-semibold text-brand-300 hover:text-brand-200"
           >
             {t('parkedOpenStudent', { name })}
-          </Link>
+          </ProfileLink>
         ) : null}
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
           {answer === 'record' ? (

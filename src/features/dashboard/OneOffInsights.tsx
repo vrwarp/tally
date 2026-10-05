@@ -10,6 +10,7 @@
  * what it drew, and who we met there and have not seen since.
  */
 import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { Card, CardHeader, EmptyState, EventIcon } from '@/components/ui';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
@@ -160,7 +161,7 @@ export function OneOffOnlyList({
                   {initials(item.student.firstName, item.student.lastName)}
                 </span>
 
-                <Link
+                <ProfileLink
                   to={`/students/${item.student.id}`}
                   className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
                 >
@@ -183,7 +184,7 @@ export function OneOffOnlyList({
                           relative: time.relative(item.metAt),
                         })}
                   </span>
-                </Link>
+                </ProfileLink>
 
                 <span className="shrink-0 rounded-xl bg-warn-500/10 px-2.5 py-1 text-center ring-1 ring-warn-500/25">
                   <span className="sr-only">

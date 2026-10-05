@@ -20,7 +20,7 @@
  * and a row that owned its own dialog closed it the moment a background read
  * rewrote the list under it.
  */
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { useParentContactHost } from '@/features/students/parentContactHostContext';
 import { cn } from '@/lib/cn';
 import { studentFullName, type Student } from '@/types';
@@ -67,14 +67,14 @@ export function AddParentContactButton({
    */
   if (!student.pcoPersonId) {
     return (
-      <Link
+      <ProfileLink
         to={`/students/${student.id}`}
         aria-label={t('addContactAria', { name })}
         className={cn(PILL, className)}
       >
         <span aria-hidden="true">＋</span>
         {t('addContact')}
-      </Link>
+      </ProfileLink>
     );
   }
 
