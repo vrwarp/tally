@@ -239,13 +239,13 @@ function handed(): RosterListProps {
   return last;
 }
 
-function open(event: TallyEvent = FRIDAY, attendance: AttendanceRecord[] = []) {
+function open(event: TallyEvent = FRIDAY, attendance: AttendanceRecord[] = [], state?: unknown) {
   live.event.publish(event);
   live.attendance.publish(attendance);
   live.handed.length = 0;
   live.builds.length = 0;
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[{ pathname: '/', state }]}>
       <CheckInPage />
     </MemoryRouter>,
   );
@@ -642,5 +642,23 @@ describe('a past gathering', () => {
     expect(await screen.findByText('Could not check in Ada Byron. Try again.')).toBeInTheDocument();
     expect(services.checkIn).not.toHaveBeenCalled();
     expect(services.clearSkippedNight).not.toHaveBeenCalled();
+  });
+});
+
+describe('coming back from a profile', () => {
+  it('hands each row the filter on screen, to be given back', () => {
+    open();
+    expect(handed().profileRestore).toEqual({ focus: live.builds.at(-1)?.filters?.focus });
+  });
+
+  it('opens on the filter the profile handed back', () => {
+    open(FRIDAY, [], { focus: 'checkedIn' });
+    expect(live.builds.at(-1)?.filters?.focus).toBe('checkedIn');
+    expect(handed().profileRestore).toEqual({ focus: 'checkedIn' });
+  });
+
+  it('ignores a filter it does not have', () => {
+    open(FRIDAY, [], { focus: 'nonsense' });
+    expect(live.builds.at(-1)?.filters?.focus).not.toBe('nonsense');
   });
 });

@@ -12,7 +12,7 @@
  * Sunday, and the row that does not name the gathering is the row that gets a
  * family the wrong phone call.
  */
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { CopyContactsButton, FollowUpActions } from '@/features/dashboard/FollowUpActions';
@@ -449,7 +449,7 @@ function MiaRow({
           {initials(student.firstName, student.lastName)}
         </span>
 
-        <Link
+        <ProfileLink
           to={`/students/${student.id}`}
           className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
         >
@@ -565,7 +565,7 @@ function MiaRow({
               ) : null}
             </span>
           ) : null}
-        </Link>
+        </ProfileLink>
 
 
         <span className="shrink-0 rounded-xl bg-danger-500/10 px-2.5 py-1 text-center ring-1 ring-danger-500/25">
