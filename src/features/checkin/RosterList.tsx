@@ -30,6 +30,12 @@ import { useTranslations } from 'use-intl';
 export interface RosterListProps {
   title: string;
   entries: readonly RosterEntry[];
+  /**
+   * The number beside the title, when it is not simply how many rows there
+   * are — the "not here yet" list counts who is still missing, not the
+   * regulars it is holding green.
+   */
+  count?: number;
   /** Small right-aligned note, e.g. what the prediction was based on. */
   description?: string;
   /** Rendered instead of rows when `entries` is empty. */
@@ -98,6 +104,7 @@ function focusableRows(list: HTMLUListElement): HTMLButtonElement[] {
 export const RosterList = memo(function RosterList({
   title,
   entries,
+  count,
   description,
   emptyLabel,
   tone = 'default',
@@ -175,7 +182,7 @@ export const RosterList = memo(function RosterList({
   );
 
   return (
-    <section className="pb-3" aria-label={t('listAria', { title, count: entries.length })}>
+    <section className="pb-3" aria-label={t('listAria', { title, count: count ?? entries.length })}>
       {/* `px-3` matches a row's own inner padding, not the page's gutter — that
           is the page's job now — so the heading's words sit over the names
           below them rather than 12px to their left. */}
@@ -183,17 +190,27 @@ export const RosterList = memo(function RosterList({
         style={{ top: 'calc(var(--app-header-h, 0px) + var(--checkin-search-h, 0px))' }}
         className="sticky z-10 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur"
       >
-        <span className={tone === 'present' ? 'text-present-400' : 'text-ink-400'}>{title}</span>
+        {/* The title and its count never give way — the hint beside them does.
+            Left to share the line, a two-digit count was enough to break
+            "In room" over two lines at 390px. */}
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+            'shrink-0 whitespace-nowrap',
+            tone === 'present' ? 'text-present-400' : 'text-ink-400',
+          )}
+        >
+          {title}
+        </span>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
             tone === 'present' ? 'bg-present-500/15 text-present-400' : 'bg-ink-800 text-ink-300',
           )}
         >
-          {entries.length}
+          {count ?? entries.length}
         </span>
         {description ? (
-          <span className="ml-auto truncate text-[11px] font-medium normal-case tracking-normal text-ink-500">
+          <span className="ml-auto min-w-0 truncate text-[11px] font-medium normal-case tracking-normal text-ink-500">
             {description}
           </span>
         ) : null}

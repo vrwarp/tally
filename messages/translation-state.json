@@ -2802,6 +2802,27 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "CheckIn.expectedTitle": {
+    "source": "Regulars not here yet",
+    "context": "Heading of a second list on the check-in screen of a children's room that tracks check-out, under the list of children in the room. It lists the regulars (children who usually come) who have not been checked in yet today. Uppercase heading styling, short. 'Regulars' is the same word as CheckIn.focusRecent.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "CheckIn.expectedTitleAfter": {
+    "source": "Regulars who didn't come",
+    "context": "The same heading as CheckIn.expectedTitle once the gathering has ended: regulars who never arrived today. Short heading.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "CheckIn.expectedArrived": {
+    "source": "{count, plural, one {# just checked in} other {# just checked in}}",
+    "context": "Small note beside CheckIn.expectedTitle: how many regulars on that list the volunteer has just checked in, whose rows stay green on the list until the screen is refreshed. A count, not a sentence.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "CheckIn.hintReadOnly": {
     "source": "read only — you can’t check in",
     "context": "Lowercase hint under the roster heading, shown only to a Viewer (the read-only role). Replaces the other hints, which all tell the reader to tap something. Says the reader can look but not check anyone in. Must stay short: it shares one truncating line with the heading and its count on a 390px phone, so keep it near 30 characters.",
@@ -2967,6 +2988,13 @@
   },
   "CheckIn.allGrades": {
     "source": "All grades",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "CheckIn.gradeChipShort": {
+    "source": "Grade",
+    "context": "Label of the narrow grade-filter chip beside the check-in search box while no grade is picked; opens a checklist of grades. One short word, the same meaning as CheckIn.allGrades but shorter.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

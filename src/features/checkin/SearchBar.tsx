@@ -10,7 +10,7 @@
  * desktop that had shrunk every other field, and it never picked up the icon
  * the shared search fields draw.
  */
-import type { KeyboardEventHandler, RefObject } from 'react';
+import type { KeyboardEventHandler, ReactNode, RefObject } from 'react';
 import { TextField } from '@/components/ui/Field';
 import { useTranslations } from 'use-intl';
 
@@ -35,6 +35,11 @@ export interface SearchBarProps {
    * that submitted its top match blind is how the wrong record gets written.
    */
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  /**
+   * A control at the trailing end of the band — the grade chip, on a
+   * check-out gathering's phone, whose filter row is full. See `FilterBar`.
+   */
+  trailing?: ReactNode;
 }
 
 export function SearchBar({
@@ -44,6 +49,7 @@ export function SearchBar({
   onQuickAdd,
   inputRef,
   onKeyDown,
+  trailing,
 }: SearchBarProps) {
   const t = useTranslations('CheckIn');
   /*
@@ -83,7 +89,7 @@ export function SearchBar({
   ) : null;
 
   return (
-    <div className="flex items-end gap-3 pb-2 pointer-fine:gap-2">
+    <div className={trailing ? 'flex items-end gap-2 pb-2' : 'flex items-end gap-3 pb-2 pointer-fine:gap-2'}>
       {quickAdd}
       <div className="min-w-0 flex-1">
         <TextField
@@ -102,9 +108,14 @@ export function SearchBar({
           onKeyDown={onKeyDown}
           onChange={(event) => onChange(event.target.value)}
           onClear={() => onChange('')}
+          /* With a control beside it the field is ~200px, and the clear
+             button's gutter is reserved even while the field is empty — which
+             cut the placeholder to "Search stu". Empty, there is no button and
+             no text to reflow, so the gutter waits for the first keystroke. */
+          className={trailing ? 'placeholder-shown:pr-3' : undefined}
         />
       </div>
-
+      {trailing}
     </div>
   );
 }

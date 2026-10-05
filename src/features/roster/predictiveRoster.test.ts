@@ -1505,6 +1505,89 @@ describe('buildRoster: check-out', () => {
   });
 });
 
+/**
+ * The regulars a check-out room is still waiting for.
+ *
+ * A check-out gathering's In room list is the room, and the room fills from a
+ * lobby kiosk; what the door also wants is who usually comes and is not here.
+ * That is a second list under In room, and it has to keep the one rule the
+ * roster has: a tap never moves a row.
+ */
+describe('buildRoster: regulars not here yet', () => {
+  const kids = makeEvent({ id: 'kids-tonight', seriesId: 'kids', requiresCheckOut: true });
+  const pastSundays = makeWeeklyEvents({ count: 3, seriesId: 'kids', title: 'Kids' });
+  const ada = makeStudent({ id: 'ada', lastName: 'Abara' });
+  const bo = makeStudent({ id: 'bo', lastName: 'Brook' });
+  const cy = makeStudent({ id: 'cy', lastName: 'Cole' });
+  const dee = makeStudent({ id: 'dee', lastName: 'Dunn' });
+
+  /** Ada, Bo and Cy are regulars; Dee has never come. */
+  const base = (overrides: Partial<BuildRosterInput> = {}): BuildRosterInput => ({
+    event: kids,
+    students: [dee, cy, bo, ada],
+    attendance: [],
+    rsvps: [],
+    history: pastSundays.map((event) => held(event, ['ada', 'bo', 'cy'])),
+    settings: makeSettings(),
+    filters: { focus: 'inRoom' },
+    ...overrides,
+  });
+  const here = (...students: string[]) =>
+    students.map((studentId) => makeAttendance({ studentId, eventId: kids.id }));
+
+  it('lists the regulars who have not arrived, A–Z, under In room', () => {
+    const view = buildRoster(base({ attendance: here('bo', 'dee') }));
+
+    expect(ids(view.entries)).toEqual(['bo', 'dee']);
+    expect(ids(view.expected)).toEqual(['ada', 'cy']);
+    expect(view.counts.expectedAbsent).toBe(2);
+  });
+
+  it('keeps a regular checked in from it where they were, and nowhere else', () => {
+    const view = buildRoster(base({ attendance: here('ada'), held: new Set(['ada']) }));
+
+    // Green, in the list the thumb was on — not moved up into In room as well.
+    expect(ids(view.expected)).toEqual(['ada', 'bo', 'cy']);
+    expect(view.expected[0]!.attendance).not.toBeNull();
+    expect(ids(view.entries)).toEqual([]);
+    expect(view.counts.expectedAbsent).toBe(2);
+    // The room count is still the room.
+    expect(view.counts.inRoom).toBe(1);
+  });
+
+  it('lets an arrival from anywhere else go to In room', () => {
+    const view = buildRoster(base({ attendance: here('ada') }));
+
+    expect(ids(view.entries)).toEqual(['ada']);
+    expect(ids(view.expected)).toEqual(['bo', 'cy']);
+  });
+
+  it('respects the grade filter', () => {
+    const view = buildRoster(
+      base({
+        students: [makeStudent({ id: 'ada', lastName: 'Abara', grade: 2 }), bo, cy, dee],
+        filters: { focus: 'inRoom', grades: [2] },
+      }),
+    );
+
+    expect(ids(view.expected)).toEqual(['ada']);
+  });
+
+  it('stands down for a search, another focus, or a gathering without check-out', () => {
+    expect(buildRoster(base({ filters: { focus: 'inRoom', query: 'ab' } })).expected).toEqual([]);
+    expect(buildRoster(base({ filters: { focus: 'checkedOut' } })).expected).toEqual([]);
+    expect(buildRoster(base({ filters: { focus: 'all' } })).expected).toEqual([]);
+    expect(
+      buildRoster(base({ event: { ...kids, requiresCheckOut: false }, filters: { focus: 'all' } }))
+        .expected,
+    ).toEqual([]);
+  });
+
+  it('is empty with no history to predict from', () => {
+    expect(buildRoster(base({ history: [] })).expected).toEqual([]);
+  });
+});
+
 /* -------------------------------------------------------------------------- */
 /* A record whose student is gone                                              */
 /* -------------------------------------------------------------------------- */
