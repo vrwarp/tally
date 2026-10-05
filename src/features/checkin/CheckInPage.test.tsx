@@ -458,6 +458,8 @@ describe('a gathering that tracks check-out', () => {
     expect(stillThere?.entries[0]!.attendance).not.toBeNull();
     expect(stillThere?.count).toBe(0);
     expect(after.get('In room')?.entries).toEqual([]);
+    // …but she is in the room, and the room's heading says so.
+    expect(after.get('In room')?.count).toBe(1);
   });
 
   it('draws no second list without a prediction', () => {

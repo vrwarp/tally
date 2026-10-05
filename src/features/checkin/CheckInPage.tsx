@@ -1415,6 +1415,10 @@ export function CheckInPage() {
             <RosterList
               title={roster.isFiltered ? t("results") : t(FOCUS_TITLE[appliedFocus])}
               entries={roster.entries}
+              // The room is the room: a regular held green in the list below is
+              // in it, and this heading is the number a volunteer counts heads
+              // against, so it has to agree with the chip and the header.
+              count={appliedFocus === "inRoom" && roster.expected.length > 0 ? counts.inRoom : undefined}
               description={
                 // While a check-in is being moved the list is a picker, and
                 // what it is filtered to matters less than what a tap now does.

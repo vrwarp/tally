@@ -186,17 +186,27 @@ export const RosterList = memo(function RosterList({
         style={{ top: 'calc(var(--app-header-h, 0px) + var(--checkin-search-h, 0px))' }}
         className="sticky z-10 flex items-baseline gap-2 bg-ink-950/95 px-3 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur"
       >
-        <span className={tone === 'present' ? 'text-present-400' : 'text-ink-400'}>{title}</span>
+        {/* The title and its count never give way — the hint beside them does.
+            Left to share the line, a two-digit count was enough to break
+            "In room" over two lines at 390px. */}
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
+            'shrink-0 whitespace-nowrap',
+            tone === 'present' ? 'text-present-400' : 'text-ink-400',
+          )}
+        >
+          {title}
+        </span>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
             tone === 'present' ? 'bg-present-500/15 text-present-400' : 'bg-ink-800 text-ink-300',
           )}
         >
           {count ?? entries.length}
         </span>
         {description ? (
-          <span className="ml-auto truncate text-[11px] font-medium normal-case tracking-normal text-ink-500">
+          <span className="ml-auto min-w-0 truncate text-[11px] font-medium normal-case tracking-normal text-ink-500">
             {description}
           </span>
         ) : null}
