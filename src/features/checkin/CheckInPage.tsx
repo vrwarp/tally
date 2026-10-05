@@ -551,10 +551,10 @@ export function CheckInPage() {
    * note has not landed, or could not be read, keeps the badge it always had.
    */
   // Both lists' rows — the regulars still expected wear their badges too.
-  const onScreen = useMemo(
-    () => (roster ? (roster.expected.length > 0 ? [...roster.entries, ...roster.expected] : roster.entries) : NO_ENTRIES),
-    [roster],
-  );
+  const onScreen = useMemo(() => {
+    if (!roster) return NO_ENTRIES;
+    return roster.expected.length > 0 ? [...roster.entries, ...roster.expected] : roster.entries;
+  }, [roster]);
   const allergyNotes = useAllergyNotes(onScreen);
 
   /* ---- Waiting for the prediction ---------------------------------------- */
