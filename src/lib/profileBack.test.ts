@@ -35,5 +35,23 @@ describe('profileBack', () => {
     expect(profileBack({ from: '/students/s2' })).toEqual(roster);
     expect(profileBack({ from: '/settings' })).toEqual(roster);
     expect(profileBack({ from: 42 })).toEqual(roster);
+    expect(profileBack({ from: 'dashboard' })).toEqual(roster);
+    expect(profileBack({ from: '//dashboard' })).toEqual(roster);
+    expect(profileBack({ from: '/x/event/e1' })).toEqual(roster);
+    expect(profileBack({ from: '/event/e1/more' })).toEqual(roster);
+    expect(profileBack({ from: '/x/events/e1' })).toEqual(roster);
+    expect(profileBack({ from: '/events/e1/more' })).toEqual(roster);
+  });
+
+  it('reads a path the same with a trailing slash, query or hash', () => {
+    expect(profileBack({ from: '/events' })).toEqual({ to: '/events', label: 'events' });
+    expect(profileBack({ from: '/dashboard//' })).toEqual({ to: '/dashboard//', label: 'insights' });
+    expect(profileBack({ from: '/review#kiosk' })).toEqual({ to: '/review#kiosk', label: 'review' });
+  });
+
+  it('hands back only a view it can return with', () => {
+    for (const restore of [null, ['checkedOut'], 'checkedOut', 3]) {
+      expect(profileBack({ from: '/', restore })).toEqual({ to: '/', label: 'checkIn' });
+    }
   });
 });

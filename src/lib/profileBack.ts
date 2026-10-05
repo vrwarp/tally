@@ -60,7 +60,9 @@ export function profileLinkState(
 export function profileBack(state: unknown): ProfileBack {
   const from =
     typeof state === 'object' && state !== null && 'from' in state ? state.from : undefined;
-  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//')) return ROSTER;
+  // Matched against exact app paths below, so anything else — another site, a
+  // protocol-relative URL — never gets past them.
+  if (typeof from !== 'string') return ROSTER;
   const restore = (state as { restore?: unknown }).restore;
   const back = (label: BackLabel): ProfileBack =>
     typeof restore === 'object' && restore !== null && !Array.isArray(restore)
