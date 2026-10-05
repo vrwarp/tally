@@ -33,8 +33,16 @@ import type { AuthContextValue } from '@/context/authContext';
 import type { DataContextValue } from '@/context/dataContext';
 import type { ToastContextValue } from '@/context/toastContext';
 import type { RosterListProps } from '@/features/checkin/RosterList';
-import type { AttendanceRecord, Role, TallyEvent, UserProfile } from '@/types';
-import { makeAttendance, makeEvent, makeSettings, makeStudent, NOW } from '../../../tests/factories';
+import type { AttendanceRecord, EventAttendanceSnapshot, Role, TallyEvent, UserProfile } from '@/types';
+import {
+  makeAttendance,
+  makeEvent,
+  makeSettings,
+  makeSnapshot,
+  makeStudent,
+  makeWeeklyEvents,
+  NOW,
+} from '../../../tests/factories';
 
 /**
  * The two live things, plus the two ledgers the assertions read.
@@ -77,6 +85,8 @@ const live = vi.hoisted(() => {
     noNotes: new Map<string, string>(),
     /** The page's clock. Moved forward to make a gathering past. */
     now: null as Date | null,
+    /** Past instances and their registers, for the tests that need a prediction. */
+    history: { events: [] as TallyEvent[], snapshots: [] as EventAttendanceSnapshot[] },
   };
 });
 
@@ -111,12 +121,12 @@ vi.mock('@/hooks/useActiveEvent', async () => {
       now: live.now ?? NOW,
       selectableEvents: live.nothing,
     }),
-    useSeriesHistoryEvents: () => live.nothing,
+    useSeriesHistoryEvents: () => live.history.events,
   };
 });
 
 vi.mock('@/hooks/useEventSnapshots', () => ({
-  useEventSnapshots: () => ({ snapshots: live.nothing, denied: new Set(), loading: false, error: null }),
+  useEventSnapshots: () => ({ snapshots: live.history.snapshots, denied: new Set(), loading: false, error: null }),
   invalidateSnapshotCache: () => {},
 }));
 
@@ -260,6 +270,7 @@ beforeEach(() => {
   live.handed.length = 0;
   live.builds.length = 0;
   live.now = null;
+  live.history = { events: live.nothing, snapshots: live.nothing };
   services.checkIn.mockClear();
   services.swapCheckIn.mockClear();
   services.undoCheckIn.mockClear();
@@ -381,6 +392,79 @@ describe('the roster', () => {
     for (const build of afterTheSwitch) {
       expect([...build.pinned!]).toEqual([]);
     }
+  });
+});
+
+/**
+ * A room that hands children back, with regulars to expect.
+ *
+ * It used to spend its whole filter row on the room and hide the prediction,
+ * so a weekly kids' room bound to a lobby kiosk never showed its regulars on
+ * this screen at all.
+ */
+describe('a gathering that tracks check-out', () => {
+  const KIDS = makeEvent({ id: 'kids-2026-02-13', seriesId: 'kids', requiresCheckOut: true });
+
+  function withRegulars() {
+    // Ada came to all three past Sundays; Grace never has.
+    const past = makeWeeklyEvents({ count: 3, seriesId: 'kids', title: 'Kids' });
+    live.history = {
+      events: past,
+      snapshots: past.map((event) => makeSnapshot(event, ['ada'])),
+    };
+  }
+
+  /** Every list the latest render handed down, by title. */
+  function lists(): Map<string, RosterListProps> {
+    const lastBuild = live.handed.length;
+    const recent = live.handed.slice(Math.max(0, lastBuild - 2));
+    return new Map(recent.map((props) => [props.title, props]));
+  }
+
+  it('offers the Regulars chip beside In room and Checked out', () => {
+    withRegulars();
+    open(KIDS);
+
+    // The row is drawn twice — the phone's and the laptop's — and CSS shows one.
+    for (const name of [
+      'Show likely regulars only',
+      'Show students still in the room',
+      'Show students who have been checked out',
+    ]) {
+      expect(screen.getAllByRole('button', { name })).toHaveLength(2);
+    }
+  });
+
+  it('lists the regulars not here yet under In room, and holds one checked in from there', async () => {
+    withRegulars();
+    open(KIDS);
+
+    const expected = lists().get('Regulars not here yet');
+    expect(expected?.entries.map((row) => row.student.id)).toEqual(['ada']);
+    expect(expected?.count).toBe(1);
+
+    services.checkIn.mockImplementation(async () => {
+      live.attendance.publish([makeAttendance({ studentId: 'ada', eventId: KIDS.id })]);
+    });
+    await act(async () => {
+      expected!.onPress(expected!.entries[0]!);
+    });
+
+    expect(services.checkIn).toHaveBeenCalledTimes(1);
+    const after = lists();
+    // Green where the thumb was, counted as arrived, and not in In room twice.
+    const stillThere = after.get('Regulars not here yet');
+    expect(stillThere?.entries.map((row) => row.student.id)).toEqual(['ada']);
+    expect(stillThere?.entries[0]!.attendance).not.toBeNull();
+    expect(stillThere?.count).toBe(0);
+    expect(after.get('In room')?.entries).toEqual([]);
+  });
+
+  it('draws no second list without a prediction', () => {
+    open(KIDS);
+
+    expect(lists().has('Regulars not here yet')).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Show likely regulars only' })).toBeNull();
   });
 });
 

@@ -9,6 +9,11 @@
  * would push the first student below the fold on a phone, which defeats the
  * point of the screen — which is also why the seven grades collapsed into a
  * single dropdown chip.
+ *
+ * On a gathering that tracks check-out the phone row holds three focus chips —
+ * Regulars, In room, Checked out — and three is all 358px holds, so the grade
+ * chip leaves it for the search band below `lg` (`gradeInRow`). See
+ * `CheckInPage`.
  */
 import type { ReactNode } from 'react';
 import { GradeFilter } from '@/features/checkin/GradeFilter';
@@ -33,6 +38,17 @@ export interface FilterBarProps {
    * roster is not currently focused here. See `CheckInPage`.
    */
   showParticipated: boolean;
+  /**
+   * Draw the Participated chip at `lg` only. A check-out gathering's phone row
+   * is already full; a laptop's has room for every filter the roster has.
+   */
+  participatedPointerOnly?: boolean;
+  /**
+   * Whether the grade chip rides this row on a phone. False on a check-out
+   * gathering, whose screen puts it in the search band below `lg` instead; at
+   * `lg` it is always here.
+   */
+  gradeInRow?: boolean;
   /** How many students have been to this gathering before. */
   participatedCount: number;
   present: number;
@@ -40,8 +56,7 @@ export interface FilterBarProps {
   availableGrades?: readonly Grade[];
   /**
    * Whether this gathering tracks check-out. When it does, `Checked in` is
-   * replaced by `In room` and `Checked out`, and Recent/Participated yield
-   * their slots — see `CheckInPage`.
+   * replaced by `In room` and `Checked out`. See `CheckInPage`.
    */
   tracksCheckOut?: boolean;
   /** Checked in and not yet checked out. */
@@ -64,11 +79,13 @@ function Chip({
   active,
   label,
   onPress,
+  className,
   children,
 }: {
   active: boolean;
   label?: string;
   onPress: () => void;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -79,6 +96,7 @@ function Chip({
       aria-label={label}
       className={cn(
         'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold inset-ring-1 transition-colors pointer-fine:min-h-9',
+        className,
         active
           ? 'bg-brand-500/20 text-brand-200 inset-ring-brand-500/40'
           // Hover, because these are the same chips the Students toolbar draws
@@ -90,6 +108,12 @@ function Chip({
     </button>
   );
 }
+
+/**
+ * Three focus chips on a 358px phone row — Regulars, In room, Checked out on a
+ * check-out gathering — fit only at this padding. 44px tall all the same.
+ */
+const TIGHT = 'max-lg:px-2.5';
 
 /** The count that makes a filter chip worth reading before it is pressed. */
 function Tally({ active, children }: { active: boolean; children: ReactNode }) {
@@ -115,6 +139,8 @@ export function FilterBar({
   recentCount,
   showParticipated,
   participatedCount,
+  participatedPointerOnly = false,
+  gradeInRow = true,
   present,
   availableGrades,
   tracksCheckOut = false,
@@ -145,6 +171,7 @@ export function FilterBar({
             {showRecent ? (
               <Chip
                 active={focus === 'recent'}
+                className={tracksCheckOut ? TIGHT : undefined}
                 label={t('chipRecentLabel')}
                 onPress={() => setFocus('recent')}
               >
@@ -159,6 +186,7 @@ export function FilterBar({
             {showParticipated ? (
               <Chip
                 active={focus === 'participated'}
+                className={participatedPointerOnly ? 'hidden lg:flex' : undefined}
                 label={t('chipParticipatedLabel')}
                 onPress={() => setFocus('participated')}
               >
@@ -176,6 +204,7 @@ export function FilterBar({
               <>
                 <Chip
                   active={focus === 'inRoom'}
+                  className={TIGHT}
                   label={t('chipInRoomLabel')}
                   onPress={() => setFocus('inRoom')}
                 >
@@ -184,6 +213,7 @@ export function FilterBar({
                 </Chip>
                 <Chip
                   active={focus === 'checkedOut'}
+                  className={TIGHT}
                   label={t('chipCheckedOutLabel')}
                   onPress={() => setFocus('checkedOut')}
                 >
@@ -204,7 +234,12 @@ export function FilterBar({
           </div>
         </div>
 
-        <GradeFilter grades={grades} onChange={onGradesChange} available={availableGrades} />
+        <GradeFilter
+          grades={grades}
+          onChange={onGradesChange}
+          available={availableGrades}
+          className={gradeInRow ? undefined : 'hidden lg:block'}
+        />
       </div>
     </div>
   );

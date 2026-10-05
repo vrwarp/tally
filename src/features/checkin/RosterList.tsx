@@ -29,6 +29,12 @@ import { useTranslations } from 'use-intl';
 export interface RosterListProps {
   title: string;
   entries: readonly RosterEntry[];
+  /**
+   * The number beside the title, when it is not simply how many rows there
+   * are — the "not here yet" list counts who is still missing, not the
+   * regulars it is holding green.
+   */
+  count?: number;
   /** Small right-aligned note, e.g. what the prediction was based on. */
   description?: string;
   /** Rendered instead of rows when `entries` is empty. */
@@ -95,6 +101,7 @@ function focusableRows(list: HTMLUListElement): HTMLButtonElement[] {
 export const RosterList = memo(function RosterList({
   title,
   entries,
+  count,
   description,
   emptyLabel,
   tone = 'default',
@@ -171,7 +178,7 @@ export const RosterList = memo(function RosterList({
   );
 
   return (
-    <section className="pb-3" aria-label={t('listAria', { title, count: entries.length })}>
+    <section className="pb-3" aria-label={t('listAria', { title, count: count ?? entries.length })}>
       {/* `px-3` matches a row's own inner padding, not the page's gutter — that
           is the page's job now — so the heading's words sit over the names
           below them rather than 12px to their left. */}
@@ -186,7 +193,7 @@ export const RosterList = memo(function RosterList({
             tone === 'present' ? 'bg-present-500/15 text-present-400' : 'bg-ink-800 text-ink-300',
           )}
         >
-          {entries.length}
+          {count ?? entries.length}
         </span>
         {description ? (
           <span className="ml-auto truncate text-[11px] font-medium normal-case tracking-normal text-ink-500">

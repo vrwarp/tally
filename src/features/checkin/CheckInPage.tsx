@@ -51,6 +51,7 @@ import { QuickAddVisitorModal } from '@/features/checkin/QuickAddVisitorModal';
 import { PastChangeDialog, type PastChange } from '@/features/checkin/PastChangeDialog';
 import { RosterList } from '@/features/checkin/RosterList';
 import { SearchBar } from '@/features/checkin/SearchBar';
+import { GradeFilter } from '@/features/checkin/GradeFilter';
 import { buildRoster, formerStudent, type RosterFocus } from '@/features/roster/predictiveRoster';
 import { useActiveEvent, useSeriesHistoryEvents } from '@/hooks/useActiveEvent';
 import { useAllergyNotes } from '@/hooks/useAllergyNotes';
@@ -131,6 +132,9 @@ const FLASH_MS = 700;
 
 /** A stable empty list, for the renders before an event has been chosen. */
 const NO_ENTRIES: readonly RosterEntry[] = [];
+
+/** Shared so a screen with nothing held allocates nothing per render. */
+const NO_IDS: ReadonlySet<string> = new Set();
 
 /**
  * How long the screen waits for the prediction before giving up on it.
@@ -499,6 +503,23 @@ export function CheckInPage() {
     };
   }, []);
 
+  /*
+   * Regulars checked in from the "not here yet" list, kept on it.
+   *
+   * That list sits under In room on a check-out gathering, and it is tapped
+   * down like any other: a regular checked in from it has to turn green where
+   * the thumb is, not leave for the In room list above (see `held` on
+   * `buildRoster`). Keyed by gathering *and* focus, so changing the filter —
+   * which redraws every list anyway — or the night lets them settle back into
+   * In room, as a reload does.
+   */
+  const heldKey = `${event?.id ?? ''}|${focus}`;
+  const [heldState, setHeldState] = useState<{ key: string; ids: ReadonlySet<string> }>(() => ({
+    key: '',
+    ids: NO_IDS,
+  }));
+  const held = heldState.key === heldKey ? heldState.ids : NO_IDS;
+
   /* ---- The roster -------------------------------------------------------- */
 
   const roster = useMemo(() => {
@@ -512,8 +533,9 @@ export function CheckInPage() {
       settings,
       filters: { query, grades, focus },
       pinned,
+      held,
     });
-  }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus, pinned]);
+  }, [event, students, attendance, rsvps, snapshots, settings, query, grades, focus, pinned, held]);
 
   useEffect(() => {
     if (event && !locked && roster) hadRoster.current = event.id;
@@ -528,7 +550,12 @@ export function CheckInPage() {
    * device ends up holding four hundred children's medical notes. A row whose
    * note has not landed, or could not be read, keeps the badge it always had.
    */
-  const allergyNotes = useAllergyNotes(roster?.entries ?? NO_ENTRIES);
+  // Both lists' rows — the regulars still expected wear their badges too.
+  const onScreen = useMemo(
+    () => (roster ? (roster.expected.length > 0 ? [...roster.entries, ...roster.expected] : roster.entries) : NO_ENTRIES),
+    [roster],
+  );
+  const allergyNotes = useAllergyNotes(onScreen);
 
   /* ---- Waiting for the prediction ---------------------------------------- */
 
@@ -929,6 +956,22 @@ export function CheckInPage() {
     [swapForId, handleSwapPick, handleCheckIn, readOnly],
   );
 
+  /** A tap on the "not here yet" list: the same tap, and the row stays put. */
+  const onPressExpected = useCallback(
+    (entry: RosterEntry) => {
+      if (!swapForId && !entry.attendance && !readOnly) {
+        const id = entry.student.id;
+        setHeldState((current) => {
+          const base = current.key === heldKey ? current.ids : NO_IDS;
+          if (base.has(id)) return current;
+          return { key: heldKey, ids: new Set(base).add(id) };
+        });
+      }
+      onPress(entry);
+    },
+    [swapForId, readOnly, heldKey, onPress],
+  );
+
   const onUndo = useCallback(
     (entry: RosterEntry) => {
       void handleUndo(entry);
@@ -1043,12 +1086,17 @@ export function CheckInPage() {
   const canFocusRecent = !roster.isFiltered && counts.recent > 0;
 
   /*
-   * A check-out roster spends both chip slots on the room.
+   * A check-out roster's phone row holds three focus chips: Regulars, In room,
+   * Checked out.
    *
-   * A nursery volunteer is not filtering by predicted regulars — they are
-   * working a room, and In room / Checked out are the whole job. Recent still
-   * *applies* if it is somehow the active focus; it just stops competing for a
-   * slot it would win and then not be used.
+   * It used to spend both of its slots on the room and hide Regulars, which
+   * left a weekly kids' room with no way to see who usually comes — a door
+   * volunteer at a lobby-kiosk gathering could run it for months and never
+   * meet the prediction. Three chips fit 358px only without the grade chip
+   * beside them, so on these gatherings that chip moves into the search band
+   * below `lg` (see `FilterBar`), where narrowing to a grade is a rarer job
+   * than either of the questions the chips answer. At `lg` everything has
+   * room, Participated included.
    */
   const tracksCheckOut = event.requiresCheckOut;
 
@@ -1073,9 +1121,10 @@ export function CheckInPage() {
    * the counselor is on Recent, the button under the roster is the way to it —
    * and that button says so in words.
    */
-  const showParticipatedChip =
-    !tracksCheckOut && canFocusParticipated && (!canFocusRecent || appliedFocus === 'participated');
-  const showRecentChip = canFocusRecent && (!tracksCheckOut || appliedFocus === 'recent');
+  const showParticipatedChip = tracksCheckOut
+    ? canFocusParticipated
+    : canFocusParticipated && (!canFocusRecent || appliedFocus === 'participated');
+  const showRecentChip = canFocusRecent;
 
   /*
    * The way back out, one rung at a time.
@@ -1128,6 +1177,8 @@ export function CheckInPage() {
       recentCount={counts.recent}
       showParticipated={showParticipatedChip}
       participatedCount={counts.participated}
+      participatedPointerOnly={tracksCheckOut && appliedFocus !== 'participated'}
+      gradeInRow={!tracksCheckOut}
       present={counts.present}
       availableGrades={roster.gradesPresent}
       tracksCheckOut={tracksCheckOut}
@@ -1255,6 +1306,18 @@ export function CheckInPage() {
                    creates a *new* student and checks them in on the server clock,
                    which is the one thing this correction exists to avoid. */
                 onQuickAdd={swapSource || readOnly ? undefined : () => setQuickAddOpen(true)}
+                trailing={
+                  tracksCheckOut ? (
+                    <GradeFilter
+                      grades={grades}
+                      onChange={setGrades}
+                      available={roster.gradesPresent}
+                      compact
+                      // As tall as the field it sits beside.
+                      className="lg:hidden [&>button]:min-h-12"
+                    />
+                  ) : undefined
+                }
               />
             </div>
 
@@ -1399,6 +1462,43 @@ export function CheckInPage() {
               listRef={rosterList}
               onLeave={returnToSearch}
             />
+
+            {/* The regulars the room is still waiting for, under the room. Not
+                a filter and not a chip: on a check-out gathering the door is
+                asking two things at once — who is here, and who usually comes
+                and is not — and the second used to be unanswerable. See
+                `expected` on `buildRoster`. */}
+            {roster.expected.length > 0 ? (
+              <RosterList
+                title={
+                  now >= event.endAt ? t('expectedTitleAfter') : t('expectedTitle')
+                }
+                count={counts.expectedAbsent}
+                entries={roster.expected}
+                description={
+                  held.size > 0 && roster.expected.length > counts.expectedAbsent
+                    ? t('expectedArrived', {
+                        count: roster.expected.length - counts.expectedAbsent,
+                      })
+                    : undefined
+                }
+                onPress={onPressExpected}
+                onUndo={onUndo}
+                onSwap={onSwap}
+                onCheckOut={handleCheckOut}
+                onUndoCheckOut={handleUndoCheckOut}
+                tracksCheckOut={tracksCheckOut}
+                mode={swapSource ? "swap" : "checkin"}
+                swapSourceId={swapSource?.student.id ?? null}
+                expandedId={expandedId}
+                canOpenProfile={canSee("core")}
+                readOnly={readOnly}
+                flashing={flashing}
+                busy={pending}
+                allergyNotes={allergyNotes}
+                onLeave={returnToSearch}
+              />
+            ) : null}
 
             {/* The way back out. A filtered list looks exactly like a short
                 roster, and a counselor who cannot find a student needs to be

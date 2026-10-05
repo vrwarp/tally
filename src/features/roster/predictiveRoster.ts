@@ -100,6 +100,21 @@ export interface RosterView {
   /** The one roster list, A–Z, already narrowed by `focus` and the query. */
   entries: RosterEntry[];
   /**
+   * The regulars In room is still waiting for, A–Z — the list drawn under it.
+   *
+   * Only ever filled on a gathering that tracks check-out, under the In room
+   * focus, with no search running. There the filter row spends its slots on
+   * the room, which used to leave a check-out gathering with no way to see its
+   * regulars at all — and on a morning the room fills from a lobby kiosk,
+   * "who usually comes and is not here yet" is the question the door is
+   * actually asking. It is not a filter, and it moves nothing: a regular who
+   * arrives leaves this list for In room by the kiosk's hand, and one checked
+   * in from here stays here, green, for as long as `held` says so.
+   *
+   * Empty everywhere else, so a caller can render it whenever it is non-empty.
+   */
+  expected: RosterEntry[];
+  /**
    * The focus actually applied. A requested `recent` degrades to `all` when the
    * prediction has nothing to say, so callers can render the chip from this and
    * never show an active filter that is not doing anything.
@@ -138,6 +153,8 @@ export interface RosterView {
     historyWindow: number;
     /** Eligible students the prediction expects, before search filtering. */
     recent: number;
+    /** Of `expected`, the ones still not checked in. */
+    expectedAbsent: number;
     /**
      * Eligible students who have been to this gathering before (or, under the
      * `ever` source, to anything), before search filtering. Zero when there is
@@ -391,6 +408,21 @@ export interface BuildRosterInput {
    * regulars. Reload and the list is the prediction's again.
    */
   pinned?: ReadonlySet<string>;
+  /**
+   * Regulars checked in from the "not here yet" list, held there.
+   *
+   * The second list under In room on a check-out gathering (see `expected`) is
+   * one a counselor taps down, and a tap never moves a row: a regular checked in
+   * from it turns green where it stands instead of leaving for the In room list
+   * above. The caller holds the ids it saw tapped there and passes them back; a
+   * held student is drawn in `expected` and left out of `entries`, so nobody is
+   * on screen twice. Arrivals that came from anywhere else — the lobby kiosk,
+   * the other phone — are not held, and appear in In room like any other.
+   *
+   * Courtesy to the thumb, like `pinned`, and forgotten as readily: the caller
+   * drops it when the filter changes or the page reloads.
+   */
+  held?: ReadonlySet<string>;
 }
 
 /** Shared so an unpinned call allocates nothing per render. */
@@ -507,6 +539,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
   const { event, students, attendance, rsvps, settings } = input;
   const filters = input.filters ?? {};
   const pinned = input.pinned ?? EMPTY_PINNED;
+  const held = input.held ?? EMPTY_PINNED;
 
   const attendanceByStudent = new Map(attendance.map((record) => [record.studentId, record]));
   const rsvpByStudent = new Map(rsvps.map((record) => [record.studentId, record]));
@@ -634,7 +667,24 @@ export function buildRoster(input: BuildRosterInput): RosterView {
     tracksCheckOut: event.requiresCheckOut,
   });
 
+  /*
+   * The second list, and what it takes out of the first.
+   *
+   * Grade filters apply (they narrow who this counselor is looking after);
+   * a search stands it down entirely, because a search is a lookup and its
+   * answer has to be one list.
+   */
+  const showExpected = event.requiresCheckOut && focus === 'inRoom' && !isFiltered;
+  const expected = showExpected
+    ? matched.filter(
+        (entry) =>
+          entry.isRecent && (entry.attendance === null || held.has(entry.student.id)),
+      )
+    : [];
+  const heldHere = new Set(expected.map((entry) => entry.student.id));
+
   const entries = matched.filter((entry) => {
+    if (heldHere.has(entry.student.id)) return false;
     // `checkedIn` is a statement about right now and stays literal: a pinned
     // student who has just been undone is precisely somebody who is *not* here.
     if (focus === 'checkedIn') return entry.attendance !== null;
@@ -659,8 +709,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
    * somebody in. Without it, typing "ma" for the Maya at the front of the queue
    * put five people whose surnames merely contain "ma" above her.
    */
-  entries.sort(
-    (a, b) =>
+  const order = (a: RosterEntry, b: RosterEntry): number =>
       (isFiltered ? matcher.rank(a.student) - matcher.rank(b.student) : 0) ||
       // A row with no name to file under goes after every row that has one:
       // the list is read by name, and a "Former student" between Maya and
@@ -671,11 +720,13 @@ export function buildRoster(input: BuildRosterInput): RosterView {
       // and then by id so the order is total. Only for them — a named pair
       // that ties keeps the roster's own order, which a check-in must not
       // disturb.
-      (a.former ? arrivalOrder(a, b) : 0),
-  );
+      (a.former ? arrivalOrder(a, b) : 0);
+  entries.sort(order);
+  expected.sort(order);
 
   return {
     entries,
+    expected,
     focus,
     isFiltered,
     gradesPresent: [...gradesSeen].sort((a, b) => a - b),
@@ -688,6 +739,7 @@ export function buildRoster(input: BuildRosterInput): RosterView {
       absent: Math.max(0, eligible - presentTotal),
       historyWindow,
       recent: recentTotal,
+      expectedAbsent: expected.filter((entry) => entry.attendance === null).length,
       participated: participatedTotal,
       participationWindow,
     },

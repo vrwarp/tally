@@ -37,6 +37,15 @@ export interface GradeFilterProps {
    * all", which is what a caller with nothing to narrow by should do.
    */
   available?: readonly Grade[];
+  /** Placement only — which breakpoints draw it. */
+  className?: string;
+  /**
+   * The narrow chip that rides the search band on a check-out gathering's
+   * phone: "Grade" rather than "All grades" while nothing is picked, so the
+   * search field beside it keeps room for its placeholder. A picked grade
+   * still says which.
+   */
+  compact?: boolean;
 }
 
 /** The three keys the chip's summary needs, as a narrow function type. */
@@ -58,7 +67,7 @@ function summarise(
   return t('someGrades', { count: grades.length });
 }
 
-export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
+export function GradeFilter({ grades, onChange, available, className, compact = false }: GradeFilterProps) {
   const tCommon = useTranslations('Common');
   const t = useTranslations('CheckIn');
   const names = useGrades();
@@ -139,7 +148,7 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
   const active = grades.length > 0;
 
   return (
-    <div ref={container} className="relative shrink-0">
+    <div ref={container} className={cn('relative shrink-0', className)}>
       <button
         ref={trigger}
         type="button"
@@ -150,13 +159,14 @@ export function GradeFilter({ grades, onChange, available }: GradeFilterProps) {
         /* Inset, like the chips beside it — the sticky search band ends flush
            with the top of this row and painted over an outside ring. */
         className={cn(
-          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold inset-ring-1 transition-colors pointer-fine:min-h-9',
+          'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full text-xs font-semibold inset-ring-1 transition-colors pointer-fine:min-h-9',
+          compact ? 'px-3' : 'px-3.5',
           active
             ? 'bg-brand-500/20 text-brand-200 inset-ring-brand-500/40'
             : 'bg-ink-900 text-ink-400 inset-ring-ink-800 hover:bg-ink-800 active:bg-ink-800',
         )}
       >
-        {summarise(t, names, grades)}
+        {compact && grades.length === 0 ? t('gradeChipShort') : summarise(t, names, grades)}
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="size-3.5">
           <path
             d="m5 8 5 5 5-5"

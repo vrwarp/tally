@@ -72,8 +72,9 @@ someone's clipboard and someone's cash box, and a half-kept copy in an app is wo
 
 **Journey 4b — the nursery, where children are checked out.** A gathering can turn on **check-out**,
 which makes the roster ternary: absent, in the room, checked out. The header leads with the live room
-count rather than the head count (`12 in room · 18 checked in`), the two filter chips become "In
-room" and "Checked out", and the one-tap button at the end of a present row changes verb from undo
+count rather than the head count (`12 in room · 18 checked in`), the "Checked in" chip becomes "In
+room" and "Checked out" beside Regulars (the grade filter moves into the search band on a phone to
+make room), and the one-tap button at the end of a present row changes verb from undo
 to **Out** — undo moves one tap deeper into the action strip, which is the right way round when
 checking children out is the gesture repeated forty times a morning. Both numbers are read off the
 register itself, so a record whose student has since left the roster still counts, and shows as a
@@ -86,6 +87,14 @@ how often the button is pressed: it is the one control a parent meets every week
 the end of a morning. What guards it now is the confirm screen itself, which costs the ordinary
 case nothing: every name is on the glass above the finger, only the ticked ones go, and the press
 has to lift inside the button it landed on.
+
+Under the In room list sits a second one, **Regulars not here yet** — the children the prediction
+expects who have not arrived, A–Z. A room filled from a lobby kiosk is mostly watched rather than
+tapped, and "who usually comes and is not here" is the question the door volunteer is actually
+asking; before this list existed, a check-out gathering never showed its regulars on the app at all.
+A regular checked in from it turns green where the row stands and stays there until the filter
+changes or the page reloads, because a tap never moves a row; an arrival from the kiosk simply
+joins In room. Once the gathering has ended the list reads **Regulars who didn't come**.
 
 Two rules make it honest. **A missed check-out is not a miss** — attendance is untouched by any of
 it, so a morning where half the parents walked off without telling anybody counts exactly like one
