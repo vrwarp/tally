@@ -14,7 +14,7 @@
  *    Tally: somebody has to put a number into Planning Center, and the row says
  *    so rather than inventing an age for a record Tally never created.
  */
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { Badge, Card, CardHeader, EmptyState, Spinner } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
 import { CallListLoadingRows } from '@/features/dashboard/LoadingRows';
@@ -183,7 +183,7 @@ function IncompleteRow({
           {initials(student.firstName, student.lastName)}
         </span>
 
-        <Link
+        <ProfileLink
           to={`/students/${student.id}`}
           className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
         >
@@ -222,7 +222,7 @@ function IncompleteRow({
               {badge}
             </Badge>
           </span>
-        </Link>
+        </ProfileLink>
 
         <span aria-hidden="true" className="shrink-0 text-ink-600">
           ›

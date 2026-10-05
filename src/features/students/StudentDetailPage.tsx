@@ -21,7 +21,7 @@
  * derive both.
  */
 import { memo, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -65,6 +65,7 @@ import {
 } from '@/lib/birthday';
 import { chainKey } from '@/lib/materialize';
 import { pcoPersonUrl } from '@/lib/planningCenter';
+import { profileBack } from '@/lib/profileBack';
 import { sessionOutcome, type SessionOutcome } from '@/lib/sessionHistory';
 import { formatPhone, initials } from '@/lib/utils';
 import { cn } from '@/lib/cn';
@@ -133,8 +134,12 @@ export function StudentDetailPage() {
   const tCommon = useTranslations('Common');
   const tEditor = useTranslations('StudentEditor');
   const locale = useLocale();
+  const tNav = useTranslations('Nav');
   const { studentId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Back to the screen the profile was opened from. See `profileBack`.
+  const back = profileBack(location.state);
   const { students, events, series, settings, loading, rosterError, refreshRoster, upstreamEdits } =
     useData();
   const { user, profile } = useAuth();
@@ -554,7 +559,10 @@ export function StudentDetailPage() {
       show(message, { tone: status === 'recreated' || status === 'relinked' || status === 'still-there' ? 'success' : 'info' });
       await refreshRoster(true);
       refreshDetails();
-      if (continueAs && continueAs !== student.id) navigate(`/students/${continueAs}`);
+      // The same visit under a new id: the way back stays where it was.
+      if (continueAs && continueAs !== student.id) {
+        navigate(`/students/${continueAs}`, { state: location.state });
+      }
     } catch (cause) {
       show(serverText(cause, t('recreateFailed', { backend: backendName })), {
         tone: 'error',
@@ -638,10 +646,12 @@ export function StudentDetailPage() {
     */
     <PageFrame width="2xl">
       <Link
-        to="/students"
+        to={back.to}
+        state={back.state}
         className="inline-flex min-h-11 w-fit items-center gap-1 text-sm text-ink-400 hover:text-ink-100"
       >
-        <span aria-hidden="true">‹</span> {t('allStudents')}
+        <span aria-hidden="true">‹</span>{' '}
+        {back.label === 'students' ? t('allStudents') : tNav(back.label)}
       </Link>
 
       <header className="flex items-start gap-3">

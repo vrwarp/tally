@@ -17,7 +17,7 @@
  * are threaded in now, and both kinds of unreachable student get somewhere to
  * go.
  */
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { ExportCsvButton } from '@/components/ExportCsvButton';
 import { Badge, Card, CardHeader, EmptyState } from '@/components/ui';
 import { AddParentContactButton } from '@/features/dashboard/AddParentContactButton';
@@ -177,7 +177,7 @@ function NewVisitorRow({
           {initials(student.firstName, student.lastName)}
         </span>
 
-        <Link
+        <ProfileLink
           to={`/students/${student.id}`}
           className="flex min-h-11 min-w-0 flex-1 flex-col justify-center hover:text-brand-300"
         >
@@ -196,7 +196,7 @@ function NewVisitorRow({
             {firstEventTitle ?? t('unknownEvent')} · {time.shortDate(firstAttendedAt)}
             {firstAttendedAt > now ? null : `, ${time.relative(firstAttendedAt)}`}
           </span>
-        </Link>
+        </ProfileLink>
 
         {/* Somebody met on a retreat is a different follow-up from somebody who
             walked into a Friday: there is no next instance of a bus trip for

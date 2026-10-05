@@ -23,6 +23,7 @@
 import { memo, useCallback, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { StudentRow, type StudentRowMode } from '@/features/checkin/StudentRow';
 import { cn } from '@/lib/cn';
+import type { RestoreState } from '@/lib/profileBack';
 import type { RosterEntry } from '@/types';
 import { useTranslations } from 'use-intl';
 
@@ -61,6 +62,8 @@ export interface RosterListProps {
   expandedId?: string | null;
   /** Whether rows may offer `Profile`. Core team only — see `StudentRow`. */
   canOpenProfile?: boolean;
+  /** Handed to each row's `Profile` link. See `StudentRow`. */
+  profileRestore?: RestoreState;
   /** A viewer's roster: every row reads, none writes. See `StudentRow`. */
   readOnly?: boolean;
   flashing: ReadonlySet<string>;
@@ -115,6 +118,7 @@ export const RosterList = memo(function RosterList({
   swapSourceId = null,
   expandedId = null,
   canOpenProfile = false,
+  profileRestore,
   readOnly = false,
   flashing,
   busy,
@@ -256,6 +260,7 @@ export const RosterList = memo(function RosterList({
               isSwapSource={entry.student.id === swapSourceId}
               expanded={entry.student.id === expandedId}
               canOpenProfile={canOpenProfile}
+              profileRestore={profileRestore}
               readOnly={readOnly}
               flashing={flashing.has(entry.student.id)}
               busy={busy.has(entry.student.id)}

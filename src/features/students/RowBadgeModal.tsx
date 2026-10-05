@@ -16,7 +16,7 @@
  * detail page is for, and every panel can get there in one press.
  */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { ProfileLink } from '@/components/ProfileLink';
 import { Badge, Button, ErrorBanner, Modal, Spinner } from '@/components/ui';
 import { EditBirthday } from '@/features/students/EditBirthday';
 import { ParentContactPanel } from '@/features/students/ParentContactModal';
@@ -89,9 +89,9 @@ export function RowBadgeModal({ student, action, onClose, now }: RowBadgeModalPr
       {action === 'queued' ? <QueuedPanel student={student} onDone={onClose} /> : null}
 
       <p className="mt-4 border-t border-ink-800 pt-3 text-sm">
-        <Link to={`/students/${student.id}`} className="text-brand-300 underline underline-offset-4">
+        <ProfileLink to={`/students/${student.id}`} className="text-brand-300 underline underline-offset-4">
           {t('openProfile', { name: student.firstName })}
-        </Link>
+        </ProfileLink>
       </p>
     </Modal>
   );

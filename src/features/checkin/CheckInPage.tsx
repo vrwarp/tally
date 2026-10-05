@@ -35,7 +35,7 @@ import {
   // same name, and the two are not interchangeable.
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { pageFrameWidth } from '@/components/pageFrameWidth';
 import { RosterErrorBanner } from '@/components/RosterErrorBanner';
 import { EmptyState, ErrorBanner, SkeletonRows } from '@/components/ui';
@@ -170,6 +170,22 @@ const FOCUS_EMPTY = {
   checkedOut: "emptyCheckedOut",
 } as const satisfies Record<RosterFocus, string>;
 
+
+const ROSTER_FOCUSES: readonly RosterFocus[] = [
+  "all",
+  "recent",
+  "participated",
+  "checkedIn",
+  "inRoom",
+  "checkedOut",
+];
+
+/** The filter a profile's back link handed back, if it is one this screen has. */
+function restoredRosterFocus(state: unknown): RosterFocus | null {
+  const focus = (state as { focus?: unknown } | null)?.focus;
+  return ROSTER_FOCUSES.find((known) => known === focus) ?? null;
+}
+
 export function CheckInPage() {
   const time = useTimeFormats();
   const t = useTranslations('CheckIn');
@@ -223,7 +239,14 @@ export function CheckInPage() {
   // most of the taps. `buildRoster` quietly downgrades this to the whole roster
   // whenever the prediction has nothing to say, so a one-off trip or a brand-new
   // series never opens on an empty list.
-  const [focus, setFocus] = useState<RosterFocus>("recent");
+  //
+  // Unless this is a return from a profile opened here: the back link hands the
+  // filter back (see `profileBack`), and a counselor who opened somebody from
+  // "Checked out" comes back to "Checked out", not to a different list.
+  const location = useLocation();
+  const [restoredFocus] = useState(() => restoredRosterFocus(location.state));
+  const [focus, setFocus] = useState<RosterFocus>(restoredFocus ?? "recent");
+  const profileRestore = useMemo(() => ({ focus }), [focus]);
 
   /*
    * A check-out roster opens on the room while the gathering is running.
@@ -233,7 +256,7 @@ export function CheckInPage() {
    * they get to it. After the window it opens on the whole roster, because the
    * question has changed from "who is here" to "who came".
    */
-  const openedOnRoom = useRef(false);
+  const openedOnRoom = useRef(restoredFocus !== null);
   useEffect(() => {
     if (!event?.requiresCheckOut || openedOnRoom.current) return;
     openedOnRoom.current = true;
@@ -1459,6 +1482,7 @@ export function CheckInPage() {
               swapSourceId={swapSource?.student.id ?? null}
               expandedId={expandedId}
               canOpenProfile={canSee("core")}
+              profileRestore={profileRestore}
               readOnly={readOnly}
               flashing={flashing}
               busy={pending}
