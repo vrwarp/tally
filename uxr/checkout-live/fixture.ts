@@ -18,7 +18,9 @@
  * Two of the arrivals carry an allergy flag, with a note, as the real read
  * would return it.
  *
- * The state is chosen by `?state=early|midway|pickup`.
+ * The state is chosen by `?state=early|midway|pickup`. `?checkout=0` turns
+ * check-out off on every Sunday of the chain — the same room run the way a
+ * youth night is, for a frame of the screen a gathering without pickup gets.
  */
 import { DEFAULT_SETTINGS, buildSearchName } from '@/types';
 import type {
@@ -36,6 +38,8 @@ const MIN = 60_000;
 export type State = 'early' | 'midway' | 'pickup';
 const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 export const STATE: State = (params.get('state') as State | null) ?? 'early';
+/** Whether the chain hands children back. On unless `?checkout=0`. */
+export const TRACKS_CHECKOUT = params.get('checkout') !== '0';
 
 const ROOT = 'kids-church';
 
@@ -68,7 +72,7 @@ function instance(startAt: Date): TallyEvent {
     location: 'Room 104',
     notes: null,
     requiresRsvp: false,
-    requiresCheckOut: true,
+    requiresCheckOut: TRACKS_CHECKOUT,
     labelTemplate: null,
     kioskTheme: null,
     kioskBackdropId: null,

@@ -11,8 +11,8 @@
  * each to `-fold.png` and `-full.png`; `shoot.ts` reads the viewport from the
  * `--phone` / `--desktop` suffix.
  *
- * Same shape as `uxr/kiosk-setup-live/freeze.ts` — a Vite server, aliases onto
- * `stubs.tsx`, the real `AppShell` around the real `CheckInPage` — with the
+ * Same shape as `uxr/kiosk-setup-live/freeze.ts` — a Vite server (`server.ts`),
+ * aliases onto `stubs.tsx`, the real `AppShell` around the real `CheckInPage` — with the
  * stubs of `uxr/transitions-live/` for the data hooks and the clock. The
  * fixture (`fixture.ts`) supplies the registers; the screen derives the
  * Recent / Participated / In room / Checked out counts itself, and this script
@@ -25,22 +25,10 @@
  *   early-all  `early`, with the In room chip pressed off: the whole roster
  */
 import { mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { createServer } from 'vite';
 import { freeze } from '../snapshot';
-
-/** Same fallback as `uxr/shoot.ts`: an image that ships its own Chromium. */
-const executablePath =
-  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ??
-  [
-    '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-    '/opt/pw-browsers/chromium/chrome-linux/chrome',
-  ].find((path) => existsSync(path));
+import { executablePath, startHarness } from './server';
 
 /** The two shapes `uxr/shoot.ts` knows, named the way it names them. */
 const VIEWPORTS = {
@@ -113,44 +101,8 @@ const outFlag = args.indexOf('--out');
 const outDir = resolve(outFlag === -1 ? 'uxr/prototype-checkout/base' : args[outFlag + 1]!);
 await mkdir(outDir, { recursive: true });
 
-const here = dirname(fileURLToPath(import.meta.url));
-const projectRoot = dirname(dirname(here));
-const src = join(projectRoot, 'src');
-
-const stubs = join(here, 'stubs.tsx');
-/*
- * `CheckInPage` still imports the write services (`services/attendance`,
- * `services/events`), which initialise Firebase at module load and refuse to
- * without a config. Emulated mode synthesises one; nothing in these frames
- * reads or writes through it, because every read is aliased to the fixture.
- */
-process.env.VITE_USE_EMULATORS = 'true';
-const server = await createServer({
-  configFile: false,
-  root: projectRoot,
-  plugins: [react(), tailwindcss()],
-  // The app's compile-time flag (see `vite.config.ts`), folded off as in any
-  // build that is not the end-to-end one.
-  define: { __E2E_HOOKS__: 'false' },
-  resolve: {
-    alias: [
-      { find: /^@\/context\/authContext$/, replacement: stubs },
-      { find: /^@\/context\/dataContext$/, replacement: stubs },
-      { find: /^@\/context\/toastContext$/, replacement: stubs },
-      { find: /^@\/hooks\/useAttendance$/, replacement: stubs },
-      { find: /^@\/hooks\/useEventSnapshots$/, replacement: stubs },
-      { find: /^@\/hooks\/useAllergyNotes$/, replacement: stubs },
-      { find: /^@\/hooks\/useNow$/, replacement: stubs },
-      { find: /^@\/services\/kioskPresence$/, replacement: stubs },
-      { find: /^@\//, replacement: `${src}/` },
-    ],
-  },
-  optimizeDeps: { entries: ['uxr/checkout-live/index.html'] },
-  server: { port: 5199, strictPort: true },
-  logLevel: 'error',
-});
-await server.listen();
-const base = 'http://127.0.0.1:5199/uxr/checkout-live/index.html';
+const server = await startHarness();
+const base = server.base;
 
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
 const written: string[] = [];

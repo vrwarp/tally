@@ -9,10 +9,17 @@
  * and the clock. `useActiveEvent`, `useSeriesHistoryEvents` and `buildRoster`
  * are the real ones, so the counts on screen are the app's own derivation.
  *
- * Writes are not the subject: a frame is a state, not a session.
+ * The register is live. `ATTENDANCE` seeds an in-memory store; the four
+ * attendance writes the screen makes (`services.ts`, aliased over
+ * `@/services/attendance`) change it and re-notify `useAttendance`, the way the
+ * Firestore listener echoes a write back. `freeze.ts` never writes, so its
+ * frames are the seed exactly. `walkthrough.ts` taps, and stands in for the
+ * lobby kiosk through `window.__kioskArrive(studentId)` — a write that reaches
+ * the register without anybody touching this screen.
  */
-import type { Role, RosterEntry, UserProfile } from '@/types';
-import { ALLERGY_NOTES, ATTENDANCE, EVENTS, NOW, SETTINGS, SNAPSHOTS, STUDENTS } from './fixture';
+import { useSyncExternalStore } from 'react';
+import type { AttendanceRecord, CheckInMethod, Role, RosterEntry, UserProfile } from '@/types';
+import { ALLERGY_NOTES, ATTENDANCE, EVENTS, NOW, SETTINGS, SNAPSHOTS, STUDENTS, TONIGHT } from './fixture';
 
 /* ---- @/context/authContext --------------------------------------------- */
 
@@ -94,9 +101,79 @@ export function useNow(): Date {
 
 /* ---- @/hooks/useAttendance --------------------------------------------- */
 
-const ATTENDANCE_RESULT = { attendance: ATTENDANCE, loading: false, error: null };
-export function useAttendance() {
-  return ATTENDANCE_RESULT;
+/*
+ * Tonight's register. Replaced, never mutated, on every write — the screen
+ * memoises on the array's identity, as it does on each snapshot Firestore
+ * hands the real listener.
+ */
+let register: readonly AttendanceRecord[] = ATTENDANCE;
+const listeners = new Set<() => void>();
+
+function commit(next: readonly AttendanceRecord[]) {
+  register = next;
+  for (const listener of listeners) listener();
+}
+
+/** Somebody arrived: a fresh record, stamped by the page's clock. */
+export function recordArrival(studentId: string, uid: string, method: CheckInMethod) {
+  if (register.some((record) => record.studentId === studentId)) return;
+  commit([
+    ...register,
+    {
+      id: studentId,
+      studentId,
+      eventId: TONIGHT.id,
+      seriesId: null,
+      checkedInAt: new Date(),
+      checkedInBy: uid,
+      method,
+      isFirstEver: false,
+      checkedOutAt: null,
+      checkedOutBy: null,
+    } as AttendanceRecord,
+  ]);
+}
+
+export function removeArrival(studentId: string) {
+  commit(register.filter((record) => record.studentId !== studentId));
+}
+
+/** A pickup, or (`uid` null) its undo. Fails, like `updateDoc`, on nobody. */
+export function recordPickup(studentId: string, uid: string | null) {
+  if (!register.some((record) => record.studentId === studentId)) {
+    throw new Error(`No check-in for ${studentId} to check out.`);
+  }
+  commit(
+    register.map((record) =>
+      record.studentId === studentId
+        ? { ...record, checkedOutAt: uid ? new Date() : null, checkedOutBy: uid }
+        : record,
+    ),
+  );
+}
+
+declare global {
+  interface Window {
+    /** The lobby kiosk checking a child in — harness only. */
+    __kioskArrive?: (studentId: string) => void;
+  }
+}
+window.__kioskArrive = (studentId) => recordArrival(studentId, 'kiosk-lobby', 'kiosk');
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+const snapshot = () => register;
+const NONE: readonly AttendanceRecord[] = [];
+
+export function useAttendance(eventId: string | null) {
+  const records = useSyncExternalStore(subscribe, snapshot);
+  return {
+    attendance: (eventId ? records : NONE) as AttendanceRecord[],
+    loading: false,
+    error: null,
+  };
 }
 const RSVPS_RESULT = { rsvps: [], loading: false, error: null };
 export function useRsvps() {
