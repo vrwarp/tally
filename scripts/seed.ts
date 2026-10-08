@@ -1,7 +1,7 @@
 /**
  * Emulator seed data.
  *
- * Fills a *local* Firebase Emulator Suite with a believable youth ministry
+ * Fills a *local* Firebase Emulator Suite with a believable church ministry
  * so every screen can be demonstrated and every journey walked end to end
  * without a real Firebase project, a real Planning Center token, or a real
  * child's name in a database.

@@ -22,8 +22,8 @@ import type { LabelTemplate } from '@/lib/labelTemplate';
 /**
  * Pre-K through 12th grade: `-1` is Pre-K, `0` is kindergarten.
  *
- * Wider than the 6–12 the youth ministry runs on, because a nursery or a
- * children's ministry is the same app with a different band — and which band a
+ * Wider than the default 6–12 band, because a nursery, a children's ministry
+ * and a youth group are the same app with different bands — and which band a
  * church actually reads is configuration (`minGrade`/`maxGrade`), not this
  * type. Widening here only decides what Tally can *represent*; an existing
  * deployment's band stays 6–12 until somebody changes it in Settings.

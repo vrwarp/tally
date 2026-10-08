@@ -239,7 +239,7 @@ function rosterHandle(timeoutMs: number) {
 }
 
 /**
- * The youth roster: Tally's own membership, with Planning Center's names on it.
+ * The roster: Tally's own membership, with Planning Center's names on it.
  *
  * Who is on it comes from `students/` — a decision somebody made in this app.
  * What they are called comes from Planning Center, read on demand and stored

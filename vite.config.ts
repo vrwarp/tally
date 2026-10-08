@@ -86,7 +86,7 @@ export default defineConfig({
       manifest: {
         name: 'Tally',
         short_name: 'Tally',
-        description: 'Fast attendance check-in for a youth ministry.',
+        description: 'Fast attendance check-in for a church’s ministries.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',

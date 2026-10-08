@@ -1,6 +1,6 @@
 # Tally
 
-Tally is an attendance app for a church's youth and children's ministry: a counselor
+Tally is a check-in and attendance app for a church's ministries: a counselor
 standing at the door taps a name and the student is marked present in under three seconds, live on
 every other counselor's phone. The core team uses the same data to see who has gone missing, who
 turned up for the first time, and whose profile still has no way to reach a parent.

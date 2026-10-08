@@ -150,7 +150,7 @@ describe('readA32EffectiveSettings', () => {
     expect(readA32EffectiveSettings({ enabled: false }).enabled).toBe(false);
   });
 
-  it('opens the grade range on the youth ministry it was written for', () => {
+  it('defaults the grade range to 6–12', () => {
     expect(readA32EffectiveSettings({}).minGrade).toBe(6);
     expect(readA32EffectiveSettings({}).maxGrade).toBe(12);
   });

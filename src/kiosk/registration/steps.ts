@@ -175,8 +175,8 @@ export interface RegistrationState {
  * makes, restated rather than imported because that module pulls the whole main
  * app's design system in with it.
  *
- * A youth gathering opens on the middle of its band, which is one fewer tap for
- * most families. A gathering that hands children back opens on no grade at all:
+ * A gathering with a grade band opens on the middle of it, which is one fewer
+ * tap for most families. A gathering that hands children back opens on no grade at all:
  * a nursery child has none, and 'No grade' is an answer rather than a blank.
  */
 export function defaultGrade(requiresCheckOut: boolean): Grade | null {

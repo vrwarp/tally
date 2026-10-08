@@ -24,7 +24,7 @@ python manage.py setup_tally_integration \
 ```
 
 The command is idempotent. It creates (or adopts) the organization/division/assembly, a **meet**
-whose attendees are the roster, a student **character**, an integration user with a DRF token, and
+whose attendees are the roster, a participant **character**, an integration user with a DRF token, and
 the menu rows that authorise the API endpoints Tally calls — then prints every value Tally needs.
 Its own documentation lives in the Attendees repo at `docs/tally_integration.md`.
 
