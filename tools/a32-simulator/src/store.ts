@@ -144,9 +144,9 @@ export class A32SimulatorStore {
   readonly requests: Array<{ method: string; path: string }> = [];
 
   readonly organization = { id: 1, slug: 'simorg' };
-  readonly division = { id: 11, slug: 'simorg_tally_youth' };
-  readonly assembly = { id: 21, slug: 'simorg_tally_youth_ministry', displayName: 'Youth ministry' };
-  readonly character = { id: 31, slug: 'simorg_tally_student', displayName: 'Student' };
+  readonly division = { id: 11, slug: 'simorg_tally' };
+  readonly assembly = { id: 21, slug: 'simorg_tally_checkin', displayName: 'Tally check-in' };
+  readonly character = { id: 31, slug: 'simorg_tally_participant', displayName: 'Participant' };
   readonly meet = {
     id: 41,
     slug: 'simorg_tally_gathering',

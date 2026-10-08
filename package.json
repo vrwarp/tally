@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Attendance tracking for a youth ministry (6th-12th grade).",
+  "description": "Check-in and attendance for a church's ministries.",
   "engines": {
     "node": ">=20"
   },

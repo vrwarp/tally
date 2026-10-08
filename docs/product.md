@@ -1,6 +1,6 @@
 # What Tally does, and why
 
-Tally is an attendance app for a church's youth and children's ministry. Two audiences, one app.
+Tally is a check-in and attendance app for a church's ministries. Two audiences, one app.
 **Counselors** get exactly one screen — check-in. **Core team and admins** also get the dashboard,
 the roster, event and RSVP management, and settings. **Viewers** — a pastor, an elder, a board
 member — read what the core team reads and change nothing: see *The read-only role* below.

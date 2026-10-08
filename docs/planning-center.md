@@ -42,7 +42,7 @@ the parameter names and defaults; if this page and that file ever disagree, the 
 
 Tally authenticates to Planning Center with a **Personal Access Token**, sent as HTTP Basic auth.
 
-1. Sign in to Planning Center as an account that can read the youth roster (and, if you plan to turn
+1. Sign in to Planning Center as an account that can read the roster (and, if you plan to turn
    on write-back, edit people).
 2. Go to <https://api.planningcenteronline.com/oauth/applications>.
 3. Under **Personal Access Tokens**, choose **New Personal Access Token**. Name it `Tally`.

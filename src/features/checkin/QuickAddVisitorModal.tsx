@@ -41,8 +41,8 @@ import { useGrades } from '@/hooks/usePureStrings';
 /**
  * What the grade field opens on.
  *
- * A youth ministry gets the middle of its band, which is one fewer tap for
- * most of the students walking in. A gathering that hands children back opens
+ * A gathering with a grade band opens on the middle of it, which is one fewer
+ * tap for most of the students walking in. A gathering that hands children back opens
  * on no grade at all: a nursery child has none to type, and making a volunteer
  * clear the field forty times a morning is the same mistake as making them
  * reach for undo.

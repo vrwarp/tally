@@ -5,7 +5,7 @@ directions, and to answer them without guessing.
 
 ## The product, in one paragraph
 
-Tally is an attendance app for a 6th-to-12th-grade youth ministry. Two
+Tally is a check-in and attendance app for a church's ministries. Two
 audiences share one codebase. **Counselors** get exactly one screen — check-in —
 and use it standing at a door on a Friday night, one-handed, in a dim hallway,
 with a queue of teenagers in front of them and a budget of about three seconds

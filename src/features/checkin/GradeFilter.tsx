@@ -31,8 +31,8 @@ export interface GradeFilterProps {
   /**
    * The grades anybody on this roster is actually in.
    *
-   * `Grade` spans Pre-K–12 so a children's ministry can exist, but a youth
-   * ministry has seven of those and would otherwise get a seven-row-longer
+   * `Grade` spans Pre-K–12 so a children's ministry can exist, but a ministry
+   * running 6–12 has seven of those and would otherwise get a seven-row-longer
    * panel listing grades nobody on its roster is in. Omitted means "offer them
    * all", which is what a caller with nothing to narrow by should do.
    */
