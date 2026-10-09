@@ -1708,8 +1708,8 @@ service cloud.firestore {
           && d.message == null
           && d.field == null
           && d.observed == null
-          && d.survivorPersonId == null
-          && d.survivorName == null
+          && d.primaryPersonId == null
+          && d.primaryName == null
           && d.startedAt == null
           && d.settledAt == null;
       }

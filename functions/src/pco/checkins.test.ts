@@ -135,7 +135,7 @@ describe('planImport', () => {
     expect(plan.events.map((event) => event.pcoPeriodId)).toEqual(['P1', 'P3']);
     expect(plan.warnings.join(' ')).toContain('share');
     // And the skipped night's check-ins went with it rather than landing on
-    // the survivor and inflating its head count.
+    // the primary and inflating its head count.
     expect(plan.attendance.map((row) => row.studentId)).toEqual(['pco_44', 'pco_44']);
   });
 

@@ -9819,7 +9819,7 @@
     "zh-Hant": "reviewed"
   },
   "SyncStrip.mergedBody": {
-    "source": "Your correction followed the merge and landed on the survivor, not here. This page now reads from them, and the ids below are what moved.",
+    "source": "Your correction followed the merge and landed on the primary record, not here. This page now reads from them, and the ids below are what moved.",
     "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9896,20 +9896,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "SyncStrip.theSurvivingRecord": {
-    "source": "the surviving profile",
+  "SyncStrip.thePrimaryRecord": {
+    "source": "the primary profile",
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
   },
-  "SyncStrip.theSurvivor": {
-    "source": "the survivor",
+  "SyncStrip.thePrimary": {
+    "source": "the primary record",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "SyncStrip.survivorMeta": {
-    "source": "#{id} · the survivor",
+  "SyncStrip.primaryMeta": {
+    "source": "#{id} · the primary record",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -9962,7 +9962,7 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "SyncStrip.openSurvivor": {
+  "SyncStrip.openPrimary": {
     "source": "Open {name}",
     "es-MX": "machine",
     "zh-Hans": "machine",
@@ -10111,7 +10111,7 @@
   },
   "JobChip.mergedLong": {
     "source": "Merged in the directory",
-    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person being edited was merged into somebody else in the directory; the correction landed on the survivor under a different id. *Long* is the row form and may be a phrase.",
+    "context": "One of nine states an edit can be in on its way to the church directory. This family is the legend the ~95 other sync strings defer to, so the nine must stay distinguishable from each other in translation — in particular the three that resolve themselves (queued, sending, waiting, stalled) must not collapse into the three that need a person (differs, failed, orphaned). The person being edited was merged into somebody else in the directory; the correction landed on the primary record under a different id. *Long* is the row form and may be a phrase.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

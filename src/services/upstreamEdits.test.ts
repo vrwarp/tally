@@ -179,8 +179,8 @@ describe('what a browser writes when a leader presses Save', () => {
       message: null,
       field: null,
       observed: null,
-      survivorPersonId: null,
-      survivorName: null,
+      primaryPersonId: null,
+      primaryName: null,
       createdAt: 'ts',
       createdBy: 'dana',
       createdByName: 'Dana Ruiz',
@@ -410,8 +410,8 @@ describe('reading a job written by a server that deploys separately', () => {
       message: 'Somebody else changed the surname',
       field: 'lastName',
       observed: { lastName: 'Chen-Itoh' },
-      survivorPersonId: '202',
-      survivorName: 'Wei Chen-Itoh',
+      primaryPersonId: '202',
+      primaryName: 'Wei Chen-Itoh',
       createdAt: new FakeTimestamp(1_767_600_000),
       createdBy: 'dana',
       createdByName: 'Dana Ruiz',
@@ -433,8 +433,8 @@ describe('reading a job written by a server that deploys separately', () => {
       message: 'Somebody else changed the surname',
       field: 'lastName',
       observed: { lastName: 'Chen-Itoh' },
-      survivorPersonId: '202',
-      survivorName: 'Wei Chen-Itoh',
+      primaryPersonId: '202',
+      primaryName: 'Wei Chen-Itoh',
       createdAt: new Date(1_767_600_000_000),
       createdBy: 'dana',
       createdByName: 'Dana Ruiz',
@@ -456,8 +456,8 @@ describe('reading a job written by a server that deploys separately', () => {
     expect(edit.message).toBeNull();
     expect(edit.field).toBeNull();
     expect(edit.observed).toBeNull();
-    expect(edit.survivorPersonId).toBeNull();
-    expect(edit.survivorName).toBeNull();
+    expect(edit.primaryPersonId).toBeNull();
+    expect(edit.primaryName).toBeNull();
     expect(edit.nextAttemptAt).toBeNull();
     expect(edit.leaseUntil).toBeNull();
     expect(edit.startedAt).toBeNull();

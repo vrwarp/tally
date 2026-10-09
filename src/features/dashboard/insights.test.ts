@@ -928,7 +928,7 @@ describe('computeNewVisitors', () => {
 
   it('excludes inactive students, who have already been followed up on', () => {
     // The commonest inactive first-timer is a quick-add merged into a roster
-    // row this week: the loser keeps its `firstAttendedAt` and stays in the
+    // row this week: the duplicate keeps its `firstAttendedAt` and stays in the
     // roster read, so without the guard it is the one row that can appear —
     // with an "Add a contact" link to a profile that no longer exists.
     const folded = makeStudent({
@@ -2033,7 +2033,7 @@ describe('a release and the chain MIA row', () => {
     const student = makeStudent({
       id: 'winner',
       createdAt: LONG_AGO,
-      mergedFromStudentIds: ['loser'],
+      mergedFromStudentIds: ['duplicate'],
     });
     const events = fridays(4);
     const snapshots = [
@@ -2042,7 +2042,7 @@ describe('a release and the chain MIA row', () => {
       held(events[2]!),
       held(events[3]!),
     ];
-    const release = makeTransition({ chainKey: FRIDAY, studentId: 'loser', releasedAt: NOW });
+    const release = makeTransition({ chainKey: FRIDAY, studentId: 'duplicate', releasedAt: NOW });
 
     expect(computeMia([student], snapshots, settings, [], [release])).toEqual([]);
   });

@@ -340,7 +340,7 @@ export interface StudentDoc {
 
   /* ---- Merged rows ------------------------------------------------------- */
   /**
-   * Set on the loser of a merge: this row is really the student it names.
+   * Set on the duplicate of a merge: this row is really the student it names.
    * The document stays, inactive, because every attendance record points at it.
    */
   mergedIntoStudentId?: string | null;
@@ -552,8 +552,8 @@ export interface UpstreamEditDoc {
    */
   observed: UpstreamEditPatch | null;
   /** On `merged`: the person the edit ended up on, which is not the one it named. */
-  survivorPersonId: string | null;
-  survivorName: string | null;
+  primaryPersonId: string | null;
+  primaryName: string | null;
   createdAt: Timestamp;
   createdBy: string;
   /** The display name of whoever queued it, for the collision sentence. */

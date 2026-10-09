@@ -10,7 +10,7 @@
  *
  * ## What a merge is, and is not
  *
- * It is a decision about *Tally's* roster, and only that. The loser goes
+ * It is a decision about *Tally's* roster, and only that. The duplicate goes
  * inactive with a pointer at the keeper; the keeper gains a pointer back. That
  * is the same vocabulary `pco/studentPerson.ts` and `backends/aliases.ts`
  * already use when a backend tells us two of *its* people were merged, and it

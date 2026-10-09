@@ -157,7 +157,7 @@ async function openProfile(page: Page, studentId: string) {
  * Counted by existence rather than by state, which is not fussiness. Folding
  * happens *before* the lease is claimed (`drainStudent`), so a poke that
  * arrives while the suite is holding a student still cancels the superseded
- * job and rewrites the survivor — it is only the upstream write that is
+ * job and rewrites the primary — it is only the upstream write that is
  * blocked. Waiting for two *queued* jobs therefore waits for something that
  * has often already stopped being true.
  */
@@ -507,7 +507,7 @@ test.describe('an edit on its way to Planning Center', () => {
   /**
    * The state the whole design turns on, in the form that proves it.
    *
-   * The survivor already holds the surname that was typed, so no *value*
+   * The primary already holds the surname that was typed, so no *value*
    * differs and nothing about the fields would ever report this. What moved is
    * the person: the edit landed under an id the job never named, and after this
    * the student resolves to a different human than it did a minute ago. Deciding
@@ -516,20 +516,20 @@ test.describe('an edit on its way to Planning Center', () => {
   test('reports a merge even when no value changed', async ({ page, signedInAs }) => {
     await signedInAs('admin');
     const personId = await personIdOf('Camila', 'Torres');
-    const survivorId = await personIdOf('Tyler', 'McAllister');
+    const primaryId = await personIdOf('Tyler', 'McAllister');
     const studentId = `pco_${personId}`;
 
     await takeEditLease(studentId);
     await openProfile(page, studentId);
-    // The surname the survivor already has, so the fields cannot disagree.
+    // The surname the primary already has, so the fields cannot disagree.
     await renameTo(page, 'McAllister');
 
-    await burySimulatorPerson(personId, survivorId);
+    await burySimulatorPerson(personId, primaryId);
     await releaseEditLease(studentId);
     await drainQueue();
 
     const merged = await pump(studentId, ['merged'], 60_000);
-    expect(merged.data.survivorPersonId).toBe(survivorId);
+    expect(merged.data.primaryPersonId).toBe(primaryId);
     await expect(strip(page)).toContainText('Merged into another person');
   });
 
@@ -769,8 +769,8 @@ test.describe('an edit on its way to Planning Center', () => {
       message: null,
       field: null,
       observed: null,
-      survivorPersonId: null,
-      survivorName: null,
+      primaryPersonId: null,
+      primaryName: null,
       createdAt: started,
       createdBy: 'someone',
       createdByName: 'Marcus Webb',

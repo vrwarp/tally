@@ -620,7 +620,7 @@ interface RosterResponse {
   /** Roster entries whose backend person could not be read. */
   unresolved: string[];
   /** Merges the read followed and wrote back; the student rides under the
-   *  survivor's row already. Ids only — nothing personal. */
+   *  primary's row already. Ids only — nothing personal. */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
   /** `unresolved` entries that are known gone — deleted, or a merge trail
    *  that ends dead. Their membership documents are frozen for check-ins. */
@@ -753,7 +753,7 @@ export const getRoster = onCall<{ force?: boolean } | undefined, Promise<RosterR
         if (!fromDoc) continue;
         // Routed by backend: the Planning Center graft writes `pcoPersonId`
         // and a `pco_` keeper, which is the wrong document for an Attendees
-        // survivor.
+        // primary.
         if (result.backendId === 'pco') {
           await graftMergedStudent(database, fromDoc, relink.toPersonId);
         } else {
@@ -2313,7 +2313,7 @@ export const addParent = onCall<
  * `upstreamRecordMissing` cannot accumulate attendance under a dead id, and
  * this is the sanctioned way to thaw them without taking them off the roster. The flow itself lives in
  * ./pco/recreate.ts and refuses to create where creating would be wrong — a
- * record that still exists clears the flag, a merge with a living survivor
+ * record that still exists clears the flag, a merge with a living primary
  * relinks instead.
  */
 export const recreatePlanningCenterPerson = onCall<
@@ -2510,7 +2510,7 @@ export const onStudentCreated = onDocumentCreated(
  *
  * **Merged is decided on the id, never on the values.** `readThroughMerges`
  * follows a person through however many merges their record has been part of,
- * so an edit against somebody merged mid-flight lands — on the survivor, under
+ * so an edit against somebody merged mid-flight lands — on the primary, under
  * a different id than the job named. If the fields also differed, `differs`
  * could describe it; if they did not, nothing would, and the job would report
  * success while the student now resolves to a different human. So the id is
@@ -2616,8 +2616,8 @@ async function runUpstreamEdit(edit: EditRecord): Promise<RunOutcome> {
   if (person && namedPersonId && person.pcoPersonId !== namedPersonId) {
     return {
       kind: 'merged',
-      survivorPersonId: person.pcoPersonId,
-      survivorName: `${person.firstName} ${person.lastName}`.trim(),
+      primaryPersonId: person.pcoPersonId,
+      primaryName: `${person.firstName} ${person.lastName}`.trim(),
       message: result.message,
     };
   }

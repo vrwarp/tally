@@ -325,7 +325,7 @@ export class SimulatorStore {
   /**
    * Buries a person the way pcomirror answers for one afterwards: the record
    * stops being served, and when the burial was a merge the stone names the
-   * survivor. `handler.ts` turns this into the mirror's `410` with
+   * primary. `handler.ts` turns this into the mirror's `410` with
    * `meta.merged_into` — the shape Tally actually faces in production, where
    * its Planning Center endpoint is the mirror. A person the simulator never
    * held stays a plain `404`, which is what raw Planning Center says about

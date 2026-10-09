@@ -117,7 +117,7 @@ is the part of C that is genuinely new code rather than deleted code.
 
 Moving the trigger to the browser did not create a race, but it did add
 initiators to one. Folding was performed *outside* the lease — two writes,
-retire the superseded jobs and then move their patch onto the survivor — on the
+retire the superseded jobs and then move their patch onto the primary — on the
 reasoning that only the upstream write needed serialising. With one trigger and
 a one-minute sweep, two drains rarely overlapped. With a poke on every write, a
 poke on every retry and a sweep, overlapping is ordinary, and the interleaving

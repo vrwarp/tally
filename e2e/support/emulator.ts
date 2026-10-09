@@ -411,7 +411,7 @@ export async function releaseSimulator(): Promise<void> {
 /**
  * Deletes a person upstream, or merges them into another.
  *
- * With no survivor it is the deletion an office admin makes; with one, the
+ * With no primary it is the deletion an office admin makes; with one, the
  * tombstone names them and Planning Center answers `410` with `meta.merged_into`
  * — which is what `readThroughMerges` follows, and therefore the only way to
  * produce the state where an edit lands on somebody other than the person it
@@ -666,17 +666,17 @@ export async function resetA32Simulator(): Promise<void> {
  *
  * On the control plane rather than the API, because this is not something
  * Tally can ask for — it is a fact about the far end that a test arranges,
- * like `down`. Afterwards the loser's id answers `410` with the survivor,
+ * like `down`. Afterwards the duplicate's id answers `410` with the primary,
  * which is the contract attendees32 states.
  */
-export async function mergeA32Attendee(loser: string, survivor: string): Promise<void> {
+export async function mergeA32Attendee(duplicate: string, primary: string): Promise<void> {
   const response = await fetch(`${E2E.a32SimulatorUrl}/_sim/merge`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ loser, survivor }),
+    body: JSON.stringify({ duplicate, primary }),
   });
   if (!response.ok) {
-    throw new Error(`Could not merge ${loser} into ${survivor}: HTTP ${response.status}.`);
+    throw new Error(`Could not merge ${duplicate} into ${primary}: HTTP ${response.status}.`);
   }
 }
 

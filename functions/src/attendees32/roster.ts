@@ -102,7 +102,7 @@ export async function fetchRoster(
 
   /*
    * Keyed by attendee, as the Planning Center roster keys its `found` map: a
-   * merge survivor is reached once through every buried id that leads to them
+   * merge primary is reached once through every buried id that leads to them
    * and once more in their own right — the keeper is usually on the roster
    * already — and the same human must not become two rows.
    */
@@ -126,9 +126,9 @@ export async function fetchRoster(
       /*
        * Soft-deleted upstream is the ordinary case — a thing to report, not a
        * reason to fail the roster. A *merged* one is better than ordinary:
-       * the `410` names the survivor, so the student is hydrated under the
+       * the `410` names the primary, so the student is hydrated under the
        * record the church kept and reported as a relink for `getRoster` to
-       * make permanent. Only a trail that ends dead — the survivor deleted
+       * make permanent. Only a trail that ends dead — the primary deleted
        * after the merge — is missing, because missing is what freezes
        * check-ins.
        */
@@ -296,7 +296,7 @@ export async function fetchPersonDetails(
     personDetailsCacheKey(config.baseUrl, options.personId),
     async () => {
       /*
-       * A merged student's details are the survivor's details — the family did
+       * A merged student's details are the primary's details — the family did
        * not stop existing because an admin folded two records together. This
        * read follows the trail and answers; the roster read is what makes the
        * move permanent. `personId` from here down is whoever holds the record.

@@ -187,18 +187,18 @@ describe('how an outcome is written down', () => {
    * The rule this whole state exists for.
    *
    * `merged` is decided on the id, never on the values, and it outranks
-   * `landed`. The dangerous case is the quiet one: the survivor already holds
+   * `landed`. The dangerous case is the quiet one: the primary already holds
    * what was typed, nothing differs, and without this the job reports success
    * while the student resolves to a different human than it did an hour ago.
    */
   it('reports a merge even when nothing about the fields changed', () => {
     const settled = settleFor(
-      { kind: 'merged', survivorPersonId: '377', survivorName: 'Ava Chen-Ito' },
+      { kind: 'merged', primaryPersonId: '377', primaryName: 'Ava Chen-Ito' },
       1,
       nowMs,
     );
     expect(settled.state).toBe('merged');
-    expect(settled).toMatchObject({ survivorPersonId: '377', survivorName: 'Ava Chen-Ito' });
+    expect(settled).toMatchObject({ primaryPersonId: '377', primaryName: 'Ava Chen-Ito' });
   });
 
   it('keeps what the backend held when somebody else changed the same field', () => {
@@ -454,9 +454,9 @@ describe('draining a student rather than a document', () => {
    * A held student is not touched at all — not even folded.
    *
    * Folding is two writes, retiring the superseded jobs and then moving their
-   * patch onto the survivor, and it used to happen before anything was
+   * patch onto the primary, and it used to happen before anything was
    * claimed. Two drains arriving together could interleave between those
-   * writes: the second found a lone survivor still carrying the *older*
+   * writes: the second found a lone primary still carrying the *older*
    * patch and sent it, so a leader who corrected their own typo watched the
    * typo reach Planning Center with the correction marked "folded into a
    * later edit" that never went.
@@ -498,7 +498,7 @@ describe('draining a student rather than a document', () => {
     expect(states).toEqual([]);
     expect(sent).toEqual([]);
     // Both jobs exactly as they were: no cancellation, no patch moved onto a
-    // survivor that a second drain could then send on its own.
+    // primary that a second drain could then send on its own.
     expect(db.get(`${UPSTREAM_EDITS}/a`)?.state).toBe('queued');
     expect(db.get(`${UPSTREAM_EDITS}/a`)?.patch).toEqual({ lastName: 'Chen' });
     expect(db.get(`${UPSTREAM_EDITS}/b`)?.state).toBe('queued');

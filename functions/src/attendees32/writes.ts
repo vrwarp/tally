@@ -158,7 +158,7 @@ export async function checkPerson(
     if (!isA32GoneError(error)) throw error;
     /*
      * Gone is not the end of the question. A merged-away attendee answers
-     * `410` with the survivor, and adding somebody to a roster by an id that
+     * `410` with the primary, and adding somebody to a roster by an id that
      * has since been merged should land on the person, not report them
      * missing and offer to create a second duplicate of the record somebody
      * has just finished de-duplicating.
@@ -232,7 +232,7 @@ export async function pushStudent(
     /*
      * The linked person may have been merged away since the push linked them —
      * an admin tidying duplicates is exactly who generates pushed visitors
-     * with stale links. Attendees answers `410` with the survivor; follow it,
+     * with stale links. Attendees answers `410` with the primary; follow it,
      * keep the document pointed at somebody real, and sync against them. Only
      * a trail that ends dead is a skip — and one a leader can act on, rather
      * than an invitation to push a duplicate of the record just cleaned up.
@@ -602,12 +602,12 @@ export async function updateStudentProfile(
   /*
    * Read through merges, not a bare get.
    *
-   * A merged attendee answers `410` with the survivor, and an edit that names
+   * A merged attendee answers `410` with the primary, and an edit that names
    * the id somebody merged away is still an edit of that person — they have
    * moved, not vanished. Following it here is what lets the queue report
    * `merged` (the row that comes back carries a different id from the one the
    * job named) instead of `orphaned`, which would offer a leader a re-create
-   * for a child who already exists under the survivor's id.
+   * for a child who already exists under the primary's id.
    *
    * `personId` rather than `resolved.personId` from here down: everything
    * after this — the compare-and-set, the PATCH, the row handed back — has to
@@ -1699,13 +1699,13 @@ export async function recreateStudent(
     };
   }
   if (check.outcome === 'relinked') {
-    // A merge with a living survivor is a relink, never a re-create: creating
+    // A merge with a living primary is a relink, never a re-create: creating
     // here would manufacture the duplicate the admin just cleaned up.
     const moved = await migrateStudentMemberships(db, studentId, {
       backendId: 'a32',
       personId: check.personId,
     });
-    logger.info('Relinked a student to a merge survivor instead of re-creating', {
+    logger.info('Relinked a student to a merge primary instead of re-creating', {
       studentId,
       a32AttendeeId: check.personId,
     });

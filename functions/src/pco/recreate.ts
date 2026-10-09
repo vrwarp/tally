@@ -11,8 +11,8 @@
  *
  *  - If the person is actually still there, nothing is created — the flag was
  *    stale, and clearing it is the whole fix.
- *  - If the person was *merged* and the survivor lives, nothing is created —
- *    the student is grafted onto the survivor, the same move every read path
+ *  - If the person was *merged* and the primary lives, nothing is created —
+ *    the student is grafted onto the primary, the same move every read path
  *    makes. Creating a fresh record here would manufacture the duplicate the
  *    admin just cleaned up.
  *  - Only a genuinely dead trail creates, and **both branches search before
@@ -132,9 +132,9 @@ export async function recreateStudent(
     if (!isPersonGoneError(error)) throw error;
     const link = await followPersonLink(client, linkedId, error);
     if (link.outcome === 'live') {
-      // A merge with a living survivor is a relink, never a re-create.
+      // A merge with a living primary is a relink, never a re-create.
       const grafted = await graftMergedStudent(db, studentId, link.personId);
-      logger.info('Relinked a student to a merge survivor instead of re-creating', {
+      logger.info('Relinked a student to a merge primary instead of re-creating', {
         studentId,
         pcoPersonId: link.personId,
       });
