@@ -105,6 +105,8 @@ function patch(value: unknown): UpstreamEditPatch {
   return out as UpstreamEditPatch;
 }
 
+const str = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
 export function toUpstreamEdit(
   id: string,
   data: Record<string, unknown>,
@@ -124,8 +126,10 @@ export function toUpstreamEdit(
     message: typeof data.message === 'string' ? data.message : null,
     field: (typeof data.field === 'string' ? data.field : null) as UpstreamEdit['field'],
     observed: data.observed ? patch(data.observed) : null,
-    survivorPersonId: typeof data.survivorPersonId === 'string' ? data.survivorPersonId : null,
-    survivorName: typeof data.survivorName === 'string' ? data.survivorName : null,
+    // Settled as primaryPersonId/primaryName; a job settled before the rename
+    // carries survivorPersonId/survivorName and means the same thing.
+    primaryPersonId: str(data.primaryPersonId) ?? str(data.survivorPersonId),
+    primaryName: str(data.primaryName) ?? str(data.survivorName),
     createdAt: toDate(data.createdAt, now),
     createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
     createdByName: typeof data.createdByName === 'string' ? data.createdByName : 'Somebody',
@@ -261,8 +265,8 @@ export function enqueueUpstreamEdit(options: EnqueueOptions): EnqueuedEdit {
     message: null,
     field: null,
     observed: null,
-    survivorPersonId: null,
-    survivorName: null,
+    primaryPersonId: null,
+    primaryName: null,
     createdAt: serverTimestamp(),
     createdBy: uid,
     createdByName: authorName,

@@ -475,7 +475,7 @@ export function computeUnseen(
    * for the whole call rather than rediscovered per student.
    *
    * The block below is the expensive one — a filter over every transition, an
-   * `isInertRelease` scan of a chain's nights for each survivor, and a sort —
+   * `isInertRelease` scan of a chain's nights for each primary, and a sort —
    * and on a 500-name directory it ran for all 500 to find the handful who
    * have ever been released. Ids only, so the membership test mirrors
    * `transitionsFor`'s own `new Set([student.id, ...mergedFromStudentIds])`
@@ -816,7 +816,7 @@ export function computeNewVisitors(
   for (const student of students) {
     // Inactive rows have been dealt with, like everywhere else on the screen.
     // The one this list kept producing was a quick-add merged into a roster
-    // row this week: the loser keeps its `firstAttendedAt` and stays in the
+    // row this week: the duplicate keeps its `firstAttendedAt` and stays in the
     // roster read, and the row linked to a profile that no longer exists.
     if (student.status !== 'active') continue;
 

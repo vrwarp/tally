@@ -432,8 +432,8 @@ test.describe('the edit queue, photographed', () => {
       message: null,
       field: null,
       observed: null,
-      survivorPersonId: null,
-      survivorName: null,
+      primaryPersonId: null,
+      primaryName: null,
       createdAt: askedAt,
       createdBy: 'dana',
       createdByName: 'Dana Ruiz',
@@ -479,8 +479,8 @@ test.describe('the edit queue, photographed', () => {
       message: null,
       field: null,
       observed: null,
-      survivorPersonId: null,
-      survivorName: null,
+      primaryPersonId: null,
+      primaryName: null,
       createdAt: longAgo,
       createdBy: 'marcus',
       createdByName: 'Marcus Webb',
@@ -615,13 +615,13 @@ test.describe('the edit queue, photographed', () => {
 
     /* ---- 10. merged ------------------------------------------------------- */
     const camilaId = await personIdOf('Camila', 'Torres');
-    const survivorId = await personIdOf('Tyler', 'McAllister');
+    const primaryId = await personIdOf('Tyler', 'McAllister');
     const camila = `pco_${camilaId}`;
     await takeEditLease(camila);
     await openProfile(page, camila);
-    // The surname the survivor already holds, so no *value* can differ.
+    // The surname the primary already holds, so no *value* can differ.
     await renameTo(page, 'McAllister');
-    await burySimulatorPerson(camilaId, survivorId);
+    await burySimulatorPerson(camilaId, primaryId);
     await releaseEditLease(camila);
     await drainUntil(camila, ['merged']);
     await openProfile(page, camila);
@@ -630,7 +630,7 @@ test.describe('the edit queue, photographed', () => {
       state: 'Merged in the directory',
       title: 'The edit landed on somebody else',
       caption:
-        'Both cells hold the same surname, because this is the quiet case: the survivor already ' +
+        'Both cells hold the same surname, because this is the quiet case: the primary already ' +
         'had it, so no field disagrees. What moved is the person, and the two ids are the only ' +
         'thing that says so. Deciding this on the id rather than the values is what catches it.',
     });

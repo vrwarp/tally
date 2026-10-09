@@ -5,7 +5,7 @@
  * `upstreamRecordMissing` is refused check-ins by the rules, and this flow is the
  * sanctioned way back that does not take them off the roster. The tests lean
  * on what the flow must *refuse* to do — create where the record still
- * exists, create where a merge survivor lives, create a duplicate of somebody
+ * exists, create where a merge primary lives, create a duplicate of somebody
  * findable by name — because a wrong create here is a new duplicate in the
  * church's permanent database.
  */
@@ -74,7 +74,7 @@ describe('what it refuses to create', () => {
     expect(docData?.upstreamRecordMissing).toBe(false);
   });
 
-  it('relinks to a merge survivor instead of creating a duplicate', async () => {
+  it('relinks to a merge primary instead of creating a duplicate', async () => {
     const dup = h.store.createPerson({ first_name: 'Rowan', last_name: 'Vasquez', child: true });
     const kept = h.store.createPerson({ first_name: 'Rowan', last_name: 'Vasquez', child: true });
     h.db.seed(`students/pco_${dup.id}`, { status: 'active', upstreamRecordMissing: true });

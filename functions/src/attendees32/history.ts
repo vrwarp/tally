@@ -236,7 +236,7 @@ export async function importMeetHistory(args: {
     // Checked after the empty test, so a holiday week nobody attended does not
     // spend the day its real session needed. The list is sorted by start, so
     // "the first" is the earliest, and the skipped night's attendance goes with
-    // it rather than inflating the survivor's head count — its gathering never
+    // it rather than inflating the primary's head count — its gathering never
     // reaches `eventDocByGathering`, which is what the attendance loop reads.
     const dayKey = occurrenceId(rootEventId, startAt);
     if (takenDays.has(dayKey)) {

@@ -415,7 +415,7 @@ export async function pushStudent(options: PushStudentOptions): Promise<PushStud
     /*
      * The linked person may have been merged away since the push linked them —
      * an admin tidying duplicates is exactly who generates pushed visitors
-     * with stale links. The mirror's 410 names the survivor; follow it, keep
+     * with stale links. The mirror's 410 names the primary; follow it, keep
      * the document pointed at somebody real, and sync against them. A trail
      * that ends dead is reported as a skip a leader can act on, not a push
      * that fails identically for ever.

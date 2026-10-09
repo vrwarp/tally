@@ -27,7 +27,7 @@ export interface SimAttendee {
   infos: Record<string, unknown>;
   isRemoved: boolean;
   /**
-   * The survivor this attendee was merged into, if any.
+   * The primary this attendee was merged into, if any.
    *
    * A tombstone rather than a deletion, exactly as attendees32 keeps one: an
    * id that has been handed out stays followable. Null for the ordinary case
@@ -274,18 +274,18 @@ export class A32SimulatorStore {
   /**
    * Merges one attendee into another, the way attendees32 does.
    *
-   * The loser keeps its row, is soft-deleted, and points at the survivor. The
+   * The duplicate keeps its row, is soft-deleted, and points at the primary. The
    * simulator does not move attendance — that is attendees32's business and
    * has its own tests over there; what a test against *this* needs is the
    * observable half, which is what an id answers afterwards.
    */
-  mergeAttendee(loserId: string, survivorId: string): SimAttendee | null {
-    const loser = this.attendees.get(loserId);
-    const survivor = this.attendees.get(survivorId);
-    if (!loser || !survivor || loser.id === survivor.id) return null;
-    loser.mergedInto = survivor.id;
-    loser.isRemoved = true;
-    return survivor;
+  mergeAttendee(duplicateId: string, primaryId: string): SimAttendee | null {
+    const duplicate = this.attendees.get(duplicateId);
+    const primary = this.attendees.get(primaryId);
+    if (!duplicate || !primary || duplicate.id === primary.id) return null;
+    duplicate.mergedInto = primary.id;
+    duplicate.isRemoved = true;
+    return primary;
   }
 
   /**
@@ -294,7 +294,7 @@ export class A32SimulatorStore {
    * Bounded for the same reason the real one is: a cycle is reachable by hand
    * and the answer to it is "gone", not a hang.
    */
-  survivorOf(id: string): SimAttendee | null {
+  primaryOf(id: string): SimAttendee | null {
     const seen = new Set<string>([id]);
     let current = this.attendees.get(id) ?? null;
 

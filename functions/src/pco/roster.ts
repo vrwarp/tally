@@ -150,7 +150,7 @@ export interface RosterResult {
   unresolved: string[];
   /**
    * Merges the hydration followed: the student is already in `people` under
-   * the survivor's id, and the caller owns making the move permanent in the
+   * the primary's id, and the caller owns making the move permanent in the
    * membership documents (`graftMergedStudent`).
    */
   relinks: Array<{ fromPersonId: string; toPersonId: string }>;
@@ -229,8 +229,8 @@ export interface RosterHydration {
   /**
    * Roster ids whose person was merged into somebody the church kept.
    *
-   * The mirror answers a merged id with `410` and the survivor's id, and the
-   * survivor is hydrated *in this same result* — so the roster already shows
+   * The mirror answers a merged id with `410` and the primary's id, and the
+   * primary is hydrated *in this same result* — so the roster already shows
    * the student under the record that now holds them. What this module cannot
    * do is move the membership document; it has no Firestore. The caller does,
    * and applies these with `graftMergedStudent`.
@@ -401,7 +401,7 @@ async function hydratePeople(
        * A deleted person is the ordinary case here — a thing to report, not a
        * thing to fail the whole roster over. A *merged* one is better than
        * ordinary: the mirror's 410 names the record the church kept, so the
-       * student is hydrated under the survivor and reported as a relink for
+       * student is hydrated under the primary and reported as a relink for
        * the caller to make permanent. Only a trail that ends dead — the
        * production log showed a keeper deleted minutes after absorbing seven
        * people — falls through to unresolved.
@@ -879,7 +879,7 @@ export async function fetchPersonDetails(
     personDetailsCacheKey(config.baseUrl, personId),
     async () => {
       /*
-       * A merged student's details are the survivor's details — the family did
+       * A merged student's details are the primary's details — the family did
        * not stop existing because an admin folded two records together. This
        * read follows the trail and answers; the roster read is what makes the
        * move permanent in the membership documents.

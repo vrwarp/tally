@@ -127,8 +127,8 @@ export interface RunOutcome {
   /** On `differs`: the fields the backend held that the edit did not expect. */
   observed?: Record<string, unknown>;
   /** On `merged`: who the edit actually landed on. */
-  survivorPersonId?: string;
-  survivorName?: string;
+  primaryPersonId?: string;
+  primaryName?: string;
   /** On `refused`: which class, so the list can aggregate rather than repeat. */
   failure?: FailureClass;
   /** On `refused`: the field a validation refusal was about. */
@@ -267,7 +267,7 @@ export async function releaseStudent(db: FirestoreLike, studentId: string): Prom
  *
  * `merged` outranks everything, including `landed`, and that is the point of it
  * being decided on the id rather than on the values. The dangerous case is the
- * quiet one: the survivor already holds what was typed, no field differs, and
+ * quiet one: the primary already holds what was typed, no field differs, and
  * without this the job would report success while the student document now
  * resolves to a different human than it did an hour ago. On a record whose
  * identity block is a name, a grade and an allergy line, that is the silent
@@ -278,8 +278,8 @@ export function settleFor(outcome: RunOutcome, attempts: number, nowMs: number) 
     case 'merged':
       return {
         state: 'merged' as EditState,
-        survivorPersonId: outcome.survivorPersonId ?? null,
-        survivorName: outcome.survivorName ?? null,
+        primaryPersonId: outcome.primaryPersonId ?? null,
+        primaryName: outcome.primaryName ?? null,
       };
     case 'differs':
       return { state: 'differs' as EditState, observed: outcome.observed ?? null };
@@ -344,8 +344,8 @@ export async function drainEdit(edit: EditRecord, deps: DrainDeps): Promise<Edit
  *
  * Split out so that folding and running happen under *one* claim. Folding is
  * two writes — retire the superseded jobs, then move their patch onto the
- * survivor — and it used to run before anything was claimed. A second drain
- * reading between those two writes sees a survivor still carrying its
+ * primary — and it used to run before anything was claimed. A second drain
+ * reading between those two writes sees a primary still carrying its
  * pre-fold patch and sends it: a leader who fixed their own typo three
  * seconds later watched the typo land in Planning Center, with the correction
  * cancelled as "folded into a later edit" that never went. It cost an
@@ -473,12 +473,12 @@ export async function drainStudent(
    * Claimed once, around the folding as well as the running.
    *
    * Folding is two writes — retire the superseded jobs, then move their patch
-   * onto the survivor — and it used to happen before anything was claimed,
+   * onto the primary — and it used to happen before anything was claimed,
    * with only the upstream write itself serialised. Two drains arriving
    * together (a browser's poke and the sweep, which is now the ordinary case
    * rather than a rare one) could interleave: the second reads after the
    * first has cancelled the newer job but before it has moved the patch, so
-   * it finds a lone survivor still carrying the *older* patch and sends that.
+   * it finds a lone primary still carrying the *older* patch and sends that.
    * The leader's correction is cancelled and their typo is what reaches
    * Planning Center.
    *

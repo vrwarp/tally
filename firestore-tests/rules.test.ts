@@ -1877,8 +1877,8 @@ describe('upstreamEdits', () => {
     message: null,
     field: null,
     observed: null,
-    survivorPersonId: null,
-    survivorName: null,
+    primaryPersonId: null,
+    primaryName: null,
     createdAt: serverTimestamp(),
     createdBy: UID.core,
     createdByName: 'Dana Ruiz',
@@ -1915,7 +1915,7 @@ describe('upstreamEdits', () => {
     await assertFails(setDoc(doc(db, editPath()), job({ attempts: 3 })));
     await assertFails(setDoc(doc(db, editPath()), job({ failure: 'auth' })));
     await assertFails(setDoc(doc(db, editPath()), job({ message: 'Saved.' })));
-    await assertFails(setDoc(doc(db, editPath()), job({ survivorPersonId: '377' })));
+    await assertFails(setDoc(doc(db, editPath()), job({ primaryPersonId: '377' })));
     await assertFails(setDoc(doc(db, editPath()), job({ settledAt: serverTimestamp() })));
   });
 

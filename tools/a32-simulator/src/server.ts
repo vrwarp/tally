@@ -93,16 +93,16 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
        */
       if (path === '/_sim/merge' && method === 'POST') {
         const body = (await readBody(incoming)) as
-          | { loser?: string; survivor?: string }
+          | { duplicate?: string; primary?: string }
           | null;
-        const survivor =
-          body?.loser && body?.survivor
-            ? store.mergeAttendee(body.loser, body.survivor)
+        const primary =
+          body?.duplicate && body?.primary
+            ? store.mergeAttendee(body.duplicate, body.primary)
             : null;
-        if (!survivor) {
-          return send(outgoing, 400, { error: 'Name a loser and a survivor that both exist.' });
+        if (!primary) {
+          return send(outgoing, 400, { error: 'Name a duplicate and a primary that both exist.' });
         }
-        return send(outgoing, 200, { status: 'ok', merged_into: survivor.id });
+        return send(outgoing, 200, { status: 'ok', merged_into: primary.id });
       }
 
       const query: SimRequest['query'] = {};

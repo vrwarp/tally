@@ -287,20 +287,20 @@ function personsApi(
     if (method === 'GET' && id) {
       const attendee = store.attendees.get(id);
       /*
-       * A merged-away id answers 410 with the survivor, which is the contract
+       * A merged-away id answers 410 with the primary, which is the contract
        * attendees32 states and the only way a caller can tell "this person
        * moved" from "this person is gone". A chain reports its end, so a
        * caller never has to walk one itself — and a trail that ends nowhere
        * is a 410 with no forwarding address, which is a third answer again.
        */
       if (attendee?.mergedInto) {
-        const survivor = store.survivorOf(attendee.id);
-        if (!survivor) {
+        const primary = store.primaryOf(attendee.id);
+        if (!primary) {
           return json(410, { detail: 'That attendee is gone, and no record holds them now.' });
         }
         return json(410, {
           detail: 'That attendee was merged into another record.',
-          merged_into: survivor.id,
+          merged_into: primary.id,
         });
       }
       /*

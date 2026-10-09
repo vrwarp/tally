@@ -963,8 +963,8 @@ export async function approveRegistration(options: {
        * whoever comes back from here: the adult ends up attached to the family
        * that was already on file.
        */
-      const survivor = await followMerges(db, studentId);
-      if (survivor !== null && !live.includes(survivor)) live.push(survivor);
+      const primary = await followMerges(db, studentId);
+      if (primary !== null && !live.includes(primary)) live.push(primary);
     }
   }
 
@@ -1001,7 +1001,7 @@ export async function approveRegistration(options: {
   /*
    * A reviewer's answer about a child, keyed by the document it was made about.
    *
-   * `live` holds *survivors* — a child folded into a roster row is pushed as
+   * `live` holds the primary of each merge — a child folded into a roster row is pushed as
    * that row, not as the document the card asked about. So a decision is looked
    * up by the id being pushed, and one made about a since-merged child simply
    * does not match: the merge already answered "who is this child", and it

@@ -32,7 +32,7 @@ export type A32PersonLink =
  *
  * `from` is the error the caller already has in hand, so the ordinary case — a
  * plain deletion with no forwarding address — costs no second request. A chain
- * can still end dead: attendees32 keeps a tombstone when a survivor is later
+ * can still end dead: attendees32 keeps a tombstone when a primary is later
  * deleted, and answers `410` with no `merged_into` for exactly that.
  */
 export async function followA32PersonLink(
@@ -52,7 +52,7 @@ export async function followA32PersonLink(
       return { outcome: 'gone' };
     } catch (error) {
       if (!isA32GoneError(error)) throw error;
-      // The survivor was itself merged: keep walking. Anything else — a
+      // The primary was itself merged: keep walking. Anything else — a
       // deletion, a tombstone with nowhere to point — ends the trail here.
       next = a32MergedForwardOf(error);
     }

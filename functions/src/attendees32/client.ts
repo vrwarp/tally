@@ -48,7 +48,7 @@ export class A32ApiError extends Error {
   /** DRF's `detail` (or the raw body), flattened to lines for a debug panel. */
   readonly errors: string[];
   /**
-   * The survivor named on a `410`, when the burial was a merge.
+   * The primary named on a `410`, when the burial was a merge.
    *
    * Attendees answers a merged-away attendee with `410` and `merged_into` in
    * the body, which is its half of the same contract Planning Center states
@@ -207,7 +207,7 @@ function readResponseHeaders(response: Response): Record<string, string> {
 }
 
 /**
- * The survivor id on a `410` body, or null.
+ * The primary id on a `410` body, or null.
  *
  * Deliberately tolerant about the type: a uuid arrives as a string here, but a
  * backend that numbered its people would send a number, and a forwarding

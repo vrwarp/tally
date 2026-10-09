@@ -79,7 +79,7 @@ function columns(grades: GradeStrings, context: RosterCsvContext): CsvColumn<Stu
     // That there is an allergy, never what it is.
     { header: 'has_allergies', value: (student) => student.hasAllergies },
     { header: 'notes', value: (student) => student.notes },
-    // A merged loser keeps its attendance, so it can legitimately appear beside
+    // A merged duplicate keeps its attendance, so it can legitimately appear beside
     // the row it was folded into. Naming the keeper makes the pair explicable
     // rather than baffling.
     { header: 'merged_into_student_id', value: (student) => student.mergedIntoStudentId ?? '' },

@@ -117,7 +117,7 @@
     "journey": "When the person moves",
     "state": "Merged upstream",
     "title": "The edit landed on somebody else",
-    "caption": "Both cells hold the same surname, because this is the quiet case: the survivor already had it, so no field disagrees. What moved is the person, and the two ids are the only thing that says so. Deciding this on the id rather than the values is what catches it."
+    "caption": "Both cells hold the same surname, because this is the quiet case: the primary already had it, so no field disagrees. What moved is the person, and the two ids are the only thing that says so. Deciding this on the id rather than the values is what catches it."
   },
   {
     "file": "pco-desktop-15-no-upstream-record.png",

@@ -179,7 +179,7 @@ export async function startSimulator(
         /**
          * Buries a person, the way an office admin deleting or merging one does.
          *
-         * With no survivor it is a plain deletion and the person is simply gone;
+         * With no primary it is a plain deletion and the person is simply gone;
          * with one, the tombstone names them and the handler answers `410` with
          * `meta.merged_into`, which is the shape Tally actually faces.
          */

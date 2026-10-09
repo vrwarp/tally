@@ -405,7 +405,7 @@ describe('a merged attendee', () => {
    * existed under another id. attendees32 answers `410` with `merged_into`
    * now, which is the same question Planning Center's mirror answers.
    */
-  it('follows the edit onto the survivor and says whose record it landed on', async () => {
+  it('follows the edit onto the primary and says whose record it landed on', async () => {
     const wei = idOf('Wei');
     const salote = idOf('Salote');
     db.seed(`students/a32_${wei}`, { status: 'active' });
@@ -460,7 +460,7 @@ describe('a merged attendee', () => {
     const salote = idOf('Salote');
     db.seed(`students/a32_${wei}`, { status: 'active' });
     store.mergeAttendee(wei, salote);
-    // The survivor is deleted afterwards, which a tidy-up does.
+    // The primary is deleted afterwards, which a tidy-up does.
     store.attendees.get(salote)!.isRemoved = true;
 
     const result = await updateStudentProfile({
@@ -484,9 +484,9 @@ describe('a merged attendee', () => {
    * duplicate the admin had just removed, with the document still pointing at
    * the tombstone.
    */
-  it('pushes a linked visitor onto the survivor rather than calling them deleted', async () => {
+  it('pushes a linked visitor onto the primary rather than calling them deleted', async () => {
     const wei = idOf('Wei');
-    const survivor = store.createAttendee({
+    const primary = store.createAttendee({
       firstName: 'Wei',
       lastName: 'Suzuki',
       infos: { fixed: { grade: store.gradeIndex(11) } },
@@ -499,16 +499,16 @@ describe('a merged attendee', () => {
       upstreamBackend: 'a32',
       upstreamPersonId: wei,
     });
-    store.mergeAttendee(wei, survivor.id);
+    store.mergeAttendee(wei, primary.id);
     const before = store.attendees.size;
 
     const result = await pushStudent({ db, client, config, cache, studentId: 'vis-1' });
 
     expect(result.status).toBe('updated');
-    expect(result.pcoPersonId).toBe(survivor.id);
+    expect(result.pcoPersonId).toBe(primary.id);
     // The document points at somebody real now, and the drift landed on them.
-    expect(db.get('students/vis-1')!.upstreamPersonId).toBe(survivor.id);
-    expect((store.attendees.get(survivor.id)!.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(10));
+    expect(db.get('students/vis-1')!.upstreamPersonId).toBe(primary.id);
+    expect((store.attendees.get(primary.id)!.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(10));
     expect(store.attendees.size).toBe(before);
   });
 
@@ -850,12 +850,12 @@ describe('recreateStudent + checkPerson', () => {
    * The merge a re-create must not undo.
    *
    * A frozen student whose attendee was merged rather than deleted already has
-   * a record: the survivor. `checkPerson` says so, and the answer used to fall
+   * a record: the primary. `checkPerson` says so, and the answer used to fall
    * through to the create anyway — a second copy of the record somebody had
    * just finished de-duplicating, which is the one thing the screen offering
    * this button promises not to make.
    */
-  it('grafts a merged student onto the survivor instead of creating a duplicate', async () => {
+  it('grafts a merged student onto the primary instead of creating a duplicate', async () => {
     const wei = idOf('Wei');
     const salote = idOf('Salote');
     db.seed(`students/a32_${wei}`, { status: 'active', upstreamRecordMissing: true });

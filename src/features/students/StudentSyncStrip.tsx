@@ -107,10 +107,10 @@ export function StudentSyncStrip({
       ? [
           {
             label: syncStrings.t('nowPointsAt'),
-            value: edit.survivorName ?? syncStrings.t('theSurvivingRecord'),
-            meta: edit.survivorPersonId
-              ? syncStrings.t('survivorMeta', { id: edit.survivorPersonId })
-              : syncStrings.t('theSurvivor'),
+            value: edit.primaryName ?? syncStrings.t('thePrimaryRecord'),
+            meta: edit.primaryPersonId
+              ? syncStrings.t('primaryMeta', { id: edit.primaryPersonId })
+              : syncStrings.t('thePrimary'),
             live: true,
           },
           {
@@ -213,15 +213,15 @@ export function StudentSyncStrip({
               <span className="text-xs text-ink-500">{syncStrings.t(ONE_NEW_PERSON)}</span>
             </>
           ) : null}
-          {edit.state === 'merged' && edit.survivorPersonId ? (
+          {edit.state === 'merged' && edit.primaryPersonId ? (
             <>
               <Button
                 variant="secondary"
                 className="w-full lg:w-auto"
-                onClick={() => window.open(pcoPersonUrl(edit.survivorPersonId!), '_blank')}
+                onClick={() => window.open(pcoPersonUrl(edit.primaryPersonId!), '_blank')}
               >
-                {syncStrings.t('openSurvivor', {
-                  name: edit.survivorName ?? syncStrings.t('theSurvivor'),
+                {syncStrings.t('openPrimary', {
+                  name: edit.primaryName ?? syncStrings.t('thePrimary'),
                 })}
               </Button>
               <span className="text-xs text-ink-500">

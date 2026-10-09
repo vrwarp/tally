@@ -132,10 +132,10 @@ request leaves a job no worker will ever pick up, under a screen that has alread
 told a leader their correction is on its way.
 
 **It is claimed around the folding, not just around the send.** Folding is two
-writes — retire the superseded jobs, then move their patch onto the survivor —
+writes — retire the superseded jobs, then move their patch onto the primary —
 and it used to happen before anything was claimed, on the reasoning that only
 the upstream write needed serialising. It does not hold. Two drains arriving
-together read between those writes: the second finds a lone survivor still
+together read between those writes: the second finds a lone primary still
 carrying the *older* patch, claims the student, and sends that. The leader's
 correction ends up cancelled as "folded into a later edit" and the typo is what
 reaches Planning Center — the right jobs in the right states, the wrong name
@@ -211,9 +211,9 @@ which is agreement), or upstream holds a third thing.
 
 `readThroughMerges` follows a person through however many merges their record has
 been part of, so an edit against somebody merged mid-flight *lands* — on the
-survivor, under a different id than the job named.
+primary, under a different id than the job named.
 
-If the fields also differed, `differs` could describe it. If the survivor already
+If the fields also differed, `differs` could describe it. If the primary already
 held what was typed, nothing would: the drain would find no difference, report
 success, and nothing anywhere would say that `students/pco_101` now resolves to a
 different human than it did that morning. On a record whose identity block is a

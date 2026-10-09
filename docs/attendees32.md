@@ -94,11 +94,11 @@ server fills the rest.
 ## 3. What is different from Planning Center
 
 - **Merges, since attendees32 grew them.** A merged-away attendee answers `410` with
-  `merged_into` naming the survivor, which is the same question Planning Center's mirror answers —
+  `merged_into` naming the primary, which is the same question Planning Center's mirror answers —
   so `mergeAware: true`, `checkPerson` relinks, and an edit whose person has moved lands on the
-  survivor and is reported as `merged` rather than as a person who is gone. A chain reports its
+  primary and is reported as `merged` rather than as a person who is gone. A chain reports its
   end, so Tally never walks one itself. A `410` *without* a forwarding address is a third answer
-  again: merged, and the survivor deleted afterwards — gone, with nowhere to point. A plain
+  again: merged, and the primary deleted afterwards — gone, with nowhere to point. A plain
   soft-delete is a `200` with `is_removed: true`, which `getA32Attendee` reports as gone; it still
   freezes check-ins until a leader removes or re-creates the student.
 - **The bracketed name cannot be written from Tally.** The nickname half of the composite is

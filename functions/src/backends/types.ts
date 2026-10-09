@@ -108,9 +108,9 @@ export interface BackendCapabilities {
 /** The answer to "is this person real, before I put them on the roster". */
 export type PersonCheck =
   | {
-      /** The id is live — or was merged and the survivor is live (`relinked`). */
+      /** The id is live — or was merged and the primary is live (`relinked`). */
       outcome: 'exists' | 'relinked';
-      /** The id to record: the same one, or the merge survivor's. */
+      /** The id to record: the same one, or the merge primary's. */
       personId: string;
       /**
        * The same person's identity in the Attendees backend, when this one

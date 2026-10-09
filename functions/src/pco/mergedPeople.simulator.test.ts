@@ -5,7 +5,7 @@
  * clean-up: an admin merged twelve duplicate records — five into one keeper,
  * seven into another — and then deleted both keepers too. Through the mirror
  * Tally reads, a merged id answers `410` with `meta.merged_into` naming the
- * survivor; a deleted one answers `410` with no forwarding address; an id the
+ * primary; a deleted one answers `410` with no forwarding address; an id the
  * mirror never held is a plain `404`. Every path that reads a person by id
  * has to survive all three, and the merge case has to *follow the trail* —
  * the student did not leave the ministry because an admin tidied a duplicate.
@@ -249,7 +249,7 @@ describe('reading details for a merged student', () => {
   let h: Harness;
   beforeEach(() => { h = harness(); });
 
-  it("answers with the survivor's details rather than an error", async () => {
+  it("answers with the primary's details rather than an error", async () => {
     const { dupId, keptId } = seedDuplicatePair(h);
     h.store.buryPerson(dupId, keptId);
 
