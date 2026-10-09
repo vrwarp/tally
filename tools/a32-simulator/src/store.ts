@@ -118,7 +118,6 @@ export interface SeedAttendeeInput {
   /** `1800-MM-DD` for a known day with an unknown year. */
   estimatedBirthday?: string | null;
   grade?: number | null;
-  allergies?: string | null;
   foodPref?: string | null;
   contacts?: Record<string, string>;
   /** Join the Tally meet as a student (default true). */
@@ -147,11 +146,20 @@ export class A32SimulatorStore {
   readonly division = { id: 11, slug: 'simorg_tally' };
   readonly assembly = { id: 21, slug: 'simorg_tally_checkin', displayName: 'Tally check-in' };
   readonly character = { id: 31, slug: 'simorg_tally_participant', displayName: 'Participant' };
+  /**
+   * The groups the token's user is in. organization_meets lists a meet only to
+   * callers whose group names appear in its infos.allowed_groups, which is why
+   * the setup command puts the integration group there.
+   */
+  readonly tokenGroups: readonly string[] = ['tally_integration'];
   readonly meet = {
     id: 41,
     slug: 'simorg_tally_gathering',
     displayName: 'Friday night',
-    infos: { default_time_zone: 'America/Los_Angeles' } as Record<string, unknown>,
+    infos: {
+      default_time_zone: 'America/Los_Angeles',
+      allowed_groups: ['tally_integration'],
+    } as Record<string, unknown>,
   };
 
   readonly relations: SimRelation[] = [
@@ -380,7 +388,6 @@ export class A32SimulatorStore {
       infos: {
         fixed: {
           ...(input.grade !== null && input.grade !== undefined ? { grade: input.grade } : {}),
-          ...(input.allergies ? { allergies: input.allergies } : {}),
           ...(input.foodPref ? { food_pref: input.foodPref } : {}),
         },
         contacts: input.contacts ?? {},

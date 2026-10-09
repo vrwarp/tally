@@ -15,6 +15,7 @@
  */
 import type { PcoRequestTrace, PcoResponseTrace } from '../pco/client.js';
 import { REDACTED } from '../pco/client.js';
+import { API, type A32Attendee } from './types.js';
 
 export interface A32Query {
   [key: string]: string | number | boolean | null | undefined | ReadonlyArray<string | number>;
@@ -109,6 +110,25 @@ export function isA32GoneError(error: unknown): error is A32ApiError {
 export function a32MergedForwardOf(error: unknown): string | null {
   if (!(error instanceof A32ApiError) || error.status !== 410) return null;
   return error.mergedInto;
+}
+
+/**
+ * One attendee by id, with attendees32's soft-delete folded into "gone".
+ *
+ * attendees32 answers a soft-deleted attendee with 200 and `is_removed: true`,
+ * because its own UI shows the deleted record, so a 200 is not yet "this
+ * person is here". Raising the 404 the server sends for an id it never had
+ * keeps every caller's `isA32GoneError` branch the one place that decides
+ * what gone means; a merged-away attendee still arrives as the 410 the
+ * server itself sends, forwarding address and all.
+ */
+export async function getA32Attendee(client: A32Client, personId: string): Promise<A32Attendee> {
+  const path = API.attendeeById(personId);
+  const attendee = await client.get<A32Attendee>(path);
+  if (attendee?.is_removed === true) {
+    throw new A32ApiError(404, path, ['Attendee is soft-deleted (is_removed).']);
+  }
+  return attendee;
 }
 
 export interface A32ClientOptions {

@@ -107,8 +107,13 @@ export function fullBirthdayOf(attendee: A32Attendee): string | null {
   return monthDay;
 }
 
+/**
+ * Tally's allergies note is attendees32's `infos.fixed.food_pref`: the field
+ * its attendee form labels "Food pref" and its own help text fills with
+ * "peanut allergy". One key, visible on both sides.
+ */
 export function allergiesOf(attendee: A32Attendee): string | null {
-  return trimmed(attendee.infos?.fixed?.allergies);
+  return trimmed(attendee.infos?.fixed?.food_pref);
 }
 
 /** A dead person is the one "inactive" Attendees can express. */

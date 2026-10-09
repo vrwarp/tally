@@ -1576,8 +1576,6 @@ function backendSettingsOf(registry: BackendRegistry, backendId: BackendId): Rec
     baseUrl: config.baseUrl,
     divisionId: config.divisionId,
     meetSlug: config.meetSlug,
-    characterSlug: config.characterSlug,
-    assemblySlug: config.assemblySlug,
     minGrade: config.minGrade,
     maxGrade: config.maxGrade,
     writeBack: config.writeBack,

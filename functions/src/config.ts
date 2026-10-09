@@ -470,12 +470,11 @@ export interface A32Config {
   baseUrl: string;
   /** The division a created attendee is filed under (numeric id, as text). */
   divisionId: string;
-  /** The meet a created student is enrolled in. */
+  /**
+   * The meet a created student is enrolled in. Enrollment carries the meet's
+   * major character, which is what the server uses whatever a client asks.
+   */
   meetSlug: string;
-  /** The character (role) that enrollment carries. */
-  characterSlug: string;
-  /** The assembly whose meets the history import offers. */
-  assemblySlug: string;
   writeBack: PcoWriteBackMode;
   minGrade: number;
   maxGrade: number;
@@ -495,8 +494,6 @@ export interface A32ConfigOverrides {
   baseUrl?: string;
   divisionId?: string;
   meetSlug?: string;
-  characterSlug?: string;
-  assemblySlug?: string;
   writeBack?: string;
   minGrade?: string;
   maxGrade?: string;
@@ -508,8 +505,6 @@ export const A32_CONFIG_KEYS = [
   'baseUrl',
   'divisionId',
   'meetSlug',
-  'characterSlug',
-  'assemblySlug',
   'writeBack',
   'minGrade',
   'maxGrade',
@@ -522,8 +517,6 @@ function readA32Params(): Required<Omit<A32ConfigOverrides, 'enabled'>> & { toke
     baseUrl: readValue(null, 'A32_API_BASE_URL'),
     divisionId: readValue(null, 'A32_DIVISION_ID'),
     meetSlug: readValue(null, 'A32_MEET_SLUG'),
-    characterSlug: readValue(null, 'A32_CHARACTER_SLUG'),
-    assemblySlug: readValue(null, 'A32_ASSEMBLY_SLUG'),
     writeBack: readValue(null, 'A32_WRITE_BACK'),
     minGrade: readValue(null, 'A32_MIN_GRADE'),
     maxGrade: readValue(null, 'A32_MAX_GRADE'),
@@ -581,17 +574,12 @@ function normalizeA32Config(
   if (baseUrlProblem) problems.push(baseUrlProblem);
   if (!raw.divisionId.trim()) problems.push('A32_DIVISION_ID is not set');
   if (!raw.meetSlug.trim()) problems.push('A32_MEET_SLUG is not set');
-  if (!raw.characterSlug.trim()) problems.push('A32_CHARACTER_SLUG is not set');
 
   return {
     token: raw.token,
     baseUrl,
     divisionId: raw.divisionId.trim(),
     meetSlug: raw.meetSlug.trim(),
-    characterSlug: raw.characterSlug.trim(),
-    // Optional: without it only the history-import picker has nothing to
-    // offer, which is not a reason to keep the roster off.
-    assemblySlug: raw.assemblySlug.trim(),
     writeBack,
     minGrade,
     maxGrade,

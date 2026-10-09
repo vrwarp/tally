@@ -15,9 +15,10 @@
  */
 import type { A32Config } from '../config.js';
 import { cacheKey, type TtlCache } from '../pco/cache.js';
+import { loadRelations } from './relations.js';
 import type { AdultContactStatus, PersonDetails, PersonSearchResult, RosterResult } from '../pco/roster.js';
 import { studentIdFor } from '../generated/backendIds.js';
-import { isA32GoneError, type A32Client } from './client.js';
+import { isA32GoneError, type A32Client, getA32Attendee } from './client.js';
 import {
   a32Grade,
   allergiesOf,
@@ -30,7 +31,7 @@ import {
   statusOf,
 } from './mapping.js';
 import { followA32PersonLink } from './personLink.js';
-import { API, type A32Attendee, type A32FolkAttendee, type A32Relation } from './types.js';
+import { API, type A32Attendee, type A32FolkAttendee } from './types.js';
 
 export interface A32FlowOptions {
   client: A32Client;
@@ -58,10 +59,6 @@ export function orgSweepCacheKey(baseUrl: string): string {
   return cacheKey({ kind: 'a32-org', base: baseUrl });
 }
 
-export function relationsCacheKey(baseUrl: string): string {
-  return cacheKey({ kind: 'a32-relations', base: baseUrl });
-}
-
 export function personDetailsCacheKey(baseUrl: string, personId: string): string {
   return cacheKey({ kind: 'a32-person', base: baseUrl, id: personId });
 }
@@ -79,24 +76,6 @@ export function cachedSweep(options: A32FlowOptions): Promise<Map<string, A32Att
   return options.cache.get(
     orgSweepCacheKey(options.config.baseUrl),
     () => sweepOrganization(options.client),
-    options.force,
-  );
-}
-
-/**
- * The relation vocabulary, cached. Reference data that changes on the scale
- * of never, but the TTL keeps it honest anyway.
- */
-function cachedRelations(options: A32FlowOptions): Promise<Map<number, A32Relation>> {
-  return options.cache.get(
-    relationsCacheKey(options.config.baseUrl),
-    async () => {
-      const byId = new Map<number, A32Relation>();
-      for await (const page of options.client.paginate<A32Relation>(API.relations)) {
-        for (const relation of page.data) byId.set(relation.id, relation);
-      }
-      return byId;
-    },
     options.force,
   );
 }
@@ -139,7 +118,7 @@ export async function fetchRoster(
 
   for (const personId of stragglers.slice(0, MAX_INDIVIDUAL_LOOKUPS)) {
     try {
-      const attendee = await options.client.get<A32Attendee>(API.attendeeById(personId));
+      const attendee = await getA32Attendee(options.client, personId);
       found.set(attendee.id, attendee);
     } catch (error) {
       /*
@@ -279,7 +258,7 @@ async function loadAttendee(
 ): Promise<A32Attendee | null> {
   const read = async (): Promise<A32Attendee | null> => {
     try {
-      return await client.get<A32Attendee>(API.attendeeById(personId));
+      return await getA32Attendee(client, personId);
     } catch (error) {
       if (isA32GoneError(error)) return null;
       throw error;
@@ -320,7 +299,7 @@ export async function fetchPersonDetails(
       let personId = options.personId;
       let attendee: A32Attendee;
       try {
-        attendee = await client.get<A32Attendee>(API.attendeeById(personId));
+        attendee = await getA32Attendee(client, personId);
       } catch (error) {
         if (!isA32GoneError(error)) throw error;
         const link = await followA32PersonLink(client, personId, error);
@@ -331,7 +310,7 @@ export async function fetchPersonDetails(
 
       const [edges, relations] = await Promise.all([
         loadFamilyEdges(client, personId),
-        cachedRelations(options),
+        loadRelations(options),
       ]);
       const candidates = findContactCandidates(personId, edges, relations);
 
@@ -401,7 +380,7 @@ export async function fetchAdultContactStatus(
   const wanted = [...new Set(options.personIds)];
 
   const before = cache.stats.misses;
-  const [swept, relations] = await Promise.all([cachedSweep(options), cachedRelations(options)]);
+  const [swept, relations] = await Promise.all([cachedSweep(options), loadRelations(options)]);
 
   // Family edges ride on every swept row, so the folk -> members index is
   // free — this is the sweep the Planning Center side has to do as its own

@@ -21,6 +21,12 @@ export interface A32Attendee {
   estimated_birthday: string | null;
   deathday: string | null;
   infos: A32AttendeeInfos | null;
+  /**
+   * attendees32 answers a soft-deleted attendee with 200 and this flag set
+   * (its own UI shows the deleted record); `getA32Attendee` turns that into
+   * the same "gone" a 404 is.
+   */
+  is_removed?: boolean;
   folkattendee_set?: A32FolkAttendee[];
 }
 
@@ -28,7 +34,6 @@ export interface A32AttendeeInfos {
   names?: { original?: string; romanization?: string };
   fixed?: {
     grade?: number | string | null;
-    allergies?: string | null;
     food_pref?: string | null;
     [key: string]: unknown;
   };
@@ -96,7 +101,8 @@ export interface A32Attendance {
 /**
  * The attendance categories the app seeds (`fixtures/db_seed.json`), by pk.
  * `attended` is the one history import keeps; the rest are RSVP-ish states
- * counted as skipped.
+ * counted as skipped. attendees32 also records Remote (31) and leave (32); a
+ * remote attendance is not a check-in, so they are skipped too, on purpose.
  */
 export const A32_CATEGORY = {
   scheduled: 1,
@@ -122,8 +128,6 @@ export const API = {
   families: '/persons/api/attendee_families/',
   folkAttendees: '/persons/api/datagrid_data_familyattendees/',
   relations: '/persons/api/all_relations/',
-  attendings: '/persons/api/attendee_attendings/',
-  defaultAttendingMeets: '/persons/api/default_attendingmeets/',
   meets: '/occasions/api/organization_meets/',
   gatherings: '/occasions/api/organization_team_gatherings/',
   attendances: '/occasions/api/organization_meet_character_attendances/',

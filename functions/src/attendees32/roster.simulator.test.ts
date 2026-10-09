@@ -223,6 +223,13 @@ describe('searchPeople', () => {
 });
 
 describe('fetchPersonDetails', () => {
+  it('treats a soft-deleted attendee as gone, not as a person with no details', async () => {
+    // attendees32 answers 200 with is_removed: true for a deleted record.
+    store.attendees.get(idOf('Priya'))!.isRemoved = true;
+    const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Priya') });
+    expect(details).toBeNull();
+  });
+
   it('names the parent and how to reach them', async () => {
     const details = await fetchPersonDetails({ client, config, cache, personId: idOf('Priya') });
     expect(details).toMatchObject({

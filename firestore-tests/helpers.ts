@@ -294,8 +294,6 @@ export function a32ConfigDoc(
     baseUrl: '',
     divisionId: '1',
     meetSlug: 'the-rock',
-    characterSlug: 'junior-student',
-    assemblySlug: 'youth',
     minGrade: 6,
     maxGrade: 12,
     writeBack: 'create',

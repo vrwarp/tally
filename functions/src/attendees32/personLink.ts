@@ -13,8 +13,8 @@
  * existed under a different id. The capability is true now because attendees32
  * answers the question — see its `AttendeeMergeService`.
  */
-import { a32MergedForwardOf, isA32GoneError, type A32Client } from './client.js';
-import { API, type A32Attendee } from './types.js';
+import { a32MergedForwardOf, isA32GoneError, type A32Client, getA32Attendee } from './client.js';
+import { type A32Attendee } from './types.js';
 
 /**
  * Five, the same as Planning Center's, and for the same reason: a chain that
@@ -47,7 +47,7 @@ export async function followA32PersonLink(
     if (seen.has(next)) return { outcome: 'gone' };
     seen.add(next);
     try {
-      const attendee = await client.get<A32Attendee>(API.attendeeById(next));
+      const attendee = await getA32Attendee(client, next);
       if (attendee?.id) return { outcome: 'live', personId: String(attendee.id), attendee };
       return { outcome: 'gone' };
     } catch (error) {
