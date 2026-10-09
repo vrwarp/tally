@@ -73,7 +73,7 @@ describe('pushStudent', () => {
 
     const attendee = store.attendees.get(createdId)!;
     expect(attendee.firstName).toBe('Keanu');
-    expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(8);
+    expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(8));
     // The side effects the create headers ask for: a family folk membership
     // and an enrollment in the configured meet.
     expect(store.folkAttendees.some((edge) => edge.attendeeId === createdId && edge.roleId === 27)).toBe(true);
@@ -140,7 +140,7 @@ describe('pushStudent', () => {
 
     expect(result.status).toBe('created');
     const created = store.attendees.get(result.pcoPersonId!)!;
-    expect((created.infos.fixed as Record<string, unknown>).grade).toBe(-1);
+    expect((created.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(-1));
   });
 
   /*
@@ -237,7 +237,7 @@ describe('pushStudent', () => {
 
     const attendee = store.attendees.get(priya)!;
     expect(attendee.lastName).toBe('Raghunathan-Iyer');
-    expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(10);
+    expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(10));
     // The read-modify-write must not lose what else lived in infos.
     expect((attendee.infos.fixed as Record<string, unknown>).food_pref).toBe('Tree nuts');
   });
@@ -279,7 +279,7 @@ describe('updateStudentProfile', () => {
 
     const attendee = store.attendees.get(wei)!;
     const fixed = attendee.infos.fixed as Record<string, unknown>;
-    expect(fixed.grade).toBe(12);
+    expect(fixed.grade).toBe(store.gradeIndex(12));
     expect(fixed.food_pref).toBe('Peanuts');
   });
 
@@ -358,7 +358,7 @@ describe('updateStudentProfile', () => {
     expect(result.wrote).toEqual(['grade']);
     // The consequence nobody would guess, said once: they will drop off the roster.
     expect(result.message).toMatch(/outside the 6-12 band/);
-    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(-1);
+    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(-1));
   });
 
   it('refuses a grade that is not a whole number between Pre-K and 12', async () => {
@@ -428,7 +428,7 @@ describe('a merged attendee', () => {
     // The id that came back is not the id the edit named, which is exactly
     // what the queue reads to report `merged` rather than `landed`.
     expect(result.person?.pcoPersonId).toBe(salote);
-    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(11);
+    expect((store.attendees.get(salote)!.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(11));
     // And nothing was written to the tombstone.
     expect((store.attendees.get(wei)!.infos.fixed as Record<string, unknown>).grade).toBe(
       tombstoneGradeBefore,
@@ -489,7 +489,7 @@ describe('a merged attendee', () => {
     const survivor = store.createAttendee({
       firstName: 'Wei',
       lastName: 'Suzuki',
-      infos: { fixed: { grade: 11 } },
+      infos: { fixed: { grade: store.gradeIndex(11) } },
     });
     db.seed('students/vis-1', {
       firstName: 'Wei',
@@ -508,7 +508,7 @@ describe('a merged attendee', () => {
     expect(result.pcoPersonId).toBe(survivor.id);
     // The document points at somebody real now, and the drift landed on them.
     expect(db.get('students/vis-1')!.upstreamPersonId).toBe(survivor.id);
-    expect((store.attendees.get(survivor.id)!.infos.fixed as Record<string, unknown>).grade).toBe(10);
+    expect((store.attendees.get(survivor.id)!.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(10));
     expect(store.attendees.size).toBe(before);
   });
 

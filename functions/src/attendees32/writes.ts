@@ -42,7 +42,7 @@ import type { PersonCheck } from '../backends/types.js';
 import { isA32GoneError, type A32Client, getA32Attendee } from './client.js';
 import { followA32PersonLink } from './personLink.js';
 import {
-  a32Grade,
+  gradeOf,
   allPhonesOf,
   allergiesOf,
   birthdayPatch,
@@ -65,6 +65,7 @@ import {
   type A32Relation,
 } from './types.js';
 import { cacheKey } from '../pco/cache.js';
+import { loadGradeScale, type GradeScale } from './grades.js';
 import { loadRelations, relationIdsOf } from './relations.js';
 
 /**
@@ -220,6 +221,8 @@ export async function pushStudent(
     return { status: 'skipped', pcoPersonId: personId, message: 'Student is missing a name.' };
   }
 
+  const scale = await loadGradeScale(options);
+
   /* ---- Already linked ---------------------------------------------------- */
   if (personId) {
     if (config.writeBack !== 'full') {
@@ -264,9 +267,13 @@ export async function pushStudent(
     const wanted = splitFirstName(firstName).firstName;
     if (trimmed(attendee.first_name) !== wanted) patch.first_name = wanted;
     if (trimmed(attendee.last_name) !== lastName) patch.last_name = lastName;
-    if (grade !== null && a32Grade(attendee) !== grade) {
-      const infos = attendee.infos ?? {};
-      patch.infos = { ...infos, fixed: { ...(infos.fixed ?? {}), grade } };
+    if (grade !== null && gradeOf(attendee, scale) !== grade) {
+      // A grade the organization's list has no rung for cannot be carried over.
+      const index = scale.toIndex(grade);
+      if (index !== null) {
+        const infos = attendee.infos ?? {};
+        patch.infos = { ...infos, fixed: { ...(infos.fixed ?? {}), grade: index } };
+      }
     }
 
     if (Object.keys(patch).length === 0) {
@@ -328,6 +335,7 @@ export async function pushStudent(
       lastName,
       grade,
       grade === null ? await loadRelations(options) : new Map(),
+      scale,
       logger,
     );
   }
@@ -356,6 +364,7 @@ export async function pushStudent(
     resolveRelationIds(options),
   ]);
 
+  const gradeIndex = scale.toIndex(grade);
   const created = await client.post<A32Attendee>(
     API.attendee,
     {
@@ -365,7 +374,7 @@ export async function pushStudent(
       division: Number.parseInt(config.divisionId, 10),
       // Omitted rather than sent as a zero: a grade nobody supplied is a claim
       // about a real child, and it is the church's database that keeps it.
-      infos: { fixed: grade === null ? {} : { grade }, contacts: {} },
+      infos: { fixed: gradeIndex === null ? {} : { grade: gradeIndex }, contacts: {} },
     },
     {
       // A family folk from the start (the app's own grids hide family-less
@@ -410,6 +419,7 @@ export async function findExistingAttendees(
   grade: number | null,
   /** Only consulted for a grade-less student, to tell a child from an adult. */
   relations: ReadonlyMap<number, A32Relation>,
+  scale: GradeScale,
 ): Promise<A32Attendee[]> {
   const plainFirstName = splitFirstName(firstName).firstName;
   const wanted = nameGradeKey(firstName, lastName, grade);
@@ -425,9 +435,9 @@ export async function findExistingAttendees(
         // Name is all there is, so being a child has to carry the rest of the
         // weight — and holding no grade has to as well, because an attendee
         // with one is not this student whatever their name says.
-        if (a32Grade(attendee) !== null) continue;
+        if (gradeOf(attendee, scale) !== null) continue;
         if (!isChildAttendee(attendee, relations)) continue;
-      } else if (a32Grade(attendee) !== grade) {
+      } else if (gradeOf(attendee, scale) !== grade) {
         // The raw grade, not the clamped one — a blank grade must not be
         // normalised into the band and match by accident.
         continue;
@@ -450,9 +460,10 @@ async function pickExistingAttendee(
   lastName: string,
   grade: number | null,
   relations: ReadonlyMap<number, A32Relation>,
+  scale: GradeScale,
   logger: FunctionLogger,
 ): Promise<A32Attendee | null> {
-  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations);
+  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations, scale);
   if (matches.length > 1) {
     logger.info('Several attendees match this student; linked the oldest', {
       matches: matches.length,
@@ -483,12 +494,12 @@ export async function findStudentCandidates(
   const lastName = trimmed(options.lastName) ?? '';
   if (!firstName && !lastName) return [];
 
-  const relations = await loadRelations(options);
-  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations);
+  const [relations, scale] = await Promise.all([loadRelations(options), loadGradeScale(options)]);
+  const matches = await findExistingAttendees(client, firstName, lastName, grade, relations, scale);
   return matches.map((attendee, index) => ({
     personId: attendee.id,
     name: `${displayFirstNameOf(attendee)} ${attendee.last_name ?? ''}`.trim(),
-    grade: a32Grade(attendee),
+    grade: gradeOf(attendee, scale),
     wouldMatch: index === 0,
   }));
 }
@@ -624,6 +635,7 @@ export async function updateStudentProfile(
 
   const patch: Record<string, unknown> = {};
   const wrote: string[] = [];
+  const scale = await loadGradeScale(options);
   let infos = attendee.infos ?? {};
   let infosChanged = false;
 
@@ -641,8 +653,18 @@ export async function updateStudentProfile(
       wrote.push('last_name');
     }
   }
-  if (options.grade !== undefined && a32Grade(attendee) !== options.grade) {
-    infos = { ...infos, fixed: { ...(infos.fixed ?? {}), grade: options.grade } };
+  if (options.grade !== undefined && gradeOf(attendee, scale) !== options.grade) {
+    const index = options.grade === null ? null : scale.toIndex(options.grade);
+    if (options.grade !== null && index === null) {
+      return {
+        status: 'invalid',
+        wrote: [],
+        message: `Attendees' grade list has no rung for grade ${options.grade}; a leader can add one in Attendees.`,
+        person: null,
+        before: null,
+      };
+    }
+    infos = { ...infos, fixed: { ...(infos.fixed ?? {}), grade: index } };
     infosChanged = true;
     wrote.push('grade');
   }
@@ -676,7 +698,7 @@ export async function updateStudentProfile(
    * not having it: the church would not know which kind of record it had.
    */
   if (options.expect) {
-    const held = mapAttendeeToRosterPerson(attendee);
+    const held = mapAttendeeToRosterPerson(attendee, scale);
     const wanted = options.expect;
     const changedUnderneath =
       (wanted.lastName !== undefined &&
@@ -704,9 +726,9 @@ export async function updateStudentProfile(
       status: 'unchanged',
       wrote: [],
       message: 'Attendees already matches.',
-      person: mapAttendeeToRosterPerson(attendee),
+      person: mapAttendeeToRosterPerson(attendee, scale),
       // The same row: nothing was written, so before and after are one thing.
-      before: mapAttendeeToRosterPerson(attendee),
+      before: mapAttendeeToRosterPerson(attendee, scale),
     };
   }
 
@@ -731,10 +753,10 @@ export async function updateStudentProfile(
     message: outOfBand
       ? `Saved ${wrote.join(', ')} to Attendees. That grade is outside the ${config.minGrade}-${config.maxGrade} band Tally reads, so they will drop off the roster.`
       : `Saved ${wrote.join(', ')} to Attendees.`,
-    person: mapAttendeeToRosterPerson(updated),
+    person: mapAttendeeToRosterPerson(updated, scale),
     // What was on file when this call looked, which is what lets the edit queue
     // tell "your edit landed" from "somebody had already changed this".
-    before: mapAttendeeToRosterPerson(attendee),
+    before: mapAttendeeToRosterPerson(attendee, scale),
   };
 }
 
@@ -1708,6 +1730,8 @@ export async function recreateStudent(
     };
   }
 
+  const scale = await loadGradeScale(options);
+
   /*
    * Search before creating, on the same terms the push uses.
    *
@@ -1725,6 +1749,7 @@ export async function recreateStudent(
       lastName,
       grade,
       grade === null ? await loadRelations(options) : new Map(),
+      scale,
     )
   )[0];
   if (match) {
@@ -1749,6 +1774,7 @@ export async function recreateStudent(
     resolveMeetId(options),
     resolveRelationIds(options),
   ]);
+  const gradeIndex = scale.toIndex(grade);
   const created = await client.post<A32Attendee>(
     API.attendee,
     {
@@ -1758,7 +1784,7 @@ export async function recreateStudent(
       division: Number.parseInt(config.divisionId, 10),
       // Omitted rather than sent as a zero: a grade nobody supplied is a claim
       // about a real child, and it is the church's database that keeps it.
-      infos: { fixed: grade === null ? {} : { grade }, contacts: {} },
+      infos: { fixed: gradeIndex === null ? {} : { grade: gradeIndex }, contacts: {} },
     },
     {
       ...(relationIds.child !== null

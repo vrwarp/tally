@@ -74,7 +74,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
     },
 
     fetchRoster: ({ personIds, force }) => fetchRoster({ client, config, cache, personIds, force }),
-    searchPeople: ({ query, limit }) => searchPeople({ client, config, query, limit }),
+    searchPeople: ({ query, limit }) => searchPeople({ client, config, cache, query, limit }),
     fetchPersonDetails: ({ personId, force }) =>
       fetchPersonDetails({ client, config, cache, personId, force, attendees }),
     fetchAllergyNotes: ({ personIds, force }) =>

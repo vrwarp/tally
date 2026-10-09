@@ -17,6 +17,7 @@ import {
   trimmed,
 } from '../backends/mappingShared.js';
 import { withPinyin } from '../names/pinyin.js';
+import type { GradeScale } from './grades.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import type { AdultContact } from '../pco/mapping.js';
 import type { RosterPerson } from '../pco/roster.js';
@@ -53,8 +54,12 @@ export function displayFirstNameOf(attendee: A32Attendee): string {
   return composeFirstName(attendee.first_name, cjkNameOf(attendee));
 }
 
-/** The grade Attendees holds (`infos.fixed.grade`), or null when it says nothing. */
-export function a32Grade(attendee: A32Attendee): number | null {
+/**
+ * The number Attendees stores in `infos.fixed.grade`: an index into the
+ * organization's grade list, not a school grade (see grades.ts). Null when it
+ * says nothing.
+ */
+export function a32GradeIndex(attendee: A32Attendee): number | null {
   const raw = attendee.infos?.fixed?.grade;
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
   if (typeof raw === 'string' && raw.trim() !== '') {
@@ -62,6 +67,11 @@ export function a32Grade(attendee: A32Attendee): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+/** The Tally grade that index means on the organization's scale, or null. */
+export function gradeOf(attendee: A32Attendee, scale: GradeScale): number | null {
+  return scale.toGrade(a32GradeIndex(attendee));
 }
 
 /**
@@ -125,10 +135,10 @@ export function statusOf(attendee: A32Attendee): 'active' | 'inactive' {
 /* Person -> roster row                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function mapAttendeeToRosterPerson(attendee: A32Attendee): RosterPerson {
+export function mapAttendeeToRosterPerson(attendee: A32Attendee, scale: GradeScale): RosterPerson {
   const firstName = displayFirstNameOf(attendee);
   const lastName = trimmed(attendee.last_name) ?? '';
-  const { grade } = clampGrade(a32Grade(attendee));
+  const { grade } = clampGrade(gradeOf(attendee, scale));
 
   return {
     id: studentIdFor('a32', attendee.id),
