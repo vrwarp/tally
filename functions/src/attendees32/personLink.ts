@@ -33,7 +33,10 @@ export type A32PersonLink =
  * `from` is the error the caller already has in hand, so the ordinary case — a
  * plain deletion with no forwarding address — costs no second request. A chain
  * can still end dead: attendees32 keeps a tombstone when a primary is later
- * deleted, and answers `410` with no `merged_into` for exactly that.
+ * deleted, and answers `410` with no `merged_into` for exactly that. A chain
+ * of hops is rarer still: attendees32 collapses one as it forms (merging B
+ * into C re-points A at C), so walking is a guard against hand-edited data,
+ * never the ordinary path.
  */
 export async function followA32PersonLink(
   client: A32Client,

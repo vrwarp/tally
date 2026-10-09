@@ -435,13 +435,39 @@ describe('a merged attendee', () => {
     );
   });
 
-  it('follows a chain to its end', async () => {
+  it('lands on the newest primary after a second merge, in one hop', async () => {
     const wei = idOf('Wei');
     const salote = idOf('Salote');
     const third = store.createAttendee({ firstName: 'Mele', lastName: 'Tui' });
     db.seed(`students/a32_${wei}`, { status: 'active' });
     store.mergeAttendee(wei, salote);
     store.mergeAttendee(salote, third.id);
+    // attendees32 collapses the chain as it forms: Wei points straight at the
+    // newest primary, so the 410 names it without anybody walking anything.
+    expect(store.attendees.get(wei)!.mergedInto).toBe(third.id);
+
+    const result = await updateStudentProfile({
+      db,
+      client,
+      config,
+      cache,
+      studentId: `a32_${wei}`,
+      grade: 9,
+    });
+
+    expect(result.person?.pcoPersonId).toBe(third.id);
+  });
+
+  it('still follows a chain to its end when the data was edited by hand', async () => {
+    const wei = idOf('Wei');
+    const salote = idOf('Salote');
+    const third = store.createAttendee({ firstName: 'Mele', lastName: 'Tui' });
+    db.seed(`students/a32_${wei}`, { status: 'active' });
+    store.mergeAttendee(wei, salote);
+    // A chain the service would never leave behind, written the way a hand
+    // edit of the column would leave it; the walk is the guard for exactly this.
+    store.attendees.get(salote)!.mergedInto = third.id;
+    store.attendees.get(salote)!.isRemoved = true;
 
     const result = await updateStudentProfile({
       db,

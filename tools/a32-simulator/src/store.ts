@@ -274,10 +274,13 @@ export class A32SimulatorStore {
   /**
    * Merges one attendee into another, the way attendees32 does.
    *
-   * The duplicate keeps its row, is soft-deleted, and points at the primary. The
-   * simulator does not move attendance — that is attendees32's business and
-   * has its own tests over there; what a test against *this* needs is the
-   * observable half, which is what an id answers afterwards.
+   * The duplicate keeps its row, is soft-deleted, and points at the primary,
+   * and every tombstone that pointed at the duplicate is re-pointed at the
+   * primary — attendees32 collapses a chain as it forms, so A-into-B then
+   * B-into-C leaves A answering C in one hop. The simulator does not move
+   * attendance — that is attendees32's business and has its own tests over
+   * there; what a test against *this* needs is the observable half, which is
+   * what an id answers afterwards.
    */
   mergeAttendee(duplicateId: string, primaryId: string): SimAttendee | null {
     const duplicate = this.attendees.get(duplicateId);
@@ -285,14 +288,19 @@ export class A32SimulatorStore {
     if (!duplicate || !primary || duplicate.id === primary.id) return null;
     duplicate.mergedInto = primary.id;
     duplicate.isRemoved = true;
+    for (const earlier of this.attendees.values()) {
+      if (earlier.mergedInto === duplicate.id) earlier.mergedInto = primary.id;
+    }
     return primary;
   }
 
   /**
    * Follows a chain of merges to whoever holds the record now, or null.
    *
-   * Bounded for the same reason the real one is: a cycle is reachable by hand
-   * and the answer to it is "gone", not a hang.
+   * A chain only exists when somebody edited the data by hand — `mergeAttendee`
+   * collapses them — so this is a guard, bounded for the same reason the real
+   * one is: a cycle is reachable by hand and the answer to it is "gone", not a
+   * hang.
    */
   primaryOf(id: string): SimAttendee | null {
     const seen = new Set<string>([id]);
