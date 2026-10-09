@@ -18,7 +18,7 @@ export function seedDefaultOrganization(store: A32SimulatorStore): void {
     gender: 'FEMALE',
     grade: 9,
     actualBirthday: '2011-03-14',
-    allergies: 'Tree nuts',
+    foodPref: 'Tree nuts',
     parents: [
       {
         firstName: 'Meena',
@@ -80,7 +80,7 @@ export function seedDefaultOrganization(store: A32SimulatorStore): void {
     gender: 'MALE',
     grade: 12,
     actualBirthday: '2008-01-05',
-    allergies: 'Shellfish',
+    foodPref: 'Shellfish',
     parents: [
       { firstName: 'Irina', gender: 'FEMALE', contacts: { phone1: '555-0355', email1: 'irina.volkov@example.org' } },
     ],

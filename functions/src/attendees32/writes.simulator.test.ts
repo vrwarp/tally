@@ -239,7 +239,7 @@ describe('pushStudent', () => {
     expect(attendee.lastName).toBe('Raghunathan-Iyer');
     expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(10);
     // The read-modify-write must not lose what else lived in infos.
-    expect((attendee.infos.fixed as Record<string, unknown>).allergies).toBe('Tree nuts');
+    expect((attendee.infos.fixed as Record<string, unknown>).food_pref).toBe('Tree nuts');
   });
 
   it('leaves the queue flag set when write-back is off', async () => {
@@ -280,7 +280,7 @@ describe('updateStudentProfile', () => {
     const attendee = store.attendees.get(wei)!;
     const fixed = attendee.infos.fixed as Record<string, unknown>;
     expect(fixed.grade).toBe(12);
-    expect(fixed.allergies).toBe('Peanuts');
+    expect(fixed.food_pref).toBe('Peanuts');
   });
 
   it('writes a day-only birthday through the 1800 sentinel on a person with no year', async () => {
@@ -791,6 +791,13 @@ describe('addParent', () => {
 });
 
 describe('recreateStudent + checkPerson', () => {
+  it('reports a soft-deleted attendee as gone', async () => {
+    // attendees32 answers 200 with is_removed: true, not a 404, for a deleted record.
+    const priya = idOf('Priya');
+    store.attendees.get(priya)!.isRemoved = true;
+    expect(await checkPerson(client, priya)).toEqual({ outcome: 'gone' });
+  });
+
   it('confirms a live person instead of re-creating them', async () => {
     const priya = idOf('Priya');
     db.seed(`students/a32_${priya}`, { status: 'active', upstreamRecordMissing: true });

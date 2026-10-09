@@ -116,6 +116,7 @@ function attendeeRow(store: A32SimulatorStore, attendee: SimAttendee): AttendeeR
     deathday: attendee.deathday,
     photo: null,
     infos: attendee.infos,
+    is_removed: attendee.isRemoved,
     organization_slug: store.organization.slug,
     attendingmeets: meets.map((row) => ({
       attendingmeet_id: row.id,
@@ -260,7 +261,6 @@ function personsApi(
   if (resource === 'datagrid_data_attendee') {
     if (method === 'GET' && id) {
       const attendee = store.attendees.get(id);
-      if (attendee && !attendee.isRemoved) return json(200, attendeeRow(store, attendee));
       /*
        * A merged-away id answers 410 with the survivor, which is the contract
        * attendees32 states and the only way a caller can tell "this person
@@ -278,6 +278,12 @@ function personsApi(
           merged_into: survivor.id,
         });
       }
+      /*
+       * A plain soft-delete is a 200 with is_removed: true, not a 404: the
+       * single-id read uses all_objects so Attendees' own UI can show the
+       * deleted record. Only an id the server never had is a 404.
+       */
+      if (attendee) return json(200, attendeeRow(store, attendee));
       return json(404, { detail: 'Not found.' });
     }
     if (method === 'GET') {
@@ -306,7 +312,6 @@ function personsApi(
       const rawFolkId = headers['x-add-folk'];
       const roleId = headers['x-folk-role'];
       const meetId = headers['x-join-meet'];
-      const characterSlug = headers['x-join-character'];
 
       if (rawFolkId && roleId) {
         const folk =
@@ -316,10 +321,10 @@ function personsApi(
         if (!folk) return json(404, { detail: 'No such folk.' });
         store.addFolkAttendee(folk.id, attendee.id, Number.parseInt(roleId, 10));
       }
+      // Enrollment carries the meet's major character; the server ignores
+      // X-Join-Character on a join, so the simulator does too.
       if (meetId && Number.parseInt(meetId, 10) === store.meet.id) {
-        const character =
-          characterSlug === store.character.slug || !characterSlug ? store.character : null;
-        if (character) store.joinMeet(attendee.id, store.meet.id, character.id);
+        store.joinMeet(attendee.id, store.meet.id, store.character.id);
       }
       return json(201, attendeeRow(store, attendee));
     }
@@ -385,49 +390,14 @@ function personsApi(
   }
 
   if (resource === 'all_relations' && method === 'GET') {
+    // A caller who is not a counselor sees only `driver` unless the query
+    // names the family category; the integration user is not a counselor.
+    const familyVocabulary = many(query.category_id).includes(String(FAMILY_CATEGORY));
     const rows = store.relations
       .filter((relation) => relation.id !== HIDDEN_ROLE)
+      .filter((relation) => familyVocabulary || relation.title === 'driver')
       .map(relationRow);
     return json(200, paginate(rows, query));
-  }
-
-  if (resource === 'attendee_attendings' && method === 'GET') {
-    const target = headers['x-target-attendee-id'];
-    if (!target || !store.attendees.get(target)) return json(404, { detail: 'Not found.' });
-    const rows = store.attendings
-      .filter((attending) => attending.attendeeId === target)
-      .map((attending) => ({
-        id: attending.id,
-        created: '2020-01-01T00:00:00Z',
-        modified: '2020-01-01T00:00:00Z',
-        attendee: attending.attendeeId,
-        category: attending.category,
-        registration: null,
-        price: null,
-      }));
-    return json(200, paginate(rows, query));
-  }
-
-  if (resource === 'default_attendingmeets' && method === 'PUT') {
-    const target = headers['x-target-attendee-id'];
-    if (!target || !store.attendees.get(target)) return json(403, { detail: 'No target attendee.' });
-    const action = String(body.action ?? '');
-    const meetSlug = String(body.meet ?? '');
-    if (meetSlug !== store.meet.slug) return json(404, { detail: 'No such meet.' });
-    if (action === 'join') {
-      const row = store.joinMeet(target, store.meet.id, store.character.id);
-      return json(200, { action, attendingmeet: row.id });
-    }
-    if (action === 'leave') {
-      const attending = store.attendingOf(target);
-      for (const row of store.attendingMeets) {
-        if (attending && row.attendingId === attending.id && row.meetId === store.meet.id) {
-          row.isRemoved = true;
-        }
-      }
-      return json(200, { action });
-    }
-    return json(400, { detail: 'action must be join or leave.' });
   }
 
   return json(404, { detail: `No persons route for ${method} ${request.path}` });
@@ -443,8 +413,14 @@ function occasionsApi(
 
   if (resource === 'organization_meets' && method === 'GET') {
     const assemblies = many(query['assemblies[]']).map((value) => Number.parseInt(value, 10));
+    // Listed only to callers whose group names appear in the meet's
+    // infos.allowed_groups — an empty list hides the meet from everyone.
+    const allowed = (store.meet.infos.allowed_groups as string[] | undefined) ?? [];
+    const visible = allowed.some((group) => store.tokenGroups.includes(group));
     const rows =
-      assemblies.length === 0 || assemblies.includes(store.assembly.id) ? [meetRow(store)] : [];
+      visible && (assemblies.length === 0 || assemblies.includes(store.assembly.id))
+        ? [meetRow(store)]
+        : [];
     return json(200, paginate(rows, query));
   }
 

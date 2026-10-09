@@ -42,6 +42,8 @@ export interface AttendeeRow {
   deathday: string | null;
   photo: string | null;
   infos: Record<string, unknown>;
+  /** 200 with this set is how attendees32 answers for a soft-deleted attendee. */
+  is_removed: boolean;
   organization_slug: string;
   attendingmeets: Array<Record<string, unknown>>;
   folkattendee_set: FolkAttendeeRow[];

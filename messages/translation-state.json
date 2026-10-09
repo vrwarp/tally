@@ -4337,20 +4337,8 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Backends.a32CharacterSlug": {
-    "source": "Character slug",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Backends.a32AssemblySlug": {
-    "source": "Assembly slug",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Backends.a32SlugsNote": {
-    "source": "Where your students live in Attendees. The setup command on the Attendees side prints all four — they name the division and meet whose attendees are the roster, and the character new students join.",
+    "source": "Where your students live in Attendees. The setup command on the Attendees side prints both: the division new attendees are filed under, and the meet whose enrollment is the roster.",
     "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "reviewed"

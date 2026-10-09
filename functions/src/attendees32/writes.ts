@@ -39,7 +39,7 @@ import type { RecreateStudentResult } from '../pco/recreate.js';
 import { migrateStudentMemberships } from '../backends/studentMigration.js';
 import { HELD_FOR_REVIEW_MESSAGE, isHeldForReview } from '../backends/pendingReview.js';
 import type { PersonCheck } from '../backends/types.js';
-import { isA32GoneError, type A32Client } from './client.js';
+import { isA32GoneError, type A32Client, getA32Attendee } from './client.js';
 import { followA32PersonLink } from './personLink.js';
 import {
   a32Grade,
@@ -65,6 +65,7 @@ import {
   type A32Relation,
 } from './types.js';
 import { cacheKey } from '../pco/cache.js';
+import { loadRelations, relationIdsOf } from './relations.js';
 
 /**
  * How many family members one adult's folks may be named from.
@@ -124,25 +125,11 @@ async function resolveMeetId(options: A32WriteOptions): Promise<number | null> {
   });
 }
 
-function relationIdsCacheKey(baseUrl: string): string {
-  return cacheKey({ kind: 'a32-relation-ids', base: baseUrl });
-}
-
-/** The `child`/`parent` relation ids, resolved by their seeded titles. */
+/** The `child`/`parent` relation ids, from the cached vocabulary. */
 async function resolveRelationIds(
   options: A32WriteOptions,
 ): Promise<{ child: number | null; parent: number | null }> {
-  return options.cache.get(relationIdsCacheKey(options.config.baseUrl), async () => {
-    let child: number | null = null;
-    let parent: number | null = null;
-    for await (const page of options.client.paginate<A32Relation>(API.relations)) {
-      for (const relation of page.data) {
-        if (relation.title === A32_RELATION_TITLES.child) child = relation.id;
-        if (relation.title === A32_RELATION_TITLES.parent) parent = relation.id;
-      }
-    }
-    return { child, parent };
-  });
+  return relationIdsOf(await loadRelations(options));
 }
 
 function readString(data: Record<string, unknown>, key: string): string | null {
@@ -164,7 +151,7 @@ export async function checkPerson(
   personId: string,
 ): Promise<PersonCheck> {
   try {
-    await client.get<A32Attendee>(API.attendeeById(personId));
+    await getA32Attendee(client, personId);
     return { outcome: 'exists', personId };
   } catch (error) {
     if (!isA32GoneError(error)) throw error;
@@ -250,7 +237,7 @@ export async function pushStudent(
     let linkedId = personId;
     let attendee: A32Attendee;
     try {
-      attendee = await client.get<A32Attendee>(API.attendeeById(linkedId));
+      attendee = await getA32Attendee(client, linkedId);
     } catch (error) {
       if (!isA32GoneError(error)) throw error;
       const link = await followA32PersonLink(client, linkedId, error);
@@ -340,7 +327,7 @@ export async function pushStudent(
       firstName,
       lastName,
       grade,
-      grade === null ? await allRelations(options) : new Map(),
+      grade === null ? await loadRelations(options) : new Map(),
       logger,
     );
   }
@@ -388,7 +375,7 @@ export async function pushStudent(
         ? { 'X-Add-Folk': 'new', 'X-Folk-Role': String(relationIds.child) }
         : {}),
       ...(meetId !== null
-        ? { 'X-Join-Meet': String(meetId), 'X-Join-Character': config.characterSlug }
+        ? { 'X-Join-Meet': String(meetId) }
         : {}),
     },
   );
@@ -496,7 +483,7 @@ export async function findStudentCandidates(
   const lastName = trimmed(options.lastName) ?? '';
   if (!firstName && !lastName) return [];
 
-  const relations = await allRelations(options);
+  const relations = await loadRelations(options);
   const matches = await findExistingAttendees(client, firstName, lastName, grade, relations);
   return matches.map((attendee, index) => ({
     personId: attendee.id,
@@ -618,7 +605,7 @@ export async function updateStudentProfile(
   let personId = resolved.personId;
   let attendee: A32Attendee;
   try {
-    attendee = await client.get<A32Attendee>(API.attendeeById(personId));
+    attendee = await getA32Attendee(client, personId);
   } catch (error) {
     if (!isA32GoneError(error)) throw error;
     const link = await followA32PersonLink(client, personId, error);
@@ -663,8 +650,8 @@ export async function updateStudentProfile(
     const wanted = trimmed(options.allergies);
     if (allergiesOf(attendee) !== wanted) {
       const fixed = { ...(infos.fixed ?? {}) } as Record<string, unknown>;
-      if (wanted === null) delete fixed.allergies;
-      else fixed.allergies = wanted;
+      if (wanted === null) delete fixed.food_pref;
+      else fixed.food_pref = wanted;
       infos = { ...infos, fixed };
       infosChanged = true;
       wrote.push('allergies');
@@ -799,7 +786,7 @@ export async function setParentContact(
 
   const [edges, relations] = await Promise.all([
     loadFamilyEdges(client, resolved.personId),
-    allRelations(options),
+    loadRelations(options),
   ]);
   const candidates = findContactCandidates(resolved.personId, edges, relations);
   const chosen = candidates[0];
@@ -813,7 +800,7 @@ export async function setParentContact(
     };
   }
 
-  const parent = await client.get<A32Attendee>(API.attendeeById(chosen.id));
+  const parent = await getA32Attendee(client, chosen.id);
   const onFile = adultContactOf(parent);
 
   const wrote: Array<'phone' | 'email'> = [];
@@ -856,19 +843,6 @@ export async function setParentContact(
     skipped,
     message: `Saved the parent's ${wrote.join(' and ')} to Attendees.`,
   };
-}
-
-function allRelations(options: A32WriteOptions): Promise<Map<number, A32Relation>> {
-  return options.cache.get(
-    cacheKey({ kind: 'a32-relations', base: options.config.baseUrl }),
-    async () => {
-      const byId = new Map<number, A32Relation>();
-      for await (const page of options.client.paginate<A32Relation>(API.relations)) {
-        for (const relation of page.data) byId.set(relation.id, relation);
-      }
-      return byId;
-    },
-  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -918,7 +892,7 @@ export async function addParent(
 
   const [edges, relations, relationIds] = await Promise.all([
     loadFamilyEdges(client, studentPersonId),
-    allRelations(options),
+    loadRelations(options),
     resolveRelationIds(options),
   ]);
   if (relationIds.parent === null || relationIds.child === null) {
@@ -946,7 +920,7 @@ export async function addParent(
   if (options.personId) {
     let chosen: A32Attendee;
     try {
-      chosen = await client.get<A32Attendee>(API.attendeeById(options.personId));
+      chosen = await getA32Attendee(client, options.personId);
     } catch (error) {
       if (isA32GoneError(error)) return refuse('not-an-adult', 'Attendees has no person with that id.');
       throw error;
@@ -1058,7 +1032,7 @@ export async function addParent(
   const wrote: Array<'phone' | 'email'> = [];
   const skipped: Array<'phone' | 'email'> = [];
   if (phone || email) {
-    const parent = await client.get<A32Attendee>(API.attendeeById(parentId));
+    const parent = await getA32Attendee(client, parentId);
     const onFile = adultContactOf(parent);
     const contacts = { ...((parent.infos ?? {}).contacts ?? {}) } as Record<string, string>;
     if (phone) {
@@ -1197,7 +1171,7 @@ async function withFolks(
     if (looked >= MAX_FOLK_MEMBER_LOOKUPS) return null;
     looked += 1;
     try {
-      const member = await options.client.get<A32Attendee>(API.attendeeById(personId));
+      const member = await getA32Attendee(options.client, personId);
       const name = `${displayFirstNameOf(member)} ${member.last_name ?? ''}`.trim();
       if (name) names.set(personId, name);
       return name || null;
@@ -1244,7 +1218,7 @@ async function loadChosenPerson(
   personId: string,
 ): Promise<A32Attendee | null> {
   try {
-    return await client.get<A32Attendee>(API.attendeeById(personId));
+    return await getA32Attendee(client, personId);
   } catch (error) {
     if (isA32GoneError(error)) return null;
     throw error;
@@ -1273,7 +1247,7 @@ export async function findAdultCandidates(
 
   const phone = normalizePhone(options.phone);
   const excluded = new Set(options.excludePersonIds ?? []);
-  const relations = await allRelations(options);
+  const relations = await loadRelations(options);
   const wantedName = buildSearchName(firstName, lastName);
 
   const candidates: AdultCandidate[] = [];
@@ -1413,7 +1387,7 @@ export async function createFamily(
     if (sibling) anchors.push(sibling);
   }
 
-  const relations = await allRelations(options);
+  const relations = await loadRelations(options);
 
   /* ---- A family that already exists, gaining a child ---------------------- */
 
@@ -1619,7 +1593,7 @@ export async function createFamily(
   const wrote: Array<'phone' | 'email'> = [];
   const skipped: Array<'phone' | 'email'> = [];
   if (phone || email) {
-    const parent = await client.get<A32Attendee>(API.attendeeById(parentId));
+    const parent = await getA32Attendee(client, parentId);
     const onFile = adultContactOf(parent);
     const contacts = { ...((parent.infos ?? {}).contacts ?? {}) } as Record<string, string>;
     if (phone) {
@@ -1750,7 +1724,7 @@ export async function recreateStudent(
       firstName,
       lastName,
       grade,
-      grade === null ? await allRelations(options) : new Map(),
+      grade === null ? await loadRelations(options) : new Map(),
     )
   )[0];
   if (match) {
@@ -1791,7 +1765,7 @@ export async function recreateStudent(
         ? { 'X-Add-Folk': 'new', 'X-Folk-Role': String(relationIds.child) }
         : {}),
       ...(meetId !== null
-        ? { 'X-Join-Meet': String(meetId), 'X-Join-Character': config.characterSlug }
+        ? { 'X-Join-Meet': String(meetId) }
         : {}),
     },
   );

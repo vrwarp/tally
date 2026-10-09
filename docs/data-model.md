@@ -1096,7 +1096,7 @@ an admin — and it must not be, since a document a browser can write is one a b
 ### `config/attendees32`
 
 The same idea for the second backend: the non-secret half of the Attendees configuration —
-`enabled`, `baseUrl`, `divisionId`, `meetSlug`, `characterSlug`, `assemblySlug`, `minGrade`,
+`enabled`, `baseUrl`, `divisionId`, `meetSlug`, `minGrade`,
 `maxGrade`, `writeBack`, `cacheTtlSeconds`, plus `updatedAt` / `updatedBy`. The DRF token lives in
 Secret Manager (`A32_TOKEN`) and nowhere else.
 

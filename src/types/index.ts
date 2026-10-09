@@ -1743,8 +1743,6 @@ export interface A32RuntimeConfigDoc {
   baseUrl: string;
   divisionId: string;
   meetSlug: string;
-  characterSlug: string;
-  assemblySlug: string;
   minGrade: number;
   maxGrade: number;
   writeBack: PcoWriteBackMode;

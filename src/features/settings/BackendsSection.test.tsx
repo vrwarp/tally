@@ -27,8 +27,6 @@ vi.mock('@/services/backends', () => ({
     baseUrl: '',
     divisionId: '',
     meetSlug: '',
-    characterSlug: '',
-    assemblySlug: '',
     minGrade: 6,
     maxGrade: 12,
     writeBack: settings.writeBack ?? 'off',

@@ -51,8 +51,6 @@ function toDraft(settings: A32EffectiveSettings, storedBaseUrl: string): A32Conf
     baseUrl: storedBaseUrl,
     divisionId: settings.divisionId,
     meetSlug: settings.meetSlug,
-    characterSlug: settings.characterSlug,
-    assemblySlug: settings.assemblySlug,
     minGrade: settings.minGrade,
     maxGrade: settings.maxGrade,
     writeBack: settings.writeBack,
@@ -114,8 +112,6 @@ export function Attendees32Editor({
           ...draft,
           divisionId: draft.divisionId.trim(),
           meetSlug: draft.meetSlug.trim(),
-          characterSlug: draft.characterSlug.trim(),
-          assemblySlug: draft.assemblySlug.trim(),
           // A band that crossed over would be clamped server-side anyway;
           // fixing it here means the number a leader sees is the number saved.
           maxGrade: Math.max(draft.minGrade, draft.maxGrade),
@@ -174,16 +170,6 @@ export function Attendees32Editor({
               label={t('a32MeetSlug')}
               value={draft.meetSlug}
               onChange={(event) => set('meetSlug', event.target.value)}
-            />
-            <TextField
-              label={t('a32CharacterSlug')}
-              value={draft.characterSlug}
-              onChange={(event) => set('characterSlug', event.target.value)}
-            />
-            <TextField
-              label={t('a32AssemblySlug')}
-              value={draft.assemblySlug}
-              onChange={(event) => set('assemblySlug', event.target.value)}
             />
           </div>
           <p className="mt-1.5 text-xs text-ink-500">

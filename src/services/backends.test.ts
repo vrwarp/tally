@@ -100,8 +100,6 @@ describe('readA32EffectiveSettings', () => {
         baseUrl: 'https://a32.example.org',
         divisionId: 'div-1',
         meetSlug: 'friday',
-        characterSlug: 'grade',
-        assemblySlug: 'youth',
         minGrade: 7,
         maxGrade: 11,
         writeBack: 'full',
@@ -113,8 +111,6 @@ describe('readA32EffectiveSettings', () => {
       baseUrl: 'https://a32.example.org',
       divisionId: 'div-1',
       meetSlug: 'friday',
-      characterSlug: 'grade',
-      assemblySlug: 'youth',
       minGrade: 7,
       maxGrade: 11,
       writeBack: 'full',
@@ -131,8 +127,6 @@ describe('readA32EffectiveSettings', () => {
     expect(settings.baseUrl).toBe('');
     expect(settings.divisionId).toBe('');
     expect(settings.meetSlug).toBe('');
-    expect(settings.characterSlug).toBe('');
-    expect(settings.assemblySlug).toBe('');
   });
 
   it('ignores a value of the wrong type in a text field', () => {
@@ -279,8 +273,6 @@ describe('saving', () => {
         baseUrl: '',
         divisionId: 'div-1',
         meetSlug: 'friday',
-        characterSlug: 'grade',
-        assemblySlug: 'youth',
         minGrade: 6,
         maxGrade: 12,
         writeBack: 'create',

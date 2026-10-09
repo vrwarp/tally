@@ -22,7 +22,6 @@ const A32_ENV = {
   A32_API_BASE_URL: 'http://127.0.0.1:4011',
   A32_DIVISION_ID: '1',
   A32_MEET_SLUG: 'the-rock',
-  A32_CHARACTER_SLUG: 'junior-student',
 };
 
 /** The registry only reads identity and delegates; a stub is a fine backend. */
