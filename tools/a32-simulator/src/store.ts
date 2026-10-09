@@ -117,6 +117,7 @@ export interface SeedAttendeeInput {
   actualBirthday?: string | null;
   /** `1800-MM-DD` for a known day with an unknown year. */
   estimatedBirthday?: string | null;
+  /** A school grade, -1 (Pre-K) to 12; stored as the organization's index. */
   grade?: number | null;
   foodPref?: string | null;
   contacts?: Record<string, string>;
@@ -142,7 +143,20 @@ export class A32SimulatorStore {
   down = false;
   readonly requests: Array<{ method: string; path: string }> = [];
 
-  readonly organization = { id: 1, slug: 'simorg' };
+  /**
+   * The organization's grade list, CFCCH-shaped. attendees32 stores a grade as
+   * an index into this list (G1 is 7, G9 is 15), which is what `gradeIndex`
+   * and `schoolGradeOf` translate; the seed takes school grades so tests read
+   * naturally.
+   */
+  readonly gradeConverter: readonly string[] = [
+    'Under three 1', 'Under three 2', 'Under three 3',
+    'Preschool 1', 'Preschool 2',
+    'Kindergarten 1', 'Kindergarten 2',
+    'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12',
+    'Postsecondary 1', 'Postsecondary 2', 'Postsecondary 3', 'Postsecondary 4',
+  ];
+  readonly organization = { id: 1, slug: 'simorg', displayName: 'Simulated church' };
   readonly division = { id: 11, slug: 'simorg_tally' };
   readonly assembly = { id: 21, slug: 'simorg_tally_checkin', displayName: 'Tally check-in' };
   readonly character = { id: 31, slug: 'simorg_tally_participant', displayName: 'Participant' };
@@ -171,6 +185,22 @@ export class A32SimulatorStore {
     { id: 30, title: 'parent', gender: 'UNSPECIFIED', emergencyContact: true, scheduler: true },
     { id: 7, title: 'driver', gender: 'UNSPECIFIED', emergencyContact: false, scheduler: false },
   ];
+
+  /** The index a record stores for a school grade (-1 Pre-K … 12), as the attendee form would. */
+  gradeIndex(grade: number): number {
+    if (grade === -1) return this.gradeConverter.indexOf('Preschool 1');
+    if (grade === 0) return this.gradeConverter.indexOf('Kindergarten 1');
+    return this.gradeConverter.indexOf(`G${grade}`);
+  }
+
+  /** The school grade an index means, or null for a rung Tally cannot hold. */
+  schoolGradeOf(index: number): number | null {
+    const label = this.gradeConverter[index] ?? '';
+    if (label.startsWith('Preschool')) return -1;
+    if (label.startsWith('Kindergarten')) return 0;
+    const numbered = /^G(\d{1,2})$/.exec(label);
+    return numbered ? Number.parseInt(numbered[1]!, 10) : null;
+  }
 
   readonly attendees = new Map<string, SimAttendee>();
   readonly folks = new Map<string, SimFolk>();
@@ -387,7 +417,7 @@ export class A32SimulatorStore {
       estimatedBirthday: input.estimatedBirthday ?? null,
       infos: {
         fixed: {
-          ...(input.grade !== null && input.grade !== undefined ? { grade: input.grade } : {}),
+          ...(input.grade !== null && input.grade !== undefined ? { grade: this.gradeIndex(input.grade) } : {}),
           ...(input.foodPref ? { food_pref: input.foodPref } : {}),
         },
         contacts: input.contacts ?? {},

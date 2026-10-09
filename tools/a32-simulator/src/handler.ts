@@ -29,8 +29,7 @@ import type {
   MeetRow,
   RelationRow,
   SimRequest,
-  SimResponse,
-} from './types.js';
+  SimResponse, OrganizationRow } from './types.js';
 
 function json(status: number, body: unknown): SimResponse {
   return { status, body };
@@ -242,7 +241,33 @@ export function handleRequest(store: A32SimulatorStore, request: SimRequest): Si
   if (segments[0] === 'occasions' && segments[1] === 'api') {
     return occasionsApi(store, request, segments.slice(2));
   }
+  if (segments[0] === 'whereabouts' && segments[1] === 'api') {
+    return whereaboutsApi(store, request, segments.slice(2));
+  }
   return json(404, { detail: `No route for ${method} ${path}` });
+}
+
+function organizationRow(store: A32SimulatorStore): OrganizationRow {
+  return {
+    id: store.organization.id,
+    slug: store.organization.slug,
+    display_name: store.organization.displayName,
+    infos: {
+      grade_converter: [...store.gradeConverter],
+      default_time_zone: 'America/Los_Angeles',
+      settings: {},
+    },
+  };
+}
+
+function whereaboutsApi(store: A32SimulatorStore, request: SimRequest, segments: string[]): SimResponse {
+  const { method, query } = request;
+  const [resource] = segments;
+  // The caller's own organization, infos included — where the grade list lives.
+  if (resource === 'user_organizations' && method === 'GET') {
+    return json(200, paginate([organizationRow(store)], query));
+  }
+  return json(404, { detail: `No whereabouts route for ${method} ${request.path}` });
 }
 
 function activeAttendees(store: A32SimulatorStore): SimAttendee[] {

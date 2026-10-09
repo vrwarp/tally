@@ -104,6 +104,13 @@ export interface AttendingRow {
   price: number | null;
 }
 
+export interface OrganizationRow {
+  id: number;
+  slug: string;
+  display_name: string;
+  infos: Record<string, unknown>;
+}
+
 export interface MeetRow {
   id: number;
   slug: string;

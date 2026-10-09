@@ -198,7 +198,7 @@ describe('fetchRoster', () => {
 
 describe('searchPeople', () => {
   it('finds people by name and labels them with the backend', async () => {
-    const results = await searchPeople({ client, config, query: 'Priya' });
+    const results = await searchPeople({ client, config, cache, query: 'Priya' });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       backendId: 'a32',
@@ -210,14 +210,14 @@ describe('searchPeople', () => {
   });
 
   it('shows an adult with no grade as ungraded, never as 6th', async () => {
-    const results = await searchPeople({ client, config, query: 'Meena' });
+    const results = await searchPeople({ client, config, cache, query: 'Meena' });
     expect(results).toHaveLength(1);
     expect(results[0]!.grade).toBeNull();
     expect(results[0]!.child).toBe(false);
   });
 
   it('answers an empty query with nobody and no request', async () => {
-    expect(await searchPeople({ client, config, query: '  ' })).toEqual([]);
+    expect(await searchPeople({ client, config, cache, query: '  ' })).toEqual([]);
     expect(store.requests.length).toBe(0);
   });
 });
@@ -321,7 +321,7 @@ describe('fetchPersonDetails', () => {
         firstName: 'Chidi',
         lastName: 'Bello',
         gender: 'MALE',
-        infos: { fixed: { grade: 8 }, contacts: {} },
+        infos: { fixed: { grade: store.gradeIndex(8) }, contacts: {} },
       });
       /*
        * Into the family the elder already has, rather than one of their own:

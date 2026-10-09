@@ -15,12 +15,14 @@
  */
 import type { A32Config } from '../config.js';
 import { cacheKey, type TtlCache } from '../pco/cache.js';
+import { loadGradeScale } from './grades.js';
 import { loadRelations } from './relations.js';
 import type { AdultContactStatus, PersonDetails, PersonSearchResult, RosterResult } from '../pco/roster.js';
 import { studentIdFor } from '../generated/backendIds.js';
 import { isA32GoneError, type A32Client, getA32Attendee } from './client.js';
 import {
-  a32Grade,
+  a32GradeIndex,
+  gradeOf,
   allergiesOf,
   contactsOf,
   displayFirstNameOf,
@@ -146,7 +148,8 @@ export async function fetchRoster(
   }
   unresolved.push(...stragglers.slice(MAX_INDIVIDUAL_LOOKUPS));
 
-  const people = [...found.values()].map(mapAttendeeToRosterPerson);
+  const scale = await loadGradeScale(options);
+  const people = [...found.values()].map((attendee) => mapAttendeeToRosterPerson(attendee, scale));
   people.sort((a, b) => (a.searchName < b.searchName ? -1 : a.searchName > b.searchName ? 1 : 0));
 
   return {
@@ -166,11 +169,13 @@ export async function fetchRoster(
 export async function searchPeople(options: {
   client: A32Client;
   config: A32Config;
+  cache: TtlCache;
   query: string;
   limit?: number;
 }): Promise<PersonSearchResult[]> {
   const query = options.query.trim();
   if (!query) return [];
+  const scale = await loadGradeScale(options);
   const limit = Math.max(1, Math.min(MAX_SEARCH_RESULTS, options.limit ?? MAX_SEARCH_RESULTS));
 
   // Never a bare list: `searchValue` narrows server-side against the infos
@@ -188,11 +193,11 @@ export async function searchPeople(options: {
         lastName: attendee.last_name ?? '',
         // What Attendees thinks, unclamped — an adult's blank grade must not
         // render as "6th".
-        grade: a32Grade(attendee),
-        // Attendees has no child flag; holding a school grade is the closest
-        // fact it keeps. Shown, never enforced — same posture as the rest of
-        // the picker.
-        child: a32Grade(attendee) !== null,
+        grade: gradeOf(attendee, scale),
+        // Attendees has no child flag; holding a rung on the grade list (any
+        // rung, a nursery one included) is the closest fact it keeps. Shown,
+        // never enforced — same posture as the rest of the picker.
+        child: a32GradeIndex(attendee) !== null,
         status: statusOf(attendee),
       });
       if (results.length >= limit) return results;

@@ -68,6 +68,18 @@ export interface A32Attending {
   attendee: string;
 }
 
+/** The caller's own organization, as `user_organizations` lists it. */
+export interface A32Organization {
+  id: number;
+  slug: string;
+  display_name: string;
+  infos: {
+    /** The rung labels `infos.fixed.grade` indexes into; see grades.ts. */
+    grade_converter?: string[] | null;
+    [key: string]: unknown;
+  } | null;
+}
+
 export interface A32Meet {
   id: number;
   slug: string;
@@ -128,6 +140,7 @@ export const API = {
   families: '/persons/api/attendee_families/',
   folkAttendees: '/persons/api/datagrid_data_familyattendees/',
   relations: '/persons/api/all_relations/',
+  organizations: '/whereabouts/api/user_organizations/',
   meets: '/occasions/api/organization_meets/',
   gatherings: '/occasions/api/organization_team_gatherings/',
   attendances: '/occasions/api/organization_meet_character_attendances/',
