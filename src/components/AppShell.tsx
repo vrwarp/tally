@@ -365,7 +365,7 @@ export function AppShell({ children }: { children: ReactNode }) {
        * there so a sixth on a short laptop scrolls rather than disappears.
        */}
       {showNav ? (
-        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:self-start lg:border-r lg:border-ink-800 lg:px-3 lg:py-4 pt-window-controls">
+        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-56 lg:shrink-0 lg:flex-col lg:gap-1 lg:self-start lg:border-r lg:border-ink-800 lg:px-3 lg:py-4 lg:pt-[max(1rem,var(--spacing-safe-top))] pt-window-controls">
           <span className="px-2 pb-4 text-sm font-bold uppercase tracking-widest text-brand-400">
             Tally
           </span>
