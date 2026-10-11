@@ -70,13 +70,22 @@ describe('hasIPadWindowControls', () => {
     expect(hasIPadWindowControls()).toBe(false);
   });
 
-  it('is false for an installed app on a real Mac', () => {
+  it('is false for an installed app on a real Mac, which reports at most one touch point', () => {
     stub({ touch: 0 });
+    expect(hasIPadWindowControls()).toBe(false);
+    stub({ touch: 1 });
     expect(hasIPadWindowControls()).toBe(false);
   });
 });
 
 describe('watchWindowControls', () => {
+  it('marks a window straight away, before anything is resized', () => {
+    stub({});
+    const stop = watchWindowControls();
+    expect(document.documentElement.hasAttribute('data-window-controls')).toBe(true);
+    stop();
+  });
+
   it('follows the window as it is resized', () => {
     stub({ innerWidth: 834 });
     const stop = watchWindowControls();

@@ -17,7 +17,6 @@ import { isStandaloneDisplay } from '@/lib/embeddedBrowser';
  *   report.
  */
 export function hasIPadWindowControls(): boolean {
-  if (typeof window === 'undefined') return false;
   // Stryker disable next-line StringLiteral: empty is "the browser told us nothing".
   const ua = navigator.userAgent || '';
   const iPad = /\biPad\b/.test(ua) || (/\bMacintosh\b/.test(ua) && navigator.maxTouchPoints > 1);
@@ -25,7 +24,7 @@ export function hasIPadWindowControls(): boolean {
 
   // WebKit's `screen.width` is the portrait width whichever way the iPad is
   // held, so take the edge that runs across the screen as it is held now.
-  const landscape = window.matchMedia?.('(orientation: landscape)').matches ?? false;
+  const landscape = window.matchMedia('(orientation: landscape)').matches;
   const across = landscape
     ? Math.max(screen.width, screen.height)
     : Math.min(screen.width, screen.height);
