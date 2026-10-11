@@ -5,6 +5,9 @@ import { registerSW } from 'virtual:pwa-register';
 import App from '@/App';
 import { TallyIntlProvider } from '@/i18n/TallyIntlProvider';
 import '@/index.css';
+import { watchWindowControls } from '@/lib/windowControls';
+
+watchWindowControls();
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root element.');

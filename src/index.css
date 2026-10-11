@@ -786,6 +786,18 @@
     padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
   }
 
+  /* Room for iPadOS's window controls, drawn over the top-left corner of an
+     installed app in a window with no safe-area inset to say so. They end
+     about 30px down and 45px across; the attribute comes from
+     `watchWindowControls`, and elsewhere these do nothing. */
+  [data-window-controls] .pt-window-controls {
+    padding-top: 2.5rem;
+  }
+
+  [data-window-controls] .pl-window-controls {
+    padding-left: 4rem;
+  }
+
   /* Momentum scrolling for the boxes that still scroll on their own — the
      filter row, the grade checklist, a modal's body — on iOS. */
   .scroll-touch {
