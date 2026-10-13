@@ -65,7 +65,9 @@ describe('EarlierAttendance', () => {
     await waitFor(() => expect(screen.getAllByText('Footprints')).toHaveLength(2));
     // Reaching two years back is the entire point — this is history the
     // screens above cannot see, because the loaded calendar stops months ago.
-    expect(screen.getByText(/Feb 2024|2\/3\/2024|Feb 3/)).toBeInTheDocument();
+    // Half past three in the morning UTC on the 3rd is still the evening of
+    // the 2nd anywhere in the Americas, so either day is this entry.
+    expect(screen.getByText(/Feb 2024|2\/[23]\/2024|Feb [23]\b/)).toBeInTheDocument();
     expect(screen.getByText(/that is everything on record/i)).toBeInTheDocument();
   });
 

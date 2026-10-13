@@ -47,7 +47,8 @@ const include = process.env.TALLY_MUTATION_TESTS
  * the real environment and the workers inherit it. New York because two of
  * the three pinned files ask for it; the third asks for Los Angeles and
  * asserts only wall-clock times, which hold in any zone that changes its
- * clocks on the same two nights.
+ * clocks on the same two nights. Every other test has to hold here as well as
+ * on the UTC runner `npm test` gets, so none may assume the host is UTC.
  */
 process.env.TZ = 'America/New_York';
 

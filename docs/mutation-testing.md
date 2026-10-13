@@ -385,7 +385,9 @@ several times slower, so the per-test timeout is longer. And Stryker runs
 Vitest on a single worker *thread* rather than forked processes, where a test
 file's `process.env.TZ` pin is silently a no-op — so the whole run is pinned to
 New York instead, which is a zone the `*.dst.test.ts` files' assertions hold in.
-A test that passes under `npm test` and fails only here almost always traces to
+That cuts the other way too: a test that holds only on a UTC host, as two that
+built their fixtures with `Date.UTC` did, fails here and nowhere else in CI. A
+test that passes under `npm test` and fails only here almost always traces to
 one of those two.
 
 ## In CI
