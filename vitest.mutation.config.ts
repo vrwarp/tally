@@ -28,6 +28,31 @@ const include = process.env.TALLY_MUTATION_TESTS
   : ALL_TESTS;
 
 /*
+ * One time zone for the whole run, and one that observes daylight saving.
+ *
+ * The `*.dst.test.ts` files pin `process.env.TZ` in a `beforeAll`, and under
+ * `npm test` that moves the clock: each file runs in its own forked process,
+ * and Node resets the time zone whenever a process's main thread assigns `TZ`.
+ * Stryker runs Vitest on a single worker *thread* instead, and a worker
+ * thread's `process.env` is a copy whose writes reach neither the process
+ * environment nor the time zone cache. The pin is silently a no-op there, the
+ * tests run in whatever zone the host has, and on a UTC runner (every GitHub
+ * runner) their first assertion, "is running in a zone that observes daylight
+ * saving", fails. Stryker reads any failing test in its initial run as a
+ * broken setup and stops before mutating anything, which is how the weekly
+ * run spent a month red.
+ *
+ * This file is evaluated on the main thread of each test runner process,
+ * before any worker exists, so an assignment here does take: it is written to
+ * the real environment and the workers inherit it. New York because two of
+ * the three pinned files ask for it; the third asks for Los Angeles and
+ * asserts only wall-clock times, which hold in any zone that changes its
+ * clocks on the same two nights. Every other test has to hold here as well as
+ * on the UTC runner `npm test` gets, so none may assume the host is UTC.
+ */
+process.env.TZ = 'America/New_York';
+
+/*
  * Stryker drives Vitest directly rather than through `npm test`, and its runner
  * wants a single flat project: with `projects` set it cannot tell which one to
  * instrument, and the `rules` project needs a Firestore emulator that a

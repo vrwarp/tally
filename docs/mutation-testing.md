@@ -374,6 +374,22 @@ The first pass over the logic core, in the order the sweep reached them:
   clauses, and not the overflow check that catches 31 February before it becomes
   3 March. That check is one comparison now rather than two.
 
+## The initial run
+
+Every run, narrowed or full, starts by running its suite once against the
+un-mutated code, and Stryker reads a single failure there as a broken setup: it
+stops before mutating anything and never creates the report directory. Two
+things about that run differ from `npm test`, and both live in
+`vitest.mutation.config.ts` rather than in any test. The instrumented code is
+several times slower, so the per-test timeout is longer. And Stryker runs
+Vitest on a single worker *thread* rather than forked processes, where a test
+file's `process.env.TZ` pin is silently a no-op — so the whole run is pinned to
+New York instead, which is a zone the `*.dst.test.ts` files' assertions hold in.
+That cuts the other way too: a test that holds only on a UTC host, as two that
+built their fixtures with `Date.UTC` did, fails here and nowhere else in CI. A
+test that passes under `npm test` and fails only here almost always traces to
+one of those two.
+
 ## In CI
 
 `.github/workflows/mutation.yml`, in two halves.

@@ -74,8 +74,12 @@ describe('eventWindow', () => {
    * The clock strings come from the device's own locale — a kiosk in Taipei is
    * as ordinary as one in Texas — so what is asserted is the join rather than
    * the times. These run under en-US, where the shape is "6:30 PM".
+   *
+   * Wall-clock time in whatever zone the process has, because that is the zone
+   * the formatter reads. Built from `Date.UTC`, these said "6:30 PM" only on a
+   * UTC host, and the mutation run is pinned to New York.
    */
-  const at = (hour: number, minute = 0) => Date.UTC(2026, 1, 13, hour, minute);
+  const at = (hour: number, minute = 0) => new Date(2026, 1, 13, hour, minute).getTime();
 
   it('says the meridiem once when both ends share it', () => {
     // 62mm of tape and a lobby screen read from four feet away: "6:30 PM –
