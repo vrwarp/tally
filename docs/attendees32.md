@@ -102,6 +102,11 @@ server fills the rest.
   address is a third answer again: merged, and the primary deleted afterwards — gone, with
   nowhere to point. A plain soft-delete is a `200` with `is_removed: true`, which `getA32Attendee`
   reports as gone; it still freezes check-ins until a leader removes or re-creates the student.
+  And Tally can make a merge: a Review-screen fold of two rows that are both Attendees people asks
+  attendees32 to merge the duplicate into the keeper first (`mergeSupported`, through
+  `POST …/<duplicate>/merge/`), and un-merging the fold asks it to unmerge, so the two never
+  disagree about whether they are one person. A merge undone in Attendees first is undone in
+  Tally without complaint. The simulator answers both calls the way the server does.
 - **The bracketed name cannot be written from Tally.** The nickname half of the composite is
   Attendees' CJK name, held in `first_name2`/`last_name2`, and Tally cannot tell which half of a
   CJK string is the family name — so a nickname edit is *refused* (`invalid`), with a sentence

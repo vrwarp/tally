@@ -14,6 +14,7 @@ import type { A32Config } from '../config.js';
 import { BACKEND_PREFIXES } from '../generated/backendIds.js';
 import { createA32Client } from './client.js';
 import { a32RootEventId, importMeetHistory, listImportableMeets } from './history.js';
+import { mergePeople, unmergePeople } from './merge.js';
 import { collectPhoneLast4 } from './phoneIndex.js';
 import {
   createAttendeeMemo,
@@ -54,6 +55,11 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
    * for why it may not outlive the call, and why only the read path gets one.
    */
   const attendees = createAttendeeMemo();
+  // A merge moves what two records hold; whatever was cached about either is stale.
+  const forget = (...personIds: string[]) => {
+    cache.invalidate(orgSweepCacheKey(config.baseUrl));
+    for (const personId of personIds) cache.invalidate(personDetailsCacheKey(config.baseUrl, personId));
+  };
 
   return {
     id: 'a32',
@@ -68,6 +74,7 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
        * Center's mirror answers and the only thing this flag is asking.
        */
       mergeAware: true,
+      mergeSupported: true,
       listsSupported: false,
       historyImportSupported: true,
       attendancePushSupported: false,
@@ -84,6 +91,16 @@ export function createA32Backend(args: BackendContext & { config: A32Config }): 
     collectPhoneLast4: ({ personIds, force }) =>
       collectPhoneLast4({ client, config, cache, personIds, force }),
     checkPerson: ({ personId }) => checkPerson(client, personId),
+    mergePeople: async ({ duplicatePersonId, primaryPersonId }) => {
+      const result = await mergePeople(client, duplicatePersonId, primaryPersonId);
+      if (result.status === 'done') forget(duplicatePersonId, primaryPersonId);
+      return result;
+    },
+    unmergePeople: async ({ duplicatePersonId }) => {
+      const result = await unmergePeople(client, duplicatePersonId);
+      if (result.status === 'done') forget(duplicatePersonId);
+      return result;
+    },
 
     pushStudent: ({ studentId, personId, createNew, logger }) =>
       pushStudent({ db, client, config, cache, studentId, personId, createNew, logger }),

@@ -93,6 +93,12 @@ export interface BackendCapabilities {
    * answers "gone" and never "relinked".
    */
   mergeAware: boolean;
+  /**
+   * Whether two of this backend's people can be merged from Tally: `mergePeople`
+   * and `unmergePeople` exist. attendees32 merges through its API; a Planning
+   * Center merge is made in Planning Center.
+   */
+  mergeSupported: boolean;
   /** Whether the backend has Planning Center-style Lists to import from. */
   listsSupported: boolean;
   /** Whether `listImportableEvents`/`importHistory` exist here. */
@@ -104,6 +110,9 @@ export interface BackendCapabilities {
    */
   attendancePushSupported: false;
 }
+
+/** The answer to "merge these two people", or "undo that", upstream. */
+export type UpstreamMergeResult = { status: 'done' } | { status: 'refused'; reason: string };
 
 /** The answer to "is this person real, before I put them on the roster". */
 export type PersonCheck =
@@ -209,6 +218,25 @@ export interface PeopleBackend {
   }): Promise<RecreateStudentResult>;
 
   /* ---- Optional surfaces, promised by `capabilities` --------------------- */
+
+  /**
+   * Merges the duplicate into the primary upstream, the same thing a leader
+   * does on the backend's own merge screen. Present iff
+   * `capabilities.mergeSupported`. A refusal carries the backend's reason, in
+   * its words, for the person who asked.
+   */
+  mergePeople?(args: {
+    duplicatePersonId: string;
+    primaryPersonId: string;
+    logger?: FunctionLogger;
+  }): Promise<UpstreamMergeResult>;
+
+  /**
+   * Undoes that merge, so the duplicate stands on its own again. Done, not
+   * refused, when it already does: an undo made upstream first is not a
+   * failure. Present iff `capabilities.mergeSupported`.
+   */
+  unmergePeople?(args: { duplicatePersonId: string; logger?: FunctionLogger }): Promise<UpstreamMergeResult>;
 
   /**
    * The kiosk phone index's raw material: backend person id -> every distinct

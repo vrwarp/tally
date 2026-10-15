@@ -281,9 +281,32 @@ function personsApi(
 ): SimResponse {
   const { method, query, headers } = request;
   const body = (request.body ?? {}) as Record<string, unknown>;
-  const [resource, id] = segments;
+  const [resource, id, action] = segments;
 
   if (resource === 'datagrid_data_attendee') {
+    /*
+     * The merge and its undo, the way attendees32 answers them: posted to the
+     * duplicate, guarded by the integration user's group (which the token
+     * already is), refused in the server's own words.
+     */
+    if (method === 'POST' && id && action === 'merge') {
+      const duplicate = store.attendees.get(id);
+      const primaryId = typeof body.primary === 'string' ? body.primary : '';
+      if (!primaryId) return json(400, { primary: 'Name the attendee to merge into.' });
+      const primary = store.attendees.get(primaryId);
+      if (!duplicate || !primary) return json(404, { detail: 'Not found.' });
+      const refusal = store.mergeRefusal(duplicate, primary);
+      if (refusal) return json(400, { detail: refusal });
+      store.mergeAttendee(duplicate.id, primary.id);
+      return json(200, { merged_into: primary.id });
+    }
+    if (method === 'POST' && id && action === 'unmerge') {
+      const duplicate = store.attendees.get(id);
+      if (!duplicate) return json(404, { detail: 'Not found.' });
+      if (!duplicate.mergedInto) return json(400, { detail: 'That attendee was not merged.' });
+      store.unmergeAttendee(duplicate.id);
+      return json(200, { restored: duplicate.id });
+    }
     if (method === 'GET' && id) {
       const attendee = store.attendees.get(id);
       /*

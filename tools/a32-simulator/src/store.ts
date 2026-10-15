@@ -35,6 +35,8 @@ export interface SimAttendee {
    * nowhere to point.
    */
   mergedInto: string | null;
+  /** Tombstones a merge re-pointed from this duplicate to its primary; put back on unmerge. */
+  repointed?: string[];
 }
 
 export interface SimFolk {
@@ -288,10 +290,39 @@ export class A32SimulatorStore {
     if (!duplicate || !primary || duplicate.id === primary.id) return null;
     duplicate.mergedInto = primary.id;
     duplicate.isRemoved = true;
+    duplicate.repointed = [];
     for (const earlier of this.attendees.values()) {
-      if (earlier.mergedInto === duplicate.id) earlier.mergedInto = primary.id;
+      if (earlier.mergedInto === duplicate.id) {
+        earlier.mergedInto = primary.id;
+        duplicate.repointed.push(earlier.id);
+      }
     }
     return primary;
+  }
+
+  /** attendees32's reasons for refusing a merge, in its words, or null. */
+  mergeRefusal(duplicate: SimAttendee, primary: SimAttendee): string | null {
+    if (duplicate.id === primary.id) return 'An attendee cannot be merged into themselves.';
+    if (primary.mergedInto) {
+      return 'That primary has itself been merged away. Merge into whoever holds the record now.';
+    }
+    if (primary.isRemoved) return 'That primary is deleted.';
+    if (duplicate.mergedInto) return 'That attendee has already been merged.';
+    return null;
+  }
+
+  /** Undoes a merge: the duplicate stands on its own again and its chain is as it was. */
+  unmergeAttendee(duplicateId: string): SimAttendee | null {
+    const duplicate = this.attendees.get(duplicateId);
+    if (!duplicate?.mergedInto) return null;
+    for (const id of duplicate.repointed ?? []) {
+      const earlier = this.attendees.get(id);
+      if (earlier) earlier.mergedInto = duplicate.id;
+    }
+    duplicate.repointed = [];
+    duplicate.mergedInto = null;
+    duplicate.isRemoved = false;
+    return duplicate;
   }
 
   /**

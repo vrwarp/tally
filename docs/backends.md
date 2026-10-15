@@ -25,6 +25,7 @@ the registry, with methods that mirror the flows the callables need —
 - writes: `pushStudent`, `pushPendingStudents`, `updateStudentProfile`, `setParentContact`,
   `addParent`, `createFamily`, `findAdultCandidates`, `recreateStudent`
 - history: `listImportableEvents`, `importHistory` (optional — capability-gated)
+- merges: `mergePeople`, `unmergePeople` (optional — capability-gated; Attendees only)
 - lists: `fetchLists`, `fetchListMemberIds` (optional, Planning Center only)
 - cache hygiene: `invalidatePersonDetails`, `invalidateReachability`, `resetCache`
 
@@ -39,6 +40,7 @@ Each backend declares `capabilities`:
 | `writeBack` | per config | per config | `off` / `create` / `full`, same ladder both sides |
 | `adultCreatable` | yes | yes | `addParent` and `createFamily` can create a person and a household/family |
 | `mergeAware` | yes | yes | Upstream merges leave a forwarding address Tally can follow |
+| `mergeSupported` | no | yes | Two of its people can be merged from Tally: the Review screen's fold asks it, and an un-merge asks it to undo |
 | `listsSupported` | yes | no | Saved lists exist upstream and can seed the roster |
 | `historyImportSupported` | yes | yes | A whole event's attendance history can be imported |
 | `attendancePushSupported` | no | no | Declared for a future backend; nothing implements it |
@@ -170,6 +172,19 @@ cached probe per window, a server without `/field_definitions` disables the whol
 silently, and an unreadable alias list never breaks an add or an import. The pointer is a pair of
 ids, so no personal data moves for it. Orgs are expected to keep the field's *value* correct —
 Tally follows it, it does not verify it.
+
+## Merging two people
+
+A fold on the Review screen is a decision about Tally's roster
+(`functions/src/backends/mergeStudents.ts`). When both rows are people of one backend, Tally saying
+they are one child does not make the backend agree — so a backend with `mergeSupported` is asked
+first: `mergePeople` merges the duplicate into the keeper upstream, and the fold happens only once
+that was made. A refusal comes back in the backend's own words and nothing on Tally's side moves.
+The fold then carries an `upstreamMerge` marker, and un-merging it calls `unmergePeople` before
+putting the row back; a merge already undone upstream counts as done, not as a refusal, so the two
+systems never disagree about whether the pair is one person. Planning Center has no such call: two
+of its people are still refused here and merged in Planning Center, where Tally follows the merge
+on the next read.
 
 ## The wire contract
 

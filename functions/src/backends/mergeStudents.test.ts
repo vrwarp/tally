@@ -7,11 +7,13 @@
  * forgets. Each of those is a test here because each of them is a real
  * possibility on a screen whose whole job is a judgement call.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FakeFirestore } from '../testing/fakeFirestore.js';
 import { PULSE_DOC } from '../kiosk/pulse.js';
 import { mergeStudents, unmergeStudents } from './mergeStudents.js';
+import type { BackendRegistry } from './registry.js';
 import { scanRoster } from './scan.js';
+import type { PeopleBackend, UpstreamMergeResult } from './types.js';
 
 const NOW = new Date('2026-08-11T10:00:00Z');
 
@@ -232,5 +234,215 @@ describe('un-merging', () => {
       now: NOW,
     });
     expect(result.status).toBe('refused');
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* When the backend can merge the two people itself                           */
+/* -------------------------------------------------------------------------- */
+
+type MergingBackend = PeopleBackend & {
+  mergePeople: ReturnType<typeof vi.fn>;
+  unmergePeople: ReturnType<typeof vi.fn>;
+};
+
+/** An Attendees adapter that answers as told, and remembers what it was asked. */
+function attendeesBackend(
+  answers: { merge?: UpstreamMergeResult; unmerge?: UpstreamMergeResult } = {},
+): MergingBackend {
+  return {
+    id: 'a32',
+    displayName: 'Attendees',
+    capabilities: { mergeSupported: true },
+    mergePeople: vi.fn(async () => answers.merge ?? { status: 'done' }),
+    unmergePeople: vi.fn(async () => answers.unmerge ?? { status: 'done' }),
+  } as unknown as MergingBackend;
+}
+
+/** Planning Center, which has no merge call. */
+function planningCenterBackend(): PeopleBackend {
+  return { id: 'pco', displayName: 'Planning Center', capabilities: { mergeSupported: false } } as unknown as PeopleBackend;
+}
+
+function registryOf(backends: Partial<Record<'pco' | 'a32', PeopleBackend>>): BackendRegistry {
+  return { get: (id: 'pco' | 'a32') => backends[id] ?? null } as unknown as BackendRegistry;
+}
+
+function mergeWith(store: FakeFirestore, registry: BackendRegistry | undefined, keeperId: string, foldId: string) {
+  return mergeStudents({ db: store, keeperId, foldId, uid: 'core-uid', now: NOW, registry });
+}
+
+function unmergeWith(store: FakeFirestore, registry: BackendRegistry | undefined, foldId: string) {
+  return unmergeStudents({ db: store, foldId, uid: 'core-uid', now: NOW, registry });
+}
+
+describe('merging two Attendees people', () => {
+  it('asks Attendees to merge the duplicate into the keeper, then folds', async () => {
+    const store = db();
+    store.seed('students/a32_aaa', { status: 'active', firstName: 'Sam' });
+    store.seed('students/a32_bbb', { status: 'active', firstName: 'Sam' });
+    const attendees = attendeesBackend();
+
+    const result = await mergeWith(store, registryOf({ a32: attendees }), 'a32_aaa', 'a32_bbb');
+
+    expect(result.status).toBe('merged');
+    expect(result.message).toMatch(/in Attendees too/);
+    expect(attendees.mergePeople).toHaveBeenCalledWith(
+      expect.objectContaining({ duplicatePersonId: 'bbb', primaryPersonId: 'aaa' }),
+    );
+    // The fold remembers that the backend merged them as well, for the undo.
+    expect(store.get('students/a32_bbb')).toMatchObject({
+      status: 'inactive',
+      mergedIntoStudentId: 'a32_aaa',
+      upstreamMerge: { backendId: 'a32', duplicatePersonId: 'bbb', primaryPersonId: 'aaa' },
+    });
+    expect(store.get('students/a32_aaa')!.mergedFromStudentIds).toEqual(['a32_bbb']);
+  });
+
+  it('does the same for a pushed visitor and the Attendees row it duplicates', async () => {
+    const store = db();
+    store.seed('students/a32_aaa', { status: 'active', firstName: 'Sam' });
+    store.seed('students/held-1', {
+      status: 'active',
+      firstName: 'Sam',
+      upstreamBackend: 'a32',
+      upstreamPersonId: 'bbb',
+    });
+    const attendees = attendeesBackend();
+
+    const result = await mergeWith(store, registryOf({ a32: attendees }), 'a32_aaa', 'held-1');
+
+    expect(result.status).toBe('merged');
+    expect(attendees.mergePeople).toHaveBeenCalledWith(
+      expect.objectContaining({ duplicatePersonId: 'bbb', primaryPersonId: 'aaa' }),
+    );
+    // Its own linkage stays: the id now forwards to the keeper's person upstream.
+    expect(store.get('students/held-1')).toMatchObject({
+      mergedIntoStudentId: 'a32_aaa',
+      upstreamBackend: 'a32',
+      upstreamPersonId: 'bbb',
+      upstreamMerge: { backendId: 'a32', duplicatePersonId: 'bbb', primaryPersonId: 'aaa' },
+    });
+    expect(store.get('students/held-1')!.mergeGraft).toBeUndefined();
+  });
+
+  it('does not fold when Attendees refuses', async () => {
+    const store = db();
+    store.seed('students/a32_aaa', { status: 'active' });
+    store.seed('students/a32_bbb', { status: 'active' });
+    const attendees = attendeesBackend({
+      merge: { status: 'refused', reason: 'Both attendees have a login; remove one first.' },
+    });
+
+    const result = await mergeWith(store, registryOf({ a32: attendees }), 'a32_aaa', 'a32_bbb');
+
+    expect(result.status).toBe('refused');
+    expect(result.message).toMatch(/Attendees would not merge them: Both attendees have a login/);
+    // Nothing on Tally's side moved either: the two must not disagree.
+    expect(store.get('students/a32_bbb')).toMatchObject({ status: 'active' });
+    expect(store.get('students/a32_bbb')!.mergedIntoStudentId).toBeUndefined();
+    expect(store.get('students/a32_aaa')!.mergedFromStudentIds).toBeUndefined();
+  });
+
+  it('still refuses two Planning Center people, which Planning Center merges itself', async () => {
+    const store = db();
+    store.seed('students/pco_7', { status: 'active' });
+    store.seed('students/pco_9', { status: 'active' });
+
+    const result = await mergeWith(store, registryOf({ pco: planningCenterBackend() }), 'pco_7', 'pco_9');
+
+    expect(result.status).toBe('refused');
+    expect(result.message).toMatch(/Merge them there/);
+  });
+
+  it('refuses two Attendees rows while Attendees is not connected', async () => {
+    const store = db();
+    store.seed('students/a32_aaa', { status: 'active' });
+    store.seed('students/a32_bbb', { status: 'active' });
+
+    const result = await mergeWith(store, registryOf({}), 'a32_aaa', 'a32_bbb');
+
+    expect(result.status).toBe('refused');
+    expect(result.message).toMatch(/Merge them there/);
+    expect(store.get('students/a32_bbb')).toMatchObject({ status: 'active' });
+  });
+
+  it('refuses two people held by different backends', async () => {
+    const store = db();
+    store.seed('students/pco_7', { status: 'active' });
+    store.seed('students/a32_bbb', { status: 'active' });
+    const attendees = attendeesBackend();
+
+    const result = await mergeWith(
+      store,
+      registryOf({ pco: planningCenterBackend(), a32: attendees }),
+      'pco_7',
+      'a32_bbb',
+    );
+
+    expect(result.status).toBe('refused');
+    expect(attendees.mergePeople).not.toHaveBeenCalled();
+  });
+});
+
+describe('un-merging a merge Attendees made too', () => {
+  async function merged(attendees: MergingBackend): Promise<FakeFirestore> {
+    const store = db();
+    store.seed('students/a32_aaa', { status: 'active', firstName: 'Sam' });
+    store.seed('students/a32_bbb', { status: 'active', firstName: 'Sam' });
+    await mergeWith(store, registryOf({ a32: attendees }), 'a32_aaa', 'a32_bbb');
+    return store;
+  }
+
+  it('undoes it in Attendees first and forgets the marker', async () => {
+    const attendees = attendeesBackend();
+    const store = await merged(attendees);
+
+    const result = await unmergeWith(store, registryOf({ a32: attendees }), 'a32_bbb');
+
+    expect(result.status).toBe('merged');
+    expect(attendees.unmergePeople).toHaveBeenCalledWith(expect.objectContaining({ duplicatePersonId: 'bbb' }));
+    const fold = store.get('students/a32_bbb')!;
+    expect(fold.status).toBe('active');
+    expect(fold.mergedIntoStudentId ?? null).toBeNull();
+    expect(fold.upstreamMerge ?? null).toBeNull();
+    expect(store.get('students/a32_aaa')!.mergedFromStudentIds).toEqual([]);
+  });
+
+  it('keeps the fold when Attendees would not undo it', async () => {
+    const attendees = attendeesBackend({
+      unmerge: { status: 'refused', reason: 'The login that moved has changed since; move it back by hand first.' },
+    });
+    const store = await merged(attendees);
+
+    const result = await unmergeWith(store, registryOf({ a32: attendees }), 'a32_bbb');
+
+    expect(result.status).toBe('refused');
+    expect(result.message).toMatch(/Attendees would not undo the merge: The login that moved/);
+    expect(store.get('students/a32_bbb')).toMatchObject({ status: 'inactive', mergedIntoStudentId: 'a32_aaa' });
+  });
+
+  it('refuses while Attendees is not connected any more', async () => {
+    const store = await merged(attendeesBackend());
+
+    const result = await unmergeWith(store, registryOf({}), 'a32_bbb');
+
+    expect(result.status).toBe('refused');
+    expect(result.message).toMatch(/not connected now/);
+    expect(store.get('students/a32_bbb')).toMatchObject({ status: 'inactive', mergedIntoStudentId: 'a32_aaa' });
+  });
+
+  it('undoes a fold nobody merged upstream without asking any backend', async () => {
+    const store = db();
+    store.seed('students/pco_7', { status: 'active' });
+    store.seed('students/held-1', { status: 'active' });
+    const attendees = attendeesBackend();
+    await mergeWith(store, registryOf({ a32: attendees }), 'pco_7', 'held-1');
+
+    const result = await unmergeWith(store, registryOf({ a32: attendees }), 'held-1');
+
+    expect(result.status).toBe('merged');
+    expect(attendees.unmergePeople).not.toHaveBeenCalled();
+    expect(store.get('students/held-1')).toMatchObject({ status: 'active' });
   });
 });

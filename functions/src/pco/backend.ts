@@ -94,6 +94,7 @@ export function createPcoBackend(args: BackendContext & { config: PcoConfig }): 
       writeBack: config.writeBack,
       adultCreatable: true,
       mergeAware: true,
+      mergeSupported: false,
       listsSupported: true,
       historyImportSupported: true,
       attendancePushSupported: false,
