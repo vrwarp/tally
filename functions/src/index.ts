@@ -4106,7 +4106,7 @@ export const discardRegistration = onCall<
 export const mergeStudents = onCall<
   { keeperId: string; foldId: string; undo?: boolean },
   Promise<MergeStudentsResult>
->({ timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
+>({ secrets: BACKEND_SECRETS, timeoutSeconds: 120, memory: '256MiB' }, async (request) => {
   await requireCoreTeam(request.auth?.uid);
   const foldId = request.data?.foldId;
   if (typeof foldId !== 'string' || foldId.trim().length === 0) {
@@ -4114,7 +4114,13 @@ export const mergeStudents = onCall<
   }
 
   if (request.data?.undo === true) {
-    return runUnmergeStudents({ db: db(), foldId: foldId.trim(), uid: request.auth!.uid, logger });
+    return runUnmergeStudents({
+      db: db(),
+      foldId: foldId.trim(),
+      uid: request.auth!.uid,
+      logger,
+      registry: await createRegistry(db()),
+    });
   }
 
   const keeperId = request.data?.keeperId;
@@ -4127,6 +4133,7 @@ export const mergeStudents = onCall<
     foldId: foldId.trim(),
     uid: request.auth!.uid,
     logger,
+    registry: await createRegistry(db()),
   });
 });
 

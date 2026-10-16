@@ -1668,6 +1668,7 @@ export interface BackendStatus {
     writeBack: PcoWriteBackMode;
     adultCreatable: boolean;
     mergeAware: boolean;
+    mergeSupported: boolean;
     listsSupported: boolean;
     historyImportSupported: boolean;
     attendancePushSupported: boolean;
