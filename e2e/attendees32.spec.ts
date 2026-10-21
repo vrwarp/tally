@@ -21,6 +21,7 @@ import {
   writeDocument,
 } from './support/emulator';
 import { expect, test } from './support/fixtures';
+import { E2E } from '../playwright.config';
 import { rosterAction } from './support/rosterActions';
 
 /**
@@ -46,6 +47,10 @@ async function pumpA32(
 }
 
 test.describe('Attendees (attendees32)', () => {
+  // Written against the simulator's people and its down switch; the real
+  // server has attendees32-live.spec.ts.
+  test.skip(E2E.a32.live, 'needs the Attendees simulator');
+
   // The suite is seeded once; what these tests wrote must not reshape what
   // the later specs assert on. See `removeA32Residue`.
   test.afterAll(async () => {

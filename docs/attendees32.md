@@ -174,3 +174,13 @@ The end-to-end suite starts it automatically. The Attendees specs (`e2e/attendee
 `e2e/multi-backend.spec.ts`) enable the backend by writing `config/attendees32` — the same document
 a leader's Save writes — and remove it afterwards, so every other spec runs against a single-backend
 world. The emulated project's `functions/.env.demo-tally` carries only the simulator's fixed token.
+
+
+## Testing against the real server
+
+The simulator in `tools/a32-simulator` is what the unit, functions and
+end-to-end suites run against. `docker-compose.integration.yml` runs the
+end-to-end suite against attendees32 itself, built from a pinned ref and loaded
+with its golden congregation; `e2e/attendees32-live.spec.ts` covers the roster
+sweep, a profile edit, a meet's history import, and a fold that asks the server
+to merge and to undo. See `e2e/README.md`.
