@@ -29,6 +29,10 @@ x-attendees32-env: &attendees32-env
 
 x-attendees32-build: &attendees32-build
   context: ${ATTENDEES32_REPO:-https://github.com/vrwarp/attendees32.git}#${ATTENDEES32_REF:-c6b8cfffd047cc4a43cd9c63ddb45e71e4d80a58}
+  args:
+    # The server reads its commit sha from the checkout at startup; a git
+    # context drops .git unless told to keep it.
+    BUILDKIT_CONTEXT_KEEP_GIT_DIR: 1
 
 services:
   attendees32-postgres:
