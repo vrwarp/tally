@@ -16,8 +16,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
+# NODE_ENV stays unset: set to development it makes `vite build` ship React's
+# development build, and the kiosk budget check fails the app build.
 ENV CI=true \
-    NODE_ENV=development \
     # Firebase writes its emulator downloads here; keeping it inside the image
     # means a run never has to reach the network for them.
     HOME=/root
