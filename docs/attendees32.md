@@ -185,4 +185,5 @@ with its golden congregation; `e2e/attendees32-live.spec.ts` covers the roster
 sweep and a meet's history import, and every write Tally makes: a profile edit,
 a fold that asks the server to merge and to undo, a visitor pushed as a new
 person, a parent added to a family, and a family registered at the door and
-approved. See `e2e/README.md`.
+approved. The kiosk is driven too: it checks a golden youth in, and registers
+a family with an allergy note that a leader then approves. See `e2e/README.md`.

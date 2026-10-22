@@ -8,12 +8,14 @@
  * is that the two codebases agree. Reads: the roster sweep, a meet's history.
  * Writes: a profile edit, a fold that asks the server to merge and to undo, a
  * visitor pushed as a new person, a parent added to a family, and a family
- * registered at the door and approved.
+ * registered at the door and approved. The kiosk itself is driven for the
+ * last two kinds: a check-in of a golden youth, and a registration.
  *
  * Runs only with a real server (E2E.a32.live); the people and the meet are
  * the golden congregation's youth group, which the server's setup command
  * provisioned Tally against.
  */
+import type { Page } from '@playwright/test';
 import { E2E } from '../playwright.config';
 import {
   a32FamiliesOf,
@@ -42,6 +44,7 @@ import {
   writeDocument,
 } from './support/emulator';
 import { expect, test } from './support/fixtures';
+import { bindTo, openKiosk, pairKiosk, typeOnKiosk } from './support/kiosk';
 import { REGISTRATIONS, removeRegistration, seedRegistration } from './support/registrations';
 import { rosterAction } from './support/rosterActions';
 
@@ -60,6 +63,56 @@ const CHILD_TITLES = ['child', 'son', 'daughter', 'ward'];
 
 function titleOf(relations: Record<string, number>, id: number): string | undefined {
   return Object.keys(relations).find((title) => relations[title] === id);
+}
+
+/** The family the kiosk test registers, under a surname of its own. */
+const KIOSK_SURNAME = `${SURNAME}k`;
+
+async function eventNamed(title: string): Promise<{ id: string }> {
+  const found = (await readCollection('events')).find((doc) => doc.data.title === title);
+  if (!found) throw new Error(`The seed produced no "${title}"; see scripts/seed.ts.`);
+  return { id: found.id };
+}
+
+/** One child through the kiosk's three questions. */
+async function enterChild(kiosk: Page, first: string, last: string, grade: string) {
+  await typeOnKiosk(kiosk, first);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.locator('[data-key="clear"]').click();
+  await typeOnKiosk(kiosk, last);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.getByRole('button', { name: grade, exact: true }).click();
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+}
+
+/** The adult, asked once after the first child. */
+async function enterGuardian(kiosk: Page, first: string, last: string, phone: string) {
+  await typeOnKiosk(kiosk, first);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await kiosk.locator('[data-key="clear"]').click();
+  await typeOnKiosk(kiosk, last);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+  await typeOnKiosk(kiosk, phone);
+  await kiosk.getByRole('button', { name: /^Next$/ }).click();
+}
+
+/** Takes a kiosk-registered family back out of Tally: its record, its students, their check-ins. */
+async function removeKioskFamily(surname: string, eventId: string): Promise<void> {
+  const registrations = (await readCollection(REGISTRATIONS)).filter(
+    (doc) => (doc.data.guardian as { lastName?: string } | null)?.lastName === surname,
+  );
+  for (const registration of registrations) {
+    for (const studentId of (registration.data.studentIds as string[] | undefined) ?? []) {
+      await deleteDocument(`events/${eventId}/attendance/${studentId}`);
+      await deleteDocument(`students/${studentId}`);
+    }
+    await deleteDocument(`${REGISTRATIONS}/${registration.id}`);
+  }
+  // Approval removes the record first; the students it left are still ours.
+  for (const student of (await readCollection('students')).filter((doc) => doc.data.lastName === surname)) {
+    await deleteDocument(`events/${eventId}/attendance/${student.id}`);
+    await deleteDocument(`students/${student.id}`);
+  }
 }
 
 /** Everyone on the server with this run's surname, by first name. */
@@ -108,7 +161,9 @@ test.describe('Attendees, the real server', () => {
     await removeA32Residue();
     await a32RemoveTwins(HANNAH, TWIN_PHONE);
     // What the write tests made, should one of them have stopped short of its own cleanup.
-    for (const row of Object.values(await peopleNamed(SURNAME))) await a32RemoveWithFamily(String(row.id));
+    for (const surname of [SURNAME, KIOSK_SURNAME]) {
+      for (const row of Object.values(await peopleNamed(surname))) await a32RemoveWithFamily(String(row.id));
+    }
   });
 
   test('a golden youth joins the roster and reads back whole', async ({
@@ -421,6 +476,169 @@ test.describe('Attendees, the real server', () => {
     } finally {
       for (const row of Object.values(await peopleNamed(SURNAME))) await a32RemoveWithFamily(String(row.id));
       await removeRegistration(registrationId, 2);
+      await firestore.remove('config/backends');
+    }
+  });
+
+  test('the kiosk finds a golden youth and checks her in', async ({ browser, page, signedInAs, attendees }) => {
+    test.setTimeout(120_000);
+    await attendees.enable();
+    await signedInAs('core');
+    const personId = await a32PersonIdOf(HANNAH);
+    const studentId = `a32_${personId}`;
+    // One Hannah on the kiosk: not hers from an earlier test, and not her twin's.
+    await removeA32Residue();
+    await writeDocument(`students/${studentId}`, { ...membership(personId, 'Hannah', 'Liu'), grade: 7 });
+    // A gathering of this run's own, open now, so the check-in has one place to land.
+    const gatheringId = `live-youth-${SURNAME}`;
+    const minutes = (offset: number) => new Date(Date.now() + offset * 60_000);
+    await writeDocument(`events/${gatheringId}`, {
+      title: 'Youth Group (live)',
+      description: null,
+      icon: null,
+      mode: 'oneoff',
+      seriesId: null,
+      recurrence: null,
+      recurrenceRootId: null,
+      predictFromChain: null,
+      startAt: minutes(-30),
+      endAt: minutes(90),
+      checkInOpensAt: minutes(-60),
+      checkInClosesAt: minutes(120),
+      location: null,
+      notes: null,
+      requiresRsvp: false,
+      requiresCheckOut: false,
+      status: 'scheduled',
+      createdAt: minutes(-200),
+      updatedAt: minutes(-200),
+      createdBy: 'e2e',
+    });
+    const { context, page: kiosk } = await openKiosk(browser);
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /youth group \(live\)/i);
+
+      // The kiosk reads the roster, backends included, after it is bound; the
+      // cache it writes says when that read has landed.
+      await kiosk.waitForFunction(
+        ([key, id]) => (localStorage.getItem(key!) ?? '').includes(id!),
+        ['tally:kiosk:roster', studentId],
+        { timeout: 60_000 },
+      );
+      await typeOnKiosk(kiosk, 'Hannah');
+      const row = kiosk.getByRole('button', { name: HANNAH_ROW }).first();
+      const noMatch = kiosk.getByText(/^no match$/i);
+      await expect(row.or(noMatch)).toBeVisible({ timeout: 20_000 });
+      // A gathering with no regulars yet scopes to nobody; widen to the roster.
+      if (await noMatch.isVisible()) await kiosk.getByRole('button', { name: /Search everyone/i }).click();
+      await expect(row).toBeVisible({ timeout: 20_000 });
+      await row.click();
+      await kiosk.getByRole('button', { name: /^Check in$/ }).click();
+      await expect(kiosk.getByText(/welcome/i)).toBeVisible();
+
+      // The kiosk uploads on its own clock, up to UPLOAD_DEADLINE_MS after the tap.
+      await expect
+        .poll(
+          async () =>
+            (await readCollection(`events/${gatheringId}/attendance`)).some(
+              (doc) => doc.data.studentId === studentId && doc.data.method === 'kiosk',
+            ),
+          { timeout: 60_000, message: "Hannah's kiosk check-in lands on the gathering" },
+        )
+        .toBe(true);
+      expect((await readCollection('kioskParkedRecords')).filter((doc) => doc.data.studentId === studentId)).toEqual([]);
+    } finally {
+      await context.close();
+      for (const doc of await readCollection(`events/${gatheringId}/attendance`)) {
+        await deleteDocument(`events/${gatheringId}/attendance/${doc.id}`);
+      }
+      for (const doc of await readCollection('kioskParkedRecords')) {
+        if (doc.data.studentId === studentId) await deleteDocument(`kioskParkedRecords/${doc.id}`);
+      }
+      await deleteDocument(`events/${gatheringId}`);
+      await deleteDocument(`students/${studentId}`);
+    }
+  });
+
+  test('a family registered at the kiosk reaches the server once a leader approves it', async ({
+    browser,
+    page,
+    signedInAs,
+    attendees,
+    firestore,
+  }) => {
+    test.setTimeout(240_000);
+    await attendees.enable('full');
+    await writeDocument('config/backends', { defaultPushBackend: 'a32' });
+    await signedInAs('core');
+    const nursery = await eventNamed('Nursery');
+    const { context, page: kiosk } = await openKiosk(browser);
+    try {
+      await pairKiosk(kiosk, page);
+      await bindTo(kiosk, /nursery/i);
+
+      await kiosk.getByRole('button', { name: /Register your child/i }).click();
+      await enterChild(kiosk, 'Wren', KIOSK_SURNAME, '4th grade');
+      // Full write-back means the server can hold an allergy note, so the kiosk asks.
+      await expect(kiosk.getByText(/Any allergies the leaders should know about/i)).toBeVisible();
+      await typeOnKiosk(kiosk, 'peanuts');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await enterGuardian(kiosk, 'Dana', KIOSK_SURNAME, '5105550714');
+      await kiosk.getByRole('button', { name: /Add another child/i }).click();
+      await typeOnKiosk(kiosk, 'Fox');
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: '2nd grade', exact: true }).click();
+      await kiosk.getByRole('button', { name: /^Next$/ }).click();
+      await kiosk.getByRole('button', { name: /^No allergies$/ }).click();
+      await kiosk.getByRole('button', { name: 'Check in Wren and Fox' }).click();
+      await expect(kiosk.getByText('Wren and Fox are checked in. Welcome!')).toBeVisible({ timeout: 20_000 });
+
+      // Nothing has reached the server yet: the children wait for a leader.
+      expect(Object.keys(await peopleNamed(KIOSK_SURNAME))).toHaveLength(0);
+
+      await gotoReady(page, '/review');
+      const card = page.locator('section', { hasText: `Dana ${KIOSK_SURNAME}` }).first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      await card.getByRole('button', { name: /Approve and add/i }).click();
+      await card.getByRole('button', { name: /^Yes — add/i }).click();
+
+      await expect
+        .poll(async () => Object.keys(await peopleNamed(KIOSK_SURNAME)).length, {
+          timeout: 90_000,
+          message: 'the children and their guardian reach Attendees',
+        })
+        .toBe(3);
+      const people = await peopleNamed(KIOSK_SURNAME);
+      expect(Object.keys(people).sort()).toEqual(['Dana', 'Fox', 'Wren']);
+      const ids = Object.fromEntries(Object.entries(people).map(([first, row]) => [first, String(row.id)]));
+
+      const members = await a32MeetMembers();
+      expect(members).toContain(ids.Wren);
+      expect(members).toContain(ids.Fox);
+
+      const family = a32FamilyOf((await a32Record(ids.Dana)).body!);
+      expect(family).not.toBeNull();
+      expect(family!.attendees).toEqual(expect.arrayContaining([ids.Wren, ids.Fox, ids.Dana]));
+      for (const first of ['Wren', 'Fox']) {
+        const families = a32FamiliesOf((await a32Record(ids[first]!)).body!);
+        expect(families.map((row) => row.id), `${first}'s families`).toEqual([family!.id]);
+      }
+      // The allergy note went with Wren, into the field the server keeps it in.
+      const wren = (await a32Record(ids.Wren!)).body!;
+      expect(String((wren.infos as { fixed?: { food_pref?: unknown } }).fixed?.food_pref ?? '')).toMatch(/peanuts/i);
+
+      // The check-in the kiosk wrote is still theirs, under the same student ids.
+      const attendance = await firestore.collection(`events/${nursery.id}/attendance`);
+      const ours = (await firestore.collection('students')).filter((doc) => doc.data.lastName === KIOSK_SURNAME);
+      expect(ours).toHaveLength(2);
+      expect(ours.every((doc) => doc.data.pendingReview === false && doc.data.upstreamBackend === 'a32')).toBe(true);
+      expect(attendance.filter((doc) => ours.some((student) => student.id === doc.data.studentId))).toHaveLength(2);
+    } finally {
+      await context.close();
+      for (const row of Object.values(await peopleNamed(KIOSK_SURNAME))) await a32RemoveWithFamily(String(row.id));
+      await removeKioskFamily(KIOSK_SURNAME, nursery.id);
       await firestore.remove('config/backends');
     }
   });
