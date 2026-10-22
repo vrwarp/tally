@@ -326,6 +326,24 @@ describe('the birthday on a student profile', () => {
     expect(await screen.findByText(/holds no year for them/)).toBeInTheDocument();
   });
 
+  /** The sentence names whichever backend holds the date, not always Planning Center. */
+  it('names the backend that holds the birthday', async () => {
+    personDetails.current = details({ birthdate: '2013-06-22' });
+    openProfile(
+      makeStudent({
+        id: 'a32_8153c1aa',
+        firstName: 'Hannah',
+        lastName: 'Liu',
+        pcoPersonId: '8153c1aa',
+        upstreamBackend: 'a32',
+        upstreamPersonId: '8153c1aa',
+        birthday: '06-22',
+      }),
+    );
+
+    expect(await screen.findByText('Saved in Attendees.')).toBeInTheDocument();
+  });
+
   it('names the gap rather than leaving a blank', () => {
     openProfile(linked({ birthday: null }));
 

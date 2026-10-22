@@ -1397,6 +1397,7 @@ function BirthdaySection({
   const readOnly = useReadOnly();
   const locale = useLocale();
   const [editing, setEditing] = useState(false);
+  const backend = backendLabelOf(student);
 
   // The date as it will be printed, with the year where there is one to print.
   const day = formatBirthdayLong(locale, onFile);
@@ -1478,10 +1479,10 @@ function BirthdaySection({
                 as something Tally is holding back.
               */}
               {!day
-                ? t('birthdaySavedOptionalYear')
+                ? t('birthdaySavedOptionalYear', { backend })
                 : birthdayYear(onFile) === null
-                  ? t('birthdaySavedNoYear')
-                  : t('birthdaySaved')}
+                  ? t('birthdaySavedNoYear', { backend })
+                  : t('birthdaySaved', { backend })}
             </p>
           ) : gateLoading ? (
             <p className="mt-1 text-xs text-ink-500">{t('readingPermissions')}</p>
