@@ -1591,12 +1591,29 @@ export async function createFamily(
       (edge) =>
         edge.attendee === child.personId && edge.folk.id === folkId && edge.is_removed !== true,
     );
-    if (alreadyIn) continue;
-    await client.post<A32FolkAttendee>(
-      API.folkAttendees,
-      { folk: folkId, attendee: child.personId, role: relationIds.child },
-      { 'X-Target-Attendee-Id': child.personId },
-    );
+    if (!alreadyIn) {
+      await client.post<A32FolkAttendee>(
+        API.folkAttendees,
+        { folk: folkId, attendee: child.personId, role: relationIds.child },
+        { 'X-Target-Attendee-Id': child.personId },
+      );
+    }
+    /*
+     * `pushStudent` gives every child it creates a family of their own, and
+     * for the children of one registration only the first of those becomes
+     * the household. The others would leave each later child in two families,
+     * listed twice in every directory, so a family that holds nobody else
+     * goes. The server deletes a folk its last member leaves.
+     */
+    for (const ownFolkId of familyFolkIdsOf(child.personId, child.edges)) {
+      if (ownFolkId === folkId) continue;
+      const others = child.edges.some(
+        (edge) =>
+          edge.folk.id === ownFolkId && edge.attendee !== child.personId && edge.is_removed !== true,
+      );
+      if (others) continue;
+      await client.delete(API.familyById(ownFolkId), { 'X-Target-Attendee-Id': child.personId });
+    }
   }
 
   // Unless this is the folk they already head — the case the precedence above

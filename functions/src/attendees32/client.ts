@@ -155,6 +155,7 @@ export interface A32Client {
   post<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T>;
   patch<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T>;
   put<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T>;
+  delete(path: string, headers?: Record<string, string>): Promise<void>;
   /** Walks `take`/`skip` pages of a list endpoint. */
   paginate<T>(
     path: string,
@@ -262,7 +263,7 @@ export function createA32Client(options: A32ClientOptions): A32Client {
   }
 
   async function requestUrl<T>(
-    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     url: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
@@ -380,6 +381,8 @@ export function createA32Client(options: A32ClientOptions): A32Client {
       requestUrl<T>('PATCH', toUrl(path), body, headers),
     put: <T>(path: string, body: unknown, headers?: Record<string, string>) =>
       requestUrl<T>('PUT', toUrl(path), body, headers),
+    delete: (path: string, headers?: Record<string, string>) =>
+      requestUrl<void>('DELETE', toUrl(path), undefined, headers),
     paginate,
   };
 }

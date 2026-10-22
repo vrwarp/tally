@@ -58,7 +58,7 @@ function readLiveAttendees() {
     const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
     if (match) values[match[1]] = match[2];
   }
-  for (const key of ['A32_TOKEN', 'A32_DIVISION_ID', 'A32_MEET_SLUG']) {
+  for (const key of ['A32_TOKEN', 'A32_DIVISION_ID', 'A32_MEET_SLUG', 'A32_CHARACTER_SLUG']) {
     if (!values[key]) throw new Error(`${file} has no ${key}. Did the Attendees setup finish?`);
   }
   const baseUrl = process.env.A32_API_BASE_URL;
@@ -69,6 +69,8 @@ function readLiveAttendees() {
     token: values.A32_TOKEN,
     divisionId: values.A32_DIVISION_ID,
     meetSlug: values.A32_MEET_SLUG,
+    // The meet's character, which the live spec needs to read the meet's roster.
+    characterSlug: values.A32_CHARACTER_SLUG,
   };
 }
 
@@ -90,6 +92,7 @@ export const E2E = {
     // same ones `setup_tally_integration` prints for a real server.
     divisionId: '11',
     meetSlug: 'simorg_tally_gathering',
+    characterSlug: '',
   },
 } as const;
 

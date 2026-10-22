@@ -182,5 +182,7 @@ The simulator in `tools/a32-simulator` is what the unit, functions and
 end-to-end suites run against. `docker-compose.integration.yml` runs the
 end-to-end suite against attendees32 itself, built from a pinned ref and loaded
 with its golden congregation; `e2e/attendees32-live.spec.ts` covers the roster
-sweep, a profile edit, a meet's history import, and a fold that asks the server
-to merge and to undo. See `e2e/README.md`.
+sweep and a meet's history import, and every write Tally makes: a profile edit,
+a fold that asks the server to merge and to undo, a visitor pushed as a new
+person, a parent added to a family, and a family registered at the door and
+approved. See `e2e/README.md`.
