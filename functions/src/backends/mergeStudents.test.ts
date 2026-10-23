@@ -161,6 +161,18 @@ describe('un-merging', () => {
     expect(store.get('students/pco_7')!.mergedFromStudentId).toBeNull();
   });
 
+  it('tells the lobby screens the duplicate is back, as the merge told them it was gone', async () => {
+    const store = db();
+    store.seed('students/pco_7', { status: 'active' });
+    store.seed('students/held-1', { status: 'active' });
+    await merge(store, 'pco_7', 'held-1');
+    const revAfterMerge = (store.get(PULSE_DOC)?.roster as { rev: number }).rev;
+
+    await unmergeStudents({ db: store, foldId: 'held-1', uid: 'core-uid', now: NOW });
+
+    expect((store.get(PULSE_DOC)?.roster as { rev: number }).rev).not.toBe(revAfterMerge);
+  });
+
   it('takes the grafted linkage back off a never-pushed duplicate and puts it back as it was', async () => {
     const store = db();
     store.seed('students/pco_7', { status: 'active', firstName: 'Robin', lastName: 'Fields' });

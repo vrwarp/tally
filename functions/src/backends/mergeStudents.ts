@@ -353,6 +353,10 @@ export async function unmergeStudents(options: {
     { merge: true },
   );
 
+  // The reactivated row is a student the lobby kiosks have dropped from their
+  // search since the merge; they must pick it up within a poll, not a TTL.
+  await bumpPulse(db, ['roster'], now, { logger });
+
   logger.info('Un-merged a roster row', { keeperId, foldId });
   return {
     status: 'merged',
