@@ -140,6 +140,9 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
   const port = await new Promise<number>((resolve, reject) => {
     server.once('error', reject);
     server.listen(requestedPort, host, () => {
+      // Only the bind can reject; later server errors must not be swallowed
+      // by an already-settled promise.
+      server.off('error', reject);
       const address = server.address();
       resolve(typeof address === 'object' && address ? address.port : requestedPort);
     });
