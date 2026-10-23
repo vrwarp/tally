@@ -36,7 +36,7 @@ export interface PastEventsResult {
   error: string | null;
   /** Asks for the next page. A no-op while one is already in flight. */
   loadMore: () => void;
-  /** Re-reads from the top. For the retry button on a failed page. */
+  /** Asks again for the page that failed — the cursor was left where it was. For the retry button. */
   retry: () => void;
 }
 
