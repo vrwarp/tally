@@ -88,12 +88,16 @@ holding screen, which is what a real volunteer sees before an admin adds them.
 | `npm run emulators` | Emulator Suite with an empty datastore, exporting to `./.emulator-data` on exit. |
 | `npm run emulators:resume` | The same, but importing `./.emulator-data` first so seeded data survives a restart. |
 | `npm run pco-sim` | The Planning Center simulator on port 4010. Needed for anything involving people — the roster and sign-in both read through it locally. Not started by `dev:emulated`. |
+| `npm run a32-sim` | The Attendees simulator on port 4011 — the counterpart of `pco-sim`; see [attendees32.md](attendees32.md). |
 | `npm run seed` | Fills the emulators *and* the simulator with the demo ministry. |
 | `npm run verify:seed` | Re-derives the roster and dashboard from the seeded data, as an end-to-end check. |
 | `npm run e2e` | Playwright end-to-end suite: chromium and webkit, desktop and phone. |
 | `npm run e2e:install` | Downloads the browsers matching the pinned Playwright version. |
 | `npm run e2e:report` | Opens the last HTML report. |
+| `npm run typecheck:e2e` | Type-checks the Playwright suite (`tsconfig.e2e.json`), which `typecheck` does not cover. |
+| `npm run perf:kiosk` | The opt-in kiosk benchmark; see [kiosk-performance.md](kiosk-performance.md). |
 | `npm run walkthrough` | Captures the screenshot walkthrough from the running app and builds the page. |
+| `npm run translate` | Drafts missing translations and reconciles `messages/translation-state.json`; `-- --todo` and `-- --sync-state` need no API key. See [i18n.md](i18n.md). |
 | `npm run functions:install` / `functions:build` | Dependency install / TypeScript build for `functions/`. |
 | `npm run functions:invokers` | Checks that every deployed callable still answers unauthenticated requests, and fixes the ones that do not. Run it when a callable starts failing in the browser with a CORS error — see [callable functions must allow unauthenticated invocations](deployment-setup.md#callable-functions-must-allow-unauthenticated-invocations). |
 
