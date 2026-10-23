@@ -913,6 +913,8 @@ describe('events', () => {
         // document two levels down that the writer chose.
         'sunday/school',
         '../events/event-1',
+        // `.` does not match a newline, so a slash after one must still count.
+        'sunday\n/school/x',
         // Relative-path names: legal strings, illegal document ids.
         '.',
         '..',

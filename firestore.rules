@@ -681,13 +681,18 @@ service cloud.firestore {
        *
        * Kept to what a Firestore document id can actually be, minus the two
        * relative-path names, which are legal strings and illegal ids.
+       *
+       * The slash test is `[^/]*`, a full match of anything but a slash, and
+       * not `!matches('.*/.*')`: `.` does not match a newline, so a value like
+       * `a<newline>/b/c` would not have matched the negated form and would have
+       * slipped past it.
        */
       function validChainRef(v) {
         return v == null
           || (v is string
               && v.size() > 0
               && v.size() <= 200
-              && !v.matches('.*/.*')
+              && v.matches('[^/]*')
               && v != '.'
               && v != '..');
       }
