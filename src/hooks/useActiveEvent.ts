@@ -105,6 +105,9 @@ const CANCELLED_ALLOWANCE = 2;
  */
 const PARTICIPATION_WINDOW = 12;
 
+/** One shared "no history", so an event with no chain answers identically every render. */
+const NO_HISTORY: TallyEvent[] = [];
+
 /**
  * The past instances of an event's series that feed its predictive roster.
  * Returns event records only — attendance for them is loaded by
@@ -119,9 +122,6 @@ const PARTICIPATION_WINDOW = 12;
  * A trip with nothing chosen loads nothing, by design: a retreat is not evidence
  * about who turns up to a retreat. See `lib/gatherings.ts`.
  */
-/** One shared "no history", so an event with no chain answers identically every render. */
-const NO_HISTORY: TallyEvent[] = [];
-
 export function useSeriesHistoryEvents(event: TallyEvent | null): TallyEvent[] {
   const { events, settings } = useData();
   const now = useNow(60_000);
