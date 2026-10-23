@@ -85,10 +85,8 @@ export function a32AliasesFromIncluded(
 
     const owner = relationships.customizable?.data ?? relationships.person?.data;
     const personId = Array.isArray(owner) ? undefined : owner?.id;
-    const value =
-      typeof (resource.attributes as { value?: unknown } | undefined)?.value === 'string'
-        ? ((resource.attributes as { value: string }).value ?? '').trim()
-        : '';
+    const raw = (resource.attributes as { value?: unknown } | undefined)?.value;
+    const value = typeof raw === 'string' ? raw.trim() : '';
     if (personId && value) aliases[personId] = value;
   }
   return aliases;

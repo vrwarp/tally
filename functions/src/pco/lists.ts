@@ -88,7 +88,7 @@ export interface FetchListsOptions {
 }
 
 /**
- * Every list the token can see, newest-relevant first.
+ * Every list the token can see, up to `limit`, in name order.
  *
  * Ordered by name rather than by size or recency: a leader is looking for a
  * list they already know the name of, and a stable order means the same list is
