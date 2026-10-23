@@ -315,22 +315,6 @@ export function unflatten(flat: Map<string, string>, order: readonly string[]): 
   return out;
 }
 
-/**
- * The ICU arguments and rich-text tags a message carries.
- *
- * `{count}`, `{count, plural, …}` and `<link>` all have to survive translation
- * intact — a dropped argument renders the raw placeholder on a screen, and a
- * dropped tag throws. Sorted so two messages can be compared by deep equality
- * regardless of the order the translator happened to write them in.
- *
- * A plural or select *branch body* is not an argument, and telling the two
- * apart is why this walks the string rather than matching it. `{count, plural,
- * one {gathering} other {gatherings}}` reads to a regexp as three arguments,
- * two of which are English words — which made every message shaped like that
- * untranslatable, because no correct Chinese carries a literal `{gatherings}`.
- * A branch body is still a message, though, so a real argument inside one is
- * found: `one {# of {total}}` carries `{total}`.
- */
 const IDENTIFIER = /^[a-zA-Z0-9_]+$/;
 const SUBMESSAGE = /(?:plural|selectordinal|select)\s*,/y;
 
@@ -384,6 +368,22 @@ function collectArguments(text: string, into: Set<string>): void {
   }
 }
 
+/**
+ * The ICU arguments and rich-text tags a message carries.
+ *
+ * `{count}`, `{count, plural, …}` and `<link>` all have to survive translation
+ * intact — a dropped argument renders the raw placeholder on a screen, and a
+ * dropped tag throws. Sorted so two messages can be compared by deep equality
+ * regardless of the order the translator happened to write them in.
+ *
+ * A plural or select *branch body* is not an argument, and telling the two
+ * apart is why this walks the string rather than matching it. `{count, plural,
+ * one {gathering} other {gatherings}}` reads to a regexp as three arguments,
+ * two of which are English words — which made every message shaped like that
+ * untranslatable, because no correct Chinese carries a literal `{gatherings}`.
+ * A branch body is still a message, though, so a real argument inside one is
+ * found: `one {# of {total}}` carries `{total}`.
+ */
 export function messageArguments(message: string): string[] {
   const args = new Set<string>();
   collectArguments(message, args);
