@@ -502,6 +502,9 @@ export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSetting
 /* Planning Center -> Student                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** See the note on `createdAt` in `fromRosterPerson`. */
+const EPOCH = new Date(0);
+
 /**
  * A roster row from Planning Center, in the shape the rest of the app already
  * speaks.
@@ -511,9 +514,6 @@ export function toSettings(snapshot: DocumentSnapshot<DocumentData>): AppSetting
  * student's Firestore document if one exists. Most students never get one:
  * a document is written only when Tally has something of its own to record.
  */
-/** See the note on `createdAt` in `fromRosterPerson`. */
-const EPOCH = new Date(0);
-
 export function fromRosterPerson(person: PcoRosterPerson, now: Date): Student {
   return {
     id: person.id,
