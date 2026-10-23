@@ -95,10 +95,11 @@ export async function bumpPulse(
     const snapshot = await ref.get();
     const data = snapshot.exists ? snapshot.data() : undefined;
 
-    if (options.debounceMs !== undefined) {
+    const { debounceMs } = options;
+    if (debounceMs !== undefined) {
       const fresh = channels.every((channel) => {
         const at = atOf(data, channel);
-        return at !== null && now.getTime() - at.getTime() < options.debounceMs!;
+        return at !== null && now.getTime() - at.getTime() < debounceMs;
       });
       if (fresh) return;
     }
