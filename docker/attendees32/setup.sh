@@ -13,7 +13,6 @@ python manage.py migrate --noinput
 python manage.py load_golden_data --seed --force --manifest /shared/golden-manifest.json
 python manage.py setup_tally_integration \
   --organization-slug d7c8Fd_cfcc_hayward \
-  --division-slug cfcch_crossing_ministry \
   --readable-meet "$YOUTH_GROUP" \
   | tee /shared/setup.log
 
