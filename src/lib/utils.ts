@@ -32,7 +32,7 @@ export function haptic(pattern: number | number[] = 12): void {
  * Name matching for the roster search bar.
  *
  * A counselor at the door is typing a name they just heard, on a phone
- * keyboard, at a student who is already walking past. Four things are forgiven,
+ * keyboard, at a student who is already walking past. Five things are forgiven,
  * cheapest check first:
  *
  * 1. Case and accents — "jose" finds "José García", and so does "José".
