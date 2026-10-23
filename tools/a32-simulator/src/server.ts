@@ -72,6 +72,7 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
         store.attendingMeets = [];
         store.gatherings = [];
         store.attendances = [];
+        store.requests.length = 0;
         store.down = false;
         const body = (await readBody(incoming)) as { seed?: boolean } | null;
         if (body?.seed !== false) seedDefaultOrganization(store);
@@ -131,9 +132,18 @@ export async function startSimulator(options: A32ServerOptions = {}): Promise<Ru
     });
   });
 
-  const port = options.port ?? Number.parseInt(process.env.A32_SIM_PORT ?? '4011', 10);
+  const requestedPort = options.port ?? Number.parseInt(process.env.A32_SIM_PORT ?? '4011', 10);
   const host = options.host ?? '127.0.0.1';
-  await new Promise<void>((resolve) => server.listen(port, host, resolve));
+  // Report the port the socket actually bound: `port: 0` asks the OS to pick
+  // one, and a bind failure must reject instead of crashing as an unhandled
+  // 'error' event.
+  const port = await new Promise<number>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(requestedPort, host, () => {
+      const address = server.address();
+      resolve(typeof address === 'object' && address ? address.port : requestedPort);
+    });
+  });
 
   if (verbose) {
     console.log(`[a32-sim] Attendees simulator listening on http://${host}:${port}`);
