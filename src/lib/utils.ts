@@ -386,20 +386,6 @@ export function matchesQuery(searchName: string, query: string): boolean {
 }
 
 /**
- * Is `needle` within `budget` edits of *some window* of `text`?
- *
- * Damerau-Levenshtein, with two adjustments for this being a substring search
- * rather than a whole-string comparison:
- *
- * - Row zero stays at zero, so the needle may start at any offset in the text
- *   for free. Typing "marcs" should not be charged for the "lee" it never got
- *   to, nor for the four names ahead of it in a full roster string.
- * - The answer is the smallest value in the final row — the best window wins.
- *
- * Adjacent transpositions cost one edit rather than two, because swapping two
- * letters ("Mracus") is how a name gets mistyped at speed.
- */
-/**
  * The three rolling rows, allocated once for the life of the tab.
  *
  * This function runs for every student the plain substring pass missed, on
@@ -418,6 +404,20 @@ let dpTwoBack = new Uint16Array(0);
 let dpPrev = new Uint16Array(0);
 let dpRow = new Uint16Array(0);
 
+/**
+ * Is `needle` within `budget` edits of *some window* of `text`?
+ *
+ * Damerau-Levenshtein, with two adjustments for this being a substring search
+ * rather than a whole-string comparison:
+ *
+ * - Row zero stays at zero, so the needle may start at any offset in the text
+ *   for free. Typing "marcs" should not be charged for the "lee" it never got
+ *   to, nor for the four names ahead of it in a full roster string.
+ * - The answer is the smallest value in the final row — the best window wins.
+ *
+ * Adjacent transpositions cost one edit rather than two, because swapping two
+ * letters ("Mracus") is how a name gets mistyped at speed.
+ */
 function approximatelyIncludes(text: string, needle: string, budget: number): boolean {
   const m = needle.length;
   const n = text.length;
@@ -531,22 +531,6 @@ export function formatPhoneInput(raw: string): string {
  */
 const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
 
-/**
- * One ordering key for every list of students in the app: given name first.
- *
- * It used to be surname-first here and given-name-first in the student
- * directory (which orders on `searchName`), while every row in both printed
- * "Given Surname" in a single weight. So neither list could be scanned by its
- * own key: a counselor with Marcus in front of them read down the leading word
- * of a surname-sorted column — Maya, Andre, Chloe, Ruby, Marcus — and found no
- * order at all, then either thumbed all twenty-four rows or fell back to
- * typing, which is the escape hatch rather than the path.
- *
- * Given name won because it is the token both lists already print first, it is
- * how a counselor holds a student in mind, and adopting it re-sorted only one
- * of the two lists. `StudentRow` sets the surname a step back so the scan has
- * something to land on.
- */
 /** Han characters, the ones `Intl.Collator` cannot file under a letter. */
 const HAN = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 
@@ -605,6 +589,22 @@ export function nameSortKey(person: {
   return romanized !== undefined && !HAN.test(romanized) ? romanized : person.firstName;
 }
 
+/**
+ * One ordering key for every list of students in the app: given name first.
+ *
+ * It used to be surname-first here and given-name-first in the student
+ * directory (which orders on `searchName`), while every row in both printed
+ * "Given Surname" in a single weight. So neither list could be scanned by its
+ * own key: a counselor with Marcus in front of them read down the leading word
+ * of a surname-sorted column — Maya, Andre, Chloe, Ruby, Marcus — and found no
+ * order at all, then either thumbed all twenty-four rows or fell back to
+ * typing, which is the escape hatch rather than the path.
+ *
+ * Given name won because it is the token both lists already print first, it is
+ * how a counselor holds a student in mind, and adopting it re-sorted only one
+ * of the two lists. `StudentRow` sets the surname a step back so the scan has
+ * something to land on.
+ */
 export function sortByName<
   T extends { lastName: string; firstName: string; searchName?: string },
 >(a: T, b: T): number {
@@ -613,7 +613,6 @@ export function sortByName<
     NAME_COLLATOR.compare(a.lastName, b.lastName)
   );
 }
-
 
 /**
  * Whether two arrays hold the very same items in the same order.
