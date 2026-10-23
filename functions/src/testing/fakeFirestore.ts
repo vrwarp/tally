@@ -152,10 +152,8 @@ export class FakeFirestore implements FirestoreLike {
   /**
    * Reads see the committed state; writes are held and applied together when
    * the callback resolves, and dropped if it throws — the two properties a
-   * caller relies on. There is no contention here to retry, so the callback
-   * runs once.
-   */
-  /**
+   * caller relies on.
+   *
    * Optimistic, like the real one: a transaction whose reads were overtaken by
    * somebody else's write before it committed is run again from the top, so
    * two workers racing for one document see each other. A test can hold one
@@ -210,6 +208,9 @@ export class FakeFirestore implements FirestoreLike {
         queued.push(() => {
           this.data.delete(ref.path);
           this.writes.push({ path: ref.path, data: { deleted: true } });
+          // Like every other write: a transaction that read this document must
+          // notice that a batch deleted it before the transaction committed.
+          this.touched(ref.path);
         }),
       commit: async () => {
         for (const apply of queued) apply();
