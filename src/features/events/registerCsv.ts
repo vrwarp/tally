@@ -148,11 +148,10 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
         // A lobby screen is not on the team, so it has no name to resolve —
         // and "Lobby kiosk" is the truer custody record than the volunteer
         // who happened to pair it. The device id is in the column beside.
-        if (deviceIdOfUid(by)) return 'Lobby kiosk';
-        // Blank rather than the raw uid: a uid in a name column reads as a
-        // person's name to whoever opens this next, and the value is already in
-        // its own column beside it.
-        return namesByUid.get(by) ?? '';
+        // Otherwise blank rather than the raw uid: a uid in a name column reads
+        // as a person's name to whoever opens this next, and the value is
+        // already in its own column beside it.
+        return byName(by);
       },
     },
     { header: 'checked_in_by_uid', value: (row) => row.attendance?.checkedInBy ?? '' },
@@ -182,12 +181,7 @@ function columns(grades: GradeStrings, context: RegisterCsvContext): CsvColumn<R
       },
       {
         header: 'checked_out_by',
-        value: (row) => {
-          const by = row.attendance?.checkedOutBy;
-          if (!by) return '';
-          if (deviceIdOfUid(by)) return 'Lobby kiosk';
-          return namesByUid.get(by) ?? '';
-        },
+        value: (row) => byName(row.attendance?.checkedOutBy),
       },
       { header: 'checked_out_by_uid', value: (row) => row.attendance?.checkedOutBy ?? '' },
       {
