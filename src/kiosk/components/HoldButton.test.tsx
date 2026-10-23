@@ -244,6 +244,29 @@ describe('a hold that stands alone', () => {
   });
 });
 
+describe('a second contact on the same button', () => {
+  it('restarts the count instead of stacking a second one', async () => {
+    const onHeld = vi.fn();
+    render(<HoldButton onHeld={onHeld}>Hold me</HoldButton>);
+    const button = screen.getByText('Hold me');
+
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 1, clientX: 100, clientY: 100 });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + 100);
+    });
+    await act(async () => {
+      fireEvent.pointerDown(button, { pointerId: 2, clientX: 100, clientY: 100 });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOLD_DELAY_MS + HOLD_MS + 500);
+    });
+
+    expect(onHeld).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('a hold that shares glass with something else', () => {
   it('cancels when the finger wanders past the slop', async () => {
     const onHeld = vi.fn();
