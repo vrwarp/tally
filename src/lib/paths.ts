@@ -11,8 +11,17 @@
  *   events/{eventId}                         a single dated gathering
  *   events/{eventId}/attendance/{studentId}  who showed up
  *   events/{eventId}/rsvps/{studentId}       who said they were coming (one-offs)
+ *   skippedNights/{chainKey}                 the nights of a repeat chain nobody came to
+ *   eventAccess/{chainKey}                   who may work a gathering (absent = open)
+ *   kioskDevices/{deviceId}                  a paired lobby kiosk and its standing
+ *   kioskParkedRecords/{recordId}            kiosk records no retry can land, awaiting review
+ *   kioskPresence/{chainKey}                 when each kiosk bound to a chain was last heard from
+ *   accessRequests/{chainKey}__{uid}         an ask to be put on a gathering
+ *   transitions/{chainKey}__{studentId}      a gathering no longer expecting a student
  *   config/settings                          tunable thresholds
  *   config/planningCenter                    the non-secret Planning Center settings
+ *   config/attendees32                       the Attendees (attendees32) counterpart
+ *   config/backends                          cross-backend settings
  *
  * Attendance and RSVP documents are keyed by student id on purpose: it makes
  * concurrent check-in from multiple counselor devices idempotent (PRD 4.1).
