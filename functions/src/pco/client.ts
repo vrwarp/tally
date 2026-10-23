@@ -431,10 +431,16 @@ export function createPcoClient(options: PcoClientOptions): PcoClient {
    * relative to what served it. Returns null rather than throwing when the
    * server sends something unparseable: the caller has other ways to find page
    * two, and all of them beat failing the roster.
+   *
+   * A link to another origin is treated as unusable too. Every request carries
+   * the Personal Access Token, so following a `next` that names a different
+   * host would hand the credential to whoever that host is; the offset step
+   * finds page two on the origin we meant to talk to.
    */
   function resolveNextUrl(nextLink: string, currentUrl: string): URL | null {
     try {
-      return new URL(nextLink, currentUrl);
+      const resolved = new URL(nextLink, currentUrl);
+      return resolved.origin === new URL(currentUrl).origin ? resolved : null;
     } catch {
       return null;
     }

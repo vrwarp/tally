@@ -175,6 +175,26 @@ describe('paginate', () => {
   });
 
   /**
+   * Every request carries the Personal Access Token, so a `links.next` that
+   * names another host must not be followed; the offset step takes over.
+   */
+  it('does not follow a links.next that points at another origin', async () => {
+    const { client, urls } = makeClient([
+      json({ data: personPage(['1', '2']), links: { next: 'https://evil.example/people?offset=2' } }),
+      json({ data: personPage(['3']) }),
+    ]);
+
+    const seen: string[] = [];
+    for await (const page of client.paginate<PcoPerson>('/people', {}, { perPage: 2 })) {
+      seen.push(...page.data.map((p) => p.id));
+    }
+
+    expect(seen).toEqual(['1', '2', '3']);
+    expect(urls.every((url) => url.startsWith(PCO_BASE_URL))).toBe(true);
+    expect(urls[1]).toBe(`${PCO_BASE_URL}/people?per_page=2&offset=2`);
+  });
+
+  /**
    * After following cursors, a page that advertises nothing has to step from
    * where the walk actually got to. Stepping from the stale local offset
    * re-requested a page already served, which the already-seen check then read
