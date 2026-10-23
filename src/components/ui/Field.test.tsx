@@ -156,3 +156,13 @@ describe('MaskedField', () => {
     expect(ghost.closest('span')?.className).toContain('text-ink-600');
   });
 });
+
+describe('a required field', () => {
+  it('is named by its label alone, without reading out the asterisk', () => {
+    render(<TextField label="Student name" required />);
+
+    const input = screen.getByRole('textbox', { name: 'Student name' });
+    expect(input).toBeRequired();
+    expect(screen.getByText('*')).toHaveAttribute('aria-hidden', 'true');
+  });
+});
