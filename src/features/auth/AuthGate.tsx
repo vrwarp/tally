@@ -222,6 +222,10 @@ function describeProvisionError(error: unknown): { key: ProvisionErrorKey; raw?:
  */
 const OPENING_RETRIES = [300, 1200, 3000, 6000];
 
+/** Grace after the last retry for its answer to land before the screen gives up. */
+const OPENING_GRACE_MS = 3000;
+const OPENING_GIVE_UP_MS = Math.max(...OPENING_RETRIES) + OPENING_GRACE_MS;
+
 /** How long the Copy button reads "Copied" before it is a Copy button again. */
 const COPIED_FEEDBACK_MS = 2000;
 
@@ -284,7 +288,7 @@ function PendingScreen() {
     const timers = OPENING_RETRIES.map((delay) =>
       setTimeout(() => void refreshProfile(), delay),
     );
-    const giveUp = setTimeout(() => setStuck(true), OPENING_RETRIES.at(-1)! + 3000);
+    const giveUp = setTimeout(() => setStuck(true), OPENING_GIVE_UP_MS);
 
     return () => {
       for (const timer of timers) clearTimeout(timer);
