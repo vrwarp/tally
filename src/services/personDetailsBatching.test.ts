@@ -266,6 +266,18 @@ describe('when a student cannot be read', () => {
     await expect(orphaned).rejects.toThrow();
   });
 
+  it('fails every row of an answer that carries neither map', async () => {
+    // A malformed body must not throw inside the collector and strand the rows.
+    batch().mockResolvedValue({ data: {} });
+
+    const first = getPersonDetails({ studentId: 'pco_1' });
+    const second = getPersonDetails({ studentId: 'pco_2' });
+    await settle();
+
+    await expect(first).rejects.toMatchObject({ code: 'internal' });
+    await expect(second).rejects.toMatchObject({ code: 'internal' });
+  });
+
   it('fails the whole batch when the call itself does', async () => {
     batch().mockRejectedValue(Object.assign(new Error('rate limited'), {
       code: 'functions/resource-exhausted',

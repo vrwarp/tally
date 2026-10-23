@@ -440,7 +440,11 @@ function flush(): void {
     })),
   }).then(
     (response) => {
-      const { details, errors } = response.data;
+      // Read defensively: a body missing either map would otherwise throw in
+      // here, after the batch has been taken off the queue, and leave every
+      // row's promise pending for the life of the tab.
+      const details = response.data?.details ?? {};
+      const errors = response.data?.errors ?? {};
       for (const [studentId, entry] of batch) {
         if (studentId in details) {
           entry.settle({ data: details[studentId] ?? null });
