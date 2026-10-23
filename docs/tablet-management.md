@@ -280,8 +280,8 @@ forever. The fourth constraint is never met, so the default mode never fires, an
 only door left. (The older policy-wide `appAutoUpdatePolicy` is superseded by the per-app
 `autoUpdateMode` above and does not change this.)
 
-Tally already has this hour. `isQuietHour()` in `src/kiosk/KioskApp.tsx:367` is `hour === 4`, and
-the nightly reload at `:1185` fires there — idle, unbound, printer released on purpose — to shed
+Tally already has this hour. `isQuietHour()` in `src/lib/kioskQuietHour.ts` is `hour === KIOSK_QUIET_HOUR` (4), and
+the nightly reload in `src/kiosk/KioskApp.tsx` fires there — idle, unbound, printer released on purpose — to shed
 what Chromium accumulates over weeks and to pick up deploys. `240`–`330` above is that same hour and
 a half. **The maintenance window and the kiosk's quiet hour should be one decision**, and the church
 should never be asked to hold two numbers that must agree. That is the strongest argument for Tally
@@ -832,7 +832,7 @@ tablet.
 
 The one want in §1 that never needed an EMM. `navigator.getBattery()` is available to Chrome on
 Android in a secure context, and the kiosk is already writing to its own row —
-`reportStanding` in `src/kiosk/services.ts:342` sets `lastSeenAt`, `boundTo` and `boundChain` on
+`reportStanding` in `src/kiosk/services.ts` sets `lastSeenAt`, `boundTo` and `boundChain` on
 `kioskDevices/{deviceId}` on a schedule. Adding `batteryLevel` and `charging` to that write turns
 the Devices screen from "this kiosk was alive on Tuesday" into "the shelf tablet has been off its
 charger since Thursday", which is the sentence somebody can actually act on before Sunday.
@@ -1097,7 +1097,7 @@ show a green tick over an invented media size.
 
 The one code change the WebUSB priority actually needs, and it is not where you would expect.
 
-**The problem.** `ready()` (`src/kiosk/printing/index.ts:680`) opens with
+**The problem.** `ready()` (`src/kiosk/printing/index.ts`) opens with
 `const stored = readPrinterConfig(); if (!stored) { setState({ kind: 'idle' }); return; }` — and the
 printing chunk is only imported at all when `tally:kiosk:printer` is set. So a tablet that has a
 policy pre-grant but has *never been manually paired here* never calls `getDevices()`, never sees
@@ -1188,13 +1188,13 @@ when the tablet is on battery — a plugged-in tablet and a retired row both say
 
 Independent of everything above; do it whether or not a single tablet is ever enrolled.
 
-- `reportStanding` (`src/kiosk/services.ts:342`) gains `batteryLevel` and `charging` from
+- `reportStanding` (`src/kiosk/services.ts`) gains `batteryLevel` and `charging` from
   `navigator.getBattery()`.
-- `KioskDeviceDoc` (`src/types/index.ts:946`) gains both as optional, in the way `boundTo` already
+- `KioskDeviceDoc` (`src/types/index.ts`) gains both as optional, in the way `boundTo` already
   is.
-- `firestore.rules:1434`: extend `touchesOnly(['lastSeenAt', 'boundTo', 'boundChain'])` and
+- `firestore.rules`: extend `touchesOnly(['lastSeenAt', 'boundTo', 'boundChain'])` and
   `validKioskReport()` — a number in 0..1 and a boolean, both optional. Tests in `firestore-tests/`.
-- `src/features/team/PersonPanel.tsx:431` renders it next to `isKioskLive`.
+- `src/features/kiosk/KioskDeviceRow.tsx` renders it next to `isKioskLive`.
 
 **The invariant.** An older kiosk that never writes these must keep passing `validKioskReport()`.
 The Battery Status API is absent on some engines and can reject; the report must survive that
@@ -1206,7 +1206,7 @@ without failing, because the report is also the kiosk's liveness oracle
 **Shipped** as `src/lib/kioskQuietHour.ts`, which also gives `quietWindowMinutes()` to the staging
 page so the window a console is told and the hour the kiosk reloads in come from one constant.
 
-`isQuietHour()` is a hard-coded `4` inside `src/kiosk/KioskApp.tsx:367`. Lift it to a named export
+`isQuietHour()` was a hard-coded `4` inside `src/kiosk/KioskApp.tsx`. Lift it to a named export
 so §4.1's maintenance window can be stated as *the same hour the kiosk reloads* rather than as a
 coincidence. Small, and it stops two numbers that must agree from being invisible to each other.
 
