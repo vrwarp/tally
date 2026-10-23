@@ -197,11 +197,11 @@ export function PlanningCenterErrorDetails({ report, className }: PlanningCenter
           <Button variant="secondary" size="sm" onClick={() => void copy()}>
             {copied === 'copied' ? t('copiedShort') : t('copyDebug')}
           </Button>
-          {copied === 'failed' ? (
-            <span className="text-xs text-ink-500">
-              {t('copyBlocked')}
-            </span>
-          ) : null}
+          {/* Always mounted, so that the sentence arriving in it is announced:
+              a live region that appears already holding its text is not. */}
+          <span aria-live="polite" className="text-xs text-ink-500">
+            {copied === 'failed' ? t('copyBlocked') : ''}
+          </span>
           <span aria-live="polite" className="sr-only">
             {copied === 'copied' ? t('copied') : ''}
           </span>

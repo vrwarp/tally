@@ -82,7 +82,11 @@ describe('PlanningCenterErrorDetails', () => {
     render(<PlanningCenterErrorDetails report={REPORT} />);
     fireEvent.click(screen.getByRole('button', { name: 'Copy debug details' }));
 
-    expect(await screen.findByText(/Copying is blocked on this device/)).toBeInTheDocument();
+    const notice = await screen.findByText(/Copying is blocked on this device/);
+    expect(notice).toBeInTheDocument();
+    // Announced, not just drawn: a screen reader user gets no other word that
+    // the press did nothing.
+    expect(notice).toHaveAttribute('aria-live', 'polite');
   });
 
   it('explains a failure that never reached Planning Center', () => {
