@@ -57,6 +57,7 @@ import {
   REGISTRATIONS_COLLECTION,
   RegistrationInputError,
   findRosterDuplicates,
+  isAlreadyExists,
   parseName,
   parseRegistrationPhone,
   sweepRegistrations,
@@ -216,8 +217,7 @@ export async function recordVisitorParent(
       completedAt: Timestamp.fromDate(now),
     });
   } catch (error) {
-    const code = (error as { code?: unknown } | null)?.code;
-    if (code !== 6 && code !== 'already-exists' && code !== 'ALREADY_EXISTS') throw error;
+    if (!isAlreadyExists(error)) throw error;
     // The same press, arriving twice. Answering it is the whole reason the
     // client mints the id rather than the server.
     return {

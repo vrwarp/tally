@@ -115,6 +115,20 @@ describe('the account menu', () => {
   });
 });
 
+describe('leaving the account menu', () => {
+  it('closes on Escape, so a keyboard user is not stuck behind the sheet', async () => {
+    await openAccountMenu('counselor');
+    expect(screen.getAllByRole('menu').length).toBeGreaterThan(0);
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    for (const chip of screen.getAllByRole('button', { name: /Sam Whitfield/ })) {
+      expect(chip).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+});
+
 describe('the view-only badge', () => {
   it('stands in for a viewer\'s initial, on the button every screen draws', () => {
     renderShell('viewer');

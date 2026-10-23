@@ -229,6 +229,26 @@ describe('useProfileHistory, when the registry has not examined a night', () => 
   });
 });
 
+describe('useProfileHistory, when the read fails', () => {
+  it('reports an Error rejection by its message', async () => {
+    fetchSkippedNights.mockRejectedValue(new Error('offline'));
+
+    const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME], WINDOW_START));
+
+    await waitFor(() => expect(result.current.error).toBe('offline'));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('still reports a rejection that is not an Error', async () => {
+    fetchSkippedNights.mockRejectedValue('quota exceeded');
+
+    const { result } = renderHook(() => useProfileHistory(STUDENT, [CAME], WINDOW_START));
+
+    // A bare string has no `.message`; the banner is keyed on a truthy error.
+    await waitFor(() => expect(result.current.error).toBe('quota exceeded'));
+  });
+});
+
 describe('useProfileHistory, when a gathering is not the reader’s', () => {
   /** Sunday School, which this reader is not on. Friday is theirs. */
   const SUNDAY = night('sunday', '2026-01-11', 'sunday-school');

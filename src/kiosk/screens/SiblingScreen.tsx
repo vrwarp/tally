@@ -85,7 +85,7 @@ export function SiblingScreen({
    * returns the people already on the screen behind this one.
    */
   const outcome = useMemo(
-    () => searchStudents(buffer, students as KioskStudent[], {}),
+    () => searchStudents(buffer, students, {}),
     [buffer, students],
   );
 

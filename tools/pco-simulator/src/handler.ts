@@ -741,6 +741,20 @@ function collectionFor(
   return store.people;
 }
 
+/** The `per_page` (capped at the store's page size, at least 1) and `offset` a request asks for. */
+function pageWindow(
+  store: SimulatorStore,
+  query: Record<string, QueryNode>,
+): { perPage: number; offset: number } {
+  const requestedPerPage = Number(scalar(query.per_page) ?? store.pageSize);
+  const perPage = Math.max(
+    1,
+    Math.min(store.pageSize, Number.isFinite(requestedPerPage) ? requestedPerPage : store.pageSize),
+  );
+  const offset = Math.max(0, Number(scalar(query.offset) ?? 0) || 0);
+  return { perPage, offset };
+}
+
 /**
  * Rebuilds a page URL, preserving every filter the caller sent.
  *
@@ -801,12 +815,7 @@ function servePeople(
   const filtered = applyWhere(candidates, nested(query.where), store);
   const ordered = applyOrder(filtered, scalar(query.order));
 
-  const requestedPerPage = Number(scalar(query.per_page) ?? store.pageSize);
-  const perPage = Math.max(
-    1,
-    Math.min(store.pageSize, Number.isFinite(requestedPerPage) ? requestedPerPage : store.pageSize),
-  );
-  const offset = Math.max(0, Number(scalar(query.offset) ?? 0) || 0);
+  const { perPage, offset } = pageWindow(store, query);
 
   const page = ordered.slice(offset, offset + perPage);
   const nextOffset = offset + perPage;
@@ -869,12 +878,7 @@ function serveLists(
   });
   if (descending) ordered.reverse();
 
-  const requestedPerPage = Number(scalar(query.per_page) ?? store.pageSize);
-  const perPage = Math.max(
-    1,
-    Math.min(store.pageSize, Number.isFinite(requestedPerPage) ? requestedPerPage : store.pageSize),
-  );
-  const offset = Math.max(0, Number(scalar(query.offset) ?? 0) || 0);
+  const { perPage, offset } = pageWindow(store, query);
   const page = ordered.slice(offset, offset + perPage);
   const nextOffset = offset + perPage;
 

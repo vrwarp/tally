@@ -394,13 +394,7 @@ export async function buildPhoneIndex(
 export async function phoneIndexIsStale(db: FirestoreLike, now: Date): Promise<boolean> {
   const snapshot = await db.doc(PHONE_INDEX_DOC).get();
   if (!snapshot.exists) return true;
-  const builtAt = snapshot.data()?.builtAt;
-  const builtDate =
-    typeof (builtAt as { toDate?: unknown })?.toDate === 'function'
-      ? (builtAt as { toDate(): Date }).toDate()
-      : builtAt instanceof Date
-        ? builtAt
-        : null;
+  const builtDate = toDateOrNull(snapshot.data()?.builtAt);
   if (!builtDate) return true;
   return now.getTime() - builtDate.getTime() > PHONE_INDEX_STALE_MS;
 }

@@ -43,6 +43,14 @@ export interface PartialRosterDialogProps {
   retrying?: boolean;
 }
 
+/** When the saved copy was read, or null if it has no date or one that does not parse. */
+function savedAt(backend: RosterBackendStatus): Date | null {
+  if (!backend.fetchedAt) return null;
+  const at = new Date(backend.fetchedAt);
+  // Formatting an invalid Date throws, which would take the whole dialog down.
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
 export function PartialRosterDialog({
   open,
   down,
@@ -76,20 +84,23 @@ export function PartialRosterDialog({
     >
       <div className="flex flex-col gap-3 text-sm text-ink-300">
         <ul className="flex flex-col gap-2">
-          {down.map((backend) => (
-            <li key={backend.backendId} className="rounded-xl bg-ink-800 px-3 py-2">
-              <p className="font-semibold text-ink-100">{backend.displayName}</p>
-              {backend.error ? <p className="mt-0.5 text-warn-400">{backend.error}</p> : null}
-              <p className="mt-0.5 text-xs text-ink-500">
-                {backend.fetchedAt
-                  ? t('savedCopyWithDate', {
-                      count: backend.people,
-                      when: time.dateTime(new Date(backend.fetchedAt)),
-                    })
-                  : t('savedCopy', { count: backend.people })}
-              </p>
-            </li>
-          ))}
+          {down.map((backend) => {
+            const readAt = savedAt(backend);
+            return (
+              <li key={backend.backendId} className="rounded-xl bg-ink-800 px-3 py-2">
+                <p className="font-semibold text-ink-100">{backend.displayName}</p>
+                {backend.error ? <p className="mt-0.5 text-warn-400">{backend.error}</p> : null}
+                <p className="mt-0.5 text-xs text-ink-500">
+                  {readAt
+                    ? t('savedCopyWithDate', {
+                        count: backend.people,
+                        when: time.dateTime(readAt),
+                      })
+                    : t('savedCopy', { count: backend.people })}
+                </p>
+              </li>
+            );
+          })}
         </ul>
 
         {unresolved > 0 ? (

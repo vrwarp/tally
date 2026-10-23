@@ -118,6 +118,19 @@ describe('preparing a photograph', () => {
     await expect(prepareKioskBackdrop(blobOf(10, 'image/jpeg'))).rejects.toThrow(CANNOT_READ);
   });
 
+  it('releases the decoded bitmap when the canvas refuses a context', async () => {
+    const { bitmap } = stubBitmap(100, 100);
+    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(null);
+    await expect(prepareKioskBackdrop(blobOf(10, 'image/jpeg'))).rejects.toThrow(CANNOT_READ);
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the decoded bitmap when the decode has no size', async () => {
+    const { bitmap } = stubBitmap(0, 4000);
+    await expect(prepareKioskBackdrop(blobOf(10, 'image/jpeg'))).rejects.toThrow(CANNOT_READ);
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+
   it('walks down the ladder and stops the moment the target is met, inclusive', async () => {
     stubBitmap(1920, 1080);
     const sizes: Record<string, number> = {

@@ -36,6 +36,17 @@ export const HISTORY_MAX_AGE_DAYS = 365;
 const DAY_MS = 86_400_000;
 
 /**
+ * The far edge of the window.
+ *
+ * Exported because it is also what gets written down as coverage: a screen that
+ * examined this window may claim it examined back to exactly here, and no
+ * further.
+ */
+export function historyWindowStart(now: Date): Date {
+  return new Date(now.getTime() - HISTORY_MAX_AGE_DAYS * DAY_MS);
+}
+
+/**
  * The finished nights that history covers, newest first.
  *
  * Three conditions, and each of them is load-bearing:
@@ -53,17 +64,6 @@ const DAY_MS = 86_400_000;
  * how deep a gathering's history runs is a fact about the window rather than
  * about how often that gathering meets.
  */
-/**
- * The far edge of the window.
- *
- * Exported because it is also what gets written down as coverage: a screen that
- * examined this window may claim it examined back to exactly here, and no
- * further.
- */
-export function historyWindowStart(now: Date): Date {
-  return new Date(now.getTime() - HISTORY_MAX_AGE_DAYS * DAY_MS);
-}
-
 export function historyWindow(events: readonly TallyEvent[], now: Date): TallyEvent[] {
   const since = historyWindowStart(now);
 

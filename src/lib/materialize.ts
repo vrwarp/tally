@@ -99,6 +99,8 @@ export interface OccurrenceSource {
  */
 export const HORIZON_DAYS = 60;
 
+const DAY_MS = 86_400_000;
+
 /**
  * The identity of a chain of repeats, stable across every instance in it.
  *
@@ -282,7 +284,7 @@ export function projectOccurrences(
 ): ProjectedOccurrence[] {
   const horizonDays = options.horizonDays ?? HORIZON_DAYS;
 
-  const horizon = new Date(now.getTime() + horizonDays * 86_400_000);
+  const horizon = new Date(now.getTime() + horizonDays * DAY_MS);
   const projected: ProjectedOccurrence[] = [];
 
   /*

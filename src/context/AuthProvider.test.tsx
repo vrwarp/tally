@@ -45,6 +45,7 @@ const browser = vi.hoisted(() => ({
 
 const firebaseApp = vi.hoisted(() => ({ options: { authDomain: 'tally.example.org' } }));
 const resolver = vi.hoisted(() => ({ resolver: true }));
+const loadResolver = vi.hoisted(() => vi.fn(async () => ({ resolver: true })));
 
 /** Whatever `signInWithGoogle` asked Google for, most recent last. */
 const providerParameters = vi.hoisted(() => [] as Record<string, string>[]);
@@ -66,7 +67,7 @@ const firebaseAuth = vi.hoisted(() => ({ currentUser: null as { uid: string } | 
 vi.mock('@/lib/firebase', () => ({
   auth: firebaseAuth,
   firebaseApp,
-  popupRedirectResolver: async () => resolver,
+  popupRedirectResolver: loadResolver,
 }));
 vi.mock('@/lib/embeddedBrowser', () => ({
   isEmbeddedBrowser: () => browser.embedded,
@@ -160,6 +161,7 @@ beforeEach(() => {
     },
   );
 
+  loadResolver.mockReset().mockResolvedValue(resolver);
   signInWithPopup.mockReset().mockResolvedValue({});
   signInWithRedirect.mockReset().mockResolvedValue(undefined);
   getRedirectResult.mockReset().mockResolvedValue(null);
@@ -601,6 +603,27 @@ describe('a popup that never opened', () => {
 
     expect(window.sessionStorage.getItem(REDIRECT_PENDING_KEY)).toBeNull();
     expect(latest?.error).toBe('No connection. Check the wifi and try again.');
+  });
+});
+
+describe('a resolver that could not be loaded', () => {
+  it('says so instead of failing silently, and tries nothing else', async () => {
+    loadResolver.mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'));
+    mount();
+    await waitFor(() => expect(latest).not.toBeNull());
+
+    let rejected = false;
+    await act(async () => {
+      await latest?.signInWithGoogle().catch(() => {
+        rejected = true;
+      });
+    });
+
+    expect(rejected).toBe(true);
+    expect(latest?.error).toBe('No connection. Check the wifi and try again.');
+    expect(signInWithPopup).not.toHaveBeenCalled();
+    expect(signInWithRedirect).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(REDIRECT_PENDING_KEY)).toBeNull();
   });
 });
 

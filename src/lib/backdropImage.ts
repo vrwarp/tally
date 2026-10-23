@@ -90,11 +90,16 @@ async function digestId(blob: Blob): Promise<string> {
 }
 
 /**
- * One file in, one kiosk-ready image out — or a `BackdropImageError` whose
- * message is meant for the screen.
+ * The decoded image drawn onto a canvas at kiosk size.
+ *
+ * Split out of `prepareKioskBackdrop` so the caller can release the decoded
+ * bitmap in one `finally`, whichever way this throws.
  */
-export async function prepareKioskBackdrop(file: Blob): Promise<PreparedKioskBackdrop> {
-  const source = await decodeToBitmap(file);
+function drawScaled(source: ImageBitmap | HTMLImageElement): {
+  canvas: HTMLCanvasElement;
+  width: number;
+  height: number;
+} {
   const sourceWidth = source.width;
   const sourceHeight = source.height;
   if (!sourceWidth || !sourceHeight) throw new BackdropImageError(CANNOT_READ);
@@ -111,7 +116,24 @@ export async function prepareKioskBackdrop(file: Blob): Promise<PreparedKioskBac
   const context = canvas.getContext('2d');
   if (!context) throw new BackdropImageError(CANNOT_READ);
   context.drawImage(source, 0, 0, width, height);
-  if ('close' in source) source.close();
+  return { canvas, width, height };
+}
+
+/**
+ * One file in, one kiosk-ready image out — or a `BackdropImageError` whose
+ * message is meant for the screen.
+ */
+export async function prepareKioskBackdrop(file: Blob): Promise<PreparedKioskBackdrop> {
+  const source = await decodeToBitmap(file);
+  let drawn: ReturnType<typeof drawScaled>;
+  try {
+    drawn = drawScaled(source);
+  } finally {
+    // A decoded bitmap holds its pixels until closed, so every exit lets go —
+    // a refused canvas or a zero-sized decode included, not just the happy path.
+    if ('close' in source) source.close();
+  }
+  const { canvas, width, height } = drawn;
 
   /*
    * WebP where the canvas can write it, JPEG where it cannot. The spec makes

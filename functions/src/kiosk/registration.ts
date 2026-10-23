@@ -534,7 +534,8 @@ export function readRegistration(data: Record<string, unknown>): RegistrationRec
   };
 }
 
-function isAlreadyExists(error: unknown): boolean {
+/** True when a `create()` was refused because the document already exists. */
+export function isAlreadyExists(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
   return code === 6 || code === 'already-exists' || code === 'ALREADY_EXISTS';
 }

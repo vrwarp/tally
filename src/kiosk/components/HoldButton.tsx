@@ -226,6 +226,16 @@ export function HoldButton({
     restoreRef.current = null;
     pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     setSlipped(false);
+    // A second contact on the same button restarts the count rather than
+    // stacking a second one: the first press's timers would otherwise run on,
+    // unreachable from `cancel`, and fire `onHeld` twice.
+    // The bar resets too, or a second touch mid-hold leaves it filling on the
+    // first press's transition and reading "done" before `onHeld` fires.
+    if (armRef.current) clearTimeout(armRef.current);
+    armRef.current = null;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setHolding(false);
     /*
      * Nothing yet — not the bar, not the count, not the claim on the gesture.
      * A press this new is indistinguishable from the first frame of a scroll,

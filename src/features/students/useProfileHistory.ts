@@ -302,8 +302,10 @@ export function useProfileHistory(
         setResolved(next);
         setError(null);
       })
-      .catch((cause: Error) => {
-        if (!cancelled) setError(cause.message);
+      .catch((cause: unknown) => {
+        // A rejection need not be an `Error`; without a fallback the banner's
+        // `error` would be undefined and the failure would go unreported.
+        if (!cancelled) setError(cause instanceof Error && cause.message ? cause.message : String(cause));
       })
       .finally(() => {
         if (cancelled) return;

@@ -15,18 +15,6 @@ import {
 } from '@/lib/time';
 import type { TallyEvent } from '@/types';
 
-/**
- * Where a gathering is in its own evening, as one line.
- *
- * A card that says only "7:00 PM – 9:00 PM" leaves the reader doing arithmetic
- * against a clock they would have to leave the app to see, and the answer
- * decides whether they should be tapping names yet.
- *
- * `present` is only ever passed for a gathering whose window has closed —
- * attendance history is a one-shot read, so a count for an evening still in
- * progress would be however many had been tapped in when the screen opened,
- * frozen, beside a card inviting the reader to go and add more.
- */
 /** The six keys this line can be, as a narrow function type. */
 export type EventStatusTranslator = (
   key:
@@ -39,6 +27,18 @@ export type EventStatusTranslator = (
   values?: Record<string, string | number>,
 ) => string;
 
+/**
+ * Where a gathering is in its own evening, as one line.
+ *
+ * A card that says only "7:00 PM – 9:00 PM" leaves the reader doing arithmetic
+ * against a clock they would have to leave the app to see, and the answer
+ * decides whether they should be tapping names yet.
+ *
+ * `present` is only ever passed for a gathering whose window has closed —
+ * attendance history is a one-shot read, so a count for an evening still in
+ * progress would be however many had been tapped in when the screen opened,
+ * frozen, beside a card inviting the reader to go and add more.
+ */
 export function eventStatusLine(
   t: EventStatusTranslator,
   strings: TimeStrings,

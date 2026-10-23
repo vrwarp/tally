@@ -37,7 +37,12 @@ export function useTeam(enabled: boolean): Team {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      // Turned off before the first snapshot: nothing is coming, so nothing is
+      // loading.
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setFailed(false);
 

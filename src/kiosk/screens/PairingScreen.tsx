@@ -27,6 +27,9 @@ export const POLL_MS = 2000;
  */
 export const TROUBLE_AFTER_FAILURES = 3;
 
+/** How long to wait before asking for a code again, after a start that failed. */
+const RESTART_MS = 30_000;
+
 /**
  * Which of the two waits this is. The distinction is *where* it stalled, which
  * the screen knows for certain, rather than *why*, which it cannot know.
@@ -139,7 +142,7 @@ export function PairingScreen({
         // Could not even start a pairing — network down, or the cap reached.
         setCode(null);
         setTrouble('no-code');
-        timer = setTimeout(run, 30_000);
+        timer = setTimeout(run, RESTART_MS);
       }
     };
 

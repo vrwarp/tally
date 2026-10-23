@@ -47,9 +47,13 @@ function many(value: string | string[] | undefined): string[] {
 function paginate<T>(rows: T[], query: SimRequest['query']): Envelope<T> {
   const take = Number.parseInt(first(query.take) ?? '20', 10);
   const skip = Number.parseInt(first(query.skip) ?? '0', 10);
+  // A negative bound would make `slice` count from the end of the list, so a
+  // malformed `skip=-1` would answer the last row rather than the first page.
+  const start = Number.isFinite(skip) ? Math.max(0, skip) : 0;
+  const size = Number.isFinite(take) ? Math.max(0, take) : 20;
   return {
     totalCount: rows.length,
-    data: rows.slice(skip, skip + (Number.isFinite(take) ? take : 20)),
+    data: rows.slice(start, start + size),
   };
 }
 

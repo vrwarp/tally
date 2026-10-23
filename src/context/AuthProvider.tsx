@@ -371,13 +371,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Marked *before* the call, because `signInWithRedirect` navigates away and
-    // never returns to this line.
     // Loaded once, here, rather than at app start — this is the first moment
     // anything actually needs the iframe machinery.
-    const resolver = await popupRedirectResolver();
+    let resolver: Awaited<ReturnType<typeof popupRedirectResolver>>;
+    try {
+      resolver = await popupRedirectResolver();
+    } catch (cause) {
+      // A lazy import that could not be fetched. Callers treat a rejection as
+      // "already surfaced through `error`", so without this the button would
+      // stop spinning and say nothing.
+      setError(t('noConnection'));
+      throw cause;
+    }
 
     const startRedirect = async () => {
+      // Marked *before* the call, because `signInWithRedirect` navigates away
+      // and never returns to this line.
       setRedirectPending(true);
       try {
         await signInWithRedirect(auth, provider, resolver);

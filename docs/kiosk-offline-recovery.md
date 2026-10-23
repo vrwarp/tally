@@ -269,7 +269,7 @@ an earlier call reported records waiting, or when this one brings records held o
 **Its authority is the kiosk's own, plus the owner's one decision.** It may add a check-in that is not
 there and record a pickup — no undo, and the same frozen-student check `attendanceFrozen()` makes in
 the rules — and it may move an existing arrival or pickup *earlier*, to a tap it witnessed, never
-later (§4). Its fence is `requireLiveKiosk` (`functions/src/index.ts:458`), the same test
+later (§4). Its fence is `requireLiveKiosk` (`functions/src/index.ts`), the same test
 `isLiveKiosk()` makes. Once no kiosk runs the old bundle, the rules that let a kiosk session write
 attendance directly are removed: the lobby's session then cannot write the register at all except
 through the one function that checks every record.

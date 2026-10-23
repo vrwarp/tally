@@ -76,7 +76,13 @@ function FieldShell({ label, labelHidden, hint, error, required, children }: Fie
         )}
       >
         {label}
-        {required ? <span className="ml-1 text-danger-400">*</span> : null}
+        {/* The control carries `required`, which a screen reader already
+            announces; the glyph is only the sighted half of that. */}
+        {required ? (
+          <span aria-hidden="true" className="ml-1 text-danger-400">
+            *
+          </span>
+        ) : null}
       </label>
       {children({ id, describedBy })}
       {hint && !error ? (

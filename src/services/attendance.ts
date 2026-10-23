@@ -280,16 +280,6 @@ export async function markPresentOnly(args: {
 const ATTENDANCE_READ_CONCURRENCY = 12;
 
 /**
- * One-shot read of who attended each of the given events.
- *
- * Used by the predictive roster and the dashboard, which need history rather
- * than a live feed — a Friday from three weeks ago is not going to change while
- * a counselor stands at the door, so paying for a listener would be waste.
- *
- * The returned map is keyed by event id and carries one entry per id asked for;
- * its iteration order is completion order, not the order given, and no caller
- * reads it as a sequence.
- *
  * `present` is everyone with a record — the head count, unchanged by check-out.
  * `checkedOut` is the subset that was checked out, always a subset, and read from
  * the same documents at the same cost.
@@ -320,6 +310,17 @@ export interface EventAttendanceRead {
   denied: Set<string>;
 }
 
+/**
+ * One-shot read of who attended each of the given events.
+ *
+ * Used by the predictive roster and the dashboard, which need history rather
+ * than a live feed — a Friday from three weeks ago is not going to change while
+ * a counselor stands at the door, so paying for a listener would be waste.
+ *
+ * The returned map is keyed by event id and carries one entry per id asked for
+ * that the caller may read (the rest are in `denied`); its iteration order is
+ * completion order, not the order given, and no caller reads it as a sequence.
+ */
 export async function fetchAttendanceByEvent(
   eventIds: readonly string[],
 ): Promise<EventAttendanceRead> {
@@ -378,6 +379,18 @@ export async function fetchAttendanceByEvent(
 }
 
 /**
+ * How far before `since` the server is asked to look.
+ *
+ * The callable filters on when the child was tapped in, and a tap lands
+ * before the gathering starts — the door opens an hour early by default, and
+ * a leader may open it earlier. The caller keeps the nights by the event's
+ * own start and intersects by event id, so asking a day early costs nothing
+ * and stops the oldest night in a window reading as a miss for the hour
+ * before its own anniversary.
+ */
+const SINCE_MARGIN_MS = 24 * 60 * 60_000;
+
+/**
  * The nights one student was checked into, since `since`, as event ids.
  *
  * The cheap half of a profile's history. "Was this student here?" is a fact
@@ -400,18 +413,6 @@ export async function fetchAttendanceByEvent(
  * Unpaged deliberately. A year of one student is at most a few hundred small
  * documents, and the profile needs all of them before it can draw anything.
  */
-/**
- * How far before `since` the server is asked to look.
- *
- * The callable filters on when the child was tapped in, and a tap lands
- * before the gathering starts — the door opens an hour early by default, and
- * a leader may open it earlier. The caller keeps the nights by the event's
- * own start and intersects by event id, so asking a day early costs nothing
- * and stops the oldest night in a window reading as a miss for the hour
- * before its own anniversary.
- */
-const SINCE_MARGIN_MS = 24 * 60 * 60_000;
-
 export async function fetchStudentAttendanceSince(
   studentId: string,
   since: Date,
