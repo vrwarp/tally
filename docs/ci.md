@@ -14,7 +14,7 @@ because it tests `main` merged into the branch rather than the branch on its own
 | Job | What it runs | Why it exists |
 | --- | --- | --- |
 | **quality** | `npm run lint`, three `tsc` passes, both builds | The app, the e2e suite and the Cloud Functions have separate TypeScript configs; all three have to compile |
-| **unit** | `npm test`, `npm run test:functions` | ~270 app tests and ~140 Cloud Functions tests, no emulator needed |
+| **unit** | `npm test`, `npm run test:functions` | The app suite (Vitest, jsdom) and the Cloud Functions suite, no emulator needed |
 | **rules** | `npm run test:rules` | Boots the Firestore emulator and runs the security-rules suite against real rule evaluation |
 | **e2e** | `playwright test --project=<matrix>` | Four browsers in parallel: chromium and webkit, desktop and phone |
 | **docker-e2e** | Builds `docker/e2e/Dockerfile` | Proves the reproducible runner still builds — never pushed anywhere |
