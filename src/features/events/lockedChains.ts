@@ -99,13 +99,8 @@ export function sharedDetail(
   if (events.length === 0) return null;
 
   const first = events[0]!;
-  const window = `${first.startAt.getHours()}:${first.startAt.getMinutes()}-${first.endAt.getHours()}:${first.endAt.getMinutes()}`;
-  const sameWindow = events.every(
-    (event) =>
-      `${event.startAt.getHours()}:${event.startAt.getMinutes()}-${event.endAt.getHours()}:${event.endAt.getMinutes()}` ===
-      window,
-  );
-  if (!sameWindow) return null;
+  const window = clockKey(first);
+  if (!events.every((event) => clockKey(event) === window)) return null;
 
   const location = events.every((event) => event.location === first.location)
     ? first.location
@@ -113,6 +108,11 @@ export function sharedDetail(
 
   const window_ = formatWindow(strings, first);
   return location ? join({ window: window_, location }) : window_;
+}
+
+/** The wall-clock hours and minutes an event runs between, as a comparable key. */
+function clockKey(event: TallyEvent): string {
+  return `${event.startAt.getHours()}:${event.startAt.getMinutes()}-${event.endAt.getHours()}:${event.endAt.getMinutes()}`;
 }
 
 /**
