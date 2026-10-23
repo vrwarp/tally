@@ -53,7 +53,6 @@ deploys cleanly.
 | --- | --- | --- |
 | `baseUrl` | `A32_API_BASE_URL` | Where the Attendees server lives. **Admin-only** in the app — every request carries the token to this address. |
 | `divisionId` | `A32_DIVISION_ID` | The division whose attendees are in scope (numeric id). |
-| `meetSlug` | `A32_MEET_SLUG` | The meet whose enrollment is the roster; new students join it, as its major character (the server decides that, whatever a client sends). |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
 | `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits Pre-K–12 (`-1` is Pre-K, `0` is kindergarten). |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
@@ -76,7 +75,7 @@ paths:
 | birthday | `actual_birthday`, else `estimated_birthday` | Attendees documents year **1800** as "day known, year unknown"; Tally reads either into its year-free `MM-DD` and writes a full date to `actual_birthday` or a day-only as `estimated_birthday: 1800-MM-DD`. (Planning Center's equivalent sentinel is 1885 — each backend keeps its own.) |
 | allergies | `infos.fixed.food_pref` | The field Attendees' own attendee form labels "Food pref" and its help text fills with "peanut allergy", so a note typed on either side shows on the other. Rides the same PATCH as profile edits. |
 | contact | family `Folk` co-members' `infos.contacts.phone1/email1` | A parent is an adult co-member of a category-0 (family) folk whose `Relation` is an emergency contact and not `child`. Fill-only-when-empty, like Planning Center. |
-| roster membership | `AttendingMeet` on the configured meet | Creates ride `X-Add-Folk: new`, `X-Folk-Role: child` and `X-Join-Meet`, so a pushed student appears correctly in Attendees' own UI. Enrollment carries the meet's major character. |
+| roster membership | none | Tally files nobody into a meet. Creates ride `X-Add-Folk: new` and `X-Folk-Role: child`, so a pushed student has a family in Attendees' own UI; which meets they attend is the church's call. |
 
 Reads run off one TTL-cached, paginated org sweep of `datagrid_data_attendee` (the plural endpoints
 hide family-less attendees; the sweep does not), with single fetches for stragglers. Reachability —

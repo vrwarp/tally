@@ -20,7 +20,6 @@ import { E2E } from '../playwright.config';
 import {
   a32FamiliesOf,
   a32FamilyOf,
-  a32MeetMembers,
   a32Patch,
   a32Person,
   a32Record,
@@ -120,8 +119,6 @@ async function peopleNamed(surname: string): Promise<Record<string, Record<strin
   const rows = (await a32Search(surname)).filter((row) => row.last_name === surname);
   return Object.fromEntries(rows.map((row) => [String(row.first_name), row]));
 }
-/** GOLDEN_MEET_IDS["youth_group"] in the golden builder. */
-const YOUTH_GROUP_MEET_ID = 100;
 
 async function pumpA32(studentId: string, states: readonly string[], timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -262,7 +259,8 @@ test.describe('Attendees, the real server', () => {
     await page.getByRole('button', { name: /^import$/i }).click();
     const dialog = page.getByRole('dialog', { name: /import history/i });
     const meet = dialog.locator('li').filter({ hasText: 'Youth Group' });
-    await meet.waitFor({ timeout: 30_000 });
+    // Listing meets sweeps the whole roster first, which a busy server takes a while over.
+    await meet.waitFor({ timeout: 90_000 });
     await expect(meet.getByText('Attendees')).toBeVisible();
 
     await meet.getByRole('button', { name: /^import$/i }).click();
@@ -297,7 +295,7 @@ test.describe('Attendees, the real server', () => {
     const personId = await a32PersonIdOf(HANNAH);
     const original = (await a32Record(personId)).body!;
     // A second record of Hannah on the server, in the youth group like her.
-    const twin = await a32Twin(original, TWIN_PHONE, YOUTH_GROUP_MEET_ID);
+    const twin = await a32Twin(original, TWIN_PHONE);
     const twinId = String(twin.id);
     const primaryStudent = `a32_${personId}`;
     const duplicateStudent = `a32_${twinId}`;
@@ -328,7 +326,7 @@ test.describe('Attendees, the real server', () => {
     }
   });
 
-  test('a visitor added by hand is created on the server, in a family and in the youth group', async ({
+  test('a visitor added by hand is created on the server, in a family of their own', async ({
     page,
     signedInAs,
     attendees,
@@ -360,12 +358,11 @@ test.describe('Attendees, the real server', () => {
       expect(record.first_name).toBe('Keanu');
       expect(record.last_name).toBe(SURNAME);
       expect(String(record.division)).toBe(E2E.a32.divisionId);
-      // A family of their own, as a child in it, and a seat in the configured meet.
+      // A family of their own, as a child in it. No meet: Tally files nobody into one.
       const relations = await a32Relations();
       const family = a32FamilyOf(record);
       expect(family).not.toBeNull();
       expect(CHILD_TITLES).toContain(titleOf(relations, family!.role));
-      expect(await a32MeetMembers()).toContain(personId);
     } finally {
       if (personId) await a32RemoveWithFamily(personId);
       if (studentId) await firestore.remove(`students/${studentId}`);
@@ -377,7 +374,7 @@ test.describe('Attendees, the real server', () => {
     await attendees.enable('full');
     await signedInAs('admin');
     const admin = { uid: await uidOf(TEAM.admin), email: TEAM.admin };
-    const child = await a32Person('Noa', SURNAME, '+15105550711', YOUTH_GROUP_MEET_ID);
+    const child = await a32Person('Noa', SURNAME, '+15105550711');
     const childId = String(child.id);
     const studentId = `a32_${childId}`;
     let parentId: string | null = null;
@@ -438,21 +435,25 @@ test.describe('Attendees, the real server', () => {
       await expect(card).toBeVisible({ timeout: 30_000 });
       await card.getByRole('button', { name: /Approve and add/i }).click();
       await card.getByRole('button', { name: /^Yes — add/i }).click();
+      // The approval is done when its record is gone; only then has the
+      // household been built, so the server is read after that.
+      await expect
+        .poll(async () => (await firestore.collection(REGISTRATIONS)).some((doc) => doc.id === registrationId), {
+          timeout: 90_000,
+          message: 'the registration record goes once the family is approved',
+        })
+        .toBe(false);
 
       // Two children pushed, then one household built around the adult.
       await expect
         .poll(async () => Object.keys(await peopleNamed(SURNAME)).length, {
-          timeout: 90_000,
+          timeout: 30_000,
           message: 'the children and their guardian reach Attendees',
         })
         .toBe(3);
       const people = await peopleNamed(SURNAME);
       expect(Object.keys(people).sort()).toEqual(['Bruno', 'Cleo', 'Sofia']);
       const ids = Object.fromEntries(Object.entries(people).map(([first, row]) => [first, String(row.id)]));
-
-      const members = await a32MeetMembers();
-      expect(members).toContain(ids.Bruno);
-      expect(members).toContain(ids.Cleo);
 
       // One family holds all three, and neither child is left in a second one.
       const family = a32FamilyOf((await a32Record(ids.Sofia)).body!);
@@ -468,11 +469,6 @@ test.describe('Attendees, the real server', () => {
       const ours = students.filter((doc) => doc.data.lastName === SURNAME);
       expect(ours).toHaveLength(2);
       expect(ours.every((doc) => doc.data.pendingReview === false)).toBe(true);
-      await expect
-        .poll(async () => (await firestore.collection(REGISTRATIONS)).some((doc) => doc.id === registrationId), {
-          timeout: 30_000,
-        })
-        .toBe(false);
     } finally {
       for (const row of Object.values(await peopleNamed(SURNAME))) await a32RemoveWithFamily(String(row.id));
       await removeRegistration(registrationId, 2);
@@ -481,7 +477,7 @@ test.describe('Attendees, the real server', () => {
   });
 
   test('the kiosk finds a golden youth and checks her in', async ({ browser, page, signedInAs, attendees }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     await attendees.enable();
     await signedInAs('core');
     const personId = await a32PersonIdOf(HANNAH);
@@ -524,7 +520,8 @@ test.describe('Attendees, the real server', () => {
       await kiosk.waitForFunction(
         ([key, id]) => (localStorage.getItem(key!) ?? '').includes(id!),
         ['tally:kiosk:roster', studentId],
-        { timeout: 60_000 },
+        // The read sweeps the whole roster, and several screens sweep it at once.
+        { timeout: 180_000 },
       );
       await typeOnKiosk(kiosk, 'Hannah');
       const row = kiosk.getByRole('button', { name: HANNAH_ROW }).first();
@@ -603,20 +600,26 @@ test.describe('Attendees, the real server', () => {
       await expect(card).toBeVisible({ timeout: 30_000 });
       await card.getByRole('button', { name: /Approve and add/i }).click();
       await card.getByRole('button', { name: /^Yes — add/i }).click();
+      // The approval is done when its record is gone, and with it the card.
+      await expect
+        .poll(
+          async () =>
+            (await firestore.collection(REGISTRATIONS)).some(
+              (doc) => (doc.data.guardian as { lastName?: string } | null)?.lastName === KIOSK_SURNAME,
+            ),
+          { timeout: 90_000, message: 'the registration record goes once the family is approved' },
+        )
+        .toBe(false);
 
       await expect
         .poll(async () => Object.keys(await peopleNamed(KIOSK_SURNAME)).length, {
-          timeout: 90_000,
+          timeout: 30_000,
           message: 'the children and their guardian reach Attendees',
         })
         .toBe(3);
       const people = await peopleNamed(KIOSK_SURNAME);
       expect(Object.keys(people).sort()).toEqual(['Dana', 'Fox', 'Wren']);
       const ids = Object.fromEntries(Object.entries(people).map(([first, row]) => [first, String(row.id)]));
-
-      const members = await a32MeetMembers();
-      expect(members).toContain(ids.Wren);
-      expect(members).toContain(ids.Fox);
 
       const family = a32FamilyOf((await a32Record(ids.Dana)).body!);
       expect(family).not.toBeNull();

@@ -4331,14 +4331,8 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Backends.a32MeetSlug": {
-    "source": "Meet slug",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Backends.a32SlugsNote": {
-    "source": "Where your students live in Attendees. The setup command on the Attendees side prints both: the division new attendees are filed under, and the meet whose enrollment is the roster.",
+    "source": "Where your students live in Attendees: the division new attendees are filed under. The setup command on the Attendees side prints it.",
     "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "reviewed"

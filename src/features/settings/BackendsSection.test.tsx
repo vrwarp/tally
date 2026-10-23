@@ -26,7 +26,6 @@ vi.mock('@/services/backends', () => ({
     enabled: settings.enabled !== false,
     baseUrl: '',
     divisionId: '',
-    meetSlug: '',
     minGrade: 6,
     maxGrade: 12,
     writeBack: settings.writeBack ?? 'off',

@@ -166,7 +166,6 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
           enabled: true,
           baseUrl: E2E.a32.baseUrl,
           divisionId: E2E.a32.divisionId,
-          meetSlug: E2E.a32.meetSlug,
           writeBack,
           minGrade: 6,
           maxGrade: 12,

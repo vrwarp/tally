@@ -31,7 +31,7 @@ const a32SimulatorUrl = `http://127.0.0.1:${PORTS.attendees}`;
  * Attendees is the simulator unless `A32_ENV_FILE` names the file the real
  * server's setup command left behind (docker/attendees32/setup.sh, run by
  * docker-compose.integration.yml). Then the suite drives attendees32 itself,
- * at `A32_API_BASE_URL`, with the token and coordinates from that file.
+ * at `A32_API_BASE_URL`, with the token and division from that file.
  *
  * The token cannot travel to the Functions emulator through its environment:
  * the emulator applies `functions/.env.demo-tally` over whatever it inherits,
@@ -58,7 +58,7 @@ function readLiveAttendees() {
     const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
     if (match) values[match[1]] = match[2];
   }
-  for (const key of ['A32_TOKEN', 'A32_DIVISION_ID', 'A32_MEET_SLUG', 'A32_CHARACTER_SLUG']) {
+  for (const key of ['A32_TOKEN', 'A32_DIVISION_ID']) {
     if (!values[key]) throw new Error(`${file} has no ${key}. Did the Attendees setup finish?`);
   }
   const baseUrl = process.env.A32_API_BASE_URL;
@@ -68,9 +68,8 @@ function readLiveAttendees() {
     baseUrl,
     token: values.A32_TOKEN,
     divisionId: values.A32_DIVISION_ID,
-    meetSlug: values.A32_MEET_SLUG,
-    // The meet's character, which the live spec needs to read the meet's roster.
-    characterSlug: values.A32_CHARACTER_SLUG,
+    // Only the history import names a meet: the one the setup made readable.
+    meetSlug: values.A32_MEET_SLUG ?? '',
   };
 }
 
@@ -92,7 +91,6 @@ export const E2E = {
     // same ones `setup_tally_integration` prints for a real server.
     divisionId: '11',
     meetSlug: 'simorg_tally_gathering',
-    characterSlug: '',
   },
 } as const;
 
