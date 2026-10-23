@@ -156,6 +156,32 @@ describe('buildRegisterCsv — who recorded it', () => {
   });
 });
 
+describe('buildRegisterCsv — who checked somebody out', () => {
+  function rowFor(record: ReturnType<typeof makeAttendance>) {
+    const event = makeEvent({ requiresCheckOut: true });
+    const rows = registerRows(event, [record], [], byId(AMARA));
+    return cells(buildRegisterCsv(grades, rows, context(event)), 0);
+  }
+
+  it('names a leader on the team, and keeps the uid in its own column', () => {
+    const row = rowFor(makeAttendance({ studentId: 'pco_1', checkedOutBy: 'u1' }));
+    expect(row.checked_out_by).toBe('Miriam');
+    expect(row.checked_out_by_uid).toBe('u1');
+  });
+
+  it('leaves the name blank for a leader who is no longer on the team', () => {
+    const row = rowFor(makeAttendance({ studentId: 'pco_1', checkedOutBy: 'ghost' }));
+    expect(row.checked_out_by).toBe('');
+    expect(row.checked_out_by_uid).toBe('ghost');
+  });
+
+  it('leaves both blank for somebody who was never checked out', () => {
+    const row = rowFor(makeAttendance({ studentId: 'pco_1', checkedOutBy: null }));
+    expect(row.checked_out_by).toBe('');
+    expect(row.checked_out_by_uid).toBe('');
+  });
+});
+
 describe('buildRegisterCsv — a lobby kiosk', () => {
   function rowFor(record: ReturnType<typeof makeAttendance>) {
     const event = makeEvent({ requiresCheckOut: true });
