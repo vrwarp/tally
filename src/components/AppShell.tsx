@@ -151,6 +151,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  /*
+   * Escape puts the account surface away.
+   *
+   * The chip announces `aria-haspopup="menu"`, and a menu that only a pointer
+   * can leave — by tapping the scrim — traps a keyboard user inside a sheet that
+   * covers the screen. Focus has not moved off the chip, so closing leaves them
+   * exactly where they were.
+   */
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [menuOpen]);
+
   // Measured, not assumed: the bar carries a safe-area inset on a notched
   // phone and vanishes at `lg`. Check-in's search box sticks below whatever
   // this comes out to.
