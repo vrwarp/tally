@@ -1575,7 +1575,6 @@ function backendSettingsOf(registry: BackendRegistry, backendId: BackendId): Rec
     enabled: config.enabled,
     baseUrl: config.baseUrl,
     divisionId: config.divisionId,
-    meetSlug: config.meetSlug,
     minGrade: config.minGrade,
     maxGrade: config.maxGrade,
     writeBack: config.writeBack,

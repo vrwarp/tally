@@ -482,6 +482,16 @@ export class A32SimulatorStore {
     return student;
   }
 
+  /** Takes one member out of a folk; a folk with no other member is removed too. */
+  leaveFolk(folkId: string, attendeeId: string): void {
+    const members = this.folkAttendees.filter((edge) => edge.folkId === folkId && !edge.isRemoved);
+    for (const edge of members) {
+      if (edge.attendeeId === attendeeId || members.length < 2) edge.isRemoved = true;
+    }
+    const folk = this.folks.get(folkId);
+    if (folk && members.length < 2) folk.isRemoved = true;
+  }
+
   familyFolksOf(attendeeId: string): SimFolk[] {
     return this.folkAttendees
       .filter((edge) => edge.attendeeId === attendeeId && !edge.isRemoved)

@@ -28,6 +28,28 @@ resets the simulator, so every run starts from the same data.
 The app is built, not dev-served, on purpose: the service worker, the code
 splitting and the minified bundle are all things that can only break once built.
 
+## Against the real Attendees server
+
+`docker-compose.integration.yml` replaces the Attendees simulator with
+attendees32 itself: built from the ref pinned in that file, loaded with its
+golden congregation, and provisioned for Tally by the server's own
+`setup_tally_integration` command against the congregation's youth group.
+
+```bash
+docker compose -f docker-compose.integration.yml build
+docker compose -f docker-compose.integration.yml run --rm e2e --project=chromium-desktop
+docker compose -f docker-compose.integration.yml down -v
+```
+
+The setup leaves the token and coordinates in a shared volume; the suite reads
+them through `A32_ENV_FILE` (see `playwright.config.ts`), hands the token to the
+Functions emulator through `functions/.env.local` (gitignored, removed again by
+the next simulator run), and skips the specs written against the simulator's
+people in favour of `attendees32-live.spec.ts`.
+The congregation is rebuilt on every run. `.github/workflows/attendees32-live.yml`
+runs this nightly and on changes to the adapter; bump `ATTENDEES32_REF` to adopt
+a server release.
+
 ## A note on running these in a sandbox
 
 The suite needs the **Eventarc emulator** to be running, because that is how a

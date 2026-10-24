@@ -681,14 +681,14 @@ export async function mergeA32Attendee(duplicate: string, primary: string): Prom
 }
 
 export async function a32PersonIdOf(name: string): Promise<string> {
-  const url = `${E2E.a32SimulatorUrl}/persons/api/datagrid_data_attendee/?searchValue=${encodeURIComponent(name)}&take=5&skip=0`;
-  const response = await fetch(url, { headers: { Authorization: 'Token a32-sim-token' } });
+  const url = `${E2E.a32.baseUrl}/persons/api/datagrid_data_attendee/?searchValue=${encodeURIComponent(name)}&take=5&skip=0`;
+  const response = await fetch(url, { headers: { Authorization: `Token ${E2E.a32.token}` } });
   if (!response.ok) {
-    throw new Error(`Could not search the Attendees simulator: HTTP ${response.status}.`);
+    throw new Error(`Could not search Attendees: HTTP ${response.status}.`);
   }
   const body = (await response.json()) as { data: Array<{ id: string }> };
   const first = body.data[0];
-  if (!first) throw new Error(`The Attendees simulator holds nobody called "${name}".`);
+  if (!first) throw new Error(`Attendees holds nobody called "${name}".`);
   return first.id;
 }
 

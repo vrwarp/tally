@@ -22,11 +22,11 @@ side:
 python manage.py setup_tally_integration --organization-slug <slug>
 ```
 
-The command is idempotent. It creates (or adopts) a division, an assembly, a **meet** whose
-enrollment is the roster, the participant **character** that meet enrolls with, an integration user
-with a DRF token, and the auth group that user is in — put on the organization's
-`groups_see_all_meets_attendees` list (never `counselor`) and on the meet's `allowed_groups`, which
-is what lets the token see the meet at all. It then prints every value Tally needs. Its own
+The command is idempotent. It creates (or adopts) an integration user with a DRF token and the auth
+group that user is in, put on the organization's `groups_see_all_meets_attendees` and `counselor`
+lists. People Tally creates are filed under the organization's "unspecified" division, the one
+Attendees itself falls back to, so nothing has to be chosen; `--readable-meet <slug>` lets the token
+read a meet's history for the import. It then prints every value Tally needs. Its own
 documentation lives in the Attendees repo at `docs/tally_integration.md`.
 
 ### Credentials and configuration
@@ -52,8 +52,7 @@ deploys cleanly.
 | Setting | Deploy env var | What it is |
 | --- | --- | --- |
 | `baseUrl` | `A32_API_BASE_URL` | Where the Attendees server lives. **Admin-only** in the app — every request carries the token to this address. |
-| `divisionId` | `A32_DIVISION_ID` | The division whose attendees are in scope (numeric id). |
-| `meetSlug` | `A32_MEET_SLUG` | The meet whose enrollment is the roster; new students join it, as its major character (the server decides that, whatever a client sends). |
+| `divisionId` | `A32_DIVISION_ID` | Where the people Tally creates are filed (numeric id, printed by the setup; `0` is the unspecified division). Reads cover the whole organization. |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
 | `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits Pre-K–12 (`-1` is Pre-K, `0` is kindergarten). |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
@@ -76,7 +75,7 @@ paths:
 | birthday | `actual_birthday`, else `estimated_birthday` | Attendees documents year **1800** as "day known, year unknown"; Tally reads either into its year-free `MM-DD` and writes a full date to `actual_birthday` or a day-only as `estimated_birthday: 1800-MM-DD`. (Planning Center's equivalent sentinel is 1885 — each backend keeps its own.) |
 | allergies | `infos.fixed.food_pref` | The field Attendees' own attendee form labels "Food pref" and its help text fills with "peanut allergy", so a note typed on either side shows on the other. Rides the same PATCH as profile edits. |
 | contact | family `Folk` co-members' `infos.contacts.phone1/email1` | A parent is an adult co-member of a category-0 (family) folk whose `Relation` is an emergency contact and not `child`. Fill-only-when-empty, like Planning Center. |
-| roster membership | `AttendingMeet` on the configured meet | Creates ride `X-Add-Folk: new`, `X-Folk-Role: child` and `X-Join-Meet`, so a pushed student appears correctly in Attendees' own UI. Enrollment carries the meet's major character. |
+| roster membership | none | Tally files nobody into a meet. Creates ride `X-Add-Folk: new` and `X-Folk-Role: child`, so a pushed student has a family in Attendees' own UI; which meets they attend is the church's call. |
 
 Reads run off one TTL-cached, paginated org sweep of `datagrid_data_attendee` (the plural endpoints
 hide family-less attendees; the sweep does not), with single fetches for stragglers. Reachability —
@@ -174,3 +173,16 @@ The end-to-end suite starts it automatically. The Attendees specs (`e2e/attendee
 `e2e/multi-backend.spec.ts`) enable the backend by writing `config/attendees32` — the same document
 a leader's Save writes — and remove it afterwards, so every other spec runs against a single-backend
 world. The emulated project's `functions/.env.demo-tally` carries only the simulator's fixed token.
+
+
+## Testing against the real server
+
+The simulator in `tools/a32-simulator` is what the unit, functions and
+end-to-end suites run against. `docker-compose.integration.yml` runs the
+end-to-end suite against attendees32 itself, built from a pinned ref and loaded
+with its golden congregation; `e2e/attendees32-live.spec.ts` covers the roster
+sweep and a meet's history import, and every write Tally makes: a profile edit,
+a fold that asks the server to merge and to undo, a visitor pushed as a new
+person, a parent added to a family, and a family registered at the door and
+approved. The kiosk is driven too: it checks a golden youth in, and registers
+a family with an allergy note that a leader then approves. See `e2e/README.md`.

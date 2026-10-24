@@ -410,6 +410,13 @@ function personsApi(
       );
       return json(201, folkRow(store, folk));
     }
+    if (method === 'DELETE') {
+      // As the server does: the member leaves, and a folk left with nobody
+      // else goes with them.
+      if (!id || !store.folks.get(id)) return json(404, { detail: 'Not found.' });
+      store.leaveFolk(id, target);
+      return json(204, undefined);
+    }
   }
 
   if (resource === 'datagrid_data_familyattendees' || resource === 'attendee_relationships') {

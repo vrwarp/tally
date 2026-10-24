@@ -1,0 +1,99 @@
+# The end-to-end suite against a real Attendees server.
+#
+# `docker-compose.e2e.yml` runs the suite with a simulator at the far end. This
+# file puts attendees32 itself there: built from a pinned ref, loaded with its
+# golden congregation, provisioned for Tally by the server's own setup command.
+# What it proves that the simulator cannot is that the two codebases agree.
+#
+#   docker compose -f docker-compose.integration.yml build
+#   docker compose -f docker-compose.integration.yml run --rm e2e --project=chromium-desktop
+#   docker compose -f docker-compose.integration.yml down -v
+#
+# ATTENDEES32_REPO and ATTENDEES32_REF pin the server; bump the ref to adopt a
+# release. The congregation is rebuilt on every run, so runs cannot leak into
+# each other.
+x-attendees32-env: &attendees32-env
+  USE_DOCKER: "yes"
+  REDIS_URL: redis://attendees32-redis:6379/0
+  POSTGRES_HOST: attendees32-postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: attendees
+  POSTGRES_USER: attendees
+  POSTGRES_PASSWORD: attendees
+  DJANGO_SERVER_EMAIL: ""
+  DJANGO_DEFAULT_FROM_EMAIL: tally-e2e@example.org
+  SENDGRID_API_KEY: unused
+  # The suite signs in many times from one address; the server's default of
+  # three failed sign-ins per ten minutes would lock it out.
+  DJANGO_LOGIN_FAILED_RATE_LIMIT: 1000/m
+
+x-attendees32-build: &attendees32-build
+  context: ${ATTENDEES32_REPO:-https://github.com/vrwarp/attendees32.git}#${ATTENDEES32_REF:-1788d1926bdaa8a5abf0e88c101c6e112ec10299}
+  args:
+    # The server reads its commit sha from the checkout at startup; a git
+    # context drops .git unless told to keep it.
+    BUILDKIT_CONTEXT_KEEP_GIT_DIR: 1
+
+services:
+  attendees32-postgres:
+    build:
+      <<: *attendees32-build
+      dockerfile: compose/local/postgres/Dockerfile
+    environment: *attendees32-env
+
+  attendees32-redis:
+    image: redis:6
+
+  attendees32:
+    build:
+      <<: *attendees32-build
+      dockerfile: compose/local/django/Dockerfile
+    image: tally-attendees32:local
+    environment: *attendees32-env
+    depends_on:
+      - attendees32-postgres
+      - attendees32-redis
+    command: /start
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "-o", "/dev/null", "http://localhost:8000/accounts/login/"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  # Loads the golden congregation and provisions Tally against its youth group,
+  # then leaves the values the suite needs in the shared volume.
+  attendees32-setup:
+    image: tally-attendees32:local
+    environment: *attendees32-env
+    depends_on:
+      attendees32:
+        condition: service_healthy
+    volumes:
+      - ./docker/attendees32/setup.sh:/setup.sh:ro
+      - attendees32-shared:/shared
+    command: ["bash", "/setup.sh"]
+
+  e2e:
+    build:
+      context: .
+      dockerfile: docker/e2e/Dockerfile
+    image: tally-e2e:local
+    shm_size: 1gb
+    init: true
+    # The server's local settings answer only to localhost, so the suite shares
+    # its network namespace and reaches it at 127.0.0.1:8000. The emulators and
+    # the app bind 127.0.0.1 in that same namespace; no port is used twice.
+    network_mode: "service:attendees32"
+    environment:
+      A32_ENV_FILE: /shared/a32.env
+      A32_API_BASE_URL: http://127.0.0.1:8000
+    depends_on:
+      attendees32-setup:
+        condition: service_completed_successfully
+    volumes:
+      - attendees32-shared:/shared:ro
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+
+volumes:
+  attendees32-shared: {}
