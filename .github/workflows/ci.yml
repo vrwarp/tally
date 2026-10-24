@@ -136,14 +136,17 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       # System dependencies are not cached, so they are installed either way;
-      # only the browser binaries themselves come from the cache. The download
-      # stalls now and then; a bounded attempt and one more beat waiting out
-      # the job's limit.
+      # only the browser binaries themselves come from the cache. That apt run
+      # is what stalls now and then: a stuck connection used to hold the step
+      # until the job's limit. apt gives up on one after thirty seconds and
+      # retries, and a failed install gets one more try.
+      - name: Give apt a timeout
+        run: printf 'Acquire::http::Timeout "30";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts
       - name: Install browsers
         run: |
           for attempt in 1 2; do
-            timeout 6m npm run e2e:install && exit 0
-            echo "::warning::Browser install attempt $attempt did not finish"
+            npm run e2e:install && exit 0
+            echo "::warning::Browser install attempt $attempt failed"
           done
           exit 1
 
