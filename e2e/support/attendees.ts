@@ -31,11 +31,10 @@ export async function a32Record(id: string): Promise<{ status: number; body: Rec
   return { status: response.status, body: response.ok ? ((await response.json()) as Record<string, unknown>) : null };
 }
 
-/** A new record of the same person, enrolled in a meet when `meetId` is given. */
+/** A new record of the same person. */
 export async function a32Twin(
   original: Record<string, unknown>,
   phone: string,
-  meetId?: number,
 ): Promise<Record<string, unknown>> {
   const response = await a32Fetch(
     'POST',
@@ -50,7 +49,7 @@ export async function a32Twin(
       actual_birthday: '2011-02-03',
       infos: { names: {}, fixed: {}, contacts: { phone1: phone } },
     },
-    { 'X-Target-Attendee-Id': 'new', ...(meetId ? { 'X-Join-Meet': String(meetId) } : {}) },
+    { 'X-Target-Attendee-Id': 'new' },
   );
   if (!response.ok) throw new Error(`Attendees would not create the twin: HTTP ${response.status} ${await response.text()}`);
   return (await response.json()) as Record<string, unknown>;
@@ -84,12 +83,11 @@ export async function a32Search(query: string): Promise<Array<Record<string, unk
   return ((await response.json()) as { data: Array<Record<string, unknown>> }).data;
 }
 
-/** A new record with no family, enrolled in a meet when `meetId` is given. */
+/** A new record with no family. */
 export async function a32Person(
   firstName: string,
   lastName: string,
   phone: string,
-  meetId?: number,
 ): Promise<Record<string, unknown>> {
   const response = await a32Fetch(
     'POST',
@@ -102,7 +100,7 @@ export async function a32Person(
       actual_birthday: '2011-02-03',
       infos: { names: {}, fixed: {}, contacts: { phone1: phone } },
     },
-    { 'X-Target-Attendee-Id': 'new', ...(meetId ? { 'X-Join-Meet': String(meetId) } : {}) },
+    { 'X-Target-Attendee-Id': 'new' },
   );
   if (!response.ok) throw new Error(`Attendees would not create ${firstName}: HTTP ${response.status} ${await response.text()}`);
   return (await response.json()) as Record<string, unknown>;
@@ -135,15 +133,6 @@ export function a32FamilyOf(
   record: Record<string, unknown>,
 ): { id: string; attendees: string[]; role: number } | null {
   return a32FamiliesOf(record)[0] ?? null;
-}
-
-/** Who is enrolled in the configured meet, by attendee id. */
-export async function a32MeetMembers(): Promise<string[]> {
-  const query = `meets[]=${encodeURIComponent(E2E.a32.meetSlug)}&characters[]=${encodeURIComponent(E2E.a32.characterSlug)}&take=9999`;
-  const response = await a32Fetch('GET', `/persons/api/organization_meet_character_attendingmeets/?${query}`);
-  if (!response.ok) throw new Error(`Attendees would not list the meet: HTTP ${response.status}`);
-  const { data } = (await response.json()) as { data: Array<{ attendee_id: string; is_removed?: boolean }> };
-  return data.filter((row) => row.is_removed !== true).map((row) => row.attendee_id);
 }
 
 /** Removes a family folk the way the attendee page does, on behalf of one of its members. */

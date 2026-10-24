@@ -97,7 +97,7 @@ jobs:
   e2e:
     name: E2E (${{ matrix.project }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       # One browser failing says nothing about the others, and knowing which
       # ones are broken is the whole point of the matrix.
@@ -136,9 +136,19 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       # System dependencies are not cached, so they are installed either way;
-      # only the browser binaries themselves come from the cache.
+      # only the browser binaries themselves come from the cache. That apt run
+      # is what stalls now and then: a stuck connection used to hold the step
+      # until the job's limit. apt gives up on one after thirty seconds and
+      # retries, and a failed install gets one more try.
+      - name: Give apt a timeout
+        run: printf 'Acquire::http::Timeout "30";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts
       - name: Install browsers
-        run: npm run e2e:install
+        run: |
+          for attempt in 1 2; do
+            npm run e2e:install && exit 0
+            echo "::warning::Browser install attempt $attempt failed"
+          done
+          exit 1
 
       - name: Cache the emulator jars
         uses: actions/cache@v6

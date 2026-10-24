@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 describe('pushStudent', () => {
-  it('creates a person for a queued visitor, with a family folk and an enrollment', async () => {
+  it('creates a person for a queued visitor, with a family folk and no enrollment', async () => {
     db.seed('students/visitor-1', {
       firstName: 'Keanu',
       lastName: 'Māhoe',
@@ -74,10 +74,10 @@ describe('pushStudent', () => {
     const attendee = store.attendees.get(createdId)!;
     expect(attendee.firstName).toBe('Keanu');
     expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(8));
-    // The side effects the create headers ask for: a family folk membership
-    // and an enrollment in the configured meet.
+    // The one side effect the create headers ask for is a family folk
+    // membership. Tally files nobody into a meet.
     expect(store.folkAttendees.some((edge) => edge.attendeeId === createdId && edge.roleId === 27)).toBe(true);
-    expect(store.attendingMeets.some((row) => store.attendings.find((a) => a.id === row.attendingId)?.attendeeId === createdId)).toBe(true);
+    expect(store.attendingMeets.some((row) => store.attendings.find((a) => a.id === row.attendingId)?.attendeeId === createdId)).toBe(false);
 
     const doc = db.get('students/visitor-1')!;
     expect(doc.upstreamBackend).toBe('a32');

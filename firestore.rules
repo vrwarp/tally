@@ -1353,12 +1353,11 @@ service cloud.firestore {
       function validA32Config() {
         let d = request.resource.data;
         return d.keys().hasOnly([
-              'enabled', 'baseUrl', 'divisionId', 'meetSlug', 'minGrade',
+              'enabled', 'baseUrl', 'divisionId', 'minGrade',
               'maxGrade', 'writeBack', 'cacheTtlSeconds', 'updatedAt', 'updatedBy',
             ])
           && (!('enabled' in d.keys()) || d.enabled is bool)
           && (!('divisionId' in d.keys()) || d.divisionId is string)
-          && (!('meetSlug' in d.keys()) || d.meetSlug is string)
           && (!('writeBack' in d.keys()) || d.writeBack in ['off', 'create', 'full'])
           // -1 is Pre-K, the bottom of the range the app understands at all.
           && (!('minGrade' in d.keys()) || (d.minGrade is int && d.minGrade >= -1 && d.minGrade <= 12))

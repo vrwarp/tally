@@ -293,7 +293,6 @@ export function a32ConfigDoc(
     enabled: true,
     baseUrl: '',
     divisionId: '1',
-    meetSlug: 'the-rock',
     minGrade: 6,
     maxGrade: 12,
     writeBack: 'create',

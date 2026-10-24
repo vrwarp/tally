@@ -21,7 +21,6 @@ const A32_ENV = {
   A32_TOKEN: 'token',
   A32_API_BASE_URL: 'http://127.0.0.1:4011',
   A32_DIVISION_ID: '1',
-  A32_MEET_SLUG: 'the-rock',
 };
 
 /** The registry only reads identity and delegates; a stub is a fine backend. */
@@ -83,7 +82,6 @@ describe('createRegistry', () => {
     const problem = registry.configErrorOf('a32') ?? '';
     expect(problem).toContain('A32_API_BASE_URL');
     expect(problem).toContain('A32_DIVISION_ID');
-    expect(problem).toContain('A32_MEET_SLUG');
   });
 
   describe('defaultPush', () => {
