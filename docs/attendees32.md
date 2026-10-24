@@ -24,9 +24,9 @@ python manage.py setup_tally_integration --organization-slug <slug>
 
 The command is idempotent. It creates (or adopts) an integration user with a DRF token and the auth
 group that user is in, put on the organization's `groups_see_all_meets_attendees` and `counselor`
-lists. People Tally creates are filed under the organization's "unspecified" division, the one
-Attendees itself falls back to, so nothing has to be chosen; `--readable-meet <slug>` lets the token
-read a meet's history for the import. It then prints every value Tally needs. Its own
+lists. People Tally creates are filed under a division of Tally's own, `<org>_tally`, made if absent,
+so nothing has to be chosen and what came in from Tally is easy to tell apart and triage;
+`--readable-meet <slug>` lets the token read a meet's history for the import. It then prints every value Tally needs. Its own
 documentation lives in the Attendees repo at `docs/tally_integration.md`.
 
 ### Credentials and configuration
@@ -52,7 +52,7 @@ deploys cleanly.
 | Setting | Deploy env var | What it is |
 | --- | --- | --- |
 | `baseUrl` | `A32_API_BASE_URL` | Where the Attendees server lives. **Admin-only** in the app — every request carries the token to this address. |
-| `divisionId` | `A32_DIVISION_ID` | Where the people Tally creates are filed (numeric id, printed by the setup; `0` is the unspecified division). Reads cover the whole organization. |
+| `divisionId` | `A32_DIVISION_ID` | Where the people Tally creates are filed (numeric id, printed by the setup: Tally's own division). Reads cover the whole organization. |
 | `writeBack` | `A32_WRITE_BACK` | `off` / `create` / `full` — the same ladder as Planning Center. |
 | `minGrade`, `maxGrade` | `A32_MIN_GRADE` / `A32_MAX_GRADE` | The grade band a deployment reads. It decides membership and warns on a profile edit; it no longer rewrites anybody's grade — a student Attendees holds no grade for arrives with none, and screens say "No grade". Defaults stay 6–12 even though `Grade` now admits Pre-K–12 (`-1` is Pre-K, `0` is kindergarten). |
 | `cacheTtlSeconds` | `A32_CACHE_TTL_SECONDS` | Read-reuse window, 0–300 seconds. |
