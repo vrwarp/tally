@@ -137,18 +137,32 @@ jobs:
 
       # System dependencies are not cached, so they are installed either way;
       # only the browser binaries themselves come from the cache. That apt run
-      # is what stalls now and then: a stuck connection used to hold the step
-      # until the job's limit. apt gives up on one after thirty seconds and
-      # retries, and a failed install gets one more try.
+      # is what stalls now and then. Twice on 2026-10-23 the mirror trickled
+      # packages out for half an hour and the job hit its limit before a test
+      # ran, while the other three browsers installed in under forty seconds.
+      # The connection stayed alive the whole time, so a socket timeout alone
+      # would not have caught it: the step gets a limit of its own instead,
+      # and a second try.
       - name: Give apt a timeout
         run: printf 'Acquire::http::Timeout "30";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts
       - name: Install browsers
+        id: install-browsers
+        # Five minutes is many times a healthy install: the cache has already
+        # supplied the browsers, so this is mostly apt. A step that runs out of
+        # time fails rather than cancelling the job, and continue-on-error
+        # lets the job carry on to the retry below.
+        timeout-minutes: 5
+        continue-on-error: true
+        run: npm run e2e:install
+      - name: Install browsers (retry)
+        if: steps.install-browsers.outcome == 'failure'
+        timeout-minutes: 5
         run: |
-          for attempt in 1 2; do
-            npm run e2e:install && exit 0
-            echo "::warning::Browser install attempt $attempt failed"
-          done
-          exit 1
+          echo "::warning::Browser install failed or timed out; trying once more"
+          # A first attempt killed mid-unpack leaves dpkg half-configured, and
+          # apt refuses to install anything until that is put right.
+          sudo dpkg --configure -a
+          npm run e2e:install
 
       - name: Cache the emulator jars
         uses: actions/cache@v6
