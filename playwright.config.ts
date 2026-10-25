@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
@@ -23,12 +25,73 @@ const PORTS = {
   app: 4173,
 } as const;
 
+const a32SimulatorUrl = `http://127.0.0.1:${PORTS.attendees}`;
+
+/**
+ * Attendees is the simulator unless `A32_ENV_FILE` names the file the real
+ * server's setup command left behind (docker/attendees32/setup.sh, run by
+ * docker-compose.integration.yml). Then the suite drives attendees32 itself,
+ * at `A32_API_BASE_URL`, with the token and division from that file.
+ *
+ * The token cannot travel to the Functions emulator through its environment:
+ * the emulator applies `functions/.env.demo-tally` over whatever it inherits,
+ * and that file names the simulator's token. `functions/.env.local` is applied
+ * last and is gitignored, so a live run writes the real token there, and a
+ * simulator run removes that file again if the live run wrote it.
+ */
+const FUNCTIONS_ENV_LOCAL = fileURLToPath(new URL('functions/.env.local', import.meta.url));
+const ENV_LOCAL_MARKER = '# Written by playwright.config.ts for a live Attendees run. Safe to delete.';
+
+function syncFunctionsEnvLocal(token: string | undefined) {
+  if (token) {
+    writeFileSync(FUNCTIONS_ENV_LOCAL, `${ENV_LOCAL_MARKER}\nA32_TOKEN=${token}\n`);
+  } else if (existsSync(FUNCTIONS_ENV_LOCAL) && readFileSync(FUNCTIONS_ENV_LOCAL, 'utf8').startsWith(ENV_LOCAL_MARKER)) {
+    unlinkSync(FUNCTIONS_ENV_LOCAL);
+  }
+}
+
+function readLiveAttendees() {
+  const file = process.env.A32_ENV_FILE;
+  if (!file) return undefined;
+  const values: Record<string, string> = {};
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (match) values[match[1]] = match[2];
+  }
+  for (const key of ['A32_TOKEN', 'A32_DIVISION_ID']) {
+    if (!values[key]) throw new Error(`${file} has no ${key}. Did the Attendees setup finish?`);
+  }
+  const baseUrl = process.env.A32_API_BASE_URL;
+  if (!baseUrl) throw new Error('A32_API_BASE_URL names the Attendees server when A32_ENV_FILE is set.');
+  return {
+    live: true as const,
+    baseUrl,
+    token: values.A32_TOKEN,
+    divisionId: values.A32_DIVISION_ID,
+    // Only the history import names a meet: the one the setup made readable.
+    meetSlug: values.A32_MEET_SLUG ?? '',
+  };
+}
+
+const liveAttendees = readLiveAttendees();
+syncFunctionsEnvLocal(liveAttendees?.token);
+
 export const E2E = {
   ...PORTS,
   projectId: 'demo-tally',
   baseURL: `http://127.0.0.1:${PORTS.app}`,
   simulatorUrl: `http://127.0.0.1:${PORTS.planningCenter}`,
-  a32SimulatorUrl: `http://127.0.0.1:${PORTS.attendees}`,
+  a32SimulatorUrl,
+  /** Where Attendees is and how to reach it: the simulator, or the real server. */
+  a32: liveAttendees ?? {
+    live: false as const,
+    baseUrl: a32SimulatorUrl,
+    token: 'a32-sim-token',
+    // The coordinates the simulator's seeded organisation answers to, the
+    // same ones `setup_tally_integration` prints for a real server.
+    divisionId: '11',
+    meetSlug: 'simorg_tally_gathering',
+  },
 } as const;
 
 /**
@@ -110,12 +173,13 @@ const planningCenterEnv = {
    */
   TALLY_EDIT_BACKOFF_MS: '250,250,250,250,250,250,250,250',
   /*
-   * Only the credential. Everything else about Attendees arrives through the
-   * `config/attendees32` document, which the Attendees specs write and remove
-   * around themselves — so every other spec runs with the second backend
-   * genuinely absent, exactly like a deployment that never set it up.
+   * Nothing about Attendees. The token is in `functions/.env.demo-tally` (the
+   * simulator's) or `functions/.env.local` (a live run's, see above); the
+   * emulator reads those over its environment. Everything else arrives through
+   * the `config/attendees32` document, which the Attendees specs write and
+   * remove around themselves — so every other spec runs with the second
+   * backend genuinely absent, exactly like a deployment that never set it up.
    */
-  A32_TOKEN: 'a32-sim-token',
   A32_CACHE_TTL_SECONDS: '5',
 };
 
@@ -188,15 +252,20 @@ export default defineConfig({
       stdout: 'pipe',
       stderr: 'pipe',
     },
-    {
-      command: 'npm run a32-sim',
-      url: `${E2E.a32SimulatorUrl}/_health`,
-      env: { A32_SIM_PORT: String(PORTS.attendees) },
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
+    // No simulator when the real server is there.
+    ...(E2E.a32.live
+      ? []
+      : [
+          {
+            command: 'npm run a32-sim',
+            url: `${E2E.a32SimulatorUrl}/_health`,
+            env: { A32_SIM_PORT: String(PORTS.attendees) },
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+            stdout: 'pipe' as const,
+            stderr: 'pipe' as const,
+          },
+        ]),
     {
       // Functions must be compiled before the emulator can load them; the
       // emulator reports a missing `lib/` as a warning and then serves nothing,

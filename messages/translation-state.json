@@ -4331,14 +4331,8 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
-  "Backends.a32MeetSlug": {
-    "source": "Meet slug",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
   "Backends.a32SlugsNote": {
-    "source": "Where your students live in Attendees. The setup command on the Attendees side prints both: the division new attendees are filed under, and the meet whose enrollment is the roster.",
+    "source": "Where your students live in Attendees: the division new attendees are filed under. The setup command on the Attendees side prints it.",
     "es-MX": "reviewed",
     "zh-Hans": "machine",
     "zh-Hant": "reviewed"
@@ -10992,19 +10986,19 @@
     "zh-Hant": "machine"
   },
   "StudentDetail.birthdaySavedOptionalYear": {
-    "source": "Saved in Planning Center. The year is optional.",
+    "source": "Saved in {backend}. The year is optional.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.birthdaySavedNoYear": {
-    "source": "Saved in Planning Center, which holds no year for them — so it shows no age.",
+    "source": "Saved in {backend}, which holds no year for them — so it shows no age.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
   "StudentDetail.birthdaySaved": {
-    "source": "Saved in Planning Center.",
+    "source": "Saved in {backend}.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

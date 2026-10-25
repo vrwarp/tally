@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 describe('pushStudent', () => {
-  it('creates a person for a queued visitor, with a family folk and an enrollment', async () => {
+  it('creates a person for a queued visitor, with a family folk and no enrollment', async () => {
     db.seed('students/visitor-1', {
       firstName: 'Keanu',
       lastName: 'Māhoe',
@@ -74,10 +74,10 @@ describe('pushStudent', () => {
     const attendee = store.attendees.get(createdId)!;
     expect(attendee.firstName).toBe('Keanu');
     expect((attendee.infos.fixed as Record<string, unknown>).grade).toBe(store.gradeIndex(8));
-    // The side effects the create headers ask for: a family folk membership
-    // and an enrollment in the configured meet.
+    // The one side effect the create headers ask for is a family folk
+    // membership. Tally files nobody into a meet.
     expect(store.folkAttendees.some((edge) => edge.attendeeId === createdId && edge.roleId === 27)).toBe(true);
-    expect(store.attendingMeets.some((row) => store.attendings.find((a) => a.id === row.attendingId)?.attendeeId === createdId)).toBe(true);
+    expect(store.attendingMeets.some((row) => store.attendings.find((a) => a.id === row.attendingId)?.attendeeId === createdId)).toBe(false);
 
     const doc = db.get('students/visitor-1')!;
     expect(doc.upstreamBackend).toBe('a32');
@@ -1022,6 +1022,28 @@ describe('createFamily', () => {
     expect(parentFamilies).toHaveLength(1);
     expect(store.familyFolksOf(second).map((folk) => folk.id)).toContain(parentFamilies[0]!.id);
     expect(store.familyFolksOf(first).map((folk) => folk.id)).toContain(parentFamilies[0]!.id);
+  });
+
+  /*
+   * Two children on one registration: the push gave each a family of their
+   * own, and the household is built in the first of those. The second child
+   * must not stay in both.
+   */
+  it('leaves no child in the one-member family the push made for them', async () => {
+    const first = await pushed('t-s1', 'Testfour', 'Person');
+    const second = await pushed('t-s2', 'Testfive', 'Person');
+    const families = (personId: string) =>
+      store.familyFolksOf(personId).filter((folk) => folk.category === 0);
+    const secondsOwn = families(second)[0]!;
+
+    const result = await build({ studentIds: ['t-s1', 't-s2'], phone: '123-123-1234' });
+
+    expect(result.status).toBe('created');
+    expect(families(first)).toHaveLength(1);
+    expect(families(second)).toHaveLength(1);
+    expect(families(second)[0]!.id).toBe(families(first)[0]!.id);
+    // The second child's own family is gone, not merely emptied.
+    expect(store.folks.get(secondsOwn.id)!.isRemoved).toBe(true);
   });
 
   it('never corroborates a child as the parent, even one of another family', async () => {

@@ -44,7 +44,6 @@ export interface A32EffectiveSettings {
   enabled: boolean;
   baseUrl: string;
   divisionId: string;
-  meetSlug: string;
   minGrade: number;
   maxGrade: number;
   writeBack: PcoWriteBackMode;
@@ -66,7 +65,6 @@ export function readA32EffectiveSettings(settings: Record<string, unknown>): A32
     enabled: settings.enabled !== false,
     baseUrl: str(settings.baseUrl),
     divisionId: str(settings.divisionId),
-    meetSlug: str(settings.meetSlug),
     minGrade: num(settings.minGrade, 6),
     maxGrade: num(settings.maxGrade, 12),
     writeBack: writeBack === 'create' || writeBack === 'full' ? writeBack : 'off',
