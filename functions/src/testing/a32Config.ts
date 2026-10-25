@@ -14,7 +14,6 @@ export function a32Config(overrides: Partial<A32Config> = {}): A32Config {
     token: DEFAULT_TOKEN,
     baseUrl: SIMULATOR_ORIGIN,
     divisionId: '11',
-    meetSlug: 'simorg_tally_gathering',
     writeBack: 'create',
     minGrade: 6,
     maxGrade: 12,

@@ -470,11 +470,6 @@ export interface A32Config {
   baseUrl: string;
   /** The division a created attendee is filed under (numeric id, as text). */
   divisionId: string;
-  /**
-   * The meet a created student is enrolled in. Enrollment carries the meet's
-   * major character, which is what the server uses whatever a client asks.
-   */
-  meetSlug: string;
   writeBack: PcoWriteBackMode;
   minGrade: number;
   maxGrade: number;
@@ -493,7 +488,6 @@ export interface A32ConfigOverrides {
   enabled?: boolean;
   baseUrl?: string;
   divisionId?: string;
-  meetSlug?: string;
   writeBack?: string;
   minGrade?: string;
   maxGrade?: string;
@@ -504,7 +498,6 @@ export interface A32ConfigOverrides {
 export const A32_CONFIG_KEYS = [
   'baseUrl',
   'divisionId',
-  'meetSlug',
   'writeBack',
   'minGrade',
   'maxGrade',
@@ -516,7 +509,6 @@ function readA32Params(): Required<Omit<A32ConfigOverrides, 'enabled'>> & { toke
     token: readValue(A32_TOKEN, 'A32_TOKEN'),
     baseUrl: readValue(null, 'A32_API_BASE_URL'),
     divisionId: readValue(null, 'A32_DIVISION_ID'),
-    meetSlug: readValue(null, 'A32_MEET_SLUG'),
     writeBack: readValue(null, 'A32_WRITE_BACK'),
     minGrade: readValue(null, 'A32_MIN_GRADE'),
     maxGrade: readValue(null, 'A32_MAX_GRADE'),
@@ -573,13 +565,11 @@ function normalizeA32Config(
   if (!rawBase) problems.push('A32_API_BASE_URL is not set');
   if (baseUrlProblem) problems.push(baseUrlProblem);
   if (!raw.divisionId.trim()) problems.push('A32_DIVISION_ID is not set');
-  if (!raw.meetSlug.trim()) problems.push('A32_MEET_SLUG is not set');
 
   return {
     token: raw.token,
     baseUrl,
     divisionId: raw.divisionId.trim(),
-    meetSlug: raw.meetSlug.trim(),
     writeBack,
     minGrade,
     maxGrade,

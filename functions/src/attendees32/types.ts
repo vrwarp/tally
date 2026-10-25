@@ -138,6 +138,7 @@ export const API = {
   attendee: '/persons/api/datagrid_data_attendee/',
   attendeeById: (id: string) => `/persons/api/datagrid_data_attendee/${encodeURIComponent(id)}/`,
   families: '/persons/api/attendee_families/',
+  familyById: (id: string) => `/persons/api/attendee_families/${encodeURIComponent(id)}/`,
   folkAttendees: '/persons/api/datagrid_data_familyattendees/',
   relations: '/persons/api/all_relations/',
   organizations: '/whereabouts/api/user_organizations/',

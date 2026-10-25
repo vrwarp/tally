@@ -1743,7 +1743,6 @@ export interface A32RuntimeConfigDoc {
   /** Admin-only: every Attendees request carries the token to this address. */
   baseUrl: string;
   divisionId: string;
-  meetSlug: string;
   minGrade: number;
   maxGrade: number;
   writeBack: PcoWriteBackMode;

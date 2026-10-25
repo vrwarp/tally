@@ -13,6 +13,7 @@ import type { Page } from '@playwright/test';
 import { gotoReady, reloadReady } from './support/auth';
 import { a32PersonIdOf, removeA32Residue } from './support/emulator';
 import { expect, test } from './support/fixtures';
+import { E2E } from '../playwright.config';
 import { rosterAction } from './support/rosterActions';
 
 /** Adds one Attendees person to the roster through the UI, and waits for the row. */
@@ -29,6 +30,10 @@ async function addFromAttendees(page: Page, name: string) {
 }
 
 test.describe('Two backends at once', () => {
+  // Written against the simulator's people and its down switch; the real
+  // server has attendees32-live.spec.ts.
+  test.skip(E2E.a32.live, 'needs the Attendees simulator');
+
   // Same sweep as the Attendees spec: the seeded world must reach the later
   // specs unchanged.
   test.afterAll(async () => {

@@ -18,7 +18,9 @@ export default async function globalSetup(): Promise<void> {
     waitForHttp(`http://127.0.0.1:${E2E.firestore}/`, 'Firestore emulator'),
     waitForHttp(`http://127.0.0.1:${E2E.auth}/`, 'Auth emulator'),
     waitForHttp(`${E2E.simulatorUrl}/_health`, 'Planning Center simulator', 30_000),
-    waitForHttp(`${E2E.a32SimulatorUrl}/_health`, 'Attendees simulator', 30_000),
+    E2E.a32.live
+      ? waitForHttp(`${E2E.a32.baseUrl}/accounts/login/`, 'Attendees server', 120_000)
+      : waitForHttp(`${E2E.a32SimulatorUrl}/_health`, 'Attendees simulator', 30_000),
   ]);
 
   // The Functions emulator is the slowest to come up and the one whose absence

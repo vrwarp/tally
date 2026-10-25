@@ -1,0 +1,52 @@
+# The end-to-end suite against a real Attendees server: attendees32 built from
+# the ref docker-compose.integration.yml names (upstream main), loaded with its golden
+# congregation. Nightly, by hand, and on changes to the Attendees adapter or
+# to the suite's own plumbing; every other pull request keeps the simulator.
+name: Attendees live
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
+  pull_request:
+    paths:
+      - functions/src/attendees32/**
+      - functions/src/backends/**
+      - e2e/attendees32*
+      - e2e/support/**
+      - docker-compose.integration.yml
+      - docker/**
+      - playwright.config.ts
+      - .github/workflows/attendees32-live.yml
+
+jobs:
+  live:
+    name: Chromium against attendees32
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the server and the suite
+        run: docker compose -f docker-compose.integration.yml build
+
+      - name: Run the suite against the server
+        run: docker compose -f docker-compose.integration.yml run --rm e2e --project=chromium-desktop
+
+      - name: Show the server on failure
+        if: failure()
+        run: docker compose -f docker-compose.integration.yml logs --tail 200 attendees32-setup attendees32
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.integration.yml down -v
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendees32-live-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

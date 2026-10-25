@@ -164,9 +164,8 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
         // the same ones `setup_tally_integration` prints for a real server.
         await writeDocument('config/attendees32', {
           enabled: true,
-          baseUrl: E2E.a32SimulatorUrl,
-          divisionId: '11',
-          meetSlug: 'simorg_tally_gathering',
+          baseUrl: E2E.a32.baseUrl,
+          divisionId: E2E.a32.divisionId,
           writeBack,
           minGrade: 6,
           maxGrade: 12,
@@ -176,6 +175,8 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
       disable: async () => {
         await deleteDocument('config/attendees32');
       },
+      // The real server has no such controls; a spec that needs them skips
+      // when E2E.a32.live.
       reset: async () => {
         touched = true;
         await resetA32Simulator();
@@ -190,8 +191,10 @@ export const test = base.extend<TallyFixtures, { seededWorld: void }>({
     // behind it — configuration gone, simulator up and reseeded.
     if (touched) {
       await deleteDocument('config/attendees32');
-      await setA32Down(false);
-      await resetA32Simulator();
+      if (!E2E.a32.live) {
+        await setA32Down(false);
+        await resetA32Simulator();
+      }
     }
   },
 });

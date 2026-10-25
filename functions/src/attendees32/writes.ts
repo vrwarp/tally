@@ -61,10 +61,8 @@ import {
   type A32Attendee,
   type A32Folk,
   type A32FolkAttendee,
-  type A32Meet,
   type A32Relation,
 } from './types.js';
-import { cacheKey } from '../pco/cache.js';
 import { loadGradeScale, type GradeScale } from './grades.js';
 import { loadRelations, relationIdsOf } from './relations.js';
 
@@ -109,21 +107,6 @@ async function resolveA32Person(
     active: data.status !== 'inactive',
     data,
   };
-}
-
-function meetIdCacheKey(baseUrl: string): string {
-  return cacheKey({ kind: 'a32-meet-id', base: baseUrl });
-}
-
-/** The configured meet's numeric id, resolved by slug and held for the TTL. */
-async function resolveMeetId(options: A32WriteOptions): Promise<number | null> {
-  return options.cache.get(meetIdCacheKey(options.config.baseUrl), async () => {
-    for await (const page of options.client.paginate<A32Meet>(API.meets)) {
-      const meet = page.data.find((row) => row.slug === options.config.meetSlug);
-      if (meet) return meet.id;
-    }
-    return null;
-  });
 }
 
 /** The `child`/`parent` relation ids, from the cached vocabulary. */
@@ -359,10 +342,7 @@ export async function pushStudent(
     };
   }
 
-  const [meetId, relationIds] = await Promise.all([
-    resolveMeetId(options),
-    resolveRelationIds(options),
-  ]);
+  const relationIds = await resolveRelationIds(options);
 
   const gradeIndex = scale.toIndex(grade);
   const created = await client.post<A32Attendee>(
@@ -377,14 +357,10 @@ export async function pushStudent(
       infos: { fixed: gradeIndex === null ? {} : { grade: gradeIndex }, contacts: {} },
     },
     {
-      // A family folk from the start (the app's own grids hide family-less
-      // attendees), and enrollment in the configured meet so the student is
-      // visible in Attendees' rosters too.
+      // A family folk from the start: the app's own grids hide family-less
+      // attendees. No meet: Tally files nobody into one.
       ...(relationIds.child !== null
         ? { 'X-Add-Folk': 'new', 'X-Folk-Role': String(relationIds.child) }
-        : {}),
-      ...(meetId !== null
-        ? { 'X-Join-Meet': String(meetId) }
         : {}),
     },
   );
@@ -1591,12 +1567,29 @@ export async function createFamily(
       (edge) =>
         edge.attendee === child.personId && edge.folk.id === folkId && edge.is_removed !== true,
     );
-    if (alreadyIn) continue;
-    await client.post<A32FolkAttendee>(
-      API.folkAttendees,
-      { folk: folkId, attendee: child.personId, role: relationIds.child },
-      { 'X-Target-Attendee-Id': child.personId },
-    );
+    if (!alreadyIn) {
+      await client.post<A32FolkAttendee>(
+        API.folkAttendees,
+        { folk: folkId, attendee: child.personId, role: relationIds.child },
+        { 'X-Target-Attendee-Id': child.personId },
+      );
+    }
+    /*
+     * `pushStudent` gives every child it creates a family of their own, and
+     * for the children of one registration only the first of those becomes
+     * the household. The others would leave each later child in two families,
+     * listed twice in every directory, so a family that holds nobody else
+     * goes. The server deletes a folk its last member leaves.
+     */
+    for (const ownFolkId of familyFolkIdsOf(child.personId, child.edges)) {
+      if (ownFolkId === folkId) continue;
+      const others = child.edges.some(
+        (edge) =>
+          edge.folk.id === ownFolkId && edge.attendee !== child.personId && edge.is_removed !== true,
+      );
+      if (others) continue;
+      await client.delete(API.familyById(ownFolkId), { 'X-Target-Attendee-Id': child.personId });
+    }
   }
 
   // Unless this is the folk they already head — the case the precedence above
@@ -1770,10 +1763,7 @@ export async function recreateStudent(
     };
   }
 
-  const [meetId, relationIds] = await Promise.all([
-    resolveMeetId(options),
-    resolveRelationIds(options),
-  ]);
+  const relationIds = await resolveRelationIds(options);
   const gradeIndex = scale.toIndex(grade);
   const created = await client.post<A32Attendee>(
     API.attendee,
@@ -1789,9 +1779,6 @@ export async function recreateStudent(
     {
       ...(relationIds.child !== null
         ? { 'X-Add-Folk': 'new', 'X-Folk-Role': String(relationIds.child) }
-        : {}),
-      ...(meetId !== null
-        ? { 'X-Join-Meet': String(meetId) }
         : {}),
     },
   );

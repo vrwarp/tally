@@ -8,7 +8,7 @@
 # Everything the suite needs runs *inside* this container — the Planning Center
 # simulator, the Firebase emulators and a production build of the app — so there
 # is nothing to wire up and no external service to be unavailable.
-FROM mcr.microsoft.com/playwright:v1.62.1-noble
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
 
 # The Firestore and Auth emulators are Java programs; the Playwright image has
 # no JRE.
@@ -16,8 +16,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
+# NODE_ENV stays unset: set to development it makes `vite build` ship React's
+# development build, and the kiosk budget check fails the app build.
 ENV CI=true \
-    NODE_ENV=development \
     # Firebase writes its emulator downloads here; keeping it inside the image
     # means a run never has to reach the network for them.
     HOME=/root
