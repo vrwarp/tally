@@ -1,5 +1,5 @@
 # The end-to-end suite against a real Attendees server: attendees32 built from
-# the ref pinned in docker-compose.integration.yml, loaded with its golden
+# the ref docker-compose.integration.yml names (upstream main), loaded with its golden
 # congregation. Nightly, by hand, and on changes to the Attendees adapter or
 # to the suite's own plumbing; every other pull request keeps the simulator.
 name: Attendees live

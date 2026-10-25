@@ -9,9 +9,10 @@
 #   docker compose -f docker-compose.integration.yml run --rm e2e --project=chromium-desktop
 #   docker compose -f docker-compose.integration.yml down -v
 #
-# ATTENDEES32_REPO and ATTENDEES32_REF pin the server; bump the ref to adopt a
-# release. The congregation is rebuilt on every run, so runs cannot leak into
-# each other.
+# ATTENDEES32_REPO and ATTENDEES32_REF name the server: upstream main by
+# default, so a change there that breaks the integration shows up in the next
+# run; set a sha to hold still. The congregation is rebuilt on every run, so
+# runs cannot leak into each other.
 x-attendees32-env: &attendees32-env
   USE_DOCKER: "yes"
   REDIS_URL: redis://attendees32-redis:6379/0
@@ -28,7 +29,7 @@ x-attendees32-env: &attendees32-env
   DJANGO_LOGIN_FAILED_RATE_LIMIT: 1000/m
 
 x-attendees32-build: &attendees32-build
-  context: ${ATTENDEES32_REPO:-https://github.com/xjlin0/attendees32.git}#${ATTENDEES32_REF:-6416b05b13db01068c852a7ab256069e6d905b21}
+  context: ${ATTENDEES32_REPO:-https://github.com/xjlin0/attendees32.git}#${ATTENDEES32_REF:-main}
   args:
     # The server reads its commit sha from the checkout at startup; a git
     # context drops .git unless told to keep it.
