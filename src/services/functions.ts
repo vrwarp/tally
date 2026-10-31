@@ -100,6 +100,23 @@ export const listPinnedAdmins = httpsCallable<void, { emails: string[] }>(
 );
 
 /* -------------------------------------------------------------------------- */
+/* The print server                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where the kiosks print over Wi-Fi. Core and up. The address is kept where
+ * the core team can read it back; the token goes to a document no client can
+ * read, which is why this is a callable and not a write. A blank or absent
+ * token keeps the one already saved; `null` removes the print server, and
+ * every kiosk goes back to USB at its next poll. See
+ * functions/src/kiosk/printServer.ts.
+ */
+export const setPrintServer = httpsCallable<
+  { url: string; token?: string } | null,
+  { status: 'saved' | 'cleared' }
+>(functions, 'setPrintServer');
+
+/* -------------------------------------------------------------------------- */
 /* Invitations                                                                 */
 /* -------------------------------------------------------------------------- */
 

@@ -34,6 +34,7 @@ const TO = join(ROOT, 'functions', 'src', 'generated');
 export const SHARED_FILES = [
   'backendIds.ts',
   'serverCodes.ts',
+  'printServerAddress.ts',
   'recurrenceCore.ts',
   'labelTemplate.ts',
   'kioskTheme.ts',

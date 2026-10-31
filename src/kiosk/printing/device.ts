@@ -32,6 +32,19 @@
  */
 import { KIOSK_KEYS, readJson, removeKey, writeJson } from '../storage';
 
+/**
+ * How this kiosk reaches its printer.
+ *
+ * `usb` is the printer on the shelf, over WebUSB, and every config written
+ * before the print server existed means it. `server` is a printer registered on
+ * the print server (see docs/wifi-printing.md): `printerId` is what the kiosk
+ * asks the server to open and `printerName` is what the printer screen calls
+ * it, carried here so the screen can name it before the server has answered.
+ */
+export type PrinterConnection =
+  | { kind: 'usb' }
+  | { kind: 'server'; printerId: string; printerName: string };
+
 export interface PrinterConfig {
   /** A `brother_ql` model identifier, e.g. `QL-810W`. */
   model: string;
@@ -69,6 +82,25 @@ export interface PrinterConfig {
    * existed lacks it, and absent has to read as "paired the ordinary way".
    */
   viaPolicy?: boolean;
+  /**
+   * How the printer is reached. Absent means USB, so every stored config stays
+   * valid; written only for a print server printer. See {@link connectionOf}.
+   */
+  connection?: PrinterConnection;
+}
+
+/** The connection a config means, with the absent case spelled out. */
+export function connectionOf(config: PrinterConfig | null | undefined): PrinterConnection {
+  return config?.connection ?? { kind: 'usb' };
+}
+
+/** A well-formed `server` connection, or null for anything else — USB, or junk. */
+function serverConnection(value: unknown): Extract<PrinterConnection, { kind: 'server' }> | null {
+  const held = value as Partial<Extract<PrinterConnection, { kind: 'server' }>> | null | undefined;
+  if (held?.kind !== 'server') return null;
+  if (typeof held.printerId !== 'string' || held.printerId === '') return null;
+  if (typeof held.printerName !== 'string' || held.printerName === '') return null;
+  return { kind: 'server', printerId: held.printerId, printerName: held.printerName };
 }
 
 /**
@@ -114,11 +146,16 @@ export function readPrinterConfig(): PrinterConfig | null {
   // boundary that decides what the rest of the module may believe about a
   // config, and a spread would let any key a future shape adds through it
   // unexamined.
+  const server = serverConnection(stored.connection);
   return {
     model: stored.model,
     label: stored.label,
     ...(stored.guessed === true ? { guessed: true } : {}),
     ...(stored.viaPolicy === true ? { viaPolicy: true } : {}),
+    // A `server` connection missing either half reads as USB rather than as
+    // no printer: the kiosk still has a model and a roll, and the printer
+    // screen is where a volunteer picks the server's printer again.
+    ...(server ? { connection: server } : {}),
   };
 }
 
@@ -141,6 +178,9 @@ export function writePrinterConfig(config: PrinterConfig): void {
      * the next morning's reload, on every managed tablet in the building.
      */
     ...(config.viaPolicy === true ? { viaPolicy: true } : {}),
+    // USB is the absence of the field, so a kiosk that never met a print
+    // server stores exactly what it always has.
+    ...(config.connection?.kind === 'server' ? { connection: config.connection } : {}),
   });
 }
 

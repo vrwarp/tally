@@ -165,6 +165,10 @@
         "recreate": "無法連線 {backend} 來重新建立這名學生。請稍後再試。"
       }
     },
+    "printServer": {
+      "badAddress": "列印伺服器需要一個像 https://print.example.org 這樣的位址。",
+      "badToken": "請貼上列印伺服器建立的 token，前後不要帶其他內容。"
+    },
     "field": {
       "childFirst": {
         "required": "孩子的名字為必填。",
@@ -797,6 +801,34 @@
     "a32EditorDescription": "除了 token 以外的一切。改動會在每位輔導下次讀取時生效。",
     "pcoEditorDescription": "除了憑證以外的一切。改動會在每位輔導下次讀取時生效。"
   },
+  "PrintServer": {
+    "title": "列印伺服器",
+    "description": "簽到台透過 Wi‑Fi 列印時經過的伺服器。在這裡設定一次，每台簽到台會自動取用。",
+    "checking": "正在檢查列印伺服器設定",
+    "loadFailed": "無法讀取列印伺服器設定。",
+    "none": "沒有列印伺服器",
+    "inUse": "簽到台透過 {host} 列印",
+    "savedWhen": "於 {when} 儲存。",
+    "howItWorks": "簽到台只在列印名牌時占用印表機；連不上列印伺服器時，會改用自己的 USB 印表機。",
+    "setUp": "設定",
+    "address": "伺服器位址",
+    "addressHint": "在瀏覽器裡連到它時輸入的位址，例如 https://print.example.org。",
+    "token": "Token",
+    "tokenHint": "在列印伺服器的管理頁面建立。Tally 會把它存放在只有簽到台能讀取的地方，之後不再顯示。",
+    "tokenKept": "留空則保留已儲存的 token。",
+    "test": "測試",
+    "testing": "正在詢問列印伺服器…",
+    "testOk": "{count, plural, =0 {列印伺服器已回應，但沒有登記任何印表機。} one {列印伺服器已回應，登記了 # 台印表機：} other {列印伺服器已回應，登記了 # 台印表機：}}",
+    "testFailed": "用這些資料連不上列印伺服器。請檢查位址和 token，並確認這個網站在列印伺服器的允許來源裡。",
+    "printerNoStatus": "沒有狀態通道，簽到台不會提供它",
+    "save": "儲存列印伺服器",
+    "remove": "移除列印伺服器",
+    "removeConfirm": "要移除列印伺服器嗎？簽到台會在下次檢查時改回各自的 USB 印表機。",
+    "removeYes": "是，移除",
+    "saved": "列印伺服器已儲存。簽到台會在一分鐘內取用。",
+    "removed": "列印伺服器已移除。簽到台改回 USB 列印。",
+    "saveFailed": "無法儲存列印伺服器。"
+  },
   "Team": {
     "title": "團隊",
     "description": "誰可以登入 Tally，登入之後能做什麼。改動會立刻套用到每一台手機。",
@@ -944,6 +976,11 @@
     "kioskLive": "目前正在記錄 {gathering}",
     "kioskIdle": "配對時間 {when} · 目前未記錄",
     "kioskOffCharger": "使用電池 · {percent}%",
+    "kioskPrinterServer": "透過列印伺服器列印 · {name}",
+    "kioskPrinterUsb": "透過 USB 列印",
+    "kioskPrinterFallback": "正在透過 USB 列印 · 連不上列印伺服器",
+    "kioskPrinterTrouble": "印表機需要處理",
+    "kioskPrinterUnpaired": "印表機未連接",
     "kioskWaitingOnTablet": "自 {when} 起 {count, plural, other {# 筆簽到紀錄}}待上傳",
     "kioskAllInSince": "自 {when} 起已全部傳到 Tally",
     "kioskPairedBy": "由 {name} 配對",

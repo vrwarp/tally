@@ -18,6 +18,7 @@ import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
   clearPrinterConfig,
+  connectionOf,
   hasConfiguredPrinter,
   readPrinterConfig,
   writePrinterConfig,
@@ -212,5 +213,59 @@ describe('hasConfiguredPrinter', () => {
     window.localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model: 'QL-810W' }));
 
     expect(hasConfiguredPrinter()).toBe(false);
+  });
+});
+
+/**
+ * How the printer is reached, which every config written before the print
+ * server existed leaves unsaid — and unsaid has to mean USB, or an upgrade
+ * would turn a working kiosk into one asking for a print server it never had.
+ */
+describe('the connection', () => {
+  const server = { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' } as const;
+
+  it('is USB when nothing says otherwise', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29' });
+    expect(readPrinterConfig()?.connection).toBeUndefined();
+    expect(connectionOf(readPrinterConfig())).toEqual({ kind: 'usb' });
+    expect(connectionOf(null)).toEqual({ kind: 'usb' });
+    // And the stored shape stays the two fields it has always been.
+    expect(JSON.parse(stored()!)).toEqual({ model: 'QL-810W', label: '62x29' });
+  });
+
+  it('carries a print server printer, by id and by name', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', connection: server });
+    expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29', connection: server });
+    expect(connectionOf(readPrinterConfig())).toEqual(server);
+  });
+
+  it('writes an explicit USB connection as the absence of one', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', connection: { kind: 'usb' } });
+    expect(JSON.parse(stored()!)).toEqual({ model: 'QL-810W', label: '62x29' });
+  });
+
+  it('reads a server connection missing either half as USB, never as no printer', () => {
+    for (const broken of [
+      { kind: 'server', printerId: 'p1' },
+      { kind: 'server', printerName: 'Shipping desk' },
+      { kind: 'server', printerId: '', printerName: 'Shipping desk' },
+      { kind: 'wifi', printerId: 'p1', printerName: 'Shipping desk' },
+      'server',
+    ]) {
+      window.localStorage.setItem(
+        KIOSK_KEYS.printer,
+        JSON.stringify({ model: 'QL-810W', label: '62x29', connection: broken }),
+      );
+      expect(readPrinterConfig(), JSON.stringify(broken)).toEqual({ model: 'QL-810W', label: '62x29' });
+      expect(hasConfiguredPrinter()).toBe(true);
+    }
+  });
+
+  it('keeps only the three fields of a server connection', () => {
+    window.localStorage.setItem(
+      KIOSK_KEYS.printer,
+      JSON.stringify({ model: 'QL-810W', label: '62x29', connection: { ...server, token: 'leak' } }),
+    );
+    expect(readPrinterConfig()?.connection).toEqual(server);
   });
 });

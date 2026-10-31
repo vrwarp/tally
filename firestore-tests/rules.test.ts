@@ -1838,6 +1838,44 @@ describe('config/backends', () => {
   });
 });
 
+/**
+ * The print server: the address the core team can see, and the token nobody
+ * can. Both are written by a function, so every client write is refused — the
+ * one way to keep "the token is never in a client-readable document" a fact
+ * the database enforces rather than a habit.
+ */
+describe('config/printServer', () => {
+  const stored = { url: 'wss://print.church.example/ws', rev: 1, updatedBy: UID.core };
+
+  it('lets core read the address and nobody write it', async () => {
+    await assertSucceeds(getDoc(doc(asUser(env, UID.core), paths.printServer())));
+    await assertFails(setDoc(doc(asUser(env, UID.core), paths.printServer()), stored));
+    await assertFails(setDoc(doc(asUser(env, UID.admin), paths.printServer()), stored));
+  });
+
+  it('keeps the address away from counselors and kiosks', async () => {
+    // A kiosk is handed the address by `getKioskEvents`, with the token; it
+    // has no business reading the document the core team edits from.
+    await assertFails(getDoc(doc(asUser(env, UID.counselor), paths.printServer())));
+    await assertFails(getDoc(doc(asKioskDevice(env, DEVICE.live), paths.printServer())));
+  });
+});
+
+describe('private/printServer', () => {
+  it('is read by no identity at all', async () => {
+    for (const db of [
+      asUser(env, UID.admin),
+      asUser(env, UID.core),
+      asUser(env, UID.counselor),
+      asKioskDevice(env, DEVICE.live),
+      asAnonymous(env),
+    ]) {
+      await assertFails(getDoc(doc(db, paths.printServerSecret())));
+      await assertFails(setDoc(doc(db, paths.printServerSecret()), { token: 'bql_x' }));
+    }
+  });
+});
+
 /*
  * `config/pcoSync` and `accessRoster` had their own suites here.
  *
@@ -3333,6 +3371,39 @@ describe('kiosk', () => {
       // And the case that must keep working forever: an engine with no Battery
       // Status API, and every kiosk built before these fields existed.
       await assertSucceeds(updateDoc(own(), { lastSeenAt: serverTimestamp() }));
+    });
+
+    it('takes what the kiosk says about its printer, and does not require it', async () => {
+      await assertSucceeds(
+        updateDoc(own(), {
+          lastSeenAt: serverTimestamp(),
+          printerKind: 'server',
+          printerState: 'ready',
+          printerName: 'Shipping desk',
+        }),
+      );
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: 'usb', printerState: 'trouble', printerName: null }),
+      );
+      // A kiosk that lost its printer clears what it last said.
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: null, printerState: null, printerName: null }),
+      );
+    });
+
+    it('refuses a printer report nobody wrote code for', async () => {
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: 'bluetooth' }));
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), printerState: 'on fire' }));
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerName: 'x'.repeat(61) }),
+      );
+      // And a core member cannot write it on the kiosk's behalf.
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.core), paths.kioskDevice(DEVICE.live)), {
+          printerKind: 'usb',
+          printerState: 'ready',
+        }),
+      );
     });
 
     it('refuses a charge that is not one', async () => {

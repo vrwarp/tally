@@ -127,6 +127,8 @@ const printing = {
   printerLogText: vi.fn(() => ''),
   describeAge: vi.fn(() => 'just now'),
   describeEntry: vi.fn(() => ''),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 let checkedOut = new Set<string>();

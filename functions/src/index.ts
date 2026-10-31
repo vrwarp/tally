@@ -163,6 +163,13 @@ import {
   type MergeStudentsResult,
 } from './backends/mergeStudents.js';
 import { bumpPulse, PULSE_DEBOUNCE_MS } from './kiosk/pulse.js';
+import {
+  PrintServerInputError,
+  parsePrintServerInput,
+  readPrintServerForKiosk,
+  savePrintServer,
+  type KioskPrintServer,
+} from './kiosk/printServer.js';
 import { materializeOccurrence as materializeOne, MINISTRY_TIME_ZONE } from './occurrences.js';
 // Imported for its registration side effect and nothing else: pulling the
 // adapter package in is what makes the Attendees backend available to the
@@ -3624,7 +3631,7 @@ export const redeemInvitation = onCall<
  */
 export const getKioskEvents = onCall<
   { days?: unknown } | undefined,
-  Promise<{ events: KioskEventEntry[] }>
+  Promise<{ events: KioskEventEntry[]; printServer: KioskPrintServer | null }>
 >({ secrets: BACKEND_SECRETS, timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
   const identity = await requireMemberOrKiosk(request.auth);
 
@@ -3672,7 +3679,44 @@ export const getKioskEvents = onCall<
 
   const marked = events.map((entry) => ({ ...entry, yours: allowed.has(entry.chain) }));
   marked.sort((a, b) => Number(b.yours) - Number(a.yours));
-  return { events: marked };
+
+  /*
+   * The print server rides on this call because it is the one read a kiosk
+   * already makes with its own identity (see kiosk/printServer.ts). The token
+   * goes to a kiosk and to nobody else: a member calling this from the app is
+   * a person, and a person reads the address on the Settings screen and never
+   * needs the key. `null` here means "no print server", which a kiosk acts on
+   * by forgetting one it had — so it is only ever sent to a kiosk.
+   */
+  const printServer = identity.kind === 'kiosk' ? await readPrintServerForKiosk(database) : null;
+  return { events: marked, printServer };
+});
+
+/**
+ * Where the kiosks print over Wi-Fi: the print server's address and token,
+ * entered once by the core team and carried to every kiosk by `getKioskEvents`
+ * and the pulse. Null clears it, which turns the feature off everywhere.
+ *
+ * A callable rather than a direct write, because the token must land in a
+ * document no client rule can read — see kiosk/printServer.ts for the split.
+ */
+export const setPrintServer = onCall<
+  { url?: unknown; token?: unknown } | null | undefined,
+  Promise<{ status: 'saved' | 'cleared' }>
+>({ timeoutSeconds: 30, memory: '256MiB' }, async (request) => {
+  await requireCoreTeam(request.auth?.uid);
+  const uid = request.auth!.uid;
+  try {
+    const input = parsePrintServerInput(request.data);
+    const status = await savePrintServer(db(), input, uid, new Date(), logger);
+    logger.info(`Print server ${status}`, { by: uid, url: input?.url ?? null });
+    return { status };
+  } catch (error) {
+    if (error instanceof PrintServerInputError) {
+      throw refuse('invalid-argument', `printServer.${error.problem}`, error.message);
+    }
+    throw error;
+  }
 });
 
 /**

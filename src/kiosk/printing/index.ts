@@ -46,11 +46,15 @@
  * reopened with backoff if the printer is still there. See `startRecovery`.
  */
 import {
+  BridgeTransport,
   BrotherQLPrinterCore,
   getPairedPrinterDevices,
   isWebUsbSupported,
+  listBridgePrinters,
   requestPrinterDevice,
   watchConnectionEvents,
+  type BridgePrinterInfo,
+  type BridgeStatusMode,
   type PrinterStatus,
 } from '@vrwarp/brother-ql-webusb/printer-core';
 import type { Label } from '@vrwarp/brother-ql-webusb/labels';
@@ -70,10 +74,13 @@ import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
   clearPrinterConfig,
+  connectionOf,
   readPrinterConfig,
   writePrinterConfig,
   type PrinterConfig,
+  type PrinterConnection,
 } from './device';
+import { ensureDeviceId, readPrintServer } from '../storage';
 import { createLabelQueue, type LabelJob, type PrintedLabel, type RasterResult } from './queue';
 import type { OwedTag } from '../owed';
 import { createPrinterLog, isNoise, type PrinterLogEntry } from './log';
@@ -81,8 +88,9 @@ import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
-export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, readPrinterConfig } from './device';
-export type { PrinterConfig } from './device';
+export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, connectionOf, readPrinterConfig } from './device';
+export type { PrinterConfig, PrinterConnection } from './device';
+export { readPrintServer } from '../storage';
 
 /* The record of what happened, and the two ways the printer screen reads a line of it. */
 export { describeAge, describeEntry, type AgeStrings } from './log';
@@ -172,7 +180,22 @@ export type PrinterNoteKey =
   | 'troubleStale'
   | 'adviceCheckPrinter'
   | 'notConnected'
-  | 'noPrinter';
+  | 'noPrinter'
+  /* The print server — see docs/wifi-printing.md. Which half failed is the point. */
+  | 'troublePrintServerUnreachable'
+  | 'advicePrintServer'
+  | 'troublePrintServerLost'
+  | 'troublePrintServerRefusedKey'
+  | 'adviceKeyInSettings'
+  | 'troublePrinterInUse'
+  | 'troublePrinterNotOnServer'
+  | 'adviceCheckPrintServer'
+  | 'troublePrintServerCannotReachPrinter'
+  | 'advicePrinterPowerWifi'
+  | 'troublePrintServerProblem'
+  | 'troubleNoPrintServer'
+  | 'adviceSetPrintServer'
+  | 'troublePrinterNoStatus';
 
 export type PrinterState =
   | { kind: 'idle' }
@@ -203,6 +226,13 @@ export type PrinterState =
        * re-renders for it.
        */
       cause?: 'press';
+      /**
+       * Set when the kiosk is set up for the print server but is printing
+       * over a USB printer because the server could not be reached. The
+       * printer screen says so; nothing switches back by itself mid-evening —
+       * the next reopen tries the server first again. See `reopen`.
+       */
+      fallback?: 'usb';
     }
   | { kind: 'trouble'; message: PrinterNote; advice: PrinterNote | null };
 
@@ -298,6 +328,7 @@ function sameState(a: PrinterState, b: PrinterState): boolean {
   // trouble down twice.
   if (a.kind === 'trouble' && b.kind === 'trouble') return noteId(a.message) === noteId(b.message);
   if (a.kind === 'unpaired' && b.kind === 'unpaired') return a.searching === b.searching;
+  if (a.kind === 'ready' && b.kind === 'ready') return a.fallback === b.fallback;
   return true;
 }
 
@@ -351,14 +382,29 @@ function describe(error: unknown): { message: PrinterNote; advice: PrinterNote |
   const code = (error as { code?: string } | null)?.code;
   const hint = (error as { platformHint?: string } | null)?.platformHint ?? null;
   const advice: PrinterNote | null = hint === null ? null : { text: hint };
+  /*
+   * Whether the failure is about a USB cable or a print server. By the printer
+   * in hand first — a kiosk on its USB fallback that loses that printer has
+   * lost a cable, whatever its config says — and by the config when there is
+   * no printer, which is the case after a failed open.
+   */
+  const overUsb = printer ? printer.device !== undefined : connectionOf(config).kind === 'usb';
 
   switch (code) {
     // Thrown by this module, not the library: the sentence on the Error is for
     // the log and the caller, and the screen gets the catalogue's words for it.
     case 'no-printer':
-      return { message: { key: 'notConnected' }, advice: { key: 'advicePlugBackIn' } };
+      return overUsb
+        ? { message: { key: 'notConnected' }, advice: { key: 'advicePlugBackIn' } }
+        : { message: { key: 'troublePrintServerUnreachable' }, advice: { key: 'advicePrintServer' } };
     case 'no-config':
       return { message: { key: 'noPrinter' }, advice: null };
+    case 'no-print-server':
+      return { message: { key: 'troubleNoPrintServer' }, advice: { key: 'adviceSetPrintServer' } };
+    case 'no-status-path':
+      return { message: { key: 'troublePrinterNoStatus' }, advice: null };
+    case 'bridge':
+      return describeBridge((error as { reason?: string }).reason, error);
     case 'printer-error': {
       const flags = (error as { errors?: { message: string }[] }).errors ?? [];
       const flag = flags[0]?.message;
@@ -369,7 +415,9 @@ function describe(error: unknown): { message: PrinterNote; advice: PrinterNote |
       };
     }
     case 'disconnected':
-      return { message: { key: 'troubleUnplugged' }, advice: { key: 'advicePlugBackIn' } };
+      return overUsb
+        ? { message: { key: 'troubleUnplugged' }, advice: { key: 'advicePlugBackIn' } }
+        : { message: { key: 'troublePrintServerLost' }, advice: { key: 'advicePrintServer' } };
     case 'claim-failed':
       return { message: { key: 'troubleHeld' }, advice };
     case 'editor-lite':
@@ -407,6 +455,45 @@ function describe(error: unknown): { message: PrinterNote; advice: PrinterNote |
         message:
           error instanceof Error ? { text: error.message } : { key: 'troubleDidNotPrint' },
         advice: null,
+      };
+  }
+}
+
+/**
+ * The print server's refusals, each as the half that failed.
+ *
+ * A volunteer who reads "the printer did not print" cannot act on it; one who
+ * reads "the print server could not be reached" checks the Wi-Fi and the NAS,
+ * and one who reads "the print server could not reach the printer" checks the
+ * printer. The `reason` values are the library's stable surface.
+ */
+function describeBridge(
+  reason: string | undefined,
+  error: unknown,
+): { message: PrinterNote; advice: PrinterNote | null } {
+  switch (reason) {
+    case 'connection':
+    case 'timeout':
+    case 'protocol':
+      return { message: { key: 'troublePrintServerUnreachable' }, advice: { key: 'advicePrintServer' } };
+    case 'unauthorized':
+      return { message: { key: 'troublePrintServerRefusedKey' }, advice: { key: 'adviceKeyInSettings' } };
+    case 'printer-busy':
+      return { message: { key: 'troublePrinterInUse' }, advice: { key: 'adviceTryAgain' } };
+    case 'unknown-printer':
+      return { message: { key: 'troublePrinterNotOnServer' }, advice: { key: 'adviceCheckPrintServer' } };
+    case 'connect-failed':
+    case 'status-failed':
+    case 'status-unavailable':
+    case 'write-failed':
+      return {
+        message: { key: 'troublePrintServerCannotReachPrinter' },
+        advice: { key: 'advicePrinterPowerWifi' },
+      };
+    default:
+      return {
+        message: { key: 'troublePrintServerProblem' },
+        advice: error instanceof Error && error.message ? { text: error.message } : null,
       };
   }
 }
@@ -579,6 +666,21 @@ export const BOOT_RETRY_MS = [2_000, 3_000, 5_000] as const;
 /** Longest a close is waited for before the page moves on without it. */
 export const CLOSE_CAP_MS = 2_000;
 
+/**
+ * How long after a job the print server's printer is held before another
+ * kiosk may have it. Long enough that a family's three labels share one
+ * open; short enough that the second kiosk in the room is never waiting on
+ * an idle one. See `BridgeLeaseOptions` in the library.
+ */
+export const LEASE_IDLE_MS = 3_000;
+
+/**
+ * How long a label waits for a printer another kiosk is using before it fails
+ * the ordinary way and is owed. The queue's two-minute staleness rule applies
+ * on top. Thirty seconds was the product owner's number.
+ */
+export const BUSY_WAIT_MS = 30_000;
+
 type Timer = ReturnType<typeof setTimeout>;
 
 /** A transport that died with its printer still listed, being brought back. */
@@ -647,6 +749,12 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
     recovery = null;
     return;
   }
+  // A print server connection has no bus to ask. The socket said it closed;
+  // whether the server is back is found out by trying, on the same ladder.
+  if (dead.device === undefined) {
+    scheduleAttempt(dead, 0);
+    return;
+  }
   let devices: UsbIdentity[] | null;
   try {
     devices = await getPairedPrinterDevices();
@@ -659,12 +767,17 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
     return;
   }
   if (devices) {
-    const present = devices.some((device) => isOurs(device, dead.device));
+    // `device` is undefined on a core driven by a non-USB transport (the
+    // library's `device` getter is optional since the bridge transport); the
+    // USB ladder only ever runs for a USB printer, so an absent device is
+    // simply "not among them".
+    const lost = dead.device;
+    const present = lost !== undefined && devices.some((device) => isOurs(device, lost));
     log.record('usb', 'devices', {
       cause: 'transport-lost',
       count: devices.length,
       present,
-      same: devices.includes(dead.device),
+      same: lost !== undefined && devices.includes(lost),
     });
     if (!present) {
       lose(dead, 'transport-lost');
@@ -711,6 +824,7 @@ async function adopt(
   device: BrotherQLPrinterCore,
   active: PrinterConfig,
   cause: string,
+  fallback?: 'usb',
 ): Promise<void> {
   printer = device;
   device.model = active.model;
@@ -726,7 +840,7 @@ async function adopt(
     startRecovery(device);
   });
   await device.open();
-  setState(readyState(active, cause), cause);
+  setState(readyState(active, cause, fallback), cause);
 }
 
 /**
@@ -737,10 +851,14 @@ async function adopt(
  * the same question, and a hand-off that fired from one and not the other
  * would be a hand-off nobody could predict. See the `cause` field.
  */
-function readyState(active: PrinterConfig, cause: string): PrinterState {
-  return cause === 'pair' || cause === LOOK_AGAIN || cause === RE_ADOPT
-    ? { kind: 'ready', config: active, cause: 'press' }
-    : { kind: 'ready', config: active };
+function readyState(active: PrinterConfig, cause: string, fallback?: 'usb'): PrinterState {
+  const pressed = cause === 'pair' || cause === LOOK_AGAIN || cause === RE_ADOPT;
+  return {
+    kind: 'ready',
+    config: active,
+    ...(pressed ? { cause: 'press' as const } : {}),
+    ...(fallback ? { fallback } : {}),
+  };
 }
 
 /**
@@ -841,7 +959,9 @@ export async function ready(
   }
   config = stored;
 
-  if (!isWebUsbSupported()) {
+  // WebUSB gates the USB kind only. A kiosk on the print server prints from
+  // any browser; its USB fallback simply has nothing to fall back to here.
+  if (!isWebUsbSupported() && connectionOf(stored).kind === 'usb') {
     setState(
       {
         kind: 'unsupported',
@@ -859,26 +979,31 @@ export async function ready(
   // event is what a kiosk needs, and upstream has now seen the whole sequence
   // work on a QL-810W: an unplug mid-job is noticed in about a second and the
   // printer needs nothing after it comes back.
-  watching ??= watchConnectionEvents({
-    connect: (device) => {
-      log.record('usb', 'connect', identity(device));
-      cancelTimers();
-      void reopen('usb-connect');
-    },
-    disconnect: (device) => {
-      // The library filters these to Brother devices, not to this one. A second
-      // Brother device leaving the bus must not cost the kiosk the printer it
-      // is holding.
-      const ours = isOurs(device, printer?.device);
-      log.record('usb', 'disconnect', { ...identity(device), ours });
-      if (printer && ours) lose(printer, 'usb-disconnect');
-    },
-  });
+  if (isWebUsbSupported()) {
+    watching ??= watchConnectionEvents({
+      connect: (device) => {
+        log.record('usb', 'connect', identity(device));
+        cancelTimers();
+        void reopen('usb-connect');
+      },
+      disconnect: (device) => {
+        // The library filters these to Brother devices, not to this one. A
+        // second Brother device leaving the bus must not cost the kiosk the
+        // printer it is holding — and a printer reached over the print server
+        // has no device on this bus at all, so nothing leaving it is ours.
+        const held = printer?.device;
+        const ours = held !== undefined && isOurs(device, held);
+        log.record('usb', 'disconnect', { ...identity(device), ours });
+        if (printer && ours) lose(printer, 'usb-disconnect');
+      },
+    });
+  }
   lifecycle ??= watchPageLifecycle();
 
   log.record('kiosk', 'ready', {
     model: stored.model,
     label: stored.label,
+    connection: connectionOf(stored).kind,
     discarded: wasDiscarded(),
   });
   // Searching until proven otherwise — a printer the browser has not listed
@@ -930,6 +1055,13 @@ async function verify(cause: string): Promise<void> {
     return;
   }
   const held = printer;
+  // A print server connection is a socket, and a socket that died while the
+  // page was frozen says so itself the moment the page is back — through the
+  // transport's `disconnect`, which the ladder answers. Nothing to list.
+  if (held.device === undefined) {
+    log.record('kiosk', 'verify', { cause, connection: 'server' });
+    return;
+  }
   let devices: UsbIdentity[];
   try {
     devices = await getPairedPrinterDevices();
@@ -1073,6 +1205,12 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
       if (printer) await printer.close().catch(() => {});
       printer = null;
 
+      const connection = connectionOf(active);
+      if (connection.kind === 'server') {
+        await reopenServer(active, connection, cause, options);
+        return;
+      }
+
       const paired = await BrotherQLPrinterCore.getPairedDevices({
         model: active.model,
         diagnostics: tracer,
@@ -1096,6 +1234,104 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
   })();
 
   return opening;
+}
+
+/**
+ * The print server first, then a USB printer if there is one.
+ *
+ * Each reopen of a `server` kiosk tries the server; if that fails and the
+ * browser lists a paired Brother device, the kiosk opens it with the same
+ * model and roll and says so on the state (`fallback: 'usb'`). Nothing
+ * switches back by itself mid-evening — the next reopen, whatever caused it,
+ * is this function again, and it starts with the server. A failure with no
+ * fallback is worded by which half failed; see `describeBridge`.
+ */
+async function reopenServer(
+  active: PrinterConfig,
+  connection: Extract<PrinterConnection, { kind: 'server' }>,
+  cause: string,
+  options: { quiet?: boolean },
+): Promise<void> {
+  let failure: unknown;
+  try {
+    await adopt(serverCore(active, connection), active, cause);
+    return;
+  } catch (error) {
+    failure = error;
+    log.record('kiosk', 'open-failed', { cause, connection: 'server', ...errorInfo(error) });
+  }
+  if (await fallbackToUsb(active, cause)) return;
+  if (!options.quiet) {
+    const { message, advice } = describe(failure);
+    setState({ kind: 'trouble', message, advice }, cause);
+  }
+}
+
+/**
+ * A core for the print server's printer, on a lease: the socket stays up so
+ * the kiosk knows the server is reachable and the printer registered, but the
+ * printer itself is held only while labels flow — a second kiosk in the room
+ * is never locked out by an idle one. See `LEASE_IDLE_MS` and `BUSY_WAIT_MS`.
+ */
+function serverCore(
+  active: PrinterConfig,
+  connection: Extract<PrinterConnection, { kind: 'server' }>,
+): BrotherQLPrinterCore {
+  const server = readPrintServer();
+  if (!server) {
+    // Set up for a print server Tally no longer has: the card was cleared, or
+    // this kiosk has never received one.
+    throw Object.assign(new Error('Tally has no print server.'), { code: 'no-print-server' });
+  }
+  const transport = new BridgeTransport({
+    url: server.url,
+    token: server.token,
+    printerId: connection.printerId,
+    clientName: kioskClientName(),
+    lease: { idleMs: LEASE_IDLE_MS, busyTimeoutMs: BUSY_WAIT_MS },
+    diagnostics: tracer,
+  });
+  return new BrotherQLPrinterCore(transport, { model: active.model, diagnostics: tracer });
+}
+
+/**
+ * What this kiosk calls itself on the print server, so its log and print log
+ * say which kiosk printed when several share one token. The device id's
+ * prefix: stable across evenings, matchable against the team's Kiosk page,
+ * and nobody's name.
+ */
+function kioskClientName(): string {
+  return `kiosk-${ensureDeviceId().slice(0, 8)}`;
+}
+
+/**
+ * The USB printer, if a `server` kiosk has one to fall back to.
+ *
+ * Same model and roll — the fallback printer is the one that used to be the
+ * only printer, loaded the same way. Silent when there is none: the server's
+ * failure is the one worth a sentence.
+ */
+async function fallbackToUsb(active: PrinterConfig, cause: string): Promise<boolean> {
+  if (!isWebUsbSupported()) return false;
+  try {
+    const paired = await BrotherQLPrinterCore.getPairedDevices({
+      model: active.model,
+      diagnostics: tracer,
+    });
+    const chosen = chooseDevice(paired, active.model);
+    log.record('usb', 'devices', {
+      cause,
+      fallback: true,
+      count: paired.length,
+      ...identity(chosen?.device),
+    });
+    if (!chosen) return false;
+    await adopt(chosen, active, cause, 'usb');
+    return true;
+  } catch (error) {
+    log.record('kiosk', 'fallback-failed', { cause, ...errorInfo(error) });
+    return false;
+  }
 }
 
 /**
@@ -1177,7 +1413,13 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
   // builds `next` from a model and a roll, so without this the first time
   // anybody picked the other spindle a policy-granted printer would start
   // describing itself as one somebody paired by hand.
-  const carried: PrinterConfig = config?.viaPolicy ? { ...next, viaPolicy: true } : next;
+  const carried: PrinterConfig = {
+    ...next,
+    ...(config?.viaPolicy ? { viaPolicy: true } : {}),
+    // And how it is reached: changing the roll on the print server's printer
+    // must not quietly turn it back into a USB one.
+    ...(config?.connection && !next.connection ? { connection: config.connection } : {}),
+  };
   writePrinterConfig(carried);
   config = carried;
   if (printer) printer.model = next.model;
@@ -1253,7 +1495,11 @@ export async function checkPrinter(): Promise<PrinterDetection | null> {
   const active = config;
   if (!active || !printer?.opened) return null;
 
-  const detected = modelFromProductName(printer.device?.productName);
+  // Off the USB bus, or off the print server's record of the printer — the
+  // `model` the administrator typed when registering it, which may be blank.
+  const detected = modelFromProductName(
+    printer.device ? printer.device.productName : serverPrinterOf(printer)?.model,
+  );
   // Before the status read rather than after it: a read that fails leaves
   // trouble on the state, and `configure` reopens and would paint over it.
   if (detected !== null && detected !== active.model) {
@@ -1292,12 +1538,142 @@ export async function checkPrinter(): Promise<PrinterDetection | null> {
       // printer got here. Dropping this would quietly relabel a policy-granted
       // printer as one somebody paired, the first time the screen is opened.
       ...(config?.viaPolicy ? { viaPolicy: true } : {}),
+      ...(config?.connection ? { connection: config.connection } : {}),
     };
     writePrinterConfig(settled);
     config = settled;
   }
 
-  return { config: { model, label }, modelFromPrinter: detected !== null, matched, status };
+  return {
+    config: { model, label, ...(config?.connection ? { connection: config.connection } : {}) },
+    modelFromPrinter: detected !== null,
+    matched,
+    status,
+  };
+}
+
+/** The print server's record of the printer a core is on, if that is how it is reached. */
+function serverPrinterOf(core: BrotherQLPrinterCore): BridgePrinterInfo | null {
+  const transport = core.transport as { printer?: BridgePrinterInfo | null };
+  return transport.printer ?? null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The print server                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** One printer the print server offers, as the printer screen lists it. */
+export interface ServerPrinterChoice {
+  id: string;
+  name: string;
+  /** What the administrator typed when registering it, matched to a model identifier if it is one. */
+  model: string | null;
+  statusMode: BridgeStatusMode;
+  /**
+   * Whether the kiosk will pair it. A printer registered with no status path
+   * cannot say when a label is out or when it has jammed, and every owed-label
+   * and reprint behaviour rests on hearing that — so it is listed, greyed, and
+   * refused. docs/wifi-printing.md.
+   */
+  eligible: boolean;
+}
+
+/**
+ * What the print server offers this kiosk, by name.
+ *
+ * Only from the printer screen, behind a press. Throws what the connection
+ * threw — the screen words it with {@link describeFailure} — and throws
+ * `no-print-server` when Tally has not handed this kiosk one.
+ */
+export async function listServerPrinters(): Promise<ServerPrinterChoice[]> {
+  const server = readPrintServer();
+  if (!server) {
+    throw Object.assign(new Error('Tally has no print server.'), { code: 'no-print-server' });
+  }
+  const printers = await listBridgePrinters({
+    url: server.url,
+    token: server.token,
+    clientName: kioskClientName(),
+    diagnostics: tracer,
+  });
+  log.record('kiosk', 'server-printers', { count: printers.length });
+  return printers.map((printer) => ({
+    id: printer.id,
+    name: printer.name,
+    model: modelFromProductName(printer.model),
+    statusMode: printer.statusMode,
+    eligible: printer.statusMode !== 'none',
+  }));
+}
+
+/**
+ * A failure as the words a volunteer gets, for a screen that caught one itself.
+ * The same sentences `PrinterState.trouble` carries.
+ */
+export function describeFailure(error: unknown): { message: PrinterNote; advice: PrinterNote | null } {
+  return describe(error);
+}
+
+/**
+ * Set this kiosk up on one of the print server's printers.
+ *
+ * The counterpart of {@link pairPrinter} for the second way in: no browser
+ * chooser, the pick comes off {@link listServerPrinters}. The model is the
+ * server's record of it when that names one, else what the screen was
+ * showing; the roll is `next`'s until `checkPrinter` reads it off the printer
+ * — over SNMP, through the server — which is what the call ends with, as the
+ * USB pairing does. A printer with no status path is refused here as well as
+ * greyed on the screen, because the screen is not the only caller a module
+ * can have.
+ */
+export async function pairServerPrinter(
+  choice: ServerPrinterChoice,
+  next: PrinterConfig,
+): Promise<PrinterDetection | null> {
+  if (!choice.eligible) {
+    log.record('kiosk', 'pair-refused', { printerId: choice.id, statusMode: choice.statusMode });
+    const { message, advice } = describe(
+      Object.assign(new Error('The printer has no status path.'), { code: 'no-status-path' }),
+    );
+    setState({ kind: 'trouble', message, advice }, 'pair-refused');
+    return null;
+  }
+  const chosen: PrinterConfig = {
+    model: choice.model ?? next.model,
+    label: next.label,
+    guessed: true,
+    connection: { kind: 'server', printerId: choice.id, printerName: choice.name },
+  };
+  log.record('kiosk', 'pair', { connection: 'server', printerId: choice.id });
+  writePrinterConfig(chosen);
+  config = chosen;
+  cancelTimers();
+  try {
+    if (printer) await printer.close().catch(() => {});
+    printer = null;
+    await adopt(serverCore(chosen, chosen.connection as Extract<PrinterConnection, { kind: 'server' }>), chosen, 'pair');
+  } catch (error) {
+    log.record('kiosk', 'pair-failed', { connection: 'server', ...errorInfo(error) });
+    const { message, advice } = describe(error);
+    setState({ kind: 'trouble', message, advice }, 'pair-failed');
+    return null;
+  }
+  return checkPrinter();
+}
+
+/**
+ * Tally's print server changed — a new address, a rotated token, or none now.
+ *
+ * Called by the shell when the pulse says so. A kiosk on the print server
+ * reconnects with what it now holds, which is how a rotated token clears
+ * "the print server refused this kiosk's key" without a visit; a kiosk on USB
+ * has nothing to do.
+ */
+export async function printServerChanged(): Promise<void> {
+  if (connectionOf(config).kind !== 'server') return;
+  log.record('kiosk', 'print-server-changed', { has: readPrintServer() !== null });
+  await closePrinter('print-server-changed');
+  await reopen('print-server-changed');
 }
 
 /* -------------------------------------------------------------------------- */

@@ -29,6 +29,9 @@ vi.mock('@/features/settings/ThresholdPreview', () => ({ ThresholdPreview: () =>
 vi.mock('@/features/settings/PlanningCenterCard', () => ({
   PlanningCenterCard: () => <section data-testid="planning-center" />,
 }));
+vi.mock('@/features/settings/PrintServerCard', () => ({
+  PrintServerCard: () => <section data-testid="print-server" />,
+}));
 // The real one is a fragment of one or two cards; both have to land in the grid
 // rather than inside a wrapper of their own.
 vi.mock('@/features/settings/BackendsSection', () => ({

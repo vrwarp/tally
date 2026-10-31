@@ -39,6 +39,7 @@ interface MockPulse {
   roster: number;
   phones: number;
   participation: number;
+  printServer: number;
 }
 
 /** What the sentinel currently says. Reassigned per test. */
@@ -83,6 +84,7 @@ const services = {
   }),
   refetchPhoneIndex: vi.fn(async () => {}),
   refetchParticipation: vi.fn(async () => {}),
+  refetchPrintServer: vi.fn(async () => {}),
   fetchAttendance: vi.fn(async () => ({
     present: new Set<string>(),
     checkedOut: new Set<string>(),
@@ -136,6 +138,7 @@ function revs(overrides: Partial<MockPulse> = {}): MockPulse {
     roster: 1,
     phones: 1,
     participation: 1,
+    printServer: 1,
     ...overrides,
   };
 }
@@ -165,6 +168,7 @@ describe('the poll', () => {
     expect(services.refetchRoster).not.toHaveBeenCalled();
     expect(services.refetchPhoneIndex).not.toHaveBeenCalled();
     expect(services.refetchParticipation).not.toHaveBeenCalled();
+    expect(services.refetchPrintServer).not.toHaveBeenCalled();
     expect(services.rememberPulse).toHaveBeenCalled();
   });
 
@@ -200,6 +204,26 @@ describe('the poll', () => {
       'friday-fellowship',
       expect.any(Function),
     );
+    expect(services.refetchPrintServer).not.toHaveBeenCalled();
+
+    pulse = revs({ phones: 2, participation: 2, printServer: 2 });
+    await poll();
+    expect(services.refetchPrintServer).toHaveBeenCalledTimes(1);
+    expect(services.refetchRoster).not.toHaveBeenCalled();
+  });
+
+  it('fetches the print server once after an upgrade from a bundle that had none', async () => {
+    // A pulse cached by the previous build has no print server channel, so it
+    // reads as zero — which can never equal a live revision. The one refetch
+    // that costs is the one that brings the print server to a kiosk that was
+    // powered on before Settings had one.
+    localStorage.setItem(KIOSK_KEYS.pulse, JSON.stringify({ roster: 1, phones: 1, participation: 1 }));
+    pulse = revs();
+    await mount();
+    await settle();
+
+    expect(services.refetchPrintServer).toHaveBeenCalledTimes(1);
+    expect(services.refetchRoster).not.toHaveBeenCalled();
   });
 
   it('catches up across a reboot from the revs on disk', async () => {

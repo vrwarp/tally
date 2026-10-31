@@ -1042,6 +1042,15 @@ export interface KioskDeviceDoc {
    */
   batteryLevel?: number;
   charging?: boolean;
+  /**
+   * The printer as the kiosk last reported it — over USB or through the
+   * print server, and whether it needs somebody. Absent on a kiosk built
+   * before these existed; null on one with no printer. See
+   * `KioskPrinterReport` in lib/kioskDevice.ts and docs/wifi-printing.md.
+   */
+  printerKind?: 'usb' | 'server' | null;
+  printerState?: 'ready' | 'fallback' | 'trouble' | 'unpaired' | null;
+  printerName?: string | null;
   retiredAt: Timestamp | null;
   retiredBy: string | null;
   /**

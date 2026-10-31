@@ -82,6 +82,8 @@ const printing = {
   labelPreview: vi.fn(() => []),
   forgetGathering: vi.fn(),
   testPrint: vi.fn(),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 /** Who the register says is already here. Reassigned per test. */

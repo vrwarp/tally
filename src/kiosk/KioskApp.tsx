@@ -20,6 +20,7 @@
  * all: it is written to this tablet's journal before its tick, and the
  * uploader carries it to Tally when Tally can be reached — see `journal.ts`.
  */
+import type { KioskPrinterReport } from '@/lib/kioskDevice';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // Type-only, so the services chunk stays out of this graph — the value import
 // below is dynamic, and that boundary is the whole startup strategy.
@@ -60,6 +61,7 @@ import { buildFamilyDigits, familyOf } from './family';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
+  connectionOf,
   readPrinterConfig,
   type PrinterConfig,
 } from './printing/device';
@@ -1310,6 +1312,7 @@ export function KioskApp() {
       roster: fresh.roster,
       phones: fresh.phones,
       participation: fresh.participation,
+      printServer: fresh.printServer,
     };
     pulseRef.current = next;
     services.rememberPulse(next);
@@ -1322,7 +1325,15 @@ export function KioskApp() {
     if (fresh.participation !== seen.participation) {
       void services.refetchParticipation(binding.predictsFrom, landScope);
     }
-  }, [services, binding, landStudents, landLast4, landScope]);
+    // A pulse cached before the print server existed reads zero here, so the
+    // first poll after an upgrade fetches it — see `CachedPulse.printServer`.
+    // Then the printing module, if it is loaded, reconnects with what the
+    // kiosk now holds: a rotated token clears "refused this kiosk's key"
+    // without a visit, and a cleared card lets the printer go.
+    if (fresh.printServer !== seen.printServer) {
+      void services.refetchPrintServer().then(() => printing?.printServerChanged());
+    }
+  }, [services, binding, landStudents, landLast4, landScope, printing]);
 
   /* ---- Leaving a gathering ----------------------------------------------- */
 
@@ -1390,6 +1401,35 @@ export function KioskApp() {
   );
 
   /**
+   * The printer as the Kiosk page should hear of it — see `KioskPrinterReport`.
+   *
+   * A ref rather than a dependency of `checkStanding`, because the report goes
+   * out on the register's tick and must not re-wire the uploader every time
+   * the printer's state moves. Null is a kiosk with no printer; undefined is
+   * a kiosk whose printing module has not said anything yet, which leaves the
+   * row's last word standing.
+   */
+  const printerReportRef = useRef<KioskPrinterReport | null | undefined>(undefined);
+  printerReportRef.current = ((): KioskPrinterReport | null | undefined => {
+    if (!printerConfig) return null;
+    if (!printerState || printerState.kind === 'idle') return undefined;
+    const connection = connectionOf(printerConfig);
+    const state: KioskPrinterReport['state'] =
+      printerState.kind === 'ready'
+        ? printerState.fallback === 'usb'
+          ? 'fallback'
+          : 'ready'
+        : printerState.kind === 'unpaired'
+          ? 'unpaired'
+          : 'trouble';
+    return {
+      kind: connection.kind,
+      state,
+      name: connection.kind === 'server' ? connection.printerName : null,
+    };
+  })();
+
+  /**
    * Reports to the device row, and acts on what the row says back.
    *
    * On a timer while bound (the register poll's own tick), at the moment of
@@ -1400,7 +1440,7 @@ export function KioskApp() {
   const checkStanding = useCallback(
     (bound: KioskBinding | null) => {
       if (!services) return;
-      void services.reportStanding(bound).then((outcome) => {
+      void services.reportStanding(bound, printerReportRef.current).then((outcome) => {
         if (outcome === 'retired') retire({ kind: 'retired', atMs: Date.now() });
         else if (outcome === 'updated') retire({ kind: 'updated' });
       });

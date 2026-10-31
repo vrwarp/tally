@@ -15,6 +15,9 @@
  *   roster        — a student document appeared (or left, via discard/merge)
  *   phones        — `kioskIndex/phones` changed
  *   participation — `kioskIndex/participation` changed
+ *   printServer   — the print server's address or token changed (see
+ *                   printServer.ts); the kiosk re-reads it through
+ *                   `getKioskEvents`, which is the only door it comes through
  *
  * (A live document may still carry a fourth, `registration`, written for the
  * retired QR flow's auto-advance. Nothing bumps or reads it; its rev is
@@ -48,7 +51,7 @@ import { toDateOrNull, type FirestoreLike, type FunctionLogger } from '../firest
 
 export const PULSE_DOC = 'kioskIndex/pulse';
 
-export type PulseChannel = 'roster' | 'phones' | 'participation';
+export type PulseChannel = 'roster' | 'phones' | 'participation' | 'printServer';
 
 /**
  * The debounce for high-frequency writers.
