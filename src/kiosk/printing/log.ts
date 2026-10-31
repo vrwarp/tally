@@ -76,6 +76,9 @@ export const MAX_VALUE_LENGTH = 160;
 const NOISE = new Set([
   'write-chunk',
   'status-packet',
+  // The bridge asks the printer for its status every second during a job and
+  // four times a second while confirming one; the answers are above.
+  'status-request',
   'write-start',
   'write-done',
   'send-start',

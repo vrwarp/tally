@@ -25,6 +25,7 @@ import type {
   PrinterLogEntry,
   PrinterState,
   PrinterStatus,
+  ServerPrinterChoice,
 } from '@/kiosk/printing';
 import { describeAge, describeEntry } from '@/kiosk/printing/log';
 import { labelsForModel } from '@vrwarp/brother-ql-webusb/labels';
@@ -89,6 +90,11 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     printerLogText: () => 'the whole record',
     describeAge,
     describeEntry,
+    /* The print server: none, unless a suite hands one over. */
+    readPrintServer: vi.fn((): { url: string; token: string; rev: number } | null => null),
+    listServerPrinters: vi.fn(async (): Promise<ServerPrinterChoice[]> => []),
+    pairServerPrinter: vi.fn(async () => found),
+    describeFailure: vi.fn(() => ({ message: { key: 'troubleNoPrintServer' as const }, advice: null })),
   };
   return printing as unknown as KioskPrinting & typeof printing;
 }
@@ -810,5 +816,131 @@ describe('the printer screen, in another language', () => {
     }
     expect(screen.getByText('變更')).toBeInTheDocument();
     expect(screen.getAllByText('顯示').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The second way in: a printer on Tally's print server.
+ *
+ * Offered only where Tally has handed this kiosk a print server, beside the
+ * USB door rather than instead of it; what the press shows is the server's
+ * list, and a row on it pairs through the module's own door.
+ */
+describe('using the print server', () => {
+  const SERVER = { url: 'wss://print.church.example/ws', token: 'bql_t', rev: 1 };
+  const SHIPPING: ServerPrinterChoice = {
+    id: 'p1',
+    name: 'Shipping desk',
+    model: 'QL-810W',
+    statusMode: 'snmp',
+    eligible: true,
+  };
+  const OLD: ServerPrinterChoice = { id: 'p2', name: 'Old QL-700', model: null, statusMode: 'none', eligible: false };
+
+  function handleWithServer(found: PrinterDetection | null, state?: PrinterState) {
+    const printing = handleWith(found);
+    printing.readPrintServer.mockReturnValue(SERVER);
+    printing.listServerPrinters.mockResolvedValue([SHIPPING, OLD]);
+    if (state) printing.currentState = (() => state) as typeof printing.currentState;
+    return printing;
+  }
+
+  it('is not offered on a kiosk Tally gave no print server', () => {
+    mount(handleWith(null), { model: 'QL-800', label: '62' }, { hasConfig: false });
+
+    expect(screen.queryByText('Use the print server')).not.toBeInTheDocument();
+  });
+
+  it('lists what the server has, greying a printer the kiosk will not take', async () => {
+    const printing = handleWithServer(null, { kind: 'idle' });
+    mount(printing, { model: 'QL-800', label: '62' }, { hasConfig: false });
+
+    expect(screen.getByText(/can print over Wi‑Fi with nothing plugged in/)).toBeInTheDocument();
+    await pressText('Use the print server');
+
+    expect(screen.getByText('Which printer should this kiosk use?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Shipping desk' })).toBeInTheDocument();
+    expect(screen.getByText(/Old QL-700 — cannot report its status/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Old QL-700/ })).not.toBeInTheDocument();
+    expect(printing.pairServerPrinter).not.toHaveBeenCalled();
+  });
+
+  it('pairs the printer somebody picked, through the module, with what the screen was showing', async () => {
+    const found = detection({
+      config: { model: 'QL-810W', label: '62x29', connection: { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' } },
+    });
+    const printing = handleWithServer(found, { kind: 'idle' });
+    mount(printing, { model: 'QL-800', label: '62' }, { hasConfig: false });
+
+    await pressText('Use the print server');
+    await press(/^Shipping desk$/);
+
+    expect(printing.pairServerPrinter).toHaveBeenCalledWith(SHIPPING, { model: 'QL-800', label: '62' });
+    // Adopted as a USB pairing's answer is: the selects follow what came back.
+    expect(screen.getByText(/QL-810W ·/)).toBeInTheDocument();
+    expect(printing.pairPrinter).not.toHaveBeenCalled();
+  });
+
+  it('says why the list could not be had, in the kiosk’s own words', async () => {
+    const printing = handleWithServer(null, { kind: 'idle' });
+    printing.listServerPrinters.mockRejectedValue({ code: 'bridge', reason: 'unauthorized' });
+    printing.describeFailure.mockReturnValue({
+      message: { key: 'troublePrintServerRefusedKey' },
+      advice: { key: 'adviceKeyInSettings' },
+    });
+    mount(printing, { model: 'QL-800', label: '62' }, { hasConfig: false });
+
+    await pressText('Use the print server');
+
+    expect(
+      screen.getByText(/The print server refused this kiosk’s key\. Paste the print server’s current token/),
+    ).toBeInTheDocument();
+  });
+
+  it('names the server’s printer in the state line and the fold, and keeps the USB door', () => {
+    const config: PrinterConfig = {
+      model: 'QL-810W',
+      label: '62x29',
+      connection: { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' },
+    };
+    const printing = handleWithServer(null, { kind: 'ready', config });
+    mount(printing, config);
+
+    expect(screen.getByText('Connected to Shipping desk through the print server — model and roll read off the printer.')).toBeInTheDocument();
+    expect(screen.getByText(/· via the print server/)).toBeInTheDocument();
+    expect(screen.getByText('Connect a different printer')).toBeInTheDocument();
+    expect(screen.getByText('Use the print server')).toBeInTheDocument();
+  });
+
+  it('says so when the kiosk is printing over USB because the server could not be reached', () => {
+    const config: PrinterConfig = {
+      model: 'QL-810W',
+      label: '62x29',
+      connection: { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' },
+    };
+    mount(handleWithServer(null, { kind: 'ready', config, fallback: 'usb' }), config);
+
+    expect(screen.getByText('Printing over USB — the print server could not be reached.')).toBeInTheDocument();
+  });
+
+  it('offers Look again rather than the USB chooser when the server’s printer is in trouble', () => {
+    const config: PrinterConfig = {
+      model: 'QL-810W',
+      label: '62x29',
+      connection: { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' },
+    };
+    mount(
+      handleWithServer(null, {
+        kind: 'trouble',
+        message: { key: 'troublePrintServerUnreachable' },
+        advice: { key: 'advicePrintServer' },
+      }),
+      config,
+    );
+
+    expect(screen.getByText(/The print server could not be reached\./)).toBeInTheDocument();
+    expect(screen.getByText('Look again')).toBeInTheDocument();
+    expect(screen.queryByText('Connect this printer again')).not.toBeInTheDocument();
+    expect(screen.getByText('Use the print server')).toBeInTheDocument();
   });
 });
