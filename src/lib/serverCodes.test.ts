@@ -33,6 +33,7 @@ describe('isServerText', () => {
 
   it('refuses a code that is not a string', () => {
     expect(isServerText({ code: 7 })).toBe(false);
+    expect(isServerText({ code: true })).toBe(false);
     expect(isServerText({ code: null })).toBe(false);
     expect(isServerText({ code: ['auth.notActive'] })).toBe(false);
   });

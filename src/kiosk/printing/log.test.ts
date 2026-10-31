@@ -70,6 +70,13 @@ describe('what a value may be', () => {
     ).toEqual({ text: 'hello', count: 3, flag: false });
   });
 
+  it('keeps a false and a zero, which are readings, and drops a number that is not one', () => {
+    expect(sanitizeData({ ok: false, count: 0, nan: Number.NaN, inf: Number.POSITIVE_INFINITY })).toEqual({
+      ok: false,
+      count: 0,
+    });
+  });
+
   it('answers nothing for nothing, so an entry carries no empty data', () => {
     expect(sanitizeData(undefined)).toBeUndefined();
     expect(sanitizeData({})).toBeUndefined();

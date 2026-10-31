@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PRINT_SERVER_ADDRESS_MAX_LENGTH,
   browserAddressOf,
   normalisePrintServerAddress,
   printServerHostOf,
@@ -15,6 +16,23 @@ describe('normalising the print server address', () => {
   it('keeps an endpoint the administrator typed in full', () => {
     expect(normalisePrintServerAddress('wss://print.church.example/ws')).toBe('wss://print.church.example/ws');
     expect(normalisePrintServerAddress('https://nas.church.example/bridge')).toBe('wss://nas.church.example/bridge');
+  });
+
+  it('strips every trailing slash, and only trailing ones', () => {
+    expect(normalisePrintServerAddress('https://nas.church.example/a/b/')).toBe('wss://nas.church.example/a/b');
+    expect(normalisePrintServerAddress('https://nas.church.example//')).toBe('wss://nas.church.example/ws');
+    expect(normalisePrintServerAddress('https://nas.church.example/bridge//')).toBe(
+      'wss://nas.church.example/bridge',
+    );
+  });
+
+  it('accepts an address exactly at the length bound and refuses one past it', () => {
+    const host = `https://${'a'.repeat(PRINT_SERVER_ADDRESS_MAX_LENGTH - 'https://.example'.length)}.example`;
+    expect(host.length).toBe(PRINT_SERVER_ADDRESS_MAX_LENGTH);
+    expect(normalisePrintServerAddress(host)).toBe(`wss://${host.slice('https://'.length)}/ws`);
+    expect(normalisePrintServerAddress(`${host}x`)).toBeNull();
+    // Surrounding whitespace is not length.
+    expect(normalisePrintServerAddress(`  ${host}  `)).not.toBeNull();
   });
 
   it('refuses anything that is not an address to a print server', () => {

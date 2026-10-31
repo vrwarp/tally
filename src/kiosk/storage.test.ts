@@ -307,10 +307,21 @@ describe('the print server', () => {
     expect(localStorage.getItem(KIOSK_KEYS.printServer)).toBeNull();
   });
 
+  it('takes a plain ws:// address too, for a print server on the LAN during a trial', () => {
+    expect(sanitizePrintServer({ ...server, url: 'ws://192.168.1.20:8080/ws' })).toEqual({
+      ...server,
+      url: 'ws://192.168.1.20:8080/ws',
+    });
+  });
+
   it('refuses anything a kiosk could not dial', () => {
     for (const bad of [
       null,
+      undefined,
+      42,
       'wss://print.church.example/ws',
+      { url: 'xwss://print.church.example/ws', token: 'bql_abc', rev: 1 },
+      { url: 'wss:/print.church.example/ws', token: 'bql_abc', rev: 1 },
       { url: 'https://print.church.example', token: 'bql_abc', rev: 1 },
       { url: 'wss://print.church.example/ws', token: '', rev: 1 },
       { url: 'wss://print.church.example/ws', rev: 1 },

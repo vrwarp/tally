@@ -516,6 +516,11 @@ function errorInfo(error: unknown): Record<string, string> {
     | undefined;
   if (typeof failure?.name === 'string') info.error = failure.name;
   if (typeof failure?.code === 'string') info.code = failure.code;
+  // The print server's refusals carry which half failed as `reason`; the
+  // record wants it for the same reason the screen does.
+  if (typeof (failure as { reason?: unknown } | null)?.reason === 'string') {
+    info.reason = (failure as { reason: string }).reason;
+  }
   if (typeof failure?.message === 'string') info.message = failure.message;
   // `underlying` rather than `cause`: the record's `cause` is why the kiosk
   // acted, and the two are written into the same entry.
@@ -1197,8 +1202,19 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
   opening = (async () => {
     try {
       if (printer?.opened) {
-        setState({ kind: 'ready', config: active }, cause);
-        return;
+        /*
+         * Open already — unless this is the USB fallback of a print server
+         * kiosk, where every reopen is the chance to get back to the server
+         * the config actually names. Then the fallback printer is put down
+         * and the whole ladder runs again; if the server is still down the
+         * same USB printer is opened a moment later, still as the fallback.
+         */
+        const onFallback =
+          state.kind === 'ready' && state.fallback !== undefined && connectionOf(active).kind === 'server';
+        if (!onFallback) {
+          setState({ kind: 'ready', config: active }, cause);
+          return;
+        }
       }
       // A transport that has already died is closed rather than reopened in
       // place, so whatever it still held is released before another claim.

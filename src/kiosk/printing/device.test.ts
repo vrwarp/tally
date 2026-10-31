@@ -249,6 +249,8 @@ describe('the connection', () => {
       { kind: 'server', printerId: 'p1' },
       { kind: 'server', printerName: 'Shipping desk' },
       { kind: 'server', printerId: '', printerName: 'Shipping desk' },
+      { kind: 'server', printerId: 'p1', printerName: '' },
+      { kind: 'server', printerId: 'p1', printerName: 7 },
       { kind: 'wifi', printerId: 'p1', printerName: 'Shipping desk' },
       'server',
     ]) {
