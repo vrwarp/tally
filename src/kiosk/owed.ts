@@ -170,3 +170,17 @@ export const OWED_NOTICE_MS = 10 * 60_000;
  * notice from flickering under the hand of a parent fixing a typo.
  */
 export const OWED_QUIET_MS = 3_000;
+
+/**
+ * How long after a press brought the printer back the kiosk may still open
+ * the offer by itself.
+ *
+ * The hand-off is for the volunteer who just pressed **Look again** and is
+ * looking at the answer. Without a bound, the press that paired the printer at
+ * set-up time stayed "the last press" for the whole evening, and the first tag
+ * owed hours later — with the printer in trouble, and the volunteer tapping
+ * the dot to read why — was answered with the offer to print it instead of
+ * the complaint. The end-to-end print server journeys found that one. A
+ * recovery is a moment, so the hand-off is given a few seconds of it.
+ */
+export const OWED_HANDOFF_MS = 5_000;

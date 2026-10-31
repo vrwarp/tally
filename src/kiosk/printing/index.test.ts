@@ -2024,6 +2024,27 @@ describe('recovering without a human', () => {
     return { device, printing, seen };
   }
 
+  it('still recovers after a reopen that found the printer already open', async () => {
+    /* `ready()` is called again whenever the shell re-reads the config — after
+       a pairing, after a roll change — and the printer is open by then, so the
+       reopen takes its shortcut. That shortcut used to leave the "in flight"
+       marker holding a finished promise, and every reopen after it — the
+       recovery ladder's included — returned that promise and did nothing. */
+    const device = makeDevice();
+    usb.paired = [device];
+    configured();
+    const printing = await load();
+    await printing.ready();
+    await printing.ready();
+    expect(device.open).toHaveBeenCalledTimes(1);
+
+    device.emit('disconnect');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(device.open).toHaveBeenCalledTimes(2);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+  });
+
   it('owes no name tag for a label that died while it was looking', async () => {
     /* The label that failed with the transport is the recovery's to explain,
        and while it is looking the state stays `ready` — so the parent standing
@@ -3511,6 +3532,30 @@ describe('the print server', () => {
     expect(printing.currentState()).toMatchObject({ kind: 'ready' });
     expect(seen).not.toContain('trouble');
     expect((await listedDevices()).mock.calls).toHaveLength(0);
+  });
+
+  it('keeps climbing when a label’s own reopen failed in the meantime', async () => {
+    /* An outage that lands mid-label: the socket dies under the job, the
+       queue reopens for the label and fails, and that failed reopen leaves a
+       fresh unopened core where the dead one was. The ladder must not take
+       the swap for a recovery somebody else made. */
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    bridge.openError = { code: 'bridge', reason: 'connection' };
+    (cores.made[0] as { emit: (event: string) => void }).emit('disconnect');
+    await expect(queue.options.send(LABEL)).rejects.toMatchObject({ code: 'no-printer' });
+    expect(cores.made).toHaveLength(2);
+    expect(printing.currentState()).toMatchObject({ message: { key: 'troublePrintServerUnreachable' } });
+
+    await tick(printing.RECOVERY_GRACE_MS);
+    await tick(printing.RECOVERY_ATTEMPT_MS[1]);
+    expect(cores.made.length).toBeGreaterThanOrEqual(4);
+    bridge.openError = null;
+    await tick(printing.RECOVERY_ATTEMPT_MS[2]);
+
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
   });
 
   it('keeps trying while the server stays down, and words the wait after the first silent try', async () => {

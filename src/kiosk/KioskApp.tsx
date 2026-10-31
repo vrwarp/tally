@@ -120,7 +120,7 @@ import {
 } from './components/StaffSession';
 import { loadCatalog } from './messages';
 import { reprintOffer, reprintStanding, type ReprintStanding } from './reprintOffer';
-import { OWED_NOTICE_MS, OWED_QUIET_MS, offeredOwed, type OwedRow } from './owed';
+import { OWED_HANDOFF_MS, OWED_NOTICE_MS, OWED_QUIET_MS, offeredOwed, type OwedRow } from './owed';
 import { OwedScreen, type OwedGroup } from './screens/OwedScreen';
 import { useQuietGlass } from './components/useQuietGlass';
 import { SiblingScreen } from './screens/SiblingScreen';
@@ -2566,15 +2566,19 @@ export function KioskApp() {
    * tags* under a thumb descending on *Print name tag*.
    *
    * Once per recovery, by the moment it carries: a second render with the same
-   * `recovered` is the same arrival.
+   * `recovered` is the same arrival. And only *at* that moment — a press that
+   * brought the printer back at set-up stays the last press all evening, and
+   * must not answer a tag owed hours later while the printer is in trouble
+   * again. See `OWED_HANDOFF_MS`.
    */
   const handedOffRef = useRef(0);
   useEffect(() => {
     if (!recovered?.byPress || recovered.atMs === handedOffRef.current) return;
     if (overlay?.kind !== 'printer' || owedRows.length === 0) return;
+    if (printerState?.kind !== 'ready' || Date.now() - recovered.atMs > OWED_HANDOFF_MS) return;
     handedOffRef.current = recovered.atMs;
     openOwed(overlay);
-  }, [recovered, overlay, owedRows, openOwed]);
+  }, [recovered, overlay, owedRows, openOwed, printerState]);
 
   /**
    * When this child's name tag last came out, and what the next one would say.

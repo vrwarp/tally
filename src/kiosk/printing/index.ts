@@ -747,16 +747,31 @@ function startRecovery(dead: BrotherQLPrinterCore): void {
   };
 }
 
+/**
+ * Whether something else has already brought a printer back, so the recovery
+ * can stand down: a connect event, a label, a press, or the kiosk letting go.
+ *
+ * By whether a printer is *open*, never by which object is in hand. A label's
+ * own reopen that failed leaves a fresh, unopened core in `printer`, and a
+ * recovery that stood down for that — as it did, comparing identities — left
+ * the kiosk in trouble until the next label, wake or press. The print server
+ * journeys found it on an outage that hit mid-label.
+ */
+function overtaken(): boolean {
+  return !config || printer?.opened === true;
+}
+
 async function decide(dead: BrotherQLPrinterCore): Promise<void> {
-  // Overtaken: the browser said it went, a connect event or a label reopened
-  // it, or the kiosk let go of it in the meantime.
-  if (printer !== dead || !config) {
+  if (overtaken()) {
     recovery = null;
     return;
   }
+  // Whatever stands for the printer now: the dead core, or the unopened one a
+  // failed reopen left behind — same device either way.
+  const held = printer ?? dead;
   // A print server connection has no bus to ask. The socket said it closed;
   // whether the server is back is found out by trying, on the same ladder.
-  if (dead.device === undefined) {
+  if (held.device === undefined) {
     scheduleAttempt(dead, 0);
     return;
   }
@@ -767,7 +782,7 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
     log.record('kiosk', 'devices-failed', { cause: 'transport-lost', ...errorInfo(error) });
     devices = null;
   }
-  if (printer !== dead || !config) {
+  if (overtaken()) {
     recovery = null;
     return;
   }
@@ -776,7 +791,7 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
     // library's `device` getter is optional since the bridge transport); the
     // USB ladder only ever runs for a USB printer, so an absent device is
     // simply "not among them".
-    const lost = dead.device;
+    const lost = held.device;
     const present = lost !== undefined && devices.some((device) => isOurs(device, lost));
     log.record('usb', 'devices', {
       cause: 'transport-lost',
@@ -785,7 +800,7 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
       same: lost !== undefined && devices.includes(lost),
     });
     if (!present) {
-      lose(dead, 'transport-lost');
+      lose(held, 'transport-lost');
       return;
     }
   }
@@ -1199,7 +1214,19 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
   // otherwise claim the interface twice.
   if (opening) return opening;
 
-  opening = (async () => {
+  /*
+   * The in-flight marker is set *after* the attempt is made and cleared by
+   * identity, never from inside it. An `async` function runs synchronously up
+   * to its first `await`, and the "already open" branch below has none — so
+   * an attempt that cleared the marker in its own `finally` did so before the
+   * marker had even been assigned, and the resolved promise then sat in it
+   * for the rest of the evening: every later reopen, the recovery ladder's
+   * included, returned it and did nothing, and the kiosk stayed "unplugged"
+   * with the cable in until the nightly reload. The print server journeys
+   * found that: Look again after a jam waited on a boot that had finished
+   * hours before.
+   */
+  const attempt = (async () => {
     try {
       if (printer?.opened) {
         /*
@@ -1244,12 +1271,14 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
         const { message, advice } = describe(error);
         setState({ kind: 'trouble', message, advice }, cause);
       }
-    } finally {
-      opening = null;
     }
   })();
-
-  return opening;
+  opening = attempt;
+  try {
+    await attempt;
+  } finally {
+    if (opening === attempt) opening = null;
+  }
 }
 
 /**
