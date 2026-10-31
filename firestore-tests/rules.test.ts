@@ -3373,6 +3373,39 @@ describe('kiosk', () => {
       await assertSucceeds(updateDoc(own(), { lastSeenAt: serverTimestamp() }));
     });
 
+    it('takes what the kiosk says about its printer, and does not require it', async () => {
+      await assertSucceeds(
+        updateDoc(own(), {
+          lastSeenAt: serverTimestamp(),
+          printerKind: 'server',
+          printerState: 'ready',
+          printerName: 'Shipping desk',
+        }),
+      );
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: 'usb', printerState: 'trouble', printerName: null }),
+      );
+      // A kiosk that lost its printer clears what it last said.
+      await assertSucceeds(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: null, printerState: null, printerName: null }),
+      );
+    });
+
+    it('refuses a printer report nobody wrote code for', async () => {
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), printerKind: 'bluetooth' }));
+      await assertFails(updateDoc(own(), { lastSeenAt: serverTimestamp(), printerState: 'on fire' }));
+      await assertFails(
+        updateDoc(own(), { lastSeenAt: serverTimestamp(), printerName: 'x'.repeat(61) }),
+      );
+      // And a core member cannot write it on the kiosk's behalf.
+      await assertFails(
+        updateDoc(doc(asUser(env, UID.core), paths.kioskDevice(DEVICE.live)), {
+          printerKind: 'usb',
+          printerState: 'ready',
+        }),
+      );
+    });
+
     it('refuses a charge that is not one', async () => {
       await assertFails(
         updateDoc(own(), { lastSeenAt: serverTimestamp(), batteryLevel: 87 }),

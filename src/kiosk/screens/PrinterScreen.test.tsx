@@ -23,6 +23,7 @@ import type {
   PrinterConfig,
   PrinterDetection,
   PrinterLogEntry,
+  PrinterNote,
   PrinterState,
   PrinterStatus,
   ServerPrinterChoice,
@@ -94,7 +95,12 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     readPrintServer: vi.fn((): { url: string; token: string; rev: number } | null => null),
     listServerPrinters: vi.fn(async (): Promise<ServerPrinterChoice[]> => []),
     pairServerPrinter: vi.fn(async () => found),
-    describeFailure: vi.fn(() => ({ message: { key: 'troubleNoPrintServer' as const }, advice: null })),
+    describeFailure: vi.fn(
+      (): { message: PrinterNote; advice: PrinterNote | null } => ({
+        message: { key: 'troubleNoPrintServer' },
+        advice: null,
+      }),
+    ),
   };
   return printing as unknown as KioskPrinting & typeof printing;
 }

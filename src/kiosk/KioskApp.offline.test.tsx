@@ -332,7 +332,10 @@ describe('coming back', () => {
 
     expect(journalRecords()).toEqual([]);
     // The report that clears "quiet", well before the register poll's next tick.
-    expect(services.reportStanding).toHaveBeenCalledWith(expect.objectContaining({ title: 'Sunday Kids' }));
+    // (The report also carries the printer, which this kiosk has none of.)
+    expect(vi.mocked(services.reportStanding).mock.calls.map(([bound]) => bound)).toContainEqual(
+      expect.objectContaining({ title: 'Sunday Kids' }),
+    );
   });
 });
 

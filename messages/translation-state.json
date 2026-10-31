@@ -5450,6 +5450,41 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Team.kioskPrinterServer": {
+    "source": "Prints through the print server · {name}",
+    "context": "Team page, kiosk row, quiet line: {name} is the printer’s name on the print server.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskPrinterUsb": {
+    "source": "Prints over USB",
+    "context": "Team page, kiosk row, quiet line.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskPrinterFallback": {
+    "source": "Printing over USB · the print server could not be reached",
+    "context": "Team page, kiosk row, amber: a print-server kiosk fell back to its USB printer.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskPrinterTrouble": {
+    "source": "Printer needs attention",
+    "context": "Team page, kiosk row, amber. The kiosk’s own screen has the sentence.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Team.kioskPrinterUnpaired": {
+    "source": "Printer not connected",
+    "context": "Team page, kiosk row, amber: the kiosk is set up for a USB printer the browser does not list.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Team.kioskWaitingOnTablet": {
     "source": "{count, plural, one {1 check-in} other {# check-ins}} waiting since {when}",
     "context": "Status line under a lobby kiosk on the Team and Kiosk pages: the kiosk told Tally it holds {count} check-ins or pickups it has not managed to send, the oldest since {when} (a time today or a date). \"Check-ins\" is the kiosk's general word for its records, pickups included, as in its all-clear Staff.checkInsAllIn.",

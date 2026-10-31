@@ -1558,7 +1558,16 @@ service cloud.firestore {
               || (d.batteryLevel is number
                   && d.batteryLevel >= 0
                   && d.batteryLevel <= 1))
-          && (d.get('charging', null) == null || d.charging is bool);
+          && (d.get('charging', null) == null || d.charging is bool)
+          // The printer, coarsely: over USB or through the print server, and
+          // whether it needs somebody. Optional for the same reason the charge
+          // is, and null for a kiosk with no printer. 60 is
+          // `KIOSK_PRINTER_NAME_MAX` in lib/kioskDevice.ts.
+          && (d.get('printerKind', null) == null || d.printerKind in ['usb', 'server'])
+          && (d.get('printerState', null) == null
+              || d.printerState in ['ready', 'fallback', 'trouble', 'unpaired'])
+          && (d.get('printerName', null) == null
+              || (d.printerName is string && d.printerName.size() <= 60));
       }
 
       function validRetirement() {
@@ -1582,7 +1591,8 @@ service cloud.firestore {
                         && request.auth.uid == 'kiosk_' + deviceId
                         && resource.data.get('retiredAt', null) == null
                         && touchesOnly(['lastSeenAt', 'boundTo', 'boundChain',
-                                        'batteryLevel', 'charging'])
+                                        'batteryLevel', 'charging',
+                                        'printerKind', 'printerState', 'printerName'])
                         && validKioskReport())
                     || (isCore() && !isKioskSession()
                         && touchesOnly(['retiredAt', 'retiredBy'])

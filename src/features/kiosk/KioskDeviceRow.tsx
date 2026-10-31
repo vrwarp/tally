@@ -161,6 +161,31 @@ export function KioskDeviceRow({ device, now, showPairedBy = false }: KioskDevic
             {t('kioskOffCharger', { percent: Math.round(device.batteryLevel * 100) })}
           </span>
         )}
+        {/*
+          How it prints, when it told Tally. Quiet while it works — "prints
+          through the print server · Shipping desk" is the fact that answers
+          "which kiosk is on the Wi-Fi printer" from a desk — and amber when
+          the printer needs somebody, in the same coarse words the kiosk's own
+          dot uses: the sentence itself is the printer screen's. A retired row
+          says nothing, as above.
+        */}
+        {!device.retiredAt && device.printerKind && device.printerState ? (
+          <span
+            className={`block text-xs ${
+              device.printerState === 'ready' ? 'text-ink-400' : 'text-warn-400'
+            }`}
+          >
+            {device.printerState === 'fallback'
+              ? t('kioskPrinterFallback')
+              : device.printerState === 'trouble'
+                ? t('kioskPrinterTrouble')
+                : device.printerState === 'unpaired'
+                  ? t('kioskPrinterUnpaired')
+                  : device.printerKind === 'server'
+                    ? t('kioskPrinterServer', { name: device.printerName ?? '' })
+                    : t('kioskPrinterUsb')}
+          </span>
+        ) : null}
       </span>
 
       {device.retiredAt || renaming ? null : armed ? (

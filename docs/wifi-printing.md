@@ -1,7 +1,13 @@
 # Printing over Wi-Fi — integrating the print server
 
-A plan, settled with the product owner on 2026-10-31 and not yet a shipped
-change. The lobby kiosk prints name tags on a Brother QL plugged into it over
+A plan, settled with the product owner on 2026-10-31. **Status:** phases 1–5
+are built (library and print server upstream; Settings card and delivery;
+the printing module; the printer screen; the Kiosk page line, the policy row
+and the docs). Phase 0 — the Sunday field trial on the real NAS, VLANs and
+QL-810W — is what remains, and is the first time any of it meets the hardware.
+How a church sets it up is [`label-printing.md`](label-printing.md#printing-over-wi-fi-through-the-print-server).
+
+The lobby kiosk prints name tags on a Brother QL plugged into it over
 WebUSB. The printer library now also speaks to a **print server** — the bridge
 in `vrwarp/brother_ql` (`bridge/`, shipped as a Docker image) — which turns a
 WebSocket from the kiosk into TCP port 9100 on a Wi-Fi printer, reads the

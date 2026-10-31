@@ -39,7 +39,12 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
-import { boundToFor, kioskUid } from '@/lib/kioskDevice';
+import {
+  boundToFor,
+  kioskUid,
+  printerReportFields,
+  type KioskPrinterReport,
+} from '@/lib/kioskDevice';
 import type { LandKioskRecordsRequest, LandKioskRecordsResponse } from '@/lib/kioskLanding';
 import {
   KIOSK_BACKDROPS_COLLECTION,
@@ -355,6 +360,12 @@ export async function unpair(): Promise<void> {
  */
 export async function reportStanding(
   bound: Pick<KioskBinding, 'title' | 'chain'> | null,
+  /**
+   * The printer, coarsely, for the Kiosk page's row — see `KioskPrinterReport`.
+   * Undefined leaves the fields alone, which is what a caller that has not
+   * loaded the printing module says; null is a kiosk with no printer.
+   */
+  printer?: KioskPrinterReport | null,
 ): Promise<StandingOutcome> {
   const deviceId = ensureDeviceId();
   /*
@@ -375,6 +386,7 @@ export async function reportStanding(
         boundTo: boundToFor(bound?.title),
         boundChain: bound?.chain ?? null,
         ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
+        ...(printer === undefined ? {} : printerReportFields(printer)),
       }),
       UPLOAD_DEADLINE_MS,
     );

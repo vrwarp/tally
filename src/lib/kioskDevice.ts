@@ -67,3 +67,40 @@ export function boundToFor(title: string | null | undefined): string | null {
   if (!title) return null;
   return title.length > KIOSK_BOUND_TO_MAX ? title.slice(0, KIOSK_BOUND_TO_MAX) : title;
 }
+
+/**
+ * The printer, as the standing report carries it to the Kiosk page.
+ *
+ * Coarse on purpose: the row says whether the kiosk prints over USB or
+ * through the print server, and whether that needs somebody — never the
+ * sentence, which is the printer screen's and changes with the kiosk's
+ * language. `fallback` is a print server kiosk printing on its USB printer
+ * because the server could not be reached. See docs/wifi-printing.md phase 5.
+ */
+export type KioskPrinterReportState = 'ready' | 'fallback' | 'trouble' | 'unpaired';
+
+export interface KioskPrinterReport {
+  kind: 'usb' | 'server';
+  state: KioskPrinterReportState;
+  /** The print server's name for the printer; null over USB. */
+  name: string | null;
+}
+
+/** Mirrored in firestore.rules (`validKioskReport`). The bridge caps names at 60 too. */
+export const KIOSK_PRINTER_NAME_MAX = 60;
+
+/**
+ * The report's three fields, flat, as the document stores them.
+ *
+ * Null for a kiosk with no printer, so a kiosk that lost its printer config
+ * clears what it last said rather than leaving a stale "prints through the
+ * print server" on the row. Every field is optional in the rules, so a kiosk
+ * built before these existed keeps writing exactly what it always did.
+ */
+export function printerReportFields(
+  report: KioskPrinterReport | null,
+): { printerKind: string | null; printerState: string | null; printerName: string | null } {
+  if (!report) return { printerKind: null, printerState: null, printerName: null };
+  const name = report.name?.trim() ? report.name.trim().slice(0, KIOSK_PRINTER_NAME_MAX) : null;
+  return { printerKind: report.kind, printerState: report.state, printerName: name };
+}
