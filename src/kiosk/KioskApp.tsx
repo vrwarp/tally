@@ -1310,6 +1310,7 @@ export function KioskApp() {
       roster: fresh.roster,
       phones: fresh.phones,
       participation: fresh.participation,
+      printServer: fresh.printServer,
     };
     pulseRef.current = next;
     services.rememberPulse(next);
@@ -1322,6 +1323,9 @@ export function KioskApp() {
     if (fresh.participation !== seen.participation) {
       void services.refetchParticipation(binding.predictsFrom, landScope);
     }
+    // A pulse cached before the print server existed reads zero here, so the
+    // first poll after an upgrade fetches it — see `CachedPulse.printServer`.
+    if (fresh.printServer !== seen.printServer) void services.refetchPrintServer();
   }, [services, binding, landStudents, landLast4, landScope]);
 
   /* ---- Leaving a gathering ----------------------------------------------- */

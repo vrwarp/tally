@@ -950,6 +950,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Errors.printServer.badAddress": {
+    "source": "The print server needs an address like https://print.example.org.",
+    "context": "Server refusal when the address typed on the Settings card is not a URL to a print server.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Errors.printServer.badToken": {
+    "source": "Paste the token the print server created, with nothing around it.",
+    "context": "Server refusal when the pasted token has spaces inside it, is too long, or is blank with none saved.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Errors.field.childFirst.required": {
     "source": "The child's first name is required.",
     "context": "Validation message painted directly under the child's first name box on the review-queue correction form (registrationFields.ts), where a core-team member is fixing what a family typed at the lobby kiosk. Refers to the child being registered, not the person reading. Also a wire contract: this exact code is thrown by a Cloud Function and translated on the client, so the code name must never change even if the wording does.",
@@ -4369,6 +4383,188 @@
   },
   "Backends.pcoEditorDescription": {
     "source": "Everything except the credentials. Changes apply to every counselor's next read.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.title": {
+    "source": "Print server",
+    "context": "Card title on the Settings screen: the server lobby kiosks print through over Wi‑Fi.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.description": {
+    "source": "Where the kiosks print over Wi‑Fi. Set it once here and every kiosk picks it up on its own.",
+    "context": "Under the card title. \"Kiosks\" are the lobby tablets.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.checking": {
+    "source": "Checking the print server settings",
+    "context": "Screen-reader status while the card loads.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.loadFailed": {
+    "source": "Could not read the print server settings.",
+    "context": "Error banner.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.none": {
+    "source": "No print server",
+    "context": "Badge: no print server has been set up.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.inUse": {
+    "source": "Kiosks print through {host}",
+    "context": "Badge: {host} is a hostname like print.example.org.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.savedWhen": {
+    "source": "Saved {when}.",
+    "context": "Small print: {when} is a relative time like \"3 days ago\".",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.howItWorks": {
+    "source": "A kiosk holds the printer only while labels are printing, and goes back to its USB printer if the print server cannot be reached.",
+    "context": "Small print under the badge.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.setUp": {
+    "source": "Set up",
+    "context": "Button that opens the form when there is no print server yet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.address": {
+    "source": "Server address",
+    "context": "Text field label.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.addressHint": {
+    "source": "What you type into a browser to reach it, like https://print.example.org.",
+    "context": "Hint under the address field. Keep the example URL as is.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.token": {
+    "source": "Token",
+    "context": "Text field label: the bearer token (API credential) the print server issued.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.tokenHint": {
+    "source": "Create one on the print server’s admin page. Tally stores it where only the kiosks can read it, and never shows it again.",
+    "context": "Hint under the token field.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.tokenKept": {
+    "source": "Leave blank to keep the token already saved.",
+    "context": "Second hint under the token field, shown when a token is already saved.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.test": {
+    "source": "Test",
+    "context": "Button: try the address and token against the print server without saving.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.testing": {
+    "source": "Asking the print server…",
+    "context": "Status while the test runs.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.testOk": {
+    "source": "{count, plural, =0 {The print server answered, but has no printers registered.} one {The print server answered. # printer is registered:} other {The print server answered. # printers are registered:}}",
+    "context": "Result of the test; a list of printer names follows the colon.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.testFailed": {
+    "source": "Could not reach the print server with these details. Check the address and the token, and that this site is on the print server’s allowed origins.",
+    "context": "Result of the test when the server could not be reached or refused the token.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.printerNoStatus": {
+    "source": "no status path — kiosks will not offer it",
+    "context": "Suffix after a printer’s name in the test result, lowercase, in parentheses in the UI.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.save": {
+    "source": "Save print server",
+    "context": "Primary button.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.remove": {
+    "source": "Remove print server",
+    "context": "Secondary button.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.removeConfirm": {
+    "source": "Remove the print server? Kiosks go back to their USB printers at their next check.",
+    "context": "Confirmation line before removing.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.removeYes": {
+    "source": "Yes, remove it",
+    "context": "Confirmation button.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.saved": {
+    "source": "Print server saved. Kiosks pick it up within a minute.",
+    "context": "Toast after saving.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.removed": {
+    "source": "Print server removed. Kiosks go back to USB printing.",
+    "context": "Toast after removing.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PrintServer.saveFailed": {
+    "source": "Could not save the print server.",
+    "context": "Fallback error when the server gave no sentence.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

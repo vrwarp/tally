@@ -165,6 +165,10 @@
         "recreate": "No se pudo conectar con {backend} para recrear a este estudiante. Prueba en un momento."
       }
     },
+    "printServer": {
+      "badAddress": "El servidor de impresión necesita una dirección como https://print.example.org.",
+      "badToken": "Pega el token que creó el servidor de impresión, sin nada alrededor."
+    },
     "field": {
       "childFirst": {
         "required": "Falta el nombre del niño o la niña.",
@@ -796,6 +800,34 @@
     "a32ApiAddressHint": "Dirección del servidor de Attendees. Cada solicitud lleva el token de esta iglesia, así que cualquier otra dirección lo manda a otro lado — solo administradores, y solo para un servidor que tú administres.",
     "a32EditorDescription": "Todo menos el token. Los cambios aplican en la siguiente lectura de cada líder.",
     "pcoEditorDescription": "Todo menos las credenciales. Los cambios aplican en la siguiente lectura de cada líder."
+  },
+  "PrintServer": {
+    "title": "Servidor de impresión",
+    "description": "Por dónde imprimen los kioscos a través de Wi‑Fi. Configúralo una vez aquí y cada kiosco lo toma por su cuenta.",
+    "checking": "Revisando la configuración del servidor de impresión",
+    "loadFailed": "No se pudo leer la configuración del servidor de impresión.",
+    "none": "Sin servidor de impresión",
+    "inUse": "Los kioscos imprimen a través de {host}",
+    "savedWhen": "Guardado {when}.",
+    "howItWorks": "Un kiosco ocupa la impresora solo mientras salen etiquetas, y vuelve a su impresora USB si no logra conectarse con el servidor de impresión.",
+    "setUp": "Configurar",
+    "address": "Dirección del servidor",
+    "addressHint": "Lo que escribes en el navegador para llegar a él, como https://print.example.org.",
+    "token": "Token",
+    "tokenHint": "Créalo en la página de administración del servidor de impresión. Tally lo guarda donde solo los kioscos pueden leerlo y no lo vuelve a mostrar.",
+    "tokenKept": "Déjalo en blanco para conservar el token ya guardado.",
+    "test": "Probar",
+    "testing": "Preguntando al servidor de impresión…",
+    "testOk": "{count, plural, =0 {El servidor de impresión respondió, pero no tiene impresoras registradas.} one {El servidor de impresión respondió. Hay # impresora registrada:} other {El servidor de impresión respondió. Hay # impresoras registradas:}}",
+    "testFailed": "No se pudo llegar al servidor de impresión con estos datos. Revisa la dirección y el token, y que este sitio esté entre los orígenes permitidos del servidor.",
+    "printerNoStatus": "sin ruta de estado; los kioscos no la ofrecerán",
+    "save": "Guardar servidor de impresión",
+    "remove": "Quitar servidor de impresión",
+    "removeConfirm": "¿Quitar el servidor de impresión? Los kioscos vuelven a sus impresoras USB en su siguiente consulta.",
+    "removeYes": "Sí, quitarlo",
+    "saved": "Servidor de impresión guardado. Los kioscos lo toman en menos de un minuto.",
+    "removed": "Servidor de impresión quitado. Los kioscos vuelven a imprimir por USB.",
+    "saveFailed": "No se pudo guardar el servidor de impresión."
   },
   "Team": {
     "title": "Equipo",

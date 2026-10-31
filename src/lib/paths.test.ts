@@ -34,6 +34,7 @@ describe('the collection names', () => {
       students: 'students',
       events: 'events',
       config: 'config',
+      private: 'private',
       skippedNights: 'skippedNights',
       upstreamEdits: 'upstreamEdits',
       eventAccess: 'eventAccess',
@@ -149,5 +150,10 @@ describe('the config documents', () => {
     expect(paths.planningCenter()).toBe('config/planningCenter');
     expect(paths.attendees32()).toBe('config/attendees32');
     expect(paths.backends()).toBe('config/backends');
+    expect(paths.printServer()).toBe('config/printServer');
+  });
+
+  it('keeps the print server token out of config, where the core team can read', () => {
+    expect(paths.printServerSecret()).toBe('private/printServer');
   });
 });

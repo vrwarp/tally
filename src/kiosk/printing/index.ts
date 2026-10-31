@@ -659,12 +659,17 @@ async function decide(dead: BrotherQLPrinterCore): Promise<void> {
     return;
   }
   if (devices) {
-    const present = devices.some((device) => isOurs(device, dead.device));
+    // `device` is undefined on a core driven by a non-USB transport (the
+    // library's `device` getter is optional since the bridge transport); the
+    // USB ladder only ever runs for a USB printer, so an absent device is
+    // simply "not among them".
+    const lost = dead.device;
+    const present = lost !== undefined && devices.some((device) => isOurs(device, lost));
     log.record('usb', 'devices', {
       cause: 'transport-lost',
       count: devices.length,
       present,
-      same: devices.includes(dead.device),
+      same: lost !== undefined && devices.includes(lost),
     });
     if (!present) {
       lose(dead, 'transport-lost');

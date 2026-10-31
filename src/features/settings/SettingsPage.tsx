@@ -28,6 +28,7 @@ import { useData } from '@/context/dataContext';
 import { useToast } from '@/context/toastContext';
 import { BackendsSection } from '@/features/settings/BackendsSection';
 import { PlanningCenterCard } from '@/features/settings/PlanningCenterCard';
+import { PrintServerCard } from '@/features/settings/PrintServerCard';
 import { ThemeCard } from '@/features/settings/ThemeCard';
 import { ThresholdPreview } from '@/features/settings/ThresholdPreview';
 import { saveSettings } from '@/services/events';
@@ -274,6 +275,7 @@ export function SettingsPage() {
         <PlanningCenterCard />
 
         <BackendsSection />
+        <PrintServerCard />
       </div>
     </PageFrame>
   );

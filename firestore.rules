@@ -1353,6 +1353,32 @@ service cloud.firestore {
     }
 
     /**
+     * The print server's address — where the lobby kiosks print over Wi-Fi.
+     *
+     * Written only by the `setPrintServer` function, never from a browser: the
+     * same save puts the bearer token in `private/printServer`, which no rule
+     * below lets any client read, and a split like that is only honest if the
+     * two halves are written together by the one party that may see both.
+     * Core-only read, as the other configuration documents are. A kiosk never
+     * reads this: it is handed the address with the token by `getKioskEvents`.
+     * See functions/src/kiosk/printServer.ts.
+     */
+    match /config/printServer {
+      allow get: if isCore();
+      allow write: if false;
+    }
+
+    /**
+     * Server-only documents. The print server's bearer token lives here, and
+     * anything else that a function must hold and no client may ever see. No
+     * identity reads or writes this collection — the Admin SDK does not go
+     * through these rules, and nothing else is meant to.
+     */
+    match /private/{docId} {
+      allow read, write: if false;
+    }
+
+    /**
      * The non-secret half of the Attendees (attendees32) configuration — the
      * `config/planningCenter` reasoning, applied to the second backend. The
      * DRF token is deliberately not here and never will be; the closed key
