@@ -195,7 +195,8 @@ with the same ground photographed from the running app:
 | [docs/kiosk-offline-recovery.md](docs/kiosk-offline-recovery.md) — kiosk check-ins and pickups that outlast an internet outage: the nine ways the old retry queue lost them, the journal and the one callable that replaced it, and why the write cap went rather than grew (Phase 1 built; Phase 2 proposed) | — |
 | [docs/team-access.md](docs/team-access.md) — who may sign in and who may work each gathering: every journey and edge case, and the changes that survived five rounds of critique and the owner's review | [frame by frame](docs/uxr/access-walkthrough/README.md) |
 | [docs/parent-contact.md](docs/parent-contact.md) — taking a parent's number at the door without slowing the queue | — |
-| [docs/label-printing.md](docs/label-printing.md) — setting up a Brother QL: models, media, per-platform quirks, what a label may say | — |
+| [docs/label-printing.md](docs/label-printing.md) — setting up a Brother QL: models, media, per-platform quirks, what a label may say, and printing over Wi-Fi through the print server | — |
+| [docs/wifi-printing.md](docs/wifi-printing.md) — how the print server reaches the kiosk: where the address and token live, the lease, the USB fallback, and the deployment it was designed for | — |
 | [docs/profile-edits.md](docs/profile-edits.md) — the edit queue | [every state](docs/walkthrough/edit-queue.md) |
 | — | [the lobby registration wizard](docs/walkthrough/registration/README.md) |
 | — | [a parent at the kiosk](docs/walkthrough/parents/README.md) |

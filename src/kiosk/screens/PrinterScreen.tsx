@@ -47,6 +47,7 @@ import type {
   PrinterDetection,
   PrinterNote,
   PrinterState,
+  ServerPrinterChoice,
 } from '../printing';
 import { useLocale, useTranslations } from 'use-intl';
 import { usePrinterNote } from '../printerNote';
@@ -101,6 +102,13 @@ type CopySlot = 'events' | 'policy';
  */
 type GrantCheck = 'idle' | 'busy' | 'granted' | 'none' | 'failed';
 
+/** See `serverOffer` in the screen. */
+type ServerOffer =
+  | { kind: 'idle' }
+  | { kind: 'asking' }
+  | { kind: 'listed'; printers: ServerPrinterChoice[] }
+  | { kind: 'failed'; message: PrinterNote; advice: PrinterNote | null };
+
 function orderedModels(printing: KioskPrinting): string[] {
   const all = printing.modelIdentifiers();
   const preferred = PREFERRED_MODELS.filter((model) => all.includes(model));
@@ -143,7 +151,7 @@ function stateLine(
   detection: PrinterDetection | null,
 ): { text: string; tone: string } {
   switch (state.kind) {
-    case 'ready':
+    case 'ready': {
       /*
        * Connected, and not called *ready*.
        *
@@ -155,11 +163,29 @@ function stateLine(
        * cost zero presses. What the bus can prove is that it answered and what
        * it said; the proof that a sticker comes out is the button below.
        */
+      // Set up for the print server and printing on the USB printer instead:
+      // amber, because the server is the thing somebody has to look at.
+      if (state.fallback === 'usb') return { text: t('fallbackUsb'), tone: 'text-warn-400' };
+      // Through the print server, the line names the printer: a lobby with a
+      // server has more than one printer in its life, and "connected" alone
+      // does not say to which.
+      const server =
+        state.config.connection?.kind === 'server' ? state.config.connection.printerName : null;
       if (detection && !detection.modelFromPrinter)
-        return { text: t('connectedGuessedModel'), tone: 'text-warn-400' };
+        return {
+          text: server ? t('connectedGuessedModelServer', { name: server }) : t('connectedGuessedModel'),
+          tone: 'text-warn-400',
+        };
       if (detection && detection.matched.length !== 1)
-        return { text: t('connectedGuessedRoll'), tone: 'text-warn-400' };
-      return { text: t('connectedReadOff'), tone: 'text-present-400' };
+        return {
+          text: server ? t('connectedGuessedRollServer', { name: server }) : t('connectedGuessedRoll'),
+          tone: 'text-warn-400',
+        };
+      return {
+        text: server ? t('connectedReadOffServer', { name: server }) : t('connectedReadOff'),
+        tone: 'text-present-400',
+      };
+    }
     case 'unpaired':
       // Set up with a printer, which is what makes this different from `idle`
       // below: the browser is not listing the one this kiosk was given.
@@ -430,6 +456,16 @@ export function PrinterScreen({
    * records having done it.
    */
   const [rollAnswered, setRollAnswered] = useState(false);
+  /**
+   * What pressing **Use the print server** has come to.
+   *
+   * The press asks the server which printers it has and lists them as rows,
+   * each a press away from pairing — the chooser's job, done by the server
+   * rather than the browser. A printer registered without a status path is
+   * listed greyed with the reason, because a volunteer who cannot see it
+   * would go looking for why the kiosk ignores a printer the server shows.
+   */
+  const [serverOffer, setServerOffer] = useState<ServerOffer>({ kind: 'idle' });
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowTap = useTapGuard(onReprint);
   const tap = useTap();
@@ -574,6 +610,41 @@ export function PrinterScreen({
   const forget = () => {
     setAttemptFailed(false);
     setTested(false);
+    setServerOffer({ kind: 'idle' });
+  };
+
+  /**
+   * Ask the print server what it has, and put the answer on the screen as rows.
+   *
+   * No busy lock: the module's call is a listing and takes no printer, and
+   * the control dims itself while the question is out.
+   */
+  const offerServer = async () => {
+    forget();
+    setServerOffer({ kind: 'asking' });
+    try {
+      setServerOffer({ kind: 'listed', printers: await printing.listServerPrinters() });
+    } catch (error) {
+      setServerOffer({ kind: 'failed', ...printing.describeFailure(error) });
+    }
+  };
+
+  /**
+   * Pair the printer somebody picked off the server's list.
+   *
+   * Through the module's own door, which writes the config, opens the printer
+   * on a lease and reads the roll off it — so what comes back is adopted the
+   * way a USB pairing's answer is. The module refuses a printer with no
+   * status path itself; the row is greyed so nobody has to find that out.
+   */
+  const pairFromServer = async (choice: ServerPrinterChoice) => {
+    forget();
+    setBusy(true);
+    try {
+      adopt(await printing.pairServerPrinter(choice, { model, label }));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onModelChange = (nextModel: string) => {
@@ -698,6 +769,17 @@ export function PrinterScreen({
    */
   const connectLeads = !setup && gatheringPrints && state.kind !== 'ready';
   const rollAmbiguous = detection !== null && detection.matched.length > 1;
+  /**
+   * Whether Tally has handed this kiosk a print server — read off the disk on
+   * every render, because the pulse writes it behind this screen's back and
+   * the control below should appear the moment it lands.
+   */
+  const hasPrintServer = printing.readPrintServer() !== null;
+  /** The print server's printer this kiosk is set up on, if that is how it is reached. */
+  const serverPrinter = ((): string | null => {
+    const active = state.kind === 'ready' ? state.config : config;
+    return active.connection?.kind === 'server' ? active.connection.printerName : null;
+  })();
 
   const nameOf = (entry: Label) => printing.labelName(entry);
   const account = detection ? detectionAccount(t, detection, label, nameOf) : null;
@@ -912,6 +994,59 @@ export function PrinterScreen({
     </button>
   );
 
+  /**
+   * **Use the print server**, with whatever the press produced under it.
+   *
+   * Drawn wherever *Connect* is, because it is the other answer to the same
+   * question — and only when Tally has a print server for this kiosk, so a
+   * lobby that prints over USB sees the screen it always has.
+   */
+  const serverUnit = (hint: boolean): ReactNode =>
+    hasPrintServer ? (
+      <Unit key="server">
+        {secondary('server', t('usePrintServer'), () => void offerServer(), busy || serverOffer.kind === 'asking')}
+        {serverOffer.kind === 'asking' ? (
+          <Say tone="text-ink-100">{t('serverAsking')}</Say>
+        ) : serverOffer.kind === 'failed' ? (
+          <Say tone="text-warn-400">
+            {[printerNote(serverOffer.message), printerNote(serverOffer.advice)].filter(Boolean).join(' ')}
+          </Say>
+        ) : serverOffer.kind === 'listed' ? (
+          serverOffer.printers.length === 0 ? (
+            <Say tone="text-ink-100">{t('serverNone')}</Say>
+          ) : (
+            <>
+              <Say tone="text-ink-100">{t('serverPick')}</Say>
+              <div className="grid shrink-0 grid-cols-1 gap-3">
+                {serverOffer.printers.map((choice) =>
+                  choice.eligible ? (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      tabIndex={-1}
+                      {...tap(() => void pairFromServer(choice))}
+                      className="flex w-full items-center rounded-xl bg-ink-800 p-4 text-base text-ink-100 active:bg-ink-700 tall:text-lg"
+                    >
+                      {choice.name}
+                    </button>
+                  ) : (
+                    <div
+                      key={choice.id}
+                      className="flex w-full items-center rounded-xl bg-ink-800 p-4 text-base text-ink-400 tall:text-lg"
+                    >
+                      {t('serverRowNoStatus', { name: choice.name })}
+                    </div>
+                  ),
+                )}
+              </div>
+            </>
+          )
+        ) : hint ? (
+          <Say>{t('usePrintServerHint')}</Say>
+        ) : null}
+      </Unit>
+    ) : null;
+
   const checksDim = busy || state.kind !== 'ready';
   const checkAndTest = (
     <div key="checks" className="grid shrink-0 grid-cols-2 gap-3">
@@ -1051,17 +1186,22 @@ export function PrinterScreen({
 
           {/* Set-up: whichever second control this state has, with the sentence
               that belongs to it. */}
-          {setup && state.kind === 'trouble' && (
+          {/* A kiosk with a print server has a second way in wherever the
+              first is offered; a kiosk without one sees nothing new. */}
+          {setup && (state.kind === 'idle' || state.kind === 'unsupported') && serverUnit(true)}
+          {setup && state.kind === 'trouble' && !serverPrinter && (
             <Unit>
               {secondary('connect-again', t('connectThisAgain'), () => void connect(), busy)}
               <Say>{grantedHere ? t('connectAsksAndroid') : t('connectOpensWindow')}</Say>
             </Unit>
           )}
+          {setup && state.kind === 'trouble' && serverUnit(false)}
           {setup && state.kind === 'unpaired' && (
             <Unit>
               {secondary('look-again', t('lookAgain'), () => void lookAgain(), busy || stillLooking)}
             </Unit>
           )}
+          {setup && state.kind === 'unpaired' && serverUnit(true)}
           {setup && state.kind === 'ready' && (
             <Unit>
               {secondary('different', t('connectDifferent'), () => void connect(), busy)}
@@ -1075,6 +1215,7 @@ export function PrinterScreen({
               )}
             </Unit>
           )}
+          {setup && state.kind === 'ready' && serverUnit(false)}
 
           {/* Mid-evening: the doors this screen has always had, grouped so the
               reason sits with whatever is greyed. */}
@@ -1095,7 +1236,7 @@ export function PrinterScreen({
                   )}
                 {canLookAgain &&
                   connectLeads &&
-                  (state.kind === 'trouble'
+                  (state.kind === 'trouble' && !serverPrinter
                     ? secondary('connect-again', t('connectThisAgain'), () => void connect(), busy)
                     : secondary('look-again', t('lookAgain'), () => void lookAgain(), busy || stillLooking))}
                 {checkAndTest}
@@ -1121,6 +1262,8 @@ export function PrinterScreen({
               )}
             </Unit>
           )}
+          {!setup && connectLeads && serverUnit(false)}
+          {!setup && state.kind === 'ready' && serverUnit(false)}
         </div>
 
         <div className="mt-auto flex min-h-0 shrink flex-col gap-3">
@@ -1228,6 +1371,7 @@ export function PrinterScreen({
                 <span className="min-w-0 truncate">
                   {model} ·{' '}
                   {summaryLabel ? printing.labelName(summaryLabel) : t('troubleNotFound')}
+                  {serverPrinter ? ` · ${t('viaPrintServer')}` : ''}
                 </span>
                 {/* Quieter than the summary in colour, not in size: this is the
                     affordance that opens the row, read at arm's length. */}

@@ -63,6 +63,10 @@ export const SERVER_CODES = [
   'notFound.personInBackend',
   'notFound.registration',
 
+  /* ---- The print server ------------------------------------------------- */
+  'printServer.badAddress',
+  'printServer.badToken',
+
   /* ---- The backend, as a whole ------------------------------------------ */
   'backend.notConfigured',
   'backend.notConnected',

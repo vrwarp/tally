@@ -127,6 +127,8 @@ const printing = {
   printerLogText: vi.fn(() => ''),
   describeAge: vi.fn(() => 'just now'),
   describeEntry: vi.fn(() => ''),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 let checkedOut = new Set<string>();
@@ -359,6 +361,26 @@ describe('the hand-off, which is the only screen the kiosk changes by itself', (
     await push({ ...READY, cause: 'press' });
 
     expect(screen.getByText(/1 name tag did not print$/)).toBeInTheDocument();
+  });
+
+  it('does not open it for a press that brought the printer back before the tag was owed', async () => {
+    /* The press that paired the printer at set-up is "the last press" all
+       evening. Hours later a tag is owed and the printer is in trouble again:
+       the volunteer tapping the dot is owed the complaint, not the offer. */
+    await mount();
+    await push({ ...READY, cause: 'press' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+    });
+    owed = [tag(ADA, 3)];
+    await push(TROUBLE);
+    await holdClear();
+    await tap(/Label printer/i);
+
+    expect(screen.queryByText(/1 name tag did not print$/)).not.toBeInTheDocument();
+    // The printer screen itself, with its own account of the tag.
+    expect(screen.getByText('Label printer')).toBeInTheDocument();
+    expect(screen.getByText(/1 name tag did not print\./)).toBeInTheDocument();
   });
 
   it('does not open it for a printer that came back on its own', async () => {

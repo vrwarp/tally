@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { boundToFor, deviceIdOfUid, isDeviceId, KIOSK_BOUND_TO_MAX, kioskUid } from '@/lib/kioskDevice';
+import {
+  boundToFor,
+  deviceIdOfUid,
+  isDeviceId,
+  KIOSK_BOUND_TO_MAX,
+  KIOSK_PRINTER_NAME_MAX,
+  kioskUid,
+  printerReportFields,
+} from '@/lib/kioskDevice';
 
 describe('isDeviceId', () => {
   it('accepts the shape the kiosk mints', () => {
@@ -87,5 +95,42 @@ describe('boundToFor', () => {
     expect(long.length).toBeGreaterThan(KIOSK_BOUND_TO_MAX);
     expect(boundToFor(long)).toBe(long.slice(0, KIOSK_BOUND_TO_MAX));
     expect(boundToFor(long)!.length).toBe(KIOSK_BOUND_TO_MAX);
+  });
+
+  it('leaves a title exactly at the bound alone, since the rule accepts it', () => {
+    const exact = 'x'.repeat(KIOSK_BOUND_TO_MAX);
+    expect(boundToFor(exact)).toBe(exact);
+  });
+});
+
+describe('printerReportFields', () => {
+  it('writes the three fields flat, as the row stores them', () => {
+    expect(printerReportFields({ kind: 'server', state: 'ready', name: 'Shipping desk' })).toEqual({
+      printerKind: 'server',
+      printerState: 'ready',
+      printerName: 'Shipping desk',
+    });
+    expect(printerReportFields({ kind: 'usb', state: 'trouble', name: null })).toEqual({
+      printerKind: 'usb',
+      printerState: 'trouble',
+      printerName: null,
+    });
+  });
+
+  it('clears all three for a kiosk with no printer, so a stale word is not left on the row', () => {
+    expect(printerReportFields(null)).toEqual({ printerKind: null, printerState: null, printerName: null });
+  });
+
+  it('tidies the name and holds it to what the rules accept', () => {
+    expect(printerReportFields({ kind: 'server', state: 'ready', name: '  Shipping desk ' }).printerName).toBe(
+      'Shipping desk',
+    );
+    expect(printerReportFields({ kind: 'server', state: 'ready', name: '   ' }).printerName).toBeNull();
+    expect(printerReportFields({ kind: 'server', state: 'ready', name: '' }).printerName).toBeNull();
+    const long = 'Shipping desk by the back door of the fellowship hall, second shelf from the top';
+    expect(long.length).toBeGreaterThan(KIOSK_PRINTER_NAME_MAX);
+    expect(printerReportFields({ kind: 'server', state: 'ready', name: long }).printerName).toBe(
+      long.slice(0, KIOSK_PRINTER_NAME_MAX),
+    );
   });
 });

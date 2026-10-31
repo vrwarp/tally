@@ -39,7 +39,12 @@ import {
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { parseStudentId } from '@/lib/backendIds';
 import { missingKeys, parseFirebaseConfig } from '@/lib/firebaseConfig';
-import { boundToFor, kioskUid } from '@/lib/kioskDevice';
+import {
+  boundToFor,
+  kioskUid,
+  printerReportFields,
+  type KioskPrinterReport,
+} from '@/lib/kioskDevice';
 import type { LandKioskRecordsRequest, LandKioskRecordsResponse } from '@/lib/kioskLanding';
 import {
   KIOSK_BACKDROPS_COLLECTION,
@@ -82,12 +87,15 @@ import {
   readCachedRoster,
   readCachedRosterOfAnyVersion,
   readJson,
+  sanitizePrintServer,
   writeCachedRoster,
   writeCachedPulse,
   writeJson,
+  writePrintServer,
   type CachedParticipation,
   type CachedPulse,
   type KioskParticipationScope,
+  type KioskPrintServer,
 } from './storage';
 
 /* -------------------------------------------------------------------------- */
@@ -213,10 +221,16 @@ const claimKioskToken = httpsCallable<
   { code: string; secret: string; deviceId: string },
   { status: 'pending' | 'not-found' | 'expired' } | { status: 'ready'; token: string }
 >(functions, 'claimKioskToken');
-const getKioskEvents = httpsCallable<{ days?: number } | void, { events: KioskEventEntry[] }>(
-  functions,
-  'getKioskEvents',
-);
+/**
+ * `printServer` is the print server Tally wants this kiosk to use, or null for
+ * none. Optional on the wire so a new bundle against old functions reads
+ * `undefined`, which means "keep whatever you have" — only an explicit null
+ * clears one. See `rememberPrintServer`.
+ */
+const getKioskEvents = httpsCallable<
+  { days?: number } | void,
+  { events: KioskEventEntry[]; printServer?: KioskPrintServer | null }
+>(functions, 'getKioskEvents');
 const materializeOccurrence = httpsCallable<
   { chain: string; startAt: number },
   { id: string; created: boolean }
@@ -346,6 +360,12 @@ export async function unpair(): Promise<void> {
  */
 export async function reportStanding(
   bound: Pick<KioskBinding, 'title' | 'chain'> | null,
+  /**
+   * The printer, coarsely, for the Kiosk page's row — see `KioskPrinterReport`.
+   * Undefined leaves the fields alone, which is what a caller that has not
+   * loaded the printing module says; null is a kiosk with no printer.
+   */
+  printer?: KioskPrinterReport | null,
 ): Promise<StandingOutcome> {
   const deviceId = ensureDeviceId();
   /*
@@ -366,6 +386,7 @@ export async function reportStanding(
         boundTo: boundToFor(bound?.title),
         boundChain: bound?.chain ?? null,
         ...(battery ? { batteryLevel: battery.level, charging: battery.charging } : {}),
+        ...(printer === undefined ? {} : printerReportFields(printer)),
       }),
       UPLOAD_DEADLINE_MS,
     );
@@ -386,10 +407,41 @@ export async function listEvents(): Promise<KioskEventEntry[]> {
   try {
     const { data } = await getKioskEvents();
     reached();
+    rememberPrintServer(data.printServer);
     return data.events;
   } catch (error) {
     noteFailure(error);
     throw error;
+  }
+}
+
+/**
+ * What the server said about the print server, kept.
+ *
+ * The print server rides on `getKioskEvents` because that is the one read a
+ * kiosk already makes with its own identity, and the token must travel on an
+ * authenticated call rather than sit in a document (docs/wifi-printing.md §2).
+ * `undefined` is a deployment whose functions predate the field and changes
+ * nothing; `null` is the core team clearing the card, and forgets.
+ */
+function rememberPrintServer(server: KioskPrintServer | null | undefined): void {
+  if (server === undefined) return;
+  writePrintServer(sanitizePrintServer(server));
+}
+
+/**
+ * Re-reads the print server after the pulse says it moved — a rotated token,
+ * a new address, or the card cleared. The gathering rows come along for the
+ * ride and are discarded; the kiosk is bound and does not want them.
+ */
+export async function refetchPrintServer(): Promise<void> {
+  try {
+    const { data } = await getKioskEvents();
+    reached();
+    rememberPrintServer(data.printServer);
+  } catch (error) {
+    // The kiosk keeps what it had; the next poll tries again.
+    noteFailure(error);
   }
 }
 
@@ -699,6 +751,7 @@ export interface KioskPulse {
   roster: number;
   phones: number;
   participation: number;
+  printServer: number;
 }
 
 function pulseChannel(data: Record<string, unknown> | null, name: string): number {
@@ -729,6 +782,7 @@ export async function fetchPulse(): Promise<KioskPulse | null> {
       roster: pulseChannel(data, 'roster'),
       phones: pulseChannel(data, 'phones'),
       participation: pulseChannel(data, 'participation'),
+      printServer: pulseChannel(data, 'printServer'),
     };
   } catch (error) {
     noteFailure(error);

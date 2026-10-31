@@ -97,6 +97,8 @@ const printing = {
   // an id: the key it is queued under, and the id it turns out to want.
   pendingLabelId: vi.fn((registrationId: string, index: number) => `${registrationId}:${index}`),
   adoptStudentId: vi.fn(),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 /** What the callable answers. Reassigned per test. */

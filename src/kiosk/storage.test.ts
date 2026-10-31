@@ -30,11 +30,14 @@ import {
   readCachedRosterOfAnyVersion,
   readJson,
   readPins,
+  readPrintServer,
   sanitizePins,
+  sanitizePrintServer,
   writeCachedPulse,
   writeCachedRoster,
   writeJson,
   writePins,
+  writePrintServer,
 } from '@/kiosk/storage';
 import type { KioskStudent } from '@/kiosk/search';
 
@@ -225,10 +228,10 @@ describe('the participation scope', () => {
 });
 
 describe('the pulse cache', () => {
-  it('round-trips the three revisions', () => {
-    writeCachedPulse({ roster: 7, phones: 3, participation: 11 });
+  it('round-trips the four revisions', () => {
+    writeCachedPulse({ roster: 7, phones: 3, participation: 11, printServer: 5 });
 
-    expect(readCachedPulse()).toEqual({ roster: 7, phones: 3, participation: 11 });
+    expect(readCachedPulse()).toEqual({ roster: 7, phones: 3, participation: 11, printServer: 5 });
   });
 
   it('has nothing to say on a kiosk that has never fetched', () => {
@@ -243,7 +246,7 @@ describe('the pulse cache', () => {
       JSON.stringify({ roster: '7', phones: null, participation: undefined }),
     );
 
-    expect(readCachedPulse()).toEqual({ roster: 0, phones: 0, participation: 0 });
+    expect(readCachedPulse()).toEqual({ roster: 0, phones: 0, participation: 0, printServer: 0 });
   });
 
   it('reads a non-finite revision as zero', () => {
@@ -251,13 +254,13 @@ describe('the pulse cache', () => {
     // migrated copy looks like rather than anything Tally wrote.
     localStorage.setItem(KIOSK_KEYS.pulse, '{"roster":1e999,"phones":2,"participation":3}');
 
-    expect(readCachedPulse()).toEqual({ roster: 0, phones: 2, participation: 3 });
+    expect(readCachedPulse()).toEqual({ roster: 0, phones: 2, participation: 3, printServer: 0 });
   });
 
   it('keeps a revision of zero, which is a revision', () => {
-    writeCachedPulse({ roster: 0, phones: 0, participation: 0 });
+    writeCachedPulse({ roster: 0, phones: 0, participation: 0, printServer: 0 });
 
-    expect(readCachedPulse()).toEqual({ roster: 0, phones: 0, participation: 0 });
+    expect(readCachedPulse()).toEqual({ roster: 0, phones: 0, participation: 0, printServer: 0 });
   });
 
   it('reads something that is not an object at all as nothing', () => {
@@ -273,7 +276,65 @@ describe('the pulse cache', () => {
       JSON.stringify({ roster: 1, phones: 2, participation: 3, registration: 4 }),
     );
 
-    expect(readCachedPulse()).toEqual({ roster: 1, phones: 2, participation: 3 });
+    expect(readCachedPulse()).toEqual({ roster: 1, phones: 2, participation: 3, printServer: 0 });
+  });
+
+  it('reads a copy written before the print server existed with that channel at zero', () => {
+    // Zero cannot equal a live revision, so the first poll after the upgrade
+    // fetches the print server — the one time "refetch for nothing" is wanted.
+    localStorage.setItem(KIOSK_KEYS.pulse, JSON.stringify({ roster: 1, phones: 2, participation: 3 }));
+
+    expect(readCachedPulse()?.printServer).toBe(0);
+  });
+});
+
+describe('the print server', () => {
+  const server = { url: 'wss://print.church.example/ws', token: 'bql_abc', rev: 1700000000000 };
+
+  it('round-trips what the server handed over', () => {
+    writePrintServer(server);
+    expect(readPrintServer()).toEqual(server);
+  });
+
+  it('has none on a kiosk that was never told of one', () => {
+    expect(readPrintServer()).toBeNull();
+  });
+
+  it('forgets one when the server says there is none', () => {
+    writePrintServer(server);
+    writePrintServer(null);
+    expect(readPrintServer()).toBeNull();
+    expect(localStorage.getItem(KIOSK_KEYS.printServer)).toBeNull();
+  });
+
+  it('takes a plain ws:// address too, for a print server on the LAN during a trial', () => {
+    expect(sanitizePrintServer({ ...server, url: 'ws://192.168.1.20:8080/ws' })).toEqual({
+      ...server,
+      url: 'ws://192.168.1.20:8080/ws',
+    });
+  });
+
+  it('refuses anything a kiosk could not dial', () => {
+    for (const bad of [
+      null,
+      undefined,
+      42,
+      'wss://print.church.example/ws',
+      { url: 'xwss://print.church.example/ws', token: 'bql_abc', rev: 1 },
+      { url: 'wss:/print.church.example/ws', token: 'bql_abc', rev: 1 },
+      { url: 'https://print.church.example', token: 'bql_abc', rev: 1 },
+      { url: 'wss://print.church.example/ws', token: '', rev: 1 },
+      { url: 'wss://print.church.example/ws', rev: 1 },
+      { token: 'bql_abc', rev: 1 },
+    ]) {
+      expect(sanitizePrintServer(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
+  it('reads a revision that is not a number as zero and keeps the rest', () => {
+    expect(sanitizePrintServer({ ...server, rev: 'seven' })).toEqual({ ...server, rev: 0 });
+    localStorage.setItem(KIOSK_KEYS.printServer, JSON.stringify({ ...server, rev: null }));
+    expect(readPrintServer()).toEqual({ ...server, rev: 0 });
   });
 });
 

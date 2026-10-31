@@ -155,6 +155,63 @@ describe('subscribeKioskDevices', () => {
     });
   });
 
+  /**
+   * The printer, as the kiosk's standing report wrote it. Only the words the
+   * rules admit reach a screen; a stray one stored by hand reads as unsaid,
+   * and an empty name as no name.
+   */
+  function printerFieldsOf(data: Record<string, unknown>): Partial<KioskDevice> {
+    let held: KioskDevice[] = [];
+    subscribeKioskDevices((next) => {
+      held = next;
+    });
+    const [, onNext] = onSnapshot.mock.calls.at(-1) as unknown as [
+      unknown,
+      (snapshot: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void,
+    ];
+    onNext({ docs: [{ id: 'lobby-tablet', data: () => ({ approvedBy: 'uid-miriam', ...data }) }] });
+    const { printerKind, printerState, printerName } = held[0]!;
+    return {
+      ...(printerKind !== undefined ? { printerKind } : {}),
+      ...(printerState !== undefined ? { printerState } : {}),
+      ...(printerName !== undefined ? { printerName } : {}),
+    };
+  }
+
+  it('carries how the kiosk prints, through either connection and every state', () => {
+    expect(printerFieldsOf({ printerKind: 'server', printerState: 'ready', printerName: 'Shipping desk' })).toEqual({
+      printerKind: 'server',
+      printerState: 'ready',
+      printerName: 'Shipping desk',
+    });
+    expect(printerFieldsOf({ printerKind: 'usb', printerState: 'trouble' })).toEqual({
+      printerKind: 'usb',
+      printerState: 'trouble',
+    });
+    for (const printerState of ['ready', 'fallback', 'trouble', 'unpaired']) {
+      expect(printerFieldsOf({ printerKind: 'usb', printerState })).toEqual({ printerKind: 'usb', printerState });
+    }
+  });
+
+  it('leaves the printer off a kiosk that never said, or said nothing', () => {
+    expect(printerFieldsOf({})).toEqual({});
+    expect(printerFieldsOf({ printerKind: null, printerState: null, printerName: null })).toEqual({});
+  });
+
+  it('drops a word nobody wrote code for, and an empty name', () => {
+    expect(printerFieldsOf({ printerKind: 'bluetooth', printerState: 'ready', printerName: 'X' })).toEqual({
+      printerState: 'ready',
+      printerName: 'X',
+    });
+    expect(printerFieldsOf({ printerKind: 'usb', printerState: 'on fire', printerName: '' })).toEqual({
+      printerKind: 'usb',
+    });
+    expect(printerFieldsOf({ printerKind: 'server', printerState: 'ready', printerName: 7 })).toEqual({
+      printerKind: 'server',
+      printerState: 'ready',
+    });
+  });
+
   it('carries the charge through when the tablet reported one', () => {
     let held: KioskDevice[] = [];
     subscribeKioskDevices((next) => {

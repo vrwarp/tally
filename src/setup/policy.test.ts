@@ -25,6 +25,14 @@ describe('policyRows', () => {
     expect(JSON.parse(row?.value ?? 'null')[0].urls).toEqual([ORIGIN]);
   });
 
+  it('answers Chrome’s local-network prompt for this origin, for the print server', () => {
+    const row = policyRows('https://tally.example.org').find(
+      (candidate) => candidate.key === 'LocalNetworkAccessAllowedForUrls',
+    );
+    expect(row?.value).toBe('["https://tally.example.org"]');
+    expect(row?.weight).toBe('recommended');
+  });
+
   it('is generated from the origin, not from a worked example', () => {
     // The failure this rules out is a page that looks right everywhere and is
     // correct only where it was written.

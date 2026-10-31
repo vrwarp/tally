@@ -51,6 +51,12 @@ export const COLLECTIONS = {
   events: 'events',
   config: 'config',
   /**
+   * Documents only the functions read or write — the print server's bearer
+   * token today. No rule lets any client at this collection; the path is here
+   * so the rules tests can prove that. See functions/src/kiosk/printServer.ts.
+   */
+  private: 'private',
+  /**
    * One document per repeat chain, recording the nights nobody came to.
    *
    * Top-level rather than under `events` because it answers about a chain, not
@@ -170,6 +176,13 @@ export const A32_CONFIG_DOC_ID = 'attendees32';
 /** Cross-backend settings: which backend receives students Tally creates. */
 export const BACKENDS_CONFIG_DOC_ID = 'backends';
 
+/**
+ * The print server's address, written by `setPrintServer` and read by the
+ * core team on Settings. Its token is `private/printServer`, which no client
+ * reads. Mirrored in `functions/src/firestore.ts`.
+ */
+export const PRINT_SERVER_DOC_ID = 'printServer';
+
 export const paths = {
   users: () => COLLECTIONS.users,
   user: (uid: string) => `${COLLECTIONS.users}/${uid}`,
@@ -224,6 +237,8 @@ export const paths = {
   planningCenter: () => `${COLLECTIONS.config}/${PCO_CONFIG_DOC_ID}`,
   attendees32: () => `${COLLECTIONS.config}/${A32_CONFIG_DOC_ID}`,
   backends: () => `${COLLECTIONS.config}/${BACKENDS_CONFIG_DOC_ID}`,
+  printServer: () => `${COLLECTIONS.config}/${PRINT_SERVER_DOC_ID}`,
+  printServerSecret: () => `${COLLECTIONS.private}/${PRINT_SERVER_DOC_ID}`,
 } as const;
 
 /** Well-known recurring series ids, seeded by `scripts/seed.ts`. */

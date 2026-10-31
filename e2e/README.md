@@ -85,6 +85,29 @@ env -u HTTPS_PROXY -u https_proxy -u HTTP_PROXY -u http_proxy \
   npx firebase emulators:start --project demo-tally --only auth,firestore,functions
 ```
 
+## Printing over Wi-Fi, with the real print server
+
+`print-server.spec.ts` drives the whole Wi-Fi printing chain: the Settings
+card, the kiosk picking the server's printer, labels, and an evening's faults —
+the cover opened, the printer switched off and on, the Wi-Fi blipping and going
+away, a rotated token, the printer taken off the server and put back, the print
+server removed from Settings, two kiosks on one printer. Only the printer is
+simulated (`e2e/support/printServer.ts`: a QL-810W as a TCP port and an SNMP
+agent on a loopback alias) and the Wi-Fi (a TCP proxy the kiosk's WebSocket
+crosses). The bridge is the one that ships, run from its built `dist/`:
+
+```bash
+git clone https://github.com/vrwarp/brother_ql ../brother_ql
+(cd ../brother_ql/bridge && npm ci && npm run build)
+TALLY_BRIDGE_DIR=../brother_ql/bridge npm run e2e:chromium -- e2e/print-server.spec.ts
+```
+
+Without `TALLY_BRIDGE_DIR` the spec skips itself, which is what CI does. Port
+161 needs root (or `CAP_NET_BIND_SERVICE`) for the SNMP agent; the fake says so
+when it cannot bind. The journeys are serial on one kiosk, because an evening
+is a sequence, and a failure prints the kiosk's own printer log and the
+bridge's log beside the assertion.
+
 ## Arranging the far end
 
 Most specs only need the simulator to *hold* a ministry. A few need it to

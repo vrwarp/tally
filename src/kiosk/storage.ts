@@ -72,6 +72,17 @@ export const KIOSK_KEYS = {
    */
   printerLog: 'tally:kiosk:printerLog',
   /**
+   * The print server this kiosk may print through — see `readPrintServer`.
+   *
+   * Written by the kiosk from what `getKioskEvents` hands it, never typed on
+   * the tablet: the core team enters the address and token once in Settings
+   * and every kiosk picks them up. Held beside the printer rather than on it,
+   * because it is a fact about the building, not about which printer this
+   * kiosk chose — a kiosk that has never paired a printer still knows there
+   * is a print server to offer. docs/wifi-printing.md §2.
+   */
+  printServer: 'tally:kiosk:printServer',
+  /**
    * The Chinese slice of the message catalogue, if this kiosk speaks Chinese.
    *
    * One locale at a time — a lobby has one default language and the switcher on
@@ -300,6 +311,12 @@ export interface CachedPulse {
   roster: number;
   phones: number;
   participation: number;
+  /**
+   * Absent from copies written before the print server existed, and read as
+   * zero then — which is the one value guaranteed to differ from any live
+   * revision, so the first poll after an upgrade refetches it.
+   */
+  printServer: number;
 }
 
 function pulseNumber(value: unknown): number {
@@ -317,11 +334,52 @@ export function readCachedPulse(): CachedPulse | null {
     roster: pulseNumber(stored.roster),
     phones: pulseNumber(stored.phones),
     participation: pulseNumber(stored.participation),
+    printServer: pulseNumber(stored.printServer),
   };
 }
 
 export function writeCachedPulse(pulse: CachedPulse): void {
   writeJson(KIOSK_KEYS.pulse, pulse);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The print server                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where this kiosk may print over Wi-Fi, as Tally handed it over.
+ *
+ * `url` is the print server's WebSocket endpoint and `token` the bearer token
+ * the core team pasted into Settings; `rev` is the save that produced them,
+ * compared with `!==` and never ordered. Null means the kiosk has no print
+ * server and prints over USB only. See `functions/src/kiosk/printServer.ts`.
+ */
+export interface KioskPrintServer {
+  url: string;
+  token: string;
+  rev: number;
+}
+
+/** A well-formed print server, or null for anything less. */
+export function sanitizePrintServer(value: unknown): KioskPrintServer | null {
+  if (!value || typeof value !== 'object') return null;
+  const { url, token, rev } = value as Record<string, unknown>;
+  if (typeof url !== 'string' || !/^wss?:\/\//.test(url)) return null;
+  if (typeof token !== 'string' || token === '') return null;
+  return { url, token, rev: pulseNumber(rev) };
+}
+
+export function readPrintServer(): KioskPrintServer | null {
+  return sanitizePrintServer(readJson(KIOSK_KEYS.printServer));
+}
+
+/**
+ * Remembers what the server said — including that there is none, which is how
+ * clearing the card in Settings turns the feature off on every kiosk.
+ */
+export function writePrintServer(server: KioskPrintServer | null): void {
+  if (server) writeJson(KIOSK_KEYS.printServer, server);
+  else removeKey(KIOSK_KEYS.printServer);
 }
 
 /* -------------------------------------------------------------------------- */

@@ -1,8 +1,10 @@
 # Label printing at the kiosk
 
 A Brother QL plugged into the lobby kiosk, driven straight from the browser over
-WebUSB. No print server, no CUPS queue, no native helper — the page talks to the
-printer.
+WebUSB. No CUPS queue, no native helper — the page talks to the printer. Or, since
+October 2026, a Brother QL on the Wi-Fi, reached through a small **print server**
+the church runs in Docker — see [Printing over Wi-Fi](#printing-over-wi-fi-through-the-print-server);
+everything about labels, rolls and what goes wrong is the same either way.
 
 Confirmed working on a QL-810W on 2026-08-02. That matters because it is the one
 claim no test here can make: the layout arithmetic is covered in
@@ -28,7 +30,8 @@ What follows is what that person has to do.
   template asks it to.
 - **Chrome or Edge**, on macOS, ChromeOS, Android or Linux. Safari and Firefox
   have both declined to implement WebUSB and never will, so a kiosk that prints
-  is a Chromium kiosk.
+  over USB is a Chromium kiosk. A kiosk that prints through the print server can
+  be any browser.
 - **HTTPS.** WebUSB needs a secure context. Deployed Tally is fine; `localhost`
   is fine; a plain-HTTP LAN address is not.
 
@@ -87,6 +90,73 @@ rolls is a change here, not an edit to every gathering. How the sticker is
 *arranged* — its margins, whether it is turned, whether every one is the same
 length — belongs to the gathering instead, and is edited in the app; see
 [Shaping the sticker](#shaping-the-sticker).
+
+## Printing over Wi-Fi, through the print server
+
+The QL-810W (and the QL-820NWB and QL-1110NWB) also take jobs over the network,
+on TCP port 9100. A browser cannot open that port, so between the kiosk and the
+printer sits the **print server**: the `bridge/` in
+[`vrwarp/brother_ql`](https://github.com/vrwarp/brother_ql), shipped as a Docker
+image. It turns a WebSocket from the kiosk into the printer's port, reads the
+printer's status over SNMP so the kiosk still hears about an open lid or an
+empty roll, and keeps a log of the last few prints. **It does no printing of its
+own**: the label is still drawn on the kiosk and sent as bytes, exactly as over
+USB, and every screen in this document behaves the same.
+
+What changes is how a printer is *found, held and lost*, and who has to do what:
+
+1. **Run the print server** on something that is always on — the church's NAS,
+   in Docker. It needs a route to the printer (TCP 9100 and UDP 161) and an
+   HTTPS address the kiosks can reach, because a page served over HTTPS may
+   only open a `wss://` socket: put it behind the reverse proxy at
+   `print.<your domain>` with the WebSocket upgrade headers on, and set its
+   `ALLOWED_ORIGINS` to Tally's origin so the token is good only from the app.
+   The container's own README has the command, the environment and the proxy
+   notes.
+2. **On the print server's admin page**, register the printer by address with
+   status mode `snmp`, press **Probe** to see the roll it reports, and press
+   **Test label** — that prints through the whole chain from a laptop before
+   any tablet is involved. Then create a **token** for the kiosks: one is
+   enough, because each kiosk names itself on the server's log.
+3. **In Tally's Settings**, on the **Print server** card, enter the address as
+   the browser shows it and paste the token. **Test** lists the printers the
+   server offers; **Save** stores the address where the core team can see it and
+   the token where no browser can read it back, and tells every kiosk. Nothing
+   is typed on a tablet, and rotating the token later is pasting the new one here.
+4. **On the kiosk**, open the printer screen (the staff gate, then **Set up a
+   label printer**) and press **Use the print server**. It lists the server's
+   printers; press the one for this room. The kiosk pairs it, reads the model
+   and the roll off it over SNMP, and the state line names it: *Connected to
+   Shipping desk through the print server*. A printer registered without a
+   status path is listed greyed and refused, because every owed-label and
+   reprint behaviour rests on hearing about failures.
+5. **Print a test label**, as for USB.
+
+Then the kiosk holds the printer **only while labels are printing** — opened on
+the first label of a family and let go three seconds after the last — so two
+kiosks can share one printer and neither locks the other out. A printer another
+kiosk is using is waited for, for up to thirty seconds, before the label fails
+the ordinary way and is owed.
+
+**When the server cannot be reached** and a USB printer is also plugged into the
+kiosk, the kiosk prints on that one and the state line says so in amber
+(*Printing over USB — the print server could not be reached*). Nothing switches
+back by itself mid-evening; the next reopen — a failure, a wake, the nightly
+reload — tries the server first again. A kiosk with no USB printer shows which
+half failed: *the print server could not be reached* is the Wi-Fi or the NAS;
+*the print server could not reach the printer* is the printer's power or its
+Wi-Fi; *the print server refused this kiosk's key* is a token that was rotated —
+paste the new one in Settings and every kiosk picks it up within a minute.
+
+On a managed tablet, add the `LocalNetworkAccessAllowedForUrls` row from
+**`/setup`** to the policy: Chrome 142 and later ask before a page first reaches
+the local network, and a kiosk has nobody there to tap *Allow*. The Kiosk page
+in the app says of each kiosk whether it prints over USB or through the print
+server, and when its printer needs somebody. The print server's own page keeps
+the last prints and a diagnostics bundle that names kiosks, so its log and the
+kiosk's **Recent printer events** can be read side by side. None of the
+[platform notes](#platform-notes) below apply to a printer reached this way: no
+udev rule, no Zadig, no Editor Lite, and no Android re-attach.
 
 ## Turning it on for a gathering
 

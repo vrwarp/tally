@@ -68,6 +68,20 @@ function toKioskDevice(snapshot: {
     // "does not say" and "flat" stay different things on the way to the screen.
     ...(typeof data.batteryLevel === 'number' ? { batteryLevel: data.batteryLevel } : {}),
     ...(typeof data.charging === 'boolean' ? { charging: data.charging } : {}),
+    // The printer, as the kiosk last reported it; only the values the rules
+    // admit reach the screen, so a stray word stored by hand reads as unsaid.
+    ...(data.printerKind === 'usb' || data.printerKind === 'server'
+      ? { printerKind: data.printerKind }
+      : {}),
+    ...(data.printerState === 'ready' ||
+    data.printerState === 'fallback' ||
+    data.printerState === 'trouble' ||
+    data.printerState === 'unpaired'
+      ? { printerState: data.printerState }
+      : {}),
+    ...(typeof data.printerName === 'string' && data.printerName !== ''
+      ? { printerName: data.printerName }
+      : {}),
     // What `landKioskRecords` last heard was still on the tablet — see
     // functions/src/kiosk/landing.ts. Absent on a kiosk that has never sent.
     ...(typeof data.waitingCount === 'number' ? { waitingCount: data.waitingCount } : {}),

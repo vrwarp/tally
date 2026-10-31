@@ -81,6 +81,8 @@ const printing = {
   settleOwed: vi.fn(),
   closePrinter: vi.fn(async () => {}),
   labelPreview: vi.fn(() => []),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 const services = {

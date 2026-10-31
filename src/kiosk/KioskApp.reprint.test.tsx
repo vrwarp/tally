@@ -117,6 +117,8 @@ const printing = {
   printerLogText: vi.fn(() => ''),
   describeAge: vi.fn(() => 'just now'),
   describeEntry: vi.fn(() => ''),
+  /* The print server: none, which is every kiosk these suites are about. */
+  readPrintServer: () => null,
 } as unknown as KioskPrinting;
 
 /** Tally, up: what the kiosk sends is on the register at the next read. */

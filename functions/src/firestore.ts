@@ -130,6 +130,17 @@ export const PATHS = {
   a32Config: 'config/attendees32',
   /** Cross-backend settings: which backend receives students Tally creates. */
   backendsConfig: 'config/backends',
+  /**
+   * The print server's address, which the Settings screen shows the core team.
+   * Written only by `setPrintServer`; see kiosk/printServer.ts.
+   */
+  printServerConfig: 'config/printServer',
+  /**
+   * The print server's bearer token. No rule lets any client read this
+   * collection: the kiosk is handed the token by `getKioskEvents`, over its own
+   * authenticated call, and nothing else ever sees it.
+   */
+  printServerSecret: 'private/printServer',
   /** Gatherings, and the two other collections an invitation's placement reads. */
   events: 'events',
   eventSeries: 'eventSeries',

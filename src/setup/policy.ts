@@ -54,6 +54,16 @@ export function policyRows(origin: string): PolicyRow[] {
         'no change here. This is the row the rest of the page is packaging.',
     },
     {
+      key: 'LocalNetworkAccessAllowedForUrls',
+      value: JSON.stringify([origin]),
+      weight: 'recommended',
+      note:
+        'Only matters with a print server (docs/wifi-printing.md). Chrome 142 and later ask before ' +
+        'a page first reaches a device on the local network, and a kiosk has nobody there to tap ' +
+        'Allow; this row answers for it. The value is this origin — the page doing the reaching — ' +
+        'not the print server’s address. Harmless on a kiosk that prints over USB.',
+    },
+    {
       key: 'BrowserSignin',
       value: '0',
       weight: 'recommended',

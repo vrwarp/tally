@@ -78,6 +78,39 @@ describe('what a row says', () => {
   });
 });
 
+describe('how it prints', () => {
+  it('says nothing on a kiosk that has not said', () => {
+    draw();
+    expect(screen.queryByText(/print/i)).not.toBeInTheDocument();
+  });
+
+  it('names the print server’s printer, quietly, while it works', () => {
+    draw({ printerKind: 'server', printerState: 'ready', printerName: 'Shipping desk' });
+    const line = screen.getByText('Prints through the print server · Shipping desk');
+    expect(line.className).toContain('text-ink-400');
+  });
+
+  it('says so, in amber, when the printer needs somebody', () => {
+    draw({ printerKind: 'server', printerState: 'trouble', printerName: 'Shipping desk' });
+    expect(screen.getByText('Printer needs attention').className).toContain('text-warn-400');
+  });
+
+  it('tells a server kiosk printing over USB apart from one that chose USB', () => {
+    draw({ printerKind: 'server', printerState: 'fallback', printerName: 'Shipping desk' });
+    expect(screen.getByText(/Printing over USB · the print server could not be reached/)).toBeInTheDocument();
+  });
+
+  it('says USB plainly, and not connected when it is not', () => {
+    draw({ printerKind: 'usb', printerState: 'ready' });
+    expect(screen.getByText('Prints over USB')).toBeInTheDocument();
+  });
+
+  it('keeps it off a retired row', () => {
+    draw({ retiredAt: new Date('2026-08-01T12:00:00Z'), printerKind: 'server', printerState: 'trouble' });
+    expect(screen.queryByText('Printer needs attention')).not.toBeInTheDocument();
+  });
+});
+
 describe('renaming', () => {
   it('toasts the new name', async () => {
     draw();

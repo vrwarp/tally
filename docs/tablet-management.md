@@ -296,6 +296,7 @@ engine, and because these keys are how the browser underneath the kiosk is made 
 | Key | Value | Why |
 | --- | --- | --- |
 | `WebUsbAllowDevicesForUrls` | see §4.3 — it has more failure modes than the rest of the table put together | The pre-grant [`label-printing.md`](label-printing.md#skipping-the-chooser-entirely) already documents: the chooser disappears, a replacement printer needs no visit, and the grant is matched by vendor/product rather than serial, so it survives the Android re-attach. Supported on Android 75+ **and only on a managed device** — this row is the reason this whole document exists. |
+| `LocalNetworkAccessAllowedForUrls` | `["https://tally.example.org"]` | Only with a print server ([`wifi-printing.md`](wifi-printing.md)). Chrome 142+ asks before a page first reaches a device on the local network, and a kiosk has nobody there to tap *Allow*. The value is the kiosk's own origin — the page doing the reaching — not the print server's address. Harmless on a kiosk that prints over USB. |
 | `URLBlocklist` | `["*"]` | Whatever else happens, the tablet is not a browser. |
 | `URLAllowlist` | `["https://tally.example.org/kiosk", "<firebase and backend origins>"]` | The kiosk's own origin and what it talks to. Getting this list wrong is the commonest way to ship a blank kiosk; start permissive on the origin, then tighten. |
 | `IncognitoModeAvailability` | `1` (disabled) | |
