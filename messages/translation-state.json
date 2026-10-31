@@ -14806,6 +14806,104 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.troublePrintServerUnreachable": {
+    "source": "The print server could not be reached.",
+    "context": "Kiosk printer screen, staff only: the print server (the Wi‑Fi bridge) did not answer.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.advicePrintServer": {
+    "source": "Check the Wi‑Fi and that the print server is running.",
+    "context": "Advice line under the previous.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrintServerLost": {
+    "source": "The connection to the print server dropped.",
+    "context": "The WebSocket to the print server closed mid-evening.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrintServerRefusedKey": {
+    "source": "The print server refused this kiosk’s key.",
+    "context": "The print server rejected the bearer token. \"Key\" is the everyday word here.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.adviceKeyInSettings": {
+    "source": "Paste the print server’s current token into Tally’s Settings.",
+    "context": "Advice: the core team pastes a new token in the main app’s Settings.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrinterInUse": {
+    "source": "Another kiosk is using the printer.",
+    "context": "The printer is held by another kiosk and stayed busy for 30 seconds.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrinterNotOnServer": {
+    "source": "The print server no longer lists this printer.",
+    "context": "The printer was removed from the print server’s registry.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.adviceCheckPrintServer": {
+    "source": "Check the printer on the print server’s page, or pick a printer again here.",
+    "context": "Advice line under the previous.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrintServerCannotReachPrinter": {
+    "source": "The print server could not reach the printer.",
+    "context": "The server is up but TCP 9100 to the printer failed.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.advicePrinterPowerWifi": {
+    "source": "Check that the printer is switched on and on the Wi‑Fi.",
+    "context": "Advice line under the previous.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrintServerProblem": {
+    "source": "The print server reported a problem.",
+    "context": "Catch-all for a print server refusal with no specific sentence; its own text may follow.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troubleNoPrintServer": {
+    "source": "This kiosk is set up for a print server, but Tally no longer has one.",
+    "context": "The kiosk is configured for the print server but Settings no longer has one.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.adviceSetPrintServer": {
+    "source": "Set one up in Tally’s Settings, or connect a USB printer here.",
+    "context": "Advice line under the previous.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.troublePrinterNoStatus": {
+    "source": "This printer cannot report its status, so the kiosk will not use it.",
+    "context": "A volunteer picked a printer registered without SNMP/TCP status; the kiosk refuses it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Printer.didNotPrint": {
     "source": "Did not print",
     "es-MX": "machine",

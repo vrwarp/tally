@@ -1325,8 +1325,13 @@ export function KioskApp() {
     }
     // A pulse cached before the print server existed reads zero here, so the
     // first poll after an upgrade fetches it — see `CachedPulse.printServer`.
-    if (fresh.printServer !== seen.printServer) void services.refetchPrintServer();
-  }, [services, binding, landStudents, landLast4, landScope]);
+    // Then the printing module, if it is loaded, reconnects with what the
+    // kiosk now holds: a rotated token clears "refused this kiosk's key"
+    // without a visit, and a cleared card lets the printer go.
+    if (fresh.printServer !== seen.printServer) {
+      void services.refetchPrintServer().then(() => printing?.printServerChanged());
+    }
+  }, [services, binding, landStudents, landLast4, landScope, printing]);
 
   /* ---- Leaving a gathering ----------------------------------------------- */
 

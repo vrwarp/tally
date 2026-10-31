@@ -67,6 +67,23 @@ const tables = vi.hoisted(() => ({
   matched: [] as { identifier: string; name: string }[],
 }));
 
+/**
+ * The print server, as the module sees it through the library's bridge client.
+ *
+ * `made` is every transport constructed, with the options it was given — the
+ * address, the token, the printer id, the lease — which is the whole of what
+ * the module decides about a connection. `openError` is what opening a core on
+ * one does, so a test can make the server unreachable or the key refused.
+ */
+const bridge = vi.hoisted(() => ({
+  made: [] as { options: Record<string, unknown> }[],
+  openError: null as unknown,
+  /** What `listBridgePrinters` answers, or throws. */
+  printers: [] as Record<string, unknown>[],
+  listError: null as unknown,
+  listCalls: [] as Record<string, unknown>[],
+}));
+
 /** A serial the printer might really carry, distinctive enough to grep the record for. */
 const SERIAL = '000M6Z401370';
 
@@ -105,36 +122,72 @@ function makeDevice(overrides: Record<string, unknown> = {}) {
 /** What the module hands the library to narrate through. */
 type Tracer = { event: (category: string, name: string, data?: Record<string, unknown>) => void };
 
-vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => ({
-  getPairedPrinterDevices: vi.fn(async () =>
-    usb.paired.map((core) => (core as { device: unknown }).device),
-  ),
-  BrotherQLPrinterCore: class {
-    static getPairedDevices = vi.fn(async () => usb.paired);
-    constructor(
-      readonly device: unknown,
-      readonly options: { model: string; diagnostics?: Tracer },
-    ) {
-      Object.assign(this, makeDevice(), { model: options.model, device });
-      cores.made.push(this);
+vi.mock('@vrwarp/brother-ql-webusb/printer-core', () => {
+  /** The bridge client, reduced to what it is handed and what it reports. */
+  class BridgeTransport {
+    printer: Record<string, unknown> | null;
+    constructor(readonly options: Record<string, unknown>) {
+      bridge.made.push(this);
+      this.printer =
+        bridge.printers.find((listed) => listed.id === options.printerId) ?? {
+          id: options.printerId,
+          name: 'Server printer',
+          statusMode: 'snmp',
+        };
     }
-  },
-  isWebUsbSupported: () => usb.supported,
-  requestPrinterDevice: async () => {
-    if (!usb.request) throw Object.assign(new Error('cancelled'), { code: 'selection-cancelled' });
-    return usb.request();
-  },
-  watchConnectionEvents: (handlers: {
-    connect: (device?: unknown) => void;
-    disconnect: (device?: unknown) => void;
-  }) => {
-    usb.watchers = handlers;
-    return () => {
-      usb.stopWatching += 1;
-    };
-  },
-  suggestLabels: () => tables.matched,
-}));
+  }
+  return {
+    BridgeTransport,
+    listBridgePrinters: vi.fn(async (options: Record<string, unknown>) => {
+      bridge.listCalls.push(options);
+      if (bridge.listError) throw bridge.listError;
+      return bridge.printers;
+    }),
+    getPairedPrinterDevices: vi.fn(async () =>
+      usb.paired.map((core) => (core as { device: unknown }).device),
+    ),
+    BrotherQLPrinterCore: class {
+      static getPairedDevices = vi.fn(async () => usb.paired);
+      constructor(
+        readonly device: unknown,
+        readonly options: { model: string; diagnostics?: Tracer },
+      ) {
+        // A core on a transport has no USB device — the library's `device`
+        // getter is undefined there — and opening it is the bridge's to refuse.
+        const viaBridge = device instanceof BridgeTransport;
+        Object.assign(this, makeDevice(), {
+          model: options.model,
+          device: viaBridge ? undefined : device,
+          transport: viaBridge ? device : undefined,
+          ...(viaBridge
+            ? {
+                open: vi.fn(async function (this: { opened: boolean }) {
+                  if (bridge.openError) throw bridge.openError;
+                  this.opened = true;
+                }),
+              }
+            : {}),
+        });
+        cores.made.push(this);
+      }
+    },
+    isWebUsbSupported: () => usb.supported,
+    requestPrinterDevice: async () => {
+      if (!usb.request) throw Object.assign(new Error('cancelled'), { code: 'selection-cancelled' });
+      return usb.request();
+    },
+    watchConnectionEvents: (handlers: {
+      connect: (device?: unknown) => void;
+      disconnect: (device?: unknown) => void;
+    }) => {
+      usb.watchers = handlers;
+      return () => {
+        usb.stopWatching += 1;
+      };
+    },
+    suggestLabels: () => tables.matched,
+  };
+});
 vi.mock('@vrwarp/brother-ql-webusb/labels', () => ({
   labelName: (label: { identifier: string; name?: string }) => label.name ?? label.identifier,
   labelsForModel: () => tables.fits,
@@ -340,6 +393,11 @@ beforeEach(() => {
   usb.watchers = null;
   usb.stopWatching = 0;
   cores.made = [];
+  bridge.made = [];
+  bridge.openError = null;
+  bridge.printers = [];
+  bridge.listError = null;
+  bridge.listCalls = [];
   tables.models = [];
   tables.fits = [];
   tables.matched = [];
@@ -2383,7 +2441,7 @@ describe('what the record says, exactly', () => {
    * than a puzzle on a Sunday.
    */
   const BOOT = [
-    'kiosk ready model="QL-810W" label="62x29" discarded=false',
+    'kiosk ready model="QL-810W" label="62x29" connection="usb" discarded=false',
     'usb devices cause="boot" count=1 hasSerial=true vendorId=1273 productId=8347',
     'state ready cause="boot"',
   ];
@@ -2581,7 +2639,7 @@ describe('what the record says, exactly', () => {
 
     await printing.ready();
     expect(said(printing)).toEqual([
-      'kiosk ready model="QL-810W" label="62x29" discarded=false',
+      'kiosk ready model="QL-810W" label="62x29" connection="usb" discarded=false',
       'usb devices cause="boot" count=0',
       'state unpaired cause="boot"',
     ]);
@@ -3195,5 +3253,341 @@ describe('asking the printer what it is, at its edges', () => {
     } finally {
       Object.defineProperty(tables, 'fits', { configurable: true, writable: true, value: [] });
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The print server                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The second way to reach a printer: through the print server, over the
+ * library's bridge client. What is under test is what the module decides —
+ * which connection to make, on what terms, what to do when it fails, and what
+ * a volunteer is told — not the protocol, which the library's own suite owns.
+ * See docs/wifi-printing.md.
+ */
+describe('the print server', () => {
+  const SERVER = { url: 'wss://print.church.example/ws', token: 'bql_kiosk', rev: 1700000000000 };
+  const SHIPPING = { kind: 'server', printerId: 'p1', printerName: 'Shipping desk' } as const;
+
+  function printServer(server: typeof SERVER | null = SERVER) {
+    if (server) window.localStorage.setItem(KIOSK_KEYS.printServer, JSON.stringify(server));
+    else window.localStorage.removeItem(KIOSK_KEYS.printServer);
+  }
+
+  function configuredForServer(model = 'QL-810W', label = '62x29') {
+    window.localStorage.setItem(
+      KIOSK_KEYS.printer,
+      JSON.stringify({ model, label, connection: SHIPPING }),
+    );
+  }
+
+  const LISTED = [
+    { id: 'p1', name: 'Shipping desk', host: '10.0.0.5', port: 9100, model: 'QL-810W', statusMode: 'snmp', busy: false },
+    { id: 'p2', name: 'Old QL-700', host: '10.0.0.6', port: 9100, statusMode: 'none', busy: false },
+  ];
+
+  it('opens the server’s printer on a lease, named for the server’s log, and never asks the bus', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(bridge.made).toHaveLength(1);
+    expect(bridge.made[0]!.options).toMatchObject({
+      url: SERVER.url,
+      token: SERVER.token,
+      printerId: 'p1',
+      lease: { idleMs: printing.LEASE_IDLE_MS, busyTimeoutMs: printing.BUSY_WAIT_MS },
+    });
+    expect(bridge.made[0]!.options.clientName).toMatch(/^kiosk-[A-Za-z0-9_-]{8}$/);
+    expect(printing.currentState()).toEqual({
+      kind: 'ready',
+      config: { model: 'QL-810W', label: '62x29', connection: SHIPPING },
+    });
+    expect(await pairedDevicesCalls()).toHaveLength(0);
+  });
+
+  it('needs no WebUSB', async () => {
+    usb.supported = false;
+    printServer();
+    configuredForServer();
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(printing.currentState().kind).toBe('ready');
+  });
+
+  it('says which half failed', async () => {
+    printServer();
+    configuredForServer();
+    const cases: [unknown, Printing.PrinterNoteKey, Printing.PrinterNoteKey | null][] = [
+      [{ code: 'bridge', reason: 'connection' }, 'troublePrintServerUnreachable', 'advicePrintServer'],
+      [{ code: 'bridge', reason: 'timeout' }, 'troublePrintServerUnreachable', 'advicePrintServer'],
+      [{ code: 'bridge', reason: 'unauthorized' }, 'troublePrintServerRefusedKey', 'adviceKeyInSettings'],
+      [{ code: 'bridge', reason: 'printer-busy' }, 'troublePrinterInUse', 'adviceTryAgain'],
+      [{ code: 'bridge', reason: 'unknown-printer' }, 'troublePrinterNotOnServer', 'adviceCheckPrintServer'],
+      [{ code: 'bridge', reason: 'connect-failed' }, 'troublePrintServerCannotReachPrinter', 'advicePrinterPowerWifi'],
+      [{ code: 'disconnected' }, 'troublePrintServerLost', 'advicePrintServer'],
+    ];
+    for (const [error, message, advice] of cases) {
+      bridge.openError = error;
+      const printing = await load();
+      await printing.ready();
+      expect(printing.currentState(), JSON.stringify(error)).toEqual({
+        kind: 'trouble',
+        message: { key: message },
+        advice: advice ? { key: advice } : null,
+      });
+    }
+  });
+
+  it('repeats what an unfamiliar refusal said', async () => {
+    printServer();
+    configuredForServer();
+    bridge.openError = Object.assign(new Error('Printer is on fire.'), { code: 'bridge', reason: 'something-new' });
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: { key: 'troublePrintServerProblem' },
+      advice: { text: 'Printer is on fire.' },
+    });
+  });
+
+  it('falls back to a USB printer when the server cannot be reached, and says so without a flicker', async () => {
+    printServer();
+    configuredForServer();
+    bridge.openError = { code: 'bridge', reason: 'connection' };
+    const device = makeDevice();
+    usb.paired = [device];
+    const printing = await load();
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(state.kind));
+
+    await printing.ready();
+
+    expect(device.open).toHaveBeenCalledTimes(1);
+    expect(printing.currentState()).toEqual({
+      kind: 'ready',
+      config: { model: 'QL-810W', label: '62x29', connection: SHIPPING },
+      fallback: 'usb',
+    });
+    expect(seen).not.toContain('trouble');
+    // Losing the fallback printer is losing a cable, whatever the config says.
+    queue.options.onFailure?.({ code: 'disconnected' }, JOB);
+    expect(printing.currentState()).toMatchObject({ message: { key: 'troubleUnplugged' } });
+  });
+
+  it('says so when Tally no longer has a print server', async () => {
+    printServer(null);
+    configuredForServer();
+    const printing = await load();
+
+    await printing.ready();
+
+    expect(bridge.made).toHaveLength(0);
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: { key: 'troubleNoPrintServer' },
+      advice: { key: 'adviceSetPrintServer' },
+    });
+  });
+
+  it('reconnects on the ladder when the socket drops, without asking the bus', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const first = cores.made[0] as { emit: (event: string) => void };
+    const seen: string[] = [];
+    printing.subscribe((state) => seen.push(state.kind));
+
+    first.emit('disconnect');
+    expect(printing.currentState().kind).toBe('ready');
+    await tick(printing.RECOVERY_GRACE_MS);
+
+    expect(bridge.made).toHaveLength(2);
+    expect(printing.currentState()).toMatchObject({ kind: 'ready' });
+    expect(seen).not.toContain('trouble');
+    expect((await listedDevices()).mock.calls).toHaveLength(0);
+  });
+
+  it('keeps trying while the server stays down, and words the wait after the first silent try', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    bridge.openError = { code: 'bridge', reason: 'connection' };
+    (cores.made[0] as { emit: (event: string) => void }).emit('disconnect');
+
+    await tick(printing.RECOVERY_GRACE_MS);
+    expect(bridge.made).toHaveLength(2);
+    expect(printing.currentState().kind).toBe('ready'); // the silent first try
+
+    await tick(printing.RECOVERY_ATTEMPT_MS[1]);
+    expect(bridge.made).toHaveLength(3);
+    expect(printing.currentState()).toMatchObject({ message: { key: 'troublePrintServerUnreachable' } });
+
+    bridge.openError = null;
+    await tick(printing.RECOVERY_ATTEMPT_MS[2]);
+    expect(printing.currentState().kind).toBe('ready');
+  });
+
+  it('a lost label over the server is the server’s to explain', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+
+    queue.options.onFailure?.({ code: 'disconnected' }, JOB);
+
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: { key: 'troublePrintServerLost' },
+      advice: { key: 'advicePrintServer' },
+    });
+  });
+
+  it('ignores a USB device leaving the bus, and checks nothing on it when the page wakes', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+
+    usb.watchers?.disconnect({ vendorId: 1273, productId: 8347, serialNumber: SERIAL });
+    expect(printing.currentState().kind).toBe('ready');
+
+    visibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    visibility('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    await settle();
+
+    expect((await listedDevices()).mock.calls).toHaveLength(0);
+    expect(printing.currentState().kind).toBe('ready');
+  });
+
+  it('lists what the server offers, and which of them the kiosk will take', async () => {
+    printServer();
+    bridge.printers = LISTED;
+    tables.models = ['QL-810W', 'QL-700'];
+    const printing = await load();
+
+    const offered = await printing.listServerPrinters();
+
+    expect(offered).toEqual([
+      { id: 'p1', name: 'Shipping desk', model: 'QL-810W', statusMode: 'snmp', eligible: true },
+      { id: 'p2', name: 'Old QL-700', model: null, statusMode: 'none', eligible: false },
+    ]);
+    expect(bridge.listCalls[0]).toMatchObject({ url: SERVER.url, token: SERVER.token });
+    expect(bridge.listCalls[0]!.clientName).toMatch(/^kiosk-/);
+  });
+
+  it('has nothing to list without a print server, and says why', async () => {
+    printServer(null);
+    const printing = await load();
+
+    await expect(printing.listServerPrinters()).rejects.toMatchObject({ code: 'no-print-server' });
+    expect(printing.describeFailure({ code: 'no-print-server' })).toEqual({
+      message: { key: 'troubleNoPrintServer' },
+      advice: { key: 'adviceSetPrintServer' },
+    });
+  });
+
+  it('pairs a server printer: writes the connection, then reads the roll off it as USB does', async () => {
+    printServer();
+    bridge.printers = LISTED;
+    tables.models = ['QL-810W'];
+    tables.fits = [{ identifier: '62x29', name: '62mm x 29mm' }];
+    tables.matched = tables.fits;
+    const printing = await load();
+    await printing.ready(); // idle: nothing configured yet
+    const [shipping] = await printing.listServerPrinters();
+
+    const detection = await printing.pairServerPrinter(shipping!, {
+      model: DEFAULT_PRINTER_MODEL,
+      label: DEFAULT_PRINTER_LABEL,
+    });
+
+    expect(printing.readPrinterConfig()).toEqual({
+      model: 'QL-810W',
+      label: '62x29',
+      connection: SHIPPING,
+    });
+    expect(printing.currentState()).toMatchObject({ kind: 'ready', cause: 'press' });
+    expect(detection).toMatchObject({ modelFromPrinter: true, config: { connection: SHIPPING } });
+    expect(queue.idle).toHaveBeenCalled();
+    expect((cores.made[0] as { queryStatus: unknown }).queryStatus).toHaveBeenCalled();
+  });
+
+  it('refuses a printer with no status path', async () => {
+    printServer();
+    bridge.printers = LISTED;
+    const printing = await load();
+    const [, old] = await printing.listServerPrinters();
+
+    expect(await printing.pairServerPrinter(old!, { model: 'QL-700', label: '62x29' })).toBeNull();
+
+    expect(printing.readPrinterConfig()).toBeNull();
+    expect(bridge.made).toHaveLength(0);
+    expect(printing.currentState()).toEqual({
+      kind: 'trouble',
+      message: { key: 'troublePrinterNoStatus' },
+      advice: null,
+    });
+  });
+
+  it('keeps the connection when the roll changes, and when the server has no model to offer', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+
+    await printing.configure({ model: 'QL-810W', label: '62' });
+    expect(printing.readPrinterConfig()?.connection).toEqual(SHIPPING);
+
+    // `checkPrinter` with a server record that names no model keeps what is set.
+    tables.models = ['QL-810W'];
+    tables.fits = [{ identifier: '62', name: '62mm' }];
+    tables.matched = tables.fits;
+    const detection = await printing.checkPrinter();
+    expect(detection).toMatchObject({ modelFromPrinter: false, config: { model: 'QL-810W', label: '62' } });
+    expect(printing.readPrinterConfig()?.connection).toEqual(SHIPPING);
+  });
+
+  it('reconnects with what Tally now holds when the print server changes', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+
+    printServer({ ...SERVER, token: 'bql_rotated', rev: SERVER.rev + 1 });
+    await printing.printServerChanged();
+    expect(bridge.made).toHaveLength(2);
+    expect(bridge.made[1]!.options.token).toBe('bql_rotated');
+    expect(printing.currentState().kind).toBe('ready');
+
+    printServer(null);
+    await printing.printServerChanged();
+    expect(printing.currentState()).toMatchObject({ message: { key: 'troubleNoPrintServer' } });
+  });
+
+  it('is nothing to a USB kiosk', async () => {
+    usb.paired = [makeDevice()];
+    configured();
+    const printing = await load();
+    await printing.ready();
+
+    printServer();
+    await printing.printServerChanged();
+
+    expect(bridge.made).toHaveLength(0);
+    expect(printing.currentState()).toEqual({ kind: 'ready', config: { model: 'QL-810W', label: '62x29' } });
   });
 });
