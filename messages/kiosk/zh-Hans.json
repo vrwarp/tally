@@ -217,6 +217,8 @@
     "connectDifferent": "连接另一台打印机",
     "usePrintServer": "使用打印服务器",
     "usePrintServerHint": "Tally 有打印服务器，这台签到台可以通过 Wi‑Fi 打印，不用插任何线。它会列出它知道的打印机。",
+    "compressLabels": "压缩标签",
+    "compressLabelsHint": "每张标签以几 KB 而不是几十 KB 发给打印机，通过 Wi‑Fi 更快。只有在标签打印出错时才关闭。",
     "serverAsking": "正在询问打印服务器…",
     "serverPick": "这台签到台应该用哪台打印机？",
     "serverNone": "打印服务器上没有登记任何打印机。请先在它的页面上添加一台，再试一次。",

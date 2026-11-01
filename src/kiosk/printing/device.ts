@@ -87,6 +87,19 @@ export interface PrinterConfig {
    * valid; written only for a print server printer. See {@link connectionOf}.
    */
   connection?: PrinterConnection;
+  /**
+   * Whether labels go out with their rows PackBits-compressed, where the
+   * model takes it (see `compression.ts`). Absent means yes — it is what every
+   * kiosk does unless somebody turned it off on the printer screen, which is
+   * the one escape hatch for a printer that turns out to mishandle it. Written
+   * only as `false`, so the stored shape stays what it was for everyone else.
+   */
+  compress?: boolean;
+}
+
+/** Whether a config asks for compressed rows: yes unless it says no. */
+export function compressionOf(config: PrinterConfig | null | undefined): boolean {
+  return config?.compress !== false;
 }
 
 /** The connection a config means, with the absent case spelled out. */
@@ -156,6 +169,8 @@ export function readPrinterConfig(): PrinterConfig | null {
     // no printer: the kiosk still has a model and a roll, and the printer
     // screen is where a volunteer picks the server's printer again.
     ...(server ? { connection: server } : {}),
+    // Only an explicit no survives; anything else is the default, which is yes.
+    ...(stored.compress === false ? { compress: false } : {}),
   };
 }
 
@@ -178,6 +193,7 @@ export function writePrinterConfig(config: PrinterConfig): void {
      * the next morning's reload, on every managed tablet in the building.
      */
     ...(config.viaPolicy === true ? { viaPolicy: true } : {}),
+    ...(config.compress === false ? { compress: false } : {}),
     // USB is the absence of the field, so a kiosk that never met a print
     // server stores exactly what it always has.
     ...(config.connection?.kind === 'server' ? { connection: config.connection } : {}),

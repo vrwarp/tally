@@ -70,10 +70,12 @@ import {
 } from './allergy';
 import { matchLabels, modelFromProductName, preferredLabel } from './detect';
 import { tokenValuesFor } from './tokens';
+import { compressFor } from './compression';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
   clearPrinterConfig,
+  compressionOf,
   connectionOf,
   readPrinterConfig,
   writePrinterConfig,
@@ -88,7 +90,13 @@ import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
-export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, connectionOf, readPrinterConfig } from './device';
+export {
+  DEFAULT_PRINTER_LABEL,
+  DEFAULT_PRINTER_MODEL,
+  compressionOf,
+  connectionOf,
+  readPrinterConfig,
+} from './device';
 export type { PrinterConfig, PrinterConnection } from './device';
 export { readPrintServer } from '../storage';
 
@@ -622,6 +630,7 @@ function rasterInWorker(config: PrinterConfig, job: LabelJob): Promise<RasterRes
       id,
       model: config.model,
       label: config.label,
+      compress: compressionOf(config) && compressFor(config.model),
       template: job.template,
       values: job.values,
     };
@@ -685,6 +694,33 @@ export const LEASE_IDLE_MS = 3_000;
  * on top. Thirty seconds was the product owner's number.
  */
 export const BUSY_WAIT_MS = 30_000;
+
+/**
+ * How long a print server label may wait for the printer to confirm it.
+ *
+ * The library's own allowance is ten seconds of status silence, which is right
+ * for a USB printer that volunteers its packets. A server printer is polled
+ * over SNMP, and on the first Sunday's Wi-Fi those reads were lost in bursts
+ * of more than ten seconds while the printer, which had every byte, printed:
+ * the kiosk called the label failed, owed it, and the volunteer printed it
+ * again. Thirty seconds is longer than any burst the bundle showed and still
+ * short enough that a printer which has really stopped is reported before the
+ * family has left the glass.
+ */
+export const SERVER_STATUS_TIMEOUT_MS = 30_000;
+
+/**
+ * How long a printer the server could not reach is taken at its word.
+ *
+ * Each attempt to open an unreachable printer costs the server its connect
+ * timeout — three to five seconds on that Sunday — and a batch of owed tags
+ * made that attempt once per tag, so nine tags kept the kiosk at it for a
+ * minute before it could say the printer was gone. Within this window a label
+ * is refused outright with the same failure, so the batch fails in one breath
+ * and is owed again at once. A press on the printer screen clears it, because
+ * the person pressing is asking for a real look.
+ */
+export const UNREACHABLE_HOLD_MS = 10_000;
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -1226,6 +1262,9 @@ async function reopen(cause: string, options: { quiet?: boolean } = {}): Promise
    * found that: Look again after a jam waited on a boot that had finished
    * hours before.
    */
+  // Somebody is looking again — a press, a label, the ladder: whatever the
+  // server said a moment ago, this is a fresh question.
+  unreachable = null;
   const attempt = (async () => {
     try {
       if (printer?.opened) {
@@ -1318,6 +1357,18 @@ async function reopenServer(
  * printer itself is held only while labels flow — a second kiosk in the room
  * is never locked out by an idle one. See `LEASE_IDLE_MS` and `BUSY_WAIT_MS`.
  */
+/**
+ * The server's last word that it could not reach the printer, and until when it
+ * is believed. See `UNREACHABLE_HOLD_MS`.
+ */
+let unreachable: { untilMs: number; error: unknown } | null = null;
+
+/** Whether a failure is the server saying the printer itself is out of reach. */
+function printerOutOfReach(error: unknown): boolean {
+  const failure = error as { code?: unknown; reason?: unknown } | null;
+  return failure?.code === 'bridge' && (failure.reason === 'connect-failed' || failure.reason === 'write-failed');
+}
+
 function serverCore(
   active: PrinterConfig,
   connection: Extract<PrinterConnection, { kind: 'server' }>,
@@ -1464,6 +1515,8 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
     // And how it is reached: changing the roll on the print server's printer
     // must not quietly turn it back into a USB one.
     ...(config?.connection && !next.connection ? { connection: config.connection } : {}),
+    // And whether its rows are compressed, which only the switch below changes.
+    ...(config?.compress === false && next.compress === undefined ? { compress: false } : {}),
   };
   writePrinterConfig(carried);
   config = carried;
@@ -1471,6 +1524,24 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
   log.record('kiosk', 'configure', { model: next.model, label: next.label });
   await reopen('configure');
   return state;
+}
+
+/**
+ * Switch the compression of label rows on or off, without touching the printer.
+ *
+ * On is the default and the right answer; the switch exists for a printer that
+ * turns out to print compressed rows wrong, so that a Sunday is not lost to
+ * finding out. The change is kept with the config and reaches the next label
+ * rasterised. Returns the config as it now stands, for the screen to hold.
+ */
+export function setCompression(enabled: boolean): PrinterConfig | null {
+  if (!config) return null;
+  const { compress: _was, ...rest } = config;
+  const next: PrinterConfig = enabled ? rest : { ...rest, compress: false };
+  writePrinterConfig(next);
+  config = next;
+  log.record('kiosk', 'compression', { enabled });
+  return next;
 }
 
 /**
@@ -1766,13 +1837,31 @@ const queue = createLabelQueue({
       recording.push({ bytes: result.job.length, pageCount: result.pageCount });
       return;
     }
+    // The server said a moment ago that the printer is out of reach; the rest
+    // of the batch is told the same without another wait. See `UNREACHABLE_HOLD_MS`.
+    if (unreachable && Date.now() < unreachable.untilMs) {
+      log.record('kiosk', 'label-refused', { cause: 'unreachable' });
+      throw unreachable.error;
+    }
+    unreachable = null;
     // A label arriving while the printer is down should reopen it rather than
     // fail: the device may have been replugged without a connect event landing.
     if (!printer?.opened) await reopen('label');
     if (!printer?.opened) {
       throw Object.assign(new Error('No printer is connected.'), { code: 'no-printer' });
     }
-    await printer.sendRaw(result.job, { pageCount: result.pageCount });
+    const viaServer = connectionOf(config).kind === 'server' && printer.device === undefined;
+    try {
+      await printer.sendRaw(result.job, {
+        pageCount: result.pageCount,
+        ...(viaServer ? { statusTimeoutMs: SERVER_STATUS_TIMEOUT_MS } : {}),
+      });
+    } catch (error) {
+      if (viaServer && printerOutOfReach(error)) {
+        unreachable = { untilMs: Date.now() + UNREACHABLE_HOLD_MS, error };
+      }
+      throw error;
+    }
     if (state.kind === 'trouble' && config) setState({ kind: 'ready', config }, 'label-printed');
   },
   onPrinted: (job) => {

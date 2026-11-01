@@ -192,7 +192,11 @@ vi.mock('@vrwarp/brother-ql-webusb/labels', () => ({
   labelName: (label: { identifier: string; name?: string }) => label.name ?? label.identifier,
   labelsForModel: () => tables.fits,
 }));
-vi.mock('@vrwarp/brother-ql-webusb/models', () => ({ modelIdentifiers: () => tables.models }));
+vi.mock('@vrwarp/brother-ql-webusb/models', () => ({
+  modelIdentifiers: () => tables.models,
+  // The QL-500 is the one model in the table without PackBits.
+  resolveModel: (model: string) => ({ compression: model !== 'QL-500' }),
+}));
 
 /* -------------------------------------------------------------------------- */
 /* The worker, the queue, the allergy lookup                                   */
@@ -1250,6 +1254,41 @@ describe('rastering', () => {
 
     expect(result.pageCount).toBe(1);
     expect(worker.posted[0]).toMatchObject({ model: 'QL-800', label: '62' });
+  });
+
+  it('asks the worker for compressed rows, unless the kiosk was told not to or the model cannot', async () => {
+    configured('QL-800', '62');
+    usb.paired = [makeDevice()];
+    const printing = await load();
+    await printing.ready();
+    worker.reply = (request) => ({ id: request.id, ok: true, job: new Uint8Array(4), pageCount: 1 });
+
+    await queue.options.raster(JOB);
+    expect(worker.posted[0]).toMatchObject({ compress: true });
+
+    // The switch on the printer screen, remembered with the config.
+    expect(printing.setCompression(false)).toEqual({ model: 'QL-800', label: '62', compress: false });
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer)!)).toEqual({ model: 'QL-800', label: '62', compress: false });
+    await queue.options.raster(JOB);
+    expect(worker.posted[1]).toMatchObject({ compress: false });
+    expect(said(printing)).toContain('kiosk compression enabled=false');
+
+    // Changing the roll keeps the answer; switching back on drops the field.
+    await printing.configure({ model: 'QL-800', label: '62x29' });
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer)!)).toEqual({ model: 'QL-800', label: '62x29', compress: false });
+    expect(printing.setCompression(true)).toEqual({ model: 'QL-800', label: '62x29' });
+    await queue.options.raster(JOB);
+    expect(worker.posted[2]).toMatchObject({ compress: true });
+
+    // A model without PackBits never gets it, whatever the switch says.
+    await printing.configure({ model: 'QL-500', label: '62' });
+    await queue.options.raster(JOB);
+    expect(worker.posted[3]).toMatchObject({ model: 'QL-500', compress: false });
+  });
+
+  it('has nothing to switch on a kiosk with no printer', async () => {
+    const printing = await load();
+    expect(printing.setCompression(false)).toBeNull();
   });
 
   it('starts the worker once and keeps it', async () => {
@@ -3412,6 +3451,81 @@ describe('the print server', () => {
     expect(said(printing)).toContain(
       'kiosk open-failed cause="boot" connection="server" error="Error" code="bridge" reason="something-new" message="Printer is on fire."',
     );
+  });
+
+  it('gives a server label thirty seconds for its confirmation, and a USB label the library’s own', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+
+    await queue.options.send(LABEL);
+
+    expect(core.sendRaw).toHaveBeenCalledWith(LABEL.job, {
+      pageCount: 1,
+      statusTimeoutMs: printing.SERVER_STATUS_TIMEOUT_MS,
+    });
+    expect(printing.SERVER_STATUS_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it('refuses the rest of a batch outright once the server says the printer is out of reach', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    const outOfReach = Object.assign(new Error('Could not connect to 10.0.0.5:9100: EHOSTUNREACH.'), {
+      code: 'bridge',
+      reason: 'connect-failed',
+    });
+    core.sendRaw.mockRejectedValueOnce(outOfReach);
+
+    // The first tag of the batch finds out; the next eight are told at once.
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    expect(core.sendRaw).toHaveBeenCalledTimes(1);
+    expect(said(printing)).toContain('kiosk label-refused cause="unreachable"');
+    // And worded as the server's failure to reach the printer, as before.
+    expect(printing.describeFailure(outOfReach)).toEqual({
+      message: { key: 'troublePrintServerCannotReachPrinter' },
+      advice: { key: 'advicePrinterPowerWifi' },
+    });
+
+    // The hold is short: a label after it asks the server again.
+    await tick(printing.UNREACHABLE_HOLD_MS);
+    await queue.options.send(LABEL);
+    expect(core.sendRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('a press clears the hold: Look again is a real look', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    core.sendRaw.mockRejectedValueOnce(Object.assign(new Error('nope'), { code: 'bridge', reason: 'connect-failed' }));
+    await expect(queue.options.send(LABEL)).rejects.toBeTruthy();
+
+    // Still within the hold, but somebody pressed: the next label is a real attempt.
+    await printing.ready(printing.LOOK_AGAIN);
+    await queue.options.send(LABEL);
+    const after = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    expect(after.sendRaw).toHaveBeenLastCalledWith(LABEL.job, expect.objectContaining({ pageCount: 1 }));
+    expect(cores.made.reduce((n, made) => n + (made as { sendRaw: ReturnType<typeof vi.fn> }).sendRaw.mock.calls.length, 0)).toBe(2);
+  });
+
+  it('holds only on the server’s word that the printer is out of reach', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    core.sendRaw.mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'bridge', reason: 'printer-busy' }));
+    await expect(queue.options.send(LABEL)).rejects.toMatchObject({ reason: 'printer-busy' });
+    await queue.options.send(LABEL);
+    expect(core.sendRaw).toHaveBeenCalledTimes(2);
   });
 
   it('a label with no printer to go to is the server’s failure, not a cable', async () => {
