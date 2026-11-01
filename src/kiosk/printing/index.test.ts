@@ -192,7 +192,11 @@ vi.mock('@vrwarp/brother-ql-webusb/labels', () => ({
   labelName: (label: { identifier: string; name?: string }) => label.name ?? label.identifier,
   labelsForModel: () => tables.fits,
 }));
-vi.mock('@vrwarp/brother-ql-webusb/models', () => ({ modelIdentifiers: () => tables.models }));
+vi.mock('@vrwarp/brother-ql-webusb/models', () => ({
+  modelIdentifiers: () => tables.models,
+  // The QL-500 is the one model in the table without PackBits.
+  resolveModel: (model: string) => ({ compression: model !== 'QL-500' }),
+}));
 
 /* -------------------------------------------------------------------------- */
 /* The worker, the queue, the allergy lookup                                   */
@@ -1250,6 +1254,41 @@ describe('rastering', () => {
 
     expect(result.pageCount).toBe(1);
     expect(worker.posted[0]).toMatchObject({ model: 'QL-800', label: '62' });
+  });
+
+  it('asks the worker for compressed rows, unless the kiosk was told not to or the model cannot', async () => {
+    configured('QL-800', '62');
+    usb.paired = [makeDevice()];
+    const printing = await load();
+    await printing.ready();
+    worker.reply = (request) => ({ id: request.id, ok: true, job: new Uint8Array(4), pageCount: 1 });
+
+    await queue.options.raster(JOB);
+    expect(worker.posted[0]).toMatchObject({ compress: true });
+
+    // The switch on the printer screen, remembered with the config.
+    expect(printing.setCompression(false)).toEqual({ model: 'QL-800', label: '62', compress: false });
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer)!)).toEqual({ model: 'QL-800', label: '62', compress: false });
+    await queue.options.raster(JOB);
+    expect(worker.posted[1]).toMatchObject({ compress: false });
+    expect(said(printing)).toContain('kiosk compression enabled=false');
+
+    // Changing the roll keeps the answer; switching back on drops the field.
+    await printing.configure({ model: 'QL-800', label: '62x29' });
+    expect(JSON.parse(window.localStorage.getItem(KIOSK_KEYS.printer)!)).toEqual({ model: 'QL-800', label: '62x29', compress: false });
+    expect(printing.setCompression(true)).toEqual({ model: 'QL-800', label: '62x29' });
+    await queue.options.raster(JOB);
+    expect(worker.posted[2]).toMatchObject({ compress: true });
+
+    // A model without PackBits never gets it, whatever the switch says.
+    await printing.configure({ model: 'QL-500', label: '62' });
+    await queue.options.raster(JOB);
+    expect(worker.posted[3]).toMatchObject({ model: 'QL-500', compress: false });
+  });
+
+  it('has nothing to switch on a kiosk with no printer', async () => {
+    const printing = await load();
+    expect(printing.setCompression(false)).toBeNull();
   });
 
   it('starts the worker once and keeps it', async () => {

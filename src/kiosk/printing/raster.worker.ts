@@ -22,7 +22,6 @@ import { createJob, expectedImageSize } from '@vrwarp/brother-ql-webusb/convert'
 import { isEndless, resolveLabel } from '@vrwarp/brother-ql-webusb/labels';
 import { labelBoxFor } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
-import { compressFor } from './compression';
 import { drawLabel } from './draw';
 
 export interface RasterRequest {
@@ -30,6 +29,8 @@ export interface RasterRequest {
   id: number;
   model: string;
   label: string;
+  /** Whether to PackBits-compress the rows; decided by the controller (see `compression.ts`). */
+  compress: boolean;
   template: LabelTemplate;
   values: LabelTokenValues;
 }
@@ -83,16 +84,16 @@ function build(request: RasterRequest): { job: Uint8Array; pageCount: number } {
    * dither and red are left off. Text thresholds crisper than it dithers, and
    * each flag left alone keeps a whole per-pixel pass out of the path:
    * Floyd-Steinberg, and the HSV conversion behind the red/black separation.
-   * Compression is on where the printer takes it — see `compression.ts`: a
-   * name tag is mostly white, and over the print server's Wi-Fi the bytes are
-   * the slow part.
+   * Compression is the controller's call — on where the printer takes it and
+   * nobody has switched it off; see `compression.ts`. A name tag is mostly
+   * white, and over the print server's Wi-Fi the bytes are the slow part.
    */
   const pageCount = Math.max(1, request.template.copies);
   const pages = Array.from({ length: pageCount }, () => image);
 
   const job = createJob(request.model, pages, request.label, {
     dither: false,
-    compress: compressFor(request.model),
+    compress: request.compress,
     red: false,
   });
 

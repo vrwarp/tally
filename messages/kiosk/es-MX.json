@@ -217,6 +217,8 @@
     "connectDifferent": "Conectar una impresora distinta",
     "usePrintServer": "Usar el servidor de impresión",
     "usePrintServerHint": "Tally tiene un servidor de impresión, así que este kiosco puede imprimir por Wi‑Fi sin nada conectado. Muestra las impresoras que conoce.",
+    "compressLabels": "Comprimir etiquetas",
+    "compressLabelsHint": "Cada etiqueta llega a la impresora en unos pocos kilobytes en vez de decenas, lo cual es más rápido por Wi‑Fi. Desactívalo solo si las etiquetas salen mal.",
     "serverAsking": "Preguntando al servidor de impresión…",
     "serverPick": "¿Qué impresora debe usar este kiosco?",
     "serverNone": "El servidor de impresión no tiene impresoras registradas. Agregue una en su página y vuelva a intentarlo.",

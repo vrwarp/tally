@@ -148,7 +148,10 @@ SNMP and a burst of lost reads was marking printed labels failed. And once the
 server has said the printer is **out of reach**, every label for the next ten
 seconds is refused at once rather than each waiting out the server's connect
 timeout, so a batch of owed tags fails in one breath and is owed again; a
-press on the printer screen asks afresh. The tablet itself still has to stay
+press on the printer screen asks afresh. Compression has a switch — **Compress
+labels**, in the printer screen's settings fold, on by default and remembered
+by the kiosk — in case a printer turns out to mishandle compressed rows; turn
+it off there and the next label goes out raw. The tablet itself still has to stay
 awake and on the Wi-Fi — a kiosk that sleeps between services cannot notice
 the printer has gone until the next family arrives; see
 `tablet-management.md` on keeping the device on while plugged in.

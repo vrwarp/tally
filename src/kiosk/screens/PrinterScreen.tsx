@@ -457,6 +457,11 @@ export function PrinterScreen({
    */
   const [rollAnswered, setRollAnswered] = useState(false);
   /**
+   * Whether labels go out compressed — on unless somebody here said no. Held
+   * by the screen so the box answers at once; the module keeps the truth.
+   */
+  const [compress, setCompress] = useState(printing.compressionOf(config));
+  /**
    * What pressing **Use the print server** has come to.
    *
    * The press asks the server which printers it has and lists them as rows,
@@ -663,6 +668,17 @@ export function PrinterScreen({
     setRollAnswered(true);
     setLabel(nextLabel);
     void apply({ model, label: nextLabel });
+  };
+
+  /**
+   * The escape hatch: a printer that prints compressed rows wrong gets them
+   * raw from the next label on, and the kiosk remembers.
+   */
+  const onCompressChange = (enabled: boolean) => {
+    forget();
+    setCompress(enabled);
+    const next = printing.setCompression(enabled);
+    if (next) onConfigChange?.(next);
   };
 
   /**
@@ -1410,6 +1426,19 @@ export function PrinterScreen({
                     ))}
                   </select>
                   <span className="text-xs text-ink-400 tall:text-sm">{t('loadedLabelHint')}</span>
+                </label>
+
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={compress}
+                    onChange={(event) => onCompressChange(event.target.checked)}
+                    className="mt-1 h-6 w-6 shrink-0 accent-accent-500"
+                  />
+                  <span className="flex flex-col gap-1">
+                    <span className="text-base text-ink-100 tall:text-lg">{t('compressLabels')}</span>
+                    <span className="text-xs text-ink-400 tall:text-sm">{t('compressLabelsHint')}</span>
+                  </span>
                 </label>
 
                 {detection && detection.status && detection.status.errors.length > 0 && (

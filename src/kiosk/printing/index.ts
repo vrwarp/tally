@@ -70,10 +70,12 @@ import {
 } from './allergy';
 import { matchLabels, modelFromProductName, preferredLabel } from './detect';
 import { tokenValuesFor } from './tokens';
+import { compressFor } from './compression';
 import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
   clearPrinterConfig,
+  compressionOf,
   connectionOf,
   readPrinterConfig,
   writePrinterConfig,
@@ -88,7 +90,13 @@ import type { GradeStrings } from '@/lib/grades';
 import RasterWorker from './raster.worker?worker';
 import type { RasterReply, RasterRequest } from './raster.worker';
 
-export { DEFAULT_PRINTER_LABEL, DEFAULT_PRINTER_MODEL, connectionOf, readPrinterConfig } from './device';
+export {
+  DEFAULT_PRINTER_LABEL,
+  DEFAULT_PRINTER_MODEL,
+  compressionOf,
+  connectionOf,
+  readPrinterConfig,
+} from './device';
 export type { PrinterConfig, PrinterConnection } from './device';
 export { readPrintServer } from '../storage';
 
@@ -622,6 +630,7 @@ function rasterInWorker(config: PrinterConfig, job: LabelJob): Promise<RasterRes
       id,
       model: config.model,
       label: config.label,
+      compress: compressionOf(config) && compressFor(config.model),
       template: job.template,
       values: job.values,
     };
@@ -1506,6 +1515,8 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
     // And how it is reached: changing the roll on the print server's printer
     // must not quietly turn it back into a USB one.
     ...(config?.connection && !next.connection ? { connection: config.connection } : {}),
+    // And whether its rows are compressed, which only the switch below changes.
+    ...(config?.compress === false && next.compress === undefined ? { compress: false } : {}),
   };
   writePrinterConfig(carried);
   config = carried;
@@ -1513,6 +1524,24 @@ export async function configure(next: PrinterConfig): Promise<PrinterState> {
   log.record('kiosk', 'configure', { model: next.model, label: next.label });
   await reopen('configure');
   return state;
+}
+
+/**
+ * Switch the compression of label rows on or off, without touching the printer.
+ *
+ * On is the default and the right answer; the switch exists for a printer that
+ * turns out to print compressed rows wrong, so that a Sunday is not lost to
+ * finding out. The change is kept with the config and reaches the next label
+ * rasterised. Returns the config as it now stands, for the screen to hold.
+ */
+export function setCompression(enabled: boolean): PrinterConfig | null {
+  if (!config) return null;
+  const { compress: _was, ...rest } = config;
+  const next: PrinterConfig = enabled ? rest : { ...rest, compress: false };
+  writePrinterConfig(next);
+  config = next;
+  log.record('kiosk', 'compression', { enabled });
+  return next;
 }
 
 /**

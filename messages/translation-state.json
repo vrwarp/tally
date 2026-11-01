@@ -15049,6 +15049,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.compressLabels": {
+    "source": "Compress labels",
+    "context": "Checkbox label in the printer screen's settings fold: whether label rows are sent PackBits-compressed. On by default.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.compressLabelsHint": {
+    "source": "Each label goes to the printer as a few kilobytes instead of tens, which is quicker over Wi‑Fi. Turn it off only if labels come out wrong.",
+    "context": "Sentence under that checkbox; the switch is an escape hatch for a printer that mishandles compressed rows.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Printer.serverAsking": {
     "source": "Asking the print server…",
     "context": "Status while the server is asked which printers it has.",

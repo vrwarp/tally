@@ -81,6 +81,10 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     subscribe: () => () => {},
     currentState: () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } }),
     configure: vi.fn(async () => {}),
+    compressionOf: (config: PrinterConfig | null | undefined) => config?.compress !== false,
+    setCompression: vi.fn((enabled: boolean): PrinterConfig | null =>
+      enabled ? { model: 'QL-810W', label: '62x29' } : { model: 'QL-810W', label: '62x29', compress: false },
+    ),
     pairPrinter: vi.fn(async () => found),
     checkPrinter: vi.fn(async () => found),
     forgetPrinter: vi.fn(async (): Promise<PrinterConfig | null> => null),
@@ -554,6 +558,28 @@ describe('checking a printer that is already connected', () => {
    * second benign check beside the proof is a control with nothing to do.
    */
   const midEvening = { onReprintByName: vi.fn(), gatheringPrints: true };
+
+  it('offers the compression switch, on by default, and tells the module and the app when it changes', async () => {
+    const printing = handleWith(detection());
+    const onConfigChange = vi.fn();
+    mount(printing, { model: 'QL-810W', label: '62x29' }, { ...midEvening, onConfigChange });
+
+    const box = screen.getByRole('checkbox', { name: /Compress labels/ });
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    expect(box).not.toBeChecked();
+    expect(printing.setCompression).toHaveBeenCalledWith(false);
+    expect(onConfigChange).toHaveBeenCalledWith({ model: 'QL-810W', label: '62x29', compress: false });
+
+    fireEvent.click(box);
+    expect(box).toBeChecked();
+    expect(printing.setCompression).toHaveBeenLastCalledWith(true);
+  });
+
+  it('shows the switch off when the kiosk was told no', () => {
+    mount(handleWith(detection()), { model: 'QL-810W', label: '62x29', compress: false }, midEvening);
+    expect(screen.getByRole('checkbox', { name: /Compress labels/ })).not.toBeChecked();
+  });
 
   it('goes down the same path, which is what a changed roll needs', async () => {
     const printing = handleWith(

@@ -2601,6 +2601,8 @@
     "connectDifferent": "Connect a different printer",
     "usePrintServer": "Use the print server",
     "usePrintServerHint": "Tally has a print server, so this kiosk can print over Wi‑Fi with nothing plugged in. It lists the printers it knows.",
+    "compressLabels": "Compress labels",
+    "compressLabelsHint": "Each label goes to the printer as a few kilobytes instead of tens, which is quicker over Wi‑Fi. Turn it off only if labels come out wrong.",
     "serverAsking": "Asking the print server…",
     "serverPick": "Which printer should this kiosk use?",
     "serverNone": "The print server has no printers registered. Add one on its page, then try again.",

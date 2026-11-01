@@ -18,6 +18,7 @@ import {
   DEFAULT_PRINTER_LABEL,
   DEFAULT_PRINTER_MODEL,
   clearPrinterConfig,
+  compressionOf,
   connectionOf,
   hasConfiguredPrinter,
   readPrinterConfig,
@@ -176,6 +177,28 @@ describe('the provenance flags', () => {
 
       expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29' });
     }
+  });
+});
+
+describe('the compression switch', () => {
+  it('is on unless the config says no, and only a no is written', () => {
+    writePrinterConfig({ model: 'QL-810W', label: '62x29' });
+    expect(JSON.parse(stored()!)).toEqual({ model: 'QL-810W', label: '62x29' });
+    expect(compressionOf(readPrinterConfig())).toBe(true);
+    expect(compressionOf(null)).toBe(true);
+
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', compress: true });
+    expect(JSON.parse(stored()!)).toEqual({ model: 'QL-810W', label: '62x29' });
+
+    writePrinterConfig({ model: 'QL-810W', label: '62x29', compress: false });
+    expect(JSON.parse(stored()!)).toEqual({ model: 'QL-810W', label: '62x29', compress: false });
+    expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29', compress: false });
+    expect(compressionOf(readPrinterConfig())).toBe(false);
+  });
+
+  it('reads anything but an explicit no as yes', () => {
+    window.localStorage.setItem(KIOSK_KEYS.printer, JSON.stringify({ model: 'QL-810W', label: '62x29', compress: 'no' }));
+    expect(readPrinterConfig()).toEqual({ model: 'QL-810W', label: '62x29' });
   });
 });
 
