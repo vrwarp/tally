@@ -570,12 +570,16 @@ test.describe('the kiosk', () => {
       await expectLabelCount(kiosk, 1);
 
       const [label] = await recordedLabels(kiosk);
-      // 62x29mm at 300 dpi is 696x271 dots, so a job is tens of kilobytes: a
-      // raster row per dot row plus the QL-800 series' 400-byte preamble. The
-      // bound is loose on purpose — the claim is "a real job", not a byte count
-      // that would break the first time a font renders differently.
+      // 62x29mm at 300 dpi is 696x271 dots: a raster row per dot row plus the
+      // QL-800 series' 400-byte preamble. The rows go out PackBits-compressed
+      // (see `printing/compression.ts`), so a blank label would be under two
+      // kilobytes and one with a name and a grade on it is a few. The bound is
+      // loose on purpose — the claim is "a real job with something drawn on
+      // it", not a byte count that would break the first time a font renders
+      // differently.
       expect(label!.pageCount).toBe(1);
-      expect(label!.bytes).toBeGreaterThan(10_000);
+      expect(label!.bytes).toBeGreaterThan(3_000);
+      expect(label!.bytes).toBeLessThan(40_000);
 
       // Now check the same child out — searched for again, because the tick
       // returns to an empty screen. Handing them back produces no sticker — the
