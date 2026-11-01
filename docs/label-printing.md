@@ -138,6 +138,21 @@ kiosks can share one printer and neither locks the other out. A printer another
 kiosk is using is waited for, for up to thirty seconds, before the label fails
 the ordinary way and is owed.
 
+Three things the first Sunday on the Wi-Fi taught, all in the code now. The
+kiosk sends a server printer its labels **compressed** (PackBits, which the
+QL-800 series takes): a name tag is mostly white, and over a poor link the
+bytes were the slow part — one uncompressed tag took seventeen seconds to
+reach the printer. A server label gets **thirty seconds** for the printer to
+confirm it, not the ten a USB printer gets, because its status is polled over
+SNMP and a burst of lost reads was marking printed labels failed. And once the
+server has said the printer is **out of reach**, every label for the next ten
+seconds is refused at once rather than each waiting out the server's connect
+timeout, so a batch of owed tags fails in one breath and is owed again; a
+press on the printer screen asks afresh. The tablet itself still has to stay
+awake and on the Wi-Fi — a kiosk that sleeps between services cannot notice
+the printer has gone until the next family arrives; see
+`tablet-management.md` on keeping the device on while plugged in.
+
 **When the server cannot be reached** and a USB printer is also plugged into the
 kiosk, the kiosk prints on that one and the state line says so in amber
 (*Printing over USB — the print server could not be reached*). Nothing switches

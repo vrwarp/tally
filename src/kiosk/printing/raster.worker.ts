@@ -22,6 +22,7 @@ import { createJob, expectedImageSize } from '@vrwarp/brother-ql-webusb/convert'
 import { isEndless, resolveLabel } from '@vrwarp/brother-ql-webusb/labels';
 import { labelBoxFor } from '@/lib/labelRender';
 import type { LabelTemplate, LabelTokenValues } from '@/lib/labelTemplate';
+import { compressFor } from './compression';
 import { drawLabel } from './draw';
 
 export interface RasterRequest {
@@ -79,17 +80,19 @@ function build(request: RasterRequest): { job: Uint8Array; pageCount: number } {
    * receives one job and cuts between the copies itself rather than the kiosk
    * sending two and hoping they stay adjacent.
    *
-   * dither, compress and red are all left off. Text thresholds crisper than it
-   * dithers, and each flag left alone keeps a whole per-pixel pass out of the
-   * path: Floyd-Steinberg, PackBits, and the HSV conversion behind the red/black
-   * separation respectively.
+   * dither and red are left off. Text thresholds crisper than it dithers, and
+   * each flag left alone keeps a whole per-pixel pass out of the path:
+   * Floyd-Steinberg, and the HSV conversion behind the red/black separation.
+   * Compression is on where the printer takes it — see `compression.ts`: a
+   * name tag is mostly white, and over the print server's Wi-Fi the bytes are
+   * the slow part.
    */
   const pageCount = Math.max(1, request.template.copies);
   const pages = Array.from({ length: pageCount }, () => image);
 
   const job = createJob(request.model, pages, request.label, {
     dither: false,
-    compress: false,
+    compress: compressFor(request.model),
     red: false,
   });
 

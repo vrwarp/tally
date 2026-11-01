@@ -3414,6 +3414,81 @@ describe('the print server', () => {
     );
   });
 
+  it('gives a server label thirty seconds for its confirmation, and a USB label the library’s own', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+
+    await queue.options.send(LABEL);
+
+    expect(core.sendRaw).toHaveBeenCalledWith(LABEL.job, {
+      pageCount: 1,
+      statusTimeoutMs: printing.SERVER_STATUS_TIMEOUT_MS,
+    });
+    expect(printing.SERVER_STATUS_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it('refuses the rest of a batch outright once the server says the printer is out of reach', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    const outOfReach = Object.assign(new Error('Could not connect to 10.0.0.5:9100: EHOSTUNREACH.'), {
+      code: 'bridge',
+      reason: 'connect-failed',
+    });
+    core.sendRaw.mockRejectedValueOnce(outOfReach);
+
+    // The first tag of the batch finds out; the next eight are told at once.
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    await expect(queue.options.send(LABEL)).rejects.toBe(outOfReach);
+    expect(core.sendRaw).toHaveBeenCalledTimes(1);
+    expect(said(printing)).toContain('kiosk label-refused cause="unreachable"');
+    // And worded as the server's failure to reach the printer, as before.
+    expect(printing.describeFailure(outOfReach)).toEqual({
+      message: { key: 'troublePrintServerCannotReachPrinter' },
+      advice: { key: 'advicePrinterPowerWifi' },
+    });
+
+    // The hold is short: a label after it asks the server again.
+    await tick(printing.UNREACHABLE_HOLD_MS);
+    await queue.options.send(LABEL);
+    expect(core.sendRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('a press clears the hold: Look again is a real look', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    core.sendRaw.mockRejectedValueOnce(Object.assign(new Error('nope'), { code: 'bridge', reason: 'connect-failed' }));
+    await expect(queue.options.send(LABEL)).rejects.toBeTruthy();
+
+    // Still within the hold, but somebody pressed: the next label is a real attempt.
+    await printing.ready(printing.LOOK_AGAIN);
+    await queue.options.send(LABEL);
+    const after = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    expect(after.sendRaw).toHaveBeenLastCalledWith(LABEL.job, expect.objectContaining({ pageCount: 1 }));
+    expect(cores.made.reduce((n, made) => n + (made as { sendRaw: ReturnType<typeof vi.fn> }).sendRaw.mock.calls.length, 0)).toBe(2);
+  });
+
+  it('holds only on the server’s word that the printer is out of reach', async () => {
+    printServer();
+    configuredForServer();
+    const printing = await load();
+    await printing.ready();
+    const core = cores.made.at(-1) as unknown as { sendRaw: ReturnType<typeof vi.fn> };
+    core.sendRaw.mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'bridge', reason: 'printer-busy' }));
+    await expect(queue.options.send(LABEL)).rejects.toMatchObject({ reason: 'printer-busy' });
+    await queue.options.send(LABEL);
+    expect(core.sendRaw).toHaveBeenCalledTimes(2);
+  });
+
   it('a label with no printer to go to is the server’s failure, not a cable', async () => {
     printServer();
     configuredForServer();
