@@ -460,7 +460,7 @@ export function PrinterScreen({
    * Whether labels go out compressed — on unless somebody here said no. Held
    * by the screen so the box answers at once; the module keeps the truth.
    */
-  const [compress, setCompress] = useState(printing.compressionOf(config));
+  const [compress, setCompress] = useState(config.compress !== false);
   /**
    * What pressing **Use the print server** has come to.
    *

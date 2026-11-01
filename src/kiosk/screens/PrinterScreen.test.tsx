@@ -81,7 +81,6 @@ function handleWith(found: PrinterDetection | null, events: PrinterLogEntry[] = 
     subscribe: () => () => {},
     currentState: () => ({ kind: 'ready' as const, config: { model: 'QL-810W', label: '62x29' } }),
     configure: vi.fn(async () => {}),
-    compressionOf: (config: PrinterConfig | null | undefined) => config?.compress !== false,
     setCompression: vi.fn((enabled: boolean): PrinterConfig | null =>
       enabled ? { model: 'QL-810W', label: '62x29' } : { model: 'QL-810W', label: '62x29', compress: false },
     ),
