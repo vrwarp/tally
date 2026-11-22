@@ -673,6 +673,7 @@ export function EventEditorModal({
       labelTemplate: template.labelTemplate,
       kioskTheme: current.kioskTheme ?? template.kioskTheme,
       icon: current.icon || (template.icon ?? ''),
+      description: current.description || (template.description ?? ''),
       location: current.location || (template.location ?? ''),
     }));
   };

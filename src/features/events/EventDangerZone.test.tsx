@@ -226,3 +226,38 @@ describe('the whole repeat', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('an extra date', () => {
+  /*
+   * A leader may rename the night — "Friday Fellowship Christmas Party" — and
+   * the chain delete below the single-night one still ends Friday Fellowship.
+   * Naming it by the night's own title would ask the leader to type the name
+   * of a party while deleting a year of Fridays.
+   */
+  it('names the gathering a chain delete ends, not the night', async () => {
+    const user = userEvent.setup();
+    previewEventDeletion.mockResolvedValue({ events: 12, checkIns: 240, rsvps: 0, unlinked: 0 });
+    const party = friday({ id: 'party', title: 'Friday Fellowship Christmas Party', extra: true });
+    const toast: ToastContextValue = { toasts: [], show: vi.fn(), dismiss: vi.fn() };
+    render(
+      <ToastContext.Provider value={toast}>
+        <EventDangerZone
+          event={party}
+          checkedIn={0}
+          onDeleted={onDeleted}
+          gatheringTitle="Friday Fellowship"
+        />
+      </ToastContext.Provider>,
+    );
+
+    expect(screen.getByText(/This is an extra date of Friday Fellowship\. Ending Friday Fellowship/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete every Friday Fellowship' }));
+
+    expect(screen.getByRole('dialog', { name: 'Delete every Friday Fellowship?' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/^Type/), 'Friday Fellowship Christmas Party');
+    expect(deleteButton()).toBeDisabled();
+    await user.clear(screen.getByLabelText(/^Type/));
+    await user.type(screen.getByLabelText(/^Type/), 'Friday Fellowship');
+    await waitFor(() => expect(deleteButton()).toBeEnabled());
+  });
+});

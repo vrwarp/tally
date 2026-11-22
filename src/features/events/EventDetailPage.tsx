@@ -50,7 +50,7 @@ import { chainKey } from '@/lib/materialize';
 import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
-import { extraDateDefaults } from '@/features/events/extraDates';
+import { chainTemplate, extraDateDefaults } from '@/features/events/extraDates';
 import { RsvpManager } from '@/features/events/RsvpManager';
 import { buildRegisterCsv, registerRows } from '@/features/events/registerCsv';
 import { shortName, useTeam } from '@/features/events/useTeam';
@@ -559,6 +559,11 @@ export function EventDetailPage() {
             <EventDangerZone
               event={event}
               checkedIn={attendance.length}
+              gatheringTitle={
+                event.extra
+                  ? (chainTemplate(events, chainKey(event))?.title ?? event.title)
+                  : event.title
+              }
               onDeleted={() => navigate('/events', { replace: true })}
             />
           )}

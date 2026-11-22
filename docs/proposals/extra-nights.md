@@ -1,7 +1,14 @@
 # Proposal: extra dates on a recurring gathering
 
-**Status:** draft for review — nothing here is built. Revision 2, after a church-staff review and a
-journey critique. What changed and why is at the bottom.
+**Status:** built (extras only). The *Instead of* option in Journey 9c is deferred: v1 adds extra
+dates beside the schedule, and replacing one regular night is still cancel-plus-extra. On-screen
+label: **Extra date**. Open questions 1–3 took the recommended answers. Not yet built: the danger
+zone's chain-delete count naming how many nights are extra, and the coordinator-guide line about
+rebinding a kiosk after an extra date is edited. The walkthrough is in
+[`docs/walkthrough/extra-dates/`](../walkthrough/extra-dates/README.md).
+
+Revision 2, after a church-staff review and a journey critique. What changed and why is at the
+bottom.
 
 A ministry that meets every Friday sometimes meets on a day that is not a Friday: the Christmas
 party on a Saturday, a makeup night after a snowed-out week, the nursery opening for the Christmas
