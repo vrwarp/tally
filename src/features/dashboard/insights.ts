@@ -290,15 +290,27 @@ export function standingIn(
   let consecutiveMisses = 0;
   let lastAttended: EventAttendanceSnapshot | null = null;
 
+  /*
+   * An extra date is asymmetric, on purpose. Turning up to one is being seen —
+   * it ends a streak like any night does. Not turning up is nothing: nobody was
+   * expected at the Christmas party, so twenty-six regulars who stayed home
+   * must not each gain a miss toward a phone call.
+   */
   for (const snapshot of eligible) {
     if (snapshot.presentStudentIds.has(student.id)) {
       lastAttended = snapshot;
       break;
     }
+    if (snapshot.event.extra) continue;
     consecutiveMisses += 1;
   }
 
-  const attended = eligible.filter((snapshot) =>
+  // The rule nights alone: what the calendar expected, and what the Recent
+  // window below is read over.
+  const ruleNights = gathering.snapshots.filter((snapshot) => !snapshot.event.extra);
+  const eligibleRuleNights = eligible.filter((snapshot) => !snapshot.event.extra);
+
+  const attended = eligibleRuleNights.filter((snapshot) =>
     snapshot.presentStudentIds.has(student.id),
   ).length;
 
@@ -315,15 +327,31 @@ export function standingIn(
    * and never came back is a real follow-up, but they are not somebody a
    * gathering was expecting — and this list is only about expectations broken.
    */
-  const inHistory = lastAttended === null ? -1 : gathering.snapshots.indexOf(lastAttended);
+  //
+  // Read over rule nights only, the way the check-in screen's own Recent
+  // filter is. When the last visit was an extra date the window starts at the
+  // newest rule night on or before it — looking the party itself up in a list
+  // that leaves it out would find nothing and quietly drop a drifting regular
+  // off the call list.
+  const visitAt = lastAttended?.event.startAt.getTime() ?? null;
+  const inHistory =
+    visitAt === null
+      ? -1
+      : ruleNights.findIndex((snapshot) => snapshot.event.startAt.getTime() <= visitAt);
   const asOfLastVisit =
-    inHistory < 0 ? [] : gathering.snapshots.slice(inHistory, inHistory + settings.predictiveOfLastN);
+    inHistory < 0 ? [] : ruleNights.slice(inHistory, inHistory + settings.predictiveOfLastN);
   const wasRegular =
     lastAttended !== null &&
     countRecentHits(student.id, asOfLastVisit) >=
       effectiveThreshold(settings, asOfLastVisit.length);
 
-  return { consecutiveMisses, lastAttended, eligible: eligible.length, attended, wasRegular };
+  return {
+    consecutiveMisses,
+    lastAttended,
+    eligible: eligibleRuleNights.length,
+    attended,
+    wasRegular,
+  };
 }
 
 /**
@@ -989,6 +1017,12 @@ export interface AttendancePoint {
   count: number;
   /** The events behind the bar, newest first. More than one on a busy day. */
   eventIds: string[];
+  /**
+   * Every gathering behind the bar was an extra date — the party, the makeup
+   * night. Drawn with a marker and left out of the average: an eighty-person
+   * Christmas party is not evidence that Fridays doubled.
+   */
+  extra: boolean;
 }
 
 /**
@@ -1030,6 +1064,7 @@ export function computeAttendanceTrend(
       existing.count += snapshot.presentStudentIds.size;
       existing.eventIds.push(snapshot.event.id);
       existing.titles.add(snapshot.event.title);
+      existing.extra = existing.extra && snapshot.event.extra === true;
       // The day is stamped with when it started, not with whichever of its
       // gatherings happened to be read first.
       if (snapshot.event.startAt < existing.date) existing.date = snapshot.event.startAt;
@@ -1042,6 +1077,7 @@ export function computeAttendanceTrend(
       date: snapshot.event.startAt,
       count: snapshot.presentStudentIds.size,
       eventIds: [snapshot.event.id],
+      extra: snapshot.event.extra === true,
       titles: new Set([snapshot.event.title]),
     });
   }

@@ -54,6 +54,8 @@ export interface EventDraft {
   recurrence?: RecurrenceRule | null;
   /** Identity of the chain of repeats. Null on the event that started it. */
   recurrenceRootId?: string | null;
+  /** A night added to the chain by hand. Never carries a rule — see `extra`. */
+  extra?: boolean;
   /** A `chainKey` whose regulars seed a one-off's prediction. */
   predictFromChain?: string | null;
   startAt: Date;
@@ -218,10 +220,17 @@ function buildEventPayload(draft: EventDraft, uid: string, isNew: boolean) {
     // keeps a mode switch in the editor from leaving a weekly rule behind on
     // something that will never run again.
     recurrence:
-      draft.mode === 'recurring' && draft.recurrence
+      draft.mode === 'recurring' && !draft.extra && draft.recurrence
         ? normalizeRecurrence(draft.recurrence, draft.startAt)
         : null,
     recurrenceRootId: draft.mode === 'recurring' ? (draft.recurrenceRootId ?? null) : null,
+    /*
+     * And an extra date never carries a rule, whatever the form handed in.
+     * Nulled here rather than trusted because the cost of getting it wrong is
+     * the whole schedule: an extra with a rule is the chain's newest live night,
+     * which makes it the template every later occurrence is projected from.
+     */
+    extra: draft.mode === 'recurring' && draft.extra === true,
     // The mirror image: a borrowed prediction belongs to a gathering that has
     // no history of its own, so switching a trip back to recurring drops it.
     predictFromChain: draft.mode === 'oneoff' ? (draft.predictFromChain ?? null) : null,

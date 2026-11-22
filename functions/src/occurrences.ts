@@ -138,8 +138,13 @@ export function toSource(id: string, data: Record<string, unknown>): OccurrenceS
     icon: str(data.icon),
     mode,
     seriesId: str(data.seriesId),
-    recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
+    // An extra date never repeats — the same reading the app's converter makes,
+    // because the two projections must agree about which nights are the shape
+    // of the chain.
+    recurrence:
+      mode === 'recurring' && data.extra !== true ? toRecurrence(data.recurrence, startAt) : null,
     recurrenceRootId: str(data.recurrenceRootId),
+    extra: mode === 'recurring' && data.extra === true,
     status: data.status === 'cancelled' ? 'cancelled' : 'scheduled',
     startAt,
     endAt,

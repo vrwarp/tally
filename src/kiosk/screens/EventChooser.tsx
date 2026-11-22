@@ -727,6 +727,17 @@ export function EventChooser({
                         {timeLabel(locale, entry.endAt)}
                       </span>
                       {/*
+                       * An extra date says so beside its hours, because that is
+                       * the fact it changes: a Friday gathering on a Saturday,
+                       * bound by a greeter who knows it as "the Friday one".
+                       */}
+                      {entry.extra && (
+                        <span className="whitespace-nowrap text-ink-300">
+                          {" · "}
+                          {t("extraDate")}
+                        </span>
+                      )}
+                      {/*
                        * Where the gathering is and whether it prints, as one
                        * run.
                        *

@@ -137,6 +137,9 @@ export function EventHeroCard({
       <div className="flex flex-wrap items-center gap-2">
         {/* Admin-only, and only where there is a fence. See `NarrowedBadge`. */}
         {narrowed !== null ? <NarrowedBadge count={narrowed} /> : null}
+        {/* First, because it is what explains everything else about the card:
+            a Friday gathering on a Saturday is meant to be there. */}
+        {event.extra ? <Badge tone="brand">{t('extraDate')}</Badge> : null}
         {cancelled ? <Badge tone="danger">{t('cancelled')}</Badge> : null}
         {open ? <Badge tone="success">{t('checkInOpen')}</Badge> : null}
         {event.requiresRsvp ? <Badge tone="warn">{t('rsvpOnly')}</Badge> : null}

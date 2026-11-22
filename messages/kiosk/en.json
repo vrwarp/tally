@@ -29,7 +29,8 @@
     "nameTagsWontPrint": "name tags won’t print",
     "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
     "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi.",
-    "today": "Today"
+    "today": "Today",
+    "extraDate": "Extra date"
   },
   "Common": {
     "language": "Language",

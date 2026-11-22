@@ -33,6 +33,7 @@ function seedEvent(
     mode?: 'recurring' | 'oneoff';
     status?: 'scheduled' | 'cancelled';
     present?: string[];
+    extra?: boolean;
   },
 ): void {
   const start = Timestamp.fromDate(options.startAt);
@@ -42,6 +43,7 @@ function seedEvent(
     status: options.status ?? 'scheduled',
     seriesId: options.seriesId ?? null,
     recurrenceRootId: options.recurrenceRootId ?? null,
+    ...(options.extra ? { extra: true, recurrence: null } : {}),
     startAt: start,
     endAt: start,
     checkInOpensAt: start,
@@ -92,6 +94,25 @@ describe('buildParticipationIndex', () => {
 
     expect(Object.keys(scopes(db))).toEqual(['sat']);
     expect(scopes(db).sat.recent).toEqual(['ada']);
+  });
+
+  /*
+   * The drift the shared rule exists to prevent. The app leaves extra dates
+   * out of the Recent window; if the server's sources forgot the flag, the
+   * party would take a slot on the kiosk and not in the app, and the lobby
+   * would tick a different set of siblings than the door.
+   */
+  it('keeps extra dates out of the Recent window, as the app does', async () => {
+    const db = new FakeFirestore();
+    seedEvent(db, 'f1', { startAt: daysAgo(21), seriesId: 'friday', present: ['ada'] });
+    seedEvent(db, 'f2', { startAt: daysAgo(14), seriesId: 'friday', present: ['ada'] });
+    seedEvent(db, 'party', { startAt: daysAgo(10), seriesId: 'friday', present: ['bo'], extra: true });
+    seedEvent(db, 'makeup', { startAt: daysAgo(9), seriesId: 'friday', present: ['bo'], extra: true });
+    seedEvent(db, 'f3', { startAt: daysAgo(7), seriesId: 'friday', present: ['cyd'] });
+
+    await buildParticipationIndex(db, { builtBy: 'test', now: NOW });
+
+    expect(scopes(db).friday).toEqual({ participated: ['ada', 'bo', 'cyd'], recent: ['ada'] });
   });
 
   it('falls back to the event id when a chain has neither', async () => {

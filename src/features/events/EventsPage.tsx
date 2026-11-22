@@ -100,6 +100,8 @@ function EventRow({
   const badges = [
     narrowed !== null ? <NarrowedBadge key="narrowed" count={narrowed} /> : null,
     event.mode === 'oneoff' ? <Badge key="oneoff" tone="brand">{t('badgeOneOff')}</Badge> : null,
+    // A Friday gathering on a Saturday reads as a mistake unless it says why.
+    event.extra ? <Badge key="extra" tone="brand">{t('badgeExtraDate')}</Badge> : null,
     cancelled ? <Badge key="cancelled" tone="danger">{t('badgeCancelled')}</Badge> : null,
     // Neutral, not `warn`. Amber is the token for something the reader has to
     // act on, and on a page whose subject is which gatherings are blocked it was

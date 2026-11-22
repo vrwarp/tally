@@ -299,8 +299,13 @@ export function toEvent(snapshot: DocumentSnapshot<DocumentData>): TallyEvent {
     seriesId: strOrNull(data.seriesId),
     // A one-off does not repeat by definition, so a stray rule on one is
     // dropped rather than rendered.
-    recurrence: mode === 'recurring' ? toRecurrence(data.recurrence, startAt) : null,
+    recurrence:
+      mode === 'recurring' && data.extra !== true ? toRecurrence(data.recurrence, startAt) : null,
     recurrenceRootId: strOrNull(data.recurrenceRootId),
+    // Only a night of a chain can be an extra one, and an extra never repeats:
+    // a stray rule on one is dropped here so nothing downstream can mistake the
+    // party for the shape of every Friday after it.
+    extra: mode === 'recurring' && data.extra === true,
     // Only a trip borrows a prediction. A recurring gathering reads its own
     // chain, and a stray value here would silently redirect it to another one.
     predictFromChain: mode === 'oneoff' ? strOrNull(data.predictFromChain) : null,

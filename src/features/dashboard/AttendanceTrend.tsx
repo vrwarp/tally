@@ -65,10 +65,14 @@ export function AttendanceTrend({
   );
 
   const peak = points.reduce((max, point) => Math.max(max, point.count), 0);
+  // The usual nights only. An extra date is drawn, because it happened, but it
+  // is not what an ordinary week looks like.
+  const usual = points.filter((point) => !point.extra);
   const average =
-    points.length > 0
-      ? Math.round(points.reduce((sum, point) => sum + point.count, 0) / points.length)
+    usual.length > 0
+      ? Math.round(usual.reduce((sum, point) => sum + point.count, 0) / usual.length)
       : 0;
+  const extras = points.length - usual.length;
 
   return (
     <Card className={className}>
@@ -130,7 +134,13 @@ export function AttendanceTrend({
                 key={point.id}
                 className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1"
                 title={
-                  point.eventIds.length > 1
+                  point.extra
+                    ? t('barTitleExtra', {
+                        title: point.title,
+                        date: time.shortDate(point.date),
+                        count: point.count,
+                      })
+                    : point.eventIds.length > 1
                     ? t('barTitleAcross', {
                         title: point.title,
                         date: time.shortDate(point.date),
@@ -157,9 +167,15 @@ export function AttendanceTrend({
                   }}
                   className={cn(
                     'w-full rounded-t-md',
-                    // The newest gathering is the one being reacted to; the rest
-                    // are context.
-                    index === points.length - 1 ? 'bg-brand-400' : 'bg-brand-500/35',
+                    // An extra date is outlined rather than filled: there, and
+                    // counted, but not one of the nights the average is made of.
+                    point.extra
+                      ? 'border border-dashed border-brand-400 bg-brand-500/10'
+                      : // The newest gathering is the one being reacted to; the
+                        // rest are context.
+                        index === points.length - 1
+                        ? 'bg-brand-400'
+                        : 'bg-brand-500/35',
                   )}
                 />
                 <span className="w-full truncate text-center text-[10px] text-ink-600">
@@ -170,7 +186,9 @@ export function AttendanceTrend({
           </div>
 
           <p className="mt-3 border-t border-ink-800 pt-2 text-xs text-ink-500">
-            {t('summary', { days: points.length, peak, average })}
+            {extras > 0
+              ? t('summaryWithExtras', { days: points.length, peak, average, extras })
+              : t('summary', { days: points.length, peak, average })}
           </p>
 
           <table className="sr-only">
@@ -185,7 +203,9 @@ export function AttendanceTrend({
             <tbody>
               {points.map((point) => (
                 <tr key={point.id}>
-                  <th scope="row">{point.title}</th>
+                  <th scope="row">
+                    {point.extra ? t('rowTitleExtra', { title: point.title }) : point.title}
+                  </th>
                   <td>{time.shortDate(point.date)}</td>
                   <td>{point.count}</td>
                 </tr>

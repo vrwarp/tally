@@ -50,6 +50,7 @@ import { chainKey } from '@/lib/materialize';
 import { useToast } from '@/context/toastContext';
 import { EventDangerZone } from '@/features/events/EventDangerZone';
 import { EventEditorModal } from '@/features/events/EventEditorModal';
+import { chainTemplate, extraDateDefaults } from '@/features/events/extraDates';
 import { RsvpManager } from '@/features/events/RsvpManager';
 import { buildRegisterCsv, registerRows } from '@/features/events/registerCsv';
 import { shortName, useTeam } from '@/features/events/useTeam';
@@ -113,6 +114,7 @@ export function EventDetailPage() {
   );
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -300,9 +302,15 @@ export function EventDetailPage() {
               ) : null}
 
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
-                  {event.mode === 'recurring' ? t('badgeRecurring') : t('badgeOneOff')}
-                </Badge>
+                {/* An extra date is a night of a repeating gathering that does not
+                    itself repeat, so "Recurring" would be the wrong word on it. */}
+                {event.extra ? (
+                  <Badge tone="brand">{t('badgeExtraDate')}</Badge>
+                ) : (
+                  <Badge tone={event.mode === 'recurring' ? 'neutral' : 'brand'}>
+                    {event.mode === 'recurring' ? t('badgeRecurring') : t('badgeOneOff')}
+                  </Badge>
+                )}
                 {cancelled ? <Badge tone="danger">{t('badgeCancelled')}</Badge> : null}
                 {!cancelled && isCheckInOpen(event, now) ? (
                   <Badge tone="success">{t('badgeCheckInOpen')}</Badge>
@@ -395,6 +403,19 @@ export function EventDetailPage() {
                     {t('cancelWarning', { title: event.title })}
                   </p>
                 ) : null}
+
+                {/*
+                  * The one way to put a night on a repeating gathering's calendar
+                  * that its rule did not: the party on a Saturday, the makeup
+                  * Wednesday after a snow week. Offered from any of the chain's
+                  * ordinary nights and never from an extra date itself, whose
+                  * page is about that one night.
+                  */}
+                {readOnly || locked || event.mode !== 'recurring' || event.extra ? null : (
+                  <Button variant="ghost" className="w-full" onClick={() => setExtraOpen(true)}>
+                    {t('addExtraDate')}
+                  </Button>
+                )}
               </div>
             </div>
           </Card>
@@ -538,6 +559,11 @@ export function EventDetailPage() {
             <EventDangerZone
               event={event}
               checkedIn={attendance.length}
+              gatheringTitle={
+                event.extra
+                  ? (chainTemplate(events, chainKey(event))?.title ?? event.title)
+                  : event.title
+              }
               onDeleted={() => navigate('/events', { replace: true })}
             />
           )}
@@ -549,6 +575,15 @@ export function EventDetailPage() {
         onClose={() => setEditorOpen(false)}
         event={event}
       />
+
+      {event.mode === 'recurring' && !event.extra ? (
+        <EventEditorModal
+          open={extraOpen}
+          onClose={() => setExtraOpen(false)}
+          defaults={extraDateDefaults(event)}
+          onSaved={(id) => navigate(`/events/${id}`)}
+        />
+      ) : null}
 
       <AccessSheet
         open={accessOpen}

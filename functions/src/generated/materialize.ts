@@ -78,6 +78,11 @@ export interface OccurrenceSource {
   seriesId: string | null;
   recurrence: RecurrenceRule | null;
   recurrenceRootId: string | null;
+  /**
+   * A night added to the chain by hand. Optional because the callable builds
+   * these from admin-SDK data by hand and absent has always meant "no".
+   */
+  extra?: boolean;
   status: 'scheduled' | 'cancelled';
   startAt: Date;
   endAt: Date;
@@ -213,6 +218,17 @@ function chainsToProject(
 
   for (const event of events) {
     if (event.mode !== 'recurring' || !event.recurrence) continue;
+    /*
+     * An extra date is never the shape of the chain. It has no rule — the
+     * converter, the payload and the rules all see to that — so the line above
+     * already skips it; this says so on purpose rather than by coincidence.
+     * The stakes are the whole calendar ahead: the template is the newest live
+     * night, and a Saturday 2–5pm party adopted as one would make every Friday
+     * after it a Saturday 2–5pm.
+     */
+    // Stryker disable next-line ConditionalExpression: unreachable while the
+    // line above holds, which is the point — it is the second lock on one door.
+    if (event.extra) continue;
 
     const key = chainKey(event);
     const pool = event.status === 'cancelled' ? cancelled : live;
@@ -315,7 +331,14 @@ export function projectOccurrences(
     // projected from (see `chainsToProject`), and one that used to be part of a
     // chain still carries the id that projection gave it — which the line above
     // has already claimed.
-    if (event.mode === 'recurring') taken.add(occurrenceId(chainKey(event), event.startAt));
+    //
+    // Not for an extra date, though. An extra is *added* beside the rule, never
+    // a stand-in for one of its nights: claiming its day would let a party on a
+    // Saturday silently hide the real Saturday night if the rule were ever moved
+    // to Saturdays, and an extra on a Friday would hide that Friday.
+    if (event.mode === 'recurring' && !event.extra) {
+      taken.add(occurrenceId(chainKey(event), event.startAt));
+    }
   }
 
   for (const [key, { template, origin }] of chainsToProject(events)) {

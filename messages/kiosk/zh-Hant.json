@@ -29,7 +29,8 @@
     "nameTagsWontPrint": "名牌不會列印",
     "waitingFrom": "{gathering} 的 {count, plural, other {# 筆簽到紀錄}}尚未上傳——請保持充電並連著 Wi-Fi。",
     "waiting": "{count, plural, other {有 # 筆簽到紀錄}}尚未上傳——請保持充電並連著 Wi-Fi。",
-    "today": "今天"
+    "today": "今天",
+    "extraDate": "額外日期"
   },
   "Common": {
     "language": "語言",

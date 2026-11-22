@@ -957,6 +957,73 @@ describe('events', () => {
   });
 });
 
+describe('events: extra dates', () => {
+  /*
+   * A night added to a chain by hand. The rules pin its shape because the
+   * projection trusts it: an extra carrying a rule would become the template
+   * every later night is projected from, and one with no chain link would sit
+   * outside the access list of the gathering it claims to belong to.
+   */
+  it('accepts an extra date: no rule, and a chain to belong to', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('extra-ok')), { ...eventDoc(), extra: true, recurrence: null }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db, paths.event('extra-ok-root')), {
+        ...eventDoc(),
+        extra: true,
+        recurrence: null,
+        seriesId: null,
+        recurrenceRootId: 'event-root-1',
+      }),
+    );
+  });
+
+  it('accepts an explicit false, which every ordinary save writes', async () => {
+    const db = asUser(env, UID.core);
+    await assertSucceeds(setDoc(doc(db, paths.event('extra-false')), { ...eventDoc(), extra: false }));
+  });
+
+  it('refuses an extra date carrying a rule', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(setDoc(doc(db, paths.event('extra-rule')), { ...eventDoc(), extra: true }));
+  });
+
+  it('refuses an extra date that belongs to no chain, or is a one-off', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(
+      setDoc(doc(db, paths.event('extra-orphan')), {
+        ...eventDoc(),
+        extra: true,
+        recurrence: null,
+        seriesId: null,
+        recurrenceRootId: null,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db, paths.event('extra-oneoff')), {
+        ...eventDoc(),
+        mode: 'oneoff',
+        extra: true,
+        recurrence: null,
+      }),
+    );
+  });
+
+  it('refuses anything but a boolean', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(
+      setDoc(doc(db, paths.event('extra-string')), { ...eventDoc(), extra: 'yes', recurrence: null }),
+    );
+  });
+
+  it('refuses turning an ordinary night into an extra one that keeps its rule', async () => {
+    const db = asUser(env, UID.core);
+    await assertFails(updateDoc(doc(db, paths.event(ID.event)), { extra: true }));
+  });
+});
+
 describe('attendance', () => {
   it('lets a counselor check a student in', async () => {
     const db = asUser(env, UID.counselor);

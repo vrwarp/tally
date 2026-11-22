@@ -94,6 +94,8 @@ interface ConfirmProps {
   event: TallyEvent;
   /** Live attendance for this one gathering, which the page already holds. */
   checkedIn: number;
+  /** What the whole chain is called — see `gatheringTitle` on the card. */
+  chainTitle: string;
   onClose: () => void;
   onDeleted: () => void;
 }
@@ -103,6 +105,7 @@ function DeleteGatheringModal({
   scope,
   event,
   checkedIn,
+  chainTitle,
   onClose,
   onDeleted,
 }: ConfirmProps) {
@@ -118,7 +121,9 @@ function DeleteGatheringModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const phrase = confirmationPhrase({ scope, title: event.title });
+  // The chain's own name for a chain delete: on an extra date the night may be
+  // called "Christmas Party", and the phrase has to name what is about to go.
+  const phrase = confirmationPhrase({ scope, title: scope === 'chain' ? chainTitle : event.title });
   const ready = matchesConfirmation(typed, phrase);
 
   /*
@@ -198,7 +203,7 @@ function DeleteGatheringModal({
       size="sm"
       title={
         scope === 'chain'
-          ? t('confirmTitleChain', { title: event.title })
+          ? t('confirmTitleChain', { title: chainTitle })
           : t('confirmTitleEvent', { title: event.title })
       }
       description={
@@ -233,7 +238,7 @@ function DeleteGatheringModal({
               <Consequences summary={summary} scope="chain" />
             ) : null}
             <p className="text-sm leading-relaxed text-ink-300">
-              {t('datesAheadGo', { title: event.title })}
+              {t('datesAheadGo', { title: chainTitle })}
             </p>
           </>
         ) : (
@@ -278,9 +283,22 @@ export interface EventDangerZoneProps {
   checkedIn: number;
   /** Called once the gathering is gone, so the page can leave. */
   onDeleted: () => void;
+  /**
+   * What the whole repeat is called, when that is not this night's own title.
+   *
+   * Only ever different on an extra date, which a leader may well have renamed
+   * — "Friday Fellowship Christmas Party" — while the gathering ending it would
+   * remove is still Friday Fellowship. Defaults to the night's own title.
+   */
+  gatheringTitle?: string;
 }
 
-export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZoneProps) {
+export function EventDangerZone({
+  event,
+  checkedIn,
+  onDeleted,
+  gatheringTitle = event.title,
+}: EventDangerZoneProps) {
   const t = useTranslations('DangerZone');
   const tCommon = useTranslations('Common');
   const { show } = useToast();
@@ -389,11 +407,17 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           */}
           {event.mode === 'recurring' ? (
             <div className="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-4">
+              {/* On an extra date the chain action is named, not "this repeat":
+                  the reader is looking at one night that does not repeat, and the
+                  button below the single-night delete must not read as another
+                  way of removing it. */}
               <p className="text-sm text-ink-400">
-                {t('repeatsNote', { title: event.title })}
+                {event.extra
+                  ? t('repeatsNoteExtra', { title: gatheringTitle })
+                  : t('repeatsNote', { title: event.title })}
               </p>
               <Button variant="secondary" onClick={() => setConfirming('chain')}>
-                {t('deleteChain')}
+                {event.extra ? t('deleteChainNamed', { title: gatheringTitle }) : t('deleteChain')}
               </Button>
             </div>
           ) : null}
@@ -410,6 +434,7 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           scope={confirming}
           event={event}
           checkedIn={checkedIn}
+          chainTitle={gatheringTitle}
           onClose={() => setConfirming(null)}
           onDeleted={() => {
             setConfirming(null);

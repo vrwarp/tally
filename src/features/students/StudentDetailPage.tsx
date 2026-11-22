@@ -1286,11 +1286,16 @@ const NightChip = memo(function NightChip({ entry, theirs }: { entry: HistoryEnt
   // "Missed" chips under a heading that says it was never theirs is the pooled
   // accusation all over again, one night at a time.
   const held = outcome === 'held';
-  const counts = held && (theirs || present);
+  // And an extra date is never a miss: nobody was expected at the party, so
+  // staying home from it fades like a night that was not theirs.
+  const extraAbsence = held && !present && event.extra === true;
+  const counts = held && !extraAbsence && (theirs || present);
 
   const label = present
     ? t('attendancePresent')
-    : !counts
+    : extraAbsence
+      ? t('attendanceExtra')
+      : !counts
       ? !held
         ? outcome === 'cancelled'
           ? t('attendanceCancelled')
@@ -1302,7 +1307,9 @@ const NightChip = memo(function NightChip({ entry, theirs }: { entry: HistoryEnt
 
   const spoken = present
     ? t('spokenPresent')
-    : !held
+    : extraAbsence
+      ? t('spokenExtra')
+      : !held
       ? t('didNotHappen')
       : !theirs
         ? t('notAGatheringTheyComeTo')

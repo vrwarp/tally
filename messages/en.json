@@ -483,7 +483,10 @@
     "barTitleAcross": "{title} · {date}: {count} across {gatherings, plural, one {# gathering} other {# gatherings}}",
     "columnGathering": "Gathering",
     "columnDate": "Date",
-    "columnPresent": "Present"
+    "columnPresent": "Present",
+    "barTitleExtra": "{title} · {date}: {count} (extra date)",
+    "summaryWithExtras": "{days, plural, one {# day} other {# days}} · peak {peak} · average {average}, not counting {extras, plural, one {# extra date} other {# extra dates}}",
+    "rowTitleExtra": "{title} (extra date)"
   },
   "Ledger": {
     "summaryHere": "{count} no longer expected here · latest {date}",
@@ -1135,7 +1138,15 @@
     "windowOpens": "Opens",
     "windowCloses": "Closes",
     "windowDated": "{date}, {time}",
-    "windowUnknown": "—"
+    "windowUnknown": "—",
+    "titleNewExtra": "Add an extra date",
+    "titleEditExtra": "Edit extra date",
+    "hintExtra": "One more date for this gathering. It counts toward the gathering's regulars and history, and it doesn't change the schedule.",
+    "addExtraDate": "Add extra date",
+    "extraDateNote": "This date only. The gathering's schedule stays as it is.",
+    "extrasUnchanged": "{count, plural, one {Doesn't change the extra date on {dates}.} other {Doesn't change the # extra dates: {dates}.}}",
+    "extraSuggestion": "Is this a {gathering} date? Add it as an extra date so it counts toward {gathering}.",
+    "extraSuggestionAction": "Make it an extra date"
   },
   "LabelTemplate": {
     "enable": "Print a label at check-in",
@@ -1327,7 +1338,9 @@
     "kioskLate": "{count, plural, one {1 check-in} other {# check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} arrived late — all in Tally since {when}.",
     "kioskLateSending": "{count, plural, one {1 late check-in} other {# late check-ins}} from {named, select, yes {{kiosk}} other {the lobby kiosk}} so far; more on the way.",
     "kioskParked": "{count, plural, one {1 kiosk record needs} other {# kiosk records need}} a decision.",
-    "kioskParkedLink": "Open Review"
+    "kioskParkedLink": "Open Review",
+    "badgeExtraDate": "Extra date",
+    "addExtraDate": "＋ Add an extra date"
   },
   "DangerZone": {
     "heading": "Danger zone",
@@ -1359,7 +1372,9 @@
     "datesAheadGo": "Future scheduled dates for {title} will also be removed from the calendar.",
     "cannotBeUndone": "This cannot be undone.",
     "deleteEmptyAsk": "Delete “{title}” permanently? Cancelling keeps it on the calendar and can be undone.",
-    "repeatsNote": "This gathering repeats. Ending it removes every {title} — the nights already recorded, their check-ins, and the dates the schedule has not reached yet."
+    "repeatsNote": "This gathering repeats. Ending it removes every {title} — the nights already recorded, their check-ins, and the dates the schedule has not reached yet.",
+    "repeatsNoteExtra": "This is an extra date of {title}. Ending {title} removes it along with every other night — the nights already recorded, their check-ins, and the dates the schedule has not reached yet.",
+    "deleteChainNamed": "Delete every {title}"
   },
   "Import": {
     "titleMulti": "Import history",
@@ -1481,7 +1496,8 @@
     "limitedTag": "🔐 {count, number}",
     "limitedTagLabel": "Limited to {count, plural, one {# person} other {# people}} — everybody else sees it locked",
     "chainCount": "{count, plural, one {# gathering} other {# gatherings}}",
-    "showLater": "{count, plural, one {Show # later gathering} other {Show # later gatherings}}"
+    "showLater": "{count, plural, one {Show # later gathering} other {Show # later gatherings}}",
+    "badgeExtraDate": "Extra date"
   },
   "EventIcons": {
     "event": "Event",
@@ -1697,7 +1713,8 @@
     "checkInOpen": "Check-in open",
     "rsvpOnly": "RSVP only",
     "cancelled": "Cancelled",
-    "checkOut": "Check-out"
+    "checkOut": "Check-out",
+    "extraDate": "Extra date"
   },
   "Grid": {
     "title": "Attendance grid",
@@ -1724,7 +1741,8 @@
     "emptyTitle": "Nothing has happened yet",
     "emptyBody": "Gatherings appear here once they are past.",
     "loadOlder": "Load older gatherings",
-    "allLoaded": "That is every gathering Tally has a record of."
+    "allLoaded": "That is every gathering Tally has a record of.",
+    "whenExtra": "{day} · {window} · Extra date"
   },
   "SyncStrip": {
     "fieldFirstName": "first name",
@@ -1962,7 +1980,9 @@
     "recordMissingBadge": "Missing from {backend}",
     "visitorBadge": "Visitor",
     "inactiveBadge": "Inactive",
-    "attendanceDescription": "{count, plural, one {The last year, by gathering — # finished gathering.} other {The last year, by gathering — # finished gatherings.}}"
+    "attendanceDescription": "{count, plural, one {The last year, by gathering — # finished gathering.} other {The last year, by gathering — # finished gatherings.}}",
+    "attendanceExtra": "Extra",
+    "spokenExtra": "extra date, not expected"
   },
   "AddStudent": {
     "titleMulti": "Add a student",
@@ -2477,7 +2497,8 @@
     "nameTagsWontPrint": "name tags won’t print",
     "waitingFrom": "{count, plural, one {1 check-in} other {# check-ins}} from {gathering} not sent yet — keep it plugged in and on Wi-Fi.",
     "waiting": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi.",
-    "today": "Today"
+    "today": "Today",
+    "extraDate": "Extra date"
   },
   "Register": {
     "couldNotSave": "Tally could not finish that just now. Try again, or see a leader.",

@@ -169,6 +169,25 @@ describe('buildSeriesHistory', () => {
     ]);
   });
 
+  it('leaves extra dates out of the window, the way it leaves out a cancelled night', () => {
+    const fridays = pastFridays(3);
+    const party = makeEvent({
+      id: 'extra-party',
+      seriesId: FRIDAY,
+      extra: true,
+      startAt: new Date(fridays[2]!.startAt.getTime() + 86_400_000),
+    });
+    const snapshots = [...fridays.map((event) => held(event)), held(party)];
+
+    const history = buildSeriesHistory(tonight, snapshots, settings);
+
+    expect(history.map((snapshot) => snapshot.event.id)).toEqual([
+      `${FRIDAY}-1`,
+      `${FRIDAY}-2`,
+      `${FRIDAY}-3`,
+    ]);
+  });
+
   it('excludes the event being checked into — an event never predicts itself', () => {
     const snapshots = [
       makeSnapshot(tonight, ['someone']),

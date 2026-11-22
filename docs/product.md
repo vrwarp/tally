@@ -306,6 +306,18 @@ gathering's own name for the whole repeat, which cannot be typed without naming 
 ministry's gatherings is about to stop existing. The dialog says what it is about to remove, counted
 by the server through the same code that would do the removing.
 
+**Journey 7½ — the Saturday that is still Friday Fellowship.** The Christmas party, a makeup
+night after a snowed-out week, the nursery opening for the Christmas Eve service: nights a
+gathering holds that its schedule did not produce. **＋ Add an extra date** on any of a gathering's
+nights opens the editor pre-filled from it, with no Type and no Repeats, and the night it writes is
+part of the gathering — its access list, its labels, its regulars, its history — while the
+schedule ahead stays exactly where it was. Editing a night of the gathering carries forward, which
+is why this could not be done by moving next Friday. Skipping an extra date is never a miss and
+never costs a regular their place on Regulars; coming to one counts as being seen. It is tagged
+*Extra date* wherever it is listed, drawn but not averaged on the trend, and a one-off whose title
+names a gathering is offered the same thing. See
+[the proposal](proposals/extra-nights.md) and [the walkthrough](walkthrough/extra-dates/README.md).
+
 **Journey 8 — five gatherings a week, and only one of them yours.** A ministry running Friday
 Fellowship, Sunday School, a Wednesday small group and a retreat gives its nursery volunteers a
 chooser carrying four gatherings they will never stand at. So a gathering can be narrowed to the

@@ -241,7 +241,13 @@ export function buildSeriesHistory(
   snapshots: readonly EventAttendanceSnapshot[],
   settings: AppSettings,
 ): EventAttendanceSnapshot[] {
-  return buildChainHistory(event, snapshots).slice(0, settings.predictiveOfLastN);
+  // Extra dates are left out before the slice, the way a cancelled night is:
+  // nobody was expected at the party, so it must not push a real Friday out of
+  // a regular's "2 of the last 3". They still count in `buildChainHistory`,
+  // which is the wider "does this student belong here" question.
+  return buildChainHistory(event, snapshots)
+    .filter((snapshot) => !snapshot.event.extra)
+    .slice(0, settings.predictiveOfLastN);
 }
 
 /**

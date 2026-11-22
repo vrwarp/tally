@@ -483,7 +483,10 @@
     "barTitleAcross": "{title} · {date}：共 {gatherings, plural, other {# 次聚会}}，{count} 人",
     "columnGathering": "聚会",
     "columnDate": "日期",
-    "columnPresent": "出席"
+    "columnPresent": "出席",
+    "barTitleExtra": "{title} · {date}：{count}（额外日期）",
+    "summaryWithExtras": "{days, plural, other {# 天}} · 最高 {peak} · 平均 {average}，不含 {extras, plural, other {# 个额外日期}}",
+    "rowTitleExtra": "{title}（额外日期）"
   },
   "Ledger": {
     "summaryHere": "{count} 人在这里不再算应到 · 最近 {date}",
@@ -1135,7 +1138,15 @@
     "windowOpens": "开始",
     "windowCloses": "结束",
     "windowDated": "{date}，{time}",
-    "windowUnknown": "—"
+    "windowUnknown": "—",
+    "titleNewExtra": "添加额外日期",
+    "titleEditExtra": "编辑额外日期",
+    "hintExtra": "为这场聚会多加一个日期。它会计入这场聚会的常来名单和出席记录，但不会改变重复日程。",
+    "addExtraDate": "添加额外日期",
+    "extraDateNote": "只有这一天。这场聚会的重复日程保持不变。",
+    "extrasUnchanged": "{count, plural, other {不会改变额外日期：{dates}。}}",
+    "extraSuggestion": "这是 {gathering} 的一次聚会吗？把它添加为额外日期，它就会计入 {gathering}。",
+    "extraSuggestionAction": "改为额外日期"
   },
   "LabelTemplate": {
     "enable": "签到时打印名牌",
@@ -1327,7 +1338,9 @@
     "kioskLate": "来自{named, select, yes { {kiosk} } other {大堂签到台}}的 {count, plural, other {# 条签到记录}}延迟送达——自 {when} 起已全部传到 Tally。",
     "kioskLateSending": "目前来自{named, select, yes { {kiosk} } other {大堂签到台}}的延迟记录有 {count, plural, other {# 条}}，其余的仍在发送。",
     "kioskParked": "来自签到台的 {count, plural, other {# 条记录}}有待决定。",
-    "kioskParkedLink": "打开“待审核”"
+    "kioskParkedLink": "打开“待审核”",
+    "badgeExtraDate": "额外日期",
+    "addExtraDate": "＋ 添加额外日期"
   },
   "DangerZone": {
     "heading": "危险操作",
@@ -1359,7 +1372,9 @@
     "datesAheadGo": "{title} 未来的预定日期也将从日历中移除。",
     "cannotBeUndone": "这无法撤销。",
     "deleteEmptyAsk": "永久删除“{title}”？取消会把它留在日历上，而且可以撤销。",
-    "repeatsNote": "这场聚会会重复。结束它会移除每一场 {title}——已经办过并记录下来的每一场、这些聚会的签到记录，以及重复日程里还没到的日期。"
+    "repeatsNote": "这场聚会会重复。结束它会移除每一场 {title}——已经办过并记录下来的每一场、这些聚会的签到记录，以及重复日程里还没到的日期。",
+    "repeatsNoteExtra": "这是 {title} 的一个额外日期。结束 {title} 会把它和其他每一场一起移除——已经记录的每一场、这些聚会的签到记录，以及重复日程里还没到的日期。",
+    "deleteChainNamed": "删除每一场 {title}"
   },
   "Import": {
     "titleMulti": "导入历史记录",
@@ -1481,7 +1496,8 @@
     "limitedTag": "🔐 {count, number}",
     "limitedTagLabel": "{count, plural, other {仅限 # 人}}——其他人看到的是锁定状态",
     "chainCount": "{count, plural, other {# 次聚会}}",
-    "showLater": "{count, plural, other {显示之后的 # 次聚会}}"
+    "showLater": "{count, plural, other {显示之后的 # 次聚会}}",
+    "badgeExtraDate": "额外日期"
   },
   "EventIcons": {
     "event": "活动",
@@ -1697,7 +1713,8 @@
     "checkInOpen": "签到进行中",
     "rsvpOnly": "仅报名",
     "cancelled": "已取消",
-    "checkOut": "需签出"
+    "checkOut": "需签出",
+    "extraDate": "额外日期"
   },
   "Grid": {
     "title": "出席表格",
@@ -1724,7 +1741,8 @@
     "emptyTitle": "还没有办过聚会",
     "emptyBody": "聚会结束之后就会出现在这里。",
     "loadOlder": "加载更早的聚会",
-    "allLoaded": "这就是 Tally 有记录的全部聚会了。"
+    "allLoaded": "这就是 Tally 有记录的全部聚会了。",
+    "whenExtra": "{day} · {window} · 额外日期"
   },
   "SyncStrip": {
     "fieldFirstName": "名字",
@@ -1962,7 +1980,9 @@
     "recordMissingBadge": "{backend} 中缺失",
     "visitorBadge": "新朋友",
     "inactiveBadge": "不在册",
-    "attendanceDescription": "{count, plural, other {最近一年，按聚会分——# 场已结束的聚会。}}"
+    "attendanceDescription": "{count, plural, other {最近一年，按聚会分——# 场已结束的聚会。}}",
+    "attendanceExtra": "额外",
+    "spokenExtra": "额外日期，不算缺席"
   },
   "AddStudent": {
     "titleMulti": "添加学生",

@@ -211,6 +211,11 @@ export interface KioskEventEntry {
    * divide".
    */
   yours?: boolean;
+  /**
+   * A night added to its gathering by hand rather than by the schedule. Absent
+   * on every ordinary row, and on any row from functions older than the field.
+   */
+  extra?: boolean;
 }
 
 const startKioskPairing = httpsCallable<void, { code: string; secret: string; expiresInSeconds: number }>(
