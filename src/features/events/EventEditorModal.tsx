@@ -46,6 +46,7 @@ import {
 import { KioskThemeField } from '@/features/events/KioskThemeField';
 import { LabelTemplateField } from '@/features/events/LabelTemplateField';
 import { gatheringOptions } from '@/lib/gatherings';
+import { chainTemplate, extraDateDefaults, suggestedExtraChain } from '@/features/events/extraDates';
 import type { KioskTheme } from '@/lib/kioskTheme';
 import type { LabelTemplate } from '@/lib/labelTemplate';
 import {
@@ -59,7 +60,9 @@ import { addMinutes, fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/
 import { createEvent, ensureMaterialized, updateEvent, type EventDraft } from '@/services/events';
 import { putKioskBackdrop } from '@/services/kioskBackdrops';
 import type { EventMode, RecurrenceRule, TallyEvent } from '@/types';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
+import { useTimeFormats } from '@/hooks/useTimeFormats';
+import { chainKey } from '@/lib/materialize';
 
 /** House defaults for the check-in window, in minutes around the event. */
 const OPENS_BEFORE_MIN = 60;
@@ -81,6 +84,20 @@ interface EditorForm {
   seriesId: string;
   /** A `chainKey`, or `''`. The gathering a one-off borrows its regulars from. */
   predictFromChain: string;
+  /**
+   * An extra date: one night added to a chain by hand. Carried, never toggled
+   * — it is decided by how the form was opened (`defaults.extra` from "Add an
+   * extra date", or the event being edited) and every save writes it back.
+   * While it is set the form asks no question about repeating and the save
+   * writes no rule, whatever `recurrence` below happens to hold.
+   */
+  extra: boolean;
+  /**
+   * The chain this night belongs to, carried the way `seriesId` is. An edit
+   * reads it off the event; a new extra date gets it from `defaults`, which is
+   * the only way a night the editor creates can join an existing chain.
+   */
+  recurrenceRootId: string;
   /**
   * Anchored on `start`, never on a date of its own. Always present — a
   * recurring gathering repeats by definition — and simply unused while the
@@ -182,6 +199,8 @@ function buildForm(
     mode,
     seriesId: event?.seriesId ?? defaults?.seriesId ?? '',
     predictFromChain: event?.predictFromChain ?? defaults?.predictFromChain ?? '',
+    extra: event?.extra ?? defaults?.extra ?? false,
+    recurrenceRootId: event?.recurrenceRootId ?? defaults?.recurrenceRootId ?? '',
     recurrence,
     start: toDateTimeLocalValue(startAt),
     end: toDateTimeLocalValue(endAt),
@@ -229,7 +248,8 @@ function validateForm(form: EditorForm): { errors: EditorErrors; times: ParsedTi
 
   // Only checkable once there is a start to anchor against — the rule is
   // phrased relative to it, so an unparseable date has already failed above.
-  if (form.mode === 'recurring' && startAt) {
+  // An extra date has no rule to be wrong about.
+  if (form.mode === 'recurring' && !form.extra && startAt) {
     const problem = validateRecurrence(form.recurrence, startAt);
     if (problem) errors.recurrence = problem;
   }
@@ -274,13 +294,21 @@ type FieldLabelKey =
   | 'labelCheckInOpens'
   | 'labelCheckInCloses';
 
+/** What decides which of a field's two labels is on screen. */
+type FormShape = Pick<EditorForm, 'mode' | 'extra'>;
+
+/** "Next start" belongs to a gathering that repeats; a single date just starts. */
+function repeats(form: FormShape): boolean {
+  return form.mode === 'recurring' && !form.extra;
+}
+
 const ERROR_FIELDS: readonly {
   key: keyof EditorErrors;
-  label: (mode: EventMode) => FieldLabelKey;
+  label: (form: FormShape) => FieldLabelKey;
 }[] = [
   { key: 'title', label: () => 'fieldTitle' },
-  { key: 'start', label: (mode) => (mode === 'recurring' ? 'labelNextStart' : 'labelStarts') },
-  { key: 'end', label: (mode) => (mode === 'recurring' ? 'labelNextEnd' : 'labelEnds') },
+  { key: 'start', label: (form) => (repeats(form) ? 'labelNextStart' : 'labelStarts') },
+  { key: 'end', label: (form) => (repeats(form) ? 'labelNextEnd' : 'labelEnds') },
   { key: 'recurrence', label: () => 'fieldRepeats' },
   { key: 'checkInOpens', label: () => 'labelCheckInOpens' },
   { key: 'checkInCloses', label: () => 'labelCheckInCloses' },
@@ -300,12 +328,12 @@ type EditorTranslator = ReturnType<typeof useTranslations<'EventEditor'>>;
 function summariseErrors(
   t: EditorTranslator,
   errors: EditorErrors,
-  mode: EventMode,
+  form: FormShape,
 ): string | null {
   const found: string[] = [];
   for (const { key, label } of ERROR_FIELDS) {
     const message = errors[key];
-    if (message) found.push(t('errorLine', { field: t(label(mode)), message: t(message) }));
+    if (message) found.push(t('errorLine', { field: t(label(form)), message: t(message) }));
   }
 
   const [first, ...rest] = found;
@@ -376,6 +404,8 @@ export function EventEditorModal({
 }: EventEditorModalProps) {
   const t = useTranslations('EventEditor');
   const tCommon = useTranslations('Common');
+  const locale = useLocale();
+  const time = useTimeFormats();
   const { events, series } = useData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -404,6 +434,7 @@ export function EventEditorModal({
     : [
         'new',
         defaults?.mode ?? '',
+        defaults?.extra ? 'extra' : '',
         defaults?.seriesId ?? '',
         defaults?.title ?? '',
         defaults?.startAt?.getTime() ?? '',
@@ -437,9 +468,29 @@ export function EventEditorModal({
   const handleStartChange = (value: string) => {
     setForm((current) => {
       const startAt = parseLocal(value);
+      /*
+       * An extra date is opened pre-filled with a date to be changed, and the
+       * leader changes the start first. Carrying the end along by the same
+       * amount keeps the gathering's length — otherwise moving the start to the
+       * 19th leaves the end on the 12th and the form refuses its own prefill.
+       */
+      const previousStart = parseLocal(current.start);
+      const previousEnd = parseLocal(current.end);
+      const end =
+        current.extra && startAt && previousStart && previousEnd
+          ? toDateTimeLocalValue(
+              new Date(previousEnd.getTime() + (startAt.getTime() - previousStart.getTime())),
+            )
+          : current.end;
+      const endAt = parseLocal(end);
       return {
         ...current,
         start: value,
+        end,
+        checkInCloses:
+          end !== current.end && endAt && !current.closesPinned
+            ? toDateTimeLocalValue(addMinutes(endAt, CLOSES_AFTER_MIN))
+            : current.checkInCloses,
         checkInOpens:
           startAt && !current.opensPinned
             ? toDateTimeLocalValue(addMinutes(startAt, -OPENS_BEFORE_MIN))
@@ -513,9 +564,12 @@ export function EventEditorModal({
        * calendar. Null on a chain's own root, which is what it should be: the
        * root is keyed on its own id.
        */
-      recurrenceRootId: form.mode === 'recurring' ? (event?.recurrenceRootId ?? null) : null,
+      recurrenceRootId: form.mode === 'recurring' ? form.recurrenceRootId || null : null,
+      // Written on every save, like `status`: an extra date stays one through an
+      // edit, and nothing else on the form can make a night into one.
+      extra: form.mode === 'recurring' && form.extra,
       predictFromChain: form.mode === 'oneoff' ? form.predictFromChain || null : null,
-      recurrence: form.mode === 'recurring' ? form.recurrence : null,
+      recurrence: repeats(form) ? form.recurrence : null,
       startAt: times.startAt,
       endAt: times.endAt,
       checkInOpensAt: times.checkInOpensAt,
@@ -588,7 +642,57 @@ export function EventEditorModal({
   };
 
   const formId = `event-editor-${event?.id ?? 'new'}`;
-  const summary = summariseErrors(t, errors, form.mode);
+
+  // Only while writing a new one-off: an existing trip has its own history and
+  // turning it into a night of something else is a different act.
+  const extraSuggestion =
+    !isEditing && form.mode === 'oneoff'
+      ? suggestedExtraChain(form, gatheringOptions(events, series))
+      : null;
+
+  /*
+   * The pointer's answer. The leader's own title and dates are kept — they are
+   * what they came to write down — and everything that makes the gathering
+   * that gathering comes across from its newest ordinary night: the chain
+   * link, the kiosk's labels and look, check-out. An RSVP list is a trip's,
+   * and goes.
+   */
+  const convertToExtra = (chain: string) => {
+    const template = chainTemplate(events, chain);
+    if (!template) return;
+    const carried = extraDateDefaults(template);
+    setForm((current) => ({
+      ...current,
+      mode: 'recurring',
+      extra: true,
+      seriesId: carried.seriesId ?? '',
+      recurrenceRootId: carried.recurrenceRootId ?? '',
+      predictFromChain: '',
+      requiresRsvp: false,
+      requiresCheckOut: template.requiresCheckOut,
+      labelTemplate: template.labelTemplate,
+      kioskTheme: current.kioskTheme ?? template.kioskTheme,
+      icon: current.icon || (template.icon ?? ''),
+      location: current.location || (template.location ?? ''),
+    }));
+  };
+
+  // The chain's extra dates still ahead, which an edit to the gathering does
+  // not reach. Only asked while editing one of its ordinary nights.
+  const editedChain = event && repeats(form) ? chainKey(event) : null;
+  const upcomingExtras = editedChain
+    ? events
+        .filter(
+          (other) =>
+            other.extra &&
+            other.status !== 'cancelled' &&
+            other.endAt.getTime() > Date.now() &&
+            chainKey(other) === editedChain,
+        )
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+    : [];
+  const listFormat = new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' });
+  const summary = summariseErrors(t, errors, form);
 
   // The gatherings a trip can borrow its regulars from. Only offered on a
   // one-off, so it costs nothing to compute for the other half of the form.
@@ -605,9 +709,19 @@ export function EventEditorModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEditing ? t('titleEdit') : t('titleNew')}
+      title={
+        form.extra
+          ? isEditing
+            ? t('titleEditExtra')
+            : t('titleNewExtra')
+          : isEditing
+            ? t('titleEdit')
+            : t('titleNew')
+      }
       description={
-        isEditing
+        form.extra
+          ? t('hintExtra')
+          : isEditing
           ? form.mode === 'recurring'
             ? t('descriptionRecurring')
             : t('descriptionOneOff')
@@ -645,7 +759,7 @@ export function EventEditorModal({
               {tCommon('cancel')}
             </Button>
             <Button type="submit" form={formId} size="lg" loading={saving}>
-              {isEditing ? t('saveChanges') : t('scheduleEvent')}
+              {isEditing ? t('saveChanges') : form.extra ? t('addExtraDate') : t('scheduleEvent')}
             </Button>
           </div>
         </div>
@@ -701,19 +815,43 @@ export function EventEditorModal({
             hint={t('descriptionHint')}
           />
 
-          <SelectField
-            label={t('fieldType')}
-            value={form.mode}
-            onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
-            hint={
-              form.mode === 'recurring'
-                ? t('typeHintRecurring')
-                : t('typeHintOneOff')
-            }
-          >
-            <option value="recurring">{t('typeRecurring')}</option>
-            <option value="oneoff">{t('typeOneOff')}</option>
-          </SelectField>
+          {/*
+            * Not asked of an extra date. It is one night of a gathering that
+            * repeats, so neither answer is true of it — and turning it into a
+            * one-off here would take it out of the chain it was added to.
+            */}
+          {form.extra ? null : (
+            <SelectField
+              label={t('fieldType')}
+              value={form.mode}
+              onChange={(changed) => handleModeChange(changed.target.value as EventMode)}
+              hint={
+                form.mode === 'recurring'
+                  ? t('typeHintRecurring')
+                  : t('typeHintOneOff')
+              }
+            >
+              <option value="recurring">{t('typeRecurring')}</option>
+              <option value="oneoff">{t('typeOneOff')}</option>
+            </SelectField>
+          )}
+
+          {/*
+            * A one-off that is really a night of a gathering already on the
+            * calendar — "Friday Fellowship Christmas Party". Pointed at, never
+            * converted silently: the leader may well mean a trip that borrows
+            * Friday's regulars, which is what Journey 4 is and stays.
+            */}
+          {extraSuggestion ? (
+            <div className="flex flex-col gap-2 rounded-xl bg-brand-500/10 p-3 ring-1 ring-brand-500/30 sm:flex-row sm:items-center">
+              <p className="min-w-0 flex-1 text-sm text-ink-200">
+                {t('extraSuggestion', { gathering: extraSuggestion.title })}
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => convertToExtra(extraSuggestion.key)}>
+                {t('extraSuggestionAction')}
+              </Button>
+            </div>
+          ) : null}
 
           {/*
             * There was a "Series" picker here, and it is gone.
@@ -756,7 +894,7 @@ export function EventEditorModal({
             */}
           <div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2 pointer-fine:gap-3">
             <TextField
-              label={t(form.mode === 'recurring' ? 'labelNextStart' : 'labelStarts')}
+              label={t(repeats(form) ? 'labelNextStart' : 'labelStarts')}
               type="datetime-local"
               value={form.start}
               onChange={(changed) => handleStartChange(changed.target.value)}
@@ -764,7 +902,7 @@ export function EventEditorModal({
               required
             />
             <TextField
-              label={t(form.mode === 'recurring' ? 'labelNextEnd' : 'labelEnds')}
+              label={t(repeats(form) ? 'labelNextEnd' : 'labelEnds')}
               type="datetime-local"
               value={form.end}
               onChange={(changed) => handleEndChange(changed.target.value)}
@@ -776,13 +914,27 @@ export function EventEditorModal({
               // a fact about the pair, and hung off "Next start" alone it wraps
               // to two lines and leaves the column ragged.
               <p className="text-xs leading-snug text-ink-500 @min-[26rem]:col-span-2">
-                {t('upcomingNote')}
+                {form.extra ? t('extraDateNote') : t('upcomingNote')}
+              </p>
+            ) : null}
+            {/*
+              * An extra date keeps what it was created with, like any night
+              * already written down — so an edit to the gathering says, before
+              * it is saved, which of its extra dates it will not reach. A label
+              * changed in December must not surprise anybody on Christmas Eve.
+              */}
+            {upcomingExtras.length > 0 ? (
+              <p className="text-xs leading-snug text-ink-500 @min-[26rem]:col-span-2">
+                {t('extrasUnchanged', {
+                  count: upcomingExtras.length,
+                  dates: listFormat.format(upcomingExtras.map((extra) => time.shortDate(extra.startAt))),
+                })}
               </p>
             ) : null}
           </div>
 
           {/* Below the date on purpose: every option here is phrased from it. */}
-          {form.mode === 'recurring' ? (
+          {repeats(form) ? (
             <RecurrenceField
               anchor={parseLocal(form.start)}
               value={form.recurrence}

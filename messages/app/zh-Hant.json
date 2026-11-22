@@ -483,7 +483,10 @@
     "barTitleAcross": "{title} · {date}：共 {gatherings, plural, other {# 次聚會}}，{count} 人",
     "columnGathering": "聚會",
     "columnDate": "日期",
-    "columnPresent": "出席"
+    "columnPresent": "出席",
+    "barTitleExtra": "{title} · {date}：{count}（額外日期）",
+    "summaryWithExtras": "{days, plural, other {# 天}} · 最高 {peak} · 平均 {average}，不含 {extras, plural, other {# 個額外日期}}",
+    "rowTitleExtra": "{title}（額外日期）"
   },
   "Ledger": {
     "summaryHere": "不再預期 {count} 人出席這場聚會 · 最近 {date}",
@@ -1135,7 +1138,15 @@
     "windowOpens": "開始",
     "windowCloses": "結束",
     "windowDated": "{date}，{time}",
-    "windowUnknown": "—"
+    "windowUnknown": "—",
+    "titleNewExtra": "新增額外日期",
+    "titleEditExtra": "編輯額外日期",
+    "hintExtra": "為這場聚會多加一個日期。它會計入這場聚會的常客和出席紀錄，但不會改變排程。",
+    "addExtraDate": "新增額外日期",
+    "extraDateNote": "只有這一天。這場聚會的排程維持不變。",
+    "extrasUnchanged": "{count, plural, other {不會改變額外日期：{dates}。}}",
+    "extraSuggestion": "這是 {gathering} 的一場聚會嗎？把它新增為額外日期，它就會計入 {gathering}。",
+    "extraSuggestionAction": "改為額外日期"
   },
   "LabelTemplate": {
     "enable": "簽到時列印名牌",
@@ -1327,7 +1338,9 @@
     "kioskLate": "來自{named, select, yes { {kiosk} } other {大廳簽到台}}的 {count, plural, other {# 筆簽到紀錄}}延遲送達——自 {when} 起已全部傳到 Tally。",
     "kioskLateSending": "目前來自{named, select, yes { {kiosk} } other {大廳簽到台}}的延遲紀錄有 {count, plural, other {# 筆}}，其餘的仍在傳送。",
     "kioskParked": "來自簽到台的 {count, plural, other {# 筆紀錄}}有待決定。",
-    "kioskParkedLink": "開啟「待審核」"
+    "kioskParkedLink": "開啟「待審核」",
+    "badgeExtraDate": "額外日期",
+    "addExtraDate": "＋ 新增額外日期"
   },
   "DangerZone": {
     "heading": "危險操作",
@@ -1359,7 +1372,9 @@
     "datesAheadGo": "{title} 未來的預定日期也將從行事曆中移除。",
     "cannotBeUndone": "這無法復原。",
     "deleteEmptyAsk": "永久刪除「{title}」？取消會把它留在行事曆上，而且可以復原。",
-    "repeatsNote": "這場聚會會重複。結束它會移除每一場 {title}——已經記錄的那些場次、它們的簽到，以及排程還沒走到的日期。"
+    "repeatsNote": "這場聚會會重複。結束它會移除每一場 {title}——已經記錄的那些場次、它們的簽到，以及排程還沒走到的日期。",
+    "repeatsNoteExtra": "這是 {title} 的一個額外日期。結束 {title} 會把它和其他每一場一起移除——已經記錄的那些場次、它們的簽到，以及排程還沒走到的日期。",
+    "deleteChainNamed": "刪除每一場 {title}"
   },
   "Import": {
     "titleMulti": "匯入歷史紀錄",
@@ -1481,7 +1496,8 @@
     "limitedTag": "🔐 {count, number}",
     "limitedTagLabel": "{count, plural, other {僅限 # 人——其他所有人看到皆為鎖定狀態}}",
     "chainCount": "{count, plural, other {# 次聚會}}",
-    "showLater": "{count, plural, other {顯示之後的 # 次聚會}}"
+    "showLater": "{count, plural, other {顯示之後的 # 次聚會}}",
+    "badgeExtraDate": "額外日期"
   },
   "EventIcons": {
     "event": "活動",
@@ -1697,7 +1713,8 @@
     "checkInOpen": "簽到進行中",
     "rsvpOnly": "僅報名",
     "cancelled": "已取消",
-    "checkOut": "需簽出"
+    "checkOut": "需簽出",
+    "extraDate": "額外日期"
   },
   "Grid": {
     "title": "出席表格",
@@ -1724,7 +1741,8 @@
     "emptyTitle": "還沒有辦過聚會",
     "emptyBody": "聚會結束之後就會出現在這裡。",
     "loadOlder": "載入更早的聚會",
-    "allLoaded": "這就是 Tally 有紀錄的全部聚會了。"
+    "allLoaded": "這就是 Tally 有紀錄的全部聚會了。",
+    "whenExtra": "{day} · {window} · 額外日期"
   },
   "SyncStrip": {
     "fieldFirstName": "名字",
@@ -1962,7 +1980,9 @@
     "recordMissingBadge": "{backend} 中缺失",
     "visitorBadge": "新朋友",
     "inactiveBadge": "不在冊",
-    "attendanceDescription": "{count, plural, other {最近一年，按聚會分——# 場已結束的聚會。}}"
+    "attendanceDescription": "{count, plural, other {最近一年，按聚會分——# 場已結束的聚會。}}",
+    "attendanceExtra": "額外",
+    "spokenExtra": "額外日期，不算缺席"
   },
   "AddStudent": {
     "titleMulti": "新增學生",

@@ -65,6 +65,13 @@ export interface ChainInstance {
   /** Marked cancelled by a human. Rarer than the gathering actually being off. */
   cancelled: boolean;
   presentStudentIds: readonly string[];
+  /**
+   * A night added to the chain by hand — the party, the makeup night. It
+   * counts as belonging (`participated`) but never takes a slot of the
+   * `recent` window: nobody was expected at it, so a party a regular skipped
+   * must not push a real Friday out of their "2 of the last 3".
+   */
+  extra?: boolean;
 }
 
 /** The two knobs from `config/settings`, already clamped by the caller. */
@@ -146,7 +153,9 @@ export function buildChainScopes(
       for (const studentId of instance.presentStudentIds) participated.add(studentId);
     }
 
-    const window = held.slice(0, Math.max(0, rule.ofLastN));
+    // Extra dates filtered out *before* the slice, the same ordering the
+    // cancelled nights above rely on and for the same reason.
+    const window = held.filter((instance) => !instance.extra).slice(0, Math.max(0, rule.ofLastN));
     const threshold = thresholdFor(rule.minAttended, window.length);
     const hits = new Map<string, number>();
     for (const instance of window) {

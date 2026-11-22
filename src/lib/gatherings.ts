@@ -68,6 +68,9 @@ export function gatheringOptions(
 
   for (const event of events) {
     if (event.mode !== 'recurring') continue;
+    // An extra date is a night of the chain, never what names it: a party
+    // retitled "Christmas Party" must not rename Friday Fellowship in the list.
+    if (event.extra) continue;
 
     const key = chainKey(event);
     const existing = found.get(key);

@@ -72,6 +72,12 @@ export interface KioskEventEntry {
    */
   requiresCheckOut: boolean;
   /**
+   * A night added to its gathering by hand — present only when true, so every
+   * ordinary row is byte-for-byte what it was. The chooser says so beside the
+   * hours; nothing else on the kiosk behaves differently.
+   */
+  extra?: true;
+  /**
    * What to print when a child is checked in here, or null for nothing.
    *
    * Here for the same reason `requiresCheckOut` is, one step further: the kiosk
@@ -233,6 +239,7 @@ function entryFromSource(
     ...kioskIcon(source.icon),
     ...kioskLook(source.kioskTheme),
     ...kioskBackdrop(source.kioskBackdropId),
+    ...(source.extra ? { extra: true as const } : {}),
   };
 }
 

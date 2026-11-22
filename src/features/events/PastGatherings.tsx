@@ -244,7 +244,9 @@ export function PastEventRow({
           {/* A step closer than it was: with two series alternating down this
               list, the date is the only thing telling one row from another. */}
           <span className="mt-0.5 block truncate text-xs text-ink-400">
-            {t('when', { day: time.weekdayDay(event.startAt), window: time.eventWindow(event) })}
+            {event.extra
+              ? t('whenExtra', { day: time.weekdayDay(event.startAt), window: time.eventWindow(event) })
+              : t('when', { day: time.weekdayDay(event.startAt), window: time.eventWindow(event) })}
           </span>
         </span>
 

@@ -105,7 +105,13 @@ export async function buildParticipationIndex(
   const rule = await readRule(db);
 
   const snapshot = await db.collection(EVENTS).get();
-  const wanted: { id: string; chain: string; startAt: Date; cancelled: boolean }[] = [];
+  const wanted: {
+    id: string;
+    chain: string;
+    startAt: Date;
+    cancelled: boolean;
+    extra: boolean;
+  }[] = [];
   for (const doc of snapshot.docs) {
     const data = doc.data();
     if (!data) continue;
@@ -119,6 +125,7 @@ export async function buildParticipationIndex(
       chain: chainKey(source),
       startAt: source.startAt,
       cancelled: source.status === 'cancelled',
+      extra: source.extra === true,
     });
   }
 
@@ -135,6 +142,9 @@ export async function buildParticipationIndex(
       chain: event.chain,
       startAt: event.startAt,
       cancelled: false,
+      // Carried so the shared rule can keep it out of the Recent window —
+      // the app reads the same flag off the same document.
+      extra: event.extra,
       // The attendance document id *is* the student id. Nothing inside is read,
       // which is what keeps a year of registers cheap to sweep.
       presentStudentIds: register.docs.map((doc) => doc.id),

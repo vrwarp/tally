@@ -29,7 +29,8 @@
     "nameTagsWontPrint": "名牌不会打印",
     "waitingFrom": "{gathering} 的 {count, plural, other {# 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。",
     "waiting": "{count, plural, other {有 # 条签到记录}}尚未上传——请保持充电并连着 Wi-Fi。",
-    "today": "今天"
+    "today": "今天",
+    "extraDate": "额外日期"
   },
   "Common": {
     "language": "语言",

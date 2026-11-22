@@ -29,7 +29,8 @@
     "nameTagsWontPrint": "las etiquetas no se imprimirán",
     "waitingFrom": "{count, plural, one {1 registro} other {# registros}} de {gathering} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
     "waiting": "{count, plural, one {1 registro} other {# registros}} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
-    "today": "Hoy"
+    "today": "Hoy",
+    "extraDate": "Fecha extra"
   },
   "Common": {
     "language": "Idioma",

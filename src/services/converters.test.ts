@@ -535,6 +535,18 @@ describe('toEvent', () => {
     ).toBe(true);
   });
 
+  it('reads an extra date, and drops any rule left on it', () => {
+    const rule = { frequency: 'weekly', interval: 1, weekdays: [5], monthlyMode: 'dayOfMonth', until: null, count: null };
+    const extra = toEvent(fakeSnapshot({ data: { mode: 'recurring', extra: true, recurrence: rule } }));
+    expect(extra.extra).toBe(true);
+    expect(extra.recurrence).toBeNull();
+
+    // Only a night of a chain can be one, and only an explicit true counts.
+    expect(toEvent(fakeSnapshot({ data: { mode: 'oneoff', extra: true } })).extra).toBe(false);
+    expect(toEvent(fakeSnapshot({ data: { mode: 'recurring', extra: 'yes' } })).extra).toBe(false);
+    expect(toEvent(fakeSnapshot({ data: {} })).extra).toBe(false);
+  });
+
   it('reads a description, and treats an empty one as absent', () => {
     expect(toEvent(fakeSnapshot({ data: { description: 'Pizza and a talk.' } })).description).toBe(
       'Pizza and a talk.',

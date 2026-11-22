@@ -272,6 +272,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Common.change": {
+    "source": "Change",
+    "context": "Text on a disclosure button beside a setting's current value; pressing it opens the controls to change that setting, and it reads Done while they are open. On the event editor's kiosk colour and kiosk photo fields, and on the kiosk printer screen's model and roll fold.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Nav.checkIn": {
     "source": "Check in",
     "context": "Nav item. Opens the screen where a counselor marks who is here. A verb phrase.",
@@ -2583,6 +2590,69 @@
   },
   "Trend.tableCaption": {
     "source": "Head count per day, oldest first.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.summary": {
+    "source": "{days, plural, one {# day} other {# days}} · peak {peak} · average {average}",
+    "context": "Footer under the attendance trend bar chart: how many days the chart covers, the highest head count among them, and the average head count.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.barTitle": {
+    "source": "{title} · {date}: {count}",
+    "context": "Hover text on one bar of the attendance trend: the gathering's name, the date, and how many were checked in.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.barTitleAcross": {
+    "source": "{title} · {date}: {count} across {gatherings, plural, one {# gathering} other {# gatherings}}",
+    "context": "Hover text on one bar of the attendance trend when several gatherings met that day and the bar adds them up: the first gathering's name, the date, the combined head count, and how many gatherings it covers.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.columnGathering": {
+    "source": "Gathering",
+    "context": "Column heading in the screen-reader table behind the attendance trend chart.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.columnDate": {
+    "source": "Date",
+    "context": "Column heading in the screen-reader table behind the attendance trend chart.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.columnPresent": {
+    "source": "Present",
+    "context": "Column heading in the screen-reader table behind the attendance trend chart: how many were checked in.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.barTitleExtra": {
+    "source": "{title} · {date}: {count} (extra date)",
+    "context": "Tooltip of a bar in the attendance chart for an extra date.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.summaryWithExtras": {
+    "source": "{days, plural, one {# day} other {# days}} · peak {peak} · average {average}, not counting {extras, plural, one {# extra date} other {# extra dates}}",
+    "context": "Summary under the attendance chart when some bars are extra dates, which are left out of the average.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Trend.rowTitleExtra": {
+    "source": "{title} (extra date)",
+    "context": "Screen-reader table row label for an extra date in the attendance chart.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -6428,6 +6498,62 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventEditor.titleNewExtra": {
+    "source": "Add an extra date",
+    "context": "Dialog title when adding one extra date (a one-time extra night) to a gathering that repeats weekly.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.titleEditExtra": {
+    "source": "Edit extra date",
+    "context": "Dialog title when editing an existing extra date of a repeating gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.hintExtra": {
+    "source": "One more date for this gathering. It counts toward the gathering's regulars and history, and it doesn't change the schedule.",
+    "context": "Dialog description for an extra date: one added night that belongs to the repeating gathering but does not change its schedule.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.addExtraDate": {
+    "source": "Add extra date",
+    "context": "Submit button of the add-extra-date dialog.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.extraDateNote": {
+    "source": "This date only. The gathering's schedule stays as it is.",
+    "context": "Note under the start/end fields of an extra date: only this one date is affected.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.extrasUnchanged": {
+    "source": "{count, plural, one {Doesn't change the extra date on {dates}.} other {Doesn't change the # extra dates: {dates}.}}",
+    "context": "Note shown while editing a repeating gathering: the listed upcoming extra dates keep their own settings and are not changed by this edit. {dates} is a formatted list of short dates.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.extraSuggestion": {
+    "source": "Is this a {gathering} date? Add it as an extra date so it counts toward {gathering}.",
+    "context": "Callout in the new one-off form when its title names an existing repeating gathering; offers to add it as an extra date of that gathering instead.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventEditor.extraSuggestionAction": {
+    "source": "Make it an extra date",
+    "context": "Button in that callout; converts the form into an extra date of the named gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "LabelTemplate.enable": {
     "source": "Print a label at check-in",
     "es-MX": "machine",
@@ -6905,6 +7031,13 @@
   },
   "Rsvp.undo": {
     "source": "Undo",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Rsvp.addCount": {
+    "source": "{count, plural, =0 {Add students} one {Add # student} other {Add # students}}",
+    "context": "The commit button of the sheet that adds students to a one-off's RSVP list, counting the students ticked. Disabled at zero.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -7537,6 +7670,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventDetail.badgeExtraDate": {
+    "source": "Extra date",
+    "context": "Chip on an event page marking a night added by hand to a repeating gathering. Must match Events.badgeExtraDate.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "EventDetail.addExtraDate": {
+    "source": "＋ Add an extra date",
+    "context": "Button on a repeating gathering's page that adds one extra date to it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "DangerZone.heading": {
     "source": "Danger zone",
     "es-MX": "machine",
@@ -7713,6 +7860,20 @@
   },
   "DangerZone.repeatsNote": {
     "source": "This gathering repeats. Ending it removes every {title} — the nights already recorded, their check-ins, and the dates the schedule has not reached yet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "DangerZone.repeatsNoteExtra": {
+    "source": "This is an extra date of {title}. Ending {title} removes it along with every other night — the nights already recorded, their check-ins, and the dates the schedule has not reached yet.",
+    "context": "Danger-zone note on an extra date: deleting the whole gathering removes this date and every other one.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "DangerZone.deleteChainNamed": {
+    "source": "Delete every {title}",
+    "context": "Button that deletes the whole repeating gathering, named so it is not mistaken for deleting this one date.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -8065,6 +8226,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "KioskTheme.ground": {
+    "source": "Ground",
+    "context": "Legend over two buttons, Dark and Light, that choose whether the lobby kiosk's screen has a dark or a light background while it shows this gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Events.title": {
     "source": "Events",
     "es-MX": "machine",
@@ -8402,6 +8570,27 @@
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
+  },
+  "Events.chainCount": {
+    "source": "{count, plural, one {# gathering} other {# gatherings}}",
+    "context": "Count at the right of a gathering's heading on the events calendar, for a gathering the reader is not on: how many of its nights are listed beneath the heading.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Events.showLater": {
+    "source": "{count, plural, one {Show # later gathering} other {Show # later gatherings}}",
+    "context": "Button at the foot of the Later band on the events calendar. Gatherings more than about two months out are folded away; this unfolds them.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Events.badgeExtraDate": {
+    "source": "Extra date",
+    "context": "Chip on a calendar row marking a night added by hand to a repeating gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "EventIcons.event": {
     "source": "Event",
@@ -9284,6 +9473,34 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "KioskBackdrop.choosePhoto": {
+    "source": "Choose a photo",
+    "context": "Button that opens the device's file picker to pick a photo for the lobby kiosk's idle screen, when the gathering has none yet.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.replacePhoto": {
+    "source": "Replace the photo",
+    "context": "The same button as Choose a photo, when the gathering already has a kiosk photo: picking one replaces it.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.readingPhoto": {
+    "source": "Reading the photo…",
+    "context": "The photo button's text while a picked photo is being read and resized, before it can be saved.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "KioskBackdrop.resizedTo": {
+    "source": "Resized to {detail}",
+    "context": "Beside the photo button once a new photo is picked. {detail} is its new size, for example '1920 px · 240 KB' — the photo was made smaller so the kiosk loads it quickly.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Recurrence.repeatOn": {
     "source": "Repeat on",
     "context": "Label above the seven day-of-week toggles.",
@@ -9683,6 +9900,34 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Recurrence.unitWeeks": {
+    "source": "weeks",
+    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Recurrence.unitMonths": {
+    "source": "months",
+    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Recurrence.unitYears": {
+    "source": "years",
+    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Recurrence.thenPreview": {
+    "source": "{count, plural, =1 {Then {first}} =2 {Then {first}, {second}} other {Then {first}, {second}, {third}…}}",
+    "context": "Under the repeat settings in the event editor: the next one, two or three dates the rule produces after the first gathering, as short dates. With three, the trailing … says the list goes on. {first}, {second} and {third} are already-formatted dates.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "EventStatus.cancelled": {
     "source": "Cancelled",
     "context": "Badge: this gathering was called off. Nobody is counted absent for it.",
@@ -9773,6 +10018,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "EventHero.extraDate": {
+    "source": "Extra date",
+    "context": "Chip on the big card for today's gathering, marking it as an extra date of a repeating gathering.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Grid.title": {
     "source": "Attendance grid",
     "es-MX": "machine",
@@ -9839,6 +10091,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Grid.reading": {
+    "source": "Reading {count, plural, one {# gathering} other {# gatherings}}…",
+    "context": "Status line in the attendance grid dialog while the registers of the chosen gatherings are being read.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Grid.shape": {
+    "source": "<n>{gatherings}</n> {gatherings, plural, one {gathering} other {gatherings}} × <n>{students}</n> {students, plural, one {student} other {students}}.",
+    "context": "The size of the attendance grid about to be downloaded: gatherings across, students down. <n> marks the two numbers, which are drawn brighter than the words.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "PastGatherings.title": {
     "source": "Past gatherings",
     "es-MX": "machine",
@@ -9895,6 +10161,13 @@
   },
   "PastGatherings.allLoaded": {
     "source": "That is every gathering Tally has a record of.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "PastGatherings.whenExtra": {
+    "source": "{day} · {window} · Extra date",
+    "context": "Second line of a past gathering row that was an extra date: day, time window, then the chip word.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -11319,6 +11592,20 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "StudentDetail.attendanceExtra": {
+    "source": "Extra",
+    "context": "Tiny chip caption under a date in a student's history: an extra date they did not attend, which is not counted as missed. One short word.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "StudentDetail.spokenExtra": {
+    "source": "extra date, not expected",
+    "context": "Screen-reader status of that chip: an extra date nobody was expected at.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "AddStudent.titleMulti": {
     "source": "Add a student",
     "es-MX": "machine",
@@ -11746,6 +12033,20 @@
     "es-MX": "machine",
     "zh-Hans": "reviewed",
     "zh-Hant": "reviewed"
+  },
+  "RowBadge.openProfile": {
+    "source": "Open {name}'s profile",
+    "context": "Link at the foot of the panel a roster badge opens, to the student's full profile. {name} is the student's first name.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "RowBadge.reading": {
+    "source": "Reading {backend}…",
+    "context": "Status line while a roster badge's panel waits for the student's details from the church database. {backend} is its name, for example Planning Center.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
   },
   "StudentEditor.titleEdit": {
     "source": "Edit {name}",
@@ -13979,6 +14280,13 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Staff.title": {
+    "source": "Staff",
+    "context": "Heading of the kiosk's staff menu, which a team member reaches by holding the Clear button. Same word as the Staff · prefix on the kiosk's door buttons.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Search.searchEveryone": {
     "source": "Search everyone",
     "es-MX": "machine",
@@ -14304,6 +14612,20 @@
   "Chooser.waiting": {
     "source": "{count, plural, one {1 check-in} other {# check-ins}} not sent yet — keep it plugged in and on Wi-Fi.",
     "context": "The same line as Chooser.waitingFrom, when the waiting check-ins come from more than one gathering (or one whose name is not known).",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.today": {
+    "source": "Today",
+    "context": "The day part of a gathering's line in the kiosk's gathering chooser, before its time range, for a gathering on today's date.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Chooser.extraDate": {
+    "source": "Extra date",
+    "context": "Kiosk event chooser (staff binding a lobby tablet): marks an extra date beside its hours. Short.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"
@@ -15354,6 +15676,34 @@
     "zh-Hans": "machine",
     "zh-Hant": "machine"
   },
+  "Printer.show": {
+    "source": "Show",
+    "context": "Toggle on the kiosk printer screen that unfolds the printer's event log, or the tablet printer setting. Reads Hide while it is open.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.hide": {
+    "source": "Hide",
+    "context": "The same toggle as Show, while the printer's event log or the tablet printer setting is unfolded.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.copy": {
+    "source": "Copy",
+    "context": "Button on the kiosk printer screen that copies the printer's event log, or the tablet printer setting, to the clipboard to send to somebody.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
+  "Printer.copied": {
+    "source": "Copied",
+    "context": "The Copy button for a moment after it has copied.",
+    "es-MX": "machine",
+    "zh-Hans": "machine",
+    "zh-Hant": "machine"
+  },
   "Pairing.title": {
     "source": "Pair this kiosk",
     "es-MX": "machine",
@@ -15571,209 +15921,6 @@
   },
   "Birthday.keepingYear": {
     "source": "{date}, keeping {year}.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Common.change": {
-    "source": "Change",
-    "context": "Text on a disclosure button beside a setting's current value; pressing it opens the controls to change that setting, and it reads Done while they are open. On the event editor's kiosk colour and kiosk photo fields, and on the kiosk printer screen's model and roll fold.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Recurrence.unitWeeks": {
-    "source": "weeks",
-    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Recurrence.unitMonths": {
-    "source": "months",
-    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Recurrence.unitYears": {
-    "source": "years",
-    "context": "An option in the unit dropdown of the custom repeat panel, after 'Repeat every [number]'. Lower case and plural in English because it continues the sentence.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Recurrence.thenPreview": {
-    "source": "{count, plural, =1 {Then {first}} =2 {Then {first}, {second}} other {Then {first}, {second}, {third}…}}",
-    "context": "Under the repeat settings in the event editor: the next one, two or three dates the rule produces after the first gathering, as short dates. With three, the trailing … says the list goes on. {first}, {second} and {third} are already-formatted dates.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskTheme.ground": {
-    "source": "Ground",
-    "context": "Legend over two buttons, Dark and Light, that choose whether the lobby kiosk's screen has a dark or a light background while it shows this gathering.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.choosePhoto": {
-    "source": "Choose a photo",
-    "context": "Button that opens the device's file picker to pick a photo for the lobby kiosk's idle screen, when the gathering has none yet.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.replacePhoto": {
-    "source": "Replace the photo",
-    "context": "The same button as Choose a photo, when the gathering already has a kiosk photo: picking one replaces it.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.readingPhoto": {
-    "source": "Reading the photo…",
-    "context": "The photo button's text while a picked photo is being read and resized, before it can be saved.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "KioskBackdrop.resizedTo": {
-    "source": "Resized to {detail}",
-    "context": "Beside the photo button once a new photo is picked. {detail} is its new size, for example '1920 px · 240 KB' — the photo was made smaller so the kiosk loads it quickly.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Events.chainCount": {
-    "source": "{count, plural, one {# gathering} other {# gatherings}}",
-    "context": "Count at the right of a gathering's heading on the events calendar, for a gathering the reader is not on: how many of its nights are listed beneath the heading.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Events.showLater": {
-    "source": "{count, plural, one {Show # later gathering} other {Show # later gatherings}}",
-    "context": "Button at the foot of the Later band on the events calendar. Gatherings more than about two months out are folded away; this unfolds them.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Grid.reading": {
-    "source": "Reading {count, plural, one {# gathering} other {# gatherings}}…",
-    "context": "Status line in the attendance grid dialog while the registers of the chosen gatherings are being read.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Grid.shape": {
-    "source": "<n>{gatherings}</n> {gatherings, plural, one {gathering} other {gatherings}} × <n>{students}</n> {students, plural, one {student} other {students}}.",
-    "context": "The size of the attendance grid about to be downloaded: gatherings across, students down. <n> marks the two numbers, which are drawn brighter than the words.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Rsvp.addCount": {
-    "source": "{count, plural, =0 {Add students} one {Add # student} other {Add # students}}",
-    "context": "The commit button of the sheet that adds students to a one-off's RSVP list, counting the students ticked. Disabled at zero.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.summary": {
-    "source": "{days, plural, one {# day} other {# days}} · peak {peak} · average {average}",
-    "context": "Footer under the attendance trend bar chart: how many days the chart covers, the highest head count among them, and the average head count.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.barTitle": {
-    "source": "{title} · {date}: {count}",
-    "context": "Hover text on one bar of the attendance trend: the gathering's name, the date, and how many were checked in.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.barTitleAcross": {
-    "source": "{title} · {date}: {count} across {gatherings, plural, one {# gathering} other {# gatherings}}",
-    "context": "Hover text on one bar of the attendance trend when several gatherings met that day and the bar adds them up: the first gathering's name, the date, the combined head count, and how many gatherings it covers.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.columnGathering": {
-    "source": "Gathering",
-    "context": "Column heading in the screen-reader table behind the attendance trend chart.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.columnDate": {
-    "source": "Date",
-    "context": "Column heading in the screen-reader table behind the attendance trend chart.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Trend.columnPresent": {
-    "source": "Present",
-    "context": "Column heading in the screen-reader table behind the attendance trend chart: how many were checked in.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "RowBadge.openProfile": {
-    "source": "Open {name}'s profile",
-    "context": "Link at the foot of the panel a roster badge opens, to the student's full profile. {name} is the student's first name.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "RowBadge.reading": {
-    "source": "Reading {backend}…",
-    "context": "Status line while a roster badge's panel waits for the student's details from the church database. {backend} is its name, for example Planning Center.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Chooser.today": {
-    "source": "Today",
-    "context": "The day part of a gathering's line in the kiosk's gathering chooser, before its time range, for a gathering on today's date.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.show": {
-    "source": "Show",
-    "context": "Toggle on the kiosk printer screen that unfolds the printer's event log, or the tablet printer setting. Reads Hide while it is open.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.hide": {
-    "source": "Hide",
-    "context": "The same toggle as Show, while the printer's event log or the tablet printer setting is unfolded.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.copy": {
-    "source": "Copy",
-    "context": "Button on the kiosk printer screen that copies the printer's event log, or the tablet printer setting, to the clipboard to send to somebody.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Printer.copied": {
-    "source": "Copied",
-    "context": "The Copy button for a moment after it has copied.",
-    "es-MX": "machine",
-    "zh-Hans": "machine",
-    "zh-Hant": "machine"
-  },
-  "Staff.title": {
-    "source": "Staff",
-    "context": "Heading of the kiosk's staff menu, which a team member reaches by holding the Clear button. Same word as the Staff · prefix on the kiosk's door buttons.",
     "es-MX": "machine",
     "zh-Hans": "machine",
     "zh-Hant": "machine"

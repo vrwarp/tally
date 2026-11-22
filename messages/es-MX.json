@@ -483,7 +483,10 @@
     "barTitleAcross": "{title} · {date}: {count} en {gatherings, plural, one {# reunión} other {# reuniones}}",
     "columnGathering": "Reunión",
     "columnDate": "Fecha",
-    "columnPresent": "Presentes"
+    "columnPresent": "Presentes",
+    "barTitleExtra": "{title} · {date}: {count} (fecha extra)",
+    "summaryWithExtras": "{days, plural, one {# día} other {# días}} · máximo {peak} · promedio {average}, sin contar {extras, plural, one {# fecha extra} other {# fechas extra}}",
+    "rowTitleExtra": "{title} (fecha extra)"
   },
   "Ledger": {
     "summaryHere": "Ya no se espera a {count} aquí · la más reciente, {date}",
@@ -1135,7 +1138,15 @@
     "windowOpens": "Abre",
     "windowCloses": "Cierra",
     "windowDated": "{date}, {time}",
-    "windowUnknown": "—"
+    "windowUnknown": "—",
+    "titleNewExtra": "Agregar una fecha extra",
+    "titleEditExtra": "Editar fecha extra",
+    "hintExtra": "Una fecha más de esta reunión. Cuenta para los de siempre y para el historial de la reunión, y no cambia el calendario.",
+    "addExtraDate": "Agregar fecha extra",
+    "extraDateNote": "Solo esta fecha. El calendario de la reunión se queda igual.",
+    "extrasUnchanged": "{count, plural, one {No cambia la fecha extra del {dates}.} other {No cambia las # fechas extra: {dates}.}}",
+    "extraSuggestion": "¿Es una fecha de {gathering}? Agrégala como fecha extra para que cuente en {gathering}.",
+    "extraSuggestionAction": "Hacerla fecha extra"
   },
   "LabelTemplate": {
     "enable": "Imprimir etiqueta al registrar",
@@ -1327,7 +1338,9 @@
     "kioskLate": "{count, plural, one {1 registro} other {# registros}} {named, select, yes {de {kiosk}} other {del kiosco del vestíbulo}} {count, plural, one {llegó tarde} other {llegaron tarde}} — todo en Tally desde {when}.",
     "kioskLateSending": "{count, plural, one {1 registro tardío} other {# registros tardíos}} {named, select, yes {de {kiosk}} other {del kiosco del vestíbulo}} hasta ahora; faltan más.",
     "kioskParked": "{count, plural, one {1 registro del kiosco necesita} other {# registros del kiosco necesitan}} una decisión.",
-    "kioskParkedLink": "Abrir «Por revisar»"
+    "kioskParkedLink": "Abrir «Por revisar»",
+    "badgeExtraDate": "Fecha extra",
+    "addExtraDate": "＋ Agregar una fecha extra"
   },
   "DangerZone": {
     "heading": "Zona de peligro",
@@ -1359,7 +1372,9 @@
     "datesAheadGo": "Las fechas futuras programadas de {title} también se van a quitar del calendario.",
     "cannotBeUndone": "Esto no se puede deshacer.",
     "deleteEmptyAsk": "¿Eliminar “{title}” para siempre? Cancelar la deja en el calendario y se puede deshacer.",
-    "repeatsNote": "Esta reunión se repite. Terminarla quita todas las {title} — las noches que ya se registraron, sus entradas y las fechas a las que el calendario aún no llega."
+    "repeatsNote": "Esta reunión se repite. Terminarla quita todas las {title} — las noches que ya se registraron, sus entradas y las fechas a las que el calendario aún no llega.",
+    "repeatsNoteExtra": "Esta es una fecha extra de {title}. Terminar {title} la quita junto con todas las demás noches — las que ya se registraron, sus entradas y las fechas a las que el calendario aún no llega.",
+    "deleteChainNamed": "Eliminar todas las reuniones de {title}"
   },
   "Import": {
     "titleMulti": "Importar historial",
@@ -1481,7 +1496,8 @@
     "limitedTag": "🔐 {count, number}",
     "limitedTagLabel": "Limitada a {count, plural, one {# persona} other {# personas}} — todos los demás la ven bloqueada",
     "chainCount": "{count, plural, one {# reunión} other {# reuniones}}",
-    "showLater": "{count, plural, one {Mostrar # reunión posterior} other {Mostrar # reuniones posteriores}}"
+    "showLater": "{count, plural, one {Mostrar # reunión posterior} other {Mostrar # reuniones posteriores}}",
+    "badgeExtraDate": "Fecha extra"
   },
   "EventIcons": {
     "event": "Evento",
@@ -1697,7 +1713,8 @@
     "checkInOpen": "Registro abierto",
     "rsvpOnly": "Solo confirmación",
     "cancelled": "Se canceló",
-    "checkOut": "Salida"
+    "checkOut": "Salida",
+    "extraDate": "Fecha extra"
   },
   "Grid": {
     "title": "Cuadro de asistencia",
@@ -1724,7 +1741,8 @@
     "emptyTitle": "Aún no ha pasado nada",
     "emptyBody": "Las reuniones aparecen aquí una vez que ya pasaron.",
     "loadOlder": "Cargar reuniones más antiguas",
-    "allLoaded": "Esas son todas las reuniones de las que Tally tiene registro."
+    "allLoaded": "Esas son todas las reuniones de las que Tally tiene registro.",
+    "whenExtra": "{day} · {window} · Fecha extra"
   },
   "SyncStrip": {
     "fieldFirstName": "nombre",
@@ -1962,7 +1980,9 @@
     "recordMissingBadge": "Falta en {backend}",
     "visitorBadge": "Visita",
     "inactiveBadge": "Fuera de la lista",
-    "attendanceDescription": "{count, plural, one {El último año, por reunión — # reunión terminada.} other {El último año, por reunión — # reuniones terminadas.}}"
+    "attendanceDescription": "{count, plural, one {El último año, por reunión — # reunión terminada.} other {El último año, por reunión — # reuniones terminadas.}}",
+    "attendanceExtra": "Extra",
+    "spokenExtra": "fecha extra, no se esperaba"
   },
   "AddStudent": {
     "titleMulti": "Agregar un estudiante",
@@ -2477,7 +2497,8 @@
     "nameTagsWontPrint": "las etiquetas no se imprimirán",
     "waitingFrom": "{count, plural, one {1 registro} other {# registros}} de {gathering} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
     "waiting": "{count, plural, one {1 registro} other {# registros}} sin enviar — mantenla conectada a la corriente y al Wi-Fi.",
-    "today": "Hoy"
+    "today": "Hoy",
+    "extraDate": "Fecha extra"
   },
   "Register": {
     "couldNotSave": "Tally no pudo terminar esto. Pruebe otra vez o busque a un líder.",

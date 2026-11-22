@@ -2293,3 +2293,90 @@ describe('the pre-marked exception on gathering rows', () => {
     expect(fridayRow!.notSeenAnywhereSince).toBeUndefined();
   });
 });
+
+describe('extra dates', () => {
+  /*
+   * A night added to a gathering by hand: the Saturday party, the Wednesday
+   * makeup. Asymmetric on purpose — turning up is being seen, staying home is
+   * nothing, because nobody was expected at it.
+   */
+  const settings = makeSettings({ miaConsecutiveMisses: 3, predictiveOfLastN: 3, predictiveMinAttended: 2 });
+  const events = fridays(6); // oldest first: -6 … -1
+
+  /** An extra date of the Friday chain, the day after `after`. */
+  const extraAfter = (after: TallyEvent, id = `extra-after-${after.id}`): TallyEvent =>
+    makeEvent({
+      id,
+      seriesId: FRIDAY,
+      extra: true,
+      startAt: new Date(after.startAt.getTime() + 86_400_000),
+      endAt: new Date(after.endAt.getTime() + 86_400_000),
+    });
+
+  it('is not a miss for a regular who stayed home', () => {
+    const student = makeStudent({ id: 'regular', createdAt: LONG_AGO });
+    // A regular for three Fridays, then missed two — and three parties between.
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(events[2]!, [student.id]),
+      held(events[3]!),
+      held(extraAfter(events[3]!)),
+      held(events[4]!),
+      held(extraAfter(events[4]!)),
+      held(extraAfter(events[2]!)),
+    ];
+
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+    const [gathering] = groupByGathering(snapshots);
+    expect(standingIn(gathering!, student, settings).consecutiveMisses).toBe(2);
+  });
+
+  it('ends a streak for a student who came to it', () => {
+    const student = makeStudent({ id: 'party-goer', createdAt: LONG_AGO });
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(events[2]!),
+      held(events[3]!),
+      held(events[4]!),
+      // Missed three Fridays — but came to the party after the last of them.
+      held(extraAfter(events[4]!), [student.id]),
+    ];
+
+    expect(computeMia([student], snapshots, settings)).toEqual([]);
+  });
+
+  it('keeps a drifting regular on the list when their last visit was a party', () => {
+    // The trap: the window as of their last visit is looked up by that visit,
+    // and the party is not one of the nights the window is made of.
+    const student = makeStudent({ id: 'drifter', createdAt: LONG_AGO });
+    const snapshots = [
+      held(events[0]!, [student.id]),
+      held(events[1]!, [student.id]),
+      held(extraAfter(events[1]!), [student.id]),
+      held(events[2]!),
+      held(events[3]!),
+      held(events[4]!),
+    ];
+
+    const mia = computeMia([student], snapshots, settings);
+    expect(studentIds(mia)).toEqual(['drifter']);
+    expect(mia[0]!.consecutiveMisses).toBe(3);
+  });
+
+  it('is drawn on the trend but marked, so the average can leave it out', () => {
+    const snapshots = [held(events[4]!, ['a']), held(extraAfter(events[4]!), ['a', 'b', 'c', 'd'])];
+
+    const points = computeAttendanceTrend(snapshots, { gatheringKey: FRIDAY });
+
+    expect(points.map((point) => point.extra)).toEqual([false, true]);
+  });
+
+  it('is a night of its gathering, not a one-off', () => {
+    const snapshots = [held(events[4]!), held(extraAfter(events[4]!))];
+
+    expect(groupByGathering(snapshots).map((gathering) => gathering.key)).toEqual([FRIDAY]);
+    expect(computeOneOffRecaps(snapshots)).toEqual([]);
+  });
+});

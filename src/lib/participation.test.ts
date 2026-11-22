@@ -263,3 +263,33 @@ describe('buildChainScopes', () => {
     });
   });
 });
+
+describe('extra dates', () => {
+  // A party a regular skipped must not push a real Friday out of their
+  // "2 of the last 3" — and turning up to one still means they belong.
+  it('never take a slot of the Recent window', () => {
+    const scopes = buildChainScopes(
+      [
+        instance('fri', 21, ['regular']),
+        instance('fri', 14, ['regular']),
+        { ...instance('fri', 10, ['guest']), extra: true },
+        { ...instance('fri', 9, ['guest']), extra: true },
+        instance('fri', 7, ['other']),
+      ],
+      RULE,
+      NOW,
+    );
+
+    expect(scopes.get('fri')?.recent).toEqual(['regular']);
+  });
+
+  it('still count as belonging', () => {
+    const scopes = buildChainScopes(
+      [instance('fri', 7, ['regular']), { ...instance('fri', 6, ['guest']), extra: true }],
+      RULE,
+      NOW,
+    );
+
+    expect(scopes.get('fri')?.participated).toEqual(['guest', 'regular']);
+  });
+});

@@ -831,6 +831,22 @@ export interface TallyEventDoc {
    * readable key and wins; this covers everything else.
    */
   recurrenceRootId: string | null;
+  /**
+   * A night added to a chain by hand rather than produced by its rule — the
+   * Saturday Christmas party of a Friday gathering, the Wednesday makeup after a
+   * snowed-out week.
+   *
+   * Always `mode: 'recurring'` with `recurrence: null` and the chain's own
+   * `seriesId` / `recurrenceRootId`, which the rules pin. So it belongs to the
+   * chain — its access list, its history, its labels — without ever being a
+   * night the projection can take its shape from. Absent reads as false, which
+   * is every document written before this existed.
+   *
+   * Every rule about extra dates keys on this flag and never on "has no
+   * recurrence": an old recurring document can carry a null rule and is an
+   * ordinary night of its chain.
+   */
+  extra?: boolean;
   startAt: Timestamp;
   endAt: Timestamp;
   /**

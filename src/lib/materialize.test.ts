@@ -696,3 +696,77 @@ describe('findProjectedOccurrence', () => {
     ).toBeNull();
   });
 });
+
+describe('extra dates', () => {
+  /*
+   * A night added to a chain by hand. The stakes are the whole calendar ahead:
+   * the template is the chain's newest live night, so an extra adopted as one
+   * would reshape every occurrence after it.
+   */
+  function party(overrides: Partial<TallyEvent> = {}): TallyEvent {
+    // Saturday 1 Aug 2026, 14:00–17:00 — a different day *and* a different
+    // shape from the Fridays, so either leaking into the projection shows.
+    const startAt = new Date(2026, 7, 1, 14, 0);
+    const endAt = new Date(2026, 7, 1, 17, 0);
+    return friday({
+      id: 'extra-party',
+      extra: true,
+      recurrence: null,
+      startAt,
+      endAt,
+      checkInOpensAt: new Date(2026, 7, 1, 13, 30),
+      checkInClosesAt: new Date(2026, 7, 1, 17, 30),
+      ...overrides,
+    });
+  }
+
+  it('never becomes the template, so the Fridays keep their day and their hours', () => {
+    const projected = projectOccurrences([friday(), party()], FRIDAY);
+
+    expect(projected.length).toBeGreaterThan(0);
+    for (const occurrence of projected) {
+      expect(occurrence.startAt.getDay()).toBe(5);
+      expect(occurrence.startAt.getHours()).toBe(19);
+      expect(occurrence.source.id).toBe('friday-fellowship-2026-07-24');
+    }
+  });
+
+  it('stays out of the template even when somebody left a rule on it', () => {
+    // The converter and the rules both strip it; this is the second lock.
+    const projected = projectOccurrences([friday(), party({ recurrence: WEEKLY })], FRIDAY);
+
+    expect(projected.every((occurrence) => occurrence.startAt.getDay() === 5)).toBe(true);
+  });
+
+  it('does not hide a rule night on the same day', () => {
+    // "As well as": a 16:00 extra on the Friday the rule already lands on.
+    const alongside = party({
+      startAt: new Date(2026, 6, 31, 16, 0),
+      endAt: new Date(2026, 6, 31, 18, 0),
+      checkInOpensAt: new Date(2026, 6, 31, 15, 0),
+      checkInClosesAt: new Date(2026, 6, 31, 18, 30),
+    });
+
+    expect(ids(projectOccurrences([friday(), alongside], FRIDAY))).toContain(
+      'friday-fellowship-2026-07-31',
+    );
+  });
+
+  it('decides nothing about any other night, added, moved, cancelled or removed', () => {
+    const baseline = projectOccurrences([friday()], FRIDAY);
+    const variants = [
+      [friday(), party()],
+      [friday(), party({ startAt: new Date(2026, 7, 12, 10, 0), endAt: new Date(2026, 7, 12, 12, 0) })],
+      [friday(), party({ status: 'cancelled' })],
+      [friday(), party(), party({ id: 'extra-two', startAt: new Date(2026, 7, 20, 18, 0) })],
+    ];
+
+    for (const events of variants) {
+      expect(projectOccurrences(events, FRIDAY)).toEqual(baseline);
+    }
+  });
+
+  it('is never projected itself', () => {
+    expect(projectOccurrences([party()], FRIDAY)).toEqual([]);
+  });
+});

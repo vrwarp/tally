@@ -708,6 +708,25 @@ service cloud.firestore {
         return v == null || (v is string && v.matches('^b[0-9a-f]{16,64}$'));
       }
 
+      /**
+       * An extra date — a night added to a chain by hand — never carries a
+       * rule, and always names the chain it was added to.
+       *
+       * Both halves matter for the same reason. The projection takes a chain's
+       * shape from its newest live night that has a rule, so an extra carrying
+       * one would become the template: a 2–5pm Saturday party would turn every
+       * Friday after it into a 2–5pm Saturday. And an extra with no chain link
+       * is a one-off that says it is not one, keyed on its own id, outside the
+       * access list of the gathering it claims to belong to.
+       */
+      function validExtra(d) {
+        return d.get('extra', false) == false
+          || (d.extra == true
+              && d.mode == 'recurring'
+              && d.get('recurrence', null) == null
+              && (d.get('seriesId', null) != null || d.get('recurrenceRootId', null) != null));
+      }
+
       function validEvent() {
         let d = request.resource.data;
         let recurrence = d.get('recurrence', null);
@@ -724,7 +743,8 @@ service cloud.firestore {
           && validKioskBackdropId(d.get('kioskBackdropId', null))
           && validChainRef(d.get('seriesId', null))
           && validChainRef(d.get('recurrenceRootId', null))
-          && validChainRef(d.get('predictFromChain', null));
+          && validChainRef(d.get('predictFromChain', null))
+          && validExtra(d);
       }
 
       allow get, list: if isActive();

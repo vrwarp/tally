@@ -395,3 +395,90 @@ describe('EventEditorModal: the chain an edit belongs to', () => {
     });
   });
 });
+
+/*
+ * Extra dates. The one assertion that matters most is the one about the rule:
+ * an extra date that saved a rule would be the chain's newest live night, and
+ * so the template every later Friday is projected from.
+ */
+describe('EventEditorModal: an extra date', () => {
+  const extraDefaults: Partial<EventDraft> = {
+    extra: true,
+    mode: 'recurring',
+    recurrence: null,
+    seriesId: FRIDAY,
+    recurrenceRootId: null,
+    title: 'Friday Fellowship',
+    startAt: new Date(2026, 1, 14, 14, 0),
+    endAt: new Date(2026, 1, 14, 17, 0),
+    checkInOpensAt: new Date(2026, 1, 14, 13, 0),
+    checkInClosesAt: new Date(2026, 1, 14, 18, 0),
+  };
+
+  it('asks no question about repeating', () => {
+    show(null, extraDefaults);
+
+    expect(screen.getByRole('dialog', { name: 'Add an extra date' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+    expect(screen.queryByText('Repeats')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Starts/)).toBeInTheDocument();
+  });
+
+  it('saves into the chain it was opened from, with no rule', async () => {
+    const user = userEvent.setup();
+    show(null, extraDefaults);
+
+    await user.click(screen.getByRole('button', { name: 'Add extra date' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent.mock.calls.at(-1)![0]).toMatchObject({
+      extra: true,
+      mode: 'recurring',
+      recurrence: null,
+      seriesId: FRIDAY,
+    });
+  });
+
+  it('never fills in a rule when an existing extra date is edited', async () => {
+    // The trap the critique found: the editor fills a missing rule with
+    // "weekly on its own day", and a save used to write it.
+    const user = userEvent.setup();
+    const party = makeEvent({
+      id: 'party',
+      seriesId: FRIDAY,
+      extra: true,
+      recurrence: null,
+      startAt: new Date(2026, 1, 14, 14, 0),
+      endAt: new Date(2026, 1, 14, 17, 0),
+    });
+    show(party);
+
+    expect(screen.getByRole('dialog', { name: 'Edit extra date' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(updateEvent).toHaveBeenCalled());
+    expect(updateEvent.mock.calls.at(-1)![1]).toMatchObject({ extra: true, recurrence: null });
+  });
+
+  it('points a one-off that names a gathering at an extra date instead', async () => {
+    const user = userEvent.setup();
+    show();
+
+    await user.selectOptions(typeSelect('Type'), 'oneoff');
+    await user.type(screen.getByLabelText(/^Title/), 'Friday Fellowship Christmas Party');
+    await user.click(screen.getByRole('button', { name: 'Make it an extra date' }));
+
+    expect(screen.queryByLabelText('Type')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add extra date' }));
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalled());
+    expect(createEvent.mock.calls.at(-1)![0]).toMatchObject({
+      title: 'Friday Fellowship Christmas Party',
+      extra: true,
+      mode: 'recurring',
+      recurrence: null,
+      seriesId: FRIDAY,
+      requiresRsvp: false,
+    });
+  });
+});

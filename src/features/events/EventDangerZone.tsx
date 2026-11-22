@@ -389,11 +389,17 @@ export function EventDangerZone({ event, checkedIn, onDeleted }: EventDangerZone
           */}
           {event.mode === 'recurring' ? (
             <div className="mt-2 flex flex-col gap-2 border-t border-ink-800 pt-4">
+              {/* On an extra date the chain action is named, not "this repeat":
+                  the reader is looking at one night that does not repeat, and the
+                  button below the single-night delete must not read as another
+                  way of removing it. */}
               <p className="text-sm text-ink-400">
-                {t('repeatsNote', { title: event.title })}
+                {event.extra
+                  ? t('repeatsNoteExtra', { title: event.title })
+                  : t('repeatsNote', { title: event.title })}
               </p>
               <Button variant="secondary" onClick={() => setConfirming('chain')}>
-                {t('deleteChain')}
+                {event.extra ? t('deleteChainNamed', { title: event.title }) : t('deleteChain')}
               </Button>
             </div>
           ) : null}

@@ -114,6 +114,9 @@ export function makeEvent(overrides: Partial<TallyEvent> = {}): TallyEvent {
     // A fixture stands in for a document unless a test is specifically about
     // the projected half of the calendar.
     materialized: pick(overrides, 'materialized', true),
+    // Only when asked for: absent is what every document written before extra
+    // dates existed reads as, and what most fixtures stand in for.
+    ...('extra' in overrides ? { extra: overrides.extra } : {}),
   };
 }
 
